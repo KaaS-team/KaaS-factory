@@ -1,5 +1,0 @@
-id: no-todo
-valid:
-  - // done
-invalid:
-  - // TODO fix

@@ -1,8 +1,0 @@
-# Use for a reported bug with a way to reproduce it: write the failing test first, fix it, and
-# have a fresh session confirm the test fails without the fix.
-name: bugfix
-steps:
-  triage: { uses: triage, label: "factory:triaging", next: build, tier: small, budget: 150000 }
-  build: { uses: build, label: "factory:building", next: verify, tier: large, budget: 600000, skills: [factory-build] }
-  verify: { uses: verify, label: "factory:verifying", next: pr, reject: build, tier: large, budget: 300000, skills: [factory-verify] }
-  pr: { uses: pr, label: "factory:in-review", revise: build, tier: small, budget: 100000, skills: [factory-pr] }

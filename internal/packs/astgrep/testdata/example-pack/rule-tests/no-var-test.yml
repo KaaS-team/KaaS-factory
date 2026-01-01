@@ -1,5 +1,0 @@
-id: no-var
-valid:
-  - const a = 1
-invalid:
-  - var a = 1

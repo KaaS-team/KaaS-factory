@@ -1,7 +1,0 @@
-Print the spans a run recorded, gate spans with their triggered flag
-
-Usage:
-  eval replay <run.trace.jsonl> [flags]
-
-Flags:
-  -h, --help   help for replay

@@ -1,8 +1,0 @@
-id: no-var
-language: TypeScript
-severity: warning
-message: Use let or const.
-note: var is function scoped.
-rule:
-  pattern: var $NAME = $VALUE
-fix: let $NAME = $VALUE

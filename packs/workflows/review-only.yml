@@ -1,7 +1,0 @@
-# Use to get a review of a pull request or branch with no code change: findings go on the
-# thread and no PR opens.
-name: review-only
-steps:
-  triage: { uses: triage, label: "factory:triaging", next: review, tier: small, budget: 150000 }
-  review: { uses: agent, label: "factory:reviewing", next: report, tier: large, budget: 400000, skills: [factory-verify] }
-  report: { uses: report, label: "factory:reporting", tier: small, budget: 100000, skills: [factory-comment] }

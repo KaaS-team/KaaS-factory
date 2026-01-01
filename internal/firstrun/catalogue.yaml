@@ -1,9 +1,0 @@
-# Data for factory first-run. Each finding's pack and effort come from the auditor itself.
-auditor:
-  binary: auditor
-  install: "cargo install --git https://github.com/KaaS-team/auditor"
-# Prior estimates by size, used until eval history replaces them.
-priors:
-  S: {tokens: 150000, minutes: 10}
-  M: {tokens: 600000, minutes: 35}
-  L: {tokens: 2000000, minutes: 120}
