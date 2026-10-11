@@ -44,7 +44,7 @@ import { defaultWorkflow } from "./engine/workflows";
 
 import { fireCron, fireEvent } from "./engine/triggers";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
-import type { CloudEvent } from "./core/event";
+import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
 import { TRUSTED_ROLES, type RepoRole } from "./ports/scm";
@@ -502,7 +502,9 @@ export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const inFlight = new Set<number>();
   let seenDelivery = deps.state.latestDelivery();
-  const unsubscribe = deps.bus?.subscribe("*", (e) => handleEvent(deps, config, e).then((filed) => void (filed > 0 && tick())));
+  // Another app's event only wakes the poll, which then applies every normal check (readyIsTrusted,
+  // intake, caps). Nothing reads an issue or an actor out of event data.
+  const unsubscribe = deps.bus?.subscribe("*", (e) => handleEvent(deps, config, e).then((filed) => void ((filed > 0 || isExternalEventType(e.type)) && tick())));
 
   function tick(): void {
     if (stopped) return;

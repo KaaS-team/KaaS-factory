@@ -70,7 +70,9 @@ The dashboard serves it. It is off (404) until the variable `events.inboundSecre
 acknowledged (200) and not stored again. The route needs no dashboard token, as GitHub's webhook does
 not, so it can be reached from off the box.
 
-The watcher hands each stored event to the same subscribers as its own emits.
+The watcher hands each stored event to the same subscribers as its own emits, and the event wakes
+its poll. Nothing reads an issue number or an actor out of event data: whatever runs next passes the
+poll's own checks (who applied `factory:ready` and their role, paused intake, the spend caps).
 
 ## Workflows on an event
 

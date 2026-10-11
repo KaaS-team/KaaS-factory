@@ -8,7 +8,12 @@ import { join } from "node:path";
 import { mergeConfig } from "../src/config";
 import { LABEL } from "../src/labels";
 import { FactoryState } from "../src/state";
-import { advanceIssue } from "../src/watch";
+import { advanceIssue, startWatch } from "../src/watch";
+import { createDashboard } from "../dashboard/server";
+import { DEFAULT_EVENTS_SECRET_ENV } from "../src/config";
+import { EVENT_SIGNATURE_HEADER, signEvent } from "../src/core/event";
+import { EventBus } from "../src/engine/bus";
+import { parseWorkflowText } from "../src/engine/workflows";
 import { readCapped } from "../src/webhook";
 import { GitHub, type RepoRole } from "../src/github";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, MultiStageExecutor } from "./harness";
@@ -54,6 +59,48 @@ describe("intake trust", () => {
     expect(await run()).toBe("lost-claim");
     expect(git.claims).toBe(1);
     expect(lastComment(github)).not.toContain("was removed");
+  });
+});
+
+describe("a signed inbound event", () => {
+  test.each([true, false])("naming an issue an untrusted user labelled ready runs nothing: the event only wakes the poll, and the poll's trust gate refuses it (a workflow listens: %p)", async (listens) => {
+    const before = process.env[DEFAULT_EVENTS_SECRET_ENV];
+    process.env[DEFAULT_EVENTS_SECRET_ENV] = "in-secret";
+    try {
+      const { github, git } = setup("drive-by", "none");
+      const state = new FactoryState(":memory:");
+      const bus = new EventBus({ store: state, sinks: [], source: "factory/acme/widgets", autoDeliver: false, log: () => {} });
+      // Empty: any stage that started would throw "no executor registered".
+      const executor = new MultiStageExecutor();
+      // A workflow listening for the type, so the event takes every path it can.
+      const wf = parseWorkflowText("name: tasks\non:\n  event: tasks.task.ready\nsteps:\n  triage:\n    uses: triage\n    label: factory:triaging\n    next: pr\n  pr:\n    uses: pr\n    label: factory:in-review\n");
+      if (!wf.ok) throw new Error(wf.problems.join("\n"));
+      const [cloneDir, workspacesDir] = [mkdtempSync(join(tmpdir(), "trust-ev-")), mkdtempSync(join(tmpdir(), "trust-ev-ws-"))];
+      dirs.push(cloneDir, workspacesDir);
+      const deps = { github, git, state, bus, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, ...(listens ? { routeWorkflows: { task: wf.workflow } } : {}) };
+      // The sender is genuine; its data names issue 1 and a maintainer as the actor.
+      const body = JSON.stringify({ specversion: "1.0", id: "t-1", source: "tasks", type: "tasks.task.ready", time: "2026-10-11T00:00:00Z", data: { issue: 1, repo: "acme/widgets", actor: "maintainer", labeledBy: "maintainer" } });
+      const res = await createDashboard(state, github, "acme/widgets", false, "/nonexistent").handle(
+        new Request("http://factory.example/events", { method: "POST", headers: { "content-type": "application/cloudevents+json", [EVENT_SIGNATURE_HEADER]: signEvent("in-secret", body) }, body }),
+        "203.0.113.7",
+      );
+      expect(res.status).toBe(201);
+      const ticks: unknown[] = [];
+      const stop = startWatch(deps as never, mergeConfig({ repo: "acme/widgets", pollIntervalSeconds: 3600 }), (r) => void ticks.push(r));
+      bus.drainInbound();
+      for (let i = 0; i < 100 && ticks.length < 2; i++) await Bun.sleep(10);
+      stop();
+      expect(ticks.length).toBeGreaterThanOrEqual(2);
+      // Issue 1 was refused by the label path's own gate; the event's issue is filed unlabelled.
+      expect(labels(github)).not.toContain(LABEL.ready);
+      expect(lastComment(github)).toContain("@drive-by has the none role");
+      expect(git.claims).toBe(0);
+      const filed = [...github.issues.values()].filter((i) => i.number !== 1);
+      expect(filed.map((i) => i.labels.map((l) => l.name))).toEqual(listens ? [[]] : []);
+    } finally {
+      if (before === undefined) delete process.env[DEFAULT_EVENTS_SECRET_ENV];
+      else process.env[DEFAULT_EVENTS_SECRET_ENV] = before;
+    }
   });
 });
 
