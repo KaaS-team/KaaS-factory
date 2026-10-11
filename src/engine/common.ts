@@ -28,6 +28,7 @@ import type { Workflow } from "../core/workflow";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
 import { FactoryState, type RetroTrigger, type Stage } from "../state";
 import { LABEL, issueType } from "../labels";
+import { emitEvent, type EventBus } from "./bus";
 import type { MachineConfig, MachineLeases, MachineSpend } from "../machine";
 
 export type { Stage };
@@ -85,6 +86,8 @@ export interface WatchDeps {
   readonly routeWorkflows?: Readonly<Record<string, Workflow>>;
   // The clock cron triggers read; absent means the real one.
   readonly now?: () => Date;
+  // The v4 event bus (src/engine/bus.ts); absent means nothing is emitted.
+  readonly bus?: EventBus;
 }
 
 // Thrown by runStage when an operator stopped the agent to take it over;
@@ -409,6 +412,8 @@ export async function runQueuedRetros(deps: WatchDeps, config: FactoryConfig): P
   for (const row of deps.state.listQueuedRetros(config.repo)) {
     try {
       const issue = await deps.github.getIssue(config.repo, row.issue);
+      // The dashboard's merge route queues "merged" after the operator merged the PR.
+      if (row.outcome === "merged") emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: row.issue, by: "operator" }, `issue/${row.issue}`);
       await runRetro(deps, config, issue, row.outcome, row.id);
     } catch (err) {
       console.error(`queued retro failed for #${row.issue}:`, err);

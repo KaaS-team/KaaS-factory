@@ -43,6 +43,7 @@ import { STEP_TYPES } from "./engine/steps";
 import { defaultWorkflow } from "./engine/workflows";
 
 import { fireCron } from "./engine/triggers";
+import { emitEvent } from "./engine/bus";
 import { TRUSTED_ROLES, type RepoRole } from "./ports/scm";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
@@ -158,6 +159,7 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.ready))) return "needs-human";
   issue = await chooseWorkflow(deps, config, issue);
+  emitEvent(deps.bus, "factory.issue.ready", { repo: config.repo, issue: issue.number, title: issue.title, workflow: workflowOf(deps, issue).name }, `issue/${issue.number}`);
   const start = workflowOf(deps, issue).start;
   await deps.github.setStateLabel(config.repo, issue.number, [LABEL.ready], labelOf(deps, issue, start));
   return runFromStage(deps, config, issue, start, worktree);
@@ -302,7 +304,10 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     const marker = mergePolicyMarker(decision.headSha);
     if (!issue.comments.some((c) => c.body.includes(marker))) await postComment(deps, config, issueNumber, renderAuditComment(decision));
     const merged = await attemptMerge(deps.github, config.repo, pr.number, decision);
-    if (merged) await runRetro(deps, config, issue, "merged");
+    if (merged) {
+      emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: issueNumber, pr: pr.number, by: "factory" }, `issue/${issueNumber}`);
+      await runRetro(deps, config, issue, "merged");
+    }
   } catch (err) {
     console.error(`merge-policy check failed for #${issue.number}:`, err);
   }

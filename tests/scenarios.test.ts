@@ -15,6 +15,7 @@ import { LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { EPOCH, startOfTodayUtc } from "../src/engine/common";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
+import { EventBus } from "../src/engine/bus";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeLeases, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const seen = new Set<string>();
@@ -102,6 +103,37 @@ describe("approval paths", () => {
     expect(c.github.readyCalls).toEqual([["factory/issue-1", true]]);
     expect(c.github.prs[0]!.isDraft).toBe(false);
     expect(labels(c.github, 1)).toEqual([LABEL.inReview]);
+    done(c);
+  });
+
+  test("1b. a run emits issue.ready, each step's start and end, pr.opened and run.completed, in order", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "factory/acme/widgets", autoDeliver: false });
+    const heard: string[] = [];
+    bus.subscribe("*", (e) => void heard.push(e.type === "factory.step.started" || e.type === "factory.step.completed" ? `${e.type}:${(e.data as { step: string }).step}` : e.type));
+    Object.assign(c.deps, { bus });
+    happy(c);
+    expect(await c.step()).toBe("shipped");
+    const steps = ["triage", "plan", "build", "verify", "pr"];
+    expect(heard).toEqual([
+      "factory.issue.ready",
+      ...steps.flatMap((s) => [`factory.step.started:${s}`, ...(s === "pr" ? ["factory.pr.opened"] : []), `factory.step.completed:${s}`]),
+      "factory.run.completed",
+    ]);
+    done(c);
+  });
+
+  test("1c. a run that parks for approval emits issue.parked", async () => {
+    const c = setup([LABEL.ready]);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    const parked: unknown[] = [];
+    bus.subscribe("factory.issue.parked", (e) => void parked.push(e.data));
+    Object.assign(c.deps, { bus });
+    c.push("triage", triage({ risk: "medium" }));
+    c.push("plan", plan("medium"));
+    expect(await c.step()).toBe("awaiting-approval");
+    expect(parked).toEqual([{ repo: "acme/widgets", issue: 1, workflow: "feature-to-pr", step: "plan", outcome: "awaiting-approval" }]);
     done(c);
   });
 
