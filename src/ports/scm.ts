@@ -41,6 +41,7 @@ export interface GhPr {
   headRefName: string;
   isDraft: boolean;
   closingIssuesReferences?: { number: number }[];
+  isCrossRepository?: boolean;
 }
 
 export interface CiCheck {

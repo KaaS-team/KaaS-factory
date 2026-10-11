@@ -187,6 +187,8 @@ export class GitHub implements TrackerPort, CodeHostPort {
     return result.stdout.trim().split("\n").pop() ?? "";
   }
 
+  // A fork can name its branch factory/issue-N or write "Closes #N", so only PRs from this
+  // repository are the factory's. Every PR lookup by head or issue goes through here.
   async listPrs(repo: string, opts?: { state?: string }): Promise<GhPr[]> {
     const result = await this.exec([
       "pr",
@@ -196,11 +198,11 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--state",
       opts?.state ?? "open",
       "--json",
-      "number,url,state,headRefName,isDraft,closingIssuesReferences",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences,isCrossRepository",
       "--limit",
       "100",
     ]);
-    return JSON.parse(result.stdout || "[]");
+    return (JSON.parse(result.stdout || "[]") as GhPr[]).filter((p) => p.isCrossRepository !== true);
   }
 
   async getPr(repo: string, number: number): Promise<GhPr> {
