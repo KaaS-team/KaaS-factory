@@ -282,5 +282,7 @@
   {"name": "dashboard: a lease holder reaches the page unescaped", "file": "dashboard/project.ts", "find": "holder: plain(l.holder)", "replace": "holder: l.holder", "test": "tests/dashboard-routes.test.ts"},
   {"name": "dashboard: an expired lease shows as held", "file": "dashboard/project.ts", "find": "live: l.expiresAt > now", "replace": "live: true", "test": "tests/dashboard-routes.test.ts"},
   {"name": "dashboard: runtimes lose their used-by", "file": "dashboard/project.ts", "find": "usedBy: refs.filter((r) => r.name === name)", "replace": "usedBy: refs.filter(() => false)", "test": "tests/dashboard-routes.test.ts"},
-  {"name": "leases: held() swallows an unreadable remote", "file": "src/adapters/git-lease/lease.ts", "find": "if (ls.code !== 0) throw new Error(`git ls-remote: ${ls.stderr.trim() || `exit ${ls.code}`}`);", "replace": "if (ls.code !== 0) return [];", "test": "tests/adapters.test.ts"}
+  {"name": "leases: held() swallows an unreadable remote", "file": "src/adapters/git-lease/lease.ts", "find": "if (ls.code !== 0) throw new Error(`git ls-remote: ${ls.stderr.trim() || `exit ${ls.code}`}`);", "replace": "if (ls.code !== 0) return [];", "test": "tests/adapters.test.ts"},
+  {"name": "tracker: no bearer header", "file": "src/adapters/http-tracker.ts", "find": "authorization: `Bearer ${token}`, ", "replace": "", "test": "tests/tracker-contract.test.ts"},
+  {"name": "tracker: branch mode keeps Closes #n", "file": "src/adapters/scm-factory.ts", "find": "return text.replace(CLOSING, \"$1$2tracker issue $3\");", "replace": "return text;", "test": "tests/tracker-contract.test.ts"}
 ]

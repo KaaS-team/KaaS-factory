@@ -181,7 +181,7 @@ describe("install.sh scaffold", () => {
 });
 
 // `bin/factory install` wiring: fixDoctor itself is unit-tested directly
-// (tests/doctor.test.ts) since `cmdInstall` hardcodes `new GitHub()` with no
+// (tests/doctor.test.ts) since `cmdInstall` builds its ScmPort with `makeScm(config)`, no
 // seam to inject a fake for an in-process test. This proves the wiring
 // exists and is skipped on --dry-run, so a real install is never silently
 // missing the label-creation step it claims to run (plan v2.11.0 item A).
@@ -192,7 +192,7 @@ describe("factory install calls fixDoctor", () => {
   const cmdInstall = bin.slice(start, end);
 
   test("calls fixDoctor after a real install", () => {
-    expect(cmdInstall).toContain("await fixDoctor(new GitHub(), config.repo, config.routes, await workflowFor(resolve(target), config)");
+    expect(cmdInstall).toContain("await fixDoctor(makeScm(config), config.repo, config.routes, await workflowFor(resolve(target), config)");
   });
 
   test("returns before fixDoctor when --dry-run is set", () => {

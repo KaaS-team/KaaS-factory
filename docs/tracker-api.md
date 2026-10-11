@@ -10,17 +10,20 @@ the gate.
 - Base URL from config `tracker.url`; every route is under `/tracker/v1`.
 - Auth: `Authorization: Bearer <token>`, read from the env var named in `tracker.tokenEnv`. A token belongs
   to one workspace (tenant); a project from another workspace answers 404.
-- `{project}` is the factory's `repo` string (`owner/name`), URL-encoded. The tracker maps it to its own project.
+- `{project}` is config `tracker.project` if set, else the factory's `repo` string (`owner/name`), URL-encoded.
 - Issue numbers are per project and stable. Bodies are Markdown, kept byte for byte, because the factory
   stores state in hidden `<!-- factory:data ... -->` comments.
-- Errors: non-2xx with `{ "error": "<message>" }`. 404 for a missing issue or comment.
+- Errors: non-2xx with `{ "error": "<message>" }`. 404 for a missing issue or comment, and for a login
+  that is not a member (the factory reads that as role `none`).
+- Applying a label the project does not have creates it.
 
 ## Types
 
 ```ts
 Issue   = { number, title, body, labels: { name }[], state: "OPEN" | "CLOSED", stateReason: string | null,
-            comments: Comment[] }            // comments only on GET one issue; [] on lists
+            comments: Comment[] }            // on lists too: the runner reads them from the poll
 Comment = { id: number, author: string, authorAssociation: "OWNER" | "MEMBER" | "NONE", body, createdAt }
+// authorAssociation OWNER or MEMBER marks a trusted commenter, as on GitHub.
 Role    = "admin" | "maintain" | "write" | "triage" | "read" | "none"
 ```
 
@@ -41,8 +44,24 @@ Role    = "admin" | "maintain" | "write" | "triage" | "read" | "none"
 | `PUT /projects/{project}/labels/{name}` | `{ color, description }` | `{}` (idempotent) |
 | `GET /projects/{project}/members/{login}` | | `{ role: Role }` |
 
-Pull requests stay on the code host. When the tracker is not GitHub, the factory finds an issue's PR by its
-head branch (`factory/<n>-<slug>`) and posts the PR URL as a comment.
+`tests/tracker-contract.test.ts` holds this table, `TRACKER_ROUTES` in the adapter and the reference server
+(`tests/fixtures/tracker-server.ts`) to the same set.
+
+## Pull requests
+
+Pull requests stay on the code host (GitHub). When the tracker is not GitHub:
+
+- an issue's PR is the one on head branch `factory/issue-<n>`;
+- closing keywords in the PR title and body are rewritten (`Closes #4` becomes `Closes tracker issue 4`), so
+  they cannot close an unrelated GitHub issue;
+- the PR URL is posted on the tracker issue as `Pull request: <url>` with a `<!-- factory:pr-link v1 -->` marker;
+- when the factory merges the PR, it closes the tracker issue.
+
+## Label names
+
+The factory's label names (`factory:ready` and the rest) are what the API carries unless config `labels` maps
+them, for example `{ "factory:ready": "ready-for-ai" }`. The map is applied at the tracker boundary only:
+the factory sends the team's name and reads it back as its own.
 
 ## Events
 

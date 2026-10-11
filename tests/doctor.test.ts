@@ -266,7 +266,7 @@ describe("tmux check", () => {
 
 // Plan v2.11.0 item A: `factory install` calls this right after a real
 // install instead of leaving it to a separate `doctor --fix`. This is the
-// only place that exercises it: `bin/factory` hardcodes `new GitHub()` with
+// only place that exercises it: `bin/factory` builds its ScmPort with `makeScm(config)`,
 // no seam to inject a fake, so the wiring itself is a source check below.
 describe("fixDoctor", () => {
   test("ensures every labelsFor(routes) label, including a repo-added type", async () => {
