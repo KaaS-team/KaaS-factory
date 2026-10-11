@@ -13,7 +13,7 @@ These files run headless in other people's repos. `tests/skills.test.ts`,
   The body is under 90 lines, and names each file in the skill's references directory.
 - An agent never lists Edit, Write, MultiEdit or NotebookEdit, and carries `STAGE_GUIDANCE` verbatim.
 - Every inline `git`, `bun` or `make` command passes the stage shell rules, and every `git`, `bash`
-  or gates script (`template/.factory/gates.sh`) command in a stage skill is on that stage's allow-list.
+  or factory script (`template/.factory/gates.sh`, `template/.factory/mutate.sh`) command in a stage skill is on that stage's allow-list.
 - No em dash in a skill or agent.
 - `[enforced: <hook>]` names a file in `template/.claude/hooks/`, and every hook has a test that runs it.
 - Nothing points at one machine: no `/Users/`, `~/.claude` or `$HOME/.claude`.

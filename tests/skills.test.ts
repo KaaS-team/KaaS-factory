@@ -185,7 +185,7 @@ test("factory-verify drops a finding the diff did not introduce, as the reviewer
 describe("every inline shell command in the template passes the stage shell rules", () => {
   const root = join(import.meta.dir, "..", "template", ".claude");
   const HOOK = join(root, "hooks", "guard-paths.sh");
-  const COMMAND = /^(git|bun|make|npm|npx|pnpm|bash|cat|ls|grep|find|echo|head|tail|cd|\.factory\/gates\.sh)\b/;
+  const COMMAND = /^(git|bun|make|npm|npx|pnpm|bash|cat|ls|grep|find|echo|head|tail|cd|\.factory\/(?:gates|mutate)\.sh)\b/;
   const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"]).stdout.toString().trim().split("\n");
   const commands = new Map<string, string>();
   for (const file of files)

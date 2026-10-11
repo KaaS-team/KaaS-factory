@@ -124,7 +124,7 @@ while IFS= read -r -d '' file; do
     fi
     cp "$file" "$dest"
     case "$rel" in
-      .claude/hooks/*|.factory/gates.sh) chmod +x "$dest" ;;
+      .claude/hooks/*|.factory/gates.sh|.factory/mutate.sh) chmod +x "$dest" ;;
     esac
     echo "overwrote: $rel"
     wrote=$((wrote + 1))
@@ -139,7 +139,7 @@ while IFS= read -r -d '' file; do
   mkdir -p "$(dirname "$dest")"
   cp "$file" "$dest"
   case "$rel" in
-    .claude/hooks/*|.factory/gates.sh) chmod +x "$dest" ;;
+    .claude/hooks/*|.factory/gates.sh|.factory/mutate.sh) chmod +x "$dest" ;;
   esac
   echo "wrote: $rel"
   wrote=$((wrote + 1))

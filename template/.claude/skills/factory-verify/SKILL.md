@@ -33,6 +33,9 @@ The runner has run the revert check and the gate on this tree. Read
 - `no-tests`, `skipped`, `unavailable`, or no file: read
   `.claude/skills/factory-verify/references/prove.md` and prove it yourself.
 
+An AC like "removing X makes the tests fail" is a mutation: run it with
+.factory/mutate.sh on a copy as prove.md says, never by editing the worktree.
+
 Every AC needs a command you ran or the proof's output as evidence; a
 crossed NG-n is a reject. When uncertain, the verdict is `uncertain`; a
 refused command is not uncertainty.
