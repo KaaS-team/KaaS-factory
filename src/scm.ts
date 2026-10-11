@@ -7,11 +7,11 @@
 //     posted on the tracker issue, and a merge closes the tracker issue.
 // The `labels` map is applied here too, on the tracker side only.
 
-import type { FactoryConfig, TrackerConfig } from "../config";
-import { GitHub } from "../github";
-import { issueBranch, issueOfBranch } from "../git";
-import type { CodeHostPort, CreatePrOptions, GhComment, GhIssue, GhPr, MergeReadiness, PrStatus, RepoRole, ScmPort, TrackerPort } from "../ports/scm";
-import { HttpTracker } from "./http-tracker";
+import type { FactoryConfig, TrackerConfig } from "./config";
+import { GitHub } from "./github";
+import { issueBranch, issueOfBranch } from "./git";
+import type { CodeHostPort, CreatePrOptions, GhComment, GhIssue, GhPr, MergeReadiness, PrStatus, RepoRole, ScmPort, TrackerPort } from "./ports/scm";
+import { HttpTracker } from "./adapters/http-tracker";
 
 export const PR_LINK_MARKER = "<!-- factory:pr-link v1 -->";
 

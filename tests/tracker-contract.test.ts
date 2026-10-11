@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HttpTracker, TRACKER_ROUTES } from "../src/adapters/http-tracker";
-import { ComposedScm, LabelMappedTracker, makeScm, PR_LINK_MARKER, unlinkClosingKeywords } from "../src/adapters/scm-factory";
+import { ComposedScm, LabelMappedTracker, makeScm, PR_LINK_MARKER, unlinkClosingKeywords } from "../src/scm";
 import { mergeConfig } from "../src/config";
 import { LABEL } from "../src/labels";
 import { FactoryState } from "../src/state";

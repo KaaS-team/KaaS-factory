@@ -48,7 +48,7 @@ export class GitCommandRunner implements CommandRunner {
 }
 
 // The one branch naming for an issue's work, and its inverse. A tracker that is
-// not GitHub links an issue to its PR through this name (src/adapters/scm-factory.ts).
+// not GitHub links an issue to its PR through this name (src/scm.ts).
 export function issueBranch(issue: number): string {
   return `factory/issue-${issue}`;
 }

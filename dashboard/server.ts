@@ -11,7 +11,7 @@ import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ScmPort } from "../src/github";
-import { makeScm } from "../src/adapters/scm-factory";
+import { makeScm } from "../src/scm";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { parseChatOps } from "../src/chatops";
 import { buildBoard } from "./board";

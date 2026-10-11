@@ -1,6 +1,6 @@
 // What the factory needs from a tracker (issues, comments, labels) and a code
 // host (PRs). GitHub (and GHE through GH_HOST) implements both in src/github.ts;
-// makeScm (src/adapters/scm-factory.ts) pairs a tracker with a code host.
+// makeScm (src/scm.ts) pairs a tracker with a code host.
 
 export interface GhIssue {
   number: number;
@@ -124,5 +124,5 @@ export interface CodeHostPort {
   authStatus(): Promise<{ ok: boolean; detail: string }>;
 }
 
-// Everything the runner needs; src/adapters/scm-factory.ts composes one from config.
+// Everything the runner needs; src/scm.ts composes one from config.
 export type ScmPort = TrackerPort & CodeHostPort;

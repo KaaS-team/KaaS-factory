@@ -6,7 +6,7 @@ import { accessSync, constants, existsSync, readdirSync, readFileSync } from "no
 import { homedir, hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
 import type { ScmPort } from "./github";
-import { makeScm } from "./adapters/scm-factory";
+import { makeScm } from "./scm";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { CommandExecutor } from "./agents/executor";

@@ -139,7 +139,7 @@ export interface FactoryConfig {
   // Where gates and check steps run, by runtime name (src/runtimes.ts); unset is "local".
   readonly runtime?: RuntimeConfig;
   // Where issues live. GitHub by default; "http" speaks Tracker API v1 (docs/tracker-api.md).
-  // PRs stay on GitHub either way (src/adapters/scm-factory.ts).
+  // PRs stay on GitHub either way (src/scm.ts).
   readonly tracker: TrackerConfig;
   // A factory label to the team's own name for it, e.g. LABEL.ready to "ready-for-ai".
   // Applied once, at the tracker boundary; everything inside still speaks LABEL.*.
