@@ -2,13 +2,15 @@
 // SQLite outbox with its retries, and the structural check that every type the
 // code emits is in the catalogue.
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { EVENT_TYPES, FACTORY_EVENTS, EVENT_SIGNATURE_HEADER, parseEvent, signEvent, verifyEvent } from "../src/core/event";
 import { EventBus, backoffMs } from "../src/engine/bus";
 import { FactoryState } from "../src/state";
-import { configProblems } from "../src/config";
+import { configProblems, DEFAULT_EVENTS_SECRET_ENV } from "../src/config";
+import { createDashboard } from "../dashboard/server";
+import { FakeGitHub } from "./harness";
 import { createHmac } from "node:crypto";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -191,5 +193,60 @@ describe("bus", () => {
     expect(bus.drainInbound()).toBe(1);
     expect(bus.drainInbound()).toBe(0);
     expect(heard).toEqual(["factory.issue.ready", "only:in-1", "wiki.page.updated"]);
+  });
+});
+
+describe("POST /events", () => {
+  const IN_SECRET = "inbound-secret-for-tests";
+  const OFF_BOX = "203.0.113.7";
+  let restore = () => {};
+  afterEach(() => restore());
+
+  function dashboardWith(secret: string | undefined) {
+    const before = process.env[DEFAULT_EVENTS_SECRET_ENV];
+    if (secret === undefined) delete process.env[DEFAULT_EVENTS_SECRET_ENV];
+    else process.env[DEFAULT_EVENTS_SECRET_ENV] = secret;
+    restore = () => (before === undefined ? delete process.env[DEFAULT_EVENTS_SECRET_ENV] : (process.env[DEFAULT_EVENTS_SECRET_ENV] = before));
+    const state = new FactoryState(":memory:");
+    return { state, dashboard: createDashboard(state, new FakeGitHub([]), "acme/widgets", false, "/nonexistent") };
+  }
+
+  const event = (over: Record<string, unknown> = {}) => ({ specversion: "1.0", id: "wiki-1", source: "wiki", type: "wiki.page.updated", time: "2026-10-11T00:00:00Z", data: { page: "setup" }, ...over });
+  function post(body: object, opts: { secret?: string; sig?: string; type?: string } = {}) {
+    const raw = JSON.stringify(body);
+    return new Request("http://factory.example:4100/events", {
+      method: "POST",
+      headers: { "content-type": opts.type ?? "application/cloudevents+json", [EVENT_SIGNATURE_HEADER]: opts.sig ?? signEvent(opts.secret ?? IN_SECRET, raw) },
+      body: raw,
+    });
+  }
+
+  test("is off (404) until the inbound secret is set", async () => {
+    const d = dashboardWith(undefined);
+    expect((await d.dashboard.handle(post(event()), "127.0.0.1")).status).toBe(404);
+  });
+
+  test("a bad or missing signature is 401 and records nothing", async () => {
+    const d = dashboardWith(IN_SECRET);
+    expect((await d.dashboard.handle(post(event(), { secret: "guess" }), OFF_BOX)).status).toBe(401);
+    expect((await d.dashboard.handle(post(event(), { sig: "" }), OFF_BOX)).status).toBe(401);
+    expect(d.state.busEvents()).toEqual([]);
+  });
+
+  test("a signed event from off the box is stored once; a duplicate id is acknowledged, not stored again", async () => {
+    const d = dashboardWith(IN_SECRET);
+    expect((await d.dashboard.handle(post(event()), OFF_BOX)).status).toBe(201);
+    expect((await d.dashboard.handle(post(event({ data: { page: "other" } })), OFF_BOX)).status).toBe(200);
+    expect((await d.dashboard.handle(post(event(), { type: "application/json" }), OFF_BOX)).status).toBe(200);
+    const rows = d.state.busEvents();
+    expect(rows.map((r) => [r.id, r.direction, r.type, r.handled_at, JSON.parse(r.data)])).toEqual([["wiki-1", "in", "wiki.page.updated", null, { page: "setup" }]]);
+  });
+
+  test("a factory type or an unknown type is ignored (202); a bad envelope is 400", async () => {
+    const d = dashboardWith(IN_SECRET);
+    expect((await d.dashboard.handle(post(event({ id: "f", type: "factory.pr.merged" })), OFF_BOX)).status).toBe(202);
+    expect((await d.dashboard.handle(post(event({ id: "u", type: "wiki.page.deleted" })), OFF_BOX)).status).toBe(202);
+    expect((await d.dashboard.handle(post(event({ specversion: "0.3" })), OFF_BOX)).status).toBe(400);
+    expect(d.state.busEvents()).toEqual([]);
   });
 });

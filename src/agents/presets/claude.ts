@@ -92,7 +92,7 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
 // no guarantee that repeating the flag concatenates rather than overriding,
 // so this sends one flag with one value rather than risk losing STAGE_GUIDANCE.
 export function claudeArgs(opts: StageRunOptions, contextPack = "", mcpConfig?: string): string[] {
-  const command = `/factory-${opts.stage} ${opts.issue}`;
+  const command = opts.prompt ?? `/factory-${opts.stage} ${opts.issue}`;
   return [
     "-p",
     opts.resume ? `${command}\n\nThe last attempt was sent back. The tail of why:\n\n${opts.resume.failure}` : command,

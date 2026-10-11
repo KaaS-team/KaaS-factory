@@ -14,6 +14,7 @@ export const FACTORY_EVENTS = [
   "factory.pr.opened",
   "factory.pr.merged",
   "factory.run.completed",
+  "factory.minion.completed",
 ] as const;
 
 // Types other KaaS apps emit that POST /events accepts. Anything else is ignored.
@@ -36,6 +37,13 @@ export type FactoryEventType = (typeof FACTORY_EVENTS)[number];
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
 export function isEventType(t: unknown): t is EventType {
   return typeof t === "string" && KNOWN.has(t);
+}
+
+// Inbound accepts only other apps' types: a factory.* event arriving from
+// outside would let a caller fake a merge or a run ending.
+const EXTERNAL: ReadonlySet<string> = new Set(EXTERNAL_EVENTS);
+export function isExternalEventType(t: unknown): boolean {
+  return typeof t === "string" && EXTERNAL.has(t);
 }
 
 export interface CloudEvent {

@@ -29,6 +29,7 @@ import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
 import { FactoryState, type RetroTrigger, type Stage } from "../state";
 import { LABEL, issueType } from "../labels";
 import { emitEvent, type EventBus } from "./bus";
+import type { Minion } from "../core/minion";
 import type { MachineConfig, MachineLeases, MachineSpend } from "../machine";
 
 export type { Stage };
@@ -88,6 +89,8 @@ export interface WatchDeps {
   readonly now?: () => Date;
   // The v4 event bus (src/engine/bus.ts); absent means nothing is emitted.
   readonly bus?: EventBus;
+  // The repo's .factory/minions, checked at boot (src/engine/minion.ts).
+  readonly minions?: readonly Minion[];
 }
 
 // Thrown by runStage when an operator stopped the agent to take it over;

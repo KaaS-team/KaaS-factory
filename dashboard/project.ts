@@ -31,6 +31,7 @@ export function workflowsView(report: HarnessReport) {
       problems: e.problems.map(plain),
       steps: e.workflow ? Object.values(e.workflow.steps).map((s) => ({ id: plain(s.id), uses: plain(s.uses), runtime: s.runtime ? plain(s.runtime) : null })) : [],
       cron: e.workflow ? e.workflow.triggers.cron.map((c) => ({ schedule: plain(c.cron.src), tz: plain(c.tz), title: plain(c.title) })) : [],
+      events: e.workflow ? e.workflow.triggers.event.map(plain) : [],
     })),
   };
 }

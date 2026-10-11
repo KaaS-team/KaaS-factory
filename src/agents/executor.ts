@@ -114,7 +114,7 @@ export class CommandExecutor implements Executor {
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
-    const agent = resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
+    const agent = opts.prompt !== undefined && opts.agent ? resolveAgentByName(this.agents, opts.agent, opts.stage) : resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
     const scratch = mkdtempSync(join(tmpdir(), `factory-scratch-${opts.issue}-`));
     try {
       return await this.spawnStage(opts, agent, scratch);
@@ -129,12 +129,13 @@ export class CommandExecutor implements Executor {
     mkdirSync(artifactDir, { recursive: true });
 
     // A read-only stage on a preset that cannot write files returns them instead.
-    const readOnly = !stagePolicy(opts.stage).write && agent.preset?.returnsArtifact === true && !agent.config.command;
+    // A minion (opts.prompt) owes no stage file, so it never gets one written for it.
+    const readOnly = opts.prompt === undefined && !stagePolicy(opts.stage).write && agent.preset?.returnsArtifact === true && !agent.config.command;
     let argv: readonly string[];
     let stdin: string | undefined;
     const types = typesFor(this.routes);
     // The stop-artifact hook checks the stage's file against this before the agent stops.
-    const spec = readOnly ? undefined : stopArtifactSpec(opts.stage, types);
+    const spec = readOnly || opts.prompt !== undefined ? undefined : stopArtifactSpec(opts.stage, types);
     if (spec) writeFileSync(join(scratch, "artifact.schema.json"), JSON.stringify(spec));
     // A step that asked for MCP servers must get them, so an agent that cannot load them is an error, not a quiet run without.
     let mcpConfig: string | undefined;
@@ -144,11 +145,11 @@ export class CommandExecutor implements Executor {
       writeFileSync(mcpConfig, JSON.stringify({ mcpServers: opts.mcp }));
     }
     const skills = opts.type ? this.routes[opts.type]?.skills ?? [] : [];
-    const contextPack = await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
+    const contextPack = opts.prompt !== undefined ? "" : await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
     if (agent.preset?.ownsPrompt) {
       ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig }));
     } else {
-      const prompt = await renderPrompt(opts, readOnly, types, contextPack);
+      const prompt = opts.prompt ?? (await renderPrompt(opts, readOnly, types, contextPack));
       if (agent.config.command) {
         const promptFile = join(scratch, "prompt.md");
         writeFileSync(promptFile, prompt);

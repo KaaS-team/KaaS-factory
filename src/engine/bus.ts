@@ -6,7 +6,7 @@
 // them to the same subscribers. Emitting never throws into the engine: a run
 // must not fail because a webhook sink is down.
 
-import { EVENT_SIGNATURE_HEADER, makeEvent, signEvent, type CloudEvent, type FactoryEventType } from "../core/event";
+import { EVENT_SIGNATURE_HEADER, makeEvent, signEvent, type CloudEvent, type EventType, type FactoryEventType } from "../core/event";
 import type { EventSink } from "../config";
 import type { BusDeliveryRow, BusEventRow } from "../state";
 
@@ -90,7 +90,8 @@ export class EventBus {
     return () => set.delete(fn);
   }
 
-  emit(type: FactoryEventType, data: unknown, subject?: string): CloudEvent {
+  // The engine passes a FactoryEventType through emitEvent; a minion passes its `emit:` type.
+  emit(type: EventType, data: unknown, subject?: string): CloudEvent {
     const event = makeEvent({ id: this.opts.newId?.() ?? crypto.randomUUID(), source: this.opts.source, type, subject, time: this.now(), data });
     this.opts.store.recordBusEvent({
       id: event.id,

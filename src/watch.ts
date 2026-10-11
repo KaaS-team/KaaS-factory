@@ -42,7 +42,10 @@ import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { STEP_TYPES } from "./engine/steps";
 import { defaultWorkflow } from "./engine/workflows";
 
-import { fireCron } from "./engine/triggers";
+import { fireCron, fireEvent } from "./engine/triggers";
+import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
+import type { CloudEvent } from "./core/event";
+import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
 import { TRUSTED_ROLES, type RepoRole } from "./ports/scm";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
@@ -409,6 +412,8 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
       console.error("factory watch: cron trigger failed", err),
     );
   }
+  // A minion runs for minutes: started here, never awaited by the poll.
+  for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date())) startMinion(deps, config, minion);
   const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
     intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
@@ -501,6 +506,7 @@ export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const inFlight = new Set<number>();
   let seenDelivery = deps.state.latestDelivery();
+  const unsubscribe = deps.bus?.subscribe("*", (e) => handleEvent(deps, config, e).then((filed) => void (filed > 0 && tick())));
 
   function tick(): void {
     if (stopped) return;
@@ -512,6 +518,11 @@ export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: 
   }
 
   const webhooks = setInterval(() => {
+    // POST /events rows the dashboard stored, then sinks whose retry is due.
+    if (deps.bus) {
+      deps.bus.drainInbound();
+      void deps.bus.deliver();
+    }
     const latest = deps.state.latestDelivery();
     if (latest === seenDelivery) return;
     seenDelivery = latest;
@@ -523,5 +534,34 @@ export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: 
     stopped = true;
     if (timer) clearTimeout(timer);
     clearInterval(webhooks);
+    unsubscribe?.();
   };
+}
+
+function startMinion(deps: WatchDeps, config: FactoryConfig, minion: Minion, event?: CloudEvent): void {
+  void runMinion(deps, config, minion, event)
+    .then((r) => r.status !== "ok" && console.error(`factory watch: minion ${minion.name} ${r.status}: ${r.reason ?? ""}`))
+    .catch((err) => console.error(`factory watch: minion ${minion.name} failed`, err));
+}
+
+// Every event, emitted here or received on POST /events: file an issue for each
+// workflow listening for its type, and start each minion it wakes. Returns how
+// many issues it filed, so the watcher can poll for them at once.
+export async function handleEvent(deps: WatchDeps, config: FactoryConfig, event: CloudEvent): Promise<number> {
+  let filed = 0;
+  for (const workflow of allWorkflows(deps)) {
+    try {
+      const n = await fireEvent(deps.github, config.repo, workflow, event);
+      if (n === undefined) continue;
+      filed++;
+      // Not the repo's workflow: record it on the issue so pickup runs this one (recordedWorkflow).
+      if (workflow.name !== workflowOf(deps).name) {
+        await deps.github.commentIssue(config.repo, n, withDataMarker(`Running workflow \`${workflow.name}\` (\`on: event: ${event.type}\`).`, WORKFLOW_MARKER, { name: workflow.name }));
+      }
+    } catch (err) {
+      console.error(`factory watch: event trigger ${workflow.name} on ${event.type} failed`, err);
+    }
+  }
+  for (const minion of minionsFor(deps.minions ?? [], event)) startMinion(deps, config, minion, event);
+  return filed;
 }

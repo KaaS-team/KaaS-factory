@@ -49,6 +49,9 @@ export interface StageRunOptions {
   readonly resume?: { readonly sessionId: string; readonly failure: string };
   // The MCP servers this run starts with, in .mcp.json's server shape. Absent: none.
   readonly mcp?: Readonly<Record<string, unknown>>;
+  // A minion's whole prompt (src/engine/minion.ts), in place of the stage skill and the
+  // context pack; with it, `agent` names the agent directly instead of the stage routing.
+  readonly prompt?: string;
 }
 
 // The killedReason a `factory takeover` stop gets. watch.ts parks on it
