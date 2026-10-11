@@ -217,7 +217,7 @@
   {"name": "ci template: a dispatch input never reaches the shell as code", "file": "template-ci/factory.yml.example", "find": "--issue \"$ISSUE\"", "replace": "--issue ${{ github.event.inputs.issue }}", "test": "tests/release.test.ts"},
   {"name": "ci template: a PR review reaches the loop", "file": "template-ci/factory.yml.example", "find": "  pull_request_review:\n    types: [submitted]\n", "replace": "", "test": "tests/release.test.ts"},
   {"name": "issueOfPr: a PR closing several issues is about none of them", "file": "src/git.ts", "find": "closes.length === 1 ?", "replace": "closes.length >= 1 ?", "test": "tests/git.test.ts"},
-  {"name": "issueOfPr: the factory branch wins over what the PR closes", "file": "src/git.ts", "find": "  if (own) return Number(own);\n", "replace": "", "test": "tests/git.test.ts"},
+  {"name": "issueOfPr: the factory branch wins over what the PR closes", "file": "src/git.ts", "find": "  if (own !== undefined) return own;\n", "replace": "", "test": "tests/git.test.ts"},
   {"name": "daemon: plist values are XML-escaped", "file": "src/daemon.ts", "find": "s.replace(/&/g, \"&amp;\").", "replace": "s.", "test": "tests/daemon.test.ts"},
   {"name": "daemon: launchd restarts the loop when it exits", "file": "src/daemon.ts", "find": "  <key>KeepAlive</key><true/>\n", "replace": "", "test": "tests/daemon.test.ts"},
   {"name": "daemon: systemd % is not a specifier", "file": "src/daemon.ts", "find": ".replace(/%/g, \"%%\")", "replace": "", "test": "tests/daemon.test.ts"},
