@@ -46,6 +46,9 @@ import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
 import { repoFromRemoteUrl } from "./config";
+import { EventBus } from "./engine/bus";
+import { loadMinions, runMinion } from "./engine/minion";
+import { parseEvent } from "./core/event";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -96,6 +99,10 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
   }
 }
 
+function stateDbPath(repo: string): string {
+  return flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, repo);
+}
+
 // Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
 // step, cron tick) resolve the exact same paths and construct the exact same
 // gate runner — one place, not three copies to drift (audit finding #1).
@@ -107,6 +114,10 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
   const runtimes = runtimesFrom(machineConfig.runtimes);
   const unknown = [...new Set([workflow, ...Object.values(routeWorkflows)].flatMap((w) => unknownRuntimes(runtimeRefs(config, w.steps), runtimes)))];
   if (unknown.length) throw new Error(unknown.join("\n"));
+  // Every minion is checked at boot: a bad file stops the watcher, not its first run.
+  const loaded = loadMinions(cloneDir, config);
+  if (loaded.problems.length) throw new Error(loaded.problems.join("\n"));
+  const state = new FactoryState(stateDbPath(config.repo));
   const github = makeScm(config);
   // This process, as leases and the spend ledger name it.
   const holder = `${hostname()}-${process.pid}`;
@@ -118,7 +129,9 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
     github,
     git: new Git(new GitCommandRunner()),
-    state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
+    state,
+    bus: new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}` }),
+    minions: loaded.minions,
     executor: new CommandExecutor(config.agents, config.stages, config.routes),
     gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
     holdoutRunner: new ShellHoldoutRunner(),
@@ -710,6 +723,66 @@ async function cmdHarness(): Promise<void> {
   if (sub === "validate" && report.problems.length) process.exit(EXIT.checksFailed);
 }
 
+// `factory minion list|run <name> [--event <json-file>]`: the repo's minions, or one run now.
+async function cmdMinion(): Promise<void> {
+  const sub = args[1];
+  if (sub !== "list" && sub !== "run") throw new UsageError("usage: factory minion (list | run <name> [--event <json-file>]) --repo-dir <path> [--json]");
+  if (sub === "list") {
+    const dir = resolve(flag("repo-dir") ?? ".");
+    const { minions, problems } = loadMinions(dir, await loadConfig(dir));
+    if (has("json")) console.log(successJson({ problems, minions: minions.map((m) => ({ name: m.name, description: m.description, on: "event" in m.on ? { event: m.on.event } : { cron: m.on.cron.src, tz: m.on.tz }, emit: m.emit ?? null })) }, !problems.length));
+    else {
+      for (const m of minions) console.log(`${m.name}  ${"event" in m.on ? `on ${m.on.event}` : `cron ${m.on.cron.src} ${m.on.tz}`}${m.emit ? `  emits ${m.emit}` : ""}  ${m.description}`);
+      for (const p of problems) console.log(`factory minion: ${p}`);
+      if (!minions.length && !problems.length) console.log("factory minion: no minions in .factory/minions");
+    }
+    if (problems.length) process.exit(EXIT.checksFailed);
+    return;
+  }
+  const name = args[2];
+  if (!name || name.startsWith("--")) throw new UsageError("minion run: a minion name is required");
+  const cloneDir = await resolveCloneDir();
+  const config = await loadConfig(cloneDir);
+  const deps = await buildWatchDeps(cloneDir, config);
+  const minion = deps.minions?.find((m) => m.name === name);
+  if (!minion) throw new UsageError(`minion run: no minion "${name}" in .factory/minions`);
+  let event;
+  const eventFile = flag("event");
+  if (eventFile) {
+    const parsed = parseEvent(JSON.parse(readFileSync(eventFile, "utf8")));
+    if (!parsed.ok) throw new UsageError(`minion run --event: ${parsed.problem}`);
+    event = parsed.event;
+  }
+  const run = await runMinion(deps, config, minion, event);
+  await deps.bus?.deliver();
+  console.log(has("json") ? successJson(run, run.status === "ok") : JSON.stringify(run, null, 2));
+  if (run.status !== "ok") process.exit(EXIT.checksFailed);
+}
+
+// `factory events tail|replay <id>`: the outbox and inbox, newest last, or one event sent again.
+async function cmdEvents(): Promise<void> {
+  const sub = args[1];
+  if (sub !== "tail" && sub !== "replay") throw new UsageError("usage: factory events (tail [--limit N] | replay <id>) --repo-dir <path> [--json]");
+  const cloneDir = resolve(flag("repo-dir") ?? ".");
+  const config = await loadConfig(cloneDir);
+  const state = new FactoryState(stateDbPath(config.repo));
+  if (sub === "tail") {
+    const rows = state.busEvents(Number(flag("limit") ?? 50));
+    for (const r of rows) {
+      if (has("json")) console.log(JSON.stringify({ ...r, data: JSON.parse(r.data), deliveries: state.busDeliveries(r.id) }));
+      else console.log(`${r.time}  ${r.direction === "in" ? "<-" : "->"}  ${r.type}  ${r.id}${r.subject ? `  ${r.subject}` : ""}${state.busDeliveries(r.id).map((d) => `  [${d.status} ${d.sink}]`).join("")}`);
+    }
+    return;
+  }
+  const id = args[2];
+  if (!id || id.startsWith("--")) throw new UsageError("events replay: an event id is required");
+  const bus = new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}`, autoDeliver: false });
+  const queued = bus.replay(id);
+  if (!queued) throw new UsageError(`events replay: no event "${id}" with a configured sink`);
+  const delivered = await bus.deliver();
+  console.log(`factory events: ${id} queued to ${queued} sink(s), ${delivered} delivered now`);
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "up":
@@ -752,6 +825,10 @@ async function main(): Promise<void> {
       return cmdDaemon();
     case "harness":
       return cmdHarness();
+    case "minion":
+      return cmdMinion();
+    case "events":
+      return cmdEvents();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

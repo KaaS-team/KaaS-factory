@@ -109,6 +109,29 @@ export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_compl
 // cwd wasn't the target repo (audit finding #1).
 export const DEFAULT_DB_PATH = defaultStatePath();
 
+export interface BusEventRow {
+  seq?: number;
+  id: string;
+  direction: "in" | "out";
+  type: string;
+  source: string;
+  subject: string | null;
+  time: string;
+  data: string;
+  handled_at: string | null;
+}
+
+export interface BusDeliveryRow {
+  id: number;
+  event_id: string;
+  sink: string;
+  status: "pending" | "delivered" | "dead";
+  attempts: number;
+  next_at: string;
+  delivered_at: string | null;
+  last_error: string | null;
+}
+
 export class FactoryState {
   private readonly db: Database;
 
@@ -204,6 +227,31 @@ export class FactoryState {
         repo TEXT NOT NULL,
         received_at TEXT NOT NULL
       );
+      -- v4.0 event bus: one row per CloudEvent, out (emitted here) or in (POST /events).
+      CREATE TABLE IF NOT EXISTS bus_events (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT NOT NULL UNIQUE,
+        direction TEXT NOT NULL,
+        type TEXT NOT NULL,
+        source TEXT NOT NULL,
+        subject TEXT,
+        time TEXT NOT NULL,
+        data TEXT NOT NULL,
+        handled_at TEXT
+      );
+      -- One row per (event, sink): the outbox the bus retries until delivered or dead.
+      CREATE TABLE IF NOT EXISTS bus_deliveries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id TEXT NOT NULL,
+        sink TEXT NOT NULL,
+        status TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_at TEXT NOT NULL,
+        delivered_at TEXT,
+        last_error TEXT,
+        UNIQUE(event_id, sink)
+      );
+      CREATE INDEX IF NOT EXISTS bus_deliveries_status_next ON bus_deliveries(status, next_at);
     `);
     // Forward-only and idempotent: safe to run on boot from several replicas.
     const have = new Set((this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name));
@@ -532,6 +580,75 @@ export class FactoryState {
   latestDelivery(): number {
     const row = this.db.query("SELECT MAX(seq) AS seq FROM webhook_deliveries").get() as { seq: number | null };
     return row.seq ?? 0;
+  }
+
+  // Event bus outbox. False when the id is already stored (an inbound redelivery).
+  recordBusEvent(e: BusEventRow): boolean {
+    const r = this.db
+      .query(
+        "INSERT OR IGNORE INTO bus_events (id, direction, type, source, subject, time, data, handled_at) VALUES ($id, $direction, $type, $source, $subject, $time, $data, $handled)",
+      )
+      .run({ $id: e.id, $direction: e.direction, $type: e.type, $source: e.source, $subject: e.subject, $time: e.time, $data: e.data, $handled: e.handled_at });
+    return r.changes > 0;
+  }
+
+  busEvent(id: string): BusEventRow | undefined {
+    return (this.db.query("SELECT * FROM bus_events WHERE id = $id").get({ $id: id }) as BusEventRow | null) ?? undefined;
+  }
+
+  // Newest last; `after` is a seq for tailing.
+  busEvents(limit = 50, after = 0): BusEventRow[] {
+    return (
+      this.db.query("SELECT * FROM (SELECT * FROM bus_events WHERE seq > $after ORDER BY seq DESC LIMIT $limit) ORDER BY seq ASC").all({
+        $after: after,
+        $limit: limit,
+      }) as BusEventRow[]
+    );
+  }
+
+  // Inbound events the watcher has not handed to subscribers yet, oldest first.
+  unhandledInbound(): BusEventRow[] {
+    return this.db.query("SELECT * FROM bus_events WHERE direction = 'in' AND handled_at IS NULL ORDER BY seq ASC").all() as BusEventRow[];
+  }
+
+  markBusHandled(id: string, at = new Date()): void {
+    this.db.query("UPDATE bus_events SET handled_at = $at WHERE id = $id").run({ $id: id, $at: at.toISOString() });
+  }
+
+  queueBusDelivery(eventId: string, sink: string, at = new Date()): void {
+    this.db
+      .query("INSERT OR IGNORE INTO bus_deliveries (event_id, sink, status, next_at) VALUES ($e, $s, 'pending', $at)")
+      .run({ $e: eventId, $s: sink, $at: at.toISOString() });
+  }
+
+  // Replay: put every delivery of one event back to pending, due now.
+  requeueBusDeliveries(eventId: string, at = new Date()): number {
+    return this.db
+      .query("UPDATE bus_deliveries SET status = 'pending', attempts = 0, next_at = $at, delivered_at = NULL, last_error = NULL WHERE event_id = $e")
+      .run({ $e: eventId, $at: at.toISOString() }).changes;
+  }
+
+  dueBusDeliveries(now = new Date()): BusDeliveryRow[] {
+    return this.db
+      .query("SELECT * FROM bus_deliveries WHERE status = 'pending' AND next_at <= $now ORDER BY id ASC")
+      .all({ $now: now.toISOString() }) as BusDeliveryRow[];
+  }
+
+  busDeliveries(eventId: string): BusDeliveryRow[] {
+    return this.db.query("SELECT * FROM bus_deliveries WHERE event_id = $e ORDER BY id ASC").all({ $e: eventId }) as BusDeliveryRow[];
+  }
+
+  markBusDelivery(id: number, d: { status: "pending" | "delivered" | "dead"; attempts: number; nextAt: Date; error?: string }, at = new Date()): void {
+    this.db
+      .query("UPDATE bus_deliveries SET status = $status, attempts = $attempts, next_at = $next, last_error = $err, delivered_at = $delivered WHERE id = $id")
+      .run({
+        $id: id,
+        $status: d.status,
+        $attempts: d.attempts,
+        $next: d.nextAt.toISOString(),
+        $err: d.error ?? null,
+        $delivered: d.status === "delivered" ? at.toISOString() : null,
+      });
   }
 
   // A free-form value in the same key table as the toggles (a cron trigger's last-checked minute).

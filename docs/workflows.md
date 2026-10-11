@@ -46,9 +46,9 @@ with an optional `if:`. The first edge whose `if:` holds wins; the last has no `
 
 `limits.questions` caps needs-info rounds and `limits.rejects` caps rejections (both default 2).
 
-## `on:` schedules
+## `on:` schedules and events
 
-A workflow can file its own issues on a schedule:
+A workflow can file its own issues on a schedule, on an event, or both:
 
 ```yaml
 on:
@@ -62,6 +62,15 @@ on:
 At the matching minute the watcher files an issue labelled `factory:ready`, which the workflow then
 runs like any other. A poll that skipped past the minute catches up for up to an hour, and while an
 issue from the same trigger is still open no new one is filed.
+
+```yaml
+on:
+  event: wiki.page.updated       # one type from docs/events.md, or a list
+```
+
+Each event files one issue per event id with the event data in its body; a redelivered event files
+nothing new. A factory event's issue is `factory:ready`. Another app's event files it unlabelled, for
+a maintainer to read and label (see [events.md](events.md)).
 
 ## `mcp:` servers per step
 

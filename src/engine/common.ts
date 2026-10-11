@@ -28,6 +28,8 @@ import type { Workflow } from "../core/workflow";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
 import { FactoryState, type RetroTrigger, type Stage } from "../state";
 import { LABEL, issueType } from "../labels";
+import { emitEvent, type EventBus } from "./bus";
+import type { Minion } from "../core/minion";
 import type { MachineConfig, MachineLeases, MachineSpend } from "../machine";
 
 export type { Stage };
@@ -85,6 +87,10 @@ export interface WatchDeps {
   readonly routeWorkflows?: Readonly<Record<string, Workflow>>;
   // The clock cron triggers read; absent means the real one.
   readonly now?: () => Date;
+  // The v4 event bus (src/engine/bus.ts); absent means nothing is emitted.
+  readonly bus?: EventBus;
+  // The repo's .factory/minions, checked at boot (src/engine/minion.ts).
+  readonly minions?: readonly Minion[];
 }
 
 // Thrown by runStage when an operator stopped the agent to take it over;
@@ -329,7 +335,7 @@ export async function runStage(
 // The machine's tally and the shared store, after stage_runs. A shared store
 // that can't be written is logged, not fatal: the stage's work is done, and
 // SQLite still has the row.
-async function recordSpend(deps: WatchDeps, config: FactoryConfig, e: SpendEntry): Promise<void> {
+export async function recordSpend(deps: Pick<WatchDeps, "machine" | "spend">, config: FactoryConfig, e: SpendEntry): Promise<void> {
   if (e.costUsd !== null) deps.machine?.spend.record(config.repo, e.costUsd);
   await deps.spend?.record(e).catch((err) => console.error(`[spend] #${e.issue} ${e.stage}: ${err instanceof Error ? err.message : err}`));
 }
@@ -409,6 +415,8 @@ export async function runQueuedRetros(deps: WatchDeps, config: FactoryConfig): P
   for (const row of deps.state.listQueuedRetros(config.repo)) {
     try {
       const issue = await deps.github.getIssue(config.repo, row.issue);
+      // The dashboard's merge route queues "merged" after the operator merged the PR.
+      if (row.outcome === "merged") emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: row.issue, by: "operator" }, `issue/${row.issue}`);
       await runRetro(deps, config, issue, row.outcome, row.id);
     } catch (err) {
       console.error(`queued retro failed for #${row.issue}:`, err);
@@ -448,6 +456,17 @@ export function failureTail(text: string): string {
 }
 
 export const EPOCH = "1970-01-01T00:00:00.000Z";
+
+// Why a daily cap holds back new work now, or undefined. The one resolver for
+// the poll's intake and for minions: the repo's cap (every worker's spend) and
+// this machine's cap across all its repos.
+export async function spendCapHit(deps: WatchDeps, config: FactoryConfig): Promise<string | undefined> {
+  const repoDailyUsd = config.spend.dailyUsd;
+  if (repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd) return `the repo's daily spend cap ($${repoDailyUsd}) is reached`;
+  const machineDailyUsd = deps.machine?.config.dailyUsd;
+  if (machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd) return `this machine's daily spend cap ($${machineDailyUsd}) is reached`;
+  return undefined;
+}
 
 // The repo's spend today: every worker's, from the shared store when there is one.
 export async function repoSpendToday(deps: WatchDeps, config: FactoryConfig): Promise<SpendTotal> {

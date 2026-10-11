@@ -5,6 +5,7 @@
 
 import { parseExpr, rootsOf, ExprError, type Expr } from "./expr";
 import { parseCron, wallClock, CronError, type Cron } from "./cron";
+import { isEventType } from "./event";
 
 export type ParkState = "awaiting-approval";
 
@@ -40,7 +41,8 @@ export interface CronTrigger {
 
 export interface Workflow {
   readonly name: string;
-  readonly triggers: { readonly cron: readonly CronTrigger[] };
+  // `on: event:` files an issue the same way when one of these event types arrives (docs/events.md).
+  readonly triggers: { readonly cron: readonly CronTrigger[]; readonly event: readonly string[] };
   readonly limits: { readonly questions: number; readonly rejects: number };
   readonly start: string;
   readonly steps: Readonly<Record<string, Step>>;
@@ -60,7 +62,7 @@ export interface StepKind {
 
 const STEP_KEYS = new Set(["uses", "label", "next", "reject", "revise", "run", "mcp", "runtime"]);
 const TOP_KEYS = new Set(["name", "description", "on", "limits", "steps"]);
-const ON_KEYS = new Set(["cron"]);
+const ON_KEYS = new Set(["cron", "event"]);
 const CRON_KEYS = new Set(["schedule", "tz", "title", "body"]);
 const EDGE_KEYS = new Set(["if", "to", "park", "approve", "revise"]);
 const PARKS: readonly ParkState[] = ["awaiting-approval"];
@@ -87,6 +89,7 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
   }
 
   const cron = parseOn(raw.on, problems);
+  const event = parseOnEvent(raw.on, problems);
 
   if (!isObj(raw.steps) || Object.keys(raw.steps).length === 0) {
     problems.push("steps: needs at least one step");
@@ -190,7 +193,7 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
     for (const id of ids) if (!reached.has(id)) problems.push(`steps.${id}: no edge reaches it from ${ids[0]}`);
   }
   if (problems.length > 0) return { ok: false, problems };
-  return { ok: true, workflow: { name, triggers: { cron }, limits, start: ids[0]!, steps } };
+  return { ok: true, workflow: { name, triggers: { cron, event }, limits, start: ids[0]!, steps } };
 }
 
 function parseOn(on: unknown, problems: string[]): CronTrigger[] {
@@ -223,6 +226,18 @@ function parseOn(on: unknown, problems: string[]): CronTrigger[] {
     }
   });
   return out;
+}
+
+// `event: <type>` or a list of types, each one in the catalogue (core/event.ts).
+function parseOnEvent(on: unknown, problems: string[]): string[] {
+  if (!isObj(on) || on.event === undefined) return [];
+  const list = typeof on.event === "string" ? [on.event] : on.event;
+  if (!Array.isArray(list) || list.length === 0 || !list.every((t) => typeof t === "string")) {
+    problems.push("on.event: an event type, or a list of them");
+    return [];
+  }
+  for (const t of list) if (!isEventType(t)) problems.push(`on.event: "${t}" is not an event type (see docs/events.md)`);
+  return [...new Set(list as string[])];
 }
 
 // Every step id a step can hand the issue to, with the key that names it.

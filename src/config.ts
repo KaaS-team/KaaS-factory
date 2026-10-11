@@ -7,6 +7,7 @@
 import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
 import { githubHost } from "./repo";
+import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { LABEL } from "./labels";
 
@@ -144,6 +145,30 @@ export interface FactoryConfig {
   // A factory label to the team's own name for it, e.g. LABEL.ready to "ready-for-ai".
   // Applied once, at the tracker boundary; everything inside still speaks LABEL.*.
   readonly labels: Readonly<Record<string, string>>;
+  // The v4 event bus: where emitted events are POSTed, and the secret inbound POST /events checks.
+  readonly events: EventsConfig;
+}
+
+// Each sink gets every emitted event whose type is in `types` (all when unset),
+// signed with the secret in the env var named by secretEnv. The secret's value
+// never appears in config, logs or errors; only the variable's name does.
+export interface EventSink {
+  readonly url: string;
+  readonly secretEnv: string;
+  readonly types?: readonly string[];
+}
+
+export interface EventsConfig {
+  readonly sinks: readonly EventSink[];
+  // Unset reads FACTORY_EVENTS_SECRET (eventsInboundSecretEnv); POST /events is off while it is empty.
+  readonly inboundSecretEnv?: string;
+}
+
+export const DEFAULT_EVENTS_SECRET_ENV = "FACTORY_EVENTS_SECRET";
+
+// The one resolver for the inbound secret's variable name.
+export function eventsInboundSecretEnv(config: Pick<FactoryConfig, "events"> | undefined): string {
+  return config?.events?.inboundSecretEnv ?? DEFAULT_EVENTS_SECRET_ENV;
 }
 
 export type TrackerConfig =
@@ -242,6 +267,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   workflow: "feature-to-pr",
   tracker: { kind: "github" },
   labels: {},
+  events: { sinks: [] },
 };
 
 // The one resolver: DEFAULT_CONFIG, then the profile's defaults, then what the repo set.
@@ -263,6 +289,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     tmux: { ...DEFAULT_CONFIG.tmux, ...partial.tmux },
     tracker: partial.tracker ?? DEFAULT_CONFIG.tracker,
     labels: { ...DEFAULT_CONFIG.labels, ...partial.labels },
+    events: { ...DEFAULT_CONFIG.events, ...partial.events },
   };
 }
 
@@ -303,6 +330,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   runtime: "object",
   tracker: "object",
   labels: "object",
+  events: "object",
   riskCriteria: "object",
 };
 
@@ -363,6 +391,7 @@ export function configProblems(raw: unknown): string[] {
       else problems.push(`holdout.${key}: unknown key (allowed: paths, cmd)`);
     }
   }
+  if (cfg.events !== undefined) eventsProblems(cfg.events, problems);
   if (cfg.gates !== undefined) gateProblems(cfg.gates, "gates", problems);
   if (cfg.packages !== undefined) {
     if (!Array.isArray(cfg.packages)) problems.push("packages: expected a list");
@@ -414,6 +443,27 @@ function labelMapProblems(raw: unknown): string[] {
     seen.set(to, from);
   }
   return problems;
+}
+
+const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
+
+function eventsProblems(raw: unknown, problems: string[]): void {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return void problems.push("events: expected an object");
+  const ev = raw as Record<string, unknown>;
+  checkKeys(ev, { sinks: "object", inboundSecretEnv: "string" }, "events.", problems);
+  if (typeof ev.inboundSecretEnv === "string" && !ENV_NAME.test(ev.inboundSecretEnv)) problems.push(`events.inboundSecretEnv: expected an env var name like "FACTORY_EVENTS_SECRET", got ${JSON.stringify(ev.inboundSecretEnv)}`);
+  if (ev.sinks === undefined) return;
+  if (!Array.isArray(ev.sinks)) return void problems.push("events.sinks: expected a list");
+  ev.sinks.forEach((s, i) => {
+    const where = `events.sinks[${i}]`;
+    if (typeof s !== "object" || s === null || Array.isArray(s)) return problems.push(`${where}: expected an object`);
+    const sink = s as Record<string, unknown>;
+    checkKeys(sink, { url: "string", secretEnv: "string", types: "strings" }, `${where}.`, problems);
+    if (typeof sink.url !== "string" || !/^https?:\/\/./.test(sink.url)) problems.push(`${where}.url: expected an http(s) URL`);
+    // A name, never a value: a secret pasted here would sit in a committed file.
+    if (typeof sink.secretEnv !== "string" || !ENV_NAME.test(sink.secretEnv)) problems.push(`${where}.secretEnv: expected an env var name like "KAAS_EVENTS_SECRET"`);
+    if (Array.isArray(sink.types)) for (const t of sink.types) if (!isEventType(t)) problems.push(`${where}.types: "${String(t)}" is not an event type (see docs/events.md)`);
+  });
 }
 
 function gateProblems(list: unknown, where: string, problems: string[]): void {

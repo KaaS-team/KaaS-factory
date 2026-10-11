@@ -68,7 +68,8 @@ export class GitHubSpend implements SpendStore {
   record(e: SpendEntry): Promise<void> {
     // One write at a time: two stages finishing together would otherwise both read and write this worker's ledger comment.
     const next = this.chain.then(async () => {
-      await this.add(e.issue, undefined, e);
+      // Issue 0 is a minion's run: it has no issue, so only the ledger counts it.
+      if (e.issue > 0) await this.add(e.issue, undefined, e);
       await this.add(await this.ledgerIssue(), e.at.slice(0, 10), e);
     });
     this.chain = next.catch(() => {});

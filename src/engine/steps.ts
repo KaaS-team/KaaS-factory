@@ -26,6 +26,7 @@ import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
 import type { Step, StepKind, Workflow } from "../core/workflow";
+import { emitEvent } from "./bus";
 import {
   failureTail,
   finish,
@@ -348,6 +349,7 @@ const pr: StepType = {
         body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx, readProofStatus(worktree, issueNumber)),
         draft: true,
       }));
+    if (!existing) emitEvent(deps.bus, "factory.pr.opened", { repo: config.repo, issue: issueNumber, url: prUrl, head }, `issue/${issueNumber}`);
     // Opened as a draft while the factory works; ready is the hand-off to a human.
     await deps.github.markReady(config.repo, head, true);
     deps.state.updateRun(config.repo, issueNumber, { pr_url: prUrl });

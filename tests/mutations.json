@@ -284,5 +284,16 @@
   {"name": "dashboard: runtimes lose their used-by", "file": "dashboard/project.ts", "find": "usedBy: refs.filter((r) => r.name === name)", "replace": "usedBy: refs.filter(() => false)", "test": "tests/dashboard-routes.test.ts"},
   {"name": "leases: held() swallows an unreadable remote", "file": "src/adapters/git-lease/lease.ts", "find": "if (ls.code !== 0) throw new Error(`git ls-remote: ${ls.stderr.trim() || `exit ${ls.code}`}`);", "replace": "if (ls.code !== 0) return [];", "test": "tests/adapters.test.ts"},
   {"name": "tracker: no bearer header", "file": "src/adapters/http-tracker.ts", "find": "authorization: `Bearer ${token}`, ", "replace": "", "test": "tests/tracker-contract.test.ts"},
-  {"name": "tracker: branch mode keeps Closes #n", "file": "src/scm.ts", "find": "return text.replace(CLOSING, \"$1$2tracker issue $3\");", "replace": "return text;", "test": "tests/tracker-contract.test.ts"}
+  {"name": "tracker: branch mode keeps Closes #n", "file": "src/scm.ts", "find": "return text.replace(CLOSING, \"$1$2tracker issue $3\");", "replace": "return text;", "test": "tests/tracker-contract.test.ts"},
+  {"name": "events: signature check accepts anything", "file": "src/core/event.ts", "find": "  return diff === 0;", "replace": "  return true;", "test": "tests/events.test.ts"},
+  {"name": "events: inbound skips the signature", "file": "dashboard/server.ts", "find": "if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER))) return json(", "replace": "if (false) return json(", "test": "tests/events.test.ts"},
+  {"name": "events: inbound accepts factory types", "file": "dashboard/server.ts", "find": "if (!isExternalEventType(e.type)) return json(", "replace": "if (false) return json(", "test": "tests/events.test.ts"},
+  {"name": "events: another app's event files a ready issue", "file": "src/engine/triggers.ts", "find": "own ? [LABEL.ready] : []", "replace": "[LABEL.ready]", "test": "tests/triggers.test.ts"},
+  {"name": "minions: run past the spend cap", "file": "src/engine/minion.ts", "find": "  if (capped) return", "replace": "  if (false) return", "test": "tests/minion.test.ts"},
+  {"name": "minions: run while intake is paused", "file": "src/engine/minion.ts", "find": "  if (!deps.state.getToggle(\"auto_start\", true)) return", "replace": "  if (false) return", "test": "tests/minion.test.ts"},
+  {"name": "minions: event data can close its fence", "file": "src/engine/minion.ts", "find": ".replace(/</g, \"\\\\u003c\")", "replace": "", "test": "tests/minion.test.ts"},
+  {"name": "minions: broader tools than triage", "file": "src/engine/minion.ts", "find": "      stage: MINION_STAGE,", "replace": "      stage: \"build\",", "test": "tests/minion.test.ts"},
+  {"name": "minions: emit a factory type", "file": "src/core/minion.ts", "find": "if (emit !== undefined && !isExternalEventType(emit)) {", "replace": "if (false) {", "test": "tests/minion.test.ts"},
+  {"name": "events: an inbound event does not wake the poll", "file": "src/watch.ts", "find": "(filed > 0 || isExternalEventType(e.type)) && tick()", "replace": "filed > 0 && tick()", "test": "tests/intake-trust.test.ts"},
+  {"name": "events: inbound event files a ready issue past the trust gate", "file": "src/engine/triggers.ts", "find": "return await github.createIssue(repo, title, body, own ? [LABEL.ready] : []);", "replace": "return await github.createIssue(repo, title, body, [LABEL.ready]);", "test": "tests/intake-trust.test.ts"}
 ]
