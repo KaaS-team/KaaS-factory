@@ -8,7 +8,7 @@ import { cronMatches } from "../core/cron";
 import type { CronTrigger, Workflow } from "../core/workflow";
 import type { ScmPort } from "../ports/scm";
 import { LABEL } from "../labels";
-import type { CloudEvent } from "../core/event";
+import { isExternalEventType, type CloudEvent } from "../core/event";
 
 export const CRON_CATCHUP_MINUTES = 60;
 const MINUTE = 60_000;
@@ -70,8 +70,12 @@ export function eventMarker(workflow: string, eventId: string): string {
 
 const EVENT_DATA_MAX = 4000;
 
-// Files one factory:ready issue when the event's type is one the workflow
-// listens for. Returns its number, or undefined when nothing was filed.
+// Files one issue when the event's type is one the workflow listens for.
+// Returns its number, or undefined when nothing was filed. Only the factory's
+// own events file it as factory:ready. Another app's event (POST /events, or a
+// minion's agent-written answer) files it unlabelled: a valid HMAC proves who
+// sent it, not that its data is fit to run, so a maintainer adds factory:ready
+// and pickup checks who did, as for any issue (readyIsTrusted).
 export async function fireEvent(github: ScmPort, repo: string, workflow: Workflow, event: CloudEvent): Promise<number | undefined> {
   if (!workflow.triggers.event.includes(event.type)) return undefined;
   const marker = eventMarker(workflow.name, event.id);
@@ -80,6 +84,8 @@ export async function fireEvent(github: ScmPort, repo: string, workflow: Workflo
   const data = JSON.stringify(event.data, null, 2) ?? "null";
   const shown = data.length > EVENT_DATA_MAX ? `${data.slice(0, EVENT_DATA_MAX)}\n... (truncated)` : data;
   const title = `${event.type}${event.subject ? `: ${event.subject}` : ""}`.slice(0, 200);
-  const body = `Filed by the \`${workflow.name}\` workflow on the \`${event.type}\` event from \`${event.source}\` (id \`${event.id}\`).\n\n\`\`\`json\n${shown}\n\`\`\`\n\n${marker}`;
-  return await github.createIssue(repo, title, body, [LABEL.ready]);
+  const own = !isExternalEventType(event.type);
+  const gate = own ? "" : `\n\nThis event came from outside the factory, so it does not start on its own. A maintainer who has read the data below adds \`${LABEL.ready}\` to run it.`;
+  const body = `Filed by the \`${workflow.name}\` workflow on the \`${event.type}\` event from \`${event.source}\` (id \`${event.id}\`).${gate}\n\n\`\`\`json\n${shown}\n\`\`\`\n\n${marker}`;
+  return await github.createIssue(repo, title, body, own ? [LABEL.ready] : []);
 }

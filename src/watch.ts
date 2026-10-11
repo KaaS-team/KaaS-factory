@@ -29,7 +29,7 @@ import {
   labelsOf,
   leased,
   postComment,
-  repoSpendToday,
+  spendCapHit,
   runQueuedRetros,
   runRetro,
   worktreeFor,
@@ -400,11 +400,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // Intake pauses (new factory:ready pickups only) while a daily cap is hit;
   // an issue already in flight keeps going, since checkSpendCap parks it on
   // its own next stage if the cap is still hit then (plan v2.7.0 item 7).
-  const repoDailyUsd = config.spend.dailyUsd;
-  const repoDailyCapHit = repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd;
-  const machineDailyUsd = deps.machine?.config.dailyUsd;
-  const machineDailyCapHit = machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd;
-  const budgetPaused = repoDailyCapHit || machineDailyCapHit;
+  const budgetPaused = (await spendCapHit(deps, config)) !== undefined;
   const intakeGated = autoStart && !stopIf && !budgetPaused;
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {

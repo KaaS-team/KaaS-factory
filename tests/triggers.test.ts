@@ -164,14 +164,16 @@ describe("workflow on: event", () => {
     if (!r.ok) expect(r.problems.join("\n")).toMatch(msg);
   });
 
-  test("fireEvent files one ready issue per event id, carrying the data and its marker", async () => {
+  test("another app's event files one unlabelled issue per event id, carrying the data and its marker", async () => {
     const gh = new FakeGitHub([]);
     const wf = nightly(`  event: wiki.page.updated`);
     const n = await fireEvent(gh, REPO, wf, wikiEvent());
     expect(n).toBeDefined();
     const issue = gh.issues.get(n!)!;
     expect(issue.title).toBe("wiki.page.updated: pages/setup");
-    expect(issue.labels.map((l) => l.name)).toEqual([LABEL.ready]);
+    // A valid HMAC proves the sender, not the data: a maintainer adds factory:ready, and pickup checks who did.
+    expect(issue.labels).toEqual([]);
+    expect(issue.body).toContain(`adds \`${LABEL.ready}\` to run it`);
     expect(issue.body).toContain('"page": "setup"');
     expect(issue.body).toContain(eventMarker("nightly", "ev-1"));
     // The same event again (a redelivery) files nothing; a new id files again.
@@ -179,6 +181,20 @@ describe("workflow on: event", () => {
     expect(await fireEvent(gh, REPO, wf, wikiEvent("ev-2"))).toBeDefined();
     // A type the workflow does not listen for files nothing.
     expect(await fireEvent(gh, REPO, wf, { ...wikiEvent("ev-3"), type: "tasks.task.ready" })).toBeUndefined();
+  });
+
+  test("the factory's own event files a factory:ready issue", async () => {
+    const gh = new FakeGitHub([]);
+    const wf = nightly(`  event: factory.pr.merged`);
+    const n = await fireEvent(gh, REPO, wf, { ...wikiEvent(), type: "factory.pr.merged", source: "factory/o/r" });
+    expect(gh.issues.get(n!)!.labels.map((l) => l.name)).toEqual([LABEL.ready]);
+  });
+
+  test("an inbound event never starts a run by itself: the poll picks nothing up", async () => {
+    const gh = new FakeGitHub([]);
+    const deps = { github: gh, state: new FactoryState(":memory:"), workflow: nightly(`  event: tasks.task.ready`) } as never;
+    expect(await handleEvent(deps, mergeConfig({ repo: REPO }), { ...wikiEvent(), type: "tasks.task.ready" })).toBe(1);
+    expect((await pollOnce(deps, mergeConfig({ repo: REPO }))).processed).toEqual([]);
   });
 
   test("handleEvent files for a routed workflow and records which workflow runs it", async () => {

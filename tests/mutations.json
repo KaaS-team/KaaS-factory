@@ -282,5 +282,14 @@
   {"name": "dashboard: a lease holder reaches the page unescaped", "file": "dashboard/project.ts", "find": "holder: plain(l.holder)", "replace": "holder: l.holder", "test": "tests/dashboard-routes.test.ts"},
   {"name": "dashboard: an expired lease shows as held", "file": "dashboard/project.ts", "find": "live: l.expiresAt > now", "replace": "live: true", "test": "tests/dashboard-routes.test.ts"},
   {"name": "dashboard: runtimes lose their used-by", "file": "dashboard/project.ts", "find": "usedBy: refs.filter((r) => r.name === name)", "replace": "usedBy: refs.filter(() => false)", "test": "tests/dashboard-routes.test.ts"},
-  {"name": "leases: held() swallows an unreadable remote", "file": "src/adapters/git-lease/lease.ts", "find": "if (ls.code !== 0) throw new Error(`git ls-remote: ${ls.stderr.trim() || `exit ${ls.code}`}`);", "replace": "if (ls.code !== 0) return [];", "test": "tests/adapters.test.ts"}
+  {"name": "leases: held() swallows an unreadable remote", "file": "src/adapters/git-lease/lease.ts", "find": "if (ls.code !== 0) throw new Error(`git ls-remote: ${ls.stderr.trim() || `exit ${ls.code}`}`);", "replace": "if (ls.code !== 0) return [];", "test": "tests/adapters.test.ts"},
+  {"name": "events: signature check accepts anything", "file": "src/core/event.ts", "find": "  return diff === 0;", "replace": "  return true;", "test": "tests/events.test.ts"},
+  {"name": "events: inbound skips the signature", "file": "dashboard/server.ts", "find": "if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER))) return json(", "replace": "if (false) return json(", "test": "tests/events.test.ts"},
+  {"name": "events: inbound accepts factory types", "file": "dashboard/server.ts", "find": "if (!isExternalEventType(e.type)) return json(", "replace": "if (false) return json(", "test": "tests/events.test.ts"},
+  {"name": "events: another app's event files a ready issue", "file": "src/engine/triggers.ts", "find": "own ? [LABEL.ready] : []", "replace": "[LABEL.ready]", "test": "tests/triggers.test.ts"},
+  {"name": "minions: run past the spend cap", "file": "src/engine/minion.ts", "find": "  if (capped) return", "replace": "  if (false) return", "test": "tests/minion.test.ts"},
+  {"name": "minions: run while intake is paused", "file": "src/engine/minion.ts", "find": "  if (!deps.state.getToggle(\"auto_start\", true)) return", "replace": "  if (false) return", "test": "tests/minion.test.ts"},
+  {"name": "minions: event data can close its fence", "file": "src/engine/minion.ts", "find": ".replace(/</g, \"\\\\u003c\")", "replace": "", "test": "tests/minion.test.ts"},
+  {"name": "minions: broader tools than triage", "file": "src/engine/minion.ts", "find": "      stage: MINION_STAGE,", "replace": "      stage: \"build\",", "test": "tests/minion.test.ts"},
+  {"name": "minions: emit a factory type", "file": "src/core/minion.ts", "find": "if (emit !== undefined && !isExternalEventType(emit)) {", "replace": "if (false) {", "test": "tests/minion.test.ts"}
 ]
