@@ -5,11 +5,12 @@
 import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { GitHub, type ScmPort } from "./github";
+import type { ScmPort } from "./github";
+import { makeScm } from "./adapters/scm-factory";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { CommandExecutor } from "./agents/executor";
-import { loadConfig, type FactoryConfig } from "./config";
+import { DEFAULT_CONFIG, loadConfig, type FactoryConfig } from "./config";
 import { EXIT, UsageError, failureJson, successJson } from "./cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "./watch";
 import { ShellGateRunner } from "./gates";
@@ -106,7 +107,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
   const runtimes = runtimesFrom(machineConfig.runtimes);
   const unknown = [...new Set([workflow, ...Object.values(routeWorkflows)].flatMap((w) => unknownRuntimes(runtimeRefs(config, w.steps), runtimes)))];
   if (unknown.length) throw new Error(unknown.join("\n"));
-  const github = new GitHub();
+  const github = makeScm(config);
   // This process, as leases and the spend ledger name it.
   const holder = `${hostname()}-${process.pid}`;
   return {
@@ -169,7 +170,7 @@ async function cmdWatch(): Promise<void> {
 // poll (plan's "Core refactor" advanceIssue entry point).
 // `--issue N`, or `--pr N` for an event on a PR (a comment or a review), which
 // names the PR, not the issue it works on. Undefined: a PR about no one issue.
-async function issueFromFlags(github: GitHub, repo: string, cmd: string): Promise<number | undefined> {
+async function issueFromFlags(github: ScmPort, repo: string, cmd: string): Promise<number | undefined> {
   const pr = Number(flag("pr"));
   if (pr) return issueOfPr(await github.getPr(repo, pr));
   const issue = Number(flag("issue"));
@@ -180,7 +181,7 @@ async function issueFromFlags(github: GitHub, repo: string, cmd: string): Promis
 async function cmdRun(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const issueNumber = await issueFromFlags(new GitHub(), config.repo, "run");
+  const issueNumber = await issueFromFlags(makeScm(config), config.repo, "run");
   if (issueNumber === undefined) {
     console.log(`factory run: PR #${flag("pr")} is not about one issue; nothing to do.`);
     return;
@@ -213,7 +214,7 @@ async function cmdPark(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   const reason = flag("reason") ?? "parked by CI (no reason given)";
-  const github = new GitHub();
+  const github = makeScm(config);
   const issueNumber = await issueFromFlags(github, config.repo, "park");
   if (issueNumber === undefined) return;
   const issue = await github.getIssue(config.repo, issueNumber);
@@ -240,9 +241,12 @@ async function cmdLogs(): Promise<void> {
 }
 
 async function cmdInbox(): Promise<void> {
-  const repo = flag("repo") ?? process.env.FACTORY_REPO;
-  if (!repo) throw new UsageError("inbox: --repo <owner/name> (or FACTORY_REPO) is required");
-  const github = new GitHub();
+  // --repo-dir reads the repo's config, so a non-GitHub tracker is asked; --repo alone means GitHub.
+  const repoDir = flag("repo-dir");
+  const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
+  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo;
+  if (!repo) throw new UsageError("inbox: --repo <owner/name>, --repo-dir <path> or FACTORY_REPO is required");
+  const github = makeScm(config ?? DEFAULT_CONFIG);
   // Only read the watcher's DB if it exists; the inbox must not create one.
   const db = flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, repo);
   const reasons = existsSync(db) ? parkReasons(new FactoryState(db).listRuns(repo)) : undefined;
@@ -277,7 +281,7 @@ async function cmdScan(): Promise<void> {
       return { stdout, stderr, code };
     },
   };
-  const result = await scan({ github: new GitHub(), runner }, config.repo, cloneDir);
+  const result = await scan({ github: makeScm(config), runner }, config.repo, cloneDir);
   if (result.skippedReason) {
     console.log(`factory scan: skipped — ${result.skippedReason}`);
     return;
@@ -301,7 +305,7 @@ async function cmdReset(): Promise<void> {
     resettable: config.resettable,
     allIssues: has("all-issues"),
   };
-  const deps = { github: new GitHub(), git: new GitCommandRunner() };
+  const deps = { github: makeScm(config), git: new GitCommandRunner() };
   const summary = await reset(deps, ctx, dryRun);
   console.log(`factory reset${dryRun ? " --dry-run" : ""}: ${summary.actions.length} action(s)`);
   for (const a of summary.actions) console.log(`  ${dryRun ? "would " : ""}${a.kind}: ${a.detail}`);
@@ -321,7 +325,7 @@ async function cmdRebaseline(): Promise<void> {
     statePath: "",
     resettable: config.resettable,
   };
-  const moved = await rebaseline({ github: new GitHub(), git: new GitCommandRunner() }, ctx, dryRun);
+  const moved = await rebaseline({ github: makeScm(config), git: new GitCommandRunner() }, ctx, dryRun);
   console.log(`factory rebaseline${dryRun ? " --dry-run" : ""}: ${config.baselineTag} -> origin/${config.base} (${moved.length} commit(s))`);
   for (const c of moved) console.log(`  ${c}`);
 }
@@ -351,10 +355,11 @@ async function cmdDoctor(): Promise<void> {
     else console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
     process.exit(EXIT.checksFailed);
   }
-  const github = new GitHub();
+  const github = makeScm(config);
   const checks = await runDoctor(
     {
       github,
+      tracker: { kind: github.trackerKind, authStatus: () => github.tracker.authStatus() },
       git: new GitCommandRunner(),
       which,
       versionOf,
@@ -431,7 +436,7 @@ async function cmdDashboard(): Promise<void> {
   const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo ?? "";
   const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH);
   const state = new FactoryState(dbPath);
-  const github = new GitHub();
+  const github = makeScm(config ?? DEFAULT_CONFIG);
   serveDashboard(state, github, repo, false, config, repoDir && config ? dashboardProject(resolve(repoDir), config) : undefined);
   await new Promise(() => {}); // keep the process alive
 }
@@ -543,7 +548,7 @@ async function cmdTakeover(): Promise<void> {
   const repo = config.repo;
   const worktree = `${flag("workspaces") ?? defaultWorkspacesDir(process.env, repo)}/issue-${n}`;
   if (!(await Bun.file(`${worktree}/.git`).exists())) throw new Error(`#${n} has no worktree at ${worktree}`);
-  const github = new GitHub();
+  const github = makeScm(config);
   const liveFile = livePath(repo, n);
   const live = readLive(liveFile);
   let agent: string;
@@ -634,7 +639,7 @@ async function cmdInstall(): Promise<void> {
   // "next:" hint above, and `doctor --fix` stays the authoritative fixer.
   try {
     const config = await loadConfig(resolve(target));
-    await fixDoctor(new GitHub(), config.repo, config.routes, await workflowFor(resolve(target), config).catch(() => undefined));
+    await fixDoctor(makeScm(config), config.repo, config.routes, await workflowFor(resolve(target), config).catch(() => undefined));
     console.log(`factory install: labels ensured on ${config.repo}`);
   } catch {
     // no usable config.json yet

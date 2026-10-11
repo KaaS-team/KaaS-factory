@@ -27,8 +27,8 @@ export class GhCommandRunner implements CommandRunner {
   }
 }
 
-import type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort } from "./ports/scm";
-export type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort };
+import type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort, TrackerPort, CodeHostPort } from "./ports/scm";
+export type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort, TrackerPort, CodeHostPort };
 
 class GhError extends Error {
   constructor(
@@ -39,7 +39,7 @@ class GhError extends Error {
   }
 }
 
-export class GitHub implements ScmPort {
+export class GitHub implements TrackerPort, CodeHostPort {
   constructor(private readonly runner: CommandRunner = new GhCommandRunner()) {}
 
   private async exec(args: string[]): Promise<CommandResult> {

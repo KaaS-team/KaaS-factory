@@ -104,6 +104,27 @@ describe("config validation at boot", () => {
     expect(configProblems({ repo: "a/b", postEditCommand: "biome check {file}" })).toEqual(['postEditCommand: expected strings, got "biome check {file}"']);
   });
 
+  test("tracker defaults to GitHub; http needs an https url and a token env var name", () => {
+    expect(DEFAULT_CONFIG.tracker).toEqual({ kind: "github" });
+    expect(configProblems({ repo: "a/b", tracker: { kind: "github" } })).toEqual([]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "http", url: "https://tasks.example.com", tokenEnv: "TASKS_TOKEN", project: "web" } })).toEqual([]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "http", url: "http://127.0.0.1:9000", tokenEnv: "T" } })).toEqual([]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "jira" } })).toEqual(['tracker.kind: expected "github" or "http", got "jira"']);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "github", url: "https://x" } })).toEqual([expect.stringContaining("tracker.url: unknown key")]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "http", url: "http://tasks.example.com", tokenEnv: "sk-live-abc" } })).toEqual([
+      'tracker.url: https (plain http only to localhost), got "http://tasks.example.com"',
+      'tracker.tokenEnv: expected an env var name, got "sk-live-abc"',
+    ]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "http" } })).toEqual(["tracker.url: required", "tracker.tokenEnv: required (the name of the env var holding the token)"]);
+  });
+
+  test("labels maps factory labels to a team's names, one to one", () => {
+    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "ready-for-ai", _note: "x" } })).toEqual([]);
+    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "ai", "factory:failed": "ai" } })).toEqual(['labels.factory:failed: "ai" is already the name for factory:ready']);
+    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "factory:failed" } })).toEqual(['labels.factory:ready: "factory:failed" is itself a factory label name']);
+    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "" } })).toEqual(['labels.factory:ready: expected a label name, got ""']);
+  });
+
   test("agent-facing riskCriteria and _comment keys are allowed", () => {
     expect(configProblems({ repo: "a/b", _comment: "hi", riskCriteria: { low: {} } })).toEqual([]);
   });

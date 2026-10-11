@@ -47,11 +47,22 @@ export class GitCommandRunner implements CommandRunner {
   }
 }
 
+// The one branch naming for an issue's work, and its inverse. A tracker that is
+// not GitHub links an issue to its PR through this name (src/adapters/scm-factory.ts).
+export function issueBranch(issue: number): string {
+  return `factory/issue-${issue}`;
+}
+
+export function issueOfBranch(head: string): number | undefined {
+  const n = /^factory\/issue-(\d+)$/.exec(head)?.[1];
+  return n ? Number(n) : undefined;
+}
+
 // The issue a PR works on: the factory's own branch name first, else the one
 // issue the PR closes. Undefined for a PR that is not about exactly one issue.
 export function issueOfPr(pr: Pick<GhPr, "headRefName" | "closingIssuesReferences">): number | undefined {
-  const own = /^factory\/issue-(\d+)$/.exec(pr.headRefName)?.[1];
-  if (own) return Number(own);
+  const own = issueOfBranch(pr.headRefName);
+  if (own !== undefined) return own;
   const closes = pr.closingIssuesReferences ?? [];
   return closes.length === 1 ? closes[0]!.number : undefined;
 }
@@ -60,7 +71,7 @@ export class Git {
   constructor(private readonly runner: CommandRunner = new GitCommandRunner()) {}
 
   branchName(issue: number): string {
-    return `factory/issue-${issue}`;
+    return issueBranch(issue);
   }
 
   // Returns true if this call won the claim (push succeeded), false if

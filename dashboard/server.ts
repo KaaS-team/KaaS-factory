@@ -10,7 +10,8 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GitHub, type ScmPort } from "../src/github";
+import type { ScmPort } from "../src/github";
+import { makeScm } from "../src/adapters/scm-factory";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { parseChatOps } from "../src/chatops";
 import { buildBoard } from "./board";
@@ -676,7 +677,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
 
 if (import.meta.main) {
   const state = new FactoryState(DB_PATH);
-  const github = new GitHub();
+  // No config file here, so the default tracker; `factory dashboard --repo-dir` reads the repo's.
+  const github = makeScm(DEFAULT_CONFIG);
   const dashboard = createDashboard(state, github, REPO);
   // 127.0.0.1 by default (audit finding #16): reach it over the network only
   // by explicitly setting FACTORY_DASHBOARD_HOST=0.0.0.0 (the Docker image
