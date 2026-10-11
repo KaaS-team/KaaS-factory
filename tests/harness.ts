@@ -6,6 +6,7 @@
 import { mayTake, type LeaseRecord } from "../src/core/lease";
 import type { LeasePort } from "../src/ports/lease";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
 import { runDir } from "../src/artifacts";
@@ -22,6 +23,27 @@ let clock = Date.parse("2026-01-01T00:00:00Z");
 export function nextIso(): string {
   clock += 1000;
   return new Date(clock).toISOString();
+}
+
+// What a customer reading the tracker must never see: this machine's name, a
+// `.local` host, a dollar amount or a model. Only the text outside HTML
+// comments is visible; the factory's hidden data markers may carry anything.
+const HOST = hostname().toLowerCase();
+export function visibleLeaks(body: string): string[] {
+  const visible = body.replace(/<!--[\s\S]*?-->/g, "").toLowerCase();
+  const out: string[] = [];
+  if (HOST && visible.includes(HOST)) out.push(`hostname ${HOST}`);
+  if (/[\w-]\.local\b/.test(visible)) out.push(".local host");
+  if (/\$\s?\d/.test(visible)) out.push("dollar amount");
+  if (/\bmodel\b/.test(visible)) out.push("model");
+  return out;
+}
+
+// The checking fakes (FakeGitHub, MemoryTracker) call this on every write, so
+// every test that drives a comment through them checks it.
+export function assertCustomerSafe(body: string): void {
+  const leaks = visibleLeaks(body);
+  if (leaks.length) throw new Error(`a tracker comment shows operator detail (${leaks.join(", ")}): ${body}`);
 }
 
 // ---------- fakes: in-memory GitHub and Git, no `gh`/`git` process ----------
@@ -70,12 +92,14 @@ export class FakeGitHub extends GitHub {
   override async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     const missing = this.repoLabels && labels.find((l) => !this.repoLabels!.has(l));
     if (missing) throw new Error(`could not add label: '${missing}' not found`);
+    assertCustomerSafe(`${title}\n${body}`);
     const number = Math.max(0, ...this.issues.keys()) + 1;
     this.issues.set(number, { number, title, body, labels: labels.map((name) => ({ name })), comments: [] });
     return number;
   }
 
   override async commentIssue(_repo: string, number: number, body: string): Promise<number> {
+    assertCustomerSafe(body);
     const issue = this.issues.get(number)!;
     const id = this.nextCommentId++;
     const comment: GhComment = { id, author: "factory-bot", authorAssociation: "OWNER", body, createdAt: nextIso() };
@@ -113,6 +137,7 @@ export class FakeGitHub extends GitHub {
 
 
   override async editComment(_repo: string, commentId: number, body: string): Promise<void> {
+    assertCustomerSafe(body);
     this.editCount += 1;
     for (const issue of this.issues.values()) {
       const comment = issue.comments.find((c) => c.id === commentId);
