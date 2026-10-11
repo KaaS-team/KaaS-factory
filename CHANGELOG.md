@@ -1,5 +1,34 @@
 # Changelog
 
+## v4.0.0
+
+Events, minions, and trackers other than GitHub. Upgraders: nothing to change; GitHub stays the default
+tracker and no events are sent until `events.sinks` is set.
+
+- Events: every run emits CloudEvents 1.0 (`factory.step.started`, `factory.pr.opened`, `factory.pr.merged`,
+  and the rest of the catalogue in `src/core/event.ts`). Config `events.sinks` posts them, signed with
+  `x-kaas-signature: sha256=<hmac>`, from a SQLite outbox with retries; a delivery is dead after 8 attempts.
+  `docs/events.md`.
+- Inbound `POST /events` (HMAC, deduped on id; off until `FACTORY_EVENTS_SECRET` is set). An inbound event
+  only wakes the poll, which applies the usual trust, pause and spend checks. Nothing is read from event data
+  to pick an issue or an actor.
+- Workflows take `on: { event: <type> }`.
+- Minions: `.factory/minions/<name>.yml`, small jobs with no issue and no PR, run on an event or a cron.
+  They run with triage's tools and only the MCP servers they name, count against the same daily caps, and
+  see event data fenced as untrusted. `factory minion list|run`, `factory events tail|replay`.
+- Trackers: `ScmPort` is now `TrackerPort` and `CodeHostPort`. Config `tracker: { kind: "http", url, tokenEnv }`
+  takes issues from any tracker speaking Tracker API v1 (`docs/tracker-api.md`); PRs stay on GitHub and link
+  back by head branch `factory/issue-<n>`. Config `labels` maps factory labels to a team's own names.
+  `factory doctor` checks the tracker.
+- One resolver builds the tracker and code host from config (`src/scm.ts`); no command constructs GitHub directly.
+
+Not in this release:
+
+- Connectors catalogue and a deterministic tool step (v4.2), org mode (v4.3), `factory teach` (v4.4),
+  kaas.team look for the dashboard (v4.5).
+- Minions run locally only, in an empty workspace (no repo checkout). No dashboard view for minions or events.
+- `factory events tail --follow`.
+
 ## v3.5.0
 
 The dashboard restyled on the lwp-deck palette, with two new pages. Upgraders: nothing to change.
