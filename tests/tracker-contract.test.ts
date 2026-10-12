@@ -12,6 +12,7 @@ import { mergeConfig } from "../src/config";
 import { LABEL } from "../src/labels";
 import { FactoryState } from "../src/state";
 import { pollOnce } from "../src/watch";
+import { EventBus } from "../src/engine/bus";
 import { MemoryTracker, SERVER_ROUTES, startTracker } from "./fixtures/tracker-server";
 import { FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 import { trackerContract } from "./ports/tracker.contract";
@@ -113,7 +114,8 @@ describe("branch-mode linking", () => {
 });
 
 describe("end to end on an http tracker", () => {
-  test("a ready issue is picked up by the runner and ends with its PR URL commented back", async () => {
+  // A ready issue on the reference server, driven by the runner to in-review with its PR open.
+  async function runToReview() {
     const repo = "acme/widgets";
     const team = { [LABEL.ready]: "ready-for-ai", [LABEL.inReview]: "ai-in-review" };
     const http = new HttpTracker(spec, env);
@@ -141,9 +143,14 @@ describe("end to end on an http tracker", () => {
     push("verify", { "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict", "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }) });
     push("pr", { "pr-body.md": `Did it.\nCloses #${n}` });
 
-    const deps = { github, git: new FakeGit(), state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+    const bus = new EventBus({ store: state, sinks: [], source: "s", autoDeliver: false });
+    const deps = { github, git: new FakeGit(), state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, bus };
     await pollOnce(deps, mergeConfig({ repo }));
+    return { repo, n, host, state, deps };
+  }
 
+  test("a ready issue is picked up by the runner and ends with its PR URL commented back", async () => {
+    const { repo, n, host, state } = await runToReview();
     const issue = await server.store.getIssue(repo, n);
     expect(issue.labels).toEqual([{ name: "ai-in-review" }]);
     const url = `https://github.com/${repo}/pull/1`;
@@ -152,6 +159,23 @@ describe("end to end on an http tracker", () => {
     expect(host.createdPrs[0]!.head).toBe(`factory/issue-${n}`);
     expect(host.createdPrs[0]!.body).not.toContain(`#${n}`);
     expect(host.createdPrs[0]!.body).toContain(`Closes tracker issue ${n}`);
+    state.close();
+  });
+
+  // merge.policy is off (the default), so only the watcher noticing the merge closes the tracker issue.
+  test("a PR a human merges on GitHub closes the tracker issue and emits pr.merged by human, once", async () => {
+    const { repo, n, host, state, deps } = await runToReview();
+    (host.prs[0] as { state: string }).state = "merged";
+    await pollOnce(deps, mergeConfig({ repo }));
+    const issue = await server.store.getIssue(repo, n);
+    expect(issue.state).toBe("CLOSED");
+    expect(issue.labels).toEqual([]);
+    const merged = () => state.busEvents().filter((e) => e.type === "factory.pr.merged").map((e) => JSON.parse(e.data));
+    expect(merged()).toEqual([{ repo, issue: n, pr: 1, by: "human" }]);
+    expect(state.listRetros(repo).map((r) => r.outcome)).toEqual(["merged"]);
+    await pollOnce(deps, mergeConfig({ repo }));
+    expect(merged()).toHaveLength(1);
+    expect(state.listRetros(repo)).toHaveLength(1);
     state.close();
   });
 });

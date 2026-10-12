@@ -187,6 +187,8 @@ export class GitHub implements TrackerPort, CodeHostPort {
     return result.stdout.trim().split("\n").pop() ?? "";
   }
 
+  // A fork can name its branch factory/issue-N or write "Closes #N", so only PRs from this
+  // repository are the factory's. Every PR lookup by head or issue goes through here.
   async listPrs(repo: string, opts?: { state?: string }): Promise<GhPr[]> {
     const result = await this.exec([
       "pr",
@@ -196,11 +198,11 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--state",
       opts?.state ?? "open",
       "--json",
-      "number,url,state,headRefName,isDraft,closingIssuesReferences",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences,isCrossRepository",
       "--limit",
       "100",
     ]);
-    return JSON.parse(result.stdout || "[]");
+    return (JSON.parse(result.stdout || "[]") as GhPr[]).filter((p) => p.isCrossRepository !== true);
   }
 
   async getPr(repo: string, number: number): Promise<GhPr> {
@@ -211,6 +213,14 @@ export class GitHub implements TrackerPort, CodeHostPort {
   async findPrByHead(repo: string, head: string): Promise<GhPr | undefined> {
     const prs = await this.listPrs(repo, { state: "open" });
     return prs.find((p) => p.headRefName === head);
+  }
+
+  async mergedPrByHead(repo: string, head: string): Promise<GhPr | undefined> {
+    const result = await this.exec([
+      "pr", "list", "--repo", repo, "--head", head, "--state", "merged",
+      "--json", "number,url,state,headRefName,isDraft,closingIssuesReferences", "--limit", "1",
+    ]);
+    return (JSON.parse(result.stdout || "[]") as GhPr[]).find((p) => p.headRefName === head);
   }
 
   // Comments and review bodies on the PR, shaped like issue comments so the

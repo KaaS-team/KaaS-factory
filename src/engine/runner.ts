@@ -72,7 +72,8 @@ async function walk(
       if (deps.leases?.held.get(issueNumber)?.lost) return "waiting";
       const overBudget = await checkSpendCap(deps, config, issueNumber);
       if (overBudget) {
-        await postComment(deps, config, issueNumber, `Parked: ${overBudget}.`, { stage: "budget", json: { reason: overBudget } });
+        // The amounts are operator detail: the inbox and the hidden marker carry them, the visible text does not.
+        await postComment(deps, config, issueNumber, "Parked: a spend cap is reached. An operator can raise it and `/factory retry`.", { stage: "budget", json: { reason: overBudget } });
         return await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: overBudget });
       }
       at.step = step.id;
