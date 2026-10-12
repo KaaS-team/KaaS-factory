@@ -4,6 +4,7 @@
 // can read this file as the spec in code. Every route is listed in SERVER_ROUTES.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../src/ports/scm";
+import { assertCustomerSafe } from "../harness";
 
 class NotFound extends Error {}
 
@@ -75,9 +76,11 @@ export class MemoryTracker implements TrackerPort {
     return this.open(repo).map(this.copy);
   }
   async commentIssue(repo: string, n: number, body: string) {
+    assertCustomerSafe(body);
     return this.say(repo, n, this.login, body);
   }
   async editComment(repo: string, id: number, body: string) {
+    assertCustomerSafe(body);
     for (const i of this.project(repo).issues.values()) {
       const c = i.comments.find((x) => x.id === id);
       if (c) return void (c.body = body);
@@ -100,6 +103,7 @@ export class MemoryTracker implements TrackerPort {
     Object.assign(this.issue(repo, n), { state: "OPEN", stateReason: "REOPENED" });
   }
   async createIssue(repo: string, title: string, body: string, labels: string[]) {
+    assertCustomerSafe(`${title}\n${body}`);
     const p = this.project(repo);
     const number = p.issues.size + 1;
     p.issues.set(number, { number, title, body, labels: [], comments: [], state: "OPEN", stateReason: null });
