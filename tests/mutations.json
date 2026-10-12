@@ -330,5 +330,7 @@
   {"name": "merged: a human merge closes the tracker issue", "file": "src/watch.ts", "find": "  if (by === \"human\") {\n    await deps.github.closeIssue(", "replace": "  if (false) {\n    await deps.github.closeIssue(", "test": "tests/tracker-contract.test.ts"},
   {"name": "merged: in-review comes off", "file": "src/watch.ts", "find": "  await deps.github.removeLabels(config.repo, issue.number, [LABEL.inReview]);\n  emitEvent(", "replace": "  emitEvent(", "test": "tests/scenarios.test.ts"},
   {"name": "merged: the event says who merged", "file": "src/watch.ts", "find": "recordMerge(deps, config, issue, pr.number, \"human\")", "replace": "recordMerge(deps, config, issue, pr.number, \"factory\")", "test": "tests/scenarios.test.ts"},
-  {"name": "merged: a PR closed unmerged is not merged", "file": "src/github.ts", "find": "\"--head\", head, \"--state\", \"merged\",", "replace": "\"--head\", head, \"--state\", \"all\",", "test": "tests/github.test.ts"}
+  {"name": "merged: a PR closed unmerged is not merged", "file": "src/github.ts", "find": "\"--head\", head, \"--state\", \"merged\",", "replace": "\"--head\", head, \"--state\", \"all\",", "test": "tests/github.test.ts"},
+  {"name": "watch: inFlight released per issue", "file": "src/watch.ts", "find": "dispatch(deps, config, issue).finally(() => release(inFlight, issue.number)),", "replace": "dispatch(deps, config, issue),", "test": "tests/continuous-dispatch.test.ts"},
+  {"name": "watch: a stale poll skips an issue released after it listed", "file": "src/watch.ts", "find": "if (released !== undefined && released > listedAt) return false;", "replace": "", "test": "tests/continuous-dispatch.test.ts"}
 ]
