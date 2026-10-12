@@ -355,6 +355,21 @@ describe("needs-info paths", () => {
     done(c);
   });
 
+  test("8b. a question the agent wrote without its marker line still takes an answer", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ risk: "medium" }));
+    c.push("plan", plan("medium"));
+    await c.step();
+    c.push("build", { ...build(), "build.json": JSON.stringify({ status: "needs-info", gate_line: "", rounds: 1 }), "question-comment.md": "## Question\nDelete the files?" });
+    c.github.say(1, "/factory approve");
+    expect(await c.step()).toBe("needs-info");
+    expect(await c.step()).toBe("waiting");
+    build_to_pr(c);
+    c.github.say(1, "deleted them");
+    expect(await c.step()).toBe("shipped");
+    done(c);
+  });
+
   test("19. the runner's own comments are not read as an answer", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", { ...triage({ disposition: "needs-info" }), ...question() });

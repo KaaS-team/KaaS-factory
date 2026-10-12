@@ -185,8 +185,12 @@ async function cancelRun(issue: GhIssue, deps: WatchDeps, config: FactoryConfig)
   return "cancelled";
 }
 
+// The runner's own data marker counts too: an agent that drops the marker line
+// from question-comment.md would otherwise park the issue with no way to answer.
+const RUNNER_QUESTION_MARKER = '<!-- factory:data {"stage":"question"';
+
 function findQuestionComment(issue: GhIssue): GhComment | undefined {
-  return [...issue.comments].reverse().find((c) => c.body.includes("<!-- factory:question v1 -->"));
+  return [...issue.comments].reverse().find((c) => c.body.includes("<!-- factory:question v1 -->") || c.body.includes(RUNNER_QUESTION_MARKER));
 }
 
 function findPlanComment(issue: GhIssue): GhComment | undefined {
