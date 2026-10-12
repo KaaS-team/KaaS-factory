@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { mergeConfig } from "../src/config";
-import { CRON_CATCHUP_MINUTES, cronMarker, fireCron } from "../src/engine/triggers";
+import { CRON_CATCHUP_MINUTES, cronMarker, eventMarker, fireCron, fireEvent } from "../src/engine/triggers";
+import type { CloudEvent } from "../src/core/event";
 import { defaultWorkflow, parseWorkflowText } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
 import { FactoryState } from "../src/state";
-import { pollOnce } from "../src/watch";
+import { handleEvent, pollOnce } from "../src/watch";
 import { FakeGitHub } from "./harness";
 
 const REPO = "o/r";
@@ -141,5 +142,68 @@ describe("fireCron under a fake clock", () => {
     const deps = { github: gh, state, workflow: nightly(), now: () => at("2026-10-09T02:00:00Z") } as never;
     await pollOnce(deps, mergeConfig({ repo: REPO }));
     expect([...gh.issues.values()].map((i) => i.title)).toEqual(["Nightly dependency check"]);
+  });
+});
+
+const wikiEvent = (id = "ev-1"): CloudEvent => ({ specversion: "1.0", id, source: "wiki", type: "wiki.page.updated", subject: "pages/setup", time: "2026-10-11T00:00:00Z", data: { page: "setup" } });
+
+describe("workflow on: event", () => {
+  test("takes one type or a list, each from the catalogue", () => {
+    expect(nightly(`  event: wiki.page.updated`).triggers.event).toEqual(["wiki.page.updated"]);
+    expect(nightly(`  event: [tasks.task.ready, wiki.page.updated]`).triggers.event).toEqual(["tasks.task.ready", "wiki.page.updated"]);
+    expect(defaultWorkflow().triggers.event).toEqual([]);
+  });
+
+  test.each([
+    [`  event: wiki.page.deleted`, /on\.event: "wiki\.page\.deleted" is not an event type/],
+    [`  event: []`, /on\.event: an event type, or a list/],
+    [`  event: 3`, /on\.event: an event type, or a list/],
+  ])("names the problem: %#", (on, msg) => {
+    const r = parseWorkflowText(withOn(on));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problems.join("\n")).toMatch(msg);
+  });
+
+  test("another app's event files one unlabelled issue per event id, carrying the data and its marker", async () => {
+    const gh = new FakeGitHub([]);
+    const wf = nightly(`  event: wiki.page.updated`);
+    const n = await fireEvent(gh, REPO, wf, wikiEvent());
+    expect(n).toBeDefined();
+    const issue = gh.issues.get(n!)!;
+    expect(issue.title).toBe("wiki.page.updated: pages/setup");
+    // A valid HMAC proves the sender, not the data: a maintainer adds factory:ready, and pickup checks who did.
+    expect(issue.labels).toEqual([]);
+    expect(issue.body).toContain(`adds \`${LABEL.ready}\` to run it`);
+    expect(issue.body).toContain('"page": "setup"');
+    expect(issue.body).toContain(eventMarker("nightly", "ev-1"));
+    // The same event again (a redelivery) files nothing; a new id files again.
+    expect(await fireEvent(gh, REPO, wf, wikiEvent())).toBeUndefined();
+    expect(await fireEvent(gh, REPO, wf, wikiEvent("ev-2"))).toBeDefined();
+    // A type the workflow does not listen for files nothing.
+    expect(await fireEvent(gh, REPO, wf, { ...wikiEvent("ev-3"), type: "tasks.task.ready" })).toBeUndefined();
+  });
+
+  test("the factory's own event files a factory:ready issue", async () => {
+    const gh = new FakeGitHub([]);
+    const wf = nightly(`  event: factory.pr.merged`);
+    const n = await fireEvent(gh, REPO, wf, { ...wikiEvent(), type: "factory.pr.merged", source: "factory/o/r" });
+    expect(gh.issues.get(n!)!.labels.map((l) => l.name)).toEqual([LABEL.ready]);
+  });
+
+  test("an inbound event never starts a run by itself: the poll picks nothing up", async () => {
+    const gh = new FakeGitHub([]);
+    const deps = { github: gh, state: new FactoryState(":memory:"), workflow: nightly(`  event: tasks.task.ready`) } as never;
+    expect(await handleEvent(deps, mergeConfig({ repo: REPO }), { ...wikiEvent(), type: "tasks.task.ready" })).toBe(1);
+    expect((await pollOnce(deps, mergeConfig({ repo: REPO }))).processed).toEqual([]);
+  });
+
+  test("handleEvent files for a routed workflow and records which workflow runs it", async () => {
+    const gh = new FakeGitHub([]);
+    const routed = parseWorkflowText(withOn(`  event: wiki.page.updated`).replace("name: nightly", "name: docs-sync"));
+    if (!routed.ok) throw new Error(routed.problems.join("\n"));
+    const deps = { github: gh, state: new FactoryState(":memory:"), workflow: defaultWorkflow(), routeWorkflows: { docs: routed.workflow } } as never;
+    expect(await handleEvent(deps, mergeConfig({ repo: REPO }), wikiEvent())).toBe(1);
+    const [issue] = [...gh.issues.values()];
+    expect(issue!.comments.map((c) => c.body).join("\n")).toContain('"name":"docs-sync"');
   });
 });

@@ -5,11 +5,12 @@
 import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { GitHub, type ScmPort } from "./github";
+import type { ScmPort } from "./github";
+import { makeScm } from "./scm";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { CommandExecutor } from "./agents/executor";
-import { loadConfig, type FactoryConfig } from "./config";
+import { DEFAULT_CONFIG, loadConfig, type FactoryConfig } from "./config";
 import { EXIT, UsageError, failureJson, successJson } from "./cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "./watch";
 import { ShellGateRunner } from "./gates";
@@ -45,6 +46,9 @@ import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
 import { repoFromRemoteUrl } from "./config";
+import { EventBus } from "./engine/bus";
+import { loadMinions, runMinion } from "./engine/minion";
+import { parseEvent } from "./core/event";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -95,6 +99,10 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
   }
 }
 
+function stateDbPath(repo: string): string {
+  return flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, repo);
+}
+
 // Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
 // step, cron tick) resolve the exact same paths and construct the exact same
 // gate runner — one place, not three copies to drift (audit finding #1).
@@ -106,7 +114,11 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
   const runtimes = runtimesFrom(machineConfig.runtimes);
   const unknown = [...new Set([workflow, ...Object.values(routeWorkflows)].flatMap((w) => unknownRuntimes(runtimeRefs(config, w.steps), runtimes)))];
   if (unknown.length) throw new Error(unknown.join("\n"));
-  const github = new GitHub();
+  // Every minion is checked at boot: a bad file stops the watcher, not its first run.
+  const loaded = loadMinions(cloneDir, config);
+  if (loaded.problems.length) throw new Error(loaded.problems.join("\n"));
+  const state = new FactoryState(stateDbPath(config.repo));
+  const github = makeScm(config);
   // This process, as leases and the spend ledger name it.
   const holder = `${hostname()}-${process.pid}`;
   return {
@@ -117,7 +129,9 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
     github,
     git: new Git(new GitCommandRunner()),
-    state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
+    state,
+    bus: new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}` }),
+    minions: loaded.minions,
     executor: new CommandExecutor(config.agents, config.stages, config.routes),
     gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
     holdoutRunner: new ShellHoldoutRunner(),
@@ -169,7 +183,7 @@ async function cmdWatch(): Promise<void> {
 // poll (plan's "Core refactor" advanceIssue entry point).
 // `--issue N`, or `--pr N` for an event on a PR (a comment or a review), which
 // names the PR, not the issue it works on. Undefined: a PR about no one issue.
-async function issueFromFlags(github: GitHub, repo: string, cmd: string): Promise<number | undefined> {
+async function issueFromFlags(github: ScmPort, repo: string, cmd: string): Promise<number | undefined> {
   const pr = Number(flag("pr"));
   if (pr) return issueOfPr(await github.getPr(repo, pr));
   const issue = Number(flag("issue"));
@@ -180,7 +194,7 @@ async function issueFromFlags(github: GitHub, repo: string, cmd: string): Promis
 async function cmdRun(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const issueNumber = await issueFromFlags(new GitHub(), config.repo, "run");
+  const issueNumber = await issueFromFlags(makeScm(config), config.repo, "run");
   if (issueNumber === undefined) {
     console.log(`factory run: PR #${flag("pr")} is not about one issue; nothing to do.`);
     return;
@@ -213,7 +227,7 @@ async function cmdPark(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   const reason = flag("reason") ?? "parked by CI (no reason given)";
-  const github = new GitHub();
+  const github = makeScm(config);
   const issueNumber = await issueFromFlags(github, config.repo, "park");
   if (issueNumber === undefined) return;
   const issue = await github.getIssue(config.repo, issueNumber);
@@ -240,9 +254,12 @@ async function cmdLogs(): Promise<void> {
 }
 
 async function cmdInbox(): Promise<void> {
-  const repo = flag("repo") ?? process.env.FACTORY_REPO;
-  if (!repo) throw new UsageError("inbox: --repo <owner/name> (or FACTORY_REPO) is required");
-  const github = new GitHub();
+  // --repo-dir reads the repo's config, so a non-GitHub tracker is asked; --repo alone means GitHub.
+  const repoDir = flag("repo-dir");
+  const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
+  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo;
+  if (!repo) throw new UsageError("inbox: --repo <owner/name>, --repo-dir <path> or FACTORY_REPO is required");
+  const github = makeScm(config ?? DEFAULT_CONFIG);
   // Only read the watcher's DB if it exists; the inbox must not create one.
   const db = flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, repo);
   const reasons = existsSync(db) ? parkReasons(new FactoryState(db).listRuns(repo)) : undefined;
@@ -277,7 +294,7 @@ async function cmdScan(): Promise<void> {
       return { stdout, stderr, code };
     },
   };
-  const result = await scan({ github: new GitHub(), runner }, config.repo, cloneDir);
+  const result = await scan({ github: makeScm(config), runner }, config.repo, cloneDir);
   if (result.skippedReason) {
     console.log(`factory scan: skipped — ${result.skippedReason}`);
     return;
@@ -301,7 +318,7 @@ async function cmdReset(): Promise<void> {
     resettable: config.resettable,
     allIssues: has("all-issues"),
   };
-  const deps = { github: new GitHub(), git: new GitCommandRunner() };
+  const deps = { github: makeScm(config), git: new GitCommandRunner() };
   const summary = await reset(deps, ctx, dryRun);
   console.log(`factory reset${dryRun ? " --dry-run" : ""}: ${summary.actions.length} action(s)`);
   for (const a of summary.actions) console.log(`  ${dryRun ? "would " : ""}${a.kind}: ${a.detail}`);
@@ -321,7 +338,7 @@ async function cmdRebaseline(): Promise<void> {
     statePath: "",
     resettable: config.resettable,
   };
-  const moved = await rebaseline({ github: new GitHub(), git: new GitCommandRunner() }, ctx, dryRun);
+  const moved = await rebaseline({ github: makeScm(config), git: new GitCommandRunner() }, ctx, dryRun);
   console.log(`factory rebaseline${dryRun ? " --dry-run" : ""}: ${config.baselineTag} -> origin/${config.base} (${moved.length} commit(s))`);
   for (const c of moved) console.log(`  ${c}`);
 }
@@ -351,10 +368,11 @@ async function cmdDoctor(): Promise<void> {
     else console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
     process.exit(EXIT.checksFailed);
   }
-  const github = new GitHub();
+  const github = makeScm(config);
   const checks = await runDoctor(
     {
       github,
+      tracker: { kind: github.trackerKind, authStatus: () => github.tracker.authStatus() },
       git: new GitCommandRunner(),
       which,
       versionOf,
@@ -431,7 +449,7 @@ async function cmdDashboard(): Promise<void> {
   const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo ?? "";
   const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH);
   const state = new FactoryState(dbPath);
-  const github = new GitHub();
+  const github = makeScm(config ?? DEFAULT_CONFIG);
   serveDashboard(state, github, repo, false, config, repoDir && config ? dashboardProject(resolve(repoDir), config) : undefined);
   await new Promise(() => {}); // keep the process alive
 }
@@ -543,7 +561,7 @@ async function cmdTakeover(): Promise<void> {
   const repo = config.repo;
   const worktree = `${flag("workspaces") ?? defaultWorkspacesDir(process.env, repo)}/issue-${n}`;
   if (!(await Bun.file(`${worktree}/.git`).exists())) throw new Error(`#${n} has no worktree at ${worktree}`);
-  const github = new GitHub();
+  const github = makeScm(config);
   const liveFile = livePath(repo, n);
   const live = readLive(liveFile);
   let agent: string;
@@ -634,7 +652,7 @@ async function cmdInstall(): Promise<void> {
   // "next:" hint above, and `doctor --fix` stays the authoritative fixer.
   try {
     const config = await loadConfig(resolve(target));
-    await fixDoctor(new GitHub(), config.repo, config.routes, await workflowFor(resolve(target), config).catch(() => undefined));
+    await fixDoctor(makeScm(config), config.repo, config.routes, await workflowFor(resolve(target), config).catch(() => undefined));
     console.log(`factory install: labels ensured on ${config.repo}`);
   } catch {
     // no usable config.json yet
@@ -705,6 +723,66 @@ async function cmdHarness(): Promise<void> {
   if (sub === "validate" && report.problems.length) process.exit(EXIT.checksFailed);
 }
 
+// `factory minion list|run <name> [--event <json-file>]`: the repo's minions, or one run now.
+async function cmdMinion(): Promise<void> {
+  const sub = args[1];
+  if (sub !== "list" && sub !== "run") throw new UsageError("usage: factory minion (list | run <name> [--event <json-file>]) --repo-dir <path> [--json]");
+  if (sub === "list") {
+    const dir = resolve(flag("repo-dir") ?? ".");
+    const { minions, problems } = loadMinions(dir, await loadConfig(dir));
+    if (has("json")) console.log(successJson({ problems, minions: minions.map((m) => ({ name: m.name, description: m.description, on: "event" in m.on ? { event: m.on.event } : { cron: m.on.cron.src, tz: m.on.tz }, emit: m.emit ?? null })) }, !problems.length));
+    else {
+      for (const m of minions) console.log(`${m.name}  ${"event" in m.on ? `on ${m.on.event}` : `cron ${m.on.cron.src} ${m.on.tz}`}${m.emit ? `  emits ${m.emit}` : ""}  ${m.description}`);
+      for (const p of problems) console.log(`factory minion: ${p}`);
+      if (!minions.length && !problems.length) console.log("factory minion: no minions in .factory/minions");
+    }
+    if (problems.length) process.exit(EXIT.checksFailed);
+    return;
+  }
+  const name = args[2];
+  if (!name || name.startsWith("--")) throw new UsageError("minion run: a minion name is required");
+  const cloneDir = await resolveCloneDir();
+  const config = await loadConfig(cloneDir);
+  const deps = await buildWatchDeps(cloneDir, config);
+  const minion = deps.minions?.find((m) => m.name === name);
+  if (!minion) throw new UsageError(`minion run: no minion "${name}" in .factory/minions`);
+  let event;
+  const eventFile = flag("event");
+  if (eventFile) {
+    const parsed = parseEvent(JSON.parse(readFileSync(eventFile, "utf8")));
+    if (!parsed.ok) throw new UsageError(`minion run --event: ${parsed.problem}`);
+    event = parsed.event;
+  }
+  const run = await runMinion(deps, config, minion, event);
+  await deps.bus?.deliver();
+  console.log(has("json") ? successJson(run, run.status === "ok") : JSON.stringify(run, null, 2));
+  if (run.status !== "ok") process.exit(EXIT.checksFailed);
+}
+
+// `factory events tail|replay <id>`: the outbox and inbox, newest last, or one event sent again.
+async function cmdEvents(): Promise<void> {
+  const sub = args[1];
+  if (sub !== "tail" && sub !== "replay") throw new UsageError("usage: factory events (tail [--limit N] | replay <id>) --repo-dir <path> [--json]");
+  const cloneDir = resolve(flag("repo-dir") ?? ".");
+  const config = await loadConfig(cloneDir);
+  const state = new FactoryState(stateDbPath(config.repo));
+  if (sub === "tail") {
+    const rows = state.busEvents(Number(flag("limit") ?? 50));
+    for (const r of rows) {
+      if (has("json")) console.log(JSON.stringify({ ...r, data: JSON.parse(r.data), deliveries: state.busDeliveries(r.id) }));
+      else console.log(`${r.time}  ${r.direction === "in" ? "<-" : "->"}  ${r.type}  ${r.id}${r.subject ? `  ${r.subject}` : ""}${state.busDeliveries(r.id).map((d) => `  [${d.status} ${d.sink}]`).join("")}`);
+    }
+    return;
+  }
+  const id = args[2];
+  if (!id || id.startsWith("--")) throw new UsageError("events replay: an event id is required");
+  const bus = new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}`, autoDeliver: false });
+  const queued = bus.replay(id);
+  if (!queued) throw new UsageError(`events replay: no event "${id}" with a configured sink`);
+  const delivered = await bus.deliver();
+  console.log(`factory events: ${id} queued to ${queued} sink(s), ${delivered} delivered now`);
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "up":
@@ -747,6 +825,10 @@ async function main(): Promise<void> {
       return cmdDaemon();
     case "harness":
       return cmdHarness();
+    case "minion":
+      return cmdMinion();
+    case "events":
+      return cmdEvents();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

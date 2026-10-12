@@ -325,7 +325,9 @@ function workflowsView() {
           h("td", null, w.source === "repo" ? ".factory/workflows" : "Runner"),
           h("td", null, ROUTED(w)),
           h("td", null, h("span", { class: "steps" }, w.steps.map((st) => h("code", { title: st.runtime ? `runs on ${st.runtime}` : st.uses }, st.uses === st.id ? st.id : `${st.id} (${st.uses})`)))),
-          h("td", null, w.cron.length ? w.cron.map((c) => h("div", null, `${c.schedule} ${c.tz}: ${c.title}`)) : "On issue labels")))))))));
+          h("td", null, w.cron.length || (w.events ?? []).length
+            ? [...w.cron.map((c) => h("div", null, `${c.schedule} ${c.tz}: ${c.title}`)), ...(w.events ?? []).map((t) => h("div", null, `On ${t}`))]
+            : "On issue labels")))))))));
 }
 
 /* ---- Settings: runtimes and leases ---- */

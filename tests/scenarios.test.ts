@@ -15,6 +15,7 @@ import { LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { EPOCH, startOfTodayUtc } from "../src/engine/common";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
+import { EventBus } from "../src/engine/bus";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeLeases, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const seen = new Set<string>();
@@ -80,6 +81,10 @@ afterAll(() => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
 });
 
+function mergedEvents(c: Ctx): Record<string, unknown>[] {
+  return c.state.busEvents().filter((e) => e.type === "factory.pr.merged").map((e) => JSON.parse(e.data));
+}
+
 function done(c: Ctx) {
   // policy: off (DEFAULT_CONFIG.merge.policy, and every scenario here except
   // the "merge policy" describe block below) must never call mergePr, on any
@@ -102,6 +107,37 @@ describe("approval paths", () => {
     expect(c.github.readyCalls).toEqual([["factory/issue-1", true]]);
     expect(c.github.prs[0]!.isDraft).toBe(false);
     expect(labels(c.github, 1)).toEqual([LABEL.inReview]);
+    done(c);
+  });
+
+  test("1b. a run emits issue.ready, each step's start and end, pr.opened and run.completed, in order", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "factory/acme/widgets", autoDeliver: false });
+    const heard: string[] = [];
+    bus.subscribe("*", (e) => void heard.push(e.type === "factory.step.started" || e.type === "factory.step.completed" ? `${e.type}:${(e.data as { step: string }).step}` : e.type));
+    Object.assign(c.deps, { bus });
+    happy(c);
+    expect(await c.step()).toBe("shipped");
+    const steps = ["triage", "plan", "build", "verify", "pr"];
+    expect(heard).toEqual([
+      "factory.issue.ready",
+      ...steps.flatMap((s) => [`factory.step.started:${s}`, ...(s === "pr" ? ["factory.pr.opened"] : []), `factory.step.completed:${s}`]),
+      "factory.run.completed",
+    ]);
+    done(c);
+  });
+
+  test("1c. a run that parks for approval emits issue.parked", async () => {
+    const c = setup([LABEL.ready]);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    const parked: unknown[] = [];
+    bus.subscribe("factory.issue.parked", (e) => void parked.push(e.data));
+    Object.assign(c.deps, { bus });
+    c.push("triage", triage({ risk: "medium" }));
+    c.push("plan", plan("medium"));
+    expect(await c.step()).toBe("awaiting-approval");
+    expect(parked).toEqual([{ repo: "acme/widgets", issue: 1, workflow: "feature-to-pr", step: "plan", outcome: "awaiting-approval" }]);
     done(c);
   });
 
@@ -749,10 +785,54 @@ describe("merge policy on an in-review PR", () => {
   test("24. policy auto merges a fully eligible PR exactly once", async () => {
     const c = setup([LABEL.ready], { merge: { policy: "auto", autoPaths: [], maxFiles: 10, maxLines: 200 } });
     const pr = await readyForMerge(c);
-    expect(await c.step()).toBe("waiting");
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    const deps = { ...c.deps, bus };
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("shipped");
     expect(c.github.merged).toEqual([{ repo: c.config.repo, prNumber: pr.number, headSha: "sha1" }]);
     const comments = c.github.issues.get(1)!.comments;
     expect(comments.some((cm) => cm.body.includes("<!-- factory:merge-policy:sha1 -->"))).toBe(true);
+    expect(labels(c.github, 1)).not.toContain(LABEL.inReview);
+    // The factory's own merge is not read back as a human one on a later poll.
+    c.github.issues.get(1)!.labels.push({ name: LABEL.inReview });
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    expect(mergedEvents(c).map((e) => e.by)).toEqual(["factory"]);
+    done(c);
+  });
+
+  test("28. policy off: a PR a human merged closes the issue, emits pr.merged by human and runs retro, once", async () => {
+    const c = setup([LABEL.ready]);
+    const pr = await readyForMerge(c);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    const deps = { ...c.deps, bus };
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    (pr as { state: string }).state = "merged";
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("shipped");
+    expect(c.github.closed).toEqual([1]);
+    expect(labels(c.github, 1)).not.toContain(LABEL.inReview);
+    expect(mergedEvents(c)).toEqual([{ repo: c.config.repo, issue: 1, pr: pr.number, by: "human" }]);
+    expect(c.state.listRetros(c.config.repo).map((r) => r.outcome)).toEqual(["merged"]);
+    // A second poll that still lists the issue does nothing: the marker comment guards it.
+    c.github.issues.get(1)!.labels.push({ name: LABEL.inReview });
+    const before = c.github.issues.get(1)!.comments.length;
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    expect(c.github.closed).toEqual([1]);
+    expect(mergedEvents(c)).toHaveLength(1);
+    expect(c.state.listRetros(c.config.repo)).toHaveLength(1);
+    expect(c.github.issues.get(1)!.comments.length).toBe(before);
+    expect(c.github.merged).toEqual([]);
+    done(c);
+  });
+
+  test("29. a PR closed without merging is not a merge", async () => {
+    const c = setup([LABEL.ready]);
+    const pr = await readyForMerge(c);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    (pr as { state: string }).state = "closed";
+    expect(await advanceIssue({ ...c.deps, bus }, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    expect(c.github.closed).toEqual([]);
+    expect(labels(c.github, 1)).toContain(LABEL.inReview);
+    expect(mergedEvents(c)).toEqual([]);
+    expect(c.state.listRetros(c.config.repo)).toEqual([]);
     done(c);
   });
 

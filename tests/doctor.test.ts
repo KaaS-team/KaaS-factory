@@ -84,6 +84,14 @@ describe("runDoctor", () => {
     expect(authCheck.detail).toContain("not logged into");
   });
 
+  test("reports the tracker's kind and auth: GitHub's is gh's, http asks the tracker", async () => {
+    const gh = (await runDoctor(deps(), ctx)).find((c) => c.name.startsWith("tracker:"))!;
+    expect(gh).toMatchObject({ name: "tracker: github, authenticated", ok: true });
+    const down = { kind: "http" as const, authStatus: async () => ({ ok: false, detail: "tracker GET /me answered 401: bad token" }) };
+    const http = (await runDoctor({ ...deps(), tracker: down }, ctx)).find((c) => c.name.startsWith("tracker:"))!;
+    expect(http).toMatchObject({ name: "tracker: http, authenticated", ok: false, detail: expect.stringContaining("401") });
+  });
+
   test("flags a config with no gates", async () => {
     files.set("text", '{"gates": []}');
     const checks = await runDoctor(deps(), ctx);
@@ -258,7 +266,7 @@ describe("tmux check", () => {
 
 // Plan v2.11.0 item A: `factory install` calls this right after a real
 // install instead of leaving it to a separate `doctor --fix`. This is the
-// only place that exercises it: `bin/factory` hardcodes `new GitHub()` with
+// only place that exercises it: `bin/factory` builds its ScmPort with `makeScm(config)`,
 // no seam to inject a fake, so the wiring itself is a source check below.
 describe("fixDoctor", () => {
   test("ensures every labelsFor(routes) label, including a repo-added type", async () => {

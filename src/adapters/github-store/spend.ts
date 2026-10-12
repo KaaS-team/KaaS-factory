@@ -17,6 +17,7 @@ import type { GhComment } from "../../ports/scm";
 import type { SpendEntry, SpendStore, SpendTotal } from "../../ports/spend";
 
 const MARKER_RE = /<!-- factory:spend (\{.*?\}) -->/g;
+const SPEND_NOTE = "Factory usage record (operator data, hidden).";
 
 interface Tally {
   readonly holder: string;
@@ -68,7 +69,8 @@ export class GitHubSpend implements SpendStore {
   record(e: SpendEntry): Promise<void> {
     // One write at a time: two stages finishing together would otherwise both read and write this worker's ledger comment.
     const next = this.chain.then(async () => {
-      await this.add(e.issue, undefined, e);
+      // Issue 0 is a minion's run: it has no issue, so only the ledger counts it.
+      if (e.issue > 0) await this.add(e.issue, undefined, e);
       await this.add(await this.ledgerIssue(), e.at.slice(0, 10), e);
     });
     this.chain = next.catch(() => {});
@@ -115,7 +117,8 @@ export class GitHubSpend implements SpendStore {
       unreportedRuns: (cur?.unreportedRuns ?? 0) + (e.costUsd === null ? 1 : 0),
       runs: (cur?.runs ?? 0) + 1,
     };
-    const body = `Factory spend${day ? ` on ${day}` : ""} by worker ${this.holder}: $${next.costUsd.toFixed(2)} over ${next.runs} stage run(s)${next.unreportedRuns ? `, ${next.unreportedRuns} with unknown cost` : ""}.\n<!-- factory:spend ${JSON.stringify(next)} -->`;
+    // The tracker is customer-facing: the worker, its host and the dollars stay in the hidden marker.
+    const body = `${SPEND_NOTE}\n<!-- factory:spend ${JSON.stringify(next)} -->`;
     if (id !== undefined) await this.scm.editComment(this.repo, id, body);
     else id = await this.scm.commentIssue(this.repo, issue, body);
     if (id !== undefined) this.ids.set(key, id);

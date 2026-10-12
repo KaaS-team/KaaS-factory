@@ -10,7 +10,8 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GitHub, type ScmPort } from "../src/github";
+import type { ScmPort } from "../src/github";
+import { makeScm } from "../src/scm";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { parseChatOps } from "../src/chatops";
 import { buildBoard } from "./board";
@@ -29,12 +30,17 @@ import { analytics } from "./analytics";
 import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
 import { harnessReport } from "../src/harness";
 import { readCapped, readDelivery, signatureMatches, WAKING_EVENTS, WEBHOOK_MAX_BYTES, WEBHOOK_SECRET_ENV } from "../src/webhook";
+import { EVENT_SIGNATURE_HEADER, isExternalEventType, parseEvent, verifyEvent } from "../src/core/event";
+import { eventsInboundSecretEnv } from "../src/config";
 
 // GitHub cannot hold a dashboard token, so this route authenticates by HMAC
 // instead (src/webhook.ts), and is the one public route reachable from off
 // the box once FACTORY_WEBHOOK_SECRET is set.
 const WEBHOOK_ROUTE = "POST /webhook/github";
 const webhookSecret = () => process.env[WEBHOOK_SECRET_ENV] ?? "";
+// Other KaaS apps POST CloudEvents here, signed with x-kaas-signature (docs/events.md).
+// Public for the same reason: it authenticates by HMAC, and is off until the secret is set.
+const EVENTS_ROUTE = "POST /events";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FACTORY_DASHBOARD_PORT ?? 4100);
@@ -72,7 +78,7 @@ function cookie(req: Request, name: string): string {
 
 // The only routes reachable without a token. Everything else is default-deny;
 // tests/dashboard-routes.test.ts walks every route against this list.
-export const PUBLIC_ROUTES: readonly string[] = ["GET /", "GET /assets", "POST /api/session", WEBHOOK_ROUTE];
+export const PUBLIC_ROUTES: readonly string[] = ["GET /", "GET /assets", "POST /api/session", WEBHOOK_ROUTE, EVENTS_ROUTE];
 
 const ASSET_TYPES: Record<string, string> = { css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", woff2: "font/woff2" };
 
@@ -93,6 +99,8 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
 
 export function createDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, workspaces = workspacesDir(process.env, repo || undefined), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }, project?: DashboardProject) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
+  // Read by name on every request; the value is never logged or returned.
+  const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
 
   const sessions = new Map<string, number>();
   const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<ScmPort["listOpenIssues"]>> }>();
@@ -347,6 +355,33 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         if (d.event === "ping") return json({ ok: true, pong: true });
         if (!WAKING_EVENTS.has(d.event) || (repo && d.repo.toLowerCase() !== repo.toLowerCase())) return json({ ok: true, ignored: true }, { status: 202 });
         const fresh = state.recordDelivery(d);
+        return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
+      },
+    },
+    {
+      method: "POST",
+      pattern: /^\/events$/,
+      label: EVENTS_ROUTE,
+      handler: async (req) => {
+        const secret = eventsSecret();
+        if (!secret) return json({ error: "not found" }, { status: 404 });
+        if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES) return json({ error: "too large" }, { status: 413 });
+        const bytes = await readCapped(req.body, WEBHOOK_MAX_BYTES);
+        if (!bytes) return json({ error: "too large" }, { status: 413 });
+        const body = new TextDecoder().decode(bytes);
+        if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER))) return json({ error: "bad signature" }, { status: 401 });
+        let raw: unknown;
+        try {
+          raw = JSON.parse(body);
+        } catch {
+          return json({ error: "body is not JSON" }, { status: 400 });
+        }
+        const parsed = parseEvent(raw);
+        if (!parsed.ok) return json({ error: parsed.problem }, { status: 400 });
+        const e = parsed.event;
+        if (!isExternalEventType(e.type)) return json({ ok: true, ignored: true }, { status: 202 });
+        // Deduped on id: a sender's retry of an event already stored is acknowledged, not re-run.
+        const fresh = state.recordBusEvent({ id: e.id, direction: "in", type: e.type, source: e.source, subject: e.subject ?? null, time: e.time, data: JSON.stringify(e.data), handled_at: null });
         return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
       },
     },
@@ -640,7 +675,7 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
     const isPublic = route !== undefined && PUBLIC_ROUTES.includes(route.label);
 
     // The webhook carries its own HMAC, so GitHub may reach it with no dashboard token set.
-    const signedWebhook = route?.label === WEBHOOK_ROUTE && webhookSecret() !== "";
+    const signedWebhook = (route?.label === WEBHOOK_ROUTE && webhookSecret() !== "") || (route?.label === EVENTS_ROUTE && eventsSecret() !== "");
     if (!loopback && !DASHBOARD_TOKEN && !signedWebhook) {
       return json({ error: "refused: reachable from a non-loopback address with no FACTORY_DASHBOARD_TOKEN set" }, { status: 503 });
     }
@@ -652,7 +687,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
     // `text/plain` a plain HTML form can send cross-site without a preflight.
     if (req.method === "POST") {
       const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
-      if (!contentType.startsWith("application/json")) return json({ error: "expected application/json" }, { status: 415 });
+      const cloudEvent = route?.label === EVENTS_ROUTE && contentType.startsWith("application/cloudevents+json");
+      if (!contentType.startsWith("application/json") && !cloudEvent) return json({ error: "expected application/json" }, { status: 415 });
       const origin = req.headers.get("origin");
       if (origin) {
         let originHost: string;
@@ -676,7 +712,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
 
 if (import.meta.main) {
   const state = new FactoryState(DB_PATH);
-  const github = new GitHub();
+  // No config file here, so the default tracker; `factory dashboard --repo-dir` reads the repo's.
+  const github = makeScm(DEFAULT_CONFIG);
   const dashboard = createDashboard(state, github, REPO);
   // 127.0.0.1 by default (audit finding #16): reach it over the network only
   // by explicitly setting FACTORY_DASHBOARD_HOST=0.0.0.0 (the Docker image

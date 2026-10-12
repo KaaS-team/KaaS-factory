@@ -66,6 +66,7 @@ export function formatInventory(report: HarnessReport): string[] {
     if (!e.workflow) continue;
     lines.push(`  steps: ${Object.values(e.workflow.steps).map((s) => (s.uses === s.id ? s.id : `${s.id}(${s.uses})`)).join(" -> ")}`);
     for (const c of e.workflow.triggers.cron) lines.push(`  cron: ${c.cron.src} ${c.tz}: ${c.title}`);
+    for (const t of e.workflow.triggers.event) lines.push(`  event: ${t}`);
   }
   return lines;
 }

@@ -1,6 +1,6 @@
-// What the factory needs from a code host: issues, comments, labels and PRs.
-// GitHub (and GHE through GH_HOST) is the adapter today, in src/github.ts; a
-// GitLab or Bitbucket adapter implements this same interface.
+// What the factory needs from a tracker (issues, comments, labels) and a code
+// host (PRs). GitHub (and GHE through GH_HOST) implements both in src/github.ts;
+// makeScm (src/scm.ts) pairs a tracker with a code host.
 
 export interface GhIssue {
   number: number;
@@ -41,6 +41,7 @@ export interface GhPr {
   headRefName: string;
   isDraft: boolean;
   closingIssuesReferences?: { number: number }[];
+  isCrossRepository?: boolean;
 }
 
 export interface CiCheck {
@@ -81,7 +82,10 @@ export interface MergeReadiness {
 export type RepoRole = "admin" | "maintain" | "write" | "triage" | "read" | "none";
 export const TRUSTED_ROLES: readonly RepoRole[] = ["admin", "maintain", "write"];
 
-export interface ScmPort {
+// The issue side: where work is filed, discussed and labelled. GitHub is one
+// tracker; src/adapters/http-tracker.ts speaks Tracker API v1
+// (docs/tracker-api.md) to any other, such as kaas Tasks or a Linear bridge.
+export interface TrackerPort {
   listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]>;
   getIssue(repo: string, number: number): Promise<GhIssue>;
   listOpenIssues(repo: string): Promise<GhIssue[]>;
@@ -93,17 +97,6 @@ export interface ScmPort {
   closeIssue(repo: string, number: number): Promise<void>;
   reopenIssue(repo: string, number: number): Promise<void>;
   createIssue(repo: string, title: string, body: string, labels: string[]): Promise<number>;
-  createPr(opts: CreatePrOptions): Promise<string>;
-  listPrs(repo: string, opts?: { state?: string }): Promise<GhPr[]>;
-  findPrByHead(repo: string, head: string): Promise<GhPr | undefined>;
-  prFeedback(repo: string, head: string): Promise<GhComment[]>;
-  markReady(repo: string, ref: string | number, ready: boolean): Promise<void>;
-  closePr(repo: string, number: number): Promise<void>;
-  prStatus(repo: string, number: number): Promise<PrStatus>;
-  mergeReadiness(repo: string, number: number): Promise<MergeReadiness>;
-  prDiff(repo: string, prNumber: number): Promise<string>;
-  prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }): Promise<GhPr | undefined>;
-  mergePr(repo: string, number: number, headSha: string): Promise<void>;
   listLabels(repo: string): Promise<string[]>;
   ensureLabel(repo: string, name: string, color: string, description: string): Promise<void>;
   currentLogin(): Promise<string>;
@@ -112,3 +105,27 @@ export interface ScmPort {
   roleOf(repo: string, login: string): Promise<RepoRole>;
   authStatus(): Promise<{ ok: boolean; detail: string }>;
 }
+
+// The code side: branches become pull requests, checked and merged. Always
+// GitHub today, whichever tracker holds the issues.
+export interface CodeHostPort {
+  createPr(opts: CreatePrOptions): Promise<string>;
+  listPrs(repo: string, opts?: { state?: string }): Promise<GhPr[]>;
+  getPr(repo: string, number: number): Promise<GhPr>;
+  findPrByHead(repo: string, head: string): Promise<GhPr | undefined>;
+  // The newest merged PR on this head, whoever merged it. One closed without merging is not one.
+  mergedPrByHead(repo: string, head: string): Promise<GhPr | undefined>;
+  prFeedback(repo: string, head: string): Promise<GhComment[]>;
+  markReady(repo: string, ref: string | number, ready: boolean): Promise<void>;
+  closePr(repo: string, number: number): Promise<void>;
+  prStatus(repo: string, number: number): Promise<PrStatus>;
+  mergeReadiness(repo: string, number: number): Promise<MergeReadiness>;
+  prDiff(repo: string, prNumber: number): Promise<string>;
+  // The open PR for this issue: by "Closes #n" when the tracker is GitHub, by head branch otherwise.
+  prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }): Promise<GhPr | undefined>;
+  mergePr(repo: string, number: number, headSha: string): Promise<void>;
+  authStatus(): Promise<{ ok: boolean; detail: string }>;
+}
+
+// Everything the runner needs; src/scm.ts composes one from config.
+export type ScmPort = TrackerPort & CodeHostPort;

@@ -13,6 +13,12 @@ import { LABEL } from "../labels";
 import { McpError } from "../mcp";
 import { checkSpendCap, finish, moveLabel, OperatorTakeover, postComment, stopStep, type Outcome, type RunCtx, type WatchDeps } from "./common";
 import { RuntimeMissing, STEP_TYPES } from "./steps";
+import { emitEvent } from "./bus";
+
+// Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
+const PARKED: ReadonlySet<Outcome> = new Set(["needs-info", "needs-human", "awaiting-approval", "failed"]);
+// Outcomes where this worker did not run the issue to a stop, so no run ended.
+const NOT_A_RUN: ReadonlySet<Outcome> = new Set(["waiting", "lost-claim", "untrusted"]);
 
 export async function runWorkflow(
   deps: WatchDeps,
@@ -23,9 +29,34 @@ export async function runWorkflow(
   worktree: string,
   ctx: RunCtx = { rejectRound: 0, questionRound: 0 },
 ): Promise<Outcome> {
-  const first = workflow.steps[startStep];
-  if (!first) throw new Error(`workflow ${workflow.name} has no step "${startStep}"`);
-  let step: Step = first;
+  if (!workflow.steps[startStep]) throw new Error(`workflow ${workflow.name} has no step "${startStep}"`);
+  const at = { step: startStep };
+  const base = { repo: config.repo, issue: issue.number, workflow: workflow.name };
+  const subject = `issue/${issue.number}`;
+  let outcome: Outcome;
+  try {
+    outcome = await walk(deps, config, workflow, issue, at, worktree, ctx);
+  } catch (e) {
+    emitEvent(deps.bus, "factory.step.failed", { ...base, step: at.step, error: e instanceof Error ? e.message : String(e) }, subject);
+    throw e;
+  }
+  if (PARKED.has(outcome)) emitEvent(deps.bus, "factory.issue.parked", { ...base, step: at.step, outcome }, subject);
+  if (!NOT_A_RUN.has(outcome)) emitEvent(deps.bus, "factory.run.completed", { ...base, step: at.step, outcome }, subject);
+  return outcome;
+}
+
+async function walk(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  workflow: Workflow,
+  issue: GhIssue,
+  at: { step: string },
+  worktree: string,
+  ctx: RunCtx,
+): Promise<Outcome> {
+  let step: Step = workflow.steps[at.step]!;
+  const base = { repo: config.repo, issue: issue.number, workflow: workflow.name };
+  const subject = `issue/${issue.number}`;
   const issueNumber = issue.number;
   // What `if:` reads: each step's JSON, seeded from the thread so a resumed run sees earlier steps.
   const markers = parseDataMarkers(issue.comments);
@@ -41,10 +72,15 @@ export async function runWorkflow(
       if (deps.leases?.held.get(issueNumber)?.lost) return "waiting";
       const overBudget = await checkSpendCap(deps, config, issueNumber);
       if (overBudget) {
-        await postComment(deps, config, issueNumber, `Parked: ${overBudget}.`, { stage: "budget", json: { reason: overBudget } });
+        // The amounts are operator detail: the inbox and the hidden marker carry them, the visible text does not.
+        await postComment(deps, config, issueNumber, "Parked: a spend cap is reached. An operator can raise it and `/factory retry`.", { stage: "budget", json: { reason: overBudget } });
         return await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: overBudget });
       }
+      at.step = step.id;
+      emitEvent(deps.bus, "factory.step.started", { ...base, step: step.id, uses: step.uses }, subject);
       const result = await STEP_TYPES[step.uses]!.run({ deps, config, issue, worktree, ctx, step, workflow });
+      if (result.kind === "stop" && result.outcome === "failed") emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, outcome: result.outcome }, subject);
+      else emitEvent(deps.bus, "factory.step.completed", { ...base, step: step.id, result: result.kind === "stop" ? result.outcome : result.kind }, subject);
       if (result.kind === "stop") return result.outcome;
       if (result.kind === "reject") {
         const back: Step = workflow.steps[step.reject!]!;
@@ -68,6 +104,7 @@ export async function runWorkflow(
       step = to;
     }
   } catch (e) {
+    if (e instanceof McpError || e instanceof RuntimeMissing) emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, error: e.message }, subject);
     if (e instanceof McpError) {
       // A server the step names is not in the base branch's .factory/mcp.json: nothing ran, so a retry after the fix is free.
       await postComment(deps, config, issueNumber, `Stopped before ${step.id}: ${e.message}. Add it to .factory/mcp.json or drop it from the step, then \`/factory retry\`.`, { stage: "mcp", json: { step: step.id, problem: e.message } });

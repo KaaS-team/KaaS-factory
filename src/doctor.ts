@@ -24,6 +24,8 @@ export interface DoctorCheck {
 
 export interface DoctorDeps {
   readonly github: ScmPort;
+  // Where issues live (config.tracker) and its own auth. Absent: GitHub, whose auth is gh's.
+  readonly tracker?: { readonly kind: "github" | "http"; authStatus(): Promise<{ ok: boolean; detail: string }> };
   readonly git: CommandRunner;
   readonly which: (bin: string) => Promise<boolean>;
   // `<bin> --version` output, or undefined when it cannot be read.
@@ -168,6 +170,9 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     detail: auth.detail,
     fixable: false,
   });
+  const kind = deps.tracker?.kind ?? "github";
+  const trackerAuth = kind === "github" ? { ok: auth.ok, detail: "issues and labels on GitHub, through gh" } : await deps.tracker!.authStatus();
+  checks.push({ name: `tracker: ${kind}, authenticated`, ok: trackerAuth.ok, detail: trackerAuth.detail, fixable: false });
 
   checks.push({
     name: "target has .factory/config.json",

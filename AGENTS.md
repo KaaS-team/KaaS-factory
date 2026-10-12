@@ -22,8 +22,8 @@ A GitHub-native loop for coding agents: triage, plan, build, verify, PR. `src/` 
     writes (`tests/stop-artifact.test.ts`).
   - Of the field names a stage skill lists, tests check only `outcome`. Edit the skill in the same change.
 - **Stage shell rules.** `STAGE_GUIDANCE` and the allow-lists live in `src/stage-permissions.ts`.
-  Template agents carry `STAGE_GUIDANCE` verbatim (`tests/skills.test.ts`), and every git, bash or
-  gates.sh command in a stage skill must be on its allow-list (`tests/stage-permissions.test.ts`).
+  Template agents carry `STAGE_GUIDANCE` verbatim (`tests/skills.test.ts`), and every git, bash,
+  gates.sh or mutate.sh command in a stage skill must be on its allow-list (`tests/stage-permissions.test.ts`).
 - **Presets.** `docs/agents.md`'s table is generated from `PRESETS` by `scripts/gen-agents-doc.ts`,
   and `tests/agents-registry.test.ts` fails when they differ.
 - **Version.** `package.json` and `template-ci/factory.yml.example`'s `FACTORY_RUNNER_REF` move

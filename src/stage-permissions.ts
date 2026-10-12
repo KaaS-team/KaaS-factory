@@ -34,7 +34,15 @@ const BUILD_EXTRA = [
 
 // The verifier reverts the non-test hunks to prove the new test fails without
 // them, then restores; the repo's deny list still blocks reset --hard and push.
-const VERIFY_EXTRA = ["Bash(git stash *)", "Bash(git checkout *)", "Bash(git restore *)"];
+// mutate.sh runs a plan's "removing X makes the tests fail" on a throwaway copy, so
+// verify never needs Edit on the worktree it judges (#42).
+const VERIFY_EXTRA = [
+  "Bash(git stash *)",
+  "Bash(git checkout *)",
+  "Bash(git restore *)",
+  "Bash(.factory/mutate.sh *)",
+  "Bash(bash .factory/mutate.sh *)",
+];
 
 // What dontAsk refuses, measured on claude 2.1.289 (docs/decisions/stage-shell-shapes.md):
 // &&, ; and pipes pass when every part is allowed. Subagents never see this
