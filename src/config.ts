@@ -45,6 +45,9 @@ export interface GateSpec {
   readonly required: boolean;
   // What the gate checks. The proof reverts the change and runs the `test` one.
   readonly role?: GateRole;
+  // The test gate's command for named test files, when `cmd` ignores them (`make check` runs the
+  // whole suite). `.factory/mutate.sh` runs it with the files a mutation names.
+  readonly fileCmd?: string;
 }
 
 // A package in a monorepo: its gates run from its own directory, and only when
@@ -471,7 +474,7 @@ function gateProblems(list: unknown, where: string, problems: string[]): void {
   list.forEach((g, i) => {
     if (typeof g !== "object" || g === null) return problems.push(`${where}[${i}]: expected an object`);
     const gate = g as Record<string, unknown>;
-    checkKeys(gate, { name: "string", cmd: "string", required: "boolean", role: "string" }, `${where}[${i}].`, problems);
+    checkKeys(gate, { name: "string", cmd: "string", fileCmd: "string", required: "boolean", role: "string" }, `${where}[${i}].`, problems);
     if (typeof gate.role === "string" && !(GATE_ROLES as readonly string[]).includes(gate.role)) problems.push(`${where}[${i}].role: "${gate.role}" is not one of ${GATE_ROLES.join(", ")}`);
   });
 }

@@ -3,7 +3,7 @@
   "base": "main",
   "baselineTag": "baseline",
   "gates": [
-    { "name": "test", "cmd": "TODO: the command that runs your tests, e.g. make test", "required": true, "role": "test" },
+    { "name": "test", "cmd": "TODO: the command that runs your tests, e.g. make test", "fileCmd": "TODO: the same runner for named test files, e.g. bun test (remove if cmd takes file arguments)", "required": true, "role": "test" },
     { "name": "lint", "cmd": "TODO: optional, e.g. make lint", "required": false, "role": "lint" }
   ],
   "agentCommands": {
