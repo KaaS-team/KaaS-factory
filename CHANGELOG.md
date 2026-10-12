@@ -1,5 +1,18 @@
 # Changelog
 
+## v4.0.3
+
+- Fix: `mutate.sh` runs each mutation in a detached git worktree of HEAD, with `TMPDIR` outside it.
+  The old archive copy had no history and no common git dir, so tests that read git history, find a
+  sibling checkout or check a path lies outside the repo failed on baseline, and every mutation came
+  back baseline-red.
+- New: a test gate may set `fileCmd`, the runner `mutate.sh` uses with named test files, for a gate
+  whose `cmd` ignores file arguments (`make check`).
+- Fix: a parked run whose PR a human merged now ships, and a parked run whose issue was closed
+  outside the factory is ended on the next poll (shipped if its PR merged, else cancelled). Before,
+  both stayed parked with their tmux window open.
+- Fix: a merged PR removes the issue workspace, as a cancel already did. The branch keeps the work.
+
 ## v4.0.2
 
 - Fix: each card leaves the watcher's in-flight set when its own run ends, so an approved card no
