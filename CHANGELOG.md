@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.0.2
+
+- Fix: each card leaves the watcher's in-flight set when its own run ends, so an approved card no
+  longer waits for the slowest card started in the same poll. A poll whose issue list predates a
+  card's release skips that card instead of starting it twice (#56).
+
 ## v4.0.1
 
 - Fix: a card parked on a question now resumes when the operator answers, even if the agent left the

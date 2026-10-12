@@ -1,6 +1,6 @@
 {
   "name": "software-factory",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "private": true,
   "type": "module",
   "description": "GitHub-native SDLC loop for coding agents: triage, plan, build, verify, PR.",
