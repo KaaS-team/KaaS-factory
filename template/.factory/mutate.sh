@@ -21,7 +21,10 @@
 # - The tests run with only PATH, HOME (the copy) and TMPDIR (inside the copy) in their environment:
 #   no token or other variable of the stage reaches the repo's code.
 # The tests run on the unmutated copy first and must pass, then on the mutated copy. Last line:
-#   MUTATION: file=<file> status=bites|survives|error failed=<n|?> reason=<why, on error>
+#   MUTATION: file=<file> status=bites|survives|error failed=<n> reason=<why, on error>
+# It fails closed: a runner that cannot start (exit 126 or 127) or is killed, a timeout, a
+# no-op replacement, a non-zero exit with no failed test (a crash or compile error),
+# or any unexpected failure is status=error, never bites.
 # Exit code: 0 bites, 1 survives, 2 error. --proof appends the result to that file's "mutations".
 set -u
 cd "$(dirname "$0")/.." || exit 2
@@ -56,6 +59,17 @@ def error(reason, why):
     print(f"mutate.sh: {why}", file=sys.stderr, flush=True)
     say(f"MUTATION: file={file} status=error failed=0 reason={reason}")
     sys.exit(2)
+
+
+# Fails closed: anything unexpected is an error (exit 2), never bites or survives.
+def crashed(kind, value, tb):
+    print(f"mutate.sh: {kind.__name__}: {value}", file=sys.stderr, flush=True)
+    say(f"MUTATION: file={file} status=error failed=0 reason=internal")
+    os._exit(2)
+
+
+sys.excepthook = crashed
+TIMEOUT = 900
 
 
 def is_test(path):
@@ -96,6 +110,8 @@ def operator(search, replace):
     return replace in edits
 
 
+if replace == search:
+    error("replace-is-noop", "the replacement equals the search text, so nothing would change")
 if not operator(search, replace):
     error("replace-not-allowed", f"the replacement must be a listed constant or the search text with one ! or comparison changed, got {replace!r}")
 
@@ -172,17 +188,24 @@ try:
 
     def run():
         try:
-            r = subprocess.run(argv, cwd=copy, env=env, capture_output=True, text=True, errors="replace")
+            r = subprocess.run(argv, cwd=copy, env=env, capture_output=True, text=True, errors="replace", timeout=TIMEOUT)
         except OSError as e:
             error("no-test-runner", f"could not run {argv[0]}: {e}")
-        return r.returncode, (r.stdout + r.stderr)
+        except subprocess.TimeoutExpired:
+            error("timeout", f"the tests ran past {TIMEOUT}s")
+        out = r.stdout + r.stderr
+        if r.returncode < 0 or r.returncode in (126, 127):
+            say("\n".join(out.splitlines()[-30:]))
+            error("runner-failed", f"the test runner did not run the tests (exit {r.returncode})")
+        return r.returncode, out
 
     code, out = run()
     if code != 0:
         say("\n".join(out.splitlines()[-30:]))
         error("baseline-red", "the tests fail on the unmutated copy, so a failure after the mutation would prove nothing")
+    mutated = text.replace(search, replace, 1)
     with open(target, "w", encoding="utf-8", newline="") as f:
-        f.write(text.replace(search, replace, 1))
+        f.write(mutated)
     code, out = run()
 finally:
     shutil.rmtree(copy, ignore_errors=True)
@@ -190,8 +213,14 @@ finally:
 if code == 0:
     status, failed = "survives", "0"
 else:
-    counts = [int(m.group(1)) for m in re.finditer(r"(\d+)\s+(?:fail|failed|failing|failures?)\b", re.sub(r"\x1b\[[0-9;]*m", "", out), re.I)]
-    status, failed = "bites", str(max(counts)) if counts else "?"
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", out)
+    counts = [int(m.group(1)) for m in re.finditer(r"(\d+)\s+(?:fail|failed|failing|failures?)\b", plain, re.I)]
+    counts.append(len(re.findall(r"^--- FAIL", plain, re.M)))
+    if max(counts) == 0:
+        # A non-zero exit with no failed test is a crash or a compile error, which proves nothing.
+        say("\n".join(out.splitlines()[-30:]))
+        error("no-test-failed", "the tests exited non-zero but reported no failed test (a crash or compile error?)")
+    status, failed = "bites", str(max(counts))
 say("\n".join(out.splitlines()[-30:]))
 if proof:
     try:

@@ -33,11 +33,15 @@ function fixture(gateCmd = "bash"): string {
   writeFileSync(join(dir, "node_modules", "dep.sh"), "dep_ok() { true; }\n");
   writeFileSync(join(dir, "src", "guard.sh"), `guard() { ${GUARD}; }\nlabel() { echo "guarded"; }\n`);
   writeFileSync(join(dir, "src", "guard.config.sh"), "x=1\n");
+  writeFileSync(join(dir, "src", "boot.sh"), "ready=1\nflag=true\n");
   writeFileSync(
     join(dir, "tests", "check.sh"),
-    'source node_modules/dep.sh && dep_ok || { echo "dependency missing"; exit 3; }\necho run >> node_modules/written.txt\necho \"secret=${FAKE_SECRET:-unset}\"\nsource src/guard.sh\nif guard evil; then echo "1 failed"; exit 1; fi\necho "0 failed"\n',
+    'source node_modules/dep.sh && dep_ok || { echo "dependency missing"; exit 3; }\nsource src/boot.sh\n[ "$ready" = 1 ] || { echo "boot error"; exit 2; }\necho run >> node_modules/written.txt\necho \"secret=${FAKE_SECRET:-unset}\"\nsource src/guard.sh\nif guard evil; then echo "1 failed"; exit 1; fi\necho "0 failed"\n',
   );
   git(dir, "init", "-q");
+  // Background gc or maintenance would touch .git while the tree is hashed.
+  git(dir, "config", "gc.auto", "0");
+  git(dir, "config", "maintenance.auto", "false");
   git(dir, "add", "-A");
   git(dir, "commit", "-qm", "fixture");
   return dir;
@@ -115,6 +119,27 @@ describe("mutate.sh", () => {
     git(dir, "commit", "-qam", "break the guard");
     const r = mutate(dir, "src/guard.sh", ":;", "true", "tests/check.sh");
     expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "baseline-red"]);
+  });
+
+  // Fails closed: none of these may read as a caught mutation.
+  test("a test runner that cannot start is an error, not bites", () => {
+    const r = mutate(fixture("no-such-test-runner-xyz"), "src/guard.sh", GUARD, "true", "tests/check.sh");
+    expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "no-test-runner"]);
+  });
+
+  test("a runner found but not executable (exit 126 or 127) is an error, not bites", () => {
+    const r = mutate(fixture("sh -c"), "src/guard.sh", GUARD, "true", "tests/check.sh");
+    expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "runner-failed"]);
+  });
+
+  test("a mutated run that crashes with no failed test is an error, not bites", () => {
+    const r = mutate(fixture(), "src/boot.sh", "ready=1", "0", "tests/check.sh");
+    expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "no-test-failed"]);
+  });
+
+  test("a replacement equal to the search text is an error, not survives", () => {
+    const r = mutate(fixture(), "src/boot.sh", "true", "true", "tests/check.sh");
+    expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "replace-is-noop"]);
   });
 
   // Each refusal names its reason and runs nothing: no file appears in the worktree.

@@ -314,5 +314,9 @@
   {"name": "allow-list: verify may run mutate.sh", "file": "src/stage-permissions.ts", "find": "  \"Bash(.factory/mutate.sh *)\",\n", "replace": "", "test": "tests/stage-permissions.test.ts"},
   {"name": "install: mutate.sh made executable on update", "file": "install.sh", "find": "      .claude/hooks/*|.factory/gates.sh|.factory/mutate.sh) chmod +x \"$dest\" ;;\n    esac\n    echo \"overwrote", "replace": "      .claude/hooks/*|.factory/gates.sh) chmod +x \"$dest\" ;;\n    esac\n    echo \"overwrote", "test": "tests/install.test.ts"},
   {"name": "mutate: replacement from the operator list", "file": "template/.factory/mutate.sh", "find": "if not operator(search, replace):\n", "replace": "if False:\n", "test": "tests/mutate.test.ts"},
-  {"name": "mutate: tests get a minimal env", "file": "template/.factory/mutate.sh", "find": "cwd=copy, env=env, capture_output", "replace": "cwd=copy, capture_output", "test": "tests/mutate.test.ts"}
+  {"name": "mutate: tests get a minimal env", "file": "template/.factory/mutate.sh", "find": "cwd=copy, env=env, capture_output", "replace": "cwd=copy, capture_output", "test": "tests/mutate.test.ts"},
+  {"name": "mutate: a crash with no failed test is not bites", "file": "template/.factory/mutate.sh", "find": "    if max(counts) == 0:\n", "replace": "    if False:\n", "test": "tests/mutate.test.ts"},
+  {"name": "mutate: runner exit 126/127 is an error", "file": "template/.factory/mutate.sh", "find": "        if r.returncode < 0 or r.returncode in (126, 127):\n", "replace": "        if False:\n", "test": "tests/mutate.test.ts"},
+  {"name": "mutate: a runner that cannot start is an error", "file": "template/.factory/mutate.sh", "find": "            error(\"no-test-runner\", f\"could not run {argv[0]}: {e}\")\n", "replace": "            return 1, \"1 failed\"\n", "test": "tests/mutate.test.ts"},
+  {"name": "mutate: a no-op replacement is an error", "file": "template/.factory/mutate.sh", "find": "if replace == search:\n", "replace": "if False:\n", "test": "tests/mutate.test.ts"}
 ]
