@@ -89,6 +89,12 @@ describe("config validation at boot", () => {
     await expect(loadConfig(repoWith({ repo: "a/b", maxOpenFactoryPr: 3 }))).rejects.toThrow(/maxOpenFactoryPr: unknown key/);
   });
 
+  test("a test gate's fileCmd is a string, and a typo of it is an unknown key", () => {
+    expect(configProblems({ repo: "a/b", gates: [{ name: "check", cmd: "make check", fileCmd: "bun test", required: true, role: "test" }] })).toEqual([]);
+    expect(configProblems({ repo: "a/b", gates: [{ name: "check", cmd: "make check", fileCmd: 1, required: true, role: "test" }] })).toEqual([expect.stringContaining("gates[0].fileCmd")]);
+    expect(configProblems({ repo: "a/b", gates: [{ name: "check", cmd: "make check", filecmd: "bun test", required: true }] })).toEqual([expect.stringContaining("gates[0].filecmd: unknown key")]);
+  });
+
   test("a wrong type is refused, and every problem is listed at once", () => {
     const problems = configProblems({ repo: "a/b", concurrency: "3", riskPolicy: { autoApproveLowRisk: "yes" }, maxBudgetUsd: { build: 0, bulid: 1 }, gates: [{ name: "t", cmd: "x", required: 1 }] });
     expect(problems).toHaveLength(5);

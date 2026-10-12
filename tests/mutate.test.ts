@@ -5,7 +5,7 @@
 
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TEST_PATH } from "../src/proof";
@@ -22,12 +22,12 @@ function git(dir: string, ...args: string[]) {
 
 // A repo whose test checks a guard, reads an ignored dependency the copy must carry, and
 // writes into that dependency dir, which must never reach the worktree's own.
-function fixture(gateCmd = "bash"): string {
+function fixture(gateCmd = "bash", fileCmd?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "mutate-fixture-"));
   dirs.push(dir);
   for (const d of [".factory", "src", "tests", "node_modules"]) mkdirSync(join(dir, d));
   copyFileSync(SCRIPT, join(dir, ".factory", "mutate.sh"));
-  const config = { gates: [{ name: "test", cmd: gateCmd, required: true, role: "test" }], protectedPaths: ["secret/**"] };
+  const config = { gates: [{ name: "test", cmd: gateCmd, ...(fileCmd ? { fileCmd } : {}), required: true, role: "test" }], protectedPaths: ["secret/**"] };
   writeFileSync(join(dir, ".factory", "config.json"), JSON.stringify(config));
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n.factory/runs/\n");
   writeFileSync(join(dir, "node_modules", "dep.sh"), "dep_ok() { true; }\n");
@@ -37,6 +37,12 @@ function fixture(gateCmd = "bash"): string {
   writeFileSync(
     join(dir, "tests", "check.sh"),
     'source node_modules/dep.sh && dep_ok || { echo "dependency missing"; exit 3; }\nsource src/boot.sh\n[ "$ready" = 1 ] || { echo "boot error"; exit 2; }\necho run >> node_modules/written.txt\necho \"secret=${FAKE_SECRET:-unset}\"\nsource src/guard.sh\nif guard evil; then echo "1 failed"; exit 1; fi\necho "0 failed"\n',
+  );
+  // What the copy looks like from inside a test: its history, its common git dir (how kaas-suite
+  // finds a sibling kaas.team checkout) and whether its temp dir sits inside the repo.
+  writeFileSync(
+    join(dir, "tests", "env.sh"),
+    'echo "commits=$(git rev-list --count HEAD 2>/dev/null || echo 0)"\necho "common=$(cd "$(git rev-parse --git-common-dir 2>/dev/null || echo /nowhere)" 2>/dev/null && pwd -P)"\ncase "$(cd "$TMPDIR" && pwd -P)" in "$(pwd -P)"/*) echo tmp=inside;; *) echo tmp=outside;; esac\necho "0 failed"\n',
   );
   git(dir, "init", "-q");
   // Background gc or maintenance would touch .git while the tree is hashed.
@@ -180,6 +186,35 @@ describe("mutate.sh", () => {
 
   test("refuses a test gate that is not one plain command", () => {
     const r = mutate(fixture("bash tests/check.sh; touch pwned"), "src/guard.sh", GUARD, "true", "tests/check.sh");
+    expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "no-test-runner"]);
+  });
+
+  // kaas-suite cards 33 to 36: a git archive copy had no history and no common git dir, and its
+  // TMPDIR sat inside the copy, so 5 tests failed before any mutation (baseline-red every time).
+  test("the copy is a git checkout of HEAD with history and the worktree's common dir, TMPDIR outside it, and leaves nothing registered", () => {
+    const dir = fixture();
+    const before = treeHash(dir);
+    const r = mutate(dir, "src/guard.sh", 'echo "guarded"', "true", "tests/env.sh");
+    expect(r.line).toBe("MUTATION: file=src/guard.sh status=survives failed=0");
+    expect(r.out).toContain("commits=1");
+    expect(r.out).toContain(`common=${realpathSync(join(dir, ".git"))}`);
+    expect(r.out).toContain("tmp=outside");
+    const list = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], { cwd: dir }).stdout.toString();
+    expect(list.match(/^worktree /gm)).toHaveLength(1);
+    expect(treeHash(dir)).toBe(before);
+  });
+
+  test("runs the test gate's fileCmd with the named tests when it has one", () => {
+    const dir = fixture("no-such-whole-suite-runner", "bash");
+    mkdirSync(join(dir, ".factory", "runs", "issue-7"), { recursive: true });
+    const r = mutate(dir, "--proof", ".factory/runs/issue-7/proof.json", "src/guard.sh", GUARD, "true", "tests/check.sh");
+    expect([r.code, r.line]).toEqual([0, "MUTATION: file=src/guard.sh status=bites failed=1"]);
+    const proof = JSON.parse(readFileSync(join(dir, ".factory", "runs", "issue-7", "proof.json"), "utf8"));
+    expect(proof.mutations[0].cmd).toBe("bash tests/check.sh");
+  });
+
+  test("refuses a fileCmd that is not one plain command", () => {
+    const r = mutate(fixture("bash", "bash tests/check.sh; touch pwned"), "src/guard.sh", GUARD, "true", "tests/check.sh");
     expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "no-test-runner"]);
   });
 

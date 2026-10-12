@@ -20,7 +20,7 @@ import { deriveIssueState, latestDataFor, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
-import { issueType, LABEL } from "./labels";
+import { issueType, LABEL, PARKED_LABELS } from "./labels";
 import { effectiveSlots } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
@@ -180,9 +180,15 @@ async function cancelRun(issue: GhIssue, deps: WatchDeps, config: FactoryConfig)
   await postComment(deps, config, issue.number, `Cancelled by \`/factory cancel\`. The branch \`${head}\` is kept; label the issue \`${LABEL.ready}\` after deleting it to start over.`);
   await deps.github.closeIssue(config.repo, issue.number);
   await runRetro(deps, config, issue, "rejected");
-  await deps.git.removeWorktree(deps.cloneDir, worktreeFor(deps, issue.number));
+  await dropWorkspace(deps, issue.number);
   finish(deps, config, issue.number, "cancelled");
   return "cancelled";
+}
+
+// A run that is over needs its workspace no more; the branch keeps the work. A failed
+// removal is logged, never fatal: the run's outcome is already decided.
+async function dropWorkspace(deps: WatchDeps, issueNumber: number): Promise<void> {
+  await deps.git.removeWorktree(deps.cloneDir, worktreeFor(deps, issueNumber)).catch((err) => console.error(`removing #${issueNumber}'s workspace failed:`, err));
 }
 
 // The runner's own data marker counts too: an agent that drops the marker line
@@ -335,9 +341,12 @@ async function recordMerge(deps: WatchDeps, config: FactoryConfig, issue: GhIssu
   if (by === "human") {
     await deps.github.closeIssue(config.repo, issue.number).catch((err) => console.error(`closing #${issue.number} after its merge failed:`, err));
   }
-  await deps.github.removeLabels(config.repo, issue.number, [LABEL.inReview]);
+  // Whatever state the run sat in: a parked run's PR can be merged by hand too.
+  const lifecycle = labelsOf(issue).filter((n) => n.startsWith("factory:") && n !== LABEL.monitor);
+  if (lifecycle.length > 0) await deps.github.removeLabels(config.repo, issue.number, lifecycle);
   emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: issue.number, pr: prNumber, by }, `issue/${issue.number}`);
   await runRetro(deps, config, issue, "merged");
+  await dropWorkspace(deps, issue.number);
   finish(deps, config, issue.number, "shipped");
   return "shipped";
 }
@@ -388,12 +397,45 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
   return undefined;
 }
 
+// Every label a run waits on a human under, so its PR may have been merged by hand meanwhile.
+const WAITING_LABELS: readonly string[] = [...PARKED_LABELS, LABEL.awaitingApproval];
+const PARKED_STATUSES = new Set<string>(["needs-info", "awaiting-approval", "needs-human"]);
+
+// A parked run whose issue was closed outside the factory drops out of every
+// label list pollOnce reads, so nothing else would ever end it: its row stays
+// parked and its tmux window open. Shipped if its PR merged, else cancelled.
+// Each issue is held in inFlight while it is checked, so an overlapping poll
+// never records it twice.
+export async function reconcileClosed(deps: WatchDeps, config: FactoryConfig, listed: Set<number>, inFlight?: Set<number>): Promise<number[]> {
+  const ended: number[] = [];
+  for (const run of deps.state.listRuns(config.repo)) {
+    if (!PARKED_STATUSES.has(run.status) || listed.has(run.issue) || inFlight?.has(run.issue)) continue;
+    inFlight?.add(run.issue);
+    try {
+      const issue = await deps.github.getIssue(config.repo, run.issue);
+      if (issue.state !== "CLOSED") continue;
+      if ((await shipIfMerged(deps, config, issue)) !== "shipped") {
+        await dropWorkspace(deps, issue.number);
+        finish(deps, config, issue.number, "cancelled", "issue closed outside the factory");
+      }
+      ended.push(issue.number);
+    } catch (err) {
+      console.error(`reconciling closed #${run.issue} failed:`, err);
+    } finally {
+      release(inFlight, run.issue);
+    }
+  }
+  return ended;
+}
+
 // The single entry point every mode drives through: the pool (watch), a
 // one-off CLI call (`factory run --issue N`, for CI), and crash recovery all
 // call this with nothing but the issue's current GitHub state.
 export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome> {
   const names = labelsOf(issue);
   if (names.includes(LABEL.ready)) return processReadyIssue(issue, deps, config);
+  // A parked run's PR merged by hand ships it; nothing else would, since only in-review checks.
+  if (WAITING_LABELS.some((l) => names.includes(l)) && (await shipIfMerged(deps, config, issue)) === "shipped") return "shipped";
   if (names.includes(LABEL.needsInfo)) return (await resumeNeedsInfo(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.awaitingApproval)) return (await resumeAwaitingApproval(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.failed) || names.includes(LABEL.needsHuman)) return (await resumeParked(issue, deps, config)) ?? "waiting";
@@ -518,6 +560,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
       dispatch(deps, config, issue).finally(() => release(inFlight, issue.number)),
     );
     const processed = candidates.filter((_, i) => outcomes[i] && outcomes[i] !== "waiting").map((issue) => issue.number);
+    processed.push(...(await reconcileClosed(deps, config, new Set(buckets.flat().map((i) => i.number)), inFlight)));
     if (stopIf) return { paused: true, reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`, processed };
     if (budgetPaused) return { paused: true, reason: "budget: today's spend cap is hit, new pickups are paused", processed };
     return { paused: false, processed };

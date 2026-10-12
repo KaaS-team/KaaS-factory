@@ -4,7 +4,7 @@
 // The last test fails if a factory label exists that no scenario reaches.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
@@ -826,6 +826,8 @@ describe("merge policy on an in-review PR", () => {
     expect(labels(c.github, 1)).not.toContain(LABEL.inReview);
     expect(mergedEvents(c)).toEqual([{ repo: c.config.repo, issue: 1, pr: pr.number, by: "human" }]);
     expect(c.state.listRetros(c.config.repo).map((r) => r.outcome)).toEqual(["merged"]);
+    // The branch keeps the work; the workspace goes once the PR merged.
+    expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(false);
     // A second poll that still lists the issue does nothing: the marker comment guards it.
     c.github.issues.get(1)!.labels.push({ name: LABEL.inReview });
     const before = c.github.issues.get(1)!.comments.length;
@@ -1012,4 +1014,72 @@ describe("blocker gate", () => {
 test("every state and parked label is reached by a scenario", () => {
   const unreached = [...STATE_LABELS, ...PARKED_LABELS].filter((l) => !seen.has(l));
   expect(unreached).toEqual([]);
+});
+
+// A parked run whose PR a human merged, or whose issue a human closed: before
+// this, only in-review checked for a merge, and a closed issue left every
+// label list, so the run stayed parked with its tmux window open forever.
+describe("parked runs ended outside the factory", () => {
+  function parked(label: string, status: "needs-human" | "needs-info" | "awaiting-approval") {
+    const c = setup([label]);
+    c.state.upsertRun({ issue: 1, repo: c.config.repo, title: "t", stage: "verify", status });
+    mkdirSync(join(c.workspacesDir, "issue-1"), { recursive: true });
+    const closedViews: number[] = [];
+    const deps = { ...c.deps, view: { show: async () => {}, close: async (n: number) => void closedViews.push(n) } };
+    const mergePr = () => c.github.prs.push({ number: 7, url: "u", state: "merged", headRefName: c.git.branchName(1), isDraft: false });
+    return { c, deps, closedViews, mergePr };
+  }
+
+  for (const [label, status] of [[LABEL.needsHuman, "needs-human"], [LABEL.needsInfo, "needs-info"], [LABEL.awaitingApproval, "awaiting-approval"], [LABEL.failed, "needs-human"]] as const) {
+    test(`a ${label} run whose PR a human merged ships, drops its labels and workspace and closes its window`, async () => {
+      const { c, deps, closedViews, mergePr } = parked(label, status);
+      mergePr();
+      expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("shipped");
+      expect(labels(c.github, 1)).not.toContain(label);
+      expect(c.github.closed).toEqual([1]);
+      expect(c.state.getRun(c.config.repo, 1)?.status).toBe("shipped");
+      expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(false);
+      expect(closedViews).toEqual([1]);
+      done(c);
+    });
+  }
+
+  test("a parked run whose closed issue had its PR merged is recorded shipped by the poll", async () => {
+    const { c, deps, closedViews, mergePr } = parked(LABEL.needsHuman, "needs-human");
+    mergePr();
+    const issue = c.github.issues.get(1)!;
+    issue.labels = [];
+    issue.state = "CLOSED";
+    const r = await pollOnce(deps, c.config);
+    expect(r.processed).toEqual([1]);
+    expect(c.state.getRun(c.config.repo, 1)?.status).toBe("shipped");
+    expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(false);
+    expect(closedViews).toEqual([1]);
+    // The next poll finds nothing parked left to end.
+    expect((await pollOnce(deps, c.config)).processed).toEqual([]);
+    done(c);
+  });
+
+  test("a parked run whose issue was closed without a merge is cancelled, not shipped", async () => {
+    const { c, deps, closedViews } = parked(LABEL.needsHuman, "needs-human");
+    const issue = c.github.issues.get(1)!;
+    issue.labels = [];
+    issue.state = "CLOSED";
+    expect((await pollOnce(deps, c.config)).processed).toEqual([1]);
+    expect(c.state.getRun(c.config.repo, 1)?.status).toBe("cancelled");
+    expect(mergedEvents(c)).toEqual([]);
+    expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(false);
+    expect(closedViews).toEqual([1]);
+    done(c);
+  });
+
+  test("a parked run whose issue is still open stays parked", async () => {
+    const { c, deps, closedViews } = parked(LABEL.needsHuman, "needs-human");
+    c.github.issues.get(1)!.labels = [];
+    expect((await pollOnce(deps, c.config)).processed).toEqual([]);
+    expect(c.state.getRun(c.config.repo, 1)?.status).toBe("needs-human");
+    expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(true);
+    expect(closedViews).toEqual([]);
+    done(c);
+  });
 });

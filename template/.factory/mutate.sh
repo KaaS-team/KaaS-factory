@@ -14,12 +14,16 @@
 #   the search text), true, false, null, undefined, 0, "", return;, return true;, return false;,
 #   return null;, return [];, return {};, or the search text with one ! removed or added, or one
 #   comparison swapped (=== and !==, < and >=, > and <=).
-# - The runner is the test gate's cmd from .factory/config.json, split into words and run as an
-#   argv array with the named test files appended. Each test file exists in HEAD and has a test path.
+# - The runner is the test gate's fileCmd from .factory/config.json, else its cmd, split into words
+#   and run as an argv array with the named test files appended. Set fileCmd when cmd ignores file
+#   arguments (make check runs the whole suite). Each test file exists in HEAD and has a test path.
+# - The copy is a detached git worktree of HEAD, removed afterwards, so a test that reads history
+#   or finds a sibling checkout through the common git dir passes there as in the worktree.
 # - Dependency directories (node_modules, .venv, venv, vendor) are copied (cloned where the
 #   filesystem can), never linked, so a test that writes into them cannot reach the worktree.
-# - The tests run with only PATH, HOME (the copy) and TMPDIR (inside the copy) in their environment:
-#   no token or other variable of the stage reaches the repo's code.
+# - The tests run with only PATH, HOME (the copy) and TMPDIR (outside the copy, so a test's temp
+#   sandbox is never inside the repo it tests) in their environment: no token or other variable of
+#   the stage reaches the repo's code.
 # The tests run on the unmutated copy first and must pass, then on the mutated copy. Last line:
 #   MUTATION: file=<file> status=bites|survives|error failed=<n> reason=<why, on error>
 # It fails closed: a runner that cannot start (exit 126 or 127) or is killed, a timeout, a
@@ -146,18 +150,17 @@ for t in tests:
 
 gates = config.get("gates") or []
 gate = next((g for g in gates if g.get("role") == "test"), None) or next((g for g in gates if g.get("name") == "test"), None)
-gate_cmd = (gate or {}).get("cmd") or ""
+gate_cmd = (gate or {}).get("fileCmd") or (gate or {}).get("cmd") or ""
 if not gate_cmd or re.search(r"[;&|<>$`()\\\n]", gate_cmd) or re.match(r"\s*[A-Za-z_][A-Za-z0-9_]*=", gate_cmd):
-    error("no-test-runner", f"the test gate cmd must be one plain command to run as argv, got {gate_cmd!r}")
+    error("no-test-runner", f"the test gate fileCmd or cmd must be one plain command to run as argv, got {gate_cmd!r}")
 argv = shlex.split(gate_cmd) + tests
 
-copy = tempfile.mkdtemp(prefix="factory-mutate.")
+root = tempfile.mkdtemp(prefix="factory-mutate.")
+copy = os.path.join(root, "tree")
+git("worktree", "prune")  # forgets a copy a killed run left registered
 try:
-    archive = subprocess.Popen(["git", "archive", "HEAD"], stdout=subprocess.PIPE)
-    untar = subprocess.run(["tar", "-x", "-C", copy], stdin=archive.stdout)
-    archive.stdout.close()
-    if archive.wait() != 0 or untar.returncode != 0:
-        error("copy-failed", "could not copy HEAD's tree")
+    if git("worktree", "add", "--detach", "--quiet", copy, "HEAD").returncode != 0:
+        error("copy-failed", "could not check HEAD out into a worktree")
     target = os.path.join(copy, file)
     if os.path.islink(target) or not os.path.realpath(target).startswith(os.path.realpath(copy) + os.sep):
         error("bad-path", f"{file} does not resolve inside the copy")
@@ -182,7 +185,7 @@ try:
         else:
             error("copy-failed", f"could not copy {d}")
 
-    tmp = os.path.join(copy, ".factory-mutate-tmp")
+    tmp = os.path.join(root, "tmp")
     os.makedirs(tmp, exist_ok=True)
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": copy, "TMPDIR": tmp}
 
@@ -208,7 +211,9 @@ try:
         f.write(mutated)
     code, out = run()
 finally:
-    shutil.rmtree(copy, ignore_errors=True)
+    git("worktree", "remove", "--force", copy)
+    shutil.rmtree(root, ignore_errors=True)
+    git("worktree", "prune")
 
 if code == 0:
     status, failed = "survives", "0"
