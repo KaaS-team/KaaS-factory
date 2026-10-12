@@ -81,6 +81,10 @@ afterAll(() => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
 });
 
+function mergedEvents(c: Ctx): Record<string, unknown>[] {
+  return c.state.busEvents().filter((e) => e.type === "factory.pr.merged").map((e) => JSON.parse(e.data));
+}
+
 function done(c: Ctx) {
   // policy: off (DEFAULT_CONFIG.merge.policy, and every scenario here except
   // the "merge policy" describe block below) must never call mergePr, on any
@@ -781,10 +785,54 @@ describe("merge policy on an in-review PR", () => {
   test("24. policy auto merges a fully eligible PR exactly once", async () => {
     const c = setup([LABEL.ready], { merge: { policy: "auto", autoPaths: [], maxFiles: 10, maxLines: 200 } });
     const pr = await readyForMerge(c);
-    expect(await c.step()).toBe("waiting");
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    const deps = { ...c.deps, bus };
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("shipped");
     expect(c.github.merged).toEqual([{ repo: c.config.repo, prNumber: pr.number, headSha: "sha1" }]);
     const comments = c.github.issues.get(1)!.comments;
     expect(comments.some((cm) => cm.body.includes("<!-- factory:merge-policy:sha1 -->"))).toBe(true);
+    expect(labels(c.github, 1)).not.toContain(LABEL.inReview);
+    // The factory's own merge is not read back as a human one on a later poll.
+    c.github.issues.get(1)!.labels.push({ name: LABEL.inReview });
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    expect(mergedEvents(c).map((e) => e.by)).toEqual(["factory"]);
+    done(c);
+  });
+
+  test("28. policy off: a PR a human merged closes the issue, emits pr.merged by human and runs retro, once", async () => {
+    const c = setup([LABEL.ready]);
+    const pr = await readyForMerge(c);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    const deps = { ...c.deps, bus };
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    (pr as { state: string }).state = "merged";
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("shipped");
+    expect(c.github.closed).toEqual([1]);
+    expect(labels(c.github, 1)).not.toContain(LABEL.inReview);
+    expect(mergedEvents(c)).toEqual([{ repo: c.config.repo, issue: 1, pr: pr.number, by: "human" }]);
+    expect(c.state.listRetros(c.config.repo).map((r) => r.outcome)).toEqual(["merged"]);
+    // A second poll that still lists the issue does nothing: the marker comment guards it.
+    c.github.issues.get(1)!.labels.push({ name: LABEL.inReview });
+    const before = c.github.issues.get(1)!.comments.length;
+    expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    expect(c.github.closed).toEqual([1]);
+    expect(mergedEvents(c)).toHaveLength(1);
+    expect(c.state.listRetros(c.config.repo)).toHaveLength(1);
+    expect(c.github.issues.get(1)!.comments.length).toBe(before);
+    expect(c.github.merged).toEqual([]);
+    done(c);
+  });
+
+  test("29. a PR closed without merging is not a merge", async () => {
+    const c = setup([LABEL.ready]);
+    const pr = await readyForMerge(c);
+    const bus = new EventBus({ store: c.state, sinks: [], source: "s", autoDeliver: false });
+    (pr as { state: string }).state = "closed";
+    expect(await advanceIssue({ ...c.deps, bus }, c.config, c.github.issues.get(1)!)).toBe("waiting");
+    expect(c.github.closed).toEqual([]);
+    expect(labels(c.github, 1)).toContain(LABEL.inReview);
+    expect(mergedEvents(c)).toEqual([]);
+    expect(c.state.listRetros(c.config.repo)).toEqual([]);
     done(c);
   });
 

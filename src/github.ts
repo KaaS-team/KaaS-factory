@@ -213,6 +213,14 @@ export class GitHub implements TrackerPort, CodeHostPort {
     return prs.find((p) => p.headRefName === head);
   }
 
+  async mergedPrByHead(repo: string, head: string): Promise<GhPr | undefined> {
+    const result = await this.exec([
+      "pr", "list", "--repo", repo, "--head", head, "--state", "merged",
+      "--json", "number,url,state,headRefName,isDraft,closingIssuesReferences", "--limit", "1",
+    ]);
+    return (JSON.parse(result.stdout || "[]") as GhPr[]).find((p) => p.headRefName === head);
+  }
+
   // Comments and review bodies on the PR, shaped like issue comments so the
   // same trust and command parsing applies. Empty when no PR exists yet.
   async prFeedback(repo: string, head: string): Promise<GhComment[]> {
