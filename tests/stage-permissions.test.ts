@@ -23,6 +23,15 @@ describe("stageSettings", () => {
       expect(allow.includes("Bash(git checkout *)")).toBe(stage === "verify");
     }
   });
+
+  // #42: verify runs a mutation on a copy through mutate.sh, never by editing the worktree.
+  test("only verify may run mutate.sh, and verify still may not Edit the worktree", () => {
+    for (const stage of STAGES) {
+      const allow: string[] = JSON.parse(stageSettings(stage, 1)).permissions.allow;
+      expect(allow.includes("Bash(.factory/mutate.sh *)")).toBe(stage === "verify");
+      if (stage === "verify") expect(allow.filter((r) => r.startsWith("Edit("))).toEqual(["Edit(.factory/runs/issue-1/**)"]);
+    }
+  });
 });
 
 describe("repo-supplied agent commands", () => {
@@ -63,7 +72,7 @@ describe("skill commands are permitted by their stage", () => {
       const cmds = text
         .split("\n")
         .filter((l) => !/never|denies|the runner runs|gate_level/i.test(l))
-        .flatMap((l) => [...l.matchAll(/`((?:git|bash|\.factory\/gates\.sh)[^`]*)`/g)].map((m) => m[1]!));
+        .flatMap((l) => [...l.matchAll(/`((?:git|bash|\.factory\/(?:gates|mutate)\.sh)[^`]*)`/g)].map((m) => m[1]!));
       for (const cmd of cmds) expect([cmd, allowed(allow, cmd)]).toEqual([cmd, true]);
     });
   }

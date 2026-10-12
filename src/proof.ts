@@ -18,10 +18,12 @@ export interface ProofResult {
   readonly cmd: string;
   readonly exitCode?: number;
   readonly tail: string;
+  // Appended by template/.factory/mutate.sh --proof when verify runs a plan's mutation (#42).
+  readonly mutations?: readonly { file: string; status: "bites" | "survives"; failed: string; cmd: string; exitCode: number; tail: string }[];
 }
 
 // A test by its path, the conventions bun, jest, vitest, pytest, go and rspec use.
-const TEST_PATH = [/(^|\/)(tests?|__tests__|spec)\//, /\.(test|spec)\.[cm]?[jt]sx?$/, /(^|\/)test_[^/]*\.py$/, /_test\.(py|go)$/, /_spec\.rb$/];
+export const TEST_PATH = [/(^|\/)(tests?|__tests__|spec)\//, /\.(test|spec)\.[cm]?[jt]sx?$/, /(^|\/)test_[^/]*\.py$/, /_test\.(py|go)$/, /_spec\.rb$/];
 
 export function isTestPath(path: string): boolean {
   return TEST_PATH.some((re) => re.test(path));
