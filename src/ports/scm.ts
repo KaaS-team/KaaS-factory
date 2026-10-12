@@ -113,6 +113,8 @@ export interface CodeHostPort {
   listPrs(repo: string, opts?: { state?: string }): Promise<GhPr[]>;
   getPr(repo: string, number: number): Promise<GhPr>;
   findPrByHead(repo: string, head: string): Promise<GhPr | undefined>;
+  // The newest merged PR on this head, whoever merged it. One closed without merging is not one.
+  mergedPrByHead(repo: string, head: string): Promise<GhPr | undefined>;
   prFeedback(repo: string, head: string): Promise<GhComment[]>;
   markReady(repo: string, ref: string | number, ready: boolean): Promise<void>;
   closePr(repo: string, number: number): Promise<void>;

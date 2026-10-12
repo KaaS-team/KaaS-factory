@@ -29,7 +29,7 @@ missing from it, or when a factory type is never emitted.
 | `factory.step.started` / `.completed` / `.failed` | each workflow step |
 | `factory.issue.parked` | a run stops for a human (needs-info, needs-human, awaiting-approval, failed) |
 | `factory.pr.opened` | the pr step opens a PR |
-| `factory.pr.merged` | the factory or an operator merges it |
+| `factory.pr.merged` | the PR merges; `by` is `factory`, `operator` (dashboard) or `human` (merged on GitHub, seen on the next poll) |
 | `factory.run.completed` | a run ends, with its outcome |
 | `factory.minion.completed` | a minion finishes, `ok` true or false |
 
