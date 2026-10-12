@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.0.1
+
+- Fix: a card parked on a question now resumes when the operator answers, even if the agent left the
+  `<!-- factory:question v1 -->` line out of its question. The runner's own `factory:data` question
+  marker counts too (#54).
+
 ## v4.0.0
 
 Events, minions, and trackers other than GitHub. Upgraders: nothing to change; GitHub stays the default
