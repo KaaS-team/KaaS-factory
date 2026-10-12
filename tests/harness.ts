@@ -115,6 +115,10 @@ export class FakeGitHub extends GitHub {
     return this.prs.find((p) => p.state === "open" && p.headRefName === head);
   }
 
+  override async mergedPrByHead(_repo: string, head: string): Promise<GhPr | undefined> {
+    return this.prs.findLast((p) => p.state === "merged" && p.headRefName === head);
+  }
+
   override async getPr(_repo: string, number: number): Promise<GhPr> {
     const pr = this.prs.find((p) => p.number === number);
     if (!pr) throw new Error(`no such PR #${number}`);

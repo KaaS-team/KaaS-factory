@@ -4,7 +4,8 @@
 //   - an issue's PR is the one on its head branch (issueBranch), not the one whose
 //     "Closes #n" names it, since #n would point at a GitHub issue;
 //   - a PR body says "Closes tracker issue n" instead of "Closes #n", the PR URL is
-//     posted on the tracker issue, and a merge closes the tracker issue.
+//     posted on the tracker issue, and a factory merge closes the tracker issue (a
+//     human merge is noticed by the watcher, src/watch.ts recordMerge).
 // The `labels` map is applied here too, on the tracker side only.
 
 import type { FactoryConfig, TrackerConfig } from "./config";
@@ -141,6 +142,10 @@ export class ComposedScm implements ScmPort {
   async getPr(repo: string, number: number) { return this.linked(await this.codeHost.getPr(repo, number)); }
   async findPrByHead(repo: string, head: string) {
     const pr = await this.codeHost.findPrByHead(repo, head);
+    return pr && this.linked(pr);
+  }
+  async mergedPrByHead(repo: string, head: string) {
+    const pr = await this.codeHost.mergedPrByHead(repo, head);
     return pr && this.linked(pr);
   }
   prFeedback(repo: string, head: string): Promise<GhComment[]> { return this.codeHost.prFeedback(repo, head); }

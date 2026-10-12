@@ -55,7 +55,8 @@ Pull requests stay on the code host (GitHub). When the tracker is not GitHub:
 - closing keywords in the PR title and body are rewritten (`Closes #4` becomes `Closes tracker issue 4`), so
   they cannot close an unrelated GitHub issue;
 - the PR URL is posted on the tracker issue as `Pull request: <url>` with a `<!-- factory:pr-link v1 -->` marker;
-- when the factory merges the PR, it closes the tracker issue.
+- when the PR merges, the factory closes the tracker issue: at once when the factory merges it, and on the
+  next poll when a human merges it on GitHub, whatever `merge.policy` says. A PR closed without merging leaves it open.
 
 ## Label names
 

@@ -280,7 +280,7 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
 // error — is not this issue's problem to raise: it just leaves the PR for a
 // human, exactly like a repo with policy "off" always does. runPool has no
 // per-item error isolation, so nothing here may throw uncaught.
-async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<void> {
+async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome | undefined> {
   try {
     const issueNumber = issue.number;
     const head = deps.git.branchName(issueNumber);
@@ -307,16 +307,53 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     const marker = mergePolicyMarker(decision.headSha);
     if (!issue.comments.some((c) => c.body.includes(marker))) await postComment(deps, config, issueNumber, renderAuditComment(decision));
     const merged = await attemptMerge(deps.github, config.repo, pr.number, decision);
-    if (merged) {
-      emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: issueNumber, pr: pr.number, by: "factory" }, `issue/${issueNumber}`);
-      await runRetro(deps, config, issue, "merged");
-    }
+    if (merged) return await recordMerge(deps, config, issue, pr.number, "factory");
   } catch (err) {
     console.error(`merge-policy check failed for #${issue.number}:`, err);
+  }
+  return undefined;
+}
+
+export function mergedMarker(prNumber: number): string {
+  return `<!-- factory:merged pr=${prNumber} -->`;
+}
+
+// Once per merged PR, whoever merged it: the marker comment is the guard, so a
+// later poll that sees the same merged PR does nothing. A human merge also closes
+// the issue, since a tracker other than GitHub only learns of it here (a factory
+// merge already closed it in ComposedScm.mergePr); a GitHub issue that is already
+// closed makes that close a no-op, and a failed close is logged, never fatal.
+async function recordMerge(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, prNumber: number, by: "factory" | "human"): Promise<Outcome> {
+  const marker = mergedMarker(prNumber);
+  if (issue.comments.some((c) => isTrusted(c) && c.body.includes(marker))) return "waiting";
+  const who = by === "human" ? "by a human on the code host" : "by the merge policy";
+  await postComment(deps, config, issue.number, `PR #${prNumber} was merged ${who}.\n\n${marker}`);
+  if (by === "human") {
+    await deps.github.closeIssue(config.repo, issue.number).catch((err) => console.error(`closing #${issue.number} after its merge failed:`, err));
+  }
+  await deps.github.removeLabels(config.repo, issue.number, [LABEL.inReview]);
+  emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: issue.number, pr: prNumber, by }, `issue/${issue.number}`);
+  await runRetro(deps, config, issue, "merged");
+  finish(deps, config, issue.number, "shipped");
+  return "shipped";
+}
+
+// The issue's PR merged on the code host, whatever merge.policy says. Checked
+// before human commands: a revise or cancel only means something on a PR that is
+// still open. Like checkMergePolicy, a transient error leaves it for the next poll.
+async function shipIfMerged(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome | undefined> {
+  try {
+    const pr = await deps.github.mergedPrByHead(config.repo, deps.git.branchName(issue.number));
+    return pr ? await recordMerge(deps, config, issue, pr.number, "human") : undefined;
+  } catch (err) {
+    console.error(`merged-PR check failed for #${issue.number}:`, err);
+    return undefined;
   }
 }
 
 export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
+  const merged = await shipIfMerged(deps, config, issue);
+  if (merged) return merged;
   // Feedback counts only if it is newer than the runner's last marker
   // comment: a handled revise is followed by the rebuild's own verdict, so it
   // is never picked up twice. The draft PR's comments and reviews count too.
@@ -343,7 +380,7 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
   }
   // A human command always wins over auto-merge, so this only runs once
   // there is nothing to revise or cancel.
-  if (config.merge.policy !== "off") await checkMergePolicy(deps, config, issue);
+  if (config.merge.policy !== "off") return checkMergePolicy(deps, config, issue);
   return undefined;
 }
 
