@@ -14,6 +14,7 @@ import { mergeConfig } from "../src/config";
 import type { StageRunOptions, StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { pollOnce } from "../src/watch";
+import type { GhIssue } from "../src/github";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } from "./harness";
 
 // Every stage run ends the issue at "needs-info" after triage alone, same
@@ -105,6 +106,48 @@ describe("pollOnce's inFlight set makes overlapping polls (what startWatch now r
     await first;
     expect(executor.concurrentDup).toBe(false);
 
+    rmSync(workspacesDir, { recursive: true, force: true });
+    rmSync(cloneDir, { recursive: true, force: true });
+  });
+
+  test("an issue that parks mid-batch is released at once, not when its batch's slowest issue finishes", async () => {
+    // kaas-suite cards 34 and 36 planned in one batch with card 35, parked at
+    // awaiting-approval, and sat approved until card 35's build and verify ended.
+    const { deps, github, executor, workspacesDir, cloneDir } = setup((n) => (n === 1 ? 300 : 10));
+    github.issues.set(2, baseIssue(2, ["factory:ready"]));
+    const config = mergeConfig({ repo: "acme/repo", concurrency: 2 });
+    const inFlight = new Set<number>();
+
+    const batch = pollOnce(deps, config, inFlight); // #1 and #2 in one batch
+    await Bun.sleep(100); // #2 has parked at needs-info, #1 is still running
+    expect(executor.active.has(1)).toBe(true);
+    expect([...inFlight]).toEqual([1]);
+
+    await batch;
+    expect(inFlight.size).toBe(0);
+    rmSync(workspacesDir, { recursive: true, force: true });
+    rmSync(cloneDir, { recursive: true, force: true });
+  });
+
+  test("a poll whose issue list predates an issue's release does not redispatch it from that stale list", async () => {
+    // The second poll lists #1 as ready while the first is running it, and its
+    // list comes back only after #1 has parked and left inFlight.
+    class StaleGitHub extends FakeGitHub {
+      override async listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]> {
+        const snapshot = await super.listIssuesByLabel(repo, label);
+        await Bun.sleep(80);
+        return snapshot;
+      }
+    }
+    const { deps, config, executor, workspacesDir, cloneDir } = setup(() => 10);
+    const stale = { ...deps, github: new StaleGitHub([baseIssue(1, ["factory:ready"])]) };
+    const inFlight = new Set<number>();
+
+    const first = pollOnce(deps, config, inFlight);
+    const second = pollOnce(stale, config, inFlight);
+    await Promise.all([first, second]);
+
+    expect(executor.starts).toEqual([1]);
     rmSync(workspacesDir, { recursive: true, force: true });
     rmSync(cloneDir, { recursive: true, force: true });
   });

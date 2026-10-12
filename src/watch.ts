@@ -431,7 +431,21 @@ async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue):
 // item 6), so an issue this poll is still working on is never handed to a
 // second, concurrent runPool call. Absent, every poll is self-contained, the
 // pre-v2.6.2 behaviour that the scenario and pool tests already exercise.
+// An issue leaves inFlight when its own dispatch ends, so a poll that listed
+// issues before that release holds a stale copy of it (still "ready", say)
+// and must skip it: `releasedAt` records when, in `releaseSeq` order.
+const releasedAt = new WeakMap<Set<number>, Map<number, number>>();
+let releaseSeq = 0;
+
+function release(inFlight: Set<number> | undefined, issue: number): void {
+  if (!inFlight?.delete(issue)) return;
+  const seqs = releasedAt.get(inFlight) ?? new Map<number, number>();
+  releasedAt.set(inFlight, seqs);
+  seqs.set(issue, ++releaseSeq);
+}
+
 export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?: Set<number>): Promise<PollResult> {
+  const listedAt = releaseSeq;
   const openPrs = await deps.github.listPrs(config.repo, { state: "open" });
   const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/"));
   // STOP_IF pauses new pickups only; approvals, answers, retries and
@@ -473,6 +487,8 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     .flat()
     .filter((issue) => {
       if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
+      const released = inFlight ? releasedAt.get(inFlight)?.get(issue.number) : undefined;
+      if (released !== undefined && released > listedAt) return false;
       seen.add(issue.number);
       return true;
     })
@@ -495,7 +511,12 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     // A pool of `concurrency` workers, not one-at-a-time and not
     // Promise.all-everything: before this, issue #4 never started until #1's
     // whole five-stage chain finished (audit finding #2).
-    const outcomes = await runPool(candidates, dispatchConcurrency(deps, config), (issue) => dispatch(deps, config, issue));
+    // Each issue leaves inFlight when its own dispatch ends: one that parks
+    // (awaiting approval, a question) must be visible to the next poll while
+    // a slower batch-mate still builds, or its human's reply sits unread.
+    const outcomes = await runPool(candidates, dispatchConcurrency(deps, config), (issue) =>
+      dispatch(deps, config, issue).finally(() => release(inFlight, issue.number)),
+    );
     const processed = candidates.filter((_, i) => outcomes[i] && outcomes[i] !== "waiting").map((issue) => issue.number);
     if (stopIf) return { paused: true, reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`, processed };
     if (budgetPaused) return { paused: true, reason: "budget: today's spend cap is hit, new pickups are paused", processed };
