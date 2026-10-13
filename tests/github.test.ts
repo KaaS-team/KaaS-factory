@@ -48,3 +48,18 @@ describe("GitHub.mergedPrByHead", () => {
     ]);
   });
 });
+
+describe("GitHub issue reads", () => {
+  // gh's own shape: the author is an object. Every reader hands the watcher a login string.
+  const raw = { number: 7, title: "t", body: "b", labels: [], comments: [{ id: "IC_1", author: { login: "octo" }, authorAssociation: "MEMBER", body: "/factory approve", createdAt: "2026-10-13T08:19:09Z" }] };
+  const gh = (out: unknown) => new GitHub({ run: async () => ({ code: 0, stdout: JSON.stringify(out), stderr: "" }) });
+
+  test("every reader gives each comment's author as its login", async () => {
+    const reads = [
+      (await gh([raw]).listIssuesByLabel("o/r", "factory:awaiting-approval"))[0]!,
+      (await gh([raw]).listOpenIssues("o/r"))[0]!,
+      await gh(raw).getIssue("o/r", 7),
+    ];
+    for (const issue of reads) expect(issue.comments[0]!.author).toBe("octo");
+  });
+});

@@ -30,6 +30,13 @@ export class GhCommandRunner implements CommandRunner {
 import type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort, TrackerPort, CodeHostPort } from "./ports/scm";
 export type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort, TrackerPort, CodeHostPort };
 
+// gh prints a comment's author as {login}; everything past this file trusts a login string, and an
+// object reached roleOf as "[object Object]", a 404, so no /factory approve was ever trusted.
+type RawIssue = Omit<GhIssue, "comments"> & { comments?: (Omit<GhComment, "author"> & { author?: { login?: string } | string })[] };
+function issueFrom(raw: RawIssue): GhIssue {
+  return { ...raw, comments: (raw.comments ?? []).map((c) => ({ ...c, author: typeof c.author === "string" ? c.author : (c.author?.login ?? "") })) };
+}
+
 class GhError extends Error {
   constructor(
     args: string[],
@@ -65,7 +72,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--limit",
       "500",
     ]);
-    return JSON.parse(result.stdout || "[]");
+    return (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
   }
 
   // Includes state/stateReason (blockers.ts's only reader of either field) so
@@ -80,7 +87,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--json",
       "number,title,body,labels,comments,state,stateReason",
     ]);
-    return JSON.parse(result.stdout);
+    return issueFrom(JSON.parse(result.stdout));
   }
 
   async listOpenIssues(repo: string): Promise<GhIssue[]> {
@@ -96,7 +103,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--limit",
       "200",
     ]);
-    return JSON.parse(result.stdout || "[]");
+    return (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
   }
 
   // Returns the new comment's id, parsed from the URL `gh` prints
