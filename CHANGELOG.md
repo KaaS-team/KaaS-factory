@@ -3,8 +3,11 @@
 ## Unreleased
 
 - The cockpit follows the kaas.team design: its tokens are a line-for-line copy of kaas.team's
-  `:root` block, set in Geist, in one light theme inside the kaas app window. The Line marks only
-  the stage waiting on you in yellow. The theme switch, Inter, Inconsolata and `make tokens` are gone.
+  `:root` block, set in Geist, in one light theme, laid out like kaas-tasks: a sidebar with a Repos
+  section that filters every view, and the view in an inset panel under a breadcrumb. The Line is the
+  home page: a headline says what the inbox needs from you, then the issues with status icons and
+  stage bars, repo cards and recent activity. The Line marks only the stage waiting on you in yellow.
+  The theme switch, Inter, Inconsolata and `make tokens` are gone.
 - Fix: a `?repo=` value from the dashboard URL can no longer name a path outside `FACTORY_HOME`.
 
 ## v4.0.3

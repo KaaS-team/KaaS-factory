@@ -10,6 +10,7 @@ import { feedCard, proofPanel } from "/lib/run-page.js";
 
 const ACTION_LABEL = { approve: "Approve plan", revise: "Request changes", answer: "Send answer", retry: "Retry", cancel: "Cancel run" };
 const REVIEW_KINDS = new Set(["review-pr", "merge-dry-run"]);
+const KIND_HEADLINE = { "approve-plan": "A plan is waiting for your approval", "answer-question": "The factory has a question for you", "review-pr": "A pull request is ready for your review", "merge-dry-run": "A pull request is ready to merge", parked: "A run needs a human", failed: "A run failed", budget: "A run hit its budget" };
 const KIND_LABEL = { "approve-plan": "Plan to approve", "answer-question": "Question for you", "review-pr": "Pull request to review", "merge-dry-run": "Ready to merge", parked: "Needs a human", failed: "Failed", budget: "Over budget" };
 const ICONS = {
   inbox: "M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5",
@@ -21,6 +22,9 @@ const ICONS = {
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1",
 };
 const NAV = [["inbox", "Inbox"], ["line", "Line"], ["runs", "Runs"], ["workflows", "Workflows"], ["analytics", "Analytics"], ["agents", "Agents"], ["settings", "Settings"]];
+const PRIMARY = 3; // Inbox, Line and Runs sit at the top; the rest at the foot, as on kaas-tasks
+const REPO_ICON = "M5 5h14v14H5zM9 5v14";
+const CHEVRON = "M9 6l6 6-6 6";
 
 const state = { route: routeFromHash(location.hash), inbox: [], repo: "", repos: [], repoFilter: "", selected: null, thread: null, review: null, filter: "all", data: {}, error: {} };
 
@@ -44,6 +48,32 @@ const svg = (path) => {
   s.append(p);
   return s;
 };
+
+const svgEl = (tag, attrs) => {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  return el;
+};
+// kaas-tasks' status icons: a ring while queued, half filled while working, a disc once it means something.
+const GLYPHS = {
+  queued: [["circle", { class: "ring", cx: 12, cy: 12, r: 7, "stroke-dasharray": "2.6 2.4" }]],
+  live: [["circle", { class: "ring", cx: 12, cy: 12, r: 7 }], ["path", { class: "fill", d: "M12 7.5a4.5 4.5 0 0 1 0 9z" }]],
+  waiting: [["circle", { class: "disc", cx: 12, cy: 12, r: 8 }], ["path", { class: "mark", d: "M12 8.5v4M12 15.6v.01" }]],
+  shipped: [["circle", { class: "disc", cx: 12, cy: 12, r: 8 }], ["path", { class: "mark", d: "M8.6 12.2l2.3 2.3 4.6-4.8" }]],
+  failed: [["circle", { class: "disc", cx: 12, cy: 12, r: 8 }], ["path", { class: "mark", d: "M9.6 9.6l4.8 4.8M14.4 9.6l-4.8 4.8" }]],
+  quiet: [["circle", { class: "ring", cx: 12, cy: 12, r: 7 }], ["path", { class: "mark", d: "M8 16l8-8" }]],
+};
+const glyphKind = (status) => (status === "shipped" ? "shipped" : ["failed", "rejected"].includes(status) ? "failed" : WAITING.has(status) ? "waiting" : ACTIVE.has(status) ? "live" : status === "queued" ? "queued" : "quiet");
+function glyph(kind, label) {
+  const s = svgEl("svg", { class: "glyph", viewBox: "0 0 24 24", "data-s": kind, role: "img", "aria-label": label || kind });
+  s.append(...GLYPHS[kind].map(([tag, attrs]) => svgEl(tag, attrs)));
+  return s;
+}
+const repoOf = (row) => row.repo ?? state.repo;
+const inRepo = (repo) => !state.repoFilter || repo === state.repoFilter;
+const short = (repo) => (repo || "").split("/").pop();
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const initials = (name) => (name === "factory" ? "F" : name.slice(0, 2).toUpperCase());
 
 const money = (n) => `$${(n || 0).toFixed(2)}`;
 const compact = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n || 0));
@@ -78,7 +108,7 @@ const stateOr = (name, ready) => {
   return ready(state.data[name]);
 };
 
-/* ---- Line ---- */
+/* ---- Line: the home page ---- */
 function stationsFor(row) {
   return stationStates(row.run, row.stages).map(({ name, ms, live, failed, done, waiting }) => {
     const grow = Math.max(1, Math.min(8, Math.round(ms / 30000)));
@@ -88,19 +118,78 @@ function stationsFor(row) {
 
 function lineRow(row) {
   const { run } = row;
-  const stations = stationsFor(row);
   const needs = WAITING.has(run.status);
-  const agents = [...new Set(row.stages.map((s) => s.agent))].join(", ");
-  const repo = row.repo ?? state.repo;
-  return h("button", { class: "line-row", type: "button", onclick: () => (needs ? go("inbox", run.issue, repo) : (location.hash = runHref(repo, run.issue))) },
-    h("div", null, h("div", { class: "line-repo" }, repo), h("div", { class: "line-title" }, `#${run.issue} ${run.title}`), h("div", { class: "line-sub" }, [agents, `started ${age(run.started_at)} ago`].filter(Boolean).join(" · "))),
-    h("div", { class: "stations-col" }, h("div", { class: "stations" }, stations.map((s) => s.node)), h("div", { class: "station-names" }, stations.map((s) => h("span", { style: `flex-grow:${s.grow}` }, s.name)))),
-    h("div", { class: `line-state${needs ? " needs-you" : ""}` }, h("span", { class: "num" }, needs ? "Waiting on you" : statusText(run.status)), needs && run.reason ? h("span", { class: "reason", title: run.reason }, run.reason) : null, `${money(run.cost_usd)} · ${compact(run.tokens_in + run.tokens_out)} tokens`));
+  const repo = repoOf(row);
+  const meta = needs ? "Needs you" : ACTIVE.has(run.status) ? run.stage : run.status === "shipped" ? age(run.updated_at) : statusText(run.status);
+  return h("button", { class: "line-row", type: "button", title: needs && run.reason ? run.reason : null, onclick: () => (needs ? go("inbox", run.issue, repo) : (location.hash = runHref(repo, run.issue))) },
+    glyph(glyphKind(run.status), statusText(run.status)),
+    h("span", { class: "line-id" }, `#${run.issue}`),
+    h("span", { class: "line-title" }, run.title),
+    h("span", { class: "line-repo" }, short(repo)),
+    h("div", { class: "stations-col" }, h("div", { class: "stations", role: "img", "aria-label": `Stage: ${run.stage}` }, stationsFor(row).map((s) => s.node))),
+    h("span", { class: "line-cost" }, money(run.cost_usd)),
+    h("span", { class: "line-state", "data-needs": needs }, meta));
 }
 
+// One line per run, newest first: who did what last, from the run row alone.
+function activityOf(row) {
+  const { run } = row;
+  const agent = row.stages.at(-1)?.agent ?? "factory";
+  const pr = /\/pull\/(\d+)/.exec(run.pr_url || "")?.[1];
+  if (run.status === "shipped") return { actor: "factory", what: pr ? `opened pull request #${pr}` : "shipped the run" };
+  if (["failed", "rejected"].includes(run.status)) return { actor: agent, what: `stopped at ${run.stage}`, quote: run.reason };
+  if (WAITING.has(run.status)) return { actor: "factory", what: `is waiting on you after ${run.stage}`, quote: run.reason };
+  if (ACTIVE.has(run.status)) return { actor: agent, what: `is working on ${run.stage}` };
+  return { actor: "factory", what: `marked it ${statusText(run.status)}` };
+}
+
+function activity(rows) {
+  const recent = [...rows].sort((x, y) => (y.run.updated_at || "").localeCompare(x.run.updated_at || "")).slice(0, 8);
+  return h("aside", { class: "section" }, h("div", { class: "section-head" }, h("h2", null, "Activity")),
+    h("ul", { class: "activity" }, recent.map((row) => {
+      const e = activityOf(row);
+      return h("li", null, h("span", { class: "avatar", "data-bot": e.actor === "factory", "aria-hidden": "true" }, initials(e.actor)),
+        h("div", null, h("p", { class: "what" }, h("strong", null, e.actor), ` ${e.what}`), e.quote ? h("p", { class: "quote" }, e.quote) : null,
+          h("p", { class: "sub" }, `#${row.run.issue} ${row.run.title} · ${age(row.run.updated_at)} ago`)));
+    })));
+}
+
+function repoCards(rows) {
+  const by = new Map();
+  for (const row of rows) by.set(repoOf(row), [...(by.get(repoOf(row)) || []), row.run]);
+  if (!by.size) return null;
+  return h("div", { class: "section" }, h("div", { class: "section-head" }, h("h2", null, "Repos"), h("span", { class: "muted" }, "Pick one to see only its issues")),
+    h("div", { class: "repo-cards" }, [...by].map(([repo, runs]) => {
+      const shipped = runs.filter((r) => r.status === "shipped").length;
+      const pct = Math.round((shipped / runs.length) * 100);
+      return h("button", { class: "repo-card", type: "button", "aria-pressed": String(state.repoFilter === repo), onclick: () => setRepo(repo) },
+        h("span", { class: "top" }, svg(REPO_ICON), short(repo), h("span", { class: "muted" }, `${pct}%`)),
+        h("div", { class: "bar-track" }, h("div", { class: "bar-fill", style: `width:${Math.max(2, pct)}%` })),
+        h("span", { class: "sub" }, `${shipped} of ${plural(runs.length, "issue")} shipped · ${money(runs.reduce((n, r) => n + (r.cost_usd || 0), 0))}`));
+    })));
+}
+
+// The headline says what the inbox needs from you, the way kaas-tasks greets you.
 function lineView() {
-  return h("section", null, heading("Line", "Every issue moves left to right. Each block is a stage, sized by how long it took."),
-    stateOr("line", ({ rows }) => rows.length ? h("div", { class: "line" }, rows.map(lineRow)) : quiet("Nothing on the line", "Label an issue factory:ready to start a run.")));
+  return h("section", null, stateOr("line", ({ rows: all }) => {
+    const rows = all.filter((r) => inRepo(repoOf(r)));
+    const asks = state.inbox.filter((i) => inRepo(i.repo));
+    const working = rows.filter((r) => ACTIVE.has(r.run.status)).length;
+    const title = asks.length > 1 ? `${asks.length} things need you` : asks.length ? KIND_HEADLINE[asks[0].kind] : working ? `${working} ${working === 1 ? "run is" : "runs are"} working` : "All clear";
+    const repos = new Set(rows.map(repoOf)).size;
+    const spent = money(rows.reduce((n, r) => n + (r.run.cost_usd || 0), 0));
+    return [
+      h("div", { class: "hero" }, h("p", { class: "date" }, new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })),
+        heading(title, rows.length ? `${plural(rows.length, "issue")} across ${plural(repos, "repo")}, ${spent} spent.` : null, asks.length ? h("a", { class: "btn btn-primary", href: "#/inbox" }, "Open the inbox") : null)),
+      !rows.length ? quiet("Nothing on the line", "Label an issue factory:ready to start a run.")
+      : h("div", { class: "home" },
+        h("div", null,
+          h("div", { class: "section" }, h("div", { class: "section-head" }, h("h2", null, "On the line"), h("span", { class: "muted" }, "Each bar is triage, plan, build, verify, pr, sized by how long it took"), h("a", { class: "end", href: "#/runs" }, "All runs")),
+            h("div", { class: "line", "data-multi": String(repos > 1) }, rows.map(lineRow))),
+          repoCards(rows)),
+        activity(rows)),
+    ];
+  }));
 }
 
 /* ---- Inbox ---- */
@@ -169,7 +258,7 @@ function conversation(item) {
     : t.error ? quiet("Could not load the thread", t.error)
     : h("div", { class: "thread" }, [{ author: "issue", body: t.body, bot: false }, ...(t.comments || []).filter((c) => !c.body.includes("<!-- factory:spend")).map((c) => ({ author: c.author, body: c.body, bot: c.body.includes("<!-- factory:") }))]
         .filter((m) => cleanBody(m.body))
-        .map((m) => h("div", { class: `msg${m.bot ? " bot" : ""}` }, h("header", null, m.bot ? "factory" : m.author), renderMarkdown(m.body, h))));
+        .map((m) => h("div", { class: `msg${m.bot ? " bot" : ""}` }, h("header", null, h("span", { class: "avatar", "data-bot": m.bot, "aria-hidden": "true" }, initials(m.bot ? "factory" : m.author)), m.bot ? "factory" : m.author), renderMarkdown(m.body, h))));
   const needsText = item.actions.filter((a) => a === "revise" || a === "answer");
   const box = needsText.length ? h("textarea", { class: "field-control", id: "composer", rows: "3", placeholder: item.kind === "answer-question" ? "Your answer" : "What should change?", "aria-label": "Your reply" }) : null;
   const isReview = REVIEW_KINDS.has(item.kind);
@@ -184,26 +273,22 @@ function conversation(item) {
           onclick: () => { const text = box ? box.value : ""; if ((a === "revise" || a === "answer") && !text.trim()) { box.focus(); return; } actOn(item, a, text); } }, actionLabel(item, a))))));
 }
 
-function repoFilterControl() {
-  if (state.repos.length <= 1) return null;
-  return h("select", { class: "field-control repo-filter", "aria-label": "Filter by repo",
-    onchange: (e) => { state.repoFilter = e.target.value; loadInbox().then(render); } },
-    h("option", { value: "", selected: state.repoFilter === "" }, "All repos"),
-    ...state.repos.map((r) => h("option", { value: r, selected: state.repoFilter === r }, r)));
-}
-
 function inboxView() {
-  const items = state.inbox;
+  const items = state.inbox.filter((i) => inRepo(i.repo));
   const multiRepo = state.repos.length > 1;
   const item = items.find(isSelected);
-  return h("section", null, heading("Inbox", "Everything the factory is waiting on you for.", repoFilterControl()),
+  return h("section", null, heading("Inbox", "Everything the factory is waiting on you for."),
     !items.length ? quiet("Nothing is waiting on you", "The factory will list plans to approve and questions to answer here.")
     : h("div", { class: "split", "data-open": String(Boolean(item)) },
       h("div", { class: "list-col" }, h("div", { class: "list" }, items.map((i) =>
         h("button", { class: "list-item", type: "button", "aria-current": String(isSelected(i)), onclick: () => selectItem(i) },
-          h("span", { class: "kind" }, KIND_LABEL[i.kind], multiRepo ? h("span", { class: "muted repo-tag" }, ` · ${i.repo}`) : null),
-          h("strong", null, `#${i.issue} ${i.title}`), h("span", { class: "muted" }, `waiting ${age(i.waitingSince)}`), h("span", { class: "muted" }, markdownText(i.ask).slice(0, 110)))))),
-      h("div", { class: "detail-col" }, item ? [h("button", { class: "btn back", type: "button", onclick: () => { state.selected = null; state.review = null; render(); } }, "Back to inbox"), conversation(item)] : quiet("Pick an item", "Its conversation and actions show up here."))));
+          glyph(["failed", "budget"].includes(i.kind) ? "failed" : "waiting", KIND_LABEL[i.kind]),
+          h("span", { class: "li-main" }, h("strong", null, `#${i.issue} ${i.title}`),
+            h("span", { class: "li-sub" }, [KIND_LABEL[i.kind], multiRepo ? short(i.repo) : null].filter(Boolean).join(" · ")),
+            h("span", { class: "li-ask" }, markdownText(i.ask).slice(0, 140))),
+          h("span", { class: "li-time" }, age(i.waitingSince)))))),
+      h("div", { class: "detail-col" }, item ? [h("button", { class: "btn back", type: "button", onclick: () => { state.selected = null; state.review = null; render(); } }, "Back to inbox"), conversation(item)]
+        : h("div", { class: "empty-detail" }, svg(ICONS.inbox), h("p", null, "Select an item to read it")))));
 }
 
 /* ---- Runs ---- */
@@ -213,12 +298,13 @@ function runsView() {
   return h("section", null, heading("Runs", "Every run the factory has started, newest first."),
     stateOr("runs", ({ runs }) => {
       const pick = FILTERS.find((f) => f[0] === state.filter)[2];
+      runs = runs.filter((r) => inRepo(r.repo ?? state.repo));
       const rows = runs.filter(pick);
       return h("div", null,
         h("div", { class: "tabs", role: "group", "aria-label": "Filter runs" }, FILTERS.map(([id, label, fn]) => h("button", { class: "tab", type: "button", "aria-pressed": String(state.filter === id), onclick: () => { state.filter = id; render(); } }, `${label} ${runs.filter(fn).length}`))),
         rows.length ? h("div", { class: "table-wrap" }, h("table", null, h("thead", null, h("tr", null, ["Issue", "Status", "Stage", "Cost", "Updated"].map((c, i) => h("th", { class: i >= 3 ? "num" : "" }, c)))),
           h("tbody", null, rows.map((r) => h("tr", { "data-href": r.issue, tabindex: "0", onclick: () => (location.hash = runHref(r.repo, r.issue)), onkeydown: (e) => e.key === "Enter" && (location.hash = runHref(r.repo, r.issue)) },
-            h("td", null, `#${r.issue} ${r.title}`), h("td", null, h("span", { class: "status", "data-tone": tone(r.status) }, statusText(r.status))), h("td", null, r.stage), h("td", { class: "num" }, money(r.cost_usd)), h("td", { class: "num" }, age(r.updated_at)))))))
+            h("td", null, `#${r.issue} ${r.title}`, state.repos.length > 1 ? h("div", { class: "muted" }, short(r.repo ?? state.repo)) : null), h("td", null, h("span", { class: "status", "data-tone": tone(r.status) }, statusText(r.status))), h("td", null, r.stage), h("td", { class: "num" }, money(r.cost_usd)), h("td", { class: "num" }, age(r.updated_at)))))))
         : quiet("No runs match", state.filter === "all" ? "Label an issue factory:ready to start one." : "Try another filter."));
     }));
 }
@@ -261,13 +347,12 @@ async function preview(issue, name) {
 
 function runView() {
   const at = runKey(state.route.jobID);
-  const back = h("a", { class: "back-link", href: "#/line" }, "Back to the Line");
-  if (!at) return h("section", null, back, quiet("No such run", "Pick a run from the Line."));
+  if (!at) return h("section", null, quiet("No such run", "Pick a run from the Line."));
   const row = state.data.line?.rows.find((r) => r.run.issue === at.issue && (r.repo ?? state.repo) === at.repo);
   const run = row?.run;
   const stations = row ? stationsFor(row) : [];
   const sub = [at.repo, run && `started ${age(run.started_at)} ago`, run && money(run.cost_usd)].filter(Boolean).join(" · ");
-  return h("section", { class: "run-page" }, back,
+  return h("section", { class: "run-page" },
     heading(`#${at.issue} ${run?.title ?? ""}`.trim(), sub,
       run ? h("span", { class: "status", "data-tone": tone(run.status) }, WAITING.has(run.status) ? "Waiting on you" : statusText(run.status)) : null),
     row ? h("div", { class: "run-stations" }, h("div", { class: "stations" }, stations.map((s) => s.node)), h("div", { class: "station-names" }, stations.map((s) => h("span", { style: `flex-grow:${s.grow}` }, s.name)))) : null,
@@ -358,10 +443,28 @@ function settingsView() {
 const VIEWS = { inbox: inboxView, line: lineView, runs: runsView, task: runView, workflows: workflowsView, analytics: analyticsView, agents: agentsView, settings: settingsView };
 const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task: ["line", "/api/line"], workflows: ["workflows", "/api/workflows"], analytics: ["analytics", "/api/analytics"], agents: ["agents", "/api/agents"], settings: ["settings", "/api/settings"] };
 
+function setRepo(repo) {
+  state.repoFilter = state.repoFilter === repo ? "" : repo;
+  loadInbox().then(render);
+}
+
+function allRepos() {
+  return state.repos.length ? state.repos : state.repo ? [state.repo] : [];
+}
+
 function renderNav() {
-  const nav = document.getElementById("nav");
   const view = state.route.view === "task" ? "line" : state.route.view;
-  nav.replaceChildren(...NAV.map(([id, label]) => h("a", { class: "nav-item", href: `#/${id}`, "aria-current": view === id ? "page" : false }, svg(ICONS[id]), label, id === "inbox" && state.inbox.length ? h("span", { class: "badge" }, String(state.inbox.length)) : null)));
+  const item = ([id, label]) => h("a", { class: "nav-item", href: `#/${id}`, "aria-current": view === id ? "page" : false }, svg(ICONS[id]), h("span", { class: "label" }, label),
+    id === "inbox" && state.inbox.length ? h("span", { class: "badge" }, String(state.inbox.length)) : null);
+  const onLine = (repo) => state.data.line?.rows.filter((r) => repoOf(r) === repo).length;
+  const repos = allRepos();
+  document.getElementById("nav").replaceChildren(...NAV.slice(0, PRIMARY).map(item),
+    ...(repos.length > 1 ? [h("div", { class: "nav-heading" }, "Repos"), ...repos.map((r) => h("button", { class: "nav-item repo-item", type: "button", "aria-pressed": String(state.repoFilter === r), title: r, onclick: () => setRepo(r) }, svg(REPO_ICON), h("span", { class: "label" }, short(r)), onLine(r) ? h("span", { class: "count" }, String(onLine(r))) : null))] : []),
+    h("div", { class: "nav-spacer" }), ...NAV.slice(PRIMARY).map(item));
+  const here = state.route.view === "task" ? runKey(state.route.jobID) : null;
+  const crumbs = [h("a", { href: "#/line" }, "factory"), state.repoFilter ? h("a", { href: "#/line", onclick: (e) => { e.preventDefault(); setRepo(state.repoFilter); }, title: "Show every repo" }, short(state.repoFilter)) : null,
+    here ? h("a", { href: "#/line" }, "Line") : null, h("span", { class: "here" }, here ? `#${here.issue}` : (NAV.find(([id]) => id === view)?.[1] ?? "Inbox"))].filter(Boolean);
+  document.getElementById("crumbs").replaceChildren(...crumbs.flatMap((c, i) => (i ? [svg(CHEVRON), c] : [c])));
 }
 
 // The feed follows the newest card unless the reader scrolled up to look at an older one.
@@ -372,7 +475,8 @@ function render() {
   const follow = !feed || feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
   const top = feed?.scrollTop ?? 0;
   const open = document.querySelector(".run-files")?.open;
-  main.replaceChildren((VIEWS[state.route.view] || inboxView)());
+  main.dataset.view = state.route.view;
+  main.replaceChildren(h("div", { class: "page" }, (VIEWS[state.route.view] || inboxView)()));
   const next = document.getElementById("feed");
   if (next) next.scrollTop = follow ? next.scrollHeight : top;
   if (open) document.querySelector(".run-files")?.setAttribute("open", "");
@@ -406,7 +510,7 @@ async function loadInbox() {
     state.repos = r.repos || [];
     state.error.inbox = null;
   } catch (e) { state.error.inbox = e.message; }
-  document.getElementById("repo-label").textContent = state.repo || (state.repos.length > 1 ? `${state.repos.length} repos` : "");
+  document.getElementById("repo-label").textContent = state.repos.length > 1 ? plural(state.repos.length, "repo") : short(state.repo);
   renderNav();
 }
 

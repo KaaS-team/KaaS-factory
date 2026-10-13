@@ -10,16 +10,17 @@
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<div class="win">
-  <div class="hwb"><i></i><i></i><i></i><span class="title">factory</span><span class="end" id="repo-label"></span></div>
-  <div class="app">
-    <header class="app-sidebar">
-      <nav aria-label="Views" id="nav"></nav>
-      <div class="sidebar-foot">
-        <label class="toggle"><input type="checkbox" id="toggle-auto-start"> Start new issues automatically</label>
-        <label class="toggle"><input type="checkbox" id="toggle-auto-approve"> Approve low-risk plans</label>
-      </div>
-    </header>
+<div class="app">
+  <header class="app-sidebar">
+    <div class="ws"><span class="ws-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h7M5 12h14M5 17h10"/></svg></span>factory<span class="ws-sub" id="repo-label"></span></div>
+    <nav aria-label="Views" id="nav"></nav>
+    <div class="sidebar-foot">
+      <label class="toggle"><input type="checkbox" id="toggle-auto-start"> Start new issues automatically</label>
+      <label class="toggle"><input type="checkbox" id="toggle-auto-approve"> Approve low-risk plans</label>
+    </div>
+  </header>
+  <div class="frame">
+    <div class="topbar" id="crumbs"></div>
     <main id="view" tabindex="-1" aria-live="polite"></main>
   </div>
 </div>
