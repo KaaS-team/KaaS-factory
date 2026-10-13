@@ -35,19 +35,39 @@ function lines(text: string): string[] {
   return plain(text.replace(/\r/g, "")).split("\n");
 }
 
+// One parse of the stream, drawn twice: in colour for the tmux window (render) and as cards
+// on the dashboard's run page (items). Neither can show the agent doing something the other hides.
+export type Tone = "fail" | "pass" | "plain";
+export interface Diff { removed: string[]; added: string[]; removedMore: number; addedMore: number }
+export type StreamItem =
+  | { kind: "stage"; stage: string; issue: number }
+  | { kind: "exit"; stage: string; ok: boolean; code: number; reason?: string }
+  | { kind: "say"; text: string; nested: boolean }
+  | { kind: "tool"; name: string; target: string; nested: boolean; diff?: Diff }
+  | { kind: "result"; ok: boolean; rows: { text: string; tone: Tone }[]; nested: boolean }
+  | { kind: "done"; ms?: number; costUsd?: number }
+  | { kind: "raw"; text: string };
+
 // Lines both sides share at the start and end are context, not change.
-export function diffLines(before: string, after: string): string[] {
+export function diffParts(before: string, after: string): Diff {
   const a = lines(before);
   const b = lines(after);
   let head = 0;
   while (head < a.length && head < b.length && a[head] === b[head]) head++;
   let tail = 0;
   while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
-  const cap = (rows: string[], sign: string, color: string) => [
-    ...rows.slice(0, DIFF_LINES).map((r) => paint(color, `    ${sign} ${r}`)),
-    ...(rows.length > DIFF_LINES ? [paint(C.dim, `    … ${rows.length - DIFF_LINES} more lines`)] : []),
-  ];
-  return [...cap(a.slice(head, a.length - tail), "-", C.red), ...cap(b.slice(head, b.length - tail), "+", C.green)];
+  const removed = a.slice(head, a.length - tail);
+  const added = b.slice(head, b.length - tail);
+  return { removed: removed.slice(0, DIFF_LINES), added: added.slice(0, DIFF_LINES), removedMore: Math.max(0, removed.length - DIFF_LINES), addedMore: Math.max(0, added.length - DIFF_LINES) };
+}
+
+function paintDiff(d: Diff): string[] {
+  const side = (rows: string[], more: number, sign: string, color: string) => [...rows.map((r) => paint(color, `    ${sign} ${r}`)), ...(more ? [paint(C.dim, `    … ${more} more lines`)] : [])];
+  return [...side(d.removed, d.removedMore, "-", C.red), ...side(d.added, d.addedMore, "+", C.green)];
+}
+
+export function diffLines(before: string, after: string): string[] {
+  return paintDiff(diffParts(before, after));
 }
 
 function resultText(content: unknown): string {
@@ -68,6 +88,32 @@ function duration(ms: number): string {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+const TONE_COLOR: Record<Tone, string> = { fail: C.red, pass: C.green, plain: C.dim };
+
+function paintItem(item: StreamItem): string[] {
+  switch (item.kind) {
+    case "stage":
+      return banner(item.stage, item.issue);
+    case "exit":
+      return [paint(item.ok ? C.green : C.red, `${item.ok ? "✓" : "✗"} ${item.stage} exit ${item.code}${item.reason ? ` (${item.reason})` : ""}`)];
+    case "say":
+      return item.text.split("\n").map((r) => `${item.nested ? "  " : ""}${paint(C.white, r)}`);
+    case "tool": {
+      const head = `${item.nested ? "  " : ""}${paint(TOOL_COLOR[item.name] ?? C.white, "●")} ${paint(C.bold, item.name)} ${item.target}`.trimEnd();
+      return [head, ...(item.diff ? paintDiff(item.diff) : [])];
+    }
+    case "result": {
+      const pad = item.nested ? "  " : "";
+      const mark = item.ok ? paint(C.green, "✓") : paint(C.red, "✗");
+      return item.rows.map((r, i) => `${pad}    ${i === 0 ? mark : " "} ${paint(TONE_COLOR[r.tone], r.text)}`);
+    }
+    case "done":
+      return [paint(C.dim, `  done${item.ms != null ? ` in ${duration(item.ms)}` : ""}${item.costUsd != null ? `  $${item.costUsd.toFixed(2)}` : ""}`)];
+    case "raw":
+      return [item.text];
+  }
+}
+
 // Stateful across lines: a tool result only says which call it answers, so the call is remembered.
 export class StreamView {
   private cwd = "";
@@ -84,61 +130,56 @@ export class StreamView {
     return first.length > 100 ? `${first.slice(0, 99)}…` : first;
   }
 
-  private toolUse(b: Block, nested: boolean): string[] {
+  private toolUse(b: Block, nested: boolean): StreamItem[] {
     const name = b.name ?? "tool";
     if (b.id) this.calls.set(b.id, name);
     if (name === "TodoWrite") return [];
-    const pad = nested ? "  " : "";
-    const head = `${pad}${paint(TOOL_COLOR[name] ?? C.white, "●")} ${paint(C.bold, name)} ${this.target(name, b.input)}`.trimEnd();
     const input = b.input ?? {};
-    if (name === "Edit" && typeof input.old_string === "string" && typeof input.new_string === "string") return [head, ...diffLines(input.old_string, input.new_string)];
-    if (name === "Write" && typeof input.content === "string") return [head, ...diffLines("", input.content)];
-    return [head];
+    const item: StreamItem = { kind: "tool", name, target: this.target(name, b.input), nested };
+    if (name === "Edit" && typeof input.old_string === "string" && typeof input.new_string === "string") item.diff = diffParts(input.old_string, input.new_string);
+    if (name === "Write" && typeof input.content === "string") item.diff = diffParts("", input.content);
+    return [item];
   }
 
   // Only command output is worth reading in the window; a Read's file contents are not.
-  private toolResult(b: Block, nested: boolean): string[] {
+  private toolResult(b: Block, nested: boolean): StreamItem[] {
     const name = b.tool_use_id ? this.calls.get(b.tool_use_id) : undefined;
-    if (name !== "Bash") return b.is_error ? [paint(C.red, `${nested ? "  " : ""}    ✗ ${lines(resultText(b.content))[0] ?? ""}`)] : [];
+    if (name !== "Bash") return b.is_error ? [{ kind: "result", ok: false, rows: [{ text: lines(resultText(b.content))[0] ?? "", tone: "fail" }], nested }] : [];
     const rows = lines(resultText(b.content)).filter((r) => r.trim() !== "").slice(-RESULT_LINES);
-    const mark = b.is_error ? paint(C.red, "✗") : paint(C.green, "✓");
-    return rows.map((r, i) => {
-      const color = FAIL_LINE.test(r) ? C.red : PASS_LINE.test(r) ? C.green : C.dim;
-      return `${nested ? "  " : ""}    ${i === 0 ? mark : " "} ${paint(color, r)}`;
-    });
+    return [{ kind: "result", ok: !b.is_error, nested, rows: rows.map((text) => ({ text, tone: FAIL_LINE.test(text) ? "fail" : PASS_LINE.test(text) ? "pass" : "plain" })) }];
   }
 
-  render(line: string): string[] {
+  items(line: string): StreamItem[] {
     const trimmed = line.trim();
     if (!trimmed) return [];
     let event: Record<string, unknown>;
     try {
       event = JSON.parse(trimmed);
     } catch {
-      return [plain(line)];
+      return [{ kind: "raw", text: plain(line) }];
     }
-    if (typeof event !== "object" || event === null) return [plain(line)];
+    if (typeof event !== "object" || event === null) return [{ kind: "raw", text: plain(line) }];
     const type = event.type;
-    if (type === "factory_stage") return banner(String(event.stage), Number(event.issue));
+    if (type === "factory_stage") return [{ kind: "stage", stage: String(event.stage), issue: Number(event.issue) }];
     if (type === "factory_exit") {
-      const ok = event.code === 0 && !event.reason;
-      return [paint(ok ? C.green : C.red, `${ok ? "✓" : "✗"} ${event.stage} exit ${event.code}${event.reason ? ` (${plain(String(event.reason))})` : ""}`)];
+      const code = Number(event.code);
+      return [{ kind: "exit", stage: String(event.stage), code, ok: code === 0 && !event.reason, ...(event.reason ? { reason: plain(String(event.reason)) } : {}) }];
     }
     if (type === "system" && event.subtype === "init" && typeof event.cwd === "string") this.cwd = event.cwd;
-    if (type === "result") {
-      const cost = typeof event.total_cost_usd === "number" ? `  $${event.total_cost_usd.toFixed(2)}` : "";
-      const took = typeof event.duration_ms === "number" ? ` in ${duration(event.duration_ms)}` : "";
-      return [paint(C.dim, `  done${took}${cost}`)];
-    }
+    if (type === "result") return [{ kind: "done", ...(typeof event.duration_ms === "number" ? { ms: event.duration_ms } : {}), ...(typeof event.total_cost_usd === "number" ? { costUsd: event.total_cost_usd } : {}) }];
     const message = event.message as { content?: unknown } | undefined;
     if ((type !== "assistant" && type !== "user") || !Array.isArray(message?.content)) return [];
     const nested = typeof event.parent_tool_use_id === "string";
-    return (message.content as Block[]).flatMap((b) => {
-      if (b.type === "text" && b.text && type === "assistant") return lines(b.text).map((r) => `${nested ? "  " : ""}${paint(C.white, r)}`);
+    return (message.content as Block[]).flatMap((b): StreamItem[] => {
+      if (b.type === "text" && b.text && type === "assistant") return [{ kind: "say", text: lines(b.text).join("\n"), nested }];
       if (b.type === "tool_use") return this.toolUse(b, nested);
       if (b.type === "tool_result") return this.toolResult(b, nested);
       return [];
     });
+  }
+
+  render(line: string): string[] {
+    return this.items(line).flatMap(paintItem);
   }
 }
 

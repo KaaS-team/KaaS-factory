@@ -348,5 +348,11 @@
   {"name": "view: edits drawn as a diff", "file": "src/view.ts", "find": "if (name === \"Edit\" && typeof input.old_string", "replace": "if (false && typeof input.old_string", "test": "tests/view.test.ts"},
   {"name": "view: a failing count is red", "file": "src/view.ts", "find": "const FAIL_LINE = /\\b[1-9]\\d* fail\\b|", "replace": "const FAIL_LINE = /", "test": "tests/view.test.ts"},
   {"name": "executor: the live stream file", "file": "src/agents/executor.ts", "find": "append(streamFile, `${line}\\n`);", "replace": "", "test": "tests/view.test.ts"},
-  {"name": "tmux: the window runs factory view", "file": "src/tmux.ts", "find": "`${factory} view ${shellQuote(streamPath(file))} --follow`", "replace": "`tail -n +1 -F ${shellQuote(file)}`", "test": "tests/tmux.test.ts"}
+  {"name": "tmux: the window runs factory view", "file": "src/tmux.ts", "find": "`${factory} view ${shellQuote(streamPath(file))} --follow`", "replace": "`tail -n +1 -F ${shellQuote(file)}`", "test": "tests/tmux.test.ts"},
+  {"name": "markdown: only http links", "file": "dashboard/public/lib/markdown.js", "find": "const safeHref = (href) => (/^https?:\\/\\//i.test(href) ? href : null);", "replace": "const safeHref = (href) => href;", "test": "tests/markdown.test.ts"},
+  {"name": "markdown: headings become elements", "file": "dashboard/public/lib/markdown.js", "find": "    const head = HEADING.exec(l);", "replace": "    const head = null;", "test": "tests/markdown.test.ts"},
+  {"name": "run page: criterion status from the verdict", "file": "dashboard/run-page.ts", "find": "status: status.get(id!) ?? \"pending\"", "replace": "status: \"pending\"", "test": "tests/run-page.test.ts"},
+  {"name": "run page: live feed from an offset", "file": "dashboard/run-page.ts", "find": "return { items: all.slice(start), next: all.length };", "replace": "return { items: all, next: all.length };", "test": "tests/run-page.test.ts"},
+  {"name": "run page: run records show no body", "file": "dashboard/public/lib/run-page.js", "find": "item.diff && !item.target.startsWith(\".factory/\")", "replace": "item.diff", "test": "tests/run-page.test.ts"},
+  {"name": "line: every repo the inbox reads", "file": "dashboard/server.ts", "find": "const repos = repo ? [...new Set([repo, ...inboxRepos()])] : [];", "replace": "const repos = repo ? [repo] : [];", "test": "tests/dashboard-routes.test.ts"}
 ]

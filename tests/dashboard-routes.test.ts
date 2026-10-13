@@ -4,7 +4,7 @@
 // read and write routes (inbox, analytics, stages, artifacts).
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitHub, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
@@ -364,6 +364,39 @@ describe("line and assets", () => {
     expect(body.rows).toHaveLength(1);
     // A clean exit with an uncertain verdict is not an ok verify; the stamp only touches the newest row.
     expect(body.rows[0]!.stages).toMatchObject([{ stage: "triage", ok: true }, { stage: "verify", ok: false }, { stage: "verify", ok: true }]);
+  });
+
+  test("the Line, the live feed and the proof span every repo the inbox reads", async () => {
+    const home = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const saved = { home: process.env.FACTORY_HOME, repos: process.env.FACTORY_REPOS };
+    process.env.FACTORY_HOME = home;
+    process.env.FACTORY_REPOS = "acme/widgets,acme/harness";
+    try {
+      const { dashboard, state } = await make("");
+      state.upsertRun({ issue: 1, repo: "acme/widgets", title: "widgets bug", stage: "build", status: "running" });
+      new FactoryState(join(home, "acme", "harness", "factory.db")).upsertRun({ issue: 7, repo: "acme/harness", title: "harness bug", stage: "plan", status: "running" });
+      const get = async (path: string) => (await dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1")).json();
+      const line = (await get("/api/line")) as { rows: { repo: string; run: { issue: number } }[] };
+      expect(line.rows.map((r) => `${r.repo}#${r.run.issue}`).sort()).toEqual(["acme/harness#7", "acme/widgets#1"]);
+
+      const transcripts = join(home, "acme", "harness", "transcripts");
+      mkdirSync(transcripts, { recursive: true });
+      cpSync(join(import.meta.dir, "fixtures/agents/claude/build.jsonl"), join(transcripts, "issue-7.stream.jsonl"));
+      const live = (await get("/api/issues/7/live?repo=acme/harness")) as { items: { kind: string }[]; next: number };
+      expect(live.items.some((i) => i.kind === "tool")).toBe(true);
+      expect(((await get(`/api/issues/7/live?repo=acme/harness&from=${live.next}`)) as { items: unknown[] }).items).toEqual([]);
+
+      cpSync(join(import.meta.dir, "fixtures/runs/issue-186"), join(home, "acme", "harness", "workspaces", "issue-7", ".factory", "runs", "issue-7"), { recursive: true });
+      const proof = (await get("/api/issues/7/proof?repo=acme/harness")) as { criteria: unknown[]; gate: { status: string }; revert: { status: string } };
+      expect(proof).toMatchObject({ gate: { status: "GREEN" }, revert: { status: "bites" } });
+      expect(proof.criteria).toHaveLength(4);
+    } finally {
+      for (const [k, v] of [["FACTORY_HOME", saved.home], ["FACTORY_REPOS", saved.repos]] as const) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 
   test("assets are public, typed, and never escape dashboard/public", async () => {

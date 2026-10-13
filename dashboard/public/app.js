@@ -5,6 +5,8 @@ import { routeFromHash } from "/lib/routes.js";
 import { createStatusLoader } from "/lib/status-loader.js";
 import { formatElapsed } from "/lib/run-metrics.js";
 import { ACTIVE, stationStates, WAITING } from "/lib/stations.js";
+import { markdownText, renderMarkdown } from "/lib/markdown.js";
+import { feedCard, proofPanel } from "/lib/run-page.js";
 
 const ACTION_LABEL = { approve: "Approve plan", revise: "Request changes", answer: "Send answer", retry: "Retry", cancel: "Cancel run" };
 const REVIEW_KINDS = new Set(["review-pr", "merge-dry-run"]);
@@ -81,7 +83,7 @@ const stateOr = (name, ready) => {
 function stationsFor(row) {
   return stationStates(row.run, row.stages).map(({ name, ms, live, failed, done }) => {
     const grow = Math.max(1, Math.min(8, Math.round(ms / 30000)));
-    return { name, node: h("div", { class: "station", style: `flex-grow:${grow}`, "data-done": done, "data-live": live, "data-failed": failed, title: `${name}${ms ? ` · ${formatElapsed(ms)}` : ""}` }) };
+    return { name, grow, node: h("div", { class: "station", style: `flex-grow:${grow}`, "data-done": done, "data-live": live, "data-failed": failed, title: `${name}${ms ? ` · ${formatElapsed(ms)}` : ""}` }) };
   });
 }
 
@@ -90,9 +92,10 @@ function lineRow(row) {
   const stations = stationsFor(row);
   const needs = WAITING.has(run.status);
   const agents = [...new Set(row.stages.map((s) => s.agent))].join(", ");
-  return h("button", { class: "line-row", type: "button", onclick: () => (needs ? go("inbox", run.issue) : (location.hash = `#/runs/${run.issue}`)) },
-    h("div", null, h("div", { class: "line-title" }, `#${run.issue} ${run.title}`), h("div", { class: "line-sub" }, [agents, `started ${age(run.started_at)} ago`].filter(Boolean).join(" · "))),
-    h("div", { class: "stations-col" }, h("div", { class: "stations" }, stations.map((s) => s.node)), h("div", { class: "station-names" }, stations.map((s) => h("span", null, s.name)))),
+  const repo = row.repo ?? state.repo;
+  return h("button", { class: "line-row", type: "button", onclick: () => (needs ? go("inbox", run.issue, repo) : (location.hash = runHref(repo, run.issue))) },
+    h("div", null, h("div", { class: "line-repo" }, repo), h("div", { class: "line-title" }, `#${run.issue} ${run.title}`), h("div", { class: "line-sub" }, [agents, `started ${age(run.started_at)} ago`].filter(Boolean).join(" · "))),
+    h("div", { class: "stations-col" }, h("div", { class: "stations" }, stations.map((s) => s.node)), h("div", { class: "station-names" }, stations.map((s) => h("span", { style: `flex-grow:${s.grow}` }, s.name)))),
     h("div", { class: `line-state${needs ? " needs-you" : ""}` }, h("span", { class: "num" }, needs ? "Waiting on you" : statusText(run.status)), needs && run.reason ? h("span", { class: "reason", title: run.reason }, run.reason) : null, `${money(run.cost_usd)} · ${compact(run.tokens_in + run.tokens_out)} tokens`));
 }
 
@@ -158,16 +161,16 @@ function reviewPanel() {
       h("thead", null, h("tr", null, ["Stage", "Agent", "Model", "Cost"].map((c, i) => h("th", { class: i === 3 ? "num" : "" }, c)))),
       h("tbody", null, r.stages.map((s) => h("tr", null, h("td", null, s.stage), h("td", null, s.agent), h("td", null, s.model || "default"), h("td", { class: "num" }, s.usage_complete === 0 ? "Not reported" : money(s.cost_usd))))))) : null,
     h("h3", { style: "margin-top:1rem" }, "Diff"),
-    h("pre", { class: "log" }, r.diff || "No diff available."));
+    h("pre", { class: "log diff" }, r.diff ? r.diff.split("\n").map((l) => h("span", { class: /^\+(?!\+\+)/.test(l) ? "diff-add" : /^-(?!--)/.test(l) ? "diff-del" : /^@@/.test(l) ? "diff-hunk" : "" }, l)) : "No diff available."));
 }
 
 function conversation(item) {
   const t = state.thread;
   const body = !t ? quiet("Loading", "Reading the issue thread.")
     : t.error ? quiet("Could not load the thread", t.error)
-    : h("div", { class: "thread" }, [{ author: "issue", body: t.body, bot: false }, ...(t.comments || []).map((c) => ({ author: c.author, body: c.body, bot: c.body.includes("<!-- factory:") }))]
+    : h("div", { class: "thread" }, [{ author: "issue", body: t.body, bot: false }, ...(t.comments || []).filter((c) => !c.body.includes("<!-- factory:spend")).map((c) => ({ author: c.author, body: c.body, bot: c.body.includes("<!-- factory:") }))]
         .filter((m) => cleanBody(m.body))
-        .map((m) => h("div", { class: `msg${m.bot ? " bot" : ""}` }, h("header", null, m.bot ? "factory" : m.author), cleanBody(m.body))));
+        .map((m) => h("div", { class: `msg${m.bot ? " bot" : ""}` }, h("header", null, m.bot ? "factory" : m.author), renderMarkdown(m.body, h))));
   const needsText = item.actions.filter((a) => a === "revise" || a === "answer");
   const box = needsText.length ? h("textarea", { class: "field-control", id: "composer", rows: "3", placeholder: item.kind === "answer-question" ? "Your answer" : "What should change?", "aria-label": "Your reply" }) : null;
   const isReview = REVIEW_KINDS.has(item.kind);
@@ -200,7 +203,7 @@ function inboxView() {
       h("div", { class: "list-col" }, h("div", { class: "list" }, items.map((i) =>
         h("button", { class: "list-item", type: "button", "aria-current": String(isSelected(i)), onclick: () => selectItem(i) },
           h("span", { class: "kind" }, KIND_LABEL[i.kind], multiRepo ? h("span", { class: "muted repo-tag" }, ` · ${i.repo}`) : null),
-          h("strong", null, `#${i.issue} ${i.title}`), h("span", { class: "muted" }, `waiting ${age(i.waitingSince)}`), h("span", { class: "muted" }, i.ask.slice(0, 110)))))),
+          h("strong", null, `#${i.issue} ${i.title}`), h("span", { class: "muted" }, `waiting ${age(i.waitingSince)}`), h("span", { class: "muted" }, markdownText(i.ask).slice(0, 110)))))),
       h("div", { class: "detail-col" }, item ? [h("button", { class: "btn back", type: "button", onclick: () => { state.selected = null; state.review = null; render(); } }, "Back to inbox"), conversation(item)] : quiet("Pick an item", "Its conversation and actions show up here."))));
 }
 
@@ -215,68 +218,69 @@ function runsView() {
       return h("div", null,
         h("div", { class: "tabs", role: "group", "aria-label": "Filter runs" }, FILTERS.map(([id, label, fn]) => h("button", { class: "tab", type: "button", "aria-pressed": String(state.filter === id), onclick: () => { state.filter = id; render(); } }, `${label} ${runs.filter(fn).length}`))),
         rows.length ? h("div", { class: "table-wrap" }, h("table", null, h("thead", null, h("tr", null, ["Issue", "Status", "Stage", "Cost", "Updated"].map((c, i) => h("th", { class: i >= 3 ? "num" : "" }, c)))),
-          h("tbody", null, rows.map((r) => h("tr", { "data-href": r.issue, tabindex: "0", onclick: () => (location.hash = `#/runs/${r.issue}`), onkeydown: (e) => e.key === "Enter" && (location.hash = `#/runs/${r.issue}`) },
+          h("tbody", null, rows.map((r) => h("tr", { "data-href": r.issue, tabindex: "0", onclick: () => (location.hash = runHref(r.repo, r.issue)), onkeydown: (e) => e.key === "Enter" && (location.hash = runHref(r.repo, r.issue)) },
             h("td", null, `#${r.issue} ${r.title}`), h("td", null, h("span", { class: "status", "data-tone": tone(r.status) }, statusText(r.status))), h("td", null, r.stage), h("td", { class: "num" }, money(r.cost_usd)), h("td", { class: "num" }, age(r.updated_at)))))))
         : quiet("No runs match", state.filter === "all" ? "Label an issue factory:ready to start one." : "Try another filter."));
     }));
 }
 
-/* ---- Run detail sheet ---- */
-const sheet = { issue: null, run: null, stages: null, artifacts: null, events: null, preview: null };
+/* ---- One run: the agent's activity and the proof, on one page ---- */
+// #/runs/<owner>/<name>/<issue>, or #/runs/<issue> for the configured repo.
+const runKey = (jobID) => { const m = /^(?:(.+)\/)?(\d+)$/.exec(jobID); return m ? { repo: m[1] || state.repo, issue: Number(m[2]) } : null; };
+const runHref = (repo, issue) => `#/runs/${repo ? `${repo}/` : ""}${issue}`;
+const live = { key: "", items: [], next: 0, proof: null, files: null, preview: null, timer: 0 };
 
-async function openSheet(issue) {
-  Object.assign(sheet, { issue, run: null, stages: null, artifacts: null, events: null, preview: null });
-  renderSheet();
-  const runs = state.data.runs ?? (await api("/api/runs").catch(() => null));
-  if (sheet.issue !== issue) return;
-  const run = (runs?.runs || []).find((r) => r.issue === issue);
-  if (!run) { sheet.run = { missing: true }; return renderSheet(); }
-  sheet.run = run;
-  renderSheet();
-  const [stages, artifacts, events] = await Promise.allSettled([api(`/api/runs/${run.id}/stages`), api(`/api/issues/${issue}/artifacts`), api(`/api/runs/${run.id}/events`)]);
-  if (sheet.issue !== issue) return; // the sheet moved on while these loaded
-  sheet.stages = stages.value?.stages ?? [];
-  sheet.artifacts = artifacts.value?.files ?? [];
-  sheet.events = events.value?.events ?? [];
-  renderSheet();
+async function pollLive() {
+  const at = runKey(state.route.jobID);
+  if (state.route.view !== "task" || !at) return;
+  const key = `${at.repo}#${at.issue}`;
+  if (live.key !== key) Object.assign(live, { key, items: [], next: 0, proof: null, files: null, preview: null });
+  const q = `repo=${encodeURIComponent(at.repo || "")}`;
+  const [feed, proof] = await Promise.allSettled([api(`/api/issues/${at.issue}/live?${q}&from=${live.next}`), api(`/api/issues/${at.issue}/proof?${q}`)]);
+  if (live.key !== key) return; // the page moved on while these loaded
+  let changed = false;
+  if (feed.value) {
+    if (feed.value.next < live.next) live.items = [];
+    if (feed.value.items.length || feed.value.next < live.next) changed = true;
+    live.items.push(...feed.value.items);
+    live.next = feed.value.next;
+  }
+  if (proof.value && JSON.stringify(proof.value) !== JSON.stringify(live.proof)) { live.proof = proof.value; changed = true; }
+  if (changed) render();
 }
 
-async function preview(name) {
-  const res = await fetch(`/api/issues/${sheet.issue}/artifacts?file=${encodeURIComponent(name)}`);
-  sheet.preview = { name, text: res.ok ? await res.text() : "Could not read this file.", truncated: res.headers.get("x-artifact-truncated") === "true" };
-  renderSheet();
+async function runFiles(issue) {
+  live.files = (await api(`/api/issues/${issue}/artifacts`).catch(() => ({ files: [] }))).files;
+  render();
 }
 
-function renderSheet() {
-  const root = document.getElementById("sheet-root");
-  root.replaceChildren();
-  if (sheet.issue == null) return;
-  const close = () => { location.hash = "#/runs"; };
-  const run = sheet.run;
-  const body = !run ? quiet("Loading", "Reading this run.") : run.missing ? quiet("No run for this issue", "It may not have started yet.") : [
-    h("dl", { class: "kv" },
-      h("dt", null, "Status"), h("dd", null, h("span", { class: "status", "data-tone": tone(run.status) }, statusText(run.status))),
-      h("dt", null, "Stage"), h("dd", null, run.stage),
-      h("dt", null, "Cost"), h("dd", null, `${money(run.cost_usd)} · ${compact(run.tokens_in + run.tokens_out)} tokens · ${run.tool_calls} tool calls`),
-      run.pr_url && [h("dt", null, "Pull request"), h("dd", null, h("a", { href: run.pr_url, target: "_blank", rel: "noreferrer" }, run.pr_url))],
-      run.gate_line && [h("dt", null, "Gates"), h("dd", null, run.gate_line)],
-      run.reason && [h("dt", null, "Reason"), h("dd", null, run.reason)]),
-    h("h2", null, "Stages"),
-    !sheet.stages ? h("p", { class: "muted" }, "Loading") : sheet.stages.length ? h("div", { class: "table-wrap" }, h("table", null, h("thead", null, h("tr", null, ["Stage", "Agent", "Took", "Tokens", "Cost"].map((c, i) => h("th", { class: i >= 2 ? "num" : "" }, c)))),
-      h("tbody", null, sheet.stages.map((s) => h("tr", null, h("td", null, h("span", { class: "status", "data-tone": s.exit_code === 0 && !s.killed_reason ? "ok" : "bad" }, s.stage)), h("td", null, s.agent), h("td", { class: "num" }, formatElapsed(s.duration_ms)),
-        h("td", { class: "num" }, s.usage_complete !== 0 && s.tokens_in + s.tokens_out ? compact(s.tokens_in + s.tokens_out) : "Not reported"), h("td", { class: "num" }, s.usage_complete === 0 ? "Not reported" : money(s.cost_usd))))))) : h("p", { class: "muted" }, "No stage has finished yet."),
-    h("h2", { style: "margin-top:1.5rem" }, "Files from the run"),
-    !sheet.artifacts ? h("p", { class: "muted" }, "Loading") : sheet.artifacts.length ? h("div", { class: "actions" }, sheet.artifacts.map((f) => h("button", { class: "btn", type: "button", onclick: () => preview(f.name) }, `${f.name} (${compact(f.size)}B)`))) : h("p", { class: "muted" }, "This run left no files on this machine."),
-    sheet.preview && [h("p", { class: "muted" }, `${sheet.preview.name}${sheet.preview.truncated ? " (first 1 MiB)" : ""} `, h("a", { href: `/api/issues/${sheet.issue}/artifacts?file=${encodeURIComponent(sheet.preview.name)}&download=1` }, "Download")), h("pre", { class: "log" }, sheet.preview.text)],
-    h("h2", { style: "margin-top:1.5rem" }, "Log"),
-    !sheet.events ? h("p", { class: "muted" }, "Loading") : sheet.events.length ? h("pre", { class: "log" }, sheet.events.slice(-200).map((e) => `[${e.stage}/${e.kind}] ${e.text}`).join("\n")) : h("p", { class: "muted" }, "Nothing logged yet."),
-  ];
-  root.append(h("div", { class: "sheet-backdrop", onclick: close }),
-    h("aside", { class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": `Run for issue ${sheet.issue}` },
-      h("button", { class: "btn sheet-close", type: "button", onclick: close }, "Close"), h("h2", null, run && !run.missing ? `#${run.issue} ${run.title}` : `#${sheet.issue}`), body));
-  root.querySelector(".sheet .btn")?.focus();
+async function preview(issue, name) {
+  const res = await fetch(`/api/issues/${issue}/artifacts?file=${encodeURIComponent(name)}`);
+  live.preview = { name, text: res.ok ? await res.text() : "Could not read this file.", truncated: res.headers.get("x-artifact-truncated") === "true" };
+  render();
 }
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet.issue != null) location.hash = "#/runs"; });
+
+function runView() {
+  const at = runKey(state.route.jobID);
+  const back = h("a", { class: "back-link", href: "#/line" }, "Back to the Line");
+  if (!at) return h("section", null, back, quiet("No such run", "Pick a run from the Line."));
+  const row = state.data.line?.rows.find((r) => r.run.issue === at.issue && (r.repo ?? state.repo) === at.repo);
+  const run = row?.run;
+  const stations = row ? stationsFor(row) : [];
+  const sub = [at.repo, run && `started ${age(run.started_at)} ago`, run && money(run.cost_usd)].filter(Boolean).join(" · ");
+  return h("section", { class: "run-page" }, back,
+    heading(`#${at.issue} ${run?.title ?? ""}`.trim(), sub,
+      run ? h("span", { class: "status", "data-tone": tone(run.status) }, WAITING.has(run.status) ? "Waiting on you" : statusText(run.status)) : null),
+    row ? h("div", { class: "run-stations" }, h("div", { class: "stations" }, stations.map((s) => s.node)), h("div", { class: "station-names" }, stations.map((s) => h("span", { style: `flex-grow:${s.grow}` }, s.name)))) : null,
+    h("div", { class: "run-grid" },
+      h("div", { class: "panel feed-panel" }, h("h2", { class: "panel-pad" }, "What the agent is doing"),
+        h("div", { class: "feed", id: "feed" }, live.items.length ? live.items.map((i) => feedCard(i, h)) : quiet("Nothing yet", "The agent's reads, edits and test runs show here as it works."))),
+      h("aside", { class: "panel panel-pad proof-col" }, h("h2", null, "Proof"), proofPanel(live.proof, h),
+        run?.pr_url ? h("p", { class: "pr-link" }, h("a", { href: run.pr_url, target: "_blank", rel: "noreferrer" }, "Open the pull request")) : null)),
+    h("details", { class: "run-files", ontoggle: (e) => e.target.open && !live.files && runFiles(at.issue) }, h("summary", null, "Files from the run"),
+      !live.files ? h("p", { class: "muted" }, "Loading") : live.files.length ? h("div", { class: "actions" }, live.files.map((f) => h("button", { class: "btn", type: "button", onclick: () => preview(at.issue, f.name) }, `${f.name} (${compact(f.size)}B)`))) : h("p", { class: "muted" }, "This run left no files on this machine."),
+      live.preview && [h("p", { class: "muted" }, `${live.preview.name}${live.preview.truncated ? " (first 1 MiB)" : ""} `, h("a", { href: `/api/issues/${at.issue}/artifacts?file=${encodeURIComponent(live.preview.name)}&download=1` }, "Download")), h("pre", { class: "log" }, live.preview.text)]));
+}
 
 /* ---- Analytics ---- */
 function bars(title, buckets, unit) {
@@ -352,20 +356,28 @@ function settingsView() {
 }
 
 /* ---- shell ---- */
-const VIEWS = { inbox: inboxView, line: lineView, runs: runsView, task: runsView, workflows: workflowsView, analytics: analyticsView, agents: agentsView, settings: settingsView };
-const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task: ["runs", "/api/runs"], workflows: ["workflows", "/api/workflows"], analytics: ["analytics", "/api/analytics"], agents: ["agents", "/api/agents"], settings: ["settings", "/api/settings"] };
+const VIEWS = { inbox: inboxView, line: lineView, runs: runsView, task: runView, workflows: workflowsView, analytics: analyticsView, agents: agentsView, settings: settingsView };
+const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task: ["line", "/api/line"], workflows: ["workflows", "/api/workflows"], analytics: ["analytics", "/api/analytics"], agents: ["agents", "/api/agents"], settings: ["settings", "/api/settings"] };
 
 function renderNav() {
   const nav = document.getElementById("nav");
-  const view = state.route.view === "task" ? "runs" : state.route.view;
+  const view = state.route.view === "task" ? "line" : state.route.view;
   nav.replaceChildren(...NAV.map(([id, label]) => h("a", { class: "nav-item", href: `#/${id}`, "aria-current": view === id ? "page" : false }, svg(ICONS[id]), label, id === "inbox" && state.inbox.length ? h("span", { class: "badge" }, String(state.inbox.length)) : null)),
     h("button", { class: "nav-item", type: "button", "aria-label": "Switch light and dark", onclick: toggleTheme }, svg(ICONS.theme), "Theme"));
 }
 
+// The feed follows the newest card unless the reader scrolled up to look at an older one.
 function render() {
   const main = document.getElementById("view");
   const focused = document.activeElement?.id === "composer" ? document.getElementById("composer").value : null;
+  const feed = document.getElementById("feed");
+  const follow = !feed || feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
+  const top = feed?.scrollTop ?? 0;
+  const open = document.querySelector(".run-files")?.open;
   main.replaceChildren((VIEWS[state.route.view] || inboxView)());
+  const next = document.getElementById("feed");
+  if (next) next.scrollTop = follow ? next.scrollHeight : top;
+  if (open) document.querySelector(".run-files")?.setAttribute("open", "");
   if (focused != null) { const c = document.getElementById("composer"); if (c) { c.value = focused; c.focus(); } }
   renderNav();
 }
@@ -422,8 +434,8 @@ function loadView() {
 
 function onRoute() {
   state.route = routeFromHash(location.hash);
-  if (state.route.view === "task") openSheet(Number(state.route.jobID));
-  else { sheet.issue = null; renderSheet(); }
+  clearInterval(live.timer);
+  if (state.route.view === "task") { live.timer = setInterval(pollLive, 1000); pollLive(); }
   render();
   loadView();
 }

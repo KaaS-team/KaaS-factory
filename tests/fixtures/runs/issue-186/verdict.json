@@ -1,0 +1,32 @@
+{
+  "result": "pass",
+  "rounds": 1,
+  "findings": [
+    {
+      "severity": "could",
+      "confidence": 3,
+      "what": "No test case for 0, sub-100-cent (e.g. 5 -> 0.05), negative, or large (e.g. 123456) amounts; rows are split on ',' which relies on seed descriptions having no commas.",
+      "where": "tests/csv.test.ts:24",
+      "why": "Cheap regression guard for edge cases of the amount column.",
+      "fix": "Add one or two assertions covering 5 cents and a negative or large amount."
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-1",
+      "status": "pass"
+    },
+    {
+      "id": "AC-2",
+      "status": "pass"
+    },
+    {
+      "id": "AC-3",
+      "status": "pass"
+    },
+    {
+      "id": "AC-4",
+      "status": "pass"
+    }
+  ]
+}

@@ -7,7 +7,7 @@
 // machine).
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ScmPort } from "../src/github";
@@ -22,7 +22,8 @@ import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
-import { discoverRepos, workspacesDir } from "../src/paths";
+import { defaultStatePath, discoverRepos, streamPath, transcriptPath, workspacesDir } from "../src/paths";
+import { liveItems, proofView } from "./run-page";
 import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
@@ -224,11 +225,21 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
     });
   }
 
+  // Each repo keeps its own state DB; the Line reads every repo the inbox does, and a
+  // repo that never ran has no DB to open.
+  const otherStates = new Map<string, FactoryState>();
+  function stateFor(r: string): FactoryState | null {
+    if (r === repo) return state;
+    const path = defaultStatePath(process.env, r);
+    if (!otherStates.has(r) && existsSync(path)) otherStates.set(r, new FactoryState(path));
+    return otherStates.get(r) ?? null;
+  }
+
   // Every stage attempt for a repo, paged by keyset so a long history is never one giant read.
-  function allStageRuns(): ReturnType<FactoryState["listStageRuns"]> {
+  function allStageRuns(st: FactoryState = state, r: string = repo): ReturnType<FactoryState["listStageRuns"]> {
     const out: ReturnType<FactoryState["listStageRuns"]> = [];
     for (let after = 0; ; ) {
-      const page = state.listStageRuns(repo, { after, limit: 500 });
+      const page = st.listStageRuns(r, { after, limit: 500 });
       out.push(...page.map(plainStage));
       if (page.length < 500) return out;
       after = page[page.length - 1]!.id;
@@ -475,6 +486,32 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       },
     },
     {
+      // The run page: the agent's activity as cards, read from the stream `factory view` reads.
+      method: "GET",
+      pattern: /^\/api\/issues\/(\d+)\/live$/,
+      label: "GET /api/issues/:n/live",
+      handler: (_req, url, m) => {
+        const r = url.searchParams.get("repo") || repo;
+        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        return json(liveItems(streamPath(transcriptPath(r, Number(m[1]), process.env)), Number(url.searchParams.get("from") ?? "0") || 0));
+      },
+    },
+    {
+      // The proof a reviewer reads: criteria from the approved plan, the gate, and the revert.
+      method: "GET",
+      pattern: /^\/api\/issues\/(\d+)\/proof$/,
+      label: "GET /api/issues/:n/proof",
+      handler: async (_req, url, m) => {
+        const r = url.searchParams.get("repo") || repo;
+        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        const n = Number(m[1]);
+        const cwd = join(workspacesFor(r), `issue-${n}`);
+        const [plan, verify, gate] = await Promise.all([readStageArtifacts(cwd, n, "plan"), readStageArtifacts(cwd, n, "verify"), readGateEvidence(cwd, n)]);
+        const proof = await Bun.file(join(cwd, runDir(n), "proof.json")).json().catch(() => undefined);
+        return json(proofView({ planComment: plan.comment, verdict: verify.json, gateLine: gate?.line, proof }));
+      },
+    },
+    {
       method: "GET",
       pattern: /^\/api\/runs\/(\d+)\/events$/,
       label: "GET /api/runs/:id/events",
@@ -497,19 +534,23 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       method: "GET",
       pattern: /^\/api\/line$/,
       label: "GET /api/line",
-      // Each recent run with the stages it went through, for the Line view.
+      // Each recent run with the stages it went through, across every repo the inbox reads.
       handler: () => {
-        const attempts = repo ? allStageRuns() : [];
-        const runs = state.listRuns(repo || undefined).slice(0, 100);
-        return json({
-          repo,
-          rows: runs.map((run) => ({
+        const repos = repo ? [...new Set([repo, ...inboxRepos()])] : [];
+        const rows = repos.flatMap((r) => {
+          const st = stateFor(r);
+          if (!st) return [];
+          const attempts = allStageRuns(st, r);
+          return st.listRuns(r).map((run) => ({
+            repo: r,
             run: plainRun(run),
             stages: attempts
               .filter((a) => a.issue === run.issue)
               .map((a) => ({ stage: a.stage, agent: a.agent, duration_ms: a.duration_ms, cost_usd: a.cost_usd, ok: a.exit_code === 0 && !a.killed_reason && (a.verdict ?? "pass") === "pass" })),
-          })),
+          }));
         });
+        rows.sort((a, b) => b.run.started_at.localeCompare(a.run.started_at));
+        return json({ repo, repos, rows: rows.slice(0, 100) });
       },
     },
     {
