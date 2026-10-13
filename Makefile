@@ -1,4 +1,4 @@
-.PHONY: agent-matrix demo install tokens check check-mutations typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix demo install check check-mutations typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
@@ -16,12 +16,6 @@ typecheck:
 # that needs the developer's own identity fails here and not only on GitHub.
 test:
 	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true bun test
-
-# The cockpit's colours: regenerate dashboard/public/tokens.css after editing
-# dashboard/tokens.ts or dashboard/design/tokens.json. tests/tokens.test.ts
-# fails in make check while the file on disk is stale.
-tokens:
-	bun scripts/build-tokens.ts
 
 # Each entry in tests/mutations.json breaks one thing; its test must go red.
 # Proves the checks bite. Its own CI job, since it copies the repo per mutation.

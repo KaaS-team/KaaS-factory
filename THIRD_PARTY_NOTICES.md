@@ -79,13 +79,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Inter and Inconsolata (fonts)
+## Geist (font)
 
-`dashboard/public/fonts/inter-{400,700}.woff2` are Inter (Copyright 2016 The Inter Project Authors,
-https://github.com/rsms/inter) and `inconsolata-{400,700}.woff2` are Inconsolata (Copyright 2006 The
-Inconsolata Project Authors, https://github.com/cyrealtype/Inconsolata), both SIL Open Font License 1.1,
-copied from the learnwithparam workshop design kit. Each licence text ships beside its font as
-`LICENSE-inter.txt` and `LICENSE-inconsolata.txt`.
+`dashboard/public/fonts/geist.woff2` is Geist (Copyright 2024 The Geist Project Authors,
+https://github.com/vercel/geist-font), SIL Open Font License 1.1, copied from kaas.team. The licence
+text ships beside it as `LICENSE-geist.txt`.
 
 ## mastra-ai/mastra@68fece5
 

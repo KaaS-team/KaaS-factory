@@ -19,7 +19,6 @@ const ICONS = {
   agents: "M8 8h8v8H8zM4 10v4M20 10v4M10 4h4M10 20h4",
   workflows: "M4 5h6v4H4zM14 15h6v4h-6zM7 9v3h10v3",
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1",
-  theme: "M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z",
 };
 const NAV = [["inbox", "Inbox"], ["line", "Line"], ["runs", "Runs"], ["workflows", "Workflows"], ["analytics", "Analytics"], ["agents", "Agents"], ["settings", "Settings"]];
 
@@ -81,9 +80,9 @@ const stateOr = (name, ready) => {
 
 /* ---- Line ---- */
 function stationsFor(row) {
-  return stationStates(row.run, row.stages).map(({ name, ms, live, failed, done }) => {
+  return stationStates(row.run, row.stages).map(({ name, ms, live, failed, done, waiting }) => {
     const grow = Math.max(1, Math.min(8, Math.round(ms / 30000)));
-    return { name, grow, node: h("div", { class: "station", style: `flex-grow:${grow}`, "data-done": done, "data-live": live, "data-failed": failed, title: `${name}${ms ? ` · ${formatElapsed(ms)}` : ""}` }) };
+    return { name, grow, node: h("div", { class: "station", style: `flex-grow:${grow}`, "data-done": done, "data-live": live, "data-failed": failed, "data-waiting": waiting, title: `${name}${ms ? ` · ${formatElapsed(ms)}` : ""}` }) };
   });
 }
 
@@ -362,8 +361,7 @@ const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task
 function renderNav() {
   const nav = document.getElementById("nav");
   const view = state.route.view === "task" ? "line" : state.route.view;
-  nav.replaceChildren(...NAV.map(([id, label]) => h("a", { class: "nav-item", href: `#/${id}`, "aria-current": view === id ? "page" : false }, svg(ICONS[id]), label, id === "inbox" && state.inbox.length ? h("span", { class: "badge" }, String(state.inbox.length)) : null)),
-    h("button", { class: "nav-item", type: "button", "aria-label": "Switch light and dark", onclick: toggleTheme }, svg(ICONS.theme), "Theme"));
+  nav.replaceChildren(...NAV.map(([id, label]) => h("a", { class: "nav-item", href: `#/${id}`, "aria-current": view === id ? "page" : false }, svg(ICONS[id]), label, id === "inbox" && state.inbox.length ? h("span", { class: "badge" }, String(state.inbox.length)) : null)));
 }
 
 // The feed follows the newest card unless the reader scrolled up to look at an older one.
@@ -380,13 +378,6 @@ function render() {
   if (open) document.querySelector(".run-files")?.setAttribute("open", "");
   if (focused != null) { const c = document.getElementById("composer"); if (c) { c.value = focused; c.focus(); } }
   renderNav();
-}
-
-function toggleTheme() {
-  const dark = getComputedStyle(document.documentElement).colorScheme === "dark";
-  const next = dark ? "light" : "dark";
-  document.documentElement.dataset.theme = next;
-  try { localStorage.setItem("factory-theme", next); } catch {}
 }
 
 function go(view, issue, repo = state.repo) {

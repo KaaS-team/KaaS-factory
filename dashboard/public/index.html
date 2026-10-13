@@ -5,29 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Factory cockpit</title>
 <meta name="description" content="What the software factory is doing, and what it needs from you.">
-<link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/styles.css">
-<script>
-  // Set the theme before first paint so a dark preference never flashes light.
-  try { const t = localStorage.getItem("factory-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
-</script>
 </head>
 <body>
-<div class="app">
-  <header class="app-sidebar">
-    <div class="brand">
-      <svg class="mark" viewBox="0 0 60 40" aria-hidden="true"><path class="mark-a" d="M4 34 L4 8 L30 8"/><path class="mark-b" d="M56 6 L56 32 L30 32"/></svg>
-      <span class="brand-wordmark">factory</span>
-    </div>
-    <nav aria-label="Views" id="nav"></nav>
-    <div class="sidebar-foot">
-      <span class="repo" id="repo-label"></span>
-      <label class="toggle"><input type="checkbox" id="toggle-auto-start"> Start new issues automatically</label>
-      <label class="toggle"><input type="checkbox" id="toggle-auto-approve"> Approve low-risk plans</label>
-    </div>
-  </header>
-  <main id="view" tabindex="-1" aria-live="polite"></main>
+<div class="win">
+  <div class="hwb"><i></i><i></i><i></i><span class="title">factory</span><span class="end" id="repo-label"></span></div>
+  <div class="app">
+    <header class="app-sidebar">
+      <nav aria-label="Views" id="nav"></nav>
+      <div class="sidebar-foot">
+        <label class="toggle"><input type="checkbox" id="toggle-auto-start"> Start new issues automatically</label>
+        <label class="toggle"><input type="checkbox" id="toggle-auto-approve"> Approve low-risk plans</label>
+      </div>
+    </header>
+    <main id="view" tabindex="-1" aria-live="polite"></main>
+  </div>
 </div>
 <script type="module" src="/app.js"></script>
 </body>

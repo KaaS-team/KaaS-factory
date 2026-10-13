@@ -407,7 +407,7 @@ describe("line and assets", () => {
     const tokens = await dashboard.handle(new Request("http://localhost:4100/tokens.css"), "10.0.0.9");
     expect(tokens.status).toBe(200);
     expect(tokens.headers.get("content-type")).toContain("text/css");
-    const font = await dashboard.handle(new Request("http://localhost:4100/fonts/inter-400.woff2"), "10.0.0.9");
+    const font = await dashboard.handle(new Request("http://localhost:4100/fonts/geist.woff2"), "10.0.0.9");
     expect(font.status).toBe(200);
     expect(font.headers.get("content-type")).toContain("font/woff2");
     expect((await dashboard.handle(new Request("http://localhost:4100/lib/..%2Fserver.js"), "10.0.0.9")).status).toBe(401);

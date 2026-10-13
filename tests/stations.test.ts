@@ -15,6 +15,13 @@ describe("stationStates", () => {
     expect(pick({ stage: "plan", status: "awaiting-approval" }, [attempt("triage", true), attempt("plan", true)])).toMatchObject({ triage: "done", plan: "done", build: "" });
   });
 
+  test("only the block where the run stopped for a person is waiting", () => {
+    const waiting = (run: { stage: string; status: string }, stages: ReturnType<typeof attempt>[]) => stationStates(run, stages).filter((s) => s.waiting).map((s) => s.name);
+    expect(waiting({ stage: "plan", status: "awaiting-approval" }, [attempt("triage", true), attempt("plan", true)])).toEqual(["plan"]);
+    expect(waiting({ stage: "verify", status: "needs-human" }, [attempt("build", true), attempt("verify", false)])).toEqual([]);
+    expect(waiting({ stage: "build", status: "running" }, [attempt("build", true)])).toEqual([]);
+  });
+
   test("a verify that parked without a pass is failed, not empty", () => {
     expect(pick({ stage: "verify", status: "needs-human" }, [attempt("build", true), attempt("verify", false)]).verify).toBe("failed");
   });
