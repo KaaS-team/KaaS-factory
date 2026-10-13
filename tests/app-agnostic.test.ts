@@ -162,4 +162,9 @@ describe("two repos sharing one FACTORY_HOME never collide", () => {
   test("a repo slug with no slash refuses instead of silently sharing a path", () => {
     expect(() => workspacesDir(env, "not-a-slug")).toThrow(/repo must be "owner\/name"/);
   });
+
+  test("a repo from a URL query cannot climb out of FACTORY_HOME", () => {
+    for (const bad of ["../..", "a/..", "./b", "a/b/c", "a/b%2f..", "a/ b"]) expect(() => workspacesDir(env, bad)).toThrow(/repo must be/);
+    expect(workspacesDir(env, "learnwithparam/claude-verification-harness")).toEndWith("/claude-verification-harness/workspaces");
+  });
 });

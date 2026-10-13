@@ -21,8 +21,10 @@ export function factoryHome(env: NodeJS.ProcessEnv = process.env): string {
 // keeps the pre-v2.6.2 shared path, which DEFAULT_DB_PATH and existing
 // fixtures still rely on.
 function repoHome(repo: string, env: NodeJS.ProcessEnv): string {
-  const [owner, name] = repo.split("/");
-  if (!owner || !name) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
+  // The repo arrives from a URL query too, so `../..` must never reach the path.
+  const [owner, name, extra] = repo.split("/");
+  const part = (s?: string) => !!s && /^[A-Za-z0-9_.-]+$/.test(s) && s !== "." && s !== "..";
+  if (!part(owner) || !part(name) || extra !== undefined) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
   return `${factoryHome(env)}/${owner}/${name}`;
 }
 
