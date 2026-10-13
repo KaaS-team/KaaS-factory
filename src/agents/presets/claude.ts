@@ -37,13 +37,12 @@ function startupProblems(init: StreamJsonLine): string[] {
   return [...failed, ...errors];
 }
 
-// The one field a person watching needs from a call's input; first line only, capped, never the whole payload.
+// The one field a person watching needs from a call's input; first line only, never the whole payload.
 const TARGET_KEYS = ["file_path", "command", "pattern", "skill", "path", "url", "query"] as const;
 export function toolTarget(input: Record<string, unknown> | undefined): string | undefined {
   const value = TARGET_KEYS.map((k) => input?.[k]).find((v): v is string => typeof v === "string" && v.trim() !== "");
   if (!value) return undefined;
-  const line = value.trim().split("\n")[0]!;
-  return line.length > 90 ? `${line.slice(0, 89)}…` : line;
+  return value.trim().split("\n")[0]!;
 }
 
 export function parseStreamJsonLine(line: string): StageEvent[] {

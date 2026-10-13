@@ -37,9 +37,15 @@ export function stopArtifactSpec(stage: StageRunOptions["stage"], types: readonl
 export const MAX_EVENT_LINE_BYTES = 1 << 20;
 export const MAX_RECORDED_OUTPUT_BYTES = 64 << 20;
 
-// One transcript line per event, the same text `factory logs` prints.
-export function renderEvent(e: StageEvent): string | undefined {
-  if (e.kind === "tool_use") return `> ${e.toolName ?? "tool"}${e.toolTarget ? ` ${plain(e.toolTarget)}` : ""}`;
+// One transcript line per event, the same text `factory logs` prints. A path inside the stage's
+// worktree prints relative to it: the watcher reads src/csv.ts, never the operator's home folder.
+// The 90 character cap applies after, so a long command keeps its tail, not the absolute prefix.
+export function renderEvent(e: StageEvent, cwd?: string): string | undefined {
+  if (e.kind === "tool_use") {
+    const rel = e.toolTarget && cwd ? e.toolTarget.split(`${cwd}/`).join("") : e.toolTarget;
+    const target = rel && rel.length > 90 ? `${rel.slice(0, 89)}…` : rel;
+    return `> ${e.toolName ?? "tool"}${target ? ` ${plain(target)}` : ""}`;
+  }
   if (e.kind === "text" || e.kind === "truncated") return e.text ? plain(e.text) : undefined;
   if (e.kind === "session") return `session ${e.sessionId}`;
   if (e.kind === "startup_error") return `startup error: ${plain(e.text ?? "")}`;
@@ -264,7 +270,7 @@ export class CommandExecutor implements Executor {
           }
         } else {
           events.push(e);
-          const line = renderEvent(e);
+          const line = renderEvent(e, opts.cwd);
           if (line !== undefined) append(opts.transcriptFile, `${line}\n`);
         }
         // Running on without the MCP servers or plugins it was configured with gives a wrong result, not a slower one.

@@ -69,6 +69,15 @@ describe("claude tool lines in the transcript", () => {
     expect(renderEvent(call("Bash", { command: "make test\necho done", description: "run" })[0]!)).toBe("> Bash make test");
   });
 
+  test("a path inside the worktree prints relative to it", () => {
+    const cwd = "/home/op/.factory/o/r/workspaces/issue-7";
+    expect(renderEvent(call("Read", { file_path: `${cwd}/src/csv.ts` })[0]!, cwd)).toBe("> Read src/csv.ts");
+    expect(renderEvent(call("Bash", { command: `cat ${cwd}/a.ts ${cwd}/b.ts` })[0]!, cwd)).toBe("> Bash cat a.ts b.ts");
+    const long = renderEvent(call("Bash", { command: `bun test ${"x".repeat(200)}` })[0]!, cwd)!;
+    expect(long.length).toBe("> Bash ".length + 90);
+    expect(long.endsWith("…")).toBe(true);
+  });
+
   test("a call with nothing to name keeps the bare line the e2e scorer counts", () => {
     expect(renderEvent(call("ScheduleWakeup", { delaySeconds: 60 })[0]!)).toBe("> ScheduleWakeup");
   });
