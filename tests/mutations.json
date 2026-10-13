@@ -344,5 +344,9 @@
   {"name": "watch: the poll reconciles closed parked runs", "file": "src/watch.ts", "find": "    processed.push(...(await reconcileClosed(deps, config, new Set(buckets.flat().map((i) => i.number)), inFlight)));\n", "replace": "", "test": "tests/scenarios.test.ts"},
   {"name": "watch: reconcile leaves an open issue parked", "file": "src/watch.ts", "find": "      if (issue.state !== \"CLOSED\") continue;\n", "replace": "", "test": "tests/scenarios.test.ts"},
   {"name": "watch: a closed unmerged parked run is cancelled", "file": "src/watch.ts", "find": "        finish(deps, config, issue.number, \"cancelled\", \"issue closed outside the factory\");\n", "replace": "", "test": "tests/scenarios.test.ts"},
-  {"name": "watch: reconcile only touches parked runs", "file": "src/watch.ts", "find": "    if (!PARKED_STATUSES.has(run.status) || listed.has(run.issue)", "replace": "    if (listed.has(run.issue)", "test": "tests/scenarios.test.ts"}
+  {"name": "watch: reconcile only touches parked runs", "file": "src/watch.ts", "find": "    if (!PARKED_STATUSES.has(run.status) || listed.has(run.issue)", "replace": "    if (listed.has(run.issue)", "test": "tests/scenarios.test.ts"},
+  {"name": "view: edits drawn as a diff", "file": "src/view.ts", "find": "if (name === \"Edit\" && typeof input.old_string", "replace": "if (false && typeof input.old_string", "test": "tests/view.test.ts"},
+  {"name": "view: a failing count is red", "file": "src/view.ts", "find": "const FAIL_LINE = /\\b[1-9]\\d* fail\\b|", "replace": "const FAIL_LINE = /", "test": "tests/view.test.ts"},
+  {"name": "executor: the live stream file", "file": "src/agents/executor.ts", "find": "append(streamFile, `${line}\\n`);", "replace": "", "test": "tests/view.test.ts"},
+  {"name": "tmux: the window runs factory view", "file": "src/tmux.ts", "find": "`${factory} view ${shellQuote(streamPath(file))} --follow`", "replace": "`tail -n +1 -F ${shellQuote(file)}`", "test": "tests/tmux.test.ts"}
 ]

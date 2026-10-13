@@ -12,6 +12,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "attach", usage: "attach [<N>] (--repo <owner/name> | --repo-dir <path>) [--session <name>]", does: "join the tmux session; with <N>, open that issue's live window (works over ssh -t and docker exec -it)" },
   { name: "takeover", usage: "takeover <N> (--repo-dir <path> | --repo <owner/name>) [--no-handback]", does: "stop #N's running stage, open its Claude session in the worktree, and /factory retry when you exit" },
   { name: "logs", usage: "logs <N> [--repo <owner/name>] [--stage <name>] [--follow] [--json]", does: "print (or follow) a run's events; --json is one object per line" },
+  { name: "view", usage: "view <stream-file> [--follow]", does: "render a stage's raw agent output in colour: tool calls, edit diffs, test results (the tmux issue window runs this)" },
   { name: "inbox", usage: "inbox [<N> <action> [--text <words>]] (--repo <owner/name> | --repo-dir <path>) [--json]", does: "list what waits for a human; with <N> <action>, post the same /factory comment a human would" },
   { name: "scan", usage: "scan --repo-dir <path>", does: "file issues from `osv-scanner` (any lockfile), else `bun audit` on a Bun project" },
   { name: "reset", usage: "reset --repo-dir <path> [--dry-run] [--all-issues]", does: "DESTRUCTIVE: force base back to the baseline tag (lists dropped commits), close PRs and factory issues (--all-issues: every open issue)" },

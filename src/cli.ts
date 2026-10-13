@@ -29,6 +29,7 @@ import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
 import { workspacesDir as defaultWorkspacesDir, defaultStatePath, factoryHome, livePath, transcriptPath } from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
+import { followStream } from "./view";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
 import { LABEL } from "./labels";
 import { ensureRepoClone } from "./repo";
@@ -126,7 +127,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     routeWorkflows,
     runtimes,
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
-    ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
+    ...(tmux ? { view: tmuxIssueView(tmux, config.repo, selfCommand()) } : {}),
     github,
     git: new Git(new GitCommandRunner()),
     state,
@@ -251,6 +252,14 @@ async function cmdLogs(): Promise<void> {
   const controller = new AbortController();
   process.on("SIGINT", () => controller.abort());
   await streamLogs(state, resolvedRepo, issue, { follow: has("follow"), stage: flag("stage"), json: has("json"), signal: controller.signal });
+}
+
+async function cmdView(): Promise<void> {
+  const file = args[1];
+  if (!file) throw new UsageError("view: a stream file is required, e.g. `factory view ~/.factory/<owner>/<repo>/transcripts/issue-12.stream.jsonl --follow`");
+  const controller = new AbortController();
+  process.on("SIGINT", () => controller.abort());
+  await followStream(file, (text) => process.stdout.write(text), { follow: has("follow"), signal: controller.signal });
 }
 
 async function cmdInbox(): Promise<void> {
@@ -476,12 +485,17 @@ async function cmdUp(): Promise<void> {
   await new Promise(() => {}); // keep the process alive
 }
 
+// This CLI as a shell command, for the tmux windows it opens.
+function selfCommand(): string {
+  return [process.execPath, Bun.main].map(shellQuote).join(" ");
+}
+
 // `up --tmux`: the watcher and the dashboard each get a window in the
 // session, and every issue in flight gets its own beside them. Detached, so
 // it works the same over SSH or `docker exec`; `factory attach` joins it.
 async function upInTmux(cloneDir: string, config: FactoryConfig): Promise<void> {
   const tmux = new Tmux(new ShellTmuxRunner(), config.tmux.session);
-  const self = [process.execPath, Bun.main].map(shellQuote).join(" ");
+  const self = selfCommand();
   const pass = ["db", "workspaces"].flatMap((f) => (flag(f) ? [`--${f}`, shellQuote(flag(f)!)] : [])).join(" ");
   const repoDir = `--repo-dir ${shellQuote(cloneDir)}`;
   await tmux.ensureWindow("watch", `${self} watch ${repoDir} --tmux ${pass}`.trim(), cloneDir);
@@ -801,6 +815,8 @@ async function main(): Promise<void> {
       return cmdDashboard();
     case "logs":
       return cmdLogs();
+    case "view":
+      return cmdView();
     case "inbox":
       return cmdInbox();
     case "scan":

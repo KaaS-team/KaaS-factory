@@ -1,6 +1,8 @@
-// The tmux view: one session, one window per issue in flight, each tailing that
-// issue's transcript. tmux only ever watches; the executor owns the agent, so a
+// The tmux view: one session, one window per issue in flight, each following that
+// issue's stream. tmux only ever watches; the executor owns the agent, so a
 // tmux failure is logged by the caller and never fails a stage.
+
+import { streamPath } from "./paths";
 
 export interface TmuxResult {
   readonly code: number;
@@ -83,9 +85,10 @@ export interface IssueView {
   close(issue: number): Promise<void>;
 }
 
-export function tmuxIssueView(tmux: Tmux, repo: string): IssueView {
+// `factory` is the command line that runs this CLI; the window renders the stage's raw stream in colour.
+export function tmuxIssueView(tmux: Tmux, repo: string, factory: string): IssueView {
   return {
-    show: (issue, file) => tmux.ensureWindow(issueWindow(repo, issue), `tail -n +1 -F ${shellQuote(file)}`),
+    show: (issue, file) => tmux.ensureWindow(issueWindow(repo, issue), `${factory} view ${shellQuote(streamPath(file))} --follow`),
     close: (issue) => tmux.killWindow(issueWindow(repo, issue)),
   };
 }

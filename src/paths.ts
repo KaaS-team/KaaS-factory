@@ -72,6 +72,11 @@ export function transcriptPath(repo: string, issue: number, env: NodeJS.ProcessE
   return `${repoHome(repo, env)}/transcripts/issue-${issue}.log`;
 }
 
+// The agent's raw output beside the transcript, which `factory view` renders in colour.
+export function streamPath(transcriptFile: string): string {
+  return transcriptFile.replace(/(\.log)?$/, ".stream.jsonl");
+}
+
 export function livePath(repo: string, issue: number, env: NodeJS.ProcessEnv = process.env): string {
   return `${repoHome(repo, env)}/live/issue-${issue}.json`;
 }

@@ -25,15 +25,15 @@ class FakeRunner implements TmuxRunner {
 }
 
 describe("tmux argv", () => {
-  test("a missing window is created detached, tailing the quoted transcript", async () => {
+  test("a missing window is created detached, following the quoted stream file in colour", async () => {
     const runner = new FakeRunner(["watch"]);
-    await tmuxIssueView(new Tmux(runner, "factory"), "acme/widgets").show(7, "/h/it's.log");
-    expect(runner.calls.at(-1)).toEqual(["new-window", "-d", "-t", "=factory:", "-n", "widgets-7", `tail -n +1 -F ${shellQuote("/h/it's.log")}`]);
+    await tmuxIssueView(new Tmux(runner, "factory"), "acme/widgets", "factory").show(7, "/h/it's.log");
+    expect(runner.calls.at(-1)).toEqual(["new-window", "-d", "-t", "=factory:", "-n", "widgets-7", `factory view ${shellQuote("/h/it's.stream.jsonl")} --follow`]);
   });
 
   test("an existing window is left alone, and a missing session is created first", async () => {
     const existing = new FakeRunner(["widgets-7"]);
-    await tmuxIssueView(new Tmux(existing, "factory"), "acme/widgets").show(7, "/x.log");
+    await tmuxIssueView(new Tmux(existing, "factory"), "acme/widgets", "factory").show(7, "/x.log");
     expect(existing.calls.some((c) => c[0] === "new-window")).toBe(false);
     const none = new FakeRunner([], false);
     await new Tmux(none, "s").ensureSession();
@@ -55,13 +55,13 @@ describe("real tmux on a private socket", () => {
     expect(await tmux.version()).toMatch(/^tmux /);
     const dir = mkdtempSync(join(tmpdir(), "factory-tmux-"));
     const file = join(dir, "issue-3.log");
-    await Bun.write(file, "hello from the agent\n");
-    const view = tmuxIssueView(tmux, "acme/widgets");
+    await Bun.write(join(dir, "issue-3.stream.jsonl"), "hello from the agent\n");
+    const view = tmuxIssueView(tmux, "acme/widgets", [process.execPath, join(import.meta.dir, "..", "bin", "factory")].map(shellQuote).join(" "));
     await view.show(3, file);
     await view.show(3, file);
     expect((await tmux.windows()).filter((w) => w === "widgets-3")).toHaveLength(1);
     let pane = "";
-    for (let i = 0; i < 40 && !pane.includes("hello from the agent"); i++) {
+    for (let i = 0; i < 100 && !pane.includes("hello from the agent"); i++) {
       await Bun.sleep(50);
       pane = (await runner.run(["capture-pane", "-p", "-t", "=t:=widgets-3"])).stdout;
     }

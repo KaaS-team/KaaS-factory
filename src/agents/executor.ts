@@ -11,7 +11,7 @@ import type { RouteConfig } from "../config";
 import { buildContextPack } from "../context";
 import { aggregateStageEvents, OPERATOR_TAKEOVER, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
 import { plain } from "../display";
-import { takeoverMarker } from "../paths";
+import { streamPath, takeoverMarker } from "../paths";
 import { McpError } from "../mcp";
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
@@ -180,6 +180,9 @@ export class CommandExecutor implements Executor {
 
     if (opts.transcriptFile) mkdirSync(dirname(opts.transcriptFile), { recursive: true });
     append(opts.transcriptFile, `\n=== ${opts.stage} #${opts.issue} ${new Date().toISOString()} (${agent.name}) ===\n`);
+    const streamFile = opts.transcriptFile ? streamPath(opts.transcriptFile) : undefined;
+    let streamed = 0;
+    append(streamFile, `${JSON.stringify({ type: "factory_stage", stage: opts.stage, issue: opts.issue, at: new Date().toISOString(), agent: agent.name })}\n`);
     const marker = opts.liveFile ? takeoverMarker(opts.liveFile) : undefined;
     if (marker) rmSync(marker, { force: true });
 
@@ -246,6 +249,8 @@ export class CommandExecutor implements Executor {
     const parseLine = agent.preset?.newParser?.() ?? agent.preset?.parseLine;
     const handle = (line: string) => {
       this.recorder?.line(opts.stage, line);
+      // The live window's copy, raw so it keeps diffs and command output; `factory view` strips escapes.
+      if (Buffer.byteLength(line) <= MAX_EVENT_LINE_BYTES && (streamed += Buffer.byteLength(line)) <= MAX_RECORDED_OUTPUT_BYTES) append(streamFile, `${line}\n`);
       if (!agent.preset || !parseLine) {
         // No parser means no events: the window shows the raw output instead, under the same cap.
         recorded += Buffer.byteLength(line);
@@ -320,6 +325,7 @@ export class CommandExecutor implements Executor {
       rmSync(marker, { force: true });
     }
     append(opts.transcriptFile, `=== ${opts.stage} exit ${exitCode}${killedReason ? ` (${killedReason})` : ""} ===\n`);
+    append(streamFile, `${JSON.stringify({ type: "factory_exit", stage: opts.stage, code: exitCode, ...(killedReason ? { reason: killedReason } : {}) })}\n`);
     const stderrTail = stderr.trim().slice(-4000) || undefined;
     const base0 = aggregateStageEvents(events, exitCode, stderrTail);
     const base = { ...base0, agent: agent.name, model: agent.config.model ?? null, usageComplete: usageComplete && base0.usageComplete !== false };
