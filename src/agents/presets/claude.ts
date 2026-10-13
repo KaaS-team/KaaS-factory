@@ -18,7 +18,7 @@ interface StreamJsonLine {
   cost_usd?: number;
   total_cost_usd?: number;
   message?: {
-    content?: Array<{ type: string; text?: string; name?: string }>;
+    content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>;
     usage?: { input_tokens?: number; output_tokens?: number };
   };
   usage?: unknown;
@@ -35,6 +35,15 @@ function startupProblems(init: StreamJsonLine): string[] {
   const failed = (init.mcp_servers ?? []).filter((s) => s.status === "failed").map((s) => `MCP server ${s.name ?? "?"} failed to start`);
   const errors = [...(init.plugin_errors ?? []), ...(init.mcp_server_errors ?? [])].map((e) => (typeof e === "string" ? e : JSON.stringify(e)));
   return [...failed, ...errors];
+}
+
+// The one field a person watching needs from a call's input; first line only, capped, never the whole payload.
+const TARGET_KEYS = ["file_path", "command", "pattern", "skill", "path", "url", "query"] as const;
+export function toolTarget(input: Record<string, unknown> | undefined): string | undefined {
+  const value = TARGET_KEYS.map((k) => input?.[k]).find((v): v is string => typeof v === "string" && v.trim() !== "");
+  if (!value) return undefined;
+  const line = value.trim().split("\n")[0]!;
+  return line.length > 90 ? `${line.slice(0, 89)}…` : line;
 }
 
 export function parseStreamJsonLine(line: string): StageEvent[] {
@@ -57,7 +66,8 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
       if (block.type === "text" && block.text) {
         events.push({ kind: "text", text: block.text });
       } else if (block.type === "tool_use" && block.name) {
-        events.push({ kind: "tool_use", toolName: block.name });
+        const target = toolTarget(block.input);
+        events.push(target ? { kind: "tool_use", toolName: block.name, toolTarget: target } : { kind: "tool_use", toolName: block.name });
       }
     }
     if (parsed.message.usage) {

@@ -7,7 +7,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CommandExecutor } from "../src/agents/executor";
+import { CommandExecutor, renderEvent } from "../src/agents/executor";
 import { parseStreamJsonLine } from "../src/agents/presets/claude";
 
 const scratch = mkdtempSync(join(tmpdir(), "factory-startup-"));
@@ -58,5 +58,18 @@ describe("claude init problems", () => {
     const { result } = await runBuild(`echo '${line}'\nsleep 30`);
     expect(result.killedReason).toBe("agent startup failed: MCP server bad failed to start");
     expect(Date.now() - started).toBeLessThan(10_000);
+  });
+});
+
+describe("claude tool lines in the transcript", () => {
+  const call = (name: string, input: object) => parseStreamJsonLine(JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name, input }] } }));
+
+  test("a watcher sees the file or command each call touched", () => {
+    expect(renderEvent(call("Read", { file_path: "src/csv.ts" })[0]!)).toBe("> Read src/csv.ts");
+    expect(renderEvent(call("Bash", { command: "make test\necho done", description: "run" })[0]!)).toBe("> Bash make test");
+  });
+
+  test("a call with nothing to name keeps the bare line the e2e scorer counts", () => {
+    expect(renderEvent(call("ScheduleWakeup", { delaySeconds: 60 })[0]!)).toBe("> ScheduleWakeup");
   });
 });

@@ -39,7 +39,7 @@ export const MAX_RECORDED_OUTPUT_BYTES = 64 << 20;
 
 // One transcript line per event, the same text `factory logs` prints.
 export function renderEvent(e: StageEvent): string | undefined {
-  if (e.kind === "tool_use") return `> ${e.toolName ?? "tool"}`;
+  if (e.kind === "tool_use") return `> ${e.toolName ?? "tool"}${e.toolTarget ? ` ${plain(e.toolTarget)}` : ""}`;
   if (e.kind === "text" || e.kind === "truncated") return e.text ? plain(e.text) : undefined;
   if (e.kind === "session") return `session ${e.sessionId}`;
   if (e.kind === "startup_error") return `startup error: ${plain(e.text ?? "")}`;

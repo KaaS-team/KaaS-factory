@@ -8,6 +8,8 @@ export type StageName = "triage" | "plan" | "build" | "verify" | "pr" | "retro";
 export interface StageEvent {
   readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated" | "session" | "startup_error";
   readonly toolName?: string;
+  // On "tool_use" events: the file, command or pattern the call touched, so a watcher can follow along.
+  readonly toolTarget?: string;
   readonly text?: string;
   readonly tokensIn?: number;
   readonly tokensOut?: number;
