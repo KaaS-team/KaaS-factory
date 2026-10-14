@@ -65,7 +65,7 @@ function section(title, h, ...kids) {
 
 export function proofPanel(p, h) {
   if (!p) return h("p", { class: "muted" }, "Reading the proof.");
-  if (!p.criteria.length && !p.gate && !p.revert && !p.result) return h("p", { class: "muted" }, "The proof fills in as the plan is approved and build and verify finish.");
+  if (!p.criteria.length && !p.gate && !p.revert && !p.holdout && !p.result) return h("p", { class: "muted" }, "The proof fills in as the plan is approved and build and verify finish.");
   const md = (text) => inline(text).map((n) => toDom(n, h));
   return h("div", { class: "proof" },
     p.criteria.length ? section("Acceptance criteria", h, h("ul", { class: "criteria" }, p.criteria.map((c) =>
@@ -74,6 +74,11 @@ export function proofPanel(p, h) {
         h("div", null, h("strong", null, c.id), " ", ...md(c.what), c.check ? h("div", { class: "muted" }, "Checked by ", ...md(c.check)) : null))))) : null,
     p.gate ? section("Gates", h, h("p", { "data-tone": p.gate.failed ? "fail" : "pass" }, `${p.gate.passed} passed, ${p.gate.failed} failed${p.gate.skipped ? `, ${p.gate.skipped} skipped` : ""}`),
       p.gate.nonBlocking.length ? h("p", { class: "muted" }, `Not blocking: ${p.gate.nonBlocking.join(", ")}`) : null) : null,
+    p.holdout ? section("Tests the build never saw", h,
+      p.holdout.ok
+        ? h("p", { "data-tone": "pass" }, `${p.holdout.passed ? `${p.holdout.passed} holdout tests` : "The holdout tests"} passed. The build agent could not read or change them.`)
+        : h("p", { "data-tone": "fail" }, "The holdout tests failed, so the work went back to build with the failing test names."),
+      p.holdout.failedTests.length ? h("ul", { class: "failed-tests" }, p.holdout.failedTests.map((t) => h("li", null, t))) : null) : null,
     p.revert ? section("Does the test catch the bug?", h,
       p.revert.status === "bites"
         ? h("p", { "data-tone": "pass" }, "The fix was reverted and the new test failed, so the test catches the bug.")

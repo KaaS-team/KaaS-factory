@@ -21,6 +21,7 @@ export interface ProofView {
   criteria: Criterion[];
   gate: { status: string; passed: number; failed: number; skipped: number; nonBlocking: string[] } | null;
   revert: { status: string; reverted: string[]; failedTests: string[] } | null;
+  holdout: { ok: boolean; passed: number; failedTests: string[] } | null;
   findings: { severity: string; what: string; fix?: string }[];
   result: string | null;
 }
@@ -35,7 +36,7 @@ function gateFrom(line: string | undefined): ProofView["gate"] {
 }
 
 // Criterion text comes from the plan the human approved; its status from the verdict.
-export function proofView(input: { planComment?: string; verdict?: unknown; gateLine?: string; proof?: unknown }): ProofView {
+export function proofView(input: { planComment?: string; verdict?: unknown; gateLine?: string; proof?: unknown; holdout?: unknown }): ProofView {
   const verdict = (input.verdict ?? {}) as { result?: string; criteria?: { id: string; status: string }[]; findings?: { severity: string; what: string; fix?: string }[] };
   const status = new Map((verdict.criteria ?? []).map((c) => [c.id, c.status]));
   const criteria = [...plain(input.planComment ?? "").matchAll(CRITERION)].map(([, id, text]) => {
@@ -46,6 +47,10 @@ export function proofView(input: { planComment?: string; verdict?: unknown; gate
   const revert = proof?.status
     ? { status: proof.status, reverted: proof.reverted ?? [], failedTests: [...new Set([...plain(proof.tail ?? "").matchAll(FAILED_TEST)].map((m) => m[1]!.replace(/^.+? > /, "")))] }
     : null;
+  const held = input.holdout as { ok?: boolean; tail?: string } | undefined;
+  const holdout = typeof held?.ok === "boolean"
+    ? { ok: held.ok, passed: Number(/(\d+) pass\b/.exec(plain(held.tail ?? ""))?.[1] ?? 0), failedTests: [...new Set([...plain(held.tail ?? "").matchAll(FAILED_TEST)].map((m) => m[1]!.replace(/^.+? > /, "")))] }
+    : null;
   const findings = (verdict.findings ?? []).map((f) => ({ severity: f.severity, what: plain(f.what), ...(f.fix ? { fix: plain(f.fix) } : {}) }));
-  return { criteria, gate: gateFrom(input.gateLine), revert, findings, result: verdict.result ?? null };
+  return { criteria, gate: gateFrom(input.gateLine), revert, holdout, findings, result: verdict.result ?? null };
 }

@@ -6,7 +6,7 @@
 // does, escalating to needs-human with a gave-up retro.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mergeConfig } from "../src/config";
@@ -72,7 +72,7 @@ function setup(initial: string[], overrides: Parameters<typeof mergeConfig>[0] =
   const deps = { github, git, state, executor, gateRunner, holdoutRunner, cloneDir, workspacesDir };
   const push = (stage: StageName, files: Record<string, string>, result?: Partial<StageRunResult>) => executor.push(stage, n, fixtureFor(stage, n), files, result);
   const step = () => advanceIssue(deps, config, github.issues.get(n)!);
-  return { n, github, git, state, holdoutRunner, config, deps, push, step };
+  return { n, github, git, state, holdoutRunner, config, deps, push, step, workspacesDir };
 }
 
 const HOLDOUT_CONFIG = { paths: [".factory/holdout/**"], cmd: "bun test .factory/holdout" };
@@ -125,6 +125,9 @@ describe("holdout on", () => {
     expect(c.holdoutRunner.runs).toBe(2);
     const comments = c.github.issues.get(c.n)!.comments.map((cm) => cm.body);
     expect(comments.some((b) => b.includes("Holdout tests failed") && b.includes("expect(total).toBe(10)"))).toBe(true);
+    // A pass posts nothing, so the run page reads the last result from the run's own folder.
+    const saved = JSON.parse(readFileSync(join(c.workspacesDir, `issue-${c.n}`, `.factory/runs/issue-${c.n}/holdout.json`), "utf8"));
+    expect(saved).toMatchObject({ ok: true, cmd: HOLDOUT_CONFIG.cmd });
   });
 
   test("a holdout path outside .factory/** in the diff parks before any push, same as any other protected path", async () => {

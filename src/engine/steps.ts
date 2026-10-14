@@ -254,6 +254,8 @@ const verify: StepType = {
     // cannot possibly already cover them.
     if (holdoutEnabled(config.holdout)) {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
+      // A pass leaves no comment, so the run page reads the result from here.
+      await Bun.write(`${worktree}/${runDir(issueNumber)}/holdout.json`, `${JSON.stringify({ ok: holdout.ok, cmd: config.holdout.cmd, tail: holdout.detail }, null, 2)}\n`);
       if (!holdout.ok) {
         ctx.rejectRound += 1;
         ctx.failure = failureTail(`Holdout tests failed:\n${holdout.detail}`);

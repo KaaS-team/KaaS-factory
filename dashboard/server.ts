@@ -497,7 +497,7 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       },
     },
     {
-      // The proof a reviewer reads: criteria from the approved plan, the gate, and the revert.
+      // The proof a reviewer reads: criteria from the approved plan, the gate, the holdout tests and the revert.
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/proof$/,
       label: "GET /api/issues/:n/proof",
@@ -507,8 +507,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const n = Number(m[1]);
         const cwd = join(workspacesFor(r), `issue-${n}`);
         const [plan, verify, gate] = await Promise.all([readStageArtifacts(cwd, n, "plan"), readStageArtifacts(cwd, n, "verify"), readGateEvidence(cwd, n)]);
-        const proof = await Bun.file(join(cwd, runDir(n), "proof.json")).json().catch(() => undefined);
-        return json(proofView({ planComment: plan.comment, verdict: verify.json, gateLine: gate?.line, proof }));
+        const [proof, holdout] = await Promise.all(["proof.json", "holdout.json"].map((f) => Bun.file(join(cwd, runDir(n), f)).json().catch(() => undefined)));
+        return json(proofView({ planComment: plan.comment, verdict: verify.json, gateLine: gate?.line, proof, holdout }));
       },
     },
     {

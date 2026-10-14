@@ -40,7 +40,13 @@ describe("the proof panel", () => {
   });
 
   test("a run with nothing yet shows nothing", () => {
-    expect(proofView({})).toEqual({ criteria: [], gate: null, revert: null, findings: [], result: null });
+    expect(proofView({})).toEqual({ criteria: [], gate: null, revert: null, holdout: null, findings: [], result: null });
+  });
+
+  test("the holdout tests read as a count, and a failure names each failing test", () => {
+    expect(proofView({ holdout: { ok: true, tail: "(pass) settleUp > never pays yourself\n\n 5 pass\n 0 fail\n" } }).holdout).toEqual({ ok: true, passed: 5, failedTests: [] });
+    const red = proofView({ holdout: { ok: false, tail: "(fail) settleUp > applying every transfer zeroes each member's net balance [0.31ms]\n 4 pass\n 1 fail\n" } }).holdout;
+    expect(red).toEqual({ ok: false, passed: 4, failedTests: ["applying every transfer zeroes each member's net balance"] });
   });
 });
 
@@ -93,5 +99,6 @@ describe("the page draws the feed as steps", async () => {
   test("the proof panel states the revert in plain words", () => {
     expect(text(proofPanel(fresh(), h))).toContain("The fix was reverted and the new test failed, so the test catches the bug.");
     expect(text(proofPanel(proofView({}), h))).toContain("fills in");
+    expect(text(proofPanel(proofView({ holdout: { ok: true, tail: " 5 pass\n 0 fail" } }), h))).toContain("5 holdout tests passed. The build agent could not read or change them.");
   });
 });
