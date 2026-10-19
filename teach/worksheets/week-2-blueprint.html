@@ -3,80 +3,133 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Week 2 Blueprint Worksheet</title>
+<title>Blueprint Worksheet</title>
 <link rel="stylesheet" href="worksheet.css">
 </head>
 <body>
 <main>
   <div class="bar">
-    <span class="crumbs"><a href="index.html">Worksheets</a> / Week 2</span>
+    <span class="crumbs"><a href="index.html">Worksheets</a> / Your blueprint</span>
     <span class="actions"><span class="saved" data-saved>Saves in this browser as you type</span><button type="button" data-clear>Clear</button><button type="button" data-copy>Copy Markdown</button><button type="button" data-download>Download .md</button><button type="button" class="primary" data-print>Save as PDF</button></span>
   </div>
 
   <header class="sheet">
-    <span class="when">Week 2, your blueprint. Questions 1 to 3 by Wed 28 Oct, 4 to 6 by Sat 31 Oct.</span>
+    <span class="when">Step 2: your blueprint</span>
     <h1>Decide what your agents <mark>know, may do and must prove</mark></h1>
-    <p class="lede">Your blueprint is the set of files in your repository that make every agent run the same way. Commit the files as you go. This sheet is the map of what you committed, so link to files where you can.</p>
-    <div class="who">
-      <label><span>Your name</span><div class="f short" data-k="name"></div></label>
-      <label><span>Repository</span><div class="f short" data-k="repo" data-ph="owner/repo"></div></label>
-    </div>
+    <p class="lede">Your blueprint is the set of files in your repository that make every agent run the same way: rules, skills, commands, hooks and gates. Commit the files as you go; this sheet is the map of what you committed.</p>
+    <div class="row who"><label>Your name<div class="f" data-k="name"></div></label></div>
   </header>
 
   <section>
-    <h2><span class="n">1</span>What does every agent read first, and what only when needed?</h2>
-    <p class="hint">The always-loaded file (<code>CLAUDE.md</code> or <code>AGENTS.md</code>) costs context on every task, so keep it short. Path rules, skills and subagents load only when they apply.</p>
-    <div class="f" data-k="context" data-ph="Always: how to run the tests, three things never to do
-Rule for src/billing/: money is integer cents
-Skill: write-release-notes"></div>
+    <h2><span class="n">1</span>Map your <code>.claude</code> directory</h2>
+    <p class="hint">What loads every session costs context on every task, so keep it short. What loads on demand can be long.</p>
+    <div class="tw"><table>
+      <thead><tr><th>File</th><th>Loaded</th><th>What you will put in it</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><code>CLAUDE.md</code> / <code>AGENTS.md</code></td><td>Every session</td><td class="f" data-ph="commands, the gate, what changes together. Under a page."></td></tr>
+        <tr><td class="k"><code>.claude/rules/*.md</code></td><td>When a matching path is read</td><td class="f" data-ph="api.md for src/api/**, db.md for migrations/**"></td></tr>
+        <tr><td class="k"><code>.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>By name, or when its description matches</td><td class="f" data-ph="fix-bug, add-migration, bump-dependency"></td></tr>
+        <tr><td class="k"><code>.claude/agents/*.md</code></td><td>In its own context when called</td><td class="f" data-ph="reviewer, security-reviewer, explorer"></td></tr>
+        <tr><td class="k"><code>.claude/settings.json</code></td><td>Start; permissions and hooks</td><td class="f" data-ph="deny rules, hook commands"></td></tr>
+        <tr><td class="k"><code>.mcp.json</code></td><td>Start</td><td class="f" data-ph="tracker, logs, docs: only what a stage needs"></td></tr>
+        <tr><td class="k"><code>REVIEW.md</code></td><td>By the reviewer</td><td class="f" data-ph="what matters in each area, written by code owners"></td></tr>
+      </tbody>
+    </table></div>
   </section>
 
   <section>
-    <h2><span class="n">2</span>What may an agent never touch, and what enforces it?</h2>
-    <p class="hint">A rule that lives only in a prompt is a wish. Name what enforces each one: a permission deny, a blocking hook, code owners or branch protection.</p>
-    <div class="f" data-k="boundary" data-ph="- .github/workflows/: denied in settings.json
-- migrations/: code owners, two approvals
-- .env files: a hook blocks the read"></div>
+    <h2><span class="n">2</span>Boundary rules: what an agent may never touch</h2>
+    <p class="hint">A rule only in a prompt is a wish. Say how each one is enforced: a permission deny, a hook that blocks, CODEOWNERS, or branch protection.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Never</th><th>Why</th><th>Enforced by</th></tr></thead>
+      <tbody>
+        <tr><td class="f" data-ph="read .env or secrets"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f" data-ph="edit CI workflow files"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f" data-ph="change a migration that has shipped"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f" data-ph="push to main, force push"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
   </section>
 
   <section>
-    <h2><span class="n">3</span>Which know-how will you turn into skills?</h2>
-    <p class="hint">Anything you explain more than twice. Give each skill a name, say when to use it, and name the check it ends on.</p>
-    <div class="f" data-k="skills"></div>
+    <h2><span class="n">3</span>Skills: know-how you explain more than twice</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Skill name</th><th>Use when</th><th>Steps, in short</th><th>Ends on this check</th></tr></thead>
+      <tbody>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
   </section>
 
   <section>
-    <h2><span class="n">4</span>Which hooks run before and after the agent acts?</h2>
-    <p class="hint">For example: block a protected path before a tool runs, format after an edit, run the gate when the agent says it is done. Say whether each one blocks or warns.</p>
-    <div class="f" data-k="hooks"></div>
+    <h2><span class="n">4</span>Route only the context each ticket type needs</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Ticket type</th><th>Rules and skills it loads</th><th>Tools and MCP it may use</th><th>What it must not see</th></tr></thead>
+      <tbody>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="e.g. holdout tests"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
   </section>
 
   <section>
-    <h2><span class="n">5</span>What must every pull request prove before review?</h2>
-    <p class="hint">List the gates with their commands, then the evidence a pull request must carry before a person reads it.</p>
-    <div class="f" data-k="gates" data-ph="Gates: npm run lint, npm test, a security scan
-Evidence: a test that failed before the fix and passes after it, the gate output, the risk tier"></div>
+    <h2><span class="n">5</span>Hooks: run before and after the agent acts</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Event</th><th>What your hook does</th><th>Blocks or warns?</th></tr></thead>
+      <tbody>
+        <tr><td class="k">PreToolUse</td><td class="f" data-ph="refuse rm -rf, refuse edits under .github/"></td><td class="f"></td></tr>
+        <tr><td class="k">PostToolUse</td><td class="f" data-ph="format and lint the file just written"></td><td class="f"></td></tr>
+        <tr><td class="k">Stop</td><td class="f" data-ph="refuse to finish until the stage output exists and the gate passed"></td><td class="f"></td></tr>
+        <tr><td class="k">SessionStart</td><td class="f" data-ph="print branch, issue, stage"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
   </section>
 
   <section>
-    <h2><span class="n">6</span>Which review comment will you turn into a rule?</h2>
-    <p class="hint">Read your last 20 review comments. A comment written three times becomes a rule, a skill, a lint or a test.</p>
-    <div class="f" data-k="source"></div>
+    <h2><span class="n">6</span>Gates: what the agent must prove</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Gate</th><th>Command</th><th>The bad change it stops</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Static: lint, types</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Tests the agent writes</td><td class="f"></td><td class="f" data-ph="must fail with the fix reverted"></td></tr>
+        <tr><td class="k">Holdout tests it never sees</td><td class="f"></td><td class="f" data-ph="a fix that games its own test"></td></tr>
+        <tr><td class="k">Security scan</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Agent review</td><td class="f" data-ph="fresh context, REVIEW.md, max 3 rounds"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
+    <label class="stack">Your PR evidence contract: a PR may not reach review without<div class="f tall" data-ph="the failing-then-passing test, gate output line, files touched against the plan, screenshots for UI, risk tier"></div></label>
   </section>
 
   <section>
-    <h2>Read this week</h2>
-    <ul class="read">
-      <li><span class="t">10 min</span><span><a href="https://code.claude.com/docs/en/claude-directory">Explore the .claude directory</a>. Every file and when it loads.</span></li>
-      <li><span class="t">15 min</span><span><a href="https://code.claude.com/docs/en/skills">Skills</a>, <a href="https://code.claude.com/docs/en/hooks">hooks</a> and <a href="https://code.claude.com/docs/en/sub-agents">subagents</a>.</span></li>
-      <li><span class="t">15 min</span><span><a href="https://engineering.atspotify.com/2025/11/context-engineering-background-coding-agents-part-2">Spotify on context for background agents, part 2</a>.</span></li>
-      <li><span class="t">15 min</span><span><a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents-part-2">Stripe's Minions, part 2</a>. Blueprints and the shared tool server.</span></li>
-      <li><span class="t">10 min</span><span><a href="https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents">Anthropic on harnesses for long-running agents</a>.</span></li>
-    </ul>
-    <p class="note">Bring to Wednesday: one hook that blocked something real, with its log line.</p>
+    <h2><span class="n">7</span>Fix at the source</h2>
+    <p class="hint">Look at your last 20 review comments. Any comment you have written three times becomes a rule, a skill, a lint or a test.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Repeated comment</th><th>Becomes</th><th>File</th></tr></thead>
+      <tbody>
+        <tr><td class="f"></td><td class="f" data-ph="rule, skill, lint, test, REVIEW.md"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
   </section>
 
-  <footer>AI-Native Software Factory Buildcamp, learnwithparam.com</footer>
+  <section>
+    <h2><span class="n">8</span>Read before the next session</h2>
+    <div class="read"><ul>
+      <li><span class="t">10 min</span> <a href="https://code.claude.com/docs/en/claude-directory">Explore the .claude directory</a>. Every file and when it loads.</li>
+      <li><span class="t">15 min</span> <a href="https://code.claude.com/docs/en/skills">Skills</a>, <a href="https://code.claude.com/docs/en/hooks">Hooks</a> and <a href="https://code.claude.com/docs/en/sub-agents">Subagents</a>.</li>
+      <li><span class="t">15 min</span> <a href="https://engineering.atspotify.com/2025/11/context-engineering-background-coding-agents-part-2">Spotify: context engineering for background agents, part 2</a>.</li>
+      <li><span class="t">15 min</span> <a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents-part-2">Stripe: Minions part 2</a>. Blueprints and the shared tool server.</li>
+      <li><span class="t">10 min</span> <a href="https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents">Anthropic: effective harnesses for long-running agents</a>.</li>
+    </ul></div>
+    <p class="note">Bring to the next session: one hook that blocked something real, with the log line.</p>
+  </section>
+
+  <footer>AI-Native Software Factory, learnwithparam.com</footer>
 </main>
 <script src="worksheet.js"></script>
 </body>

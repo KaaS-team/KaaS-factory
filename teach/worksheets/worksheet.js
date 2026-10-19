@@ -1,5 +1,5 @@
 // Worksheets: every .f box is editable, saved in this browser as you type, printed as written,
-// and exported as one Markdown file (each question a heading, each answer as typed).
+// and exported as one Markdown file (each part a heading, each table a Markdown table).
 (function () {
   const page = location.pathname.split("/").pop() || "index.html";
   const key = "sf-worksheet:" + page;
@@ -9,9 +9,11 @@
     if (el.contentEditable !== "plaintext-only") el.setAttribute("contenteditable", "true");
     el.dataset.k = el.dataset.k || "f" + i;
     el.setAttribute("role", "textbox");
-    el.setAttribute("aria-multiline", el.classList.contains("short") ? "false" : "true");
-    const label = el.closest("section, label")?.querySelector("h2, h3, span");
-    el.setAttribute("aria-label", label ? label.textContent.trim() : el.dataset.ph || "Answer");
+    el.setAttribute("aria-multiline", "true");
+    const label = el.closest("label");
+    const th = el.matches("td") && el.closest("table").querySelectorAll("thead th")[el.cellIndex];
+    const name = label ? label.firstChild.textContent : th ? (el.parentElement.cells[0].textContent + ": " + th.textContent) : el.dataset.ph;
+    el.setAttribute("aria-label", (name || "Answer").trim());
   });
 
   // Pasted text arrives as plain text, so Markdown copied from anywhere keeps its shape.
@@ -48,30 +50,41 @@
   });
 
   const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
-  const answer = (el) => (el && el.textContent.trim()) || "_No answer yet_";
+  const cell = (el) => text(el).replace(/\|/g, "\\|") || " ";
+  // A label's own words, without the answer box inside it.
+  function labelText(label) {
+    const copy = label.cloneNode(true);
+    copy.querySelectorAll(".f").forEach((f) => f.remove());
+    return text(copy);
+  }
+  function answer(el) {
+    const t = el.textContent.trim();
+    return t ? (t.includes("\n") ? "\n\n" + t : " " + t) : " _blank_";
+  }
+  function table(tw) {
+    const head = Array.from(tw.querySelectorAll("thead th")).map(cell);
+    const out = ["", "| " + head.join(" | ") + " |", "|" + head.map(() => " --- ").join("|") + "|"];
+    tw.querySelectorAll("tbody tr").forEach((tr) => {
+      out.push("| " + Array.from(tr.cells).map((c) => text(c) ? cell(c) : " ").join(" | ") + " |");
+    });
+    return out.concat("");
+  }
 
+  // Every part becomes a heading; labelled boxes become "**Label**: answer"; tables stay tables.
   function markdown() {
     const out = ["# " + text(document.querySelector("h1"))];
-    document.querySelectorAll(".who label").forEach((l) => {
-      out.push("- " + text(l.querySelector("span")) + ": " + (text(l.querySelector(".f")) || "_blank_"));
-    });
+    document.querySelectorAll("header .row > label").forEach((l) => out.push("", "**" + labelText(l) + "**:" + answer(l.querySelector(".f"))));
     document.querySelectorAll("section").forEach((s) => {
       const h = s.querySelector("h2");
-      const own = Array.from(s.querySelectorAll(":scope > .f, :scope > .tw"));
-      if (!h || !own.length) return;
+      const parts = Array.from(s.querySelectorAll(".row > label, label.stack, .tw"));
+      if (!h || !parts.length) return;
       out.push("", "## " + text(h).replace(/^(\d+)\s*/, "$1. "));
-      own.forEach((el) => {
-        if (el.classList.contains("tw")) {
-          el.querySelectorAll("tbody tr").forEach((tr) => {
-            const cells = Array.from(tr.cells).map((c) => text(c) || "_blank_");
-            out.push("- " + cells.join(" | "));
-          });
-        } else {
-          out.push("", answer(el));
-        }
+      parts.forEach((el) => {
+        if (el.classList.contains("tw")) out.push(...table(el));
+        else out.push("", "**" + labelText(el) + "**:" + answer(el.querySelector(".f")));
       });
     });
-    return out.join("\n") + "\n";
+    return out.join("\n").replace(/\n{3,}/g, "\n\n") + "\n";
   }
 
   function fileName() {

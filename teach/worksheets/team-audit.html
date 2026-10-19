@@ -14,69 +14,77 @@
   </div>
 
   <header class="sheet">
-    <span class="when">For tech leads and engineering leaders. One team, one hour.</span>
-    <h1>Find where delivery chokes once <mark>agents write the code</mark></h1>
-    <p class="lede">When agents make code cheap, the wait moves to review, verification and release. DORA's 2025 report found that AI amplifies the system it lands in. Run this with the team in the room.</p>
-    <div class="who">
-      <label><span>Team</span><div class="f short" data-k="name"></div></label>
-      <label><span>Date</span><div class="f short" data-k="date"></div></label>
-    </div>
+    <span class="when">For tech leads and engineering leaders, one team, one hour</span>
+    <h1>Where does your team's delivery <mark>choke once agents write the code</mark>?</h1>
+    <p class="lede">When agents make code cheap, the bottleneck moves to review, verification and release. DORA's 2025 report found AI amplifies the system it lands in: strong teams get faster, weak ones get less stable. Score each row 0 to 3 with the team in the room, then pick the three lowest rows that block the most work.</p>
+    <div class="row who"><label>Team<div class="f" data-k="name"></div></label><label>Date<div class="f" data-k="date"></div></label></div>
   </header>
 
   <section>
-    <h2><span class="n">1</span>Where are you today?</h2>
-    <p class="hint">Take the last 30 days: pull requests merged per week, wait for first review, lead time to production, reverts and hotfixes, share written mostly by an agent, and agent spend per pull request. Write "unknown" where you cannot pull a number. That is a finding too.</p>
-    <div class="f" data-k="baseline" data-ph="- PRs merged per week: 40
-- Wait for first review: 1.5 days
-- Agent spend per PR: unknown"></div>
+    <h2><span class="n">1</span>Baseline numbers, last 30 days</h2>
+    <div class="row">
+      <label>PRs merged per week<div class="f"></div></label>
+      <label>Median wait for first review<div class="f"></div></label>
+      <label>Median lead time, ready to production<div class="f"></div></label>
+      <label>Reverts and hotfixes<div class="f"></div></label>
+      <label>Share of PRs written mostly by an agent<div class="f"></div></label>
+      <label>Agent spend per PR<div class="f" data-ph="or unknown"></div></label>
+    </div>
   </section>
 
   <section>
-    <h2><span class="n">2</span>Score each layer from 0 to 3</h2>
-    <p class="hint">0 means none, 1 ad hoc, 2 written down and 3 enforced by a check. Write the evidence beside each score.</p>
+    <h2><span class="n">2</span>Score the eleven layers</h2>
+    <p class="hint">0 none, 1 ad hoc, 2 written down, 3 enforced by a check.</p>
     <div class="tw"><table>
-      <thead><tr><th>Layer</th><th>A 3 looks like</th><th>Score</th><th>Evidence</th></tr></thead>
+      <thead><tr><th>Layer</th><th>3 looks like</th><th>Score</th><th>Evidence</th></tr></thead>
       <tbody>
         <tr><td class="k">Intake</td><td>A ticket has a ready checklist an agent can check</td><td class="f"></td><td class="f"></td></tr>
         <tr><td class="k">Triage</td><td>Each ticket type has its own route and risk tier</td><td class="f"></td><td class="f"></td></tr>
         <tr><td class="k">Planning</td><td>Features carry a spec a person approves before code</td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Context</td><td>A short <code>AGENTS.md</code>, path rules and skills in the repo</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Context</td><td>Short <code>AGENTS.md</code>, path-scoped rules, skills in the repo</td><td class="f"></td><td class="f"></td></tr>
         <tr><td class="k">Isolation</td><td>Agents run in a worktree or sandbox with limits</td><td class="f"></td><td class="f"></td></tr>
         <tr><td class="k">Verification</td><td>Gates and holdout tests the agent cannot skip</td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Review</td><td>Risk tiers decide approvals, with a cap on rounds</td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Delivery</td><td>Merge queue, feature flags, staged release and fast rollback</td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Learning</td><td>Incidents become evals and repeated comments become rules</td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Measurement</td><td>Wait time, rounds and cost per pull request on a dashboard</td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Governance</td><td>A written AI policy, spend limits and an audit trail per run</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Review</td><td>Risk tiers decide approvals; AI review on every PR; round cap</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Delivery</td><td>Merge queue, feature flags, staged release, fast rollback</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Learning</td><td>Incidents and reverts become evals; repeated comments become rules</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Measurement</td><td>Wait time, rounds, autonomy and cost per PR on a dashboard</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Governance</td><td>Written AI policy, spend caps, audit trail per run</td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="page-break">
+    <h2><span class="n">3</span>The three rows to fix first</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Row</th><th>What it blocks today</th><th>First change</th><th>Owner</th><th>Check that proves it</th></tr></thead>
+      <tbody>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
       </tbody>
     </table></div>
   </section>
 
   <section>
-    <h2><span class="n">3</span>Which three layers will you fix first?</h2>
-    <p class="hint">Pick low scores that block the most work. For each, say what it blocks today, the first change, its owner and the check that proves it worked.</p>
-    <div class="f" data-k="fix"></div>
+    <h2><span class="n">4</span>30, 60, 90 days</h2>
+    <div class="row">
+      <label>Day 30: one ticket type automated<div class="f tall" data-ph="usually dependency updates or small bugs"></div></label>
+      <label>Day 60: risk tiers and AI review live<div class="f tall"></div></label>
+      <label>Day 90: the guardrail number<div class="f tall" data-ph="revert rate no worse while PRs per week rise"></div></label>
+    </div>
   </section>
 
   <section>
-    <h2><span class="n">4</span>What will be true at 30, 60 and 90 days?</h2>
-    <p class="hint">A common path: one ticket type automated by day 30, risk tiers and agent review by day 60, and a guardrail number by day 90.</p>
-    <div class="f" data-k="plan" data-ph="- Day 30: dependency updates run end to end
-- Day 60: risk tiers decide approvals
-- Day 90: revert rate holds while PRs per week rise"></div>
-  </section>
-
-  <section>
-    <h2>Questions to ask in the room</h2>
+    <h2><span class="n">5</span>Questions to ask in the room</h2>
     <ul>
-      <li>Which pull requests would you merge without reading the diff if the evidence were attached? What evidence?</li>
+      <li>Which PRs would you merge without reading the diff if the evidence were attached? What evidence?</li>
       <li>Which paths must always have a person, whoever wrote the change?</li>
       <li>What did the last three incidents have in common, and would a gate have caught one?</li>
       <li>Who owns a change an agent wrote, and who answers for it when it breaks?</li>
     </ul>
   </section>
 
-  <footer>AI-Native Software Factory, learnwithparam.com and kaas.team</footer>
+  <footer>AI-Native Software Factory, learnwithparam.com, kaas.team</footer>
 </main>
 <script src="worksheet.js"></script>
 </body>
