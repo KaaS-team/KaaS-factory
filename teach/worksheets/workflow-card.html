@@ -10,53 +10,53 @@
 <main>
   <div class="bar">
     <span class="crumbs"><a href="index.html">Worksheets</a> / Workflow cards</span>
-    <span class="actions"><span class="saved" data-saved>Type in any box. It saves in this browser.</span><button type="button" data-clear>Clear</button><button type="button" class="primary" data-print>Save as PDF</button></span>
+    <span class="actions"><span class="saved" data-saved>Saves in this browser as you type</span><button type="button" data-clear>Clear</button><button type="button" data-copy>Copy Markdown</button><button type="button" data-download>Download .md</button><button type="button" class="primary" data-print>Save as PDF</button></span>
   </div>
 
   <header class="sheet">
-    <span class="eyebrow">Project 1 · Week 1 · One card per ticket type</span>
-    <h1>Write the workflow for <mark>one ticket type</mark> on one page</h1>
-    <p class="lede">Fill one card for each of the three types you chose in the Week 1 worksheet. Start from the matching entry in the Workflow library and change what is different on your team. A card is done when a new engineer could run the workflow from it alone. In week 3 each card becomes a workflow file your factory runs.</p>
-    <div class="meta"><span>Due <b>Sat 24 Oct</b>, office hours</span><span>Becomes <code>.factory/workflows/&lt;type&gt;.yml</code> in week 3</span></div>
+    <span class="when">Week 1, due Sat 24 Oct at office hours.</span>
+    <h1>Write the workflow for <mark>one ticket type</mark></h1>
+    <p class="lede">Fill one card for each of the three ticket types you chose in week 1. Start from the <a href="workflow-library.html">workflow library</a> and change what is different on your team. A card is done when a new engineer could run the workflow from it alone.</p>
+    <div class="who">
+      <label><span>Your name</span><div class="f short" data-k="name"></div></label>
+    </div>
   </header>
 
-  <div id="cards"></div>
+  <div id="cards" style="display:grid;gap:56px"></div>
 
   <template id="card">
-    <section class="card-sheet">
-      <h2><span class="n">Card {n}</span>Ticket type: <span class="f" data-k="type" data-ph="e.g. dependency update" style="flex:1;min-height:0"></span></h2>
-      <div class="row">
-        <label>Trigger: where it comes from<div class="f" data-k="trigger" data-ph="label, alert, schedule, webhook, message"></div></label>
-        <label>Ready means the ticket carries<div class="f" data-k="ready" data-ph="repro steps, affected version, expected result"></div></label>
-      </div>
-      <div class="row">
-        <label>Triage decides<div class="f" data-k="triage" data-ph="the question that routes it"></div></label>
-        <label>Risk tier, and what raises it<div class="f" data-k="tier" data-ph="low, medium or high; paths that bump it"></div></label>
-      </div>
-      <div class="tw"><table>
-        <thead><tr><th>Step</th><th>Script or agent</th><th>Tool or skill</th><th>Output it leaves</th><th>Check that ends it</th></tr></thead>
-        <tbody>
-          <tr><td class="f" data-k="s1"></td><td class="f" data-k="s1t"></td><td class="f" data-k="s1u"></td><td class="f" data-k="s1o"></td><td class="f" data-k="s1c"></td></tr>
-          <tr><td class="f" data-k="s2"></td><td class="f" data-k="s2t"></td><td class="f" data-k="s2u"></td><td class="f" data-k="s2o"></td><td class="f" data-k="s2c"></td></tr>
-          <tr><td class="f" data-k="s3"></td><td class="f" data-k="s3t"></td><td class="f" data-k="s3u"></td><td class="f" data-k="s3o"></td><td class="f" data-k="s3c"></td></tr>
-          <tr><td class="f" data-k="s4"></td><td class="f" data-k="s4t"></td><td class="f" data-k="s4u"></td><td class="f" data-k="s4o"></td><td class="f" data-k="s4c"></td></tr>
-          <tr><td class="f" data-k="s5"></td><td class="f" data-k="s5t"></td><td class="f" data-k="s5u"></td><td class="f" data-k="s5o"></td><td class="f" data-k="s5c"></td></tr>
-          <tr><td class="f" data-k="s6"></td><td class="f" data-k="s6t"></td><td class="f" data-k="s6u"></td><td class="f" data-k="s6o"></td><td class="f" data-k="s6c"></td></tr>
-        </tbody>
-      </table></div>
-      <div class="row">
-        <label>Human in the loop: where, who, and what they see<div class="f tall" data-k="human" data-ph="approves the plan; sees acceptance criteria and risk"></div></label>
-        <label>Stop rules<div class="f tall" data-k="stop" data-ph="max rounds, max minutes, max spend, who gets it after"></div></label>
-      </div>
-      <div class="row">
-        <label>Done means the PR carries<div class="f" data-k="done" data-ph="failing-then-passing test, gate output, screenshots"></div></label>
-        <label>The failure that would hurt most, and the gate that catches it<div class="f" data-k="risk"></div></label>
-        <label>Metric you will watch<div class="f" data-k="metric" data-ph="e.g. time from ready to PR"></div></label>
-      </div>
-    </section>
+    <div class="card-sheet" style="display:grid">
+      <section>
+        <h2><span class="n">1</span>Card <span data-card></span>: which ticket type?</h2>
+        <div class="f short" data-k="type" data-ph="Dependency update"></div>
+      </section>
+      <section>
+        <h2><span class="n">2</span>How does it arrive, and when is it ready?</h2>
+        <p class="hint">The trigger, and what the ticket must carry before work starts.</p>
+        <div class="f" data-k="arrive" data-ph="Arrives as a Dependabot pull request.
+Ready when the changelog is linked and CI has run once."></div>
+      </section>
+      <section>
+        <h2><span class="n">3</span>What are the steps, and who runs each?</h2>
+        <p class="hint">Mark each step as a script, an agent or a person, and name the check that ends it.</p>
+        <div class="f" data-k="steps" data-ph="1. (script) Read the changelog for breaking changes
+2. (agent) Fix code the upgrade broke. Ends when tests pass.
+3. (person) Approve if the tier is high"></div>
+      </section>
+      <section>
+        <h2><span class="n">4</span>Where does a human step in, and when does it stop?</h2>
+        <p class="hint">Who approves what, the limits on rounds, time and spend, and who gets the ticket when a limit is hit.</p>
+        <div class="f" data-k="human"></div>
+      </section>
+      <section>
+        <h2><span class="n">5</span>What does done look like?</h2>
+        <p class="hint">The evidence on the pull request, the failure that would hurt most and the gate that catches it, and the number you will watch.</p>
+        <div class="f" data-k="done"></div>
+      </section>
+    </div>
   </template>
 
-  <footer>AI-Native Software Factory Buildcamp · learnwithparam.com</footer>
+  <footer>AI-Native Software Factory Buildcamp, learnwithparam.com</footer>
 </main>
 <script>
   // Three cards from one template; field keys are prefixed per card so each saves on its own.
@@ -65,9 +65,7 @@
     const host = document.getElementById("cards");
     for (let n = 1; n <= 3; n++) {
       const node = tpl.content.cloneNode(true);
-      const sheet = node.querySelector(".card-sheet");
-      if (n > 1) sheet.classList.add("page-break");
-      sheet.querySelector(".n").textContent = "Card " + n;
+      node.querySelector("[data-card]").textContent = n;
       node.querySelectorAll(".f").forEach((el) => { el.dataset.k = "c" + n + "-" + el.dataset.k; });
       host.appendChild(node);
     }

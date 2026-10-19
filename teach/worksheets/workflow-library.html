@@ -6,12 +6,12 @@
 <title>Workflow Library</title>
 <link rel="stylesheet" href="worksheet.css">
 <style>
-  .wf { display: grid; gap: 8px; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; break-inside: avoid; }
+  .wf { display: grid; gap: 10px; padding: 20px 22px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; break-inside: avoid; }
   .wf h3 { margin: 0; font-size: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
-  .wf dl { display: grid; grid-template-columns: 9.5em 1fr; gap: 4px 12px; margin: 0; font-size: 13.5px; }
+  .wf dl { display: grid; grid-template-columns: 9.5em 1fr; gap: 4px 12px; margin: 0; font-size: 14.5px; }
   .wf dt { font-weight: 600; color: var(--ink-2); }
   .wf dd { margin: 0; min-width: 0; }
-  .flow { font: 600 12.5px var(--mono); color: var(--ink); background: #F1F1F1; padding: 4px 8px; border-radius: 2px; overflow-wrap: anywhere; }
+  .flow { font: 600 12.5px var(--mono); color: var(--ink); background: var(--paper); border: 1px solid var(--line); padding: 6px 10px; border-radius: 6px; overflow-wrap: anywhere; }
   @media (max-width: 520px) { .wf dl { grid-template-columns: 1fr; } .wf dt { margin-top: 4px; } }
   @media print { .wf { padding: 3mm; } .wf dl { font-size: 9.5pt; } }
 </style>
@@ -24,7 +24,7 @@
   </div>
 
   <header class="sheet">
-    <span class="eyebrow">Reference · read with the Week 1 worksheet</span>
+    <span class="when">Reference for the week 1 worksheet</span>
     <h1>Every ticket type runs <mark>its own workflow</mark></h1>
     <p class="lede">The loop is the same for every ticket: triage, plan, build, verify, review, deliver. What changes per type is the trigger, who triages, the risk tier, which steps are plain scripts, where the human sits, when it stops, and what you measure. These are starting defaults drawn from how Anthropic, Stripe, Spotify, Uber, Google SRE, CISA and GitHub run them. Copy one into a Workflow card and change it to fit your team.</p>
   </header>
@@ -150,7 +150,7 @@
 
   <section>
     <h2><span class="n">D</span>Sources</h2>
-    <div class="read"><ul>
+    <ul>
       <li><a href="https://claude.dev/blog/solving-code-review-at-anthropic/">Anthropic: how the Claude Code team does code review</a></li>
       <li><a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents">Stripe: Minions</a> and <a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents-part-2">part 2</a></li>
       <li><a href="https://engineering.atspotify.com/2025/11/spotifys-background-coding-agent-part-1">Spotify: Honk, part 1</a></li>
@@ -158,10 +158,10 @@
       <li><a href="https://www.cisa.gov/ssvc">CISA: SSVC</a>, <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog">KEV catalog</a>, <a href="https://www.first.org/epss/">FIRST: EPSS</a></li>
       <li><a href="https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions">GitHub: automating Dependabot with Actions</a></li>
       <li><a href="https://basecamp.com/shapeup">Shape Up</a> and <a href="https://www.martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html">Fowler: spec-driven development tools</a></li>
-    </ul></div>
+    </ul>
   </section>
 
-  <footer>AI-Native Software Factory Buildcamp · learnwithparam.com</footer>
+  <footer>AI-Native Software Factory Buildcamp, learnwithparam.com</footer>
 </main>
 <script src="worksheet.js"></script>
 </body>

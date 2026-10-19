@@ -10,121 +10,83 @@
 <main>
   <div class="bar">
     <span class="crumbs"><a href="index.html">Worksheets</a> / Week 1</span>
-    <span class="actions"><span class="saved" data-saved>Type in any box. It saves in this browser.</span><button type="button" data-clear>Clear</button><button type="button" class="primary" data-print>Save as PDF</button></span>
+    <span class="actions"><span class="saved" data-saved>Saves in this browser as you type</span><button type="button" data-clear>Clear</button><button type="button" data-copy>Copy Markdown</button><button type="button" data-download>Download .md</button><button type="button" class="primary" data-print>Save as PDF</button></span>
   </div>
 
   <header class="sheet">
-    <span class="eyebrow">Project 1 · Week 1 · Your workflow</span>
-    <h1>Map how an issue becomes a <mark>merged pull request</mark></h1>
-    <p class="lede">Before an agent can run your workflow, you need it on paper: who does what, what each step leaves behind, and where work waits. Fill parts 1 to 3 before Wednesday's session and parts 4 to 6 before Saturday's office hours.</p>
-    <div class="meta"><span>Name <b class="f" data-k="name" data-ph="your name" style="display:inline-block;min-width:12em;min-height:0"></b></span><span>Due <b>Wed 21 Oct</b> (parts 1 to 3), <b>Sat 24 Oct</b> (parts 4 to 6)</span></div>
+    <span class="when">Week 1, your workflow. Questions 1 to 3 by Wed 21 Oct, 4 to 6 by Sat 24 Oct.</span>
+    <h1>Map how one change reaches <mark>production</mark></h1>
+    <p class="lede">Answer in your own words. Bullets, a short table or notes pasted in Markdown all work. Write what a new teammate would need to know, not everything you know.</p>
+    <div class="who">
+      <label><span>Your name</span><div class="f short" data-k="name"></div></label>
+      <label><span>Repository you will automate</span><div class="f short" data-k="repo" data-ph="owner/repo"></div></label>
+    </div>
   </header>
 
   <section>
-    <h2><span class="n">1</span>Your team and codebase</h2>
-    <div class="row">
-      <label>Repository you will automate<div class="f" data-ph="owner/repo, language, size"></div></label>
-      <label>Where work comes from<div class="f" data-ph="GitHub Issues, Linear, Jira, support inbox, alerts"></div></label>
-      <label>Team<div class="f" data-ph="how many engineers, who reviews, who is on call"></div></label>
-      <label>Gates you already have<div class="f" data-ph="CI jobs, linters, type check, tests, CODEOWNERS, branch protection"></div></label>
-    </div>
+    <h2><span class="n">1</span>Where does work come from, and what checks it today?</h2>
+    <p class="hint">Name the tracker, the team, who reviews, and the checks that run on every pull request.</p>
+    <div class="f" data-k="setup" data-ph="- Work comes from: GitHub Issues and a support inbox
+- Team: 5 engineers, 2 of them review most PRs
+- Checks today: CI, lint, type check, unit tests"></div>
   </section>
 
   <section>
-    <h2><span class="n">2</span>Today's path, for one real change</h2>
-    <p class="hint">Pick a change merged in the last two weeks. Walk it from first report to running in production. Work time is hands on keyboard; wait time is everything else. The longest wait is usually the first thing a factory fixes.</p>
-    <div class="tw"><table>
-      <thead><tr><th>Step</th><th>Who</th><th>Tool</th><th>Work time</th><th>Wait time</th><th>What it left behind</th></tr></thead>
-      <tbody>
-        <tr><td class="k">Reported</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="issue, alert, message"></td></tr>
-        <tr><td class="k">Triaged</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="label, priority, owner"></td></tr>
-        <tr><td class="k">Planned</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="comment, spec, nothing"></td></tr>
-        <tr><td class="k">Built</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="branch, tests"></td></tr>
-        <tr><td class="k">Reviewed</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="rounds, comments"></td></tr>
-        <tr><td class="k">Merged</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Deployed</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Checked live</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="how you knew it worked"></td></tr>
-      </tbody>
-    </table></div>
-    <div class="row">
-      <label>Lead time, report to production<div class="f" data-ph="e.g. 6 days"></div></label>
-      <label>Where it waited longest, and why<div class="f" data-ph="e.g. 2 days waiting for review"></div></label>
-    </div>
+    <h2><span class="n">2</span>Walk one real change from report to production</h2>
+    <p class="hint">Pick something merged in the last two weeks. Note who did each step and how long it waited, then name the longest wait.</p>
+    <div class="f" data-k="path" data-ph="1. Support reports a broken discount code (Mon)
+2. Lead triages it, waits 1 day
+3. Engineer fixes it in 2 hours
+4. PR waits 2 days for review
+5. Deployed Friday
+
+Lead time: 5 days. Longest wait: review."></div>
   </section>
 
   <section>
-    <h2><span class="n">3</span>Your ticket mix</h2>
-    <p class="hint">Count the last 30 days. Each type runs a different workflow (see the Workflow library). Automate first where volume is high, risk is low and a check can prove the result.</p>
-    <div class="tw"><table>
-      <thead><tr><th>Type</th><th>How many</th><th>Typical cycle time</th><th>Pain 1 to 5</th><th>A check could prove it done?</th></tr></thead>
-      <tbody>
-        <tr><td class="k">Small bug</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Unclear bug or support report</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Dependency update</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Security finding</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Incident follow-up</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Flaky test</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Feature from product</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Refactor or migration</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Docs or copy</td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-      </tbody>
-    </table></div>
-    <label class="stack">The three types you will automate first, and why<div class="f tall" data-ph="1. ...  2. ...  3. ..."></div></label>
+    <h2><span class="n">3</span>Which tickets will you automate first?</h2>
+    <p class="hint">Look at the last 30 days. Start where volume is high, risk is low and a check can prove the result. The <a href="workflow-library.html">workflow library</a> shows how each type runs.</p>
+    <div class="f" data-k="mix" data-ph="| Type | Per month | Why first |
+|---|---|---|
+| Dependency update | 12 | CI proves it |
+| Small bug | 8 | a failing test proves it |"></div>
   </section>
 
   <section>
-    <h2><span class="n">4</span>Redesign it as stages an agent can run</h2>
-    <p class="hint">For your first ticket type. Every stage takes an input, leaves an output someone can read, and ends on a check. Write the check as something a script or a person can answer yes or no.</p>
-    <div class="tw"><table>
-      <thead><tr><th>Stage</th><th>Input</th><th>Output it leaves</th><th>Owner: agent or engineer</th><th>Check that ends it</th><th>Human approval?</th></tr></thead>
-      <tbody>
-        <tr><td class="k">Triage</td><td class="f"></td><td class="f" data-ph="type, risk, missing info"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Plan</td><td class="f"></td><td class="f" data-ph="acceptance criteria"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Build</td><td class="f"></td><td class="f" data-ph="failing test, then fix"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Verify</td><td class="f"></td><td class="f" data-ph="evidence: test output, revert proof"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Review</td><td class="f"></td><td class="f" data-ph="findings, verdict"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k">Deliver</td><td class="f"></td><td class="f" data-ph="PR with evidence"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
-      </tbody>
-    </table></div>
+    <h2><span class="n">4</span>Write your first workflow as stages</h2>
+    <p class="hint">For each stage, say what goes in, what comes out, who runs it (a script, an agent or a person) and the check that ends it.</p>
+    <div class="f" data-k="stages" data-ph="- Triage (agent): issue in, type and risk out. Ends when a label is set.
+- Build (agent): a failing test first, then the fix. Ends when tests pass.
+- Review (person): reads the evidence. Ends on approve or request changes."></div>
   </section>
 
   <section>
-    <h2><span class="n">5</span>Risk tiers: the change sets the tier, not the author</h2>
-    <p class="hint">Anthropic's Claude Code team routes review by risk: low needs no human once checks are green, medium needs one person, high needs two. Some paths always need a person. Write yours.</p>
-    <div class="tw"><table>
-      <thead><tr><th>Tier</th><th>What puts a change here in your repo</th><th>Who approves</th><th>Merge</th></tr></thead>
-      <tbody>
-        <tr><td class="k"><span class="pill pass">Low</span></td><td class="f" data-ph="docs, copy, test-only, flagged additive change"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k"><span class="pill wait">Medium</span></td><td class="f" data-ph="ordinary product change"></td><td class="f"></td><td class="f"></td></tr>
-        <tr><td class="k"><span class="pill fail">High</span></td><td class="f" data-ph="billing, auth, migrations, CI files, secrets"></td><td class="f"></td><td class="f"></td></tr>
-      </tbody>
-    </table></div>
+    <h2><span class="n">5</span>What makes a change low, medium or high risk?</h2>
+    <p class="hint">The change sets the tier, not who wrote it. Low merges on green checks, medium needs one reviewer and high needs two.</p>
+    <div class="f" data-k="tiers" data-ph="- Low: docs, copy, tests only
+- Medium: ordinary product code
+- High: billing, auth, migrations, CI files"></div>
   </section>
 
   <section>
-    <h2><span class="n">6</span>Walk one real issue through your stages</h2>
-    <div class="row">
-      <label>Issue link and one-line summary<div class="f"></div></label>
-      <label>Its type and risk tier<div class="f"></div></label>
-    </div>
-    <label class="stack">What would the agent need to know that is not written down anywhere?<div class="f tall" data-ph="tribal knowledge, the local setup, which test suite matters"></div></label>
-    <label class="stack">Where should it stop and ask a person, and what would it ask?<div class="f tall"></div></label>
-    <label class="stack">What would you need to see on the pull request to approve it in ten minutes?<div class="f tall" data-ph="test that failed before and passes now, screenshots, gate output, scope"></div></label>
+    <h2><span class="n">6</span>What would an agent need to run this well?</h2>
+    <p class="hint">Think of one real issue. What is not written down anywhere? Where should the agent stop and ask? What evidence would let you approve its pull request in ten minutes?</p>
+    <div class="f" data-k="needs"></div>
   </section>
 
   <section>
-    <h2><span class="n">7</span>Read before Wednesday</h2>
-    <div class="read"><ul>
-      <li><span class="t">15 min</span> <a href="https://claude.dev/blog/solving-code-review-at-anthropic/">How the Claude Code team does code review</a>. Risk tiers, layered review, the three-round cap.</li>
-      <li><span class="t">15 min</span> <a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents">Stripe: Minions, one-shot end-to-end coding agents</a>. Fixed steps mixed with agent steps.</li>
-      <li><span class="t">10 min</span> <a href="https://docs.warp.dev/factories/">Warp Factories docs</a> and <a href="https://mastra.ai/factory">Mastra Factory</a>. Two vendors, the same stages.</li>
-      <li><span class="t">15 min</span> <a href="https://engineering.atspotify.com/2025/11/spotifys-background-coding-agent-part-1">Spotify: 1,500+ PRs later, Honk part 1</a>. What changed when PRs got cheap.</li>
-      <li><span class="t">skim</span> <a href="https://services.google.com/fh/files/misc/2025_state_of_ai_assisted_software_development.pdf">DORA 2025: State of AI-assisted Software Development</a>. AI amplifies the system it lands in.</li>
-    </ul></div>
-    <p class="note">Bring to Wednesday: your part 2 table and the one wait you most want gone. You will present it in two minutes.</p>
+    <h2>Read before Wednesday</h2>
+    <ul class="read">
+      <li><span class="t">15 min</span><span><a href="https://claude.dev/blog/solving-code-review-at-anthropic/">How the Claude Code team does code review</a>. Risk tiers, layered review and a cap of three rounds.</span></li>
+      <li><span class="t">15 min</span><span><a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents">Stripe's Minions</a>. Fixed steps mixed with agent steps.</span></li>
+      <li><span class="t">10 min</span><span><a href="https://docs.warp.dev/factories/">Warp Factories</a> and <a href="https://mastra.ai/factory">Mastra Factory</a>. Two vendors, the same stages.</span></li>
+      <li><span class="t">15 min</span><span><a href="https://engineering.atspotify.com/2025/11/spotifys-background-coding-agent-part-1">Spotify's Honk, part 1</a>. What changed once pull requests got cheap.</span></li>
+      <li><span class="t">Skim</span><span><a href="https://services.google.com/fh/files/misc/2025_state_of_ai_assisted_software_development.pdf">DORA 2025</a>. AI amplifies the system it lands in.</span></li>
+    </ul>
+    <p class="note">Bring to Wednesday: your answer to question 2 and the one wait you most want gone. You get two minutes to present it.</p>
   </section>
 
-  <footer>AI-Native Software Factory Buildcamp · learnwithparam.com · Save as PDF prints exactly what you typed.</footer>
+  <footer>AI-Native Software Factory Buildcamp, learnwithparam.com</footer>
 </main>
 <script src="worksheet.js"></script>
 </body>
