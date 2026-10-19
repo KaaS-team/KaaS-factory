@@ -14,6 +14,7 @@
   </div>
 
   <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
     <span class="when">Step 1: your workflow</span>
     <h1>Map how an issue becomes a <mark>merged pull request</mark></h1>
     <p class="lede">Before an agent can run your workflow, you need it on paper: who does what, what each step leaves behind, and where work waits.</p>
@@ -74,7 +75,7 @@
 
   <section>
     <h2><span class="n">4</span>Redesign it as stages an agent can run</h2>
-    <p class="hint">For your first ticket type. Every stage takes an input, leaves an output someone can read, and ends on a check. Write the check as something a script or a person can answer yes or no.</p>
+    <p class="hint">For your first ticket type. Every stage takes an input, leaves an output someone can read, and ends on a check. Write the check as something a script or a human reviewer can answer yes or no.</p>
     <div class="tw"><table>
       <thead><tr><th>Stage</th><th>Input</th><th>Output it leaves</th><th>Owner: agent or engineer</th><th>Check that ends it</th><th>Human approval?</th></tr></thead>
       <tbody>
@@ -90,7 +91,7 @@
 
   <section>
     <h2><span class="n">5</span>Risk tiers: the change sets the tier, not the author</h2>
-    <p class="hint">Anthropic's Claude Code team routes review by risk: low needs no human once checks are green, medium needs one person, high needs two. Some paths always need a person. Write yours.</p>
+    <p class="hint">Anthropic's Claude Code team routes review by risk: low needs no human once checks are green, medium needs one human approval, high needs two. Some paths always need human review. Write yours.</p>
     <div class="tw"><table>
       <thead><tr><th>Tier</th><th>What puts a change here in your repo</th><th>Who approves</th><th>Merge</th></tr></thead>
       <tbody>
@@ -108,7 +109,7 @@
       <label>Its type and risk tier<div class="f"></div></label>
     </div>
     <label class="stack">What would the agent need to know that is not written down anywhere?<div class="f tall" data-ph="tribal knowledge, the local setup, which test suite matters"></div></label>
-    <label class="stack">Where should it stop and ask a person, and what would it ask?<div class="f tall"></div></label>
+    <label class="stack">Where should it stop and ask a human, and what would it ask?<div class="f tall"></div></label>
     <label class="stack">What would you need to see on the pull request to approve it in ten minutes?<div class="f tall" data-ph="test that failed before and passes now, screenshots, gate output, scope"></div></label>
   </section>
 
@@ -124,7 +125,7 @@
     <p class="note">Bring to the next session: your part 2 table and the one wait you most want gone. You will present it in two minutes.</p>
   </section>
 
-  <footer>AI-Native Software Factory, learnwithparam.com</footer>
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Free to use with your team.</footer>
 </main>
 <script src="worksheet.js"></script>
 </body>

@@ -89,6 +89,8 @@ ul, ol { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
 /* Fields: contenteditable so every word prints, styled like kaas.team inputs */
 .row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
 .row > label, label.stack { display: grid; gap: 6px; align-content: start; font: 500 13.5px/1.4 var(--sans); color: var(--ink); min-width: 0; }
+/* Fields side by side share one height, so a short answer box never sits beside a wrapped one */
+.row > label { grid-template-rows: auto 1fr; align-content: stretch; }
 .f {
   display: block; min-height: 38px; padding: 8px 11px;
   background: var(--surface); border: 0; border-radius: 6px; box-shadow: var(--lift);
@@ -175,3 +177,13 @@ footer { font-size: 13px; color: var(--muted); padding-top: 12px; }
   a { text-decoration: none; }
   .read a::after { content: " " attr(href); font: 400 7.5pt var(--mono); color: var(--muted); word-break: break-all; }
 }
+
+/* Brand line: the KaaS.team mark from the playbook covers, then learnwithparam */
+.brand { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 15px var(--sans); }
+.brand a { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); }
+.brand .x { color: var(--faint); font-weight: 400; }
+.bm { width: 24px; height: 24px; flex: none; }
+.bm .mb { fill: var(--ink); }
+.bm rect:not(.mb) { fill: var(--surface); }
+.bm path { fill: none; stroke: var(--surface); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+@media print { header.sheet { gap: 2.5mm; } .brand { font-size: 10pt; } .bm { width: 5mm; height: 5mm; } .who { margin-top: 0; } footer a { text-decoration: none; } }

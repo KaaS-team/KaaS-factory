@@ -24,6 +24,7 @@
   </div>
 
   <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
     <span class="when">Reference for the workflow worksheet</span>
     <h1>Every ticket type runs <mark>its own workflow</mark></h1>
     <p class="lede">The loop is the same for every ticket: triage, plan, build, verify, review, deliver. What changes per type is the trigger, who triages, the risk tier, which steps are plain scripts, where the human sits, when it stops, and what you measure. These are starting defaults drawn from how Anthropic, Stripe, Spotify, Uber, Google SRE, CISA and GitHub run them. Copy one into a Workflow card and change it to fit your team.</p>
@@ -33,8 +34,8 @@
     <h2><span class="n">A</span>Four rules every workflow below follows</h2>
     <ol>
       <li><b>Scripts where you can, agents where you must.</b> Stripe's Minions mix fixed steps (lint, push, run CI) with agent steps (write the fix). Anything with one right answer is a script.</li>
-      <li><b>The change sets the risk tier.</b> Paths, size and data touched decide who approves, never who or what wrote it. An agent's approval never counts as a person's.</li>
-      <li><b>Every loop has a cap.</b> Stripe allows two CI rounds per run. Anthropic caps agent review at three rounds after one PR went through fifty overnight. When the cap is hit, a person gets the issue with the reason.</li>
+      <li><b>The change sets the risk tier.</b> Paths, size and data touched decide who approves, never who or what wrote it. An agent's approval never counts as a human approval.</li>
+      <li><b>Every loop has a cap.</b> Stripe allows two CI rounds per run. Anthropic caps agent review at three rounds after one PR went through fifty overnight. When the cap is hit, the issue escalates to a human with the reason.</li>
       <li><b>Fix a repeated finding at the source.</b> The third time a reviewer says the same thing, it becomes a rule, a skill, a lint or a test.</li>
     </ol>
   </section>
@@ -48,7 +49,7 @@
         <tr><td class="k">Support report</td><td>Is it new, a duplicate, or not a bug? What is missing?</td><td>Agent asks, support answers</td><td>1 business day</td></tr>
         <tr><td class="k">Dependency update</td><td>Patch, minor or major? Does CI pass?</td><td>A script</td><td>Weekly batch</td></tr>
         <tr><td class="k">Security finding</td><td>Exploited in the wild? Reachable in our code? Exposed to the internet?</td><td>Security owner, agent gathers evidence</td><td>Hours for exploited, days otherwise</td></tr>
-        <tr><td class="k">Incident</td><td>Severity, and who is incident commander</td><td>On-call person, never an agent</td><td>Minutes</td></tr>
+        <tr><td class="k">Incident</td><td>Severity, and who is incident commander</td><td>On-call engineer, never an agent</td><td>Minutes</td></tr>
         <tr><td class="k">Flaky test</td><td>Flaky or a real regression?</td><td>A script, agent investigates</td><td>Quarantine now, fix in a week</td></tr>
         <tr><td class="k">Feature or epic</td><td>Is the problem shaped? Is the appetite set?</td><td>Product and tech lead</td><td>Planning cycle</td></tr>
       </tbody>
@@ -64,7 +65,7 @@
       <dt>Scripts</dt><dd>Gates, the revert proof, the PR template.</dd>
       <dt>Agent</dt><dd>Reproduces, writes the failing test, makes the smallest fix.</dd>
       <dt>Human</dt><dd>Reviews the PR. Low tier when only covered, non-sensitive files changed.</dd>
-      <dt>Stops when</dt><dd>No failing test after one try: ask the reporter. Two rejected builds: park for a person.</dd>
+      <dt>Stops when</dt><dd>No failing test after one try: ask the reporter. Two rejected builds: escalate to a human.</dd>
       <dt>Watch</dt><dd>Reopen rate; time from ready to PR.</dd>
     </dl></div>
 
@@ -101,11 +102,11 @@
       <dt>Trigger</dt><dd>Private report, bug bounty, pen test. Never a public issue.</dd>
       <dt>Path</dt><dd><span class="flow">private advisory → reproduce in an isolated worktree, no network → fix + regression test → hunt the same bug class elsewhere → two reviewers → coordinated release</span></dd>
       <dt>Agent</dt><dd>Writes the exploit as a failing test, then searches for variants of the same pattern.</dd>
-      <dt>Human</dt><dd>Two people, one of them the security owner. Disclosure timing is a person's call.</dd>
+      <dt>Human</dt><dd>Two human approvals, one from the security owner. A human decides when to disclose.</dd>
       <dt>Watch</dt><dd>Variants found per report: the real payoff of the agent here.</dd>
     </dl></div>
 
-    <div class="wf"><h3>Incident <span class="pill fail">People lead</span></h3><dl>
+    <div class="wf"><h3>Incident <span class="pill fail">Humans lead</span></h3><dl>
       <dt>Trigger</dt><dd>Alert or customer impact. Declare early, downgrade freely.</dd>
       <dt>Path</dt><dd><span class="flow">declare + severity → incident commander → mitigate (roll back, flag off) → resolve → blameless postmortem → action items become issues</span></dd>
       <dt>Agent</dt><dd>Scribe and investigator: keeps the timeline, diffs what shipped since the last good deploy, searches logs and traces, drafts the status update and the postmortem.</dd>
@@ -161,7 +162,7 @@
     </ul>
   </section>
 
-  <footer>AI-Native Software Factory, learnwithparam.com</footer>
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Free to use with your team.</footer>
 </main>
 <script src="worksheet.js"></script>
 </body>
