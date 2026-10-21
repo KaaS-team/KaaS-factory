@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gates and Six Layers</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
+<script src="flow.js" defer></script>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs">Software factory homework, week three</span>
+    <span class="actions"><a href="../team-audit.html">Blank template</a><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Assignment 3: gates and the six layers</span>
+    <h1>Build the gates and <mark>six layers</mark> an agent needs before it runs alone</h1>
+    <p class="lede">A blueprint tells an agent how to work. It does not stop the agent when it ignores the blueprint. This week adds the parts that do: a boundary, a place to run, routed context, stage skills, verification and delivery. Then each task type from week one gets its own gate.</p>
+  </header>
+
+  <section>
+    <h2>You will learn what each layer stops, and which ones our repos lack</h2>
+    <ul>
+      <li>The six layers of a software factory, and the question each one answers.</li>
+      <li>What kaas.team, lwp-academy and englishmaa have in each layer today, and what to add.</li>
+      <li>The gate each task type needs, drawn as the path a change takes through it.</li>
+    </ul>
+    <div class="legend" aria-label="How to read the drawings">
+      <span><i class="human"></i>A human owns the step</span>
+      <span><i class="tool"></i>The runner or agent does it</span>
+      <span><i class="gate"></i>A check that can say no</span>
+      <span><i class="gap"></i>A check we still have to build</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Six layers answer six questions before an agent touches a repo</h2>
+    <p>A <b>layer</b> is one part of the factory that answers one question about unattended work. Week one had a person answer all six in their head. The factory answers each one in a file or a script.</p>
+    <figure class="flow" data-cols="3">
+      <ol>
+        <li data-k="gate" data-who="Boundary"><b>What may it touch?</b> protected paths, deny rules, env scrub, a diff check</li>
+        <li data-k="tool" data-who="Execution"><b>Where does it run?</b> one git worktree per issue, local, Docker or Actions</li>
+        <li data-k="tool" data-who="Context"><b>What does it need to know?</b> the issue, the handoff, AGENTS.md, rules on path</li>
+        <li data-k="tool" data-who="Skills"><b>What know-how repeats?</b> one skill per stage: triage, plan, build, verify, PR</li>
+        <li data-k="gate" data-who="Verification"><b>What proof exists?</b> gates, a test that bites, hidden tests, a reviewer</li>
+        <li data-k="human" data-who="Delivery"><b>Who ships it?</b> a PR from the template, and a human merges</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Boundary stops an edit before it lands, then checks the diff again</h2>
+    <p>The <b>Boundary</b> layer decides what a stage may touch unattended. A hook can miss a <code>sed -i</code> run through Bash. So the runner diffs the branch against <code>protectedPaths</code> before every push.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="build stage"><b>Try an edit</b> say, to server/src/edge.rs or .env</li>
+        <li data-k="gate" data-who="guard-paths.sh"><b>Check the path</b> on every Edit and Write; fails closed</li>
+        <li data-k="gate" data-who="settings.json"><b>Deny the risky tools</b> Read(./.env*), gh and git push are refused</li>
+        <li data-k="gate" data-who="src/boundary.ts"><b>Diff before push</b> any protected path in the diff parks the run</li>
+        <li data-k="human" data-who="Param"><b>Take protected work</b> billing, prices, secrets, deploy config</li>
+      </ol>
+    </figure>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Today</td><td>nothing in the repo</td><td>nothing in the repo</td><td>protectedPaths in repo.json</td></tr>
+        <tr><td class="k">Add</td><td>protect scripts/lighthouse.mjs, the Plunk client, Coolify config</td><td>protect server.mjs boot keys, Stripe webhook, auth tables, migrations</td><td>deny .env reads; protect mobile/revenuecat.json and release.env</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Execution gives every issue its own worktree, budget and clock</h2>
+    <p>The <b>Execution</b> layer decides where an agent runs and what it can reach. Today Claude Code runs in Param's main checkout, on main. The factory claims an issue, makes a worktree for it, and kills a stage that runs past its budget.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Label the issue</b> factory:ready</li>
+        <li data-k="tool" data-who="src/pool.ts"><b>Claim it</b> one worker wins, by compare and swap</li>
+        <li data-k="tool" data-who="src/git.ts"><b>Make a worktree</b> one branch per issue, never main</li>
+        <li data-k="gate" data-who="config.json"><b>Cap it</b> maxBudgetUsd, stageTimeoutMinutes and maxToolCalls per stage</li>
+      </ol>
+    </figure>
+    <p class="hint">All three repos add this by installing the factory. Nothing is built per repo, except the englishmaa E2E ports, which repo.json already names.</p>
+  </section>
+
+  <section>
+    <h2>Context reaches the agent from the issue and the repo, never from a laptop</h2>
+    <p>The <b>Context</b> layer decides what a stage knows. A stage reads the issue, the handoff from the last stage, AGENTS.md and any rule whose path it touches. Anything on Param's laptop is invisible to it.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="issue.json"><b>The issue</b> what was asked, by whom</li>
+        <li data-k="tool" data-who="src/rehydrate.ts"><b>The handoff</b> what the last stage decided</li>
+        <li data-k="tool" data-who="AGENTS.md"><b>The repo rules</b> commands, the gate, what changes together</li>
+        <li data-k="tool" data-who=".claude/rules"><b>Path rules</b> lwp-db loads only when a migration is open</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What to add</b> AGENTS.md in kaas.team and lwp-academy, and a one-line CLAUDE.md in all three. Without them a stage starts from the issue alone.</div>
+  </section>
+
+  <section>
+    <h2>Skills give each stage one job and one shape of output</h2>
+    <p>The <b>Skills</b> layer holds the reusable know-how of each stage. The factory template ships one skill per stage. A stop hook checks that each stage wrote its artifact in the shape the runner expects.</p>
+    <figure class="flow" data-cols="5">
+      <ol>
+        <li data-k="tool" data-who="factory-triage"><b>Triage</b> real, clear, in scope?</li>
+        <li data-k="tool" data-who="factory-plan"><b>Plan</b> files, test, risk</li>
+        <li data-k="tool" data-who="factory-build"><b>Build</b> in the worktree</li>
+        <li data-k="gate" data-who="factory-verify"><b>Verify</b> revert and prove</li>
+        <li data-k="tool" data-who="factory-pr"><b>PR</b> from the template</li>
+      </ol>
+    </figure>
+    <p class="hint">Week two's vendored skills plug in here: triage, systematic-debugging and code-review-and-quality sit beside the stage skills in .claude/skills.</p>
+  </section>
+
+  <section>
+    <h2>Verification trusts the gate's own line, never the agent's claim</h2>
+    <p>The <b>Verification</b> layer decides what proof exists before a human looks. The runner reads one line that <code>gates.sh</code> prints. Then verify reverts the fix, and the new test must fail without it.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="gate" data-who=".factory/gates.sh"><b>Run the gate</b> our make check, wrapped</li>
+        <li data-k="gate" data-who="src/gates.ts"><b>Read the line</b> FACTORY_GATES: status, passed, failed, skipped</li>
+        <li data-k="gate" data-who="factory-verify" data-back="1"><b>Revert and rerun</b> the test must fail for the stated reason</li>
+        <li data-k="gate" data-who="src/holdout.ts"><b>Hidden tests</b> sparse-checked out of every agent, restored from base</li>
+        <li data-k="gate" data-who="factory-reviewer"><b>Review</b> a subagent reads the diff against the plan</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Delivery ends at a PR and a human merge, because main deploys</h2>
+    <p>The <b>Delivery</b> layer decides how work reaches a person and who ships it. All three apps deploy from main. So the factory stops at a PR, and a human merges.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="factory-pr"><b>Open the PR</b> with the gate line and the verify proof</li>
+        <li data-k="gate" data-who="ci.yml"><b>CI runs make check</b> again on GitHub</li>
+        <li data-k="human" data-who="Param"><b>Read and merge</b> the only merge path</li>
+        <li data-k="tool" data-who="Coolify"><b>Deploy</b> on push to main</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What to add</b> ci.yml in kaas.team and lwp-academy. Branch protection needs a paid plan on these private repos, so CI is our required check by habit, not by setting.</div>
+  </section>
+
+  <section>
+    <h2>Each task type gets a gate that matches what can go wrong with it</h2>
+    <p>A <b>gate</b> is a command that can refuse a change. One gate for everything is too weak for a security bug and too slow for a copy edit. These are the gates we build for the task types from week one.</p>
+
+    <h3>Dependabot PR: merge-ready means green and in the patch range</h3>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="Dependabot"><b>Open the bump</b> weekly, grouped minor and patch, all three repos</li>
+        <li data-k="gate" data-who="ci.yml"><b>make check</b> build, tests, browser, Lighthouse</li>
+        <li data-k="gap" data-who="a rule we add"><b>Flag it ready</b> label a green patch bump for the morning</li>
+        <li data-k="human" data-who="Param"><b>Merge</b> a major version waits for a plan</li>
+      </ol>
+    </figure>
+
+    <h3>Vulnerability alert: no dismissal without a reason and a date</h3>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="factory scan"><b>File the issue</b> one per package, from osv-scanner findings on the lockfile</li>
+        <li data-k="gap" data-who="audit step"><b>Audit in make check</b> fail on a high advisory in a reachable package</li>
+        <li data-k="tool" data-who="supply-chain-risk-auditor"><b>Draft the call</b> fix, upgrade, or dismiss with the reason</li>
+        <li data-k="human" data-who="Param"><b>Decide</b> and record why and when to look again</li>
+      </ol>
+    </figure>
+
+    <h3>Security bug: the test must fail on the old code</h3>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Approve the plan</b> security work never skips approval</li>
+        <li data-k="tool" data-who="build"><b>Fix and test</b> e.g. the CSP header lists only the gtag paths</li>
+        <li data-k="gate" data-who="verify" data-back="2"><b>Revert and rerun</b> the header test must fail</li>
+        <li data-k="gap" data-who="make check"><b>Secret scan</b> on every push, in every repo</li>
+      </ol>
+    </figure>
+
+    <h3>Lighthouse: the same bar in all three repos</h3>
+    <figure class="flow">
+      <ol>
+        <li data-k="gate" data-who="kaas.team, lwp-academy"><b>100 everywhere</b> mobile Performance median of three, at least 95</li>
+        <li data-k="gap" data-who="englishmaa web"><b>Add the script</b> copy scripts/lighthouse.mjs and wire it into make check</li>
+        <li data-k="gate" data-who="mutation"><b>Prove it bites</b> slow a page on purpose and watch the gate fail</li>
+      </ol>
+    </figure>
+
+    <h3>UI task: a preview before production, and a human says yes</h3>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="build"><b>Change the page</b></li>
+        <li data-k="gate" data-who="browser gate"><b>Build, browser, Lighthouse</b></li>
+        <li data-k="gap" data-who="PR"><b>Screenshots on the PR</b> desktop and phone, before and after</li>
+        <li data-k="human" data-who="Param"><b>Judge the copy</b> on the PR, not on the live site</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>A gate counts only when a mutation proves it can fail</h2>
+    <p>A <b>mutation</b> breaks the code on purpose to show a check catches it. The factory repo lists one per check in <code>tests/mutations.json</code>, and <code>make check-mutations</code> runs them in CI. Every gate on this page lands the same way, in the same change.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Gate</th><th>The mutation</th><th>Expected result</th></tr></thead>
+      <tbody>
+        <tr><td class="k">englishmaa Lighthouse</td><td>add a 2 MB image to the home page</td><td>make check fails on mobile Performance</td></tr>
+        <tr><td class="k">Secret scan</td><td>commit a fake key in a test fixture</td><td>the push is refused</td></tr>
+        <tr><td class="k">Dependency audit</td><td>pin vite back to 8.3.0</td><td>make check fails on the high advisory</td></tr>
+        <tr><td class="k">CSP header test</td><td>put the whole googletagmanager.com host back</td><td>the header test fails</td></tr>
+        <tr><td class="k">CRON_SECRET boot</td><td>unset the key</td><td>server.mjs refuses to boot</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Key terms</h2>
+    <dl class="terms">
+      <dt>Layer</dt><dd>One part of the factory that answers one question about unattended work.</dd>
+      <dt>Boundary</dt><dd>What a stage may touch: protected paths, deny rules and the diff check.</dd>
+      <dt>Gate</dt><dd>A command that can refuse a change, read by the runner from one line.</dd>
+      <dt>Test that bites</dt><dd>A test that fails when the fix is reverted.</dd>
+      <dt>Mutation</dt><dd>A deliberate break that proves a check can fail.</dd>
+    </dl>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Layer names and file paths are from the software-factory README and its template.</footer>
+</main>
+</body>
+</html>

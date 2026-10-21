@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Blueprint</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
+<script src="flow.js" defer></script>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs">Software factory homework, week two</span>
+    <span class="actions"><a href="../blueprint.html">Blank template</a><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Assignment 2: the blueprint</span>
+    <h1>Write the blueprint in the <mark>.claude directory</mark>, borrowing from five public skill packs</h1>
+    <p class="lede">Week one showed every task type starting and ending in Param's head. This week moves that knowledge into files an agent reads. We compare five public blueprints, map their skills onto our task types, and decide what each of our three repos adopts.</p>
+  </header>
+
+  <section>
+    <h2>You will learn which blueprint skill covers which of our task types</h2>
+    <ul>
+      <li>What the .claude directory holds in each of our repos today, and what it should hold.</li>
+      <li>How owainlewis/blueprint, addyosmani/agent-skills, mattpocock/skills, gstack and pstack each walk a change from idea to merge.</li>
+      <li>Which skills we adopt per task type, and how we vendor them so an upstream edit cannot reach a run unread.</li>
+    </ul>
+    <div class="legend" aria-label="How to read the drawings">
+      <span><i class="human"></i>A human owns the step</span>
+      <span><i class="tool"></i>A skill the agent runs</span>
+      <span><i class="gate"></i>A check that can say no</span>
+      <span><i class="gap"></i>Missing in our repos today</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two of our three repos give an agent almost nothing to read</h2>
+    <p>A <b>blueprint</b> is the set of files that tells an agent how this repo works: instructions, rules, skills, hooks and settings. In Claude Code it lives in <code>AGENTS.md</code> or <code>CLAUDE.md</code> and the <code>.claude</code> directory. A factory agent runs in a fresh worktree, so it sees only what the repo holds.</p>
+    <div class="tw"><table>
+      <thead><tr><th>File</th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><code>AGENTS.md</code>, <code>CLAUDE.md</code></td><td><span class="tag never">none</span></td><td><span class="tag never">none</span></td><td>AGENTS.md; no CLAUDE.md, so Claude Code does not load it</td></tr>
+        <tr><td class="k"><code>.claude/skills/</code></td><td>humanizer, kb-issue</td><td><span class="tag never">none</span></td><td><span class="tag never">none</span></td></tr>
+        <tr><td class="k"><code>.claude/rules/</code></td><td><span class="tag never">none</span></td><td><span class="tag never">none</span></td><td>lwp-api, lwp-db, lwp-comments, lwp-engineering, lwp-playwright</td></tr>
+        <tr><td class="k"><code>.claude/repo.json</code></td><td><span class="tag never">none</span></td><td><span class="tag never">none</span></td><td>impact map and protected paths</td></tr>
+        <tr><td class="k"><code>.claude/settings.json</code></td><td><span class="tag never">none</span></td><td><span class="tag never">none</span></td><td><span class="tag never">none</span></td></tr>
+        <tr><td class="k">Pre-push hook</td><td>make check</td><td><span class="tag never">none</span></td><td>make check</td></tr>
+      </tbody>
+    </table></div>
+    <p>Everything else an agent relies on today comes from Param's home folder and the lwp-claude-plugins enabled on that laptop. A factory run on another machine gets none of it.</p>
+  </section>
+
+  <section>
+    <h2>owainlewis/blueprint splits define, deliver and check into twelve skills</h2>
+    <p><b>owainlewis/blueprint</b> is a pack of opt-in skills, installed with <code>npx skills add owainlewis/blueprint</code>. A new project goes requirements, then architecture. A new feature goes spec, then task-to-pr or factory.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="/requirements"><b>Requirements</b> writes REQUIREMENTS.md with the human</li>
+        <li data-k="tool" data-who="/architecture"><b>Architecture</b> writes ARCHITECTURE.md; /architecture-review checks it</li>
+        <li data-k="tool" data-who="/spec, /plan"><b>Spec and plan</b> one feature, split into tasks</li>
+        <li data-k="tool" data-who="/task-to-pr"><b>Task to PR</b> code, tests, independent review, CI, a passing PR left open</li>
+        <li data-k="gate" data-who="/factory"><b>Factory</b> task-to-pr, then merge after required approvals and gates</li>
+        <li data-k="tool" data-who="/test, /review, /improve"><b>Check and improve</b> run any time on the codebase</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>addyosmani/agent-skills turns each phase into a checklist with excuses named</h2>
+    <p><b>addyosmani/agent-skills</b> groups skills by phase: define, plan, build, verify, review and ship. Every skill carries an anti-rationalization table: the excuses an agent gives for skipping a step, each with its rebuttal.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="/spec"><b>Spec</b> interview-me, spec-driven-development</li>
+        <li data-k="tool" data-who="/plan"><b>Plan</b> planning-and-task-breakdown</li>
+        <li data-k="tool" data-who="/build"><b>Build</b> incremental, test-driven, frontend-ui-engineering</li>
+        <li data-k="gate" data-who="/test"><b>Test</b> browser-testing-with-devtools, debugging-and-error-recovery</li>
+        <li data-k="gate" data-who="/review, /webperf"><b>Review</b> code-review-and-quality, security-and-hardening, performance-optimization</li>
+        <li data-k="tool" data-who="/ship"><b>Ship</b> ci-cd-and-automation, deprecation-and-migration, shipping-and-launch</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>mattpocock/skills keeps each skill small and the human in charge</h2>
+    <p><b>mattpocock/skills</b> is a set of small skills you compose yourself. It starts by grilling the human until the plan holds, and it ends at a PR. <code>wizard</code> writes a bash script for the steps only a human can do.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="grill-me"><b>Grill the plan</b> questions until the idea holds</li>
+        <li data-k="tool" data-who="to-spec, to-tickets"><b>Spec, then tickets</b> one ticket per slice</li>
+        <li data-k="tool" data-who="triage"><b>Triage</b> sort incoming tickets</li>
+        <li data-k="gate" data-who="tdd, diagnosing-bugs"><b>Test first</b> a failing test before the fix</li>
+        <li data-k="gate" data-who="code-review"><b>Review</b> the diff against the spec</li>
+        <li data-k="tool" data-who="pr, retro"><b>PR and retro</b> open it, then write what was learned</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>gstack runs a sprint from office hours to a canary after deploy</h2>
+    <p><b>gstack</b> is Garry Tan's MIT skill stack for Claude Code. Its order is think, plan, build, review, test, ship and reflect. It is the only pack here that follows a change past merge, into deploy and a canary.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="/office-hours"><b>Think</b> what to build and why</li>
+        <li data-k="human" data-who="/plan-ceo-review, /plan-eng-review"><b>Plan reviews</b> scope, architecture, design and DX, or /autoplan</li>
+        <li data-k="gate" data-who="/review, /cso"><b>Review</b> code, and a security audit at any stage</li>
+        <li data-k="gate" data-who="/qa, /benchmark"><b>Test</b> real browser QA and Core Web Vitals</li>
+        <li data-k="tool" data-who="/ship, /land-and-deploy"><b>Ship and deploy</b> PR, merge, deploy</li>
+        <li data-k="gate" data-who="/canary"><b>Watch production</b> after deploy</li>
+        <li data-k="tool" data-who="/retro, /learn"><b>Reflect</b> what to keep for next time</li>
+      </ol>
+      <figcaption>Safety skills sit beside the sprint: /careful, /freeze and /guard limit what a session may touch.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>pstack makes the agent prove a change works before it says done</h2>
+    <p><b>pstack</b> is poteto's skill stack, mirrored at backnotprop/pstack with ports for Claude Code. Its principles are prove-it-works, fix root causes and encode lessons in structure. <code>/interrogate</code> sends a diff to other models to break it.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="/poteto-mode"><b>Route the task</b> the entry skill picks the path</li>
+        <li data-k="human" data-who="/sharpen, /in-your-own-words"><b>Sharpen the ask</b> restate it until it is testable</li>
+        <li data-k="tool" data-who="/architect, /blast-radius"><b>Design</b> and list what the change reaches</li>
+        <li data-k="gate" data-who="/tdd"><b>Test first</b></li>
+        <li data-k="gate" data-who="/interrogate, /show-me-your-work"><b>Break it</b> other models attack the diff; evidence before claims</li>
+        <li data-k="tool" data-who="/reflect, /correct"><b>Encode the lesson</b> as a rule or a verification skill</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Every task type from week one has a skill waiting in at least one pack</h2>
+    <p>A <b>task route</b> is the skill path one task type follows. The table maps each of our task types to the skill that would replace a step Param does by hand. The last column is our pick.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Task type</th><th>blueprint</th><th>agent-skills</th><th>mattpocock</th><th>gstack</th><th>pstack</th><th>We adopt</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Planning</td><td>/requirements, /spec, /plan</td><td>spec-driven, planning</td><td>grill-me, to-spec, to-tickets</td><td>/office-hours, /autoplan</td><td>/sharpen</td><td>grilling (vendored), to-tickets</td></tr>
+        <tr><td class="k">Triage</td><td></td><td></td><td>triage</td><td>/investigate</td><td>/how, /why</td><td>triage</td></tr>
+        <tr><td class="k">Small bug</td><td>/task-to-pr</td><td>debugging-and-error-recovery</td><td>diagnosing-bugs, tdd</td><td>/investigate</td><td>/tdd</td><td>systematic-debugging (vendored), tdd</td></tr>
+        <tr><td class="k">Dependabot fix</td><td>/task-to-pr</td><td>deprecation-and-migration</td><td></td><td>/ship</td><td></td><td>deprecation-and-migration</td></tr>
+        <tr><td class="k">Vulnerability, security bug</td><td>/review</td><td>security-and-hardening</td><td></td><td>/cso</td><td>/interrogate</td><td>supply-chain-risk-auditor (vendored), /cso</td></tr>
+        <tr><td class="k">Lighthouse</td><td></td><td>performance-optimization, /webperf</td><td></td><td>/benchmark</td><td></td><td>our own gate script</td></tr>
+        <tr><td class="k">UI task</td><td></td><td>frontend-ui-engineering, browser-testing</td><td></td><td>/design-review, /qa</td><td></td><td>browser-testing, /qa</td></tr>
+        <tr><td class="k">Epic, milestone</td><td>/architecture, /plan</td><td>planning-and-task-breakdown</td><td>to-tickets, wayfinder</td><td>/plan-eng-review</td><td>/architect, /swarm</td><td>to-tickets</td></tr>
+        <tr><td class="k">Review</td><td>/review</td><td>code-review-and-quality</td><td>code-review</td><td>/review, /codex</td><td>/interrogate</td><td>code-review-and-quality (vendored)</td></tr>
+      </tbody>
+    </table></div>
+    <p class="hint">A blank cell means the pack has no skill for that task type.</p>
+  </section>
+
+  <section>
+    <h2>We vendor a skill by commit and hash, so an upstream edit waits for a reader</h2>
+    <p><b>Vendoring</b> copies a skill into our own repo at a pinned version. <code>plugins/lwp-eng/vendor.json</code> in lwp-claude-plugins pins each source to a commit and each file to a sha256. Today it pins addyosmani 1401c8b8, mattpocock 24fe0ef7, obra/superpowers 8ca22dba and trailofbits 82fe8226.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Pick one skill</b> for one task type from the table</li>
+        <li data-k="human" data-who="Param"><b>Read every line</b> a skill is a prompt that runs with our tools</li>
+        <li data-k="tool" data-who="vendor.json"><b>Pin it</b> source commit plus a sha256 per file</li>
+        <li data-k="tool" data-who="sync-skills.py"><b>Copy into the plugin</b> at the pinned commit, recording each hash</li>
+        <li data-k="gate" data-who="check-vendored.py"><b>Check the pins</b> in make check: an edited file fails until the pin moves</li>
+        <li data-k="gap" data-who="each app repo"><b>Copy into the repo</b> a factory worktree has no plugins, so the skill must live in .claude/skills</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The target blueprint puts the same files in all three repos</h2>
+    <p>Each repo gets the same skeleton, with its own commands and rules inside. The skeleton is what week three wires gates into.</p>
+<pre>AGENTS.md                      commands, the gate, what changes together, what never to touch
+CLAUDE.md                      one line: @AGENTS.md
+.claude/
+  settings.json                deny rules for .env, secrets and deploy config; hooks registered
+  repo.json                    impact map, protected paths, formatters
+  rules/lwp-*.md               loaded only when a matching path is read
+  skills/
+    triage/                    from mattpocock, vendored
+    systematic-debugging/      from obra/superpowers, vendored
+    code-review-and-quality/   from addyosmani, vendored
+    &lt;one per repo&gt;/            kaas.team kb-issue, englishmaa voice work, lwp-academy cohort pages
+.githooks/pre-push             make check
+.github/dependabot.yml         weekly, grouped minor and patch
+.github/workflows/ci.yml       make check on every push and PR</pre>
+    <div class="grid2">
+      <div class="callout"><b>kaas.team</b> needs AGENTS.md, CLAUDE.md, settings.json, repo.json, Dependabot and CI. It keeps its skills and hook.</div>
+      <div class="callout"><b>lwp-academy</b> needs everything: it has no .claude directory, no hook and no CI.</div>
+      <div class="callout"><b>englishmaa</b> needs CLAUDE.md, settings.json, skills and dependabot.yml. Its AGENTS.md, rules and CI stay.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Key terms</h2>
+    <dl class="terms">
+      <dt>Blueprint</dt><dd>The files that tell an agent how this repo works: AGENTS.md, CLAUDE.md and .claude.</dd>
+      <dt>Skill</dt><dd>A SKILL.md the agent loads when its description matches the task.</dd>
+      <dt>Task route</dt><dd>The skill path one task type follows from start to PR.</dd>
+      <dt>Vendoring</dt><dd>Copying a skill into our repo at a pinned commit and hash.</dd>
+    </dl>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Packs: <a href="https://github.com/owainlewis/blueprint" target="_blank" rel="noopener">owainlewis/blueprint</a>, <a href="https://github.com/addyosmani/agent-skills" target="_blank" rel="noopener">addyosmani/agent-skills</a>, <a href="https://github.com/mattpocock/skills" target="_blank" rel="noopener">mattpocock/skills</a>, <a href="https://github.com/garrytan/gstack" target="_blank" rel="noopener">garrytan/gstack</a>, <a href="https://github.com/backnotprop/pstack" target="_blank" rel="noopener">backnotprop/pstack</a>.</footer>
+</main>
+</body>
+</html>

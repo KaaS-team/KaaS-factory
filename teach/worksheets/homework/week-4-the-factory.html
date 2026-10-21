@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Factory</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
+<script src="flow.js" defer></script>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs">Software factory homework, week four</span>
+    <span class="actions"><a href="../factory.html">Blank template</a><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Assignment 4: the factory</span>
+    <h1>Run the <mark>software factory</mark> on all three repos, one task type at a time</h1>
+    <p class="lede">Weeks one to three mapped the manual work, wrote the blueprint and built the gates. This week the factory runs them. We install our own factory on kaas.team, lwp-academy and englishmaa, route the safest task types first, and compare it with third-party factories.</p>
+  </header>
+
+  <section>
+    <h2>You will learn how an issue becomes a merged PR without Param in the middle</h2>
+    <ul>
+      <li>The loop our factory runs, and the two points where a human still decides.</li>
+      <li>What happened when we ran it on real work, and how the factory fixes itself.</li>
+      <li>Which task types each of our apps routes to the factory first, and which stay human.</li>
+      <li>How other coding agents and third-party factories fit the same loop.</li>
+    </ul>
+    <div class="legend" aria-label="How to read the drawings">
+      <span><i class="human"></i>A human owns the step</span>
+      <span><i class="tool"></i>The runner or a stage agent</span>
+      <span><i class="gate"></i>A check that can say no</span>
+      <span><i class="wait"></i>Parked, waiting for a person</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>The factory loop turns a labelled issue into a PR a human merges</h2>
+    <p>A <b>software factory</b> is a runner that takes an issue through triage, plan, build, verify and PR with no one at the keyboard. Each stage is a skill in its own worktree. The runner, not the agent, decides green or red.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Label the issue</b> factory:ready</li>
+        <li data-k="tool" data-who="triage"><b>Classify risk</b> and post a triage comment</li>
+        <li data-k="tool" data-who="plan"><b>Plan</b> acceptance criteria and a risk verdict</li>
+        <li data-k="human" data-who="/factory approve"><b>Approve the plan</b> low risk can auto-approve</li>
+        <li data-k="tool" data-who="build"><b>Build test-first</b> the smallest change</li>
+        <li data-k="gate" data-who="gates.sh"><b>Run the gate</b> the runner reads FACTORY_GATES</li>
+        <li data-k="gate" data-who="verify" data-back="5"><b>Prove it</b> revert, see the test fail; a reject goes back to build twice</li>
+        <li data-k="wait" data-who="needs-human"><b>Park</b> after two rejects or two questions</li>
+        <li data-k="tool" data-who="pr"><b>Open the PR</b> from the repo's template</li>
+        <li data-k="human" data-who="Param"><b>Merge</b> main deploys</li>
+        <li data-k="tool" data-who="retro"><b>Write the lesson</b> into .factory/memory</li>
+      </ol>
+    </figure>
+    <p>Compare it with week one. Param still labels, approves and merges. Everything between those three clicks now has a check.</p>
+  </section>
+
+  <section>
+    <h2>We ran the factory on kaas-suite first, and it shipped most of what it took</h2>
+    <p><b>Dogfooding</b> means running our own tool on our own product before anyone else does. On 11 and 12 October the factory ran 35 issues on kaas-suite, the KaaS.team product apps.</p>
+    <div class="stats">
+      <div class="stat"><b>35</b><span>issues run overnight</span></div>
+      <div class="stat"><b>30</b><span>shipped</span></div>
+      <div class="stat"><b>5</b><span>cancelled by the operator</span></div>
+      <div class="stat"><b>29</b><span>verify rejects, against 24 passes</span></div>
+    </div>
+    <p>More rejects than passes is the Tester doing its job: most cards needed a second build. One card was uncertain on all four verify rounds. It shipped because a human read it and merged.</p>
+  </section>
+
+  <section>
+    <h2>Every failure the factory hits becomes an issue against the factory</h2>
+    <p>The factory repo releases through its own gate. Each new check lands with a mutation that must turn its test red. A bug seen while running kaas-suite is filed against the factory, fixed, and released.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="factory"><b>Run on kaas-suite</b> real issues</li>
+        <li data-k="human" data-who="operator"><b>Notice a fault</b> a leak, a stuck card, a wrong verdict</li>
+        <li data-k="tool" data-who="factory repo"><b>File it</b> issues #41 to #53</li>
+        <li data-k="gate" data-who="check-mutations"><b>Fix with a mutation</b> the mutation must turn its test red</li>
+        <li data-k="gate" data-who="CI"><b>Three jobs</b> check with an empty HOME, mutations, docker build</li>
+        <li data-k="tool" data-who="release" data-back="1"><b>Release</b> v4.0.1 to v4.0.3; install.sh carries the fix to every repo</li>
+      </ol>
+    </figure>
+    <div class="tw"><table>
+      <thead><tr><th>Seen while running</th><th>Filed</th><th>Fixed in</th></tr></thead>
+      <tbody>
+        <tr><td>Operator detail posted on tracker cards a customer could read</td><td>#44</td><td>PR #48</td></tr>
+        <tr><td>Verify could not run the mutation a plan asked for</td><td>#42</td><td>PR #51</td></tr>
+        <tr><td>Approved cards waited on a batch-mate's run</td><td></td><td>PR #56, v4.0.2</td></tr>
+        <tr><td>A rejected finding could be downgraded and passed without a fix</td><td>#47</td><td>open</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Installing it is three commands per repo, after week three's files exist</h2>
+    <p>The <b>template</b> is the set of hooks, stage skills and gate script the factory copies into a repo. <code>factory init</code> detects the stack and writes the config. <code>gates.sh</code> wraps the repo's own <code>make check</code>.</p>
+<pre>factory install ~/learn/kaaslabs/kaas.team        # template: hooks, stage skills, gates.sh
+factory init --repo-dir ~/learn/kaaslabs/kaas.team  # .factory/config.json from the stack
+factory watch --repo-dir ~/learn/kaaslabs/kaas.team # poll and drive the loop</pre>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="week two"><b>Blueprint in place</b> AGENTS.md, CLAUDE.md, .claude</li>
+        <li data-k="gate" data-who="week three"><b>Gates in place</b> make check, CI, protectedPaths</li>
+        <li data-k="tool" data-who="factory install"><b>Install the template</b></li>
+        <li data-k="tool" data-who="factory init"><b>Write the config</b> budgets, protected paths, auto-approve off</li>
+        <li data-k="gate" data-who="first issue"><b>Run one easy issue</b> and read every stage's comment</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Each app routes its safest task types first and keeps money and taste human</h2>
+    <p>A <b>route</b> is the rule that sends a task type to the factory, to a human, or to both. We start with the task types week one showed are already checked, and add one type a week.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Task type</th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Dependabot fix</td><td><span class="tag auto">Factory</span> first</td><td><span class="tag auto">Factory</span> first</td><td><span class="tag auto">Factory</span> first: PR #1 is waiting</td></tr>
+        <tr><td class="k">Lighthouse fix</td><td><span class="tag auto">Factory</span></td><td><span class="tag auto">Factory</span></td><td><span class="tag auto">Factory</span> after the gate exists</td></tr>
+        <tr><td class="k">Small bug</td><td><span class="tag auto">Factory</span></td><td><span class="tag auto">Factory</span></td><td><span class="tag auto">Factory</span></td></tr>
+        <tr><td class="k">Vulnerability</td><td colspan="3"><span class="tag auto">factory scan</span> files it; <span class="tag human">Param</span> decides a dismissal</td></tr>
+        <tr><td class="k">Security bug</td><td colspan="3"><span class="tag auto">Factory</span> builds; plan approval always on</td></tr>
+        <tr><td class="k">UI copy</td><td><span class="tag human">Human judges</span> on the PR</td><td><span class="tag human">Human judges</span></td><td><span class="tag human">Human judges</span></td></tr>
+        <tr><td class="k">Epic, milestone</td><td colspan="3"><span class="tag human">Param plans</span> and splits; each piece is a factory issue</td></tr>
+        <tr><td class="k">Never</td><td>book publishing to the bucket</td><td>Stripe, prices, member data</td><td>RevenueCat, store release, the tutor voice</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Any coding agent can run a stage, but only Claude gets the path guard</h2>
+    <p>A <b>preset</b> tells the runner how to call one agent CLI. Presets exist for Claude, Codex, Gemini, OpenCode, Cursor, Pi and Mastra Code. Only Claude is verified live by us. A different vendor on verify than on build means the Tester does not share the builder's blind spots.</p>
+<pre>{
+  "agents": { "claude": { "preset": "claude" }, "gemini": { "preset": "gemini" } },
+  "stages": { "default": "claude", "verify": "gemini" }
+}</pre>
+    <div class="tw"><table>
+      <thead><tr><th>Safety</th><th>Claude</th><th>Codex, Gemini, Cursor, Pi, Mastra Code</th><th>OpenCode</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Read-only stages cannot edit</td><td>stage allow-list</td><td>the agent's own read-only flag</td><td>only the prompt and the gate</td></tr>
+        <tr><td class="k">Path guard hook</td><td>yes</td><td>no</td><td>no</td></tr>
+        <tr><td class="k">Diff check before push</td><td>yes</td><td>yes</td><td>yes</td></tr>
+      </tbody>
+    </table></div>
+    <p class="callout">So Claude builds anything near a protected path. Another vendor may verify, where a read-only flag is enough.</p>
+  </section>
+
+  <section>
+    <h2>Third-party factories draw the human line in nearly the same places</h2>
+    <p>We could run a third-party factory instead. Each one below stops for a human before code and before merge. They differ in where the loop runs and how much proof it demands.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Factory</th><th>Stages</th><th>Where a human sits</th><th>When we would pick it</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Ours</td><td>triage, plan, build, verify, pr, retro</td><td>plan approval, needs-human, merge</td><td>default: the test-that-bites rule and hidden tests are ours</td></tr>
+        <tr><td class="k">owainlewis /factory</td><td>task-to-pr, then merge after approvals and gates</td><td>approvals the repo requires</td><td>a repo with branch protection, which ours lack</td></tr>
+        <tr><td class="k">gstack /ship, /land-and-deploy</td><td>review, QA, ship, deploy, canary</td><td>throughout the sprint</td><td>a session where Param drives and wants deploy watched</td></tr>
+        <tr><td class="k">Mastra Factory</td><td>intake, triage, planning, build, review</td><td>each stage manual or auto; signals mid-run</td><td>intake from Linear and Slack</td></tr>
+        <tr><td class="k">Vercel Foreman on eve</td><td>classifier, analyst, implementer, reviewer</td><td>the run stops at a draft PR</td><td>a team already on Vercel</td></tr>
+        <tr><td class="k">Warp's factory guide</td><td>triage, spec, implement, review</td><td>spec approval, then merge</td><td>a team that wants the agent in Warp</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Key terms</h2>
+    <dl class="terms">
+      <dt>Software factory</dt><dd>A runner that takes an issue to a PR through checked stages.</dd>
+      <dt>Dogfooding</dt><dd>Running our own tool on our own product first.</dd>
+      <dt>Template</dt><dd>The hooks, stage skills and gate script copied into each repo.</dd>
+      <dt>Route</dt><dd>The rule that sends a task type to the factory, a human, or both.</dd>
+      <dt>Preset</dt><dd>How the runner calls one agent CLI for a stage.</dd>
+    </dl>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Reading: <a href="https://github.com/owainlewis/blueprint" target="_blank" rel="noopener">owainlewis/blueprint</a>, <a href="https://github.com/garrytan/gstack" target="_blank" rel="noopener">gstack</a>, <a href="https://mastra.ai/blog/announcing-mastra-factory-beta" target="_blank" rel="noopener">Mastra Factory</a>, <a href="https://vercel.com/kb/guide/eve-software-factory" target="_blank" rel="noopener">Foreman on eve</a>, <a href="https://docs.warp.dev/guides/agent-workflows/set-up-a-software-factory" target="_blank" rel="noopener">Warp's factory guide</a>.</footer>
+</main>
+</body>
+</html>

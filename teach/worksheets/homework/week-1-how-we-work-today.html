@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How We Work Today</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
+<script src="flow.js" defer></script>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs">Software factory homework, week one</span>
+    <span class="actions"><a href="../workflow.html">Blank template</a><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Assignment 1: before any factory</span>
+    <h1>Map how we ship each task type by hand, <mark>before any factory</mark></h1>
+    <p class="lede">This page maps how we run kaas.team, lwp-academy and englishmaa today, with no factory. Each task type gets one drawing. The drawing shows who does each step, what checks it, and where a check is missing. Every step points at a real commit, PR or alert from October 2026.</p>
+  </header>
+
+  <section>
+    <h2>You will learn where our work waits on one person</h2>
+    <ul>
+      <li>How each task type moves today, from planning and triage to a revert and a review.</li>
+      <li>Which step a human owns, which step a script checks, and which check does not exist yet.</li>
+      <li>Which task types are ready for a factory first, and which ones stay with a human.</li>
+    </ul>
+    <div class="legend" aria-label="How to read the drawings">
+      <span><i class="human"></i>A human owns the step</span>
+      <span><i class="tool"></i>A tool or agent does it</span>
+      <span><i class="gate"></i>A check runs and can say no</span>
+      <span><i class="wait"></i>The work waits</span>
+      <span><i class="gap"></i>A check that is missing</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>One person, one laptop and three repos run all three businesses</h2>
+    <p>A <b>manual workflow</b> is a path where a person starts, checks and finishes every step. All three apps follow one. Param notices the work, opens a Claude Code session in the main checkout, and pushes to main. The table shows what each repo has around that path today.</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Commits, last 30 days</td><td>41</td><td>88</td><td>89</td></tr>
+        <tr><td class="k">Pull requests, ever</td><td>1</td><td>3</td><td>1, from Dependabot</td></tr>
+        <tr><td class="k">GitHub issues and milestones</td><td>none</td><td>none</td><td>none</td></tr>
+        <tr><td class="k">The gate, <code>make check</code></td><td>build, test, browser, lighthouse</td><td>build, test, maven, browser, lighthouse</td><td>impact, server, web, mobile, prose, quality, sdk</td></tr>
+        <tr><td class="k">Who runs the gate</td><td>The pre-push hook</td><td>Param, by hand</td><td>The pre-push hook and CI</td></tr>
+        <tr><td class="k">Dependabot</td><td>off</td><td>off</td><td>alerts and PRs on</td></tr>
+        <tr><td class="k">AGENTS.md or CLAUDE.md</td><td>neither</td><td>neither</td><td>AGENTS.md only</td></tr>
+        <tr><td class="k">Deploy</td><td>Coolify, on push to main</td><td>Coolify, on push to main</td><td>not written in the repo; mobile by a manual button in Actions</td></tr>
+      </tbody>
+    </table></div>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Notice the work</b> on the live site, in an email or in a Telegram alert</li>
+        <li data-k="tool" data-who="Claude Code"><b>Edit in a session</b> in the main checkout, straight on main</li>
+        <li data-k="gate" data-who="make check"><b>Run the gate</b> in the pre-push hook, if the repo has one</li>
+        <li data-k="tool" data-who="Coolify"><b>Deploy on push</b> to main, with no review step</li>
+      </ol>
+      <figcaption>The shape under every drawing on this page. The rest of the page shows where each task type bends it.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Planning lives in specs and Linear, but no commit points back to them</h2>
+    <p><b>Planning</b> is deciding what to build and in what order. Ours starts as a spec in <code>internal-apps/plan/specs</code>, numbered from <code>00-ladder</code> to <code>09</code>. Linear holds one project per product under the team key LEA. The code never names either.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Have the idea</b> during a session, a call or a review of numbers</li>
+        <li data-k="human" data-who="Param and Claude"><b>Write the spec</b> as a markdown file in plan/specs</li>
+        <li data-k="wait" data-who="Linear"><b>Maybe add a card</b> to the product's Linear project</li>
+        <li data-k="tool" data-who="Claude Code"><b>Build it</b> in the app repo, commits straight on main</li>
+        <li data-k="gap" data-who="nobody"><b>Link the commit to the plan</b> no commit names a LEA key or a spec</li>
+        <li data-k="gap" data-who="nobody"><b>Mark the spec done</b> STATUS.md is edited by hand, or not at all</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> STATUS.md still says 02-email-plunk is not started. Plunk mail shipped in all three apps on 14 and 15 October. The plan and the code drifted within a week.</div>
+    <p class="ev">Evidence: internal-apps/plan/specs/STATUS.md line 8; zero LEA keys in 60 days of commits across the three repos.</p>
+  </section>
+
+  <section>
+    <h2>Triage happens in one head, so nothing records what was dropped</h2>
+    <p><b>Triage</b> is deciding whether a report is real, how urgent it is and who takes it. We have no issues in any of the three repos. A report arrives, Param decides on the spot, and the decision leaves no trace.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="many places"><b>A signal arrives</b> a reader email, a Coolify alert in Telegram, a broken page seen live</li>
+        <li data-k="human" data-who="Param"><b>Decide now or later</b> with no label, priority or owner written down</li>
+        <li data-k="gap" data-who="nobody"><b>Write the issue</b> zero GitHub issues across the three repos</li>
+        <li data-k="wait" data-who="Param's memory"><b>Wait</b> until it is fixed or forgotten</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> A factory starts from an issue. With no issue, there is nothing to pick up, and no way to count what we dropped.</div>
+  </section>
+
+  <section>
+    <h2>A small bug gets fixed once per repo, by hand, on the same day</h2>
+    <p>A <b>small bug</b> is a wrong behaviour one change can fix and one test can pin. On 15 October a book download subscribed readers to the newsletter. The same Plunk rule lived in three repos, so the fix was made three times.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Notice it</b> a download added the reader to the newsletter list</li>
+        <li data-k="tool" data-who="Claude Code"><b>Fix kaas.team</b> never subscribe on a download (0657164)</li>
+        <li data-k="gate" data-who="pre-push hook"><b>Run make check</b> then push; Coolify deploys</li>
+        <li data-k="human" data-who="Param"><b>Remember lwp-academy</b> and make the same fix (fbfc7e0)</li>
+        <li data-k="human" data-who="Param"><b>Remember englishmaa</b> and revert its Plunk mirror (8aa9273)</li>
+        <li data-k="gap" data-who="nobody"><b>Find the other repos</b> nothing searches siblings for the same call</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> The second and third fixes depend on Param remembering. The support address changed in two repos the same day for the same reason (6516b62, 1d3f1ab).</div>
+  </section>
+
+  <section>
+    <h2>A Dependabot PR passes CI and then waits, because nobody is told</h2>
+    <p>A <b>Dependabot fix</b> is a version bump that GitHub opens as a PR. Only englishmaa has Dependabot on. Its first PR bumps vite from 8.3.0 to 8.3.4 in <code>/web</code>.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="Dependabot"><b>Open PR #1</b> vite 8.3.0 to 8.3.4, on 21 October</li>
+        <li data-k="gate" data-who="GitHub Actions"><b>Run make check</b> in ci.yml; it passes</li>
+        <li data-k="wait" data-who="nobody"><b>Wait</b> nothing tells a person a green bump is ready</li>
+        <li data-k="human" data-who="Param"><b>Read the changelog and merge</b> not done yet</li>
+        <li data-k="gap" data-who="kaas.team, lwp-academy"><b>Open a bump at all</b> Dependabot is off in both repos</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> The fix exists and is proven, yet the open vite alerts stay open until a person clicks merge.</div>
+  </section>
+
+  <section>
+    <h2>A vulnerability alert gets one decision, and the reason stays in a dropdown</h2>
+    <p><b>Vulnerability handling</b> is reading a security alert on a dependency and choosing to fix it, accept it or dismiss it. englishmaa has nine alerts so far. Six vite alerts are open today, two of them high.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="GitHub"><b>Raise alerts</b> uuid, braces and node-forge on 7 October; six for vite on 21 October</li>
+        <li data-k="human" data-who="Param"><b>Read the advisory</b> and check whether the code path is reachable</li>
+        <li data-k="human" data-who="Param"><b>Decide</b> uuid fixed; braces and node-forge, both high, dismissed the same day</li>
+        <li data-k="gap" data-who="nobody"><b>Write down why</b> the only record is the reason tolerable_risk</li>
+        <li data-k="gap" data-who="nobody"><b>Look again later</b> a dismissed alert has no date to revisit</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> The judgement is sound, but it lives in one person's head. A second person, or an agent, cannot tell a reasoned dismissal from a rushed one.</div>
+  </section>
+
+  <section>
+    <h2>A security bug is fixed when someone spots it, and no test keeps it fixed</h2>
+    <p>A <b>security bug</b> is a flaw in our own code that lets the wrong thing run or the wrong person in. Both examples below were found while doing other work, and both were one-line fixes.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Spot it</b> englishmaa's CSP allowed every script from googletagmanager.com</li>
+        <li data-k="tool" data-who="Claude Code"><b>Narrow it</b> to the two gtag paths in edge.rs (18db42e, 18 October)</li>
+        <li data-k="gate" data-who="pre-push and CI"><b>Run make check</b> it passes, as it did before the fix</li>
+        <li data-k="gap" data-who="nobody"><b>Pin it with a test</b> the commit changes one line and adds no test</li>
+      </ol>
+    </figure>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Spot it</b> lwp-academy's digest cron silently got 401 with no secret set</li>
+        <li data-k="tool" data-who="Claude Code"><b>Refuse to boot</b> without CRON_SECRET (34fb677, 19 October)</li>
+        <li data-k="human" data-who="Param"><b>Run the gate by hand</b> lwp-academy has no hook and no CI</li>
+        <li data-k="gap" data-who="nobody"><b>Pin it with a test</b> the commit touches server.mjs and the env example only</li>
+      </ol>
+      <figcaption>Two security bugs, two repos, the same shape: a person finds it, a session fixes it, nothing proves it stays fixed.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Security checks run in one repo's browser gate and nowhere else</h2>
+    <p>A <b>security check</b> is a script that fails the build when a known class of mistake appears. We have one. lwp-academy's browser gate keeps analytics and Google One Tap off auth pages, whose URLs carry tokens (94505bc).</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="git push"><b>Push a change</b> to any of the three repos</li>
+        <li data-k="gate" data-who="lwp-academy browser gate"><b>Keep trackers off token pages</b> the only security check we run</li>
+        <li data-k="gap" data-who="nobody"><b>Audit dependencies</b> no audit step in any make check</li>
+        <li data-k="gap" data-who="nobody"><b>Scan for secrets</b> no secret scan in any gate</li>
+        <li data-k="gap" data-who="GitHub"><b>Code scanning</b> not enabled on any of the three repos</li>
+        <li data-k="gap" data-who="GitHub"><b>Protect main</b> branch protection needs a paid plan on these private repos</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> Every other security finding depends on a person reading code at the right moment.</div>
+  </section>
+
+  <section>
+    <h2>Lighthouse is a real gate in two repos, and missing in the third</h2>
+    <p>A <b>Lighthouse check</b> scores a page for performance, accessibility, best practices and SEO. kaas.team and lwp-academy fail the gate below 100 in any category. Mobile Performance is the exception: the median of three runs must reach 95.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="make lighthouse"><b>Build and serve</b> the site the way production does</li>
+        <li data-k="tool" data-who="scripts/lighthouse.mjs"><b>Score every page</b> mobile and desktop, three mobile runs each</li>
+        <li data-k="gate" data-who="the bar"><b>100 everywhere</b> except mobile Performance: median of three, at least 95 (fa6234e)</li>
+        <li data-k="gate" data-who="retry rule"><b>Retry a crash, never a score</b> a NO_NAVSTART crash gets three tries (bbb9ed9)</li>
+        <li data-k="human" data-who="Param"><b>Fix the page</b> when it fails, in the same session</li>
+        <li data-k="gap" data-who="englishmaa web"><b>Score the web app</b> englishmaa's make check has no Lighthouse step</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> The rule took two commits to make honest. One bad run used to fail the push. One crash used to look like a low score.</div>
+  </section>
+
+  <section>
+    <h2>A UI change is judged on the live site, so taste reverts reach production</h2>
+    <p>A <b>UI task</b> changes what a reader sees: layout, copy or a component. No script can say whether copy is right. On kaas.team we judge it after deploy, not before.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Ask for new copy</b> sell the whole lifecycle, in company voice</li>
+        <li data-k="tool" data-who="Claude Code"><b>Write it</b> on main (2a6d3bb, 12:40, 6 October)</li>
+        <li data-k="gate" data-who="pre-push hook"><b>Run make check</b> build, browser and Lighthouse pass</li>
+        <li data-k="tool" data-who="Coolify"><b>Deploy</b> the new copy goes live</li>
+        <li data-k="human" data-who="Param" data-back="1"><b>Read it live and revert</b> five minutes later (3f4add2)</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> The gate checked everything a script can check, and the change was still wrong. The taste check happened on production because there is no preview step.</div>
+  </section>
+
+  <section>
+    <h2>An epic lands as one long day of commits straight on main</h2>
+    <p>An <b>epic</b> is a change too big for one commit that ships as a planned series. The lwp-academy cutover moved members, auth and Stripe off lwp-website. It landed as 22 commits on 19 October.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Decide the cutover</b> www becomes lwp-academy alone</li>
+        <li data-k="tool" data-who="Claude Code"><b>Member DB</b> pool, boot migrations, baseline schema (74cf864)</li>
+        <li data-k="tool" data-who="Claude Code"><b>Auth on shared tables</b> better-auth mapped to snake_case (b89a3c4)</li>
+        <li data-k="tool" data-who="Claude Code"><b>Serve /api/auth in-process</b> and the Pro video gate (8c15898)</li>
+        <li data-k="tool" data-who="Claude Code"><b>Checkout, webhook, portal</b> in-process (83c2a19)</li>
+        <li data-k="tool" data-who="Claude Code"><b>Drop the proxy</b> serve every path ourselves (975e446)</li>
+        <li data-k="human" data-who="Param"><b>Run the gate by hand</b> no hook, no CI, no PR</li>
+        <li data-k="gap" data-who="Param, next day"><b>Click the real portal</b> a cancel never marked the membership ending (0fd5a1a)</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> There was no list of the pieces, so done meant "Param stopped". The portal bug was found by clicking the real portal, a day after it went live.</div>
+  </section>
+
+  <section>
+    <h2>A milestone is a word in a commit message</h2>
+    <p>A <b>milestone</b> is a named group of work with a finish line, such as a store release. englishmaa works in phases. GitHub has zero milestones in all three repos, so a phase exists only where a commit names it.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="human" data-who="Param"><b>Name the phase</b> in the plan, outside GitHub</li>
+        <li data-k="tool" data-who="Claude Code"><b>Ship it in one commit</b> "Phase 6: in-app account deletion and a store-release kit" (b563943, 7 October)</li>
+        <li data-k="gap" data-who="GitHub"><b>Track it as a milestone</b> no milestone, no issue list, no due date</li>
+        <li data-k="human" data-who="Param"><b>Press release</b> mobile-release.yml runs only from a manual button</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>A revert after a green gate shows what the gate cannot see</h2>
+    <p>A <b>revert</b> undoes a change that already shipped. englishmaa swapped its text to speech fallback to local voices. The gate passed, and the change was undone two hours later.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="Claude Code"><b>Swap the voices</b> local Kokoro and Kitten replace the fallback (7296d0d, 11:01)</li>
+        <li data-k="gate" data-who="pre-push and CI"><b>Run make check</b> it passes</li>
+        <li data-k="tool" data-who="deploy"><b>Ship it</b> to main</li>
+        <li data-k="human" data-who="Param" data-back="1"><b>Revert it</b> at 13:13 (1ada6ce)</li>
+        <li data-k="gap" data-who="nobody"><b>Write down why</b> the revert message gives no reason</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Review is a click on our own PR, three seconds after opening it</h2>
+    <p>A <b>review</b> is a second reader checking a change before it merges. We have three human PRs in total. lwp-academy PR #2 was opened at 15:18:38 and merged at 15:18:41 by the same account.</p>
+    <figure class="flow">
+      <ol>
+        <li data-k="tool" data-who="Claude Code"><b>Open PR #2</b> record the labs on Sundays from 18 October</li>
+        <li data-k="gap" data-who="nobody"><b>Review it</b> no reviewer, no CI on lwp-academy</li>
+        <li data-k="human" data-who="Param"><b>Merge it</b> three seconds later</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Most task types already have a check, but every one starts and ends with Param</h2>
+    <p>The table sorts the drawings by what a factory could take over. A task type is ready when a script can prove the outcome. It stays human when the outcome is taste, money or trust.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Task type</th><th>Check today</th><th>Missing check</th><th>First home</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Dependabot fix</td><td>CI on englishmaa</td><td>Dependabot in two repos</td><td><span class="tag auto">Factory</span> human merges</td></tr>
+        <tr><td class="k">Small bug</td><td>make check</td><td>A test per fix; a sibling search</td><td><span class="tag auto">Factory</span> human merges</td></tr>
+        <tr><td class="k">Lighthouse fix</td><td>Two repos</td><td>englishmaa web</td><td><span class="tag auto">Factory</span> human merges</td></tr>
+        <tr><td class="k">Security bug</td><td>make check</td><td>A test that pins the fix</td><td><span class="tag auto">Factory</span> plan approved first</td></tr>
+        <tr><td class="k">Vulnerability alert</td><td>GitHub alerts, one repo</td><td>A written reason and a revisit date</td><td><span class="tag human">Human decides</span> factory drafts</td></tr>
+        <tr><td class="k">Triage</td><td>none</td><td>Issues at all</td><td><span class="tag human">Human</span> factory labels</td></tr>
+        <tr><td class="k">UI copy</td><td>Build, browser, Lighthouse</td><td>A preview before deploy</td><td><span class="tag human">Human judges</span></td></tr>
+        <tr><td class="k">Epic and milestone</td><td>make check</td><td>A list of the pieces</td><td><span class="tag human">Human plans</span> factory builds pieces</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Key terms</h2>
+    <dl class="terms">
+      <dt>Manual workflow</dt><dd>A path where a person starts, checks and finishes every step.</dd>
+      <dt>Gate</dt><dd>A command that can refuse a change; ours is <code>make check</code>.</dd>
+      <dt>Missing check</dt><dd>A step where a mistake would ship because no script looks.</dd>
+      <dt>Human in the loop</dt><dd>A step only a person may decide: scope, taste, money or trust.</dd>
+    </dl>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Commit hashes, PRs and alerts come from Param-Harrison/kaas.team, lwp-academy and englishmaa, read on 21 October 2026.</footer>
+</main>
+</body>
+</html>
