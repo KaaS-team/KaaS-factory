@@ -1,0 +1,52 @@
+/* Homework pages: the worksheet tokens plus the drawing scenes (lwp-deck style: 8-unit grid, lifted
+   cards, one yellow highlight for the step a human owns). Filled answers read as text, not inputs. */
+@import url("../worksheet.css");
+
+.scene { width: 100%; height: auto; display: block; font-family: var(--sans); }
+.scene .card { fill: var(--surface); stroke: #D9D9D9; stroke-width: 1; }
+.scene .card.human { fill: var(--accent); stroke: #C9CC3F; }
+.scene .card.gate { fill: var(--pass-bg); stroke: #9FD9B5; }
+.scene .card.stop { fill: var(--fail-bg); stroke: #E8B4BC; }
+.scene .card.dim { fill: var(--panel); stroke: var(--line); stroke-dasharray: 4 4; }
+.scene .lane { fill: var(--panel); stroke: var(--line); }
+.scene .t { font: 600 13px var(--sans); fill: var(--ink); }
+.scene .s { font: 400 11.5px var(--sans); fill: var(--muted); }
+.scene .m { font: 500 11px var(--mono); fill: var(--ink-2); }
+.scene .k { font: 600 11px var(--sans); fill: var(--faint); letter-spacing: .06em; }
+.scene .line { stroke: var(--ink-2); stroke-width: 1.4; fill: none; }
+.scene .line.back { stroke: var(--fail); stroke-dasharray: 5 4; }
+.scene .line.ok { stroke: var(--pass); }
+.scene .dot { fill: var(--ink); }
+figure { margin: 0; display: grid; gap: 10px; }
+figcaption { font-size: 13.5px; color: var(--muted); max-width: 70ch; }
+.figwrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); background: var(--surface); padding: 16px; }
+.figwrap .scene { min-width: 640px; }
+
+/* Stat tiles for real numbers from a run */
+.stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
+.stat { padding: 14px 16px; border-radius: 10px; box-shadow: var(--lift); background: var(--surface); display: grid; gap: 2px; }
+.stat b { font: 600 24px/1.2 var(--sans); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+
+/* A filled answer: reads like a field, but it is the homework */
+.a { padding: 10px 12px; border-radius: 6px; background: var(--panel); box-shadow: 0 0 0 1px var(--line); font-size: 14.5px; }
+.a + .a { margin-top: -6px; }
+.qa { display: grid; gap: 6px; }
+.qa > span { font: 500 13.5px var(--sans); }
+.grid2 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.callout { border-left: 3px solid var(--ink); padding: 4px 0 4px 14px; color: var(--ink-2); }
+.tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 5px; font: 500 12px var(--sans); background: var(--grey-bg); color: var(--ink-2); white-space: nowrap; }
+.tag.human { background: var(--accent); color: var(--ink); }
+.tag.auto { background: var(--pass-bg); color: var(--pass); }
+.tag.never { background: var(--fail-bg); color: var(--fail); }
+pre { margin: 0; padding: 12px 14px; background: var(--panel); border-radius: 8px; box-shadow: 0 0 0 1px var(--line); overflow-x: auto; font: 400 12.5px/1.55 var(--mono); }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+.toc a { font-size: 13.5px; padding: 4px 10px; border-radius: 6px; background: var(--surface); box-shadow: var(--lift); text-decoration: none; }
+td.k { white-space: normal; }
+
+@media print {
+  .figwrap { box-shadow: none; padding: 0; overflow: visible; }
+  .figwrap .scene { min-width: 0; }
+  .stat { box-shadow: none; border: 1px solid var(--line); }
+  figure, .stat, pre { break-inside: avoid; }
+}

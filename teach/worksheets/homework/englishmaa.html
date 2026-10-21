@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>englishmaa Homework</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="../index.html">Worksheets</a> / <a href="index.html">Our homework</a> / englishmaa.com</span>
+    <span class="actions"><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Homework: englishmaa.com</span>
+    <h1>englishmaa is the most <mark>factory-ready</mark> repo we have</h1>
+    <p class="lede">A Rust server, a web page and an Expo app share one gate. The repo already has what a factory needs most: an AGENTS.md that says where it differs from the house standard, path rules, an impact map so a change runs only the checks it reaches, and CI. What it lacks is a boundary around money and voice.</p>
+    <nav class="toc"><a href="#s1">Workflow</a><a href="#s2">Cards</a><a href="#s3">Blueprint</a><a href="#s4">Factory</a><a href="#s5">Audit</a></nav>
+  </header>
+
+  <section id="s1">
+    <h2><span class="n">1</span>Team and codebase</h2>
+    <div class="grid2">
+      <div class="qa"><span>Repository</span><div class="a"><code>Param-Harrison/englishmaa</code>: <code>server/</code> (axum, sqlx, billing webhooks, live session socket), <code>web/</code> (Vite), <code>mobile/</code> (Expo, RevenueCat paywall), vendored avatar SDK.</div></div>
+      <div class="qa"><span>Gates</span><div class="a"><code>make check</code>: impact audit, cargo fmt and clippy with warnings as errors, database tests, web build and SEO, biome, vitest, mobile checks, prose, quality, SDK drift. CI runs it on GitHub with Postgres. The pre-push hook queues it on the build box.</div></div>
+      <div class="qa"><span>Impact map</span><div class="a"><code>.claude/repo.json</code> maps every tracked file to the checks it reaches, and <code>check-impact</code> fails when a file is unmapped.</div></div>
+      <div class="qa"><span>Protected paths today</span><div class="a">Only <code>web/src/sdk/*</code> and <code>*/package-lock.json</code>. Plans, prices and billing are not protected.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Today's path, one real change</h2>
+    <p class="hint">15 October: local Kokoro and Kitten voices replaced OpenRouter as the speech fallback. Two hours later it was reverted.</p>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 900 220" role="img" aria-labelledby="em1">
+          <title id="em1">A large change lands at 11:01 and is reverted at 13:13 with no reason recorded</title>
+          <defs><marker id="a3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" fill="#3D3D3D"/></marker></defs>
+          <rect class="card" x="16" y="32" width="250" height="104" rx="8"/><text class="t" x="28" y="56">7296d0d  11:01</text><text class="s" x="28" y="76">two ONNX voices in-process</text><text class="s" x="28" y="92">sha256-pinned model fetch</text><text class="s" x="28" y="108">runtime image moves to trixie</text><text class="s" x="28" y="124">new boot validation</text>
+          <rect class="card gate" x="298" y="32" width="160" height="104" rx="8"/><text class="t" x="310" y="56">Gate green</text><text class="s" x="310" y="76">fmt, clippy, tests,</text><text class="s" x="310" y="92">e2e browsers muted</text>
+          <rect class="card stop" x="490" y="32" width="170" height="104" rx="8"/><text class="t" x="502" y="56">1ada6ce  13:13</text><text class="s" x="502" y="76">Revert</text><text class="s" x="502" y="92">no reason in the</text><text class="s" x="502" y="108">commit message</text>
+          <rect class="card dim" x="692" y="32" width="192" height="104" rx="8"/><text class="t" x="704" y="56">Lesson lost</text><text class="s" x="704" y="76">nothing in a rule,</text><text class="s" x="704" y="92">test or retro says</text><text class="s" x="704" y="108">why it came out</text>
+          <path class="line" d="M266 84H296M458 84H488M660 84H690" marker-end="url(#a3)"/>
+          <text class="s" x="16" y="180">One commit changed the voice, the base image and boot rules together. A factory plan would have split it into three cards,</text>
+          <text class="s" x="16" y="198">and its retro stage would have written down the cause of the revert.</text>
+        </svg>
+      </div>
+    </figure>
+    <p class="callout">What the gate cannot see: how the tutor sounds, and what the voice costs per engaged minute. Both need a human or a production probe.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Ticket mix, last 30 days</h2>
+    <p class="hint">82 commits, a rough sort by subject.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Type</th><th>About</th><th>Example</th><th>Can a check prove it?</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Speech provider changes</td><td>8 or so</td><td>Edge read-aloud v2 token, Kokoro on OpenRouter, the reverted local voices</td><td>That it runs, yes. That it sounds right, no.</td></tr>
+        <tr><td class="k">Billing and metering</td><td>6 or so</td><td>Old subscriptions stop entitling, yearly upgrade stops the monthly renewal</td><td>Yes, and tests pin the yearly saving</td></tr>
+        <tr><td class="k">Gate and kit</td><td>11</td><td>Run only the checks a change reaches</td><td>Yes</td></tr>
+        <tr><td class="k">Mail and notifications</td><td>8 or so</td><td>Sign-in codes through Plunk, daily email opt-in, PWA push</td><td>Yes, against a stub</td></tr>
+        <tr><td class="k">Bugs</td><td>7</td><td>Send reminders only to browser push services</td><td>Yes</td></tr>
+        <tr><td class="k">Reverts</td><td>2</td><td>Local voices, the Plunk subscription mirror</td><td>Not before merge</td></tr>
+      </tbody>
+    </table></div>
+    <div class="qa"><span>Top three to automate first</span><div class="a">1. Bugs with a reproduction. 2. Kit and gate upkeep, where the gate itself is the evidence. 3. SEO and practice pages, which are generated from <code>scenarios.rs</code> and checked by <code>check-seo.mjs</code>.</div></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Risk tiers</h2>
+    <div class="grid2">
+      <div class="qa"><span><span class="pill pass">Low</span></span><div class="a">Web copy, practice scenarios, SEO, gate scripts.</div></div>
+      <div class="qa"><span><span class="pill wait">Medium</span></span><div class="a">Server handlers that are not billing, the mobile frame, mail templates.</div></div>
+      <div class="qa"><span><span class="pill fail">High</span></span><div class="a"><code>plans.rs</code>, billing webhooks, metering, speech providers, <code>mobile/revenuecat.json</code>, store listings, migrations.</div></div>
+    </div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="n">5</span>Three workflow cards</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Bug with a reproduction</th><th>New practice scenario</th><th>Speech provider change</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Trigger</td><td><code>factory:ready</code>, steps to reproduce</td><td>A scenario brief on the issue</td><td>A cost or outage alert</td></tr>
+        <tr><td class="k">Steps</td><td>failing test, fix, <code>check-affected --run</code>, revert proof</td><td>edit <code>scenarios.rs</code>, <code>make practice-pages</code>, SEO check</td><td>plan only; a human builds and listens</td></tr>
+        <tr><td class="k">Human in the loop</td><td>Merge</td><td>Read the page, merge</td><td>Listen to it, approve the cost</td></tr>
+        <tr><td class="k">Stop rules</td><td>Touches billing or metering: park</td><td>A generated file edited by hand: park</td><td>Any change to the base image: split the card</td></tr>
+        <tr><td class="k">Done means</td><td>CI green, test bites</td><td>Page live in the sitemap</td><td>A probe speaks one sentence in production</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s3">
+    <h2><span class="n">6</span>Blueprint</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Piece</th><th>Today</th><th>Add</th></tr></thead>
+      <tbody>
+        <tr><td class="k">AGENTS.md</td><td>Rules, run steps, where it differs from the house standard</td><td>Nothing; it is the model for the other two</td></tr>
+        <tr><td class="k">Rules</td><td>lwp-api, lwp-db, lwp-comments, lwp-playwright, lwp-engineering in <code>.claude/rules</code></td><td>A scoped rule for <code>server/src/tts*</code>: a provider change ships alone</td></tr>
+        <tr><td class="k">protectedPaths</td><td>SDK copy, lockfiles</td><td><code>server/src/plans.rs</code>, billing, metering, <code>mobile/revenuecat.json</code>, migrations</td></tr>
+        <tr><td class="k">Gate scope</td><td><code>check-affected.py</code> from the impact map</td><td>The factory's <code>gates.sh</code> calls it, so build runs only what the diff reaches</td></tr>
+        <tr><td class="k">Retro</td><td>None</td><td>Every revert opens a card whose only output is the cause and the rule it became</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s4">
+    <h2><span class="n">7</span>The factory for englishmaa</h2>
+    <div class="grid2">
+      <div class="qa"><span>Isolation</span><div class="a">VM mode. Port 3088 is held by e2e (<code>portsHeldByE2E</code>), so one run at a time, or a port per worktree.</div></div>
+      <div class="qa"><span>Secrets</span><div class="a">No OpenRouter, Plunk, RevenueCat or Stripe keys in the stage env. Tests use the dev Postgres with a throwaway database per test.</div></div>
+      <div class="qa"><span>Metrics</span><div class="a">Time to PR, verify rejects per card, reverts, cost per PR.</div></div>
+      <div class="qa"><span>Demo card</span><div class="a">Re-file "send reminders only to browser push services" against its parent commit and run it end to end.</div></div>
+    </div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="n">8</span>Team audit</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Layer</th><th>Score 0 to 3</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Context</td><td>3</td><td>AGENTS.md, path rules, impact map</td></tr>
+        <tr><td class="k">Gates</td><td>3</td><td>CI plus pre-push, warnings are errors</td></tr>
+        <tr><td class="k">Boundaries</td><td>1</td><td>Money and voice are unprotected</td></tr>
+        <tr><td class="k">Learning loop</td><td>0</td><td>Reverts carry no cause</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Fix first: protect plans and billing, and make every revert leave a reason.</p>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Source: <code>git log</code> of englishmaa, 21 September to 21 October 2026.</footer>
+</main>
+</body>
+</html>

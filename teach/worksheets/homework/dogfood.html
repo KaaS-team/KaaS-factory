@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Factory Dogfood</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="../index.html">Worksheets</a> / <a href="index.html">Our homework</a> / Dogfood</span>
+    <span class="actions"><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Evidence</span>
+    <h1>The factory <mark>ships itself</mark>, and runs on our product</h1>
+    <p class="lede">Two loops. The factory repo releases through its own gate, and every bug it hits while running real work becomes an issue against itself. The real work was kaas-suite, the KaaS.team product apps: 35 issues run overnight on 11 and 12 October.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>The release loop</h2>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 900 250" role="img" aria-labelledby="df1">
+          <title id="df1">Run the factory on a product, file what broke against the factory, fix with a mutation, release a version, run again</title>
+          <defs><marker id="a4" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" fill="#3D3D3D"/></marker></defs>
+          <rect class="card" x="16" y="40" width="190" height="76" rx="8"/><text class="t" x="28" y="66">Run on kaas-suite</text><text class="s" x="28" y="86">real cards, real money</text><text class="s" x="28" y="102">factory.db records each stage</text>
+          <rect class="card human" x="238" y="40" width="190" height="76" rx="8"/><text class="t" x="250" y="66">Operator notices</text><text class="s" x="250" y="86" style="fill:#171717">a wrong verdict, a leak,</text><text class="s" x="250" y="102" style="fill:#171717">a stuck card</text>
+          <rect class="card" x="460" y="40" width="190" height="76" rx="8"/><text class="t" x="472" y="66">Issue on the factory</text><text class="s" x="472" y="86">#41 to #53, each one</text><text class="s" x="472" y="102">a failure we saw</text>
+          <rect class="card gate" x="682" y="40" width="200" height="76" rx="8"/><text class="t" x="694" y="66">Fix plus mutation</text><text class="s" x="694" y="86">the mutation must turn</text><text class="s" x="694" y="102">its test red</text>
+          <rect class="card gate" x="682" y="156" width="200" height="76" rx="8"/><text class="t" x="694" y="182">CI: three jobs</text><text class="s" x="694" y="202">check with an empty HOME,</text><text class="s" x="694" y="218">mutations, docker build</text>
+          <rect class="card" x="460" y="156" width="190" height="76" rx="8"/><text class="t" x="472" y="182">Versioned PR</text><text class="s" x="472" y="202">v4.0.1, v4.0.2, v4.0.3</text><text class="s" x="472" y="218">CHANGELOG entry</text>
+          <rect class="card dim" x="16" y="156" width="412" height="76" rx="8"/><text class="t" x="28" y="182">Template ships to every repo</text><text class="s" x="28" y="202">install.sh copies template/ into the target, so a fix to a hook</text><text class="s" x="28" y="218">or a stage skill reaches kaas-suite on the next install</text>
+          <path class="line" d="M206 78H236M428 78H458M650 78H680M782 116V154M680 194H652M460 194H430" marker-end="url(#a4)"/>
+          <path class="line" d="M110 156V118" marker-end="url(#a4)"/>
+        </svg>
+      </div>
+      <figcaption>Rule 0 applied to the factory itself: every check in <code>tests/mutations.json</code> names the line that breaks it and the test that must go red. A check with no mutation did not ship.</figcaption>
+    </figure>
+    <div class="tw"><table>
+      <thead><tr><th>Seen while running</th><th>Filed as</th><th>What happened next</th></tr></thead>
+      <tbody>
+        <tr><td>Spend and hostname posted on tracker cards a customer could read</td><td>#44</td><td>PR #48 keeps operator detail out of tracker comments</td></tr>
+        <tr><td>Verify could not run the guard-removed check a plan asked for</td><td>#42</td><td>PR #51 runs a plan's mutation on a throwaway copy with mutate.sh</td></tr>
+        <tr><td>A finding that caused a reject could be downgraded and passed without a fix</td><td>#47</td><td>Open</td></tr>
+        <tr><td>Approved cards waited on a batch-mate's run</td><td>PR #56</td><td>Released as v4.0.2</td></tr>
+        <tr><td>Retry after maxToolCalls re-ran plan and asked for approval again</td><td>#53</td><td>Open</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>The kaas-suite run, from factory.db</h2>
+    <div class="stats">
+      <div class="stat"><b>35</b><span>issues run, 11 Oct 21:32 to 12 Oct 13:36 UTC</span></div>
+      <div class="stat"><b>30</b><span>shipped</span></div>
+      <div class="stat"><b>5</b><span>cancelled, three of them re-filed as round 2</span></div>
+      <div class="stat"><b>$78</b><span>total, about $2.20 per issue</span></div>
+    </div>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 900 250" role="img" aria-labelledby="df2">
+          <title id="df2">Spend by stage: build 37.45, plan 21.71, verify 18.47, triage, pr and retro under 0.20 each</title>
+          <text class="k" x="16" y="24">SPEND BY STAGE, USD</text>
+          <text class="t" x="16" y="58">build</text><rect x="96" y="44" width="600" height="20" rx="4" fill="#171717"/><text class="m" x="706" y="59">37.45  (77 runs)</text>
+          <text class="t" x="16" y="98">plan</text><rect x="96" y="84" width="348" height="20" rx="4" fill="#3D3D3D"/><text class="m" x="454" y="99">21.71  (48 runs)</text>
+          <text class="t" x="16" y="138">verify</text><rect x="96" y="124" width="296" height="20" rx="4" fill="#3D3D3D"/><text class="m" x="402" y="139">18.47  (72 runs)</text>
+          <text class="t" x="16" y="178">triage</text><rect x="96" y="164" width="3" height="20" rx="1" fill="#8A8A8A"/><text class="m" x="108" y="179">0.16</text>
+          <text class="t" x="16" y="208">pr</text><rect x="96" y="194" width="3" height="20" rx="1" fill="#8A8A8A"/><text class="m" x="108" y="209">0.17</text>
+          <text class="t" x="16" y="238">retro</text><rect x="96" y="224" width="3" height="20" rx="1" fill="#8A8A8A"/><text class="m" x="108" y="239">0.15</text>
+        </svg>
+      </div>
+      <figcaption>The cheap stages run on a small model; plan, build and verify are where judgement costs money. Spend stays in factory.db and on this internal page, never on a tracker card.</figcaption>
+    </figure>
+    <div class="grid2">
+      <div class="qa"><span>Verify verdicts across 72 runs</span><div class="a"><span class="pill pass">pass 24</span> <span class="pill fail">reject 29</span> <span class="pill wait">uncertain 19</span><br>More rejects than passes. The Tester is doing its job: most cards needed a second build.</div></div>
+      <div class="qa"><span>What a human still did</span><div class="a">Every merge on the repo was made under Param's account. The operator cancelled five cards and re-filed three as round 2 (#23 replaced #3, #31 replaced #18, #36 replaced #10). Review findings became their own follow-up cards (#22, #24, #26, #32 to #35).</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>What the retro stage learned</h2>
+    <p class="hint">Verbatim lessons from the retros table. Each one is a candidate for a rule or a stage skill edit.</p>
+    <ul>
+      <li><b>#2</b> "A plan that fans out one LLM call or subprocess per input unit should cap the unit count and total wall-clock runtime up front, and name an env allow-list for any spawned process instead of inheriting the server env."</li>
+      <li><b>#10</b> "Never hold a DB transaction or row lock across external I/O such as LLM calls or PR/API calls."</li>
+      <li><b>#10</b> "A test-that-bites proof must show a behavioural failure: reverting the change and seeing only compile or missing-module errors proves the file exists, not that the assertions catch a wrong result."</li>
+    </ul>
+    <p class="note">The third lesson is the one to carry into all three apps: a revert that only breaks the import is not proof. Verify must mutate the logic.</p>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Sources: the factory repo, its issues and PRs, and <code>~/.factory/Param-Harrison/kaas-suite/factory.db</code>.</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Our Factory Homework</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="../index.html">Worksheets</a> / Our homework</span>
+    <span class="actions"><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Worked homework, all three steps</span>
+    <h1>Our own <mark>Software Factory</mark> homework, on three real businesses</h1>
+    <p class="lede">These are the worksheets filled in for the products we run ourselves: kaas.team, lwp-academy and englishmaa.com. Each page maps today's real path from the git history, then redesigns it as factory workflows. The factory's own release loop and an overnight run on kaas-suite are the evidence that the redesign is not theory.</p>
+  </header>
+
+  <section>
+    <h2>The loop every page maps onto</h2>
+    <p class="hint">Yellow is a human in the loop. Green is a check a script runs. The red dashed line is verify sending work back to build, at most twice, before the card parks for a human.</p>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 960 300" role="img" aria-labelledby="loopT">
+          <title id="loopT">Issue to production: triage, plan, human approval, build, verify, PR, human merge, deploy, retro</title>
+          <defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" fill="#3D3D3D"/></marker>
+          <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" fill="#B4233A"/></marker></defs>
+          <text class="k" x="16" y="28">GITHUB ISSUE THREAD IS THE ONLY STATE</text>
+          <rect class="card" x="16" y="48" width="96" height="64" rx="8"/><text class="t" x="28" y="74">Issue</text><text class="s" x="28" y="94">factory:ready</text>
+          <rect class="card" x="136" y="48" width="96" height="64" rx="8"/><text class="t" x="148" y="74">Triage</text><text class="s" x="148" y="94">type, risk tier</text>
+          <rect class="card" x="256" y="48" width="96" height="64" rx="8"/><text class="t" x="268" y="74">Plan</text><text class="s" x="268" y="94">tests named</text>
+          <rect class="card human" x="376" y="48" width="104" height="64" rx="8"/><text class="t" x="388" y="74">Approve</text><text class="s" x="388" y="94" style="fill:#171717">/factory approve</text>
+          <rect class="card" x="504" y="48" width="96" height="64" rx="8"/><text class="t" x="516" y="74">Build</text><text class="s" x="516" y="94">worktree, gates</text>
+          <rect class="card gate" x="624" y="48" width="104" height="64" rx="8"/><text class="t" x="636" y="74">Verify</text><text class="s" x="636" y="94">revert: test bites</text>
+          <rect class="card" x="752" y="48" width="88" height="64" rx="8"/><text class="t" x="764" y="74">PR</text><text class="s" x="764" y="94">evidence</text>
+          <rect class="card human" x="864" y="48" width="80" height="64" rx="8"/><text class="t" x="876" y="74">Merge</text><text class="s" x="876" y="94" style="fill:#171717">a human</text>
+          <path class="line" d="M112 80H134M232 80H254M352 80H374M480 80H502M600 80H622M728 80H750M840 80H862" marker-end="url(#ar)"/>
+          <path class="line back" d="M676 112V150H552V114" marker-end="url(#arr)"/>
+          <text class="s" x="560" y="168" style="fill:#B4233A">reject, at most twice, then needs-human</text>
+          <rect class="card gate" x="864" y="200" width="80" height="64" rx="8"/><text class="t" x="876" y="226">Deploy</text><text class="s" x="876" y="246">gate on push</text>
+          <path class="line" d="M904 112V198" marker-end="url(#ar)"/>
+          <rect class="card" x="624" y="200" width="200" height="64" rx="8"/><text class="t" x="636" y="226">Retro</text><text class="s" x="636" y="246">one lesson per card</text>
+          <path class="line" d="M864 232H826" marker-end="url(#ar)"/>
+          <rect class="card dim" x="256" y="200" width="320" height="64" rx="8"/><text class="t" x="268" y="226">Fix at the source</text><text class="s" x="268" y="246">lesson becomes a rule, skill, hook or test</text>
+          <path class="line" d="M624 232H578" marker-end="url(#ar)"/>
+          <path class="line" d="M304 200V114" marker-end="url(#ar)"/>
+          <text class="s" x="16" y="232">next plan reads it</text>
+        </svg>
+      </div>
+      <figcaption>The labels are the state machine: factory:ready, awaiting-approval, building, verifying, in-review, then failed, needs-human or blocked when something stops it.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The three businesses</h2>
+    <div class="cards">
+      <a href="kaas-team.html"><span class="when">Astro site, lead capture, books</span><b>kaas.team</b><span class="hint">Mostly content and books. An editorial desk with two human approvals, a Lighthouse gate on push, and no CI.</span></a>
+      <a href="lwp-academy.html"><span class="when">Astro front, auth, Stripe, Postgres</span><b>lwp-academy</b><span class="hint">Money and members run in-process. The highest risk surface of the three, and no .claude folder yet.</span></a>
+      <a href="englishmaa.html"><span class="when">Rust server, web, Expo mobile</span><b>englishmaa.com</b><span class="hint">The most factory-ready repo: impact map, protected paths, path rules and a gate that runs only what a change reaches.</span></a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Evidence: the factory eating its own dog food</h2>
+    <div class="cards">
+      <a href="dogfood.html"><span class="when">Release loop and a real run</span><b>How the factory ships itself</b><span class="hint">Mutation tests, versioned releases, bugs filed from its own runs, and 35 kaas-suite issues in one night.</span></a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Walkthrough assignments for the call</h2>
+    <div class="cards">
+      <a href="claude-directory.html"><span class="when">Assignment 1</span><b>The .claude directory, in layers</b><span class="hint">What lives in your home folder, the team plugin and the repo, with our files as the example.</span></a>
+      <a href="skills.html"><span class="when">Assignment 2</span><b>Skills that hold up</b><span class="hint">Anthropic's authoring rules, the upstream packs we vendor, and when a skill must become a gate.</span></a>
+      <a href="automate-vs-human.html"><span class="when">Assignment 3</span><b>What to automate, what stays human</b><span class="hint">Sorted from our own commits, reverts and verify rejects.</span></a>
+      <a href="other-agents.html"><span class="when">Assignment 4</span><b>Other coding agents and other factories</b><span class="hint">Running the same loop on Codex, Gemini or Cursor, and how Mastra, Foreman and Warp draw the same line.</span></a>
+    </div>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Numbers come from git history and the factory's own run database, dated October 2026.</footer>
+</main>
+</body>
+</html>

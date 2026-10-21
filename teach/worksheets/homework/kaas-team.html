@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>kaas.team Homework</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="../index.html">Worksheets</a> / <a href="index.html">Our homework</a> / kaas.team</span>
+    <span class="actions"><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Homework: kaas.team</span>
+    <h1>kaas.team is a <mark>content factory</mark> with a small code surface</h1>
+    <p class="lede">Most changes are books, newsletter issues and copy. The code that can hurt us is small: the lead form, the Plunk calls and the book bucket. So the factory here is mostly an editorial line with two human approvals, plus a short code line for lead and gate fixes.</p>
+    <nav class="toc"><a href="#s1">Workflow</a><a href="#s2">Cards</a><a href="#s3">Blueprint</a><a href="#s4">Factory</a><a href="#s5">Audit</a></nav>
+  </header>
+
+  <section id="s1">
+    <h2><span class="n">1</span>Team and codebase</h2>
+    <div class="grid2">
+      <div class="qa"><span>Repository</span><div class="a"><code>Param-Harrison/kaas.team</code>: Astro site, <code>server.mjs</code> and <code>lead.mjs</code> (Plunk lead capture), playbook books as web, PDF and EPUB in an R2 bucket, scenes in <code>src/scenes/</code>.</div></div>
+      <div class="qa"><span>Where work comes from</span><div class="a">Param's own list and the editorial desk. No GitHub issues yet, so nothing a factory could pick up today.</div></div>
+      <div class="qa"><span>Team</span><div class="a">One founder plus Claude Code sessions. Param reviews everything that ships.</div></div>
+      <div class="qa"><span>Gates we already have</span><div class="a"><code>make check</code> = build, node tests, a browser walk, Lighthouse (mobile performance, median of three, bar 95). A pre-push hook runs it and then checks every committed book matches the bucket copy. No CI: Coolify deploys on push to main.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Today's path, one real change</h2>
+    <p class="hint">The lead bug from 14 and 15 October: a playbook download quietly subscribed new readers to the newsletter. Times are commit times; work and wait were not tracked, which is itself a finding.</p>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 900 200" role="img" aria-labelledby="kt1">
+          <title id="kt1">Today's path for kaas.team: Param notices, a Claude Code session fixes it, the pre-push gate runs, Coolify deploys</title>
+          <defs><marker id="a1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" fill="#3D3D3D"/></marker></defs>
+          <rect class="card human" x="16" y="40" width="152" height="80" rx="8"/><text class="t" x="28" y="66">Param notices</text><text class="s" x="28" y="86" style="fill:#171717">Plunk shows new</text><text class="s" x="28" y="102" style="fill:#171717">subscribers he never had</text>
+          <rect class="card" x="200" y="40" width="152" height="80" rx="8"/><text class="t" x="212" y="66">Claude Code</text><text class="s" x="212" y="86">interactive session</text><text class="s" x="212" y="102">on main, no issue</text>
+          <rect class="card gate" x="384" y="40" width="152" height="80" rx="8"/><text class="t" x="396" y="66">pre-push</text><text class="s" x="396" y="86">make check, then</text><text class="s" x="396" y="102">books match bucket</text>
+          <rect class="card" x="568" y="40" width="136" height="80" rx="8"/><text class="t" x="580" y="66">Coolify</text><text class="s" x="580" y="86">deploys on push</text><text class="s" x="580" y="102">to main</text>
+          <rect class="card dim" x="736" y="40" width="148" height="80" rx="8"/><text class="t" x="748" y="66">Checked live?</text><text class="s" x="748" y="86">by hand, if at all</text><text class="s" x="748" y="102">no record left</text>
+          <path class="line" d="M168 80H198M352 80H382M536 80H566M704 80H734" marker-end="url(#a1)"/>
+          <text class="m" x="16" y="160">2d3e70b 14 Oct 16:07  track with the public key</text>
+          <text class="m" x="440" y="160">0657164 15 Oct 09:13  never subscribe on a download</text>
+        </svg>
+      </div>
+      <figcaption>Two commits, seventeen hours apart. The first fix made tracking work, and working tracking is what exposed the auto-subscribe. Nothing between the two said "check who got subscribed".</figcaption>
+    </figure>
+    <div class="tw"><table>
+      <thead><tr><th>Step</th><th>Who</th><th>Tool</th><th>What it left behind</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Reported</td><td>Param</td><td>Plunk dashboard</td><td>Nothing written down</td></tr>
+        <tr><td class="k">Triaged and planned</td><td>Param with Claude</td><td>Claude Code session</td><td>Only the commit body</td></tr>
+        <tr><td class="k">Built</td><td>Claude</td><td>Claude Code</td><td><code>lead.mjs</code> looks the address up first; a new contact is created unsubscribed</td></tr>
+        <tr><td class="k">Reviewed</td><td>Param</td><td>The diff in the session</td><td>No PR, no review record</td></tr>
+        <tr><td class="k">Merged and deployed</td><td>pre-push, Coolify</td><td><code>.githooks/pre-push</code></td><td>A green gate and a deploy</td></tr>
+        <tr><td class="k">Checked live</td><td>Nobody on record</td><td></td><td>The gap: no probe proves a download leaves a contact unsubscribed in production</td></tr>
+      </tbody>
+    </table></div>
+    <p class="callout">Longest wait: between "it works" and "it does the right thing for the reader". A factory would have put the reader outcome in the plan as a named test before build started.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Ticket mix, last 30 days</h2>
+    <p class="hint">41 commits, sorted by hand from the subjects.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Type</th><th>About</th><th>Example</th><th>Can a check prove it?</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Book or newsletter content</td><td>15</td><td>Newsletter issue 2, the AI code review playbook and its two editor revisions</td><td>Partly: build, prose check, book matches bucket. Voice and judgement need Param.</td></tr>
+        <tr><td class="k">Site copy and UI</td><td>15</td><td>Astro rebuild, audit sheet, gallery picks; one revert of a copy change</td><td>Layout and Lighthouse yes. Whether the copy sells, no.</td></tr>
+        <tr><td class="k">Lead and mail bugs</td><td>6</td><td>Plunk key, auto-subscribe, reply-to address</td><td>Yes, with a test that hits a Plunk stub and asserts the contact state</td></tr>
+        <tr><td class="k">Gate and flaky checks</td><td>4</td><td>Lighthouse crash retries, median of three</td><td>Yes: run it three times and compare</td></tr>
+        <tr><td class="k">Revert</td><td>1</td><td>"Copy: sell the whole lifecycle"</td><td>No. It was a taste call.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="qa"><span>Top three to automate first</span><div class="a">1. Lead and mail bugs, because a stubbed test can prove them. 2. Gate flakes, because the evidence is a rerun. 3. The mechanical half of a book revision: apply an approved editor memo, rebuild, and prove the PDF matches the bucket.</div></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Stages and risk tiers</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Stage</th><th>Output</th><th>Check</th><th>Human approval</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Triage</td><td>Type (content, lead, gate, copy) and tier</td><td>Copy changes are routed to the editorial desk, never to build</td><td>No</td></tr>
+        <tr><td class="k">Plan</td><td>For code: the test that names the reader outcome. For content: the brief.</td><td>The plan lists one test per acceptance line</td><td><span class="tag human">Yes</span> for the brief, the first of the kb-issue approvals</td></tr>
+        <tr><td class="k">Build</td><td>Branch and diff</td><td><code>make check</code></td><td>No</td></tr>
+        <tr><td class="k">Verify</td><td>Revert proof, Lighthouse rerun</td><td>The named test goes red without the fix</td><td>No</td></tr>
+        <tr><td class="k">Review</td><td>PR with evidence and screenshots</td><td>Evidence contract filled</td><td><span class="tag human">Yes</span> the artifact, the second approval</td></tr>
+        <tr><td class="k">Deliver</td><td>Merge, Coolify deploy, publish-resources</td><td>pre-push gate and bucket match</td><td><span class="tag human">Yes</span> "nothing is pushed until Param says ship"</td></tr>
+      </tbody>
+    </table></div>
+    <div class="grid2">
+      <div class="qa"><span><span class="pill pass">Low</span></span><div class="a">Gate scripts, tests, typo fixes in a book. Merge after green, still by a human here because Coolify deploys main.</div></div>
+      <div class="qa"><span><span class="pill wait">Medium</span></span><div class="a"><code>lead.mjs</code>, <code>server.mjs</code>, the newsletter feed. Plan approval required.</div></div>
+      <div class="qa"><span><span class="pill fail">High</span></span><div class="a">Anything that mails readers, the bucket publish, <code>.env*</code>, the Dockerfile. Triage refuses; a human does it in a session.</div></div>
+    </div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="n">5</span>Three workflow cards</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Lead or mail bug</th><th>Gate flake</th><th>Book revision from an editor memo</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Trigger</td><td>Issue labelled <code>factory:ready</code></td><td>A red pre-push that passes on retry</td><td>An approved memo pasted on the issue</td></tr>
+        <tr><td class="k">Ready means</td><td>The wrong reader outcome is written down</td><td>Two failing logs attached</td><td>Memo approved; every note has a page anchor</td></tr>
+        <tr><td class="k">Steps</td><td>plan names the test, build, verify reverts</td><td>run three times, classify, fix the harness not the bar</td><td>apply notes, <code>make ebook</code>, prose check</td></tr>
+        <tr><td class="k">Human in the loop</td><td>Approve the plan, merge</td><td>Merge</td><td>Read the rendered PDF, then say ship</td></tr>
+        <tr><td class="k">Stop rules</td><td>Touches mail sending: park</td><td>Wants to lower the bar to 90: park</td><td>A note changes the argument: park</td></tr>
+        <tr><td class="k">Done means</td><td>Test fails on the old code, passes on the new</td><td>Three runs agree</td><td>Committed book equals the bucket copy</td></tr>
+        <tr><td class="k">Worst failure</td><td>Readers get mail they never asked for</td><td>A real slowdown hidden as flake</td><td>A wrong claim in print</td></tr>
+        <tr><td class="k">Metric</td><td>Time to PR, reverts</td><td>Flake reruns per week</td><td>Editor rounds per book</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s3">
+    <h2><span class="n">6</span>Blueprint: what exists and what we add</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Piece</th><th>Today</th><th>Add for the factory</th></tr></thead>
+      <tbody>
+        <tr><td class="k">AGENTS.md</td><td>None</td><td>Commands, the pre-push contract, "never mail a reader from a test"</td></tr>
+        <tr><td class="k">Rules</td><td>None in the repo; house rules come from the lwp-eng plugin</td><td><code>.claude/rules/lead.md</code> scoped to <code>lead.mjs</code>: every Plunk call names subscribe or not</td></tr>
+        <tr><td class="k">Skills</td><td><code>kb-issue</code> (editorial desk, two approvals), <code>humanizer</code></td><td>The factory stage skills from the template</td></tr>
+        <tr><td class="k">repo.json</td><td>None, though <code>scripts/lwp/</code> is vendored</td><td>protectedPaths: <code>lead.mjs</code> send paths, <code>.env*</code>, <code>Dockerfile</code>, <code>scripts/publish*</code></td></tr>
+        <tr><td class="k">Hooks</td><td>Only what Param's own setup installs (lwp-guards). The repo-driven lwp-eng hooks read <code>repo.json</code>, which is missing</td><td>The template's <code>guard-paths.sh</code> inside a stage</td></tr>
+        <tr><td class="k">Gates</td><td>pre-push <code>make check</code> plus bucket match</td><td>A GitHub job so a factory PR is checked before a human looks at it</td></tr>
+      </tbody>
+    </table></div>
+    <div class="qa"><span>Fix at the source</span><div class="a">The auto-subscribe bug becomes a test that walks every lead kind and asserts the Plunk contact state, so the next lead kind cannot forget it. One test for the structure, not a review note.</div></div>
+  </section>
+
+  <section id="s4">
+    <h2><span class="n">7</span>The factory for kaas.team</h2>
+    <div class="grid2">
+      <div class="qa"><span>Isolation</span><div class="a">Local runner, a worktree per issue. Plunk and R2 keys are not in the stage env, so a test cannot mail or publish.</div></div>
+      <div class="qa"><span>Doer and Tester</span><div class="a">Build writes the fix; verify reverts it and needs the named test red. Two rejects park the card.</div></div>
+      <div class="qa"><span>Merge policy</span><div class="a">Dry run. Every merge is Param's, because main deploys.</div></div>
+      <div class="qa"><span>Circuit breaker</span><div class="a">Two reverts of factory PRs in a week turn the route back to sessions only.</div></div>
+    </div>
+    <div class="qa"><span>Demo card for the call</span><div class="a">File the auto-subscribe bug as an issue against the commit before 0657164, run the factory, and show verify reverting the fix and the lead-kind test going red.</div></div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="n">8</span>Team audit, honest scores</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Layer</th><th>Score 0 to 3</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Work intake</td><td>0</td><td>No issues; work lives in Param's head</td></tr>
+        <tr><td class="k">Gates</td><td>2</td><td>Strong pre-push, but no CI and nothing checks a branch</td></tr>
+        <tr><td class="k">Context</td><td>1</td><td>Two skills, no AGENTS.md, no repo.json</td></tr>
+        <tr><td class="k">Human approvals</td><td>3</td><td>Brief and artifact approvals are explicit in kb-issue</td></tr>
+        <tr><td class="k">Live checks</td><td>1</td><td>Nothing proves reader outcomes after deploy</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Fix first: file work as issues, add AGENTS.md and repo.json, and add a test that walks every lead kind.</p>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Source: <code>git log</code> of kaas.team, 21 September to 21 October 2026.</footer>
+</main>
+</body>
+</html>

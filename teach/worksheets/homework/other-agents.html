@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Other Agents and Factories</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="../index.html">Worksheets</a> / <a href="index.html">Our homework</a> / Assignment 4</span>
+    <span class="actions"><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Assignment 4</span>
+    <h1>The loop is the product, <mark>the agent is a part</mark></h1>
+    <p class="lede">The gate, plan approval and the verdict do not depend on which coding agent runs a stage. That is why the same factory can run Claude for build and another vendor for verify, and why other teams' factories draw the human line in nearly the same places.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>One loop, any agent per stage</h2>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 900 230" role="img" aria-labelledby="oa1">
+          <title id="oa1">The runner owns gates, approval and verdicts; each stage can be a different agent CLI</title>
+          <rect class="lane" x="16" y="16" width="868" height="64" rx="10"/>
+          <text class="k" x="32" y="40">RUNNER, AGENT-INDEPENDENT</text>
+          <text class="s" x="32" y="62">labels as state, gates.sh and its FACTORY_GATES line, /factory approve from trusted accounts, budgets, the env scrub</text>
+          <rect class="card" x="16" y="104" width="160" height="72" rx="8"/><text class="t" x="28" y="130">triage</text><text class="m" x="28" y="152">claude</text>
+          <rect class="card" x="192" y="104" width="160" height="72" rx="8"/><text class="t" x="204" y="130">plan</text><text class="m" x="204" y="152">claude</text>
+          <rect class="card" x="368" y="104" width="160" height="72" rx="8"/><text class="t" x="380" y="130">build</text><text class="m" x="380" y="152">claude or codex</text>
+          <rect class="card gate" x="544" y="104" width="160" height="72" rx="8"/><text class="t" x="556" y="130">verify</text><text class="m" x="556" y="152">gemini</text>
+          <rect class="card" x="720" y="104" width="164" height="72" rx="8"/><text class="t" x="732" y="130">pr</text><text class="m" x="732" y="152">any</text>
+          <text class="s" x="16" y="208">A different vendor for verify than for build is the same idea as Vercel's Foreman reviewer: the Tester should not share the Doer's blind spots.</text>
+        </svg>
+      </div>
+    </figure>
+<pre>{
+  "agents": { "claude": { "preset": "claude" }, "gemini": { "preset": "gemini" } },
+  "stages": { "default": "claude", "verify": "gemini" }
+}</pre>
+    <p class="hint">From the factory's <code>docs/agents.md</code>. <code>factory install &lt;repo&gt; --agents claude,gemini</code> keeps skills in <code>.claude/skills</code> and symlinks the other agents' skill folders to it.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>What each agent keeps safe, honestly</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Layer</th><th>Claude</th><th>Codex, Gemini, Cursor, Pi, Mastra Code</th><th>OpenCode</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Read-only stages cannot edit</td><td>Stage allow-list</td><td>The agent's own plan or read-only flag</td><td>Only the prompt and the gate</td></tr>
+        <tr><td class="k">Path guard hook</td><td>Yes</td><td>No</td><td>No</td></tr>
+        <tr><td class="k">Tool-call cap and timeout</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td class="k">Verified live by us</td><td>Yes</td><td>Not yet</td><td>Not yet</td></tr>
+      </tbody>
+    </table></div>
+    <p class="callout">So for our three apps: Claude builds anything near a protected path, because only Claude has the path guard. Another agent can verify, where a read-only flag is enough.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Moving context and skills between agents</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Need</th><th>Portable way</th><th>Our repos</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Project instructions</td><td><code>AGENTS.md</code>, read by Codex, Gemini CLI, Cursor, Copilot, OpenCode, Aider and more. Keep <code>CLAUDE.md</code> as <code>@AGENTS.md</code>.</td><td>The factory does this. englishmaa has AGENTS.md only, so Claude Code does not load it there. kaas.team and lwp-academy have neither file.</td></tr>
+        <tr><td class="k">Skills</td><td>The SKILL.md format is shared. Upstream packs install per agent, for example <code>npx skills@latest add -a &lt;agent&gt;</code> for mattpocock/skills.</td><td>We vendor by commit and hash instead, then symlink per agent</td></tr>
+        <tr><td class="k">Hooks</td><td>Not portable. Each agent has its own or none.</td><td>Put the rule in a gate, which every agent hits</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Other factories, same human line</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Factory</th><th>Stages</th><th>Trigger</th><th>Where a human sits</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Ours</td><td>triage, plan, build, verify, pr, retro</td><td><code>factory:ready</code> label, cron or event</td><td>Plan approval, needs-human after two rejects, merge</td></tr>
+        <tr><td class="k">Mastra Factory</td><td>intake, triage, planning, build, review</td><td>GitHub, Linear and Slack boards</td><td>Each stage set to manual or auto; humans steer mid-run with Signals and merge</td></tr>
+        <tr><td class="k">Vercel Foreman (eve)</td><td>classifier, analyst, implementer, reviewer</td><td><code>factory</code> label</td><td>The run stops at a draft PR; a human takes it from there and merges</td></tr>
+        <tr><td class="k">Warp guide</td><td>triage, spec, implement, review</td><td>Labels as a state machine</td><td>Spec approval, called the most important checkpoint, then merge</td></tr>
+        <tr><td class="k">obra/superpowers</td><td>brainstorm, plan, subagent build, review, finish</td><td>Interactive</td><td>Throughout; it is a session method, not a runner</td></tr>
+      </tbody>
+    </table></div>
+    <div class="grid2">
+      <div class="qa"><span>What they all agree on</span><div class="a">A human approves scope before code, and a human merges. Two revision rounds is a common cap (Foreman and ours).</div></div>
+      <div class="qa"><span>Where we differ</span><div class="a">Our verify must revert the fix and see the test fail, holdout tests are hidden from every agent, and the runner trusts only the gate's own line, never the agent's claim.</div></div>
+    </div>
+    <p class="note">Assignment: pick the stage where a second vendor would help you most. For us it is verify on lwp-academy copy and redirect cards, where a read-only flag is enough and a different model catches what the builder missed.</p>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Reading: <a href="https://mastra.ai/blog/announcing-mastra-factory-beta" target="_blank" rel="noopener">Mastra Factory</a>, <a href="https://vercel.com/kb/guide/eve-software-factory" target="_blank" rel="noopener">Foreman on eve</a>, <a href="https://docs.warp.dev/guides/agent-workflows/set-up-a-software-factory" target="_blank" rel="noopener">Warp's factory guide</a>, <a href="https://agents.md" target="_blank" rel="noopener">agents.md</a>.</footer>
+</main>
+</body>
+</html>

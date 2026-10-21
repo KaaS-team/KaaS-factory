@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Automate or Human</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="../index.html">Worksheets</a> / <a href="index.html">Our homework</a> / Assignment 3</span>
+    <span class="actions"><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Assignment 3</span>
+    <h1>What to automate, and what <mark>stays human</mark></h1>
+    <p class="lede">The line is not "easy versus hard". It is "can a script prove the outcome?" If yes, the factory can do it end to end and a human merges. If the outcome is taste, money or trust, the factory can prepare it but a human decides.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>The two questions</h2>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 900 300" role="img" aria-labelledby="ah1">
+          <title id="ah1">A two by two: can a check prove it, and what does a mistake cost</title>
+          <text class="k" x="16" y="24">CAN A CHECK PROVE IT?</text>
+          <text class="s" x="200" y="48">Yes</text><text class="s" x="580" y="48">No</text>
+          <text class="s" x="16" y="120">Cheap to undo</text><text class="s" x="16" y="232">Costly to undo</text>
+          <rect class="card gate" x="120" y="60" width="360" height="110" rx="10"/>
+          <text class="t" x="136" y="86">Factory end to end</text><text class="s" x="136" y="106">lead bugs with a stub test, gate flakes, 301s,</text><text class="s" x="136" y="122">Maven copy sync, practice pages, kit upkeep</text>
+          <text class="s" x="136" y="152">human: merge</text>
+          <rect class="card" x="500" y="60" width="384" height="110" rx="10"/>
+          <text class="t" x="516" y="86">Factory drafts, human judges</text><text class="s" x="516" y="106">site copy, newsletter structure, book revisions,</text><text class="s" x="516" y="122">landing layout</text>
+          <text class="s" x="516" y="152">human: approve the brief and the artifact</text>
+          <rect class="card" x="120" y="180" width="360" height="110" rx="10"/>
+          <text class="t" x="136" y="206">Factory with plan approval</text><text class="s" x="136" y="226">server handlers, security fixes with a test,</text><text class="s" x="136" y="242">migrations behind a review</text>
+          <text class="s" x="136" y="272">human: approve the plan, merge</text>
+          <rect class="card human" x="500" y="180" width="384" height="110" rx="10"/>
+          <text class="t" x="516" y="206">Human in a session</text><text class="s" x="516" y="226" style="fill:#171717">Stripe and RevenueCat billing, mailing readers,</text><text class="s" x="516" y="242" style="fill:#171717">tutor voice, prices, secrets, deploy config</text>
+          <text class="s" x="516" y="272" style="fill:#171717">factory: refuses at triage</text>
+        </svg>
+      </div>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Live examples from our own repos</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Change</th><th>Repo</th><th>Where it sits</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td>A download subscribed new readers</td><td>kaas.team</td><td><span class="tag auto">Automate</span> with plan approval</td><td>A stubbed Plunk test can assert the contact state (0657164)</td></tr>
+        <tr><td>Lighthouse crash, NO_NAVSTART</td><td>kaas.team</td><td><span class="tag auto">Automate</span></td><td>Three runs agree (bbb9ed9)</td></tr>
+        <tr><td>"Copy: sell the whole lifecycle"</td><td>kaas.team</td><td><span class="tag human">Human</span></td><td>Reverted the same day (3f4add2). No check could have said no.</td></tr>
+        <tr><td>Portal cancel never marked the member ending</td><td>lwp-academy</td><td><span class="tag human">Human finds it</span>, then a test</td><td>Found only by clicking the real portal in test mode (0fd5a1a)</td></tr>
+        <tr><td>Refuse to boot without CRON_SECRET</td><td>lwp-academy</td><td><span class="tag auto">Automate</span> with plan approval</td><td>A boot test with the key missing (34fb677)</td></tr>
+        <tr><td>Local voices replace the speech fallback</td><td>englishmaa</td><td><span class="tag never">Never in the factory</span></td><td>Green gate, reverted two hours later (7296d0d, 1ada6ce)</td></tr>
+        <tr><td>Run only the checks a change reaches</td><td>englishmaa</td><td><span class="tag auto">Automate</span></td><td>The gate proves itself (20729fc)</td></tr>
+        <tr><td>SSRF block in event sinks</td><td>kaas-suite</td><td><span class="tag auto">Factory builds</span>, human decides</td><td>Card #15: verify said "uncertain" on all four rounds, never pass. It shipped because a human read it and merged.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Where the human sits in the factory</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Point</th><th>Mechanism</th><th>Why it cannot be a model</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Approve the plan</td><td><code>/factory approve</code>, accepted only from trusted accounts</td><td>The plan is where scope is decided. A model approving its own scope is the self-graded rubric again.</td></tr>
+        <tr><td class="k">Answer a question</td><td>The card parks on needs-info with the question on the issue</td><td>Only the person who filed it knows what they meant</td></tr>
+        <tr><td class="k">After two verify rejects</td><td>needs-human</td><td>Two rounds that did not converge mean the plan is wrong, not the code</td></tr>
+        <tr><td class="k">Merge</td><td>A human presses merge; our merge policy is dry run</td><td>Main deploys on all three apps</td></tr>
+        <tr><td class="k">Taste</td><td>The second approval in kb-issue</td><td>Voice is the product</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Assignment: take your last ten merged changes. Put each in one of the four boxes above. The top-left box is your first factory route.</p>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Commit hashes are from the three app repos; card numbers from kaas-suite.</footer>
+</main>
+</body>
+</html>

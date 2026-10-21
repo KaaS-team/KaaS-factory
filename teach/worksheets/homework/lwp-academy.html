@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>lwp-academy Homework</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="../index.html">Worksheets</a> / <a href="index.html">Our homework</a> / lwp-academy</span>
+    <span class="actions"><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Homework: lwp-academy</span>
+    <h1>lwp-academy holds the money, so the factory must <mark>stop at the till</mark></h1>
+    <p class="lede">Since 19 October the academy serves auth, Pro checkout, the Stripe webhook and the billing portal in-process, on a Postgres member database. That makes it the riskiest of the three, and today it has the thinnest guard: no .claude folder, no AGENTS.md, no pre-push hook and no CI.</p>
+    <nav class="toc"><a href="#s1">Workflow</a><a href="#s2">Cards</a><a href="#s3">Blueprint</a><a href="#s4">Factory</a><a href="#s5">Audit</a></nav>
+  </header>
+
+  <section id="s1">
+    <h2><span class="n">1</span>Team and codebase</h2>
+    <div class="grid2">
+      <div class="qa"><span>Repository</span><div class="a"><code>Param-Harrison/lwp-academy</code>: Astro front, <code>server.mjs</code> with better-auth, Stripe checkout, webhook and portal, <code>migrations/</code>, books and lead magnets.</div></div>
+      <div class="qa"><span>Where work comes from</span><div class="a">The www cutover plan, Maven copy changes from <code>internal-apps/flows</code>, member questions. No GitHub issues.</div></div>
+      <div class="qa"><span>Gates we already have</span><div class="a"><code>make check</code> = build, tests against a throwaway Postgres, the Maven sync check, a browser walk, Lighthouse. <code>make legacy</code> walks every old URL against the live site after a deploy.</div></div>
+      <div class="qa"><span>What enforces the gate</span><div class="a">Nothing in the repo. It runs when someone types <code>make check</code>. Coolify deploys main either way.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Today's path, one real change</h2>
+    <p class="hint">0fd5a1a, 20 October: "A portal cancel marks the membership as ending". The bug was found by a person clicking through the real Stripe portal in test mode.</p>
+    <figure>
+      <div class="figwrap">
+        <svg class="scene" viewBox="0 0 900 230" role="img" aria-labelledby="la1">
+          <title id="la1">Stripe portal cancel: the webhook only read cancel_at_period_end, so the member row never said ending</title>
+          <defs><marker id="a2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" fill="#3D3D3D"/></marker></defs>
+          <text class="k" x="16" y="24">WHAT STRIPE SENT</text>
+          <rect class="card" x="16" y="36" width="200" height="72" rx="8"/><text class="t" x="28" y="62">Portal cancel</text><text class="m" x="28" y="82">cancel_at: a date</text><text class="m" x="28" y="98">cancel_at_period_end: false</text>
+          <rect class="card" x="248" y="36" width="180" height="72" rx="8"/><text class="t" x="260" y="62">Webhook</text><text class="s" x="260" y="82">read only the</text><text class="s" x="260" y="98">period-end flag</text>
+          <rect class="card stop" x="460" y="36" width="180" height="72" rx="8"/><text class="t" x="472" y="62">Member row</text><text class="s" x="472" y="82">still "active",</text><text class="s" x="472" y="98">never "ending"</text>
+          <path class="line" d="M216 72H246M428 72H458" marker-end="url(#a2)"/>
+          <text class="k" x="16" y="148">WHO FOUND IT AND HOW IT SHIPPED</text>
+          <rect class="card human" x="16" y="160" width="200" height="56" rx="8"/><text class="t" x="28" y="184">Param in test mode</text><text class="s" x="28" y="202" style="fill:#171717">clicks the real portal</text>
+          <rect class="card" x="248" y="160" width="180" height="56" rx="8"/><text class="t" x="260" y="184">Claude Code session</text><text class="s" x="260" y="202">fix plus a test</text>
+          <rect class="card dim" x="460" y="160" width="180" height="56" rx="8"/><text class="t" x="472" y="184">make check</text><text class="s" x="472" y="202">if someone runs it</text>
+          <rect class="card" x="672" y="160" width="200" height="56" rx="8"/><text class="t" x="684" y="184">Coolify deploy</text><text class="s" x="684" y="202">on push to main</text>
+          <path class="line" d="M216 188H246M428 188H458M640 188H670" marker-end="url(#a2)"/>
+        </svg>
+      </div>
+      <figcaption>The commit says the portal schedules a cancel with cancel_at and leaves cancel_at_period_end false. Only a run through the real portal showed that shape. That run stays human, and its recorded payload becomes the fixture.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Ticket mix, last 30 days</h2>
+    <p class="hint">82 commits, a rough sort by subject. Half of them are the lwp-website cutover, which is one epic, not tickets.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Type</th><th>About</th><th>Example</th><th>Can a check prove it?</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Cutover epic</td><td>30+</td><td>Member DB, auth on the shared tables, checkout in-process, drop the proxy</td><td>Partly. <code>make legacy</code> proves every old URL still answers.</td></tr>
+        <tr><td class="k">Content, books, Maven copy</td><td>22</td><td>Sync Maven copy, the Claude Code best practices playbook</td><td>The Maven sync check proves copy matches the plan</td></tr>
+        <tr><td class="k">Gate and test fixes</td><td>12</td><td>The gate's server takes every boot key from server.mjs</td><td>Yes</td></tr>
+        <tr><td class="k">Billing and auth bugs</td><td>4 to 6</td><td>Portal cancel, failed social sign-in lands on /sign-in</td><td>Yes, once the real Stripe payload is a fixture</td></tr>
+        <tr><td class="k">Security and ops</td><td>3</td><td>Refuse to boot without CRON_SECRET</td><td>Yes: a boot test with the key missing</td></tr>
+      </tbody>
+    </table></div>
+    <div class="qa"><span>Top three to automate first</span><div class="a">1. Maven copy sync: the check already exists, so a factory run is "make the check green" with a diff to review. 2. Gate and test fixes. 3. SEO 301s and thin pages, which <code>make legacy</code> and the indexable test can prove.</div></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Risk tiers</h2>
+    <div class="grid2">
+      <div class="qa"><span><span class="pill pass">Low</span></span><div class="a">Content in <code>src/content</code>, books, copy synced from Maven, redirects in <code>legacy.json</code>.</div></div>
+      <div class="qa"><span><span class="pill wait">Medium</span></span><div class="a">Pages and components, analytics, the member dashboard view.</div></div>
+      <div class="qa"><span><span class="pill fail">High, never in the factory</span></span><div class="a">Auth, checkout, the Stripe webhook and portal, <code>migrations/</code>, <code>.env*</code>, the boot keys in <code>server.mjs</code>. Triage refuses these cards.</div></div>
+    </div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="n">5</span>Three workflow cards</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Maven copy sync</th><th>Legacy URL broke</th><th>Billing bug</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Trigger</td><td><code>make maven</code> red after a plan change</td><td><code>make legacy</code> red after a deploy</td><td>A member report or a test-mode run</td></tr>
+        <tr><td class="k">Who builds</td><td><span class="tag auto">Factory</span></td><td><span class="tag auto">Factory</span></td><td><span class="tag human">A human in a session</span></td></tr>
+        <tr><td class="k">Steps</td><td>sync, build, browser walk</td><td>add the 301, rerun legacy against a preview</td><td>record the real payload, write the failing test, fix</td></tr>
+        <tr><td class="k">Human in the loop</td><td>Read the copy diff, merge</td><td>Merge</td><td>Every step</td></tr>
+        <tr><td class="k">Stop rules</td><td>Any price or Stripe link in copy: park</td><td>A path under <code>/api</code>: park</td><td>Not a factory card</td></tr>
+        <tr><td class="k">Worst failure</td><td>A wrong price on a page</td><td>A 301 loop</td><td>Charging a member who cancelled</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s3">
+    <h2><span class="n">6</span>Blueprint</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Piece</th><th>Today</th><th>Add</th></tr></thead>
+      <tbody>
+        <tr><td class="k">AGENTS.md</td><td>None</td><td>Commands, the throwaway Postgres, "never call live Stripe from a test"</td></tr>
+        <tr><td class="k">repo.json protectedPaths</td><td>None</td><td>Auth, checkout, webhook, portal, <code>migrations/</code>, <code>.env*</code>, <code>Dockerfile</code></td></tr>
+        <tr><td class="k">Rules</td><td>None</td><td><code>lwp-db.md</code> and <code>lwp-api.md</code> from lwp-claude-plugins, as englishmaa has</td></tr>
+        <tr><td class="k">Enforced gate</td><td>Manual <code>make check</code></td><td>A pre-push hook, the same contract kaas.team already uses</td></tr>
+        <tr><td class="k">Structural tests</td><td>routes, access, billing, csp, legacy, indexable</td><td>A webhook test fed by recorded Stripe payloads for every event we handle</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s4">
+    <h2><span class="n">7</span>The factory for lwp-academy</h2>
+    <div class="grid2">
+      <div class="qa"><span>Isolation</span><div class="a">Stripe and auth secrets never in the stage env. Tests use the compose Postgres on tmpfs, so every run starts empty.</div></div>
+      <div class="qa"><span>Routes</span><div class="a">Only content, copy sync, redirects and gate fixes. Everything else stays in sessions.</div></div>
+      <div class="qa"><span>Metric</span><div class="a">Share of commits that came through a factory PR, and zero factory PRs touching a protected path.</div></div>
+      <div class="qa"><span>Demo card</span><div class="a">Change a price name in the Maven plan, let the factory turn <code>make maven</code> green, read the diff live.</div></div>
+    </div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="n">8</span>Team audit</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Layer</th><th>Score 0 to 3</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Gates</td><td>1</td><td>Good checks, nothing makes them run</td></tr>
+        <tr><td class="k">Boundaries</td><td>0</td><td>No protected paths on the repo that holds the money</td></tr>
+        <tr><td class="k">Structural tests</td><td>2</td><td>Route and access walks exist</td></tr>
+        <tr><td class="k">Live checks</td><td>2</td><td><code>make legacy</code> against the live site</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Fix first, before any factory run: a pre-push hook, then repo.json with protected paths, then AGENTS.md.</p>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Source: <code>git log</code> of lwp-academy, 21 September to 21 October 2026.</footer>
+</main>
+</body>
+</html>
