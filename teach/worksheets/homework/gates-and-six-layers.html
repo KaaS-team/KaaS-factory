@@ -12,15 +12,15 @@
 <body>
 <main>
   <div class="bar">
-    <span class="crumbs">Software factory homework, week three</span>
+    <span class="crumbs">Software factory homework</span>
     <span class="actions"><a href="../team-audit.html">Blank template</a><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
   </div>
 
   <header class="sheet">
     <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
-    <span class="when">Assignment 3: gates and the six layers</span>
+    <span class="when">Gates and the six layers</span>
     <h1>Build the gates and <mark>six layers</mark> an agent needs before it runs alone</h1>
-    <p class="lede">A blueprint tells an agent how to work. It does not stop the agent when it ignores the blueprint. This week adds the parts that do: a boundary, a place to run, routed context, stage skills, verification and delivery. Then each task type from week one gets its own gate.</p>
+    <p class="lede">A blueprint tells an agent how to work. It does not stop the agent when it ignores the blueprint. The six layers are the parts that do: a boundary, a place to run, routed context, stage skills, verification and delivery. Then each task type from <a href="how-we-work-today.html">how we work today</a> gets its own gate.</p>
   </header>
 
   <section>
@@ -40,7 +40,7 @@
 
   <section>
     <h2>Six layers answer six questions before an agent touches a repo</h2>
-    <p>A <b>layer</b> is one part of the factory that answers one question about unattended work. Week one had a person answer all six in their head. The factory answers each one in a file or a script.</p>
+    <p>A <b>layer</b> is one part of the factory that answers one question about unattended work. Today a person answers all six in their head. The factory answers each one in a file or a script.</p>
     <figure class="flow" data-cols="3">
       <ol>
         <li data-k="gate" data-who="Boundary"><b>What may it touch?</b> protected paths, deny rules, env scrub, a diff check</li>
@@ -114,7 +114,7 @@
         <li data-k="tool" data-who="factory-pr"><b>PR</b> from the template</li>
       </ol>
     </figure>
-    <p class="hint">Week two's vendored skills plug in here: triage, systematic-debugging and code-review-and-quality sit beside the stage skills in .claude/skills.</p>
+    <p class="hint">The vendored skills from <a href="the-blueprint.html">the blueprint</a> plug in here: triage, systematic-debugging and code-review-and-quality sit beside the stage skills in .claude/skills.</p>
   </section>
 
   <section>
@@ -147,7 +147,7 @@
 
   <section>
     <h2>Each task type gets a gate that matches what can go wrong with it</h2>
-    <p>A <b>gate</b> is a command that can refuse a change. One gate for everything is too weak for a security bug and too slow for a copy edit. These are the gates we build for the task types from week one.</p>
+    <p>A <b>gate</b> is a command that can refuse a change. One gate for everything is too weak for a security bug and too slow for a copy edit. These are the gates we build for the task types we run by hand today.</p>
 
     <h3>Dependabot PR: merge-ready means green and in the patch range</h3>
     <figure class="flow">

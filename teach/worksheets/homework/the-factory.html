@@ -12,15 +12,15 @@
 <body>
 <main>
   <div class="bar">
-    <span class="crumbs">Software factory homework, week four</span>
+    <span class="crumbs">Software factory homework</span>
     <span class="actions"><a href="../factory.html">Blank template</a><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
   </div>
 
   <header class="sheet">
     <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
-    <span class="when">Assignment 4: the factory</span>
+    <span class="when">The factory</span>
     <h1>Run the <mark>software factory</mark> on all three repos, one task type at a time</h1>
-    <p class="lede">Weeks one to three mapped the manual work, wrote the blueprint and built the gates. This week the factory runs them. We install our own factory on kaas.team, lwp-academy and englishmaa, route the safest task types first, and compare it with third-party factories.</p>
+    <p class="lede">The earlier assignments mapped <a href="how-we-work-today.html">how we work today</a>, wrote <a href="the-blueprint.html">the blueprint</a> and built the <a href="gates-and-six-layers.html">gates</a>. Now the factory runs them. We install our own factory on kaas.team, lwp-academy and englishmaa, route the safest task types first, and compare it with third-party factories.</p>
   </header>
 
   <section>
@@ -57,7 +57,7 @@
         <li data-k="tool" data-who="retro"><b>Write the lesson</b> into .factory/memory</li>
       </ol>
     </figure>
-    <p>Compare it with week one. Param still labels, approves and merges. Everything between those three clicks now has a check.</p>
+    <p>Compare it with <a href="how-we-work-today.html">how we work today</a>. Param still labels, approves and merges. Everything between those three clicks now has a check.</p>
   </section>
 
   <section>
@@ -97,15 +97,15 @@
   </section>
 
   <section>
-    <h2>Installing it is three commands per repo, after week three's files exist</h2>
+    <h2>Installing it is three commands per repo, after the blueprint and gates exist</h2>
     <p>The <b>template</b> is the set of hooks, stage skills and gate script the factory copies into a repo. <code>factory init</code> detects the stack and writes the config. <code>gates.sh</code> wraps the repo's own <code>make check</code>.</p>
 <pre>factory install ~/learn/kaaslabs/kaas.team        # template: hooks, stage skills, gates.sh
 factory init --repo-dir ~/learn/kaaslabs/kaas.team  # .factory/config.json from the stack
 factory watch --repo-dir ~/learn/kaaslabs/kaas.team # poll and drive the loop</pre>
     <figure class="flow">
       <ol>
-        <li data-k="tool" data-who="week two"><b>Blueprint in place</b> AGENTS.md, CLAUDE.md, .claude</li>
-        <li data-k="gate" data-who="week three"><b>Gates in place</b> make check, CI, protectedPaths</li>
+        <li data-k="tool" data-who="blueprint"><b>Blueprint in place</b> AGENTS.md, CLAUDE.md, .claude</li>
+        <li data-k="gate" data-who="gates"><b>Gates in place</b> make check, CI, protectedPaths</li>
         <li data-k="tool" data-who="factory install"><b>Install the template</b></li>
         <li data-k="tool" data-who="factory init"><b>Write the config</b> budgets, protected paths, auto-approve off</li>
         <li data-k="gate" data-who="first issue"><b>Run one easy issue</b> and read every stage's comment</li>
@@ -115,7 +115,7 @@ factory watch --repo-dir ~/learn/kaaslabs/kaas.team # poll and drive the loop</p
 
   <section>
     <h2>Each app routes its safest task types first and keeps money and taste human</h2>
-    <p>A <b>route</b> is the rule that sends a task type to the factory, to a human, or to both. We start with the task types week one showed are already checked, and add one type a week.</p>
+    <p>A <b>route</b> is the rule that sends a task type to the factory, to a human, or to both. We start with the task types that are already checked today, and add one type a week.</p>
     <div class="tw"><table>
       <thead><tr><th>Task type</th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
       <tbody>
