@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="homework.css">
 <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
-<script src="flow.js" defer></script>
+<script src="scene.js" defer></script>
 </head>
 <body>
 <main>
@@ -58,14 +58,44 @@
   <section>
     <h2>owainlewis/blueprint splits define, deliver and check into twelve skills</h2>
     <p><b>owainlewis/blueprint</b> is a pack of opt-in skills, installed with <code>npx skills add owainlewis/blueprint</code>. A new project goes requirements, then architecture. A new feature goes spec, then task-to-pr or factory.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="/requirements"><b>Requirements</b> writes REQUIREMENTS.md with the human</li>
-        <li data-k="tool" data-who="/architecture"><b>Architecture</b> writes ARCHITECTURE.md; /architecture-review checks it</li>
-        <li data-k="tool" data-who="/spec, /plan"><b>Spec and plan</b> one feature, split into tasks</li>
-        <li data-k="tool" data-who="/task-to-pr"><b>Task to PR</b> code, tests, independent review, CI, a passing PR left open</li>
-        <li data-k="gate" data-who="/factory"><b>Factory</b> task-to-pr, then merge after required approvals and gates</li>
-        <li data-k="tool" data-who="/test, /review, /improve"><b>Check and improve</b> run any time on the codebase</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "proj", "at": [0, 0], "label": "New project", "shape": "ellipse", "tone": "accent" },
+    { "id": "req", "at": [1, 0], "label": "Requirements", "shape": "doc", "tone": "accent", "who": "/requirements" },
+    { "id": "arch", "at": [2, 0], "label": "Architecture", "shape": "doc", "who": "/architecture" },
+    { "id": "holds", "at": [3, 0], "label": "Holds up?", "shape": "diamond", "tone": "pass" },
+    { "id": "feat", "at": [0, 1], "label": "New feature", "shape": "ellipse", "tone": "accent" },
+    { "id": "spec", "at": [1, 1], "label": "Spec and plan", "who": "/spec, /plan" },
+    { "id": "pr", "at": [2, 1], "label": "Task to PR", "tone": "pass", "who": "/task-to-pr" },
+    { "id": "merge", "at": [3, 1], "label": "Merge too?", "shape": "diamond" },
+    { "id": "open", "at": [3, 2], "label": "Open PR", "shape": "ellipse", "who": "passing" },
+    { "id": "fac", "at": [2, 2], "label": "Merge after gates", "tone": "pass", "who": "/factory" },
+    { "id": "any", "at": [0, 2], "label": "Test, review, improve", "dashed": true, "who": "any time" }
+  ],
+  "edges": [
+    { "from": "proj", "to": "req" },
+    { "from": "req", "to": "arch" },
+    { "from": "arch", "to": "holds", "label": "review" },
+    { "from": "holds", "to": "arch", "label": "no", "tone": "fail", "bend": -70 },
+    { "from": "holds", "to": "spec", "label": "yes" },
+    { "from": "feat", "to": "spec" },
+    { "from": "spec", "to": "pr" },
+    { "from": "pr", "to": "merge" },
+    { "from": "merge", "to": "open", "label": "no" },
+    { "from": "merge", "to": "fac", "label": "yes" }
+  ]
+}
+      </script>
+      <figcaption>Two ways in, one review loop, and a choice at the end between an open PR and a merge.</figcaption>
+      <ol class="narr">
+        <li><b>A new project</b> starts with /requirements, which writes REQUIREMENTS.md with the human, then /architecture, which writes ARCHITECTURE.md.</li>
+        <li><b>/architecture-review</b> checks the design. If it does not hold, it goes back to architecture.</li>
+        <li><b>A new feature</b> starts at /spec and /plan: one feature, split into tasks.</li>
+        <li><b>/task-to-pr</b> writes code and tests, gets an independent review and CI, and leaves a passing PR open.</li>
+        <li><b>/factory</b> runs task-to-pr, then merges after the required approvals and gates.</li>
+        <li><b>/test, /review and /improve</b> run on the codebase at any time, outside the line.</li>
       </ol>
     </figure>
   </section>
@@ -73,14 +103,39 @@
   <section>
     <h2>addyosmani/agent-skills turns each phase into a checklist with excuses named</h2>
     <p><b>addyosmani/agent-skills</b> groups skills by phase: define, plan, build, verify, review and ship. Every skill carries an anti-rationalization table: the excuses an agent gives for skipping a step, each with its rebuttal.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="/spec"><b>Spec</b> interview-me, spec-driven-development</li>
-        <li data-k="tool" data-who="/plan"><b>Plan</b> planning-and-task-breakdown</li>
-        <li data-k="tool" data-who="/build"><b>Build</b> incremental, test-driven, frontend-ui-engineering</li>
-        <li data-k="gate" data-who="/test"><b>Test</b> browser-testing-with-devtools, debugging-and-error-recovery</li>
-        <li data-k="gate" data-who="/review, /webperf"><b>Review</b> code-review-and-quality, security-and-hardening, performance-optimization</li>
-        <li data-k="tool" data-who="/ship"><b>Ship</b> ci-cd-and-automation, deprecation-and-migration, shipping-and-launch</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "groups": [{ "label": "Define", "nodes": ["spec", "plan"] }, { "label": "Verify", "nodes": ["test", "review"] }],
+  "nodes": [
+    { "id": "spec", "at": [0, 0], "label": "Spec", "tone": "accent", "who": "/spec, interview-me" },
+    { "id": "plan", "at": [1, 0], "label": "Plan", "who": "/plan" },
+    { "id": "build", "at": [2, 0], "label": "Build", "who": "/build, incremental" },
+    { "id": "test", "at": [3, 0], "label": "Test", "tone": "pass", "who": "/test, devtools" },
+    { "id": "review", "at": [3, 1.2], "label": "Review", "tone": "pass", "who": "/review, /webperf" },
+    { "id": "ship", "at": [2, 1.2], "label": "Ship", "shape": "ellipse", "who": "/ship" },
+    { "id": "excuse", "at": [0.5, 1.2], "label": "Excuse, rebuttal", "shape": "doc", "tone": "wait", "who": "in every skill" }
+  ],
+  "edges": [
+    { "from": "spec", "to": "plan" },
+    { "from": "plan", "to": "build" },
+    { "from": "build", "to": "test" },
+    { "from": "test", "to": "build", "label": "red", "tone": "fail", "bend": -70 },
+    { "from": "test", "to": "review" },
+    { "from": "review", "to": "build", "label": "fix", "tone": "fail" },
+    { "from": "review", "to": "ship", "label": "ok", "tone": "pass" },
+    { "from": "excuse", "to": "build", "label": "no skips", "tone": "wait", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Six phases, two loops back to build, and a table of excuses that stops a skipped step.</figcaption>
+      <ol class="narr">
+        <li><b>Spec</b> runs interview-me and spec-driven-development with the human.</li>
+        <li><b>Plan</b> runs planning-and-task-breakdown. <b>Build</b> is incremental and test-driven, with frontend-ui-engineering for pages.</li>
+        <li><b>Test</b> uses browser-testing-with-devtools and debugging-and-error-recovery. Red goes back to build.</li>
+        <li><b>Review</b> runs code-review-and-quality, security-and-hardening and performance-optimization. A finding goes back to build.</li>
+        <li><b>Ship</b> covers ci-cd-and-automation, deprecation-and-migration and shipping-and-launch.</li>
+        <li><b>Every skill</b> carries an anti-rationalization table: the excuse an agent gives for skipping a step, and its rebuttal.</li>
       </ol>
     </figure>
   </section>
@@ -88,14 +143,44 @@
   <section>
     <h2>mattpocock/skills keeps each skill small and the human in charge</h2>
     <p><b>mattpocock/skills</b> is a set of small skills you compose yourself. It starts by grilling the human until the plan holds, and it ends at a PR. <code>wizard</code> writes a bash script for the steps only a human can do.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="grill-me"><b>Grill the plan</b> questions until the idea holds</li>
-        <li data-k="tool" data-who="to-spec, to-tickets"><b>Spec, then tickets</b> one ticket per slice</li>
-        <li data-k="tool" data-who="triage"><b>Triage</b> sort incoming tickets</li>
-        <li data-k="gate" data-who="tdd, diagnosing-bugs"><b>Test first</b> a failing test before the fix</li>
-        <li data-k="gate" data-who="code-review"><b>Review</b> the diff against the spec</li>
-        <li data-k="tool" data-who="pr, retro"><b>PR and retro</b> open it, then write what was learned</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "idea", "at": [0, 0], "label": "An idea", "shape": "ellipse", "tone": "accent" },
+    { "id": "grill", "at": [1, 0], "label": "Grill the plan", "tone": "accent", "who": "grill-me" },
+    { "id": "holds", "at": [2, 0], "label": "Holds?", "shape": "diamond", "tone": "accent" },
+    { "id": "spec", "at": [3, 0], "label": "Spec", "shape": "doc", "who": "to-spec" },
+    { "id": "tickets", "at": [3, 1], "label": "Tickets", "shape": "store", "who": "to-tickets" },
+    { "id": "triage", "at": [2, 1], "label": "Which first?", "shape": "diamond" },
+    { "id": "human", "at": [2, 2.1], "label": "Script the human steps", "tone": "accent", "who": "wizard" },
+    { "id": "tdd", "at": [1, 1], "label": "Failing test first", "tone": "pass", "who": "tdd" },
+    { "id": "review", "at": [0, 1], "label": "Review the diff", "tone": "pass", "who": "code-review" },
+    { "id": "pr", "at": [0, 2.1], "label": "PR", "shape": "ellipse", "who": "pr" },
+    { "id": "retro", "at": [1, 2.1], "label": "Retro", "shape": "doc", "who": "retro" }
+  ],
+  "edges": [
+    { "from": "idea", "to": "grill" },
+    { "from": "grill", "to": "holds" },
+    { "from": "holds", "to": "grill", "label": "no", "tone": "fail", "bend": -70 },
+    { "from": "holds", "to": "spec", "label": "yes" },
+    { "from": "spec", "to": "tickets" },
+    { "from": "tickets", "to": "triage" },
+    { "from": "triage", "to": "tdd", "label": "code" },
+    { "from": "triage", "to": "human", "label": "human" },
+    { "from": "tdd", "to": "review" },
+    { "from": "review", "to": "pr" },
+    { "from": "pr", "to": "retro" }
+  ]
+}
+      </script>
+      <figcaption>The human stays at the front: the plan is grilled until it holds, and human-only steps become a script.</figcaption>
+      <ol class="narr">
+        <li><b>grill-me</b> asks questions until the idea holds. If it does not, the grilling goes on.</li>
+        <li><b>to-spec, then to-tickets</b> turn the plan into one ticket per slice.</li>
+        <li><b>triage</b> sorts the incoming tickets. A step only a human can do goes to <code>wizard</code>, which writes a bash script for it.</li>
+        <li><b>tdd and diagnosing-bugs</b> write a failing test before the fix. <b>code-review</b> reads the diff against the spec.</li>
+        <li><b>pr</b> opens it, and <b>retro</b> writes what was learned.</li>
       </ol>
     </figure>
   </section>
@@ -103,31 +188,84 @@
   <section>
     <h2>gstack runs a sprint from office hours to a canary after deploy</h2>
     <p><b>gstack</b> is Garry Tan's MIT skill stack for Claude Code. Its order is think, plan, build, review, test, ship and reflect. It is the only pack here that follows a change past merge, into deploy and a canary.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="/office-hours"><b>Think</b> what to build and why</li>
-        <li data-k="human" data-who="/plan-ceo-review, /plan-eng-review"><b>Plan reviews</b> scope, architecture, design and DX, or /autoplan</li>
-        <li data-k="gate" data-who="/review, /cso"><b>Review</b> code, and a security audit at any stage</li>
-        <li data-k="gate" data-who="/qa, /benchmark"><b>Test</b> real browser QA and Core Web Vitals</li>
-        <li data-k="tool" data-who="/ship, /land-and-deploy"><b>Ship and deploy</b> PR, merge, deploy</li>
-        <li data-k="gate" data-who="/canary"><b>Watch production</b> after deploy</li>
-        <li data-k="tool" data-who="/retro, /learn"><b>Reflect</b> what to keep for next time</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "think", "at": [0, 0], "label": "Think", "tone": "accent", "who": "/office-hours" },
+    { "id": "plan", "at": [1, 0], "label": "Plan reviews", "tone": "accent", "who": "/autoplan" },
+    { "id": "build", "at": [2, 0], "label": "Build" },
+    { "id": "review", "at": [3, 0], "label": "Review", "tone": "pass", "who": "/review, /cso" },
+    { "id": "qa", "at": [3, 1], "label": "Real browser QA", "tone": "pass", "who": "/qa, /benchmark" },
+    { "id": "ship", "at": [2, 1], "label": "Ship and deploy", "who": "/land-and-deploy" },
+    { "id": "canary", "at": [1, 1], "label": "Healthy?", "shape": "diamond", "tone": "pass" },
+    { "id": "inv", "at": [1, 2.1], "label": "Investigate", "tone": "fail", "who": "/investigate" },
+    { "id": "retro", "at": [0, 1], "label": "Reflect", "shape": "doc", "who": "/retro, /learn" },
+    { "id": "safe", "at": [3, 2.1], "label": "Safety rails", "tone": "wait", "dashed": true, "who": "/careful, /guard" }
+  ],
+  "edges": [
+    { "from": "think", "to": "plan" },
+    { "from": "plan", "to": "build" },
+    { "from": "build", "to": "review" },
+    { "from": "review", "to": "qa" },
+    { "from": "qa", "to": "build", "label": "bug", "tone": "fail" },
+    { "from": "qa", "to": "ship" },
+    { "from": "ship", "to": "canary", "label": "canary" },
+    { "from": "canary", "to": "retro", "label": "yes" },
+    { "from": "canary", "to": "inv", "label": "no", "tone": "fail" }
+  ]
+}
+      </script>
+      <figcaption>The only pack that follows a change past merge: a canary after deploy decides between reflect and investigate.</figcaption>
+      <ol class="narr">
+        <li><b>/office-hours</b> settles what to build and why. <b>/plan-ceo-review and /plan-eng-review</b> check scope, architecture, design and DX, or /autoplan runs them all.</li>
+        <li><b>/review</b> reads the code, and <b>/cso</b> runs a security audit at any stage.</li>
+        <li><b>/qa</b> tests in a real browser and <b>/benchmark</b> checks Core Web Vitals. A bug goes back to build.</li>
+        <li><b>/ship and /land-and-deploy</b> open the PR, merge and deploy. <b>/canary</b> watches production after deploy.</li>
+        <li><b>/retro and /learn</b> keep what worked. Beside the sprint, /careful, /freeze and /guard limit what a session may touch.</li>
       </ol>
-      <figcaption>Safety skills sit beside the sprint: /careful, /freeze and /guard limit what a session may touch.</figcaption>
     </figure>
   </section>
 
   <section>
     <h2>pstack makes the agent prove a change works before it says done</h2>
     <p><b>pstack</b> is poteto's skill stack, mirrored at backnotprop/pstack with ports for Claude Code. Its principles are prove-it-works, fix root causes and encode lessons in structure. <code>/interrogate</code> sends a diff to other models to break it.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="/poteto-mode"><b>Route the task</b> the entry skill picks the path</li>
-        <li data-k="human" data-who="/sharpen, /in-your-own-words"><b>Sharpen the ask</b> restate it until it is testable</li>
-        <li data-k="tool" data-who="/architect, /blast-radius"><b>Design</b> and list what the change reaches</li>
-        <li data-k="gate" data-who="/tdd"><b>Test first</b></li>
-        <li data-k="gate" data-who="/interrogate, /show-me-your-work"><b>Break it</b> other models attack the diff; evidence before claims</li>
-        <li data-k="tool" data-who="/reflect, /correct"><b>Encode the lesson</b> as a rule or a verification skill</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "route", "at": [0, 0], "label": "Route the task", "tone": "accent", "who": "/poteto-mode" },
+    { "id": "sharp", "at": [1, 0], "label": "Sharpen the ask", "tone": "accent", "who": "/sharpen" },
+    { "id": "design", "at": [2, 0], "label": "Design", "who": "/architect" },
+    { "id": "blast", "at": [3, 0], "label": "Blast radius", "shape": "doc", "who": "/blast-radius" },
+    { "id": "tdd", "at": [3, 1], "label": "Test first", "tone": "pass", "who": "/tdd" },
+    { "id": "attack", "at": [2, 1], "label": "Other models attack", "tone": "pass", "who": "/interrogate" },
+    { "id": "holds", "at": [1, 1], "label": "Survives?", "shape": "diamond", "tone": "pass" },
+    { "id": "show", "at": [0, 1], "label": "Show the work", "tone": "pass", "who": "/show-me-your-work" },
+    { "id": "lesson", "at": [0, 2.1], "label": "Encode the lesson", "shape": "doc", "who": "/reflect, /correct" },
+    { "id": "rule", "at": [1.5, 2.1], "label": "Rule or check", "shape": "store" }
+  ],
+  "edges": [
+    { "from": "route", "to": "sharp" },
+    { "from": "sharp", "to": "design", "label": "testable" },
+    { "from": "design", "to": "blast" },
+    { "from": "blast", "to": "tdd" },
+    { "from": "tdd", "to": "attack" },
+    { "from": "attack", "to": "holds" },
+    { "from": "holds", "to": "tdd", "label": "broken", "tone": "fail", "via": [[1, 1.72], [3, 1.72]] },
+    { "from": "holds", "to": "show", "label": "yes" },
+    { "from": "show", "to": "lesson" },
+    { "from": "lesson", "to": "rule" }
+  ]
+}
+      </script>
+      <figcaption>Other models try to break the diff before the agent may say done, and every lesson becomes structure.</figcaption>
+      <ol class="narr">
+        <li><b>/poteto-mode</b> is the entry skill: it picks the path for the task.</li>
+        <li><b>/sharpen and /in-your-own-words</b> restate the ask until it is testable.</li>
+        <li><b>/architect</b> designs it and <b>/blast-radius</b> lists what the change reaches.</li>
+        <li><b>/tdd</b> writes the test first. <b>/interrogate</b> sends the diff to other models to break it; a break goes back to the test.</li>
+        <li><b>/show-me-your-work</b> puts evidence before claims. <b>/reflect and /correct</b> encode the lesson as a rule or a verification skill.</li>
       </ol>
     </figure>
   </section>
@@ -155,14 +293,39 @@
   <section>
     <h2>We vendor a skill by commit and hash, so an upstream edit waits for a reader</h2>
     <p><b>Vendoring</b> copies a skill into our own repo at a pinned version. <code>plugins/lwp-eng/vendor.json</code> in lwp-claude-plugins pins each source to a commit and each file to a sha256. Today it pins addyosmani 1401c8b8, mattpocock 24fe0ef7, obra/superpowers 8ca22dba and trailofbits 82fe8226.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Pick one skill</b> for one task type from the table</li>
-        <li data-k="human" data-who="Param"><b>Read every line</b> a skill is a prompt that runs with our tools</li>
-        <li data-k="tool" data-who="vendor.json"><b>Pin it</b> source commit plus a sha256 per file</li>
-        <li data-k="tool" data-who="sync-skills.py"><b>Copy into the plugin</b> at the pinned commit, recording each hash</li>
-        <li data-k="gate" data-who="check-vendored.py"><b>Check the pins</b> in make check: an edited file fails until the pin moves</li>
-        <li data-k="gap" data-who="each app repo"><b>Copy into the repo</b> a factory worktree has no plugins, so the skill must live in .claude/skills</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "lanes": [{ "label": "lwp-claude-plugins", "rows": [0, 1] }, { "label": "each app repo", "rows": [2, 2] }],
+  "nodes": [
+    { "id": "pick", "at": [0, 0], "label": "Pick one skill", "tone": "accent", "who": "one task type" },
+    { "id": "read", "at": [1, 0], "label": "Read every line", "tone": "accent", "who": "Param" },
+    { "id": "safe", "at": [2, 0], "label": "Safe?", "shape": "diamond", "tone": "accent" },
+    { "id": "pin", "at": [2, 1], "label": "Pin it", "shape": "doc", "who": "vendor.json" },
+    { "id": "copy", "at": [1, 1], "label": "Copy it in", "who": "sync-skills.py" },
+    { "id": "hash", "at": [0, 1], "label": "Hash matches?", "shape": "diamond", "tone": "pass" },
+    { "id": "repo", "at": [0, 2], "label": "Copy into the repo", "tone": "fail", "dashed": true, "who": "missing today" },
+    { "id": "run", "at": [1, 2], "label": "A run reads it", "shape": "store", "faint": true, "who": ".claude/skills" }
+  ],
+  "edges": [
+    { "from": "pick", "to": "read" },
+    { "from": "read", "to": "safe" },
+    { "from": "safe", "to": "pin", "label": "yes" },
+    { "from": "pin", "to": "copy" },
+    { "from": "copy", "to": "hash" },
+    { "from": "hash", "to": "copy", "label": "fails", "tone": "fail", "bend": 60 },
+    { "from": "hash", "to": "repo", "label": "yes", "tone": "fail", "dashed": true },
+    { "from": "repo", "to": "run", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>A skill is read, pinned and hashed in the plugin; the last hop into each app repo is still missing.</figcaption>
+      <ol class="narr">
+        <li><b>Param picks one skill</b> for one task type from the table, and <b>reads every line</b>: a skill is a prompt that runs with our tools.</li>
+        <li><b>vendor.json pins it:</b> the source commit, plus a sha256 for every file.</li>
+        <li><b>sync-skills.py copies it</b> into the plugin at the pinned commit and records each hash.</li>
+        <li><b>check-vendored.py</b> runs in make check. An edited file fails until the pin moves.</li>
+        <li><b>The copy into each app repo</b> is missing. A factory worktree has no plugins, so the skill must live in .claude/skills.</li>
       </ol>
     </figure>
   </section>

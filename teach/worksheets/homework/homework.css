@@ -1,5 +1,5 @@
-/* Homework pages: the worksheet tokens plus hand-drawn flows (flow.js draws each figure from its list).
-   Yellow is a step a human owns, green a check that runs, red dashed a check that is missing. */
+/* Homework pages: the worksheet tokens plus hand-drawn scenes (scene.js draws each figure from its spec).
+   Yellow is a step a human owns, green a check that can say no, red a check that is missing. */
 @import url("../worksheet.css");
 
 @font-face { font-family: Excalifont; src: url("excalifont.woff2") format("woff2"); font-display: swap; }
@@ -7,14 +7,19 @@
 figure { margin: 0; display: grid; gap: 12px; min-width: 0; }
 figcaption { font-size: 14px; color: var(--muted); max-width: 70ch; }
 
-/* A flow: the list until the drawing exists, then the drawing (the list stays for screen readers) */
-figure.flow > ol { list-style: decimal; padding-left: 22px; gap: 6px; font-size: 14px; }
-figure.flow > ol b { font-weight: 600; margin-right: 4px; }
-figure.flow:has(> svg) > ol { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-svg.drawn { display: block; max-width: 100%; height: auto; overflow: visible; }
-svg.drawn .ttl { font: 17px Excalifont, var(--sans); fill: #1e1e1e; }
-svg.drawn .bdy { font: 13px var(--sans); fill: var(--ink-2); }
-svg.drawn .who { font: 500 11.5px var(--mono); fill: var(--muted); }
+/* A scene: scene.js draws the JSON spec into .stage; the narration list under it is the text of the drawing */
+figure.scene .stage { overflow-x: auto; overscroll-behavior-x: contain; padding: 6px 0 2px; }
+svg.drawn { display: block; height: auto; margin: 0 auto; }
+svg.drawn .lbl { font-family: Excalifont, var(--sans); font-size: 34px; fill: #1e1e1e; text-anchor: middle; }
+svg.drawn .lbl.faint { fill: #9A9A9A; }
+svg.drawn .who { font: 500 22px var(--mono); fill: var(--muted); text-anchor: middle; }
+svg.drawn .elbl { font-family: Excalifont, var(--sans); font-size: 27px; fill: #3D3D3D; text-anchor: middle; }
+svg.drawn .elbl-bg { fill: var(--surface); }
+svg.drawn .lane { fill: #F4F4F0; stroke: none; }
+svg.drawn .lane-t { font: 600 28px var(--sans); fill: var(--muted); }
+svg.drawn .grp { font: 500 26px var(--sans); fill: var(--muted); }
+ol.narr { list-style: decimal; padding-left: 22px; display: grid; gap: 4px; font-size: 14px; color: var(--ink-2); max-width: 75ch; margin: 0; }
+ol.narr b { font-weight: 600; color: var(--ink); }
 
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13.5px; color: var(--ink-2); }
 .legend span { display: inline-flex; align-items: center; gap: 8px; }

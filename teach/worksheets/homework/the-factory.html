@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="homework.css">
 <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
-<script src="flow.js" defer></script>
+<script src="scene.js" defer></script>
 </head>
 <body>
 <main>
@@ -42,19 +42,50 @@
   <section>
     <h2>The factory loop turns a labelled issue into a PR a human merges</h2>
     <p>A <b>software factory</b> is a runner that takes an issue through triage, plan, build, verify and PR with no one at the keyboard. Each stage is a skill in its own worktree. The runner, not the agent, decides green or red.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Label the issue</b> factory:ready</li>
-        <li data-k="tool" data-who="triage"><b>Classify risk</b> and post a triage comment</li>
-        <li data-k="tool" data-who="plan"><b>Plan</b> acceptance criteria and a risk verdict</li>
-        <li data-k="human" data-who="/factory approve"><b>Approve the plan</b> low risk can auto-approve</li>
-        <li data-k="tool" data-who="build"><b>Build test-first</b> the smallest change</li>
-        <li data-k="gate" data-who="gates.sh"><b>Run the gate</b> the runner reads FACTORY_GATES</li>
-        <li data-k="gate" data-who="verify" data-back="5"><b>Prove it</b> revert, see the test fail; a reject goes back to build twice</li>
-        <li data-k="wait" data-who="needs-human"><b>Park</b> after two rejects or two questions</li>
-        <li data-k="tool" data-who="pr"><b>Open the PR</b> from the repo's template</li>
-        <li data-k="human" data-who="Param"><b>Merge</b> main deploys</li>
-        <li data-k="tool" data-who="retro"><b>Write the lesson</b> into .factory/memory</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "label", "at": [0, 0], "label": "Label it", "shape": "ellipse", "tone": "accent", "who": "Param" },
+    { "id": "triage", "at": [1, 0], "label": "Triage", "who": "classify risk" },
+    { "id": "plan", "at": [2, 0], "label": "Plan", "who": "criteria, risk" },
+    { "id": "risk", "at": [3, 0], "label": "Low risk?", "shape": "diamond" },
+    { "id": "approve", "at": [3, 1], "label": "Approve plan", "tone": "accent", "who": "/factory approve" },
+    { "id": "build", "at": [2, 1], "label": "Build", "who": "test first" },
+    { "id": "gate", "at": [1, 1], "label": "Gate green?", "shape": "diamond", "tone": "pass" },
+    { "id": "bite", "at": [0, 1], "label": "Test bites?", "shape": "diamond", "tone": "pass" },
+    { "id": "pr", "at": [0, 2.2], "label": "Open the PR", "who": "repo template" },
+    { "id": "merge", "at": [1, 2.2], "label": "Merge", "shape": "ellipse", "tone": "accent", "who": "Param" },
+    { "id": "memory", "at": [2, 2.2], "label": "Lesson", "shape": "store", "who": ".factory/memory" },
+    { "id": "park", "at": [3, 2.2], "label": "Park it", "tone": "wait", "who": "needs-human" }
+  ],
+  "edges": [
+    { "from": "label", "to": "triage" },
+    { "from": "triage", "to": "plan" },
+    { "from": "plan", "to": "risk" },
+    { "from": "risk", "to": "approve", "label": "no" },
+    { "from": "risk", "to": "build", "label": "yes", "dashed": true },
+    { "from": "approve", "to": "build" },
+    { "from": "build", "to": "gate" },
+    { "from": "gate", "to": "build", "label": "red", "tone": "fail", "bend": 60 },
+    { "from": "gate", "to": "bite", "label": "ok" },
+    { "from": "bite", "to": "build", "label": "reject", "tone": "fail", "via": [[0.5, 1.68], [2, 1.68]] },
+    { "from": "build", "to": "park", "label": "twice", "tone": "fail" },
+    { "from": "bite", "to": "pr", "label": "yes" },
+    { "from": "pr", "to": "merge" },
+    { "from": "merge", "to": "memory", "label": "retro" }
+  ]
+}
+      </script>
+      <figcaption>Param clicks three times: label, approve and merge. Every step between them has a check, and two loops back to build.</figcaption>
+      <ol class="narr">
+        <li><b>Param labels the issue</b> factory:ready.</li>
+        <li><b>Triage classifies the risk</b> and posts a comment. <b>Plan</b> writes the acceptance criteria and a risk verdict.</li>
+        <li><b>Param approves the plan</b> with /factory approve. A low-risk plan can approve itself, when the repo turns that on.</li>
+        <li><b>Build works test first</b> on the smallest change. The runner reads the FACTORY_GATES line, and red goes back.</li>
+        <li><b>Verify reverts the fix</b> and the test must fail. A reject goes back to build.</li>
+        <li><b>After two rejects or two questions,</b> the card parks as needs-human.</li>
+        <li><b>PR opens</b> from the repo's template, <b>Param merges,</b> main deploys, and retro writes the lesson into .factory/memory.</li>
       </ol>
     </figure>
     <p>Compare it with <a href="how-we-work-today.html">how we work today</a>. Param still labels, approves and merges. Everything between those three clicks now has a check.</p>
@@ -75,14 +106,39 @@
   <section>
     <h2>Every failure the factory hits becomes an issue against the factory</h2>
     <p>The factory repo releases through its own gate. Each new check lands with a mutation that must turn its test red. A bug seen while running kaas-suite is filed against the factory, fixed, and released.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="factory"><b>Run on kaas-suite</b> real issues</li>
-        <li data-k="human" data-who="operator"><b>Notice a fault</b> a leak, a stuck card, a wrong verdict</li>
-        <li data-k="tool" data-who="factory repo"><b>File it</b> issues #41 to #53</li>
-        <li data-k="gate" data-who="check-mutations"><b>Fix with a mutation</b> the mutation must turn its test red</li>
-        <li data-k="gate" data-who="CI"><b>Three jobs</b> check with an empty HOME, mutations, docker build</li>
-        <li data-k="tool" data-who="release" data-back="1"><b>Release</b> v4.0.1 to v4.0.3; install.sh carries the fix to every repo</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "run", "at": [0, 0], "label": "Run kaas-suite", "tone": "accent", "who": "real issues" },
+    { "id": "notice", "at": [1, 0], "label": "Notice a fault", "who": "operator" },
+    { "id": "file", "at": [2, 0], "label": "File it", "shape": "doc", "who": "#41 to #53" },
+    { "id": "fix", "at": [3, 0], "label": "Fix with a test", "who": "factory repo" },
+    { "id": "red", "at": [3, 1], "label": "Mutant goes red?", "shape": "diamond", "tone": "pass" },
+    { "id": "ci", "at": [2, 1], "label": "Three CI jobs", "tone": "pass", "who": "empty HOME" },
+    { "id": "rel", "at": [1, 1], "label": "Release", "shape": "store", "who": "v4.0.1 to v4.0.3" },
+    { "id": "install", "at": [0, 1], "label": "install.sh", "who": "every repo" }
+  ],
+  "edges": [
+    { "from": "run", "to": "notice" },
+    { "from": "notice", "to": "file" },
+    { "from": "file", "to": "fix" },
+    { "from": "fix", "to": "red" },
+    { "from": "red", "to": "fix", "label": "no", "tone": "fail", "bend": -60 },
+    { "from": "red", "to": "ci", "label": "yes" },
+    { "from": "ci", "to": "rel" },
+    { "from": "rel", "to": "install" },
+    { "from": "install", "to": "run", "label": "rerun" }
+  ]
+}
+      </script>
+      <figcaption>A circle: every fault seen on kaas-suite comes back as a release that every repo installs.</figcaption>
+      <ol class="narr">
+        <li><b>The factory runs on kaas-suite</b> with real issues.</li>
+        <li><b>The operator notices a fault:</b> a leak, a stuck card or a wrong verdict, and files it against the factory repo.</li>
+        <li><b>The fix lands with a mutation,</b> and make check-mutations must turn its test red.</li>
+        <li><b>CI runs three jobs:</b> check with an empty HOME, mutations, and a docker build.</li>
+        <li><b>A release ships,</b> and install.sh carries the fix to every repo on its next run.</li>
       </ol>
     </figure>
     <div class="tw"><table>
@@ -102,13 +158,40 @@
 <pre>factory install ~/learn/kaaslabs/kaas.team        # template: hooks, stage skills, gates.sh
 factory init --repo-dir ~/learn/kaaslabs/kaas.team  # .factory/config.json from the stack
 factory watch --repo-dir ~/learn/kaaslabs/kaas.team # poll and drive the loop</pre>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="blueprint"><b>Blueprint in place</b> AGENTS.md, CLAUDE.md, .claude</li>
-        <li data-k="gate" data-who="gates"><b>Gates in place</b> make check, CI, protectedPaths</li>
-        <li data-k="tool" data-who="factory install"><b>Install the template</b></li>
-        <li data-k="tool" data-who="factory init"><b>Write the config</b> budgets, protected paths, auto-approve off</li>
-        <li data-k="gate" data-who="first issue"><b>Run one easy issue</b> and read every stage's comment</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "bp", "at": [0, 0], "label": "Blueprint", "shape": "doc", "who": "AGENTS.md, .claude" },
+    { "id": "gates", "at": [0, 1], "label": "Gates", "shape": "doc", "tone": "pass", "who": "make check, CI" },
+    { "id": "ready", "at": [1, 0.5], "label": "Both in place?", "shape": "diamond" },
+    { "id": "first", "at": [1, 1.6], "label": "Build them first", "tone": "fail", "dashed": true },
+    { "id": "install", "at": [2, 0.5], "label": "Install", "who": "factory install" },
+    { "id": "init", "at": [3, 0.5], "label": "Write config", "shape": "doc", "who": "factory init" },
+    { "id": "easy", "at": [3, 1.6], "label": "One easy issue", "tone": "accent" },
+    { "id": "read", "at": [2, 1.6], "label": "Stages right?", "shape": "diamond", "tone": "pass" },
+    { "id": "watch", "at": [2, 2.7], "label": "Watch", "shape": "ellipse", "tone": "pass", "who": "factory watch" }
+  ],
+  "edges": [
+    { "from": "bp", "to": "ready" },
+    { "from": "gates", "to": "ready" },
+    { "from": "ready", "to": "first", "label": "no", "tone": "fail" },
+    { "from": "ready", "to": "install", "label": "yes" },
+    { "from": "install", "to": "init" },
+    { "from": "init", "to": "easy" },
+    { "from": "easy", "to": "read", "label": "read" },
+    { "from": "read", "to": "init", "label": "no", "tone": "fail" },
+    { "from": "read", "to": "watch", "label": "yes" }
+  ]
+}
+      </script>
+      <figcaption>The factory installs last. Without a blueprint and gates, it has nothing to read and nothing to prove against.</figcaption>
+      <ol class="narr">
+        <li><b>The blueprint</b> (AGENTS.md, CLAUDE.md, .claude) and <b>the gates</b> (make check, CI, protected paths) come first.</li>
+        <li><b>factory install</b> copies the template: hooks, stage skills and gates.sh.</li>
+        <li><b>factory init</b> writes the config: budgets, protected paths, and auto-approve off.</li>
+        <li><b>Run one easy issue</b> and read every stage's comment. If a stage reads wrong, fix the config first.</li>
+        <li><b>factory watch</b> then polls and drives the loop.</li>
       </ol>
     </figure>
   </section>

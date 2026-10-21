@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="homework.css">
 <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
-<script src="flow.js" defer></script>
+<script src="scene.js" defer></script>
 </head>
 <body>
 <main>
@@ -20,14 +20,14 @@
     <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
     <span class="when">Before any factory</span>
     <h1>Map how we ship each task type by hand, <mark>before any factory</mark></h1>
-    <p class="lede">This page maps how we run kaas.team, lwp-academy and englishmaa today, with no factory. Each task type gets one drawing. The drawing shows who does each step, what checks it, and where a check is missing. Every step points at a real commit, PR or alert from October 2026.</p>
+    <p class="lede">This page maps how we run kaas.team, lwp-academy and englishmaa today, with no factory. First comes the one workflow every task runs, from triage to merge. Then each task type gets its own drawing, built from a real commit, PR or alert from October 2026.</p>
   </header>
 
   <section>
     <h2>You will learn where our work waits on one person</h2>
     <ul>
-      <li>How each task type moves today, from planning and triage to a revert and a review.</li>
-      <li>Which step a human owns, which step a script checks, and which check does not exist yet.</li>
+      <li>The workflow every task runs today, and which steps it skips when they are not needed.</li>
+      <li>How each task type bends that workflow, from planning and triage to a revert and a review.</li>
       <li>Which task types are ready for a factory first, and which ones stay with a human.</li>
     </ul>
     <div class="legend" aria-label="How to read the drawings">
@@ -37,11 +37,80 @@
       <span><i class="wait"></i>The work waits</span>
       <span><i class="gap"></i>A check that is missing</span>
     </div>
+    <p class="hint">An oval starts or ends the work. A diamond is a decision. A folded page is a file, and a drum is a branch or a list.</p>
+  </section>
+
+  <section>
+    <h2>Every task runs one workflow from triage to merge, and skips what it does not need</h2>
+    <p>The <b>workflow</b> is the path a task takes from the moment it arrives to the moment it is live. Ours runs in a Claude Code session with the lwp-eng plugin. Param makes every decision, and the session does the rest. Each diamond is a place where the task takes only the steps it needs.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "groups": [{ "label": "Plan", "nodes": ["spec", "tasks"] }],
+  "nodes": [
+    { "id": "in", "at": [0, 0], "label": "A task arrives", "shape": "ellipse" },
+    { "id": "size", "at": [1, 0], "label": "Big or unclear?", "shape": "diamond", "tone": "accent" },
+    { "id": "spec", "at": [2, 0], "label": "Research, write the spec", "shape": "doc", "who": "plan/specs" },
+    { "id": "tasks", "at": [3, 0], "label": "Spec to task list", "who": "TaskCreate" },
+    { "id": "issue", "at": [0, 1], "label": "Write an issue", "tone": "fail", "dashed": true, "who": "never done" },
+    { "id": "build", "at": [1, 1], "label": "Build in a worktree", "who": "one per task" },
+    { "id": "ui", "at": [2, 1], "label": "UI and UX plan", "tone": "accent", "who": "frontend-design" },
+    { "id": "page", "at": [3, 1], "label": "Changes a page?", "shape": "diamond" },
+    { "id": "gate", "at": [1, 2], "label": "Run the gate", "tone": "pass", "who": "check-affected.py" },
+    { "id": "test", "at": [2, 2], "label": "Run the tests", "tone": "pass", "who": "unit, e2e" },
+    { "id": "lh", "at": [3, 2], "label": "Lighthouse", "tone": "pass", "who": "100, mobile 95" },
+    { "id": "ship", "at": [0, 3], "label": "Ship how?", "shape": "diamond", "tone": "accent" },
+    { "id": "verify", "at": [1, 3], "label": "Plan against done", "tone": "accent", "who": "verifier, task list" },
+    { "id": "push", "at": [0, 4], "label": "Push to main", "tone": "pass", "who": "pre-push gate" },
+    { "id": "pr", "at": [1, 4], "label": "Open a PR, merge", "who": "5 PRs ever" },
+    { "id": "live", "at": [2.5, 4], "label": "Go live", "shape": "ellipse", "who": "probe the URL" }
+  ],
+  "edges": [
+    { "from": "in", "to": "size" },
+    { "from": "in", "to": "issue", "label": "no", "tone": "fail", "dashed": true },
+    { "from": "size", "to": "spec", "label": "yes" },
+    { "from": "size", "to": "build", "label": "no" },
+    { "from": "spec", "to": "tasks" },
+    { "from": "tasks", "to": "page" },
+    { "from": "page", "to": "ui", "label": "yes" },
+    { "from": "ui", "to": "build" },
+    { "from": "page", "to": "build", "label": "no", "via": [[3, 1.72], [1.25, 1.72]] },
+    { "from": "build", "to": "gate" },
+    { "from": "gate", "to": "build", "label": "red", "tone": "fail", "bend": 70 },
+    { "from": "gate", "to": "test" },
+    { "from": "test", "to": "lh", "label": "if UI" },
+    { "from": "lh", "to": "verify", "via": [[3, 3]] },
+    { "from": "test", "to": "verify", "label": "no UI" },
+    { "from": "verify", "to": "build", "label": "gaps", "tone": "fail", "via": [[0.45, 2.5], [0.45, 1.6]] },
+    { "from": "verify", "to": "ship" },
+    { "from": "ship", "to": "push", "label": "most" },
+    { "from": "ship", "to": "pr", "label": "rarely" },
+    { "from": "push", "to": "live", "via": [[0, 4.75], [2.5, 4.75]] },
+    { "from": "pr", "to": "live" }
+  ]
+}
+      </script>
+      <figcaption>The workflow from triage to merge, as one Claude Code session runs it today.</figcaption>
+      <ol class="narr">
+        <li><b>A task arrives</b> as a chat message, a Telegram alert from Coolify, a reader email or a page seen broken live. No issue is written; all three repos have zero.</li>
+        <li><b>Big or unclear?</b> Param decides. A one-line fix goes straight to a worktree. An epic or a new product gets research and a spec first.</li>
+        <li><b>Research and write the spec</b> in <code>internal-apps/plan/specs</code>, or as an <code>intent.md</code> through the eng-intent skill. The grilling skill stress-tests it.</li>
+        <li><b>Spec to task list.</b> The session writes one task per piece with TaskCreate. The stop-tasks hook refuses to end a turn while a task is open.</li>
+        <li><b>Changes a page?</b> If yes, the frontend-design skill plans the UI and UX first. A backend fix skips it.</li>
+        <li><b>Build in a worktree,</b> one per task, so parallel sessions never touch the same files. Guard hooks refuse secrets, applied migrations and the wrong e2e port.</li>
+        <li><b>Run the gate.</b> <code>check-affected.py --run</code> runs only the checks the change reaches. The stop-gate hook refuses to end a turn that skipped it. Red goes back to build.</li>
+        <li><b>Run the tests,</b> then <b>Lighthouse</b> only when a page changed. kaas.team and lwp-academy need 100 everywhere, with mobile Performance at a median of 95.</li>
+        <li><b>Plan against done.</b> The verifier agent exercises the change, and the task list is read against the spec. A gap goes back to build.</li>
+        <li><b>Ship.</b> Most changes push to main through the pre-push gate. A PR is rare: five in all three repos, ever.</li>
+        <li><b>Deploy and probe the URL.</b> Coolify deploys on push, and the session curls the live page before it calls the task done.</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What it costs</b> Every diamond is Param. The session cannot start without him, cannot pick a branch without him, and cannot ship without him. The workflow is sound; it just has one person in every decision.</div>
   </section>
 
   <section>
     <h2>One person, one laptop and three repos run all three businesses</h2>
-    <p>A <b>manual workflow</b> is a path where a person starts, checks and finishes every step. All three apps follow one. Param notices the work, opens a Claude Code session in the main checkout, and pushes to main. The table shows what each repo has around that path today.</p>
+    <p>A <b>manual workflow</b> is a path where a person starts, checks and finishes every step. All three apps run the workflow above. The table shows what each repo has around it today.</p>
     <div class="tw"><table>
       <thead><tr><th></th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
       <tbody>
@@ -55,28 +124,38 @@
         <tr><td class="k">Deploy</td><td>Coolify, on push to main</td><td>Coolify, on push to main</td><td>not written in the repo; mobile by a manual button in Actions</td></tr>
       </tbody>
     </table></div>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Notice the work</b> on the live site, in an email or in a Telegram alert</li>
-        <li data-k="tool" data-who="Claude Code"><b>Edit in a session</b> in the main checkout, straight on main</li>
-        <li data-k="gate" data-who="make check"><b>Run the gate</b> in the pre-push hook, if the repo has one</li>
-        <li data-k="tool" data-who="Coolify"><b>Deploy on push</b> to main, with no review step</li>
-      </ol>
-      <figcaption>The shape under every drawing on this page. The rest of the page shows where each task type bends it.</figcaption>
-    </figure>
   </section>
 
   <section>
     <h2>Planning lives in specs and Linear, but no commit points back to them</h2>
     <p><b>Planning</b> is deciding what to build and in what order. Ours starts as a spec in <code>internal-apps/plan/specs</code>, numbered from <code>00-ladder</code> to <code>09</code>. Linear holds one project per product under the team key LEA. The code never names either.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Have the idea</b> during a session, a call or a review of numbers</li>
-        <li data-k="human" data-who="Param and Claude"><b>Write the spec</b> as a markdown file in plan/specs</li>
-        <li data-k="wait" data-who="Linear"><b>Maybe add a card</b> to the product's Linear project</li>
-        <li data-k="tool" data-who="Claude Code"><b>Build it</b> in the app repo, commits straight on main</li>
-        <li data-k="gap" data-who="nobody"><b>Link the commit to the plan</b> no commit names a LEA key or a spec</li>
-        <li data-k="gap" data-who="nobody"><b>Mark the spec done</b> STATUS.md is edited by hand, or not at all</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "idea", "at": [0, 0], "label": "An idea", "shape": "ellipse", "tone": "accent" },
+    { "id": "spec", "at": [1, 0], "label": "Spec in plan/specs", "shape": "doc", "tone": "accent" },
+    { "id": "linear", "at": [2, 0], "label": "Linear card", "shape": "store", "tone": "wait", "dashed": true, "who": "LEA, maybe" },
+    { "id": "build", "at": [1, 1], "label": "Build in a session" },
+    { "id": "main", "at": [2, 1], "label": "main", "shape": "store" },
+    { "id": "status", "at": [3, 1], "label": "STATUS.md", "shape": "doc", "tone": "fail", "who": "02 not started" }
+  ],
+  "edges": [
+    { "from": "idea", "to": "spec" },
+    { "from": "spec", "to": "linear", "label": "maybe", "dashed": true },
+    { "from": "spec", "to": "build" },
+    { "from": "build", "to": "main", "label": "commits" },
+    { "from": "main", "to": "linear", "label": "no key", "tone": "fail", "dashed": true },
+    { "from": "main", "to": "status", "label": "no update", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Planning flows one way: from the idea to main. Nothing flows back to say a spec is done.</figcaption>
+      <ol class="narr">
+        <li><b>An idea</b> comes up in a session, a call or a review of numbers.</li>
+        <li><b>Param and Claude write the spec</b> as a markdown file in plan/specs. Sometimes a Linear card follows.</li>
+        <li><b>A session builds it</b> in the app repo, with commits straight on main.</li>
+        <li><b>Nothing links back.</b> No commit names a LEA key or a spec, and STATUS.md is edited by hand, or not at all.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> STATUS.md still says 02-email-plunk is not started. Plunk mail shipped in all three apps on 14 and 15 October. The plan and the code drifted within a week.</div>
@@ -86,12 +165,35 @@
   <section>
     <h2>Triage happens in one head, so nothing records what was dropped</h2>
     <p><b>Triage</b> is deciding whether a report is real, how urgent it is and who takes it. We have no issues in any of the three repos. A report arrives, Param decides on the spot, and the decision leaves no trace.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="many places"><b>A signal arrives</b> a reader email, a Coolify alert in Telegram, a broken page seen live</li>
-        <li data-k="human" data-who="Param"><b>Decide now or later</b> with no label, priority or owner written down</li>
-        <li data-k="gap" data-who="nobody"><b>Write the issue</b> zero GitHub issues across the three repos</li>
-        <li data-k="wait" data-who="Param's memory"><b>Wait</b> until it is fixed or forgotten</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "mail", "at": [0, 0], "label": "Reader email", "shape": "ellipse" },
+    { "id": "alert", "at": [0, 1], "label": "Telegram alert", "shape": "ellipse" },
+    { "id": "seen", "at": [0, 2], "label": "Seen live", "shape": "ellipse" },
+    { "id": "decide", "at": [1, 1], "label": "Param decides", "shape": "diamond", "tone": "accent" },
+    { "id": "now", "at": [2, 0], "label": "Fix it now", "who": "the workflow above" },
+    { "id": "issue", "at": [2, 1], "label": "Write an issue", "tone": "fail", "dashed": true, "who": "zero, ever" },
+    { "id": "later", "at": [2, 2], "label": "Later", "tone": "wait", "dashed": true, "who": "in Param's memory" },
+    { "id": "lost", "at": [3, 2], "label": "Forgotten", "shape": "ellipse", "faint": true }
+  ],
+  "edges": [
+    { "from": "mail", "to": "decide" },
+    { "from": "alert", "to": "decide" },
+    { "from": "seen", "to": "decide" },
+    { "from": "decide", "to": "now", "label": "urgent" },
+    { "from": "decide", "to": "issue", "label": "skipped", "tone": "fail", "dashed": true },
+    { "from": "decide", "to": "later", "label": "not now" },
+    { "from": "later", "to": "lost", "tone": "wait", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Three ways in, one person deciding, and no record of the tasks that wait.</figcaption>
+      <ol class="narr">
+        <li><b>A signal arrives</b> from a reader email, a Coolify alert in Telegram, or a page seen broken on the live site.</li>
+        <li><b>Param decides now or later,</b> with no label, priority or owner written down.</li>
+        <li><b>An urgent task</b> runs the workflow above. Anything else waits in memory until it is fixed or forgotten.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> A factory starts from an issue. With no issue, there is nothing to pick up, and no way to count what we dropped.</div>
@@ -100,14 +202,34 @@
   <section>
     <h2>A small bug gets fixed once per repo, by hand, on the same day</h2>
     <p>A <b>small bug</b> is a wrong behaviour one change can fix and one test can pin. On 15 October a book download subscribed readers to the newsletter. The same Plunk rule lived in three repos, so the fix was made three times.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Notice it</b> a download added the reader to the newsletter list</li>
-        <li data-k="tool" data-who="Claude Code"><b>Fix kaas.team</b> never subscribe on a download (0657164)</li>
-        <li data-k="gate" data-who="pre-push hook"><b>Run make check</b> then push; Coolify deploys</li>
-        <li data-k="human" data-who="Param"><b>Remember lwp-academy</b> and make the same fix (fbfc7e0)</li>
-        <li data-k="human" data-who="Param"><b>Remember englishmaa</b> and revert its Plunk mirror (8aa9273)</li>
-        <li data-k="gap" data-who="nobody"><b>Find the other repos</b> nothing searches siblings for the same call</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "bug", "at": [0, 1], "label": "Download subscribes", "shape": "ellipse", "tone": "fail" },
+    { "id": "kaas", "at": [1, 0], "label": "Fix kaas.team", "who": "0657164" },
+    { "id": "academy", "at": [1, 1], "label": "Remember lwp-academy", "tone": "accent", "who": "fbfc7e0" },
+    { "id": "em", "at": [1, 2], "label": "Remember englishmaa", "tone": "accent", "who": "8aa9273" },
+    { "id": "gate", "at": [2, 1], "label": "Gate, push, deploy", "tone": "pass", "who": "per repo" },
+    { "id": "search", "at": [3, 1], "label": "Search the siblings", "tone": "fail", "dashed": true, "who": "missing" }
+  ],
+  "edges": [
+    { "from": "bug", "to": "kaas", "label": "first" },
+    { "from": "bug", "to": "academy", "label": "then" },
+    { "from": "bug", "to": "em", "label": "then" },
+    { "from": "kaas", "to": "gate" },
+    { "from": "academy", "to": "gate" },
+    { "from": "em", "to": "gate" },
+    { "from": "gate", "to": "search", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>One bug fans out into three repos, and memory is the only thing that finds the second and third.</figcaption>
+      <ol class="narr">
+        <li><b>Param notices</b> a book download added the reader to the newsletter list.</li>
+        <li><b>kaas.team is fixed first:</b> never subscribe on a download (0657164).</li>
+        <li><b>Param remembers lwp-academy</b> and makes the same fix (fbfc7e0), then <b>englishmaa,</b> where the Plunk mirror is reverted (8aa9273).</li>
+        <li><b>Nothing searches the siblings</b> for the same call, so a fourth copy would stay broken.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> The second and third fixes depend on Param remembering. The support address changed in two repos the same day for the same reason (6516b62, 1d3f1ab).</div>
@@ -116,13 +238,31 @@
   <section>
     <h2>A Dependabot PR passes CI and then waits, because nobody is told</h2>
     <p>A <b>Dependabot fix</b> is a version bump that GitHub opens as a PR. Only englishmaa has Dependabot on. Its first PR bumps vite from 8.3.0 to 8.3.4 in <code>/web</code>.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="Dependabot"><b>Open PR #1</b> vite 8.3.0 to 8.3.4, on 21 October</li>
-        <li data-k="gate" data-who="GitHub Actions"><b>Run make check</b> in ci.yml; it passes</li>
-        <li data-k="wait" data-who="nobody"><b>Wait</b> nothing tells a person a green bump is ready</li>
-        <li data-k="human" data-who="Param"><b>Read the changelog and merge</b> not done yet</li>
-        <li data-k="gap" data-who="kaas.team, lwp-academy"><b>Open a bump at all</b> Dependabot is off in both repos</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "pr", "at": [0, 0], "label": "PR #1, vite bump", "who": "Dependabot" },
+    { "id": "ci", "at": [1, 0], "label": "make check", "tone": "pass", "who": "ci.yml, green" },
+    { "id": "told", "at": [2, 0], "label": "Who is told?", "shape": "diamond" },
+    { "id": "nobody", "at": [3, 0], "label": "Nobody", "tone": "fail", "dashed": true },
+    { "id": "merge", "at": [2, 1], "label": "Merge it", "tone": "wait", "dashed": true, "who": "not done yet" },
+    { "id": "off", "at": [0, 1], "label": "No bumps", "shape": "store", "tone": "fail", "dashed": true, "who": "kaas, academy" }
+  ],
+  "edges": [
+    { "from": "pr", "to": "ci" },
+    { "from": "ci", "to": "told" },
+    { "from": "told", "to": "nobody", "tone": "fail" },
+    { "from": "told", "to": "merge", "label": "Param", "tone": "wait", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>The bump is proven green, then stops at a question nobody answers.</figcaption>
+      <ol class="narr">
+        <li><b>Dependabot opens PR #1</b> on 21 October: vite 8.3.0 to 8.3.4.</li>
+        <li><b>CI runs make check</b> in ci.yml, and it passes.</li>
+        <li><b>Nothing tells a person</b> that a green bump is ready, so the merge waits until Param happens to look.</li>
+        <li><b>kaas.team and lwp-academy</b> get no bumps at all: Dependabot is off in both.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> The fix exists and is proven, yet the open vite alerts stay open until a person clicks merge.</div>
@@ -131,13 +271,34 @@
   <section>
     <h2>A vulnerability alert gets one decision, and the reason stays in a dropdown</h2>
     <p><b>Vulnerability handling</b> is reading a security alert on a dependency and choosing to fix it, accept it or dismiss it. englishmaa has nine alerts so far. Six vite alerts are open today, two of them high.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="GitHub"><b>Raise alerts</b> uuid, braces and node-forge on 7 October; six for vite on 21 October</li>
-        <li data-k="human" data-who="Param"><b>Read the advisory</b> and check whether the code path is reachable</li>
-        <li data-k="human" data-who="Param"><b>Decide</b> uuid fixed; braces and node-forge, both high, dismissed the same day</li>
-        <li data-k="gap" data-who="nobody"><b>Write down why</b> the only record is the reason tolerable_risk</li>
-        <li data-k="gap" data-who="nobody"><b>Look again later</b> a dismissed alert has no date to revisit</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "alert", "at": [0, 1], "label": "Alert", "shape": "ellipse", "who": "GitHub" },
+    { "id": "read", "at": [1, 1], "label": "Read the advisory", "tone": "accent", "who": "Param" },
+    { "id": "reach", "at": [2, 1], "label": "Reachable?", "shape": "diamond", "tone": "accent" },
+    { "id": "fix", "at": [3, 0], "label": "Fix it", "tone": "pass", "who": "uuid" },
+    { "id": "dismiss", "at": [3, 1], "label": "Dismiss", "tone": "wait", "who": "braces, node-forge" },
+    { "id": "open", "at": [3, 2], "label": "Leave open", "tone": "wait", "dashed": true, "who": "six for vite" },
+    { "id": "why", "at": [2, 2.1], "label": "Reason, revisit date", "shape": "doc", "tone": "fail", "dashed": true }
+  ],
+  "edges": [
+    { "from": "alert", "to": "read" },
+    { "from": "read", "to": "reach" },
+    { "from": "reach", "to": "fix", "label": "yes" },
+    { "from": "reach", "to": "dismiss", "label": "no" },
+    { "from": "reach", "to": "open", "label": "later" },
+    { "from": "dismiss", "to": "why", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Three outcomes from one decision, and only a dropdown value records why.</figcaption>
+      <ol class="narr">
+        <li><b>GitHub raises alerts:</b> uuid, braces and node-forge on 7 October; six for vite on 21 October.</li>
+        <li><b>Param reads the advisory</b> and checks whether the code path is reachable.</li>
+        <li><b>He decides:</b> uuid fixed; braces and node-forge, both high, dismissed the same day; the vite alerts still open.</li>
+        <li><b>The reason</b> is the dropdown value tolerable_risk, with no note and no date to look again.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> The judgement is sound, but it lives in one person's head. A second person, or an agent, cannot tell a reasoned dismissal from a rushed one.</div>
@@ -146,36 +307,64 @@
   <section>
     <h2>A security bug is fixed when someone spots it, and no test keeps it fixed</h2>
     <p>A <b>security bug</b> is a flaw in our own code that lets the wrong thing run or the wrong person in. Both examples below were found while doing other work, and both were one-line fixes.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Spot it</b> englishmaa's CSP allowed every script from googletagmanager.com</li>
-        <li data-k="tool" data-who="Claude Code"><b>Narrow it</b> to the two gtag paths in edge.rs (18db42e, 18 October)</li>
-        <li data-k="gate" data-who="pre-push and CI"><b>Run make check</b> it passes, as it did before the fix</li>
-        <li data-k="gap" data-who="nobody"><b>Pin it with a test</b> the commit changes one line and adds no test</li>
-      </ol>
-    </figure>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Spot it</b> lwp-academy's digest cron silently got 401 with no secret set</li>
-        <li data-k="tool" data-who="Claude Code"><b>Refuse to boot</b> without CRON_SECRET (34fb677, 19 October)</li>
-        <li data-k="human" data-who="Param"><b>Run the gate by hand</b> lwp-academy has no hook and no CI</li>
-        <li data-k="gap" data-who="nobody"><b>Pin it with a test</b> the commit touches server.mjs and the env example only</li>
-      </ol>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "lanes": [{ "label": "englishmaa CSP", "rows": [0, 0] }, { "label": "lwp-academy cron", "rows": [1, 1] }],
+  "nodes": [
+    { "id": "s1", "at": [0, 0], "label": "Spot it", "tone": "accent", "who": "every gtm script" },
+    { "id": "f1", "at": [1, 0], "label": "Narrow to two paths", "who": "18db42e" },
+    { "id": "g1", "at": [2, 0], "label": "Gate passes", "tone": "pass", "who": "pre-push and CI" },
+    { "id": "t1", "at": [3, 0], "label": "A test pins it", "tone": "fail", "dashed": true, "who": "missing" },
+    { "id": "s2", "at": [0, 1], "label": "Spot it", "tone": "accent", "who": "silent 401" },
+    { "id": "f2", "at": [1, 1], "label": "Refuse to boot", "who": "34fb677" },
+    { "id": "g2", "at": [2, 1], "label": "Gate by hand", "tone": "accent", "who": "no hook, no CI" },
+    { "id": "t2", "at": [3, 1], "label": "A test pins it", "tone": "fail", "dashed": true, "who": "missing" }
+  ],
+  "edges": [
+    { "from": "s1", "to": "f1" }, { "from": "f1", "to": "g1" }, { "from": "g1", "to": "t1", "tone": "fail", "dashed": true },
+    { "from": "s2", "to": "f2" }, { "from": "f2", "to": "g2" }, { "from": "g2", "to": "t2", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
       <figcaption>Two security bugs, two repos, the same shape: a person finds it, a session fixes it, nothing proves it stays fixed.</figcaption>
+      <ol class="narr">
+        <li><b>englishmaa:</b> the CSP allowed every script from googletagmanager.com. A session narrowed it to the two gtag paths in edge.rs (18db42e, 18 October). The gate passed, as it did before the fix.</li>
+        <li><b>lwp-academy:</b> the digest cron silently got 401 with no secret set. The server now refuses to boot without CRON_SECRET (34fb677, 19 October). The gate ran by hand.</li>
+        <li><b>Neither commit adds a test,</b> so the next edit can undo either fix and every check stays green.</li>
+      </ol>
     </figure>
   </section>
 
   <section>
     <h2>Security checks run in one repo's browser gate and nowhere else</h2>
     <p>A <b>security check</b> is a script that fails the build when a known class of mistake appears. We have one. lwp-academy's browser gate keeps analytics and Google One Tap off auth pages, whose URLs carry tokens (94505bc).</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="git push"><b>Push a change</b> to any of the three repos</li>
-        <li data-k="gate" data-who="lwp-academy browser gate"><b>Keep trackers off token pages</b> the only security check we run</li>
-        <li data-k="gap" data-who="nobody"><b>Audit dependencies</b> no audit step in any make check</li>
-        <li data-k="gap" data-who="nobody"><b>Scan for secrets</b> no secret scan in any gate</li>
-        <li data-k="gap" data-who="GitHub"><b>Code scanning</b> not enabled on any of the three repos</li>
-        <li data-k="gap" data-who="GitHub"><b>Protect main</b> branch protection needs a paid plan on these private repos</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "push", "at": [1.5, 1], "label": "git push", "shape": "store" },
+    { "id": "track", "at": [0, 0], "label": "Trackers off token pages", "tone": "pass", "who": "lwp-academy only" },
+    { "id": "audit", "at": [3, 0], "label": "Dependency audit", "tone": "fail", "dashed": true },
+    { "id": "secret", "at": [0, 2], "label": "Secret scan", "tone": "fail", "dashed": true },
+    { "id": "code", "at": [3, 2], "label": "Code scanning", "tone": "fail", "dashed": true },
+    { "id": "protect", "at": [1.5, 2.15], "label": "Protect main", "tone": "fail", "dashed": true, "who": "needs paid plan" }
+  ],
+  "edges": [
+    { "from": "push", "to": "track", "tone": "pass" },
+    { "from": "push", "to": "audit", "tone": "fail", "dashed": true },
+    { "from": "push", "to": "secret", "tone": "fail", "dashed": true },
+    { "from": "push", "to": "code", "tone": "fail", "dashed": true },
+    { "from": "push", "to": "protect", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Five checks a push could meet. One runs, in one repo.</figcaption>
+      <ol class="narr">
+        <li><b>Trackers off token pages</b> runs in lwp-academy's browser gate. It is the only security check we run.</li>
+        <li><b>No make check</b> in any repo audits dependencies or scans for secrets.</li>
+        <li><b>Code scanning</b> is not enabled on any of the three repos.</li>
+        <li><b>Branch protection</b> returns 403: it needs a paid plan on these private repos.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> Every other security finding depends on a person reading code at the right moment.</div>
@@ -184,14 +373,35 @@
   <section>
     <h2>Lighthouse is a real gate in two repos, and missing in the third</h2>
     <p>A <b>Lighthouse check</b> scores a page for performance, accessibility, best practices and SEO. kaas.team and lwp-academy fail the gate below 100 in any category. Mobile Performance is the exception: the median of three runs must reach 95.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="make lighthouse"><b>Build and serve</b> the site the way production does</li>
-        <li data-k="tool" data-who="scripts/lighthouse.mjs"><b>Score every page</b> mobile and desktop, three mobile runs each</li>
-        <li data-k="gate" data-who="the bar"><b>100 everywhere</b> except mobile Performance: median of three, at least 95 (fa6234e)</li>
-        <li data-k="gate" data-who="retry rule"><b>Retry a crash, never a score</b> a NO_NAVSTART crash gets three tries (bbb9ed9)</li>
-        <li data-k="human" data-who="Param"><b>Fix the page</b> when it fails, in the same session</li>
-        <li data-k="gap" data-who="englishmaa web"><b>Score the web app</b> englishmaa's make check has no Lighthouse step</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "build", "at": [0, 0], "label": "Build like production", "who": "make lighthouse" },
+    { "id": "score", "at": [1, 0], "label": "Score every page", "who": "3 mobile runs" },
+    { "id": "crash", "at": [2, 0], "label": "Crashed?", "shape": "diamond" },
+    { "id": "bar", "at": [3, 0], "label": "Meets the bar?", "shape": "diamond", "tone": "pass" },
+    { "id": "push", "at": [3, 1.1], "label": "Push", "shape": "ellipse", "tone": "pass" },
+    { "id": "fix", "at": [2, 1.1], "label": "Fix the page", "tone": "accent", "who": "same session" },
+    { "id": "em", "at": [0, 1.1], "label": "englishmaa web", "tone": "fail", "dashed": true, "who": "no Lighthouse step" }
+  ],
+  "edges": [
+    { "from": "build", "to": "score" },
+    { "from": "score", "to": "crash" },
+    { "from": "crash", "to": "score", "label": "retry", "tone": "wait", "bend": -70 },
+    { "from": "crash", "to": "bar", "label": "no" },
+    { "from": "bar", "to": "push", "label": "yes", "tone": "pass" },
+    { "from": "bar", "to": "fix", "label": "no", "tone": "fail" },
+    { "from": "fix", "to": "build", "label": "rebuild" }
+  ]
+}
+      </script>
+      <figcaption>Two loops: a crash is retried, a low score sends the page back to be fixed.</figcaption>
+      <ol class="narr">
+        <li><b>Build and serve</b> the site the way production does, then score every page on mobile and desktop.</li>
+        <li><b>A NO_NAVSTART crash</b> gets up to three tries (bbb9ed9). A score is never retried.</li>
+        <li><b>The bar is 100 everywhere,</b> except mobile Performance: median of three, at least 95 (fa6234e).</li>
+        <li><b>A miss</b> sends Param back to fix the page in the same session. englishmaa's make check has no Lighthouse step at all.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> The rule took two commits to make honest. One bad run used to fail the push. One crash used to look like a low score.</div>
@@ -200,13 +410,34 @@
   <section>
     <h2>A UI change is judged on the live site, so taste reverts reach production</h2>
     <p>A <b>UI task</b> changes what a reader sees: layout, copy or a component. No script can say whether copy is right. On kaas.team we judge it after deploy, not before.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Ask for new copy</b> sell the whole lifecycle, in company voice</li>
-        <li data-k="tool" data-who="Claude Code"><b>Write it</b> on main (2a6d3bb, 12:40, 6 October)</li>
-        <li data-k="gate" data-who="pre-push hook"><b>Run make check</b> build, browser and Lighthouse pass</li>
-        <li data-k="tool" data-who="Coolify"><b>Deploy</b> the new copy goes live</li>
-        <li data-k="human" data-who="Param" data-back="1"><b>Read it live and revert</b> five minutes later (3f4add2)</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "ask", "at": [0, 0], "label": "Ask for new copy", "tone": "accent" },
+    { "id": "write", "at": [1, 0], "label": "Write it on main", "who": "2a6d3bb, 12:40" },
+    { "id": "gate", "at": [2, 0], "label": "Gate passes", "tone": "pass", "who": "build, Lighthouse" },
+    { "id": "live", "at": [3, 0], "label": "Live site", "shape": "store" },
+    { "id": "read", "at": [3, 1], "label": "Read it live", "tone": "accent" },
+    { "id": "revert", "at": [2, 1], "label": "Revert", "tone": "fail", "who": "3f4add2, 12:45" },
+    { "id": "preview", "at": [1, 1], "label": "Preview first", "tone": "fail", "dashed": true, "who": "missing" }
+  ],
+  "edges": [
+    { "from": "ask", "to": "write" },
+    { "from": "write", "to": "gate" },
+    { "from": "gate", "to": "live", "label": "deploy" },
+    { "from": "live", "to": "read" },
+    { "from": "read", "to": "revert", "label": "wrong" },
+    { "from": "revert", "to": "ask", "tone": "fail", "dashed": true, "via": [[2, 1.62], [0, 1.62]] },
+    { "from": "write", "to": "preview", "label": "no", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>The taste check sits after the live site, so the loop closes on production.</figcaption>
+      <ol class="narr">
+        <li><b>Param asks for new copy</b> that sells the whole lifecycle, in company voice.</li>
+        <li><b>A session writes it</b> on main (2a6d3bb, 12:40, 6 October). Build, browser and Lighthouse pass, and Coolify deploys.</li>
+        <li><b>Param reads it live</b> and reverts it five minutes later (3f4add2).</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> The gate checked everything a script can check, and the change was still wrong. The taste check happened on production because there is no preview step.</div>
@@ -215,16 +446,39 @@
   <section>
     <h2>An epic lands as one long day of commits straight on main</h2>
     <p>An <b>epic</b> is a change too big for one commit that ships as a planned series. The lwp-academy cutover moved members, auth and Stripe off lwp-website. It landed as 22 commits on 19 October.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Decide the cutover</b> www becomes lwp-academy alone</li>
-        <li data-k="tool" data-who="Claude Code"><b>Member DB</b> pool, boot migrations, baseline schema (74cf864)</li>
-        <li data-k="tool" data-who="Claude Code"><b>Auth on shared tables</b> better-auth mapped to snake_case (b89a3c4)</li>
-        <li data-k="tool" data-who="Claude Code"><b>Serve /api/auth in-process</b> and the Pro video gate (8c15898)</li>
-        <li data-k="tool" data-who="Claude Code"><b>Checkout, webhook, portal</b> in-process (83c2a19)</li>
-        <li data-k="tool" data-who="Claude Code"><b>Drop the proxy</b> serve every path ourselves (975e446)</li>
-        <li data-k="human" data-who="Param"><b>Run the gate by hand</b> no hook, no CI, no PR</li>
-        <li data-k="gap" data-who="Param, next day"><b>Click the real portal</b> a cancel never marked the membership ending (0fd5a1a)</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "groups": [{ "label": "22 commits on main, 19 October", "nodes": ["db", "auth", "api", "pay", "proxy"] }],
+  "nodes": [
+    { "id": "decide", "at": [0, 0], "label": "Decide the cutover", "tone": "accent" },
+    { "id": "db", "at": [1, 0], "label": "Member DB", "who": "74cf864" },
+    { "id": "auth", "at": [2, 0], "label": "Auth on shared tables", "who": "b89a3c4" },
+    { "id": "api", "at": [3, 0], "label": "/api/auth in-process", "who": "8c15898" },
+    { "id": "pay", "at": [2, 1], "label": "Checkout, portal", "who": "83c2a19" },
+    { "id": "proxy", "at": [3, 1], "label": "Drop the proxy", "who": "975e446" },
+    { "id": "gate", "at": [3, 2.2], "label": "Gate by hand", "tone": "accent", "who": "no hook, no CI" },
+    { "id": "list", "at": [0, 1], "label": "List of the pieces", "shape": "doc", "tone": "fail", "dashed": true },
+    { "id": "portal", "at": [2, 2.2], "label": "Click the real portal", "tone": "fail", "who": "next day, 0fd5a1a" }
+  ],
+  "edges": [
+    { "from": "decide", "to": "db" },
+    { "from": "db", "to": "auth" },
+    { "from": "auth", "to": "api" },
+    { "from": "api", "to": "pay", "bend": 0 },
+    { "from": "pay", "to": "proxy" },
+    { "from": "proxy", "to": "gate" },
+    { "from": "gate", "to": "portal", "label": "bug", "tone": "fail" },
+    { "from": "decide", "to": "list", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Five pieces of a cutover in one day on main, with no list to say when it was done.</figcaption>
+      <ol class="narr">
+        <li><b>Param decides the cutover:</b> www becomes lwp-academy alone.</li>
+        <li><b>The sessions build it in pieces:</b> member DB (74cf864), auth on shared tables (b89a3c4), /api/auth in-process (8c15898), checkout and portal (83c2a19), then drop the proxy (975e446).</li>
+        <li><b>The gate runs by hand,</b> with no hook, no CI and no PR.</li>
+        <li><b>The next day,</b> clicking the real portal shows a cancel never marked the membership ending (0fd5a1a).</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> There was no list of the pieces, so done meant "Param stopped". The portal bug was found by clicking the real portal, a day after it went live.</div>
@@ -233,12 +487,29 @@
   <section>
     <h2>A milestone is a word in a commit message</h2>
     <p>A <b>milestone</b> is a named group of work with a finish line, such as a store release. englishmaa works in phases. GitHub has zero milestones in all three repos, so a phase exists only where a commit names it.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="human" data-who="Param"><b>Name the phase</b> in the plan, outside GitHub</li>
-        <li data-k="tool" data-who="Claude Code"><b>Ship it in one commit</b> "Phase 6: in-app account deletion and a store-release kit" (b563943, 7 October)</li>
-        <li data-k="gap" data-who="GitHub"><b>Track it as a milestone</b> no milestone, no issue list, no due date</li>
-        <li data-k="human" data-who="Param"><b>Press release</b> mobile-release.yml runs only from a manual button</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "phase", "at": [0, 0], "label": "Phase 6 in the plan", "shape": "doc", "tone": "accent" },
+    { "id": "commit", "at": [1, 0], "label": "One commit", "who": "b563943" },
+    { "id": "button", "at": [2, 0], "label": "Press release", "tone": "accent", "who": "manual button" },
+    { "id": "store", "at": [3, 0], "label": "App stores", "shape": "ellipse" },
+    { "id": "ms", "at": [1, 1], "label": "Milestone", "shape": "store", "tone": "fail", "dashed": true, "who": "GitHub, zero" }
+  ],
+  "edges": [
+    { "from": "phase", "to": "commit" },
+    { "from": "commit", "to": "button" },
+    { "from": "button", "to": "store" },
+    { "from": "phase", "to": "ms", "label": "never made", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>A phase goes from a plan to the store in one commit and one button press.</figcaption>
+      <ol class="narr">
+        <li><b>Param names the phase</b> in the plan, outside GitHub.</li>
+        <li><b>A session ships it in one commit:</b> "Phase 6: in-app account deletion and a store-release kit" (b563943, 7 October).</li>
+        <li><b>The release</b> runs only from a manual button: mobile-release.yml has no other trigger.</li>
       </ol>
     </figure>
   </section>
@@ -246,13 +517,30 @@
   <section>
     <h2>A revert after a green gate shows what the gate cannot see</h2>
     <p>A <b>revert</b> undoes a change that already shipped. englishmaa swapped its text to speech fallback to local voices. The gate passed, and the change was undone two hours later.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="Claude Code"><b>Swap the voices</b> local Kokoro and Kitten replace the fallback (7296d0d, 11:01)</li>
-        <li data-k="gate" data-who="pre-push and CI"><b>Run make check</b> it passes</li>
-        <li data-k="tool" data-who="deploy"><b>Ship it</b> to main</li>
-        <li data-k="human" data-who="Param" data-back="1"><b>Revert it</b> at 13:13 (1ada6ce)</li>
-        <li data-k="gap" data-who="nobody"><b>Write down why</b> the revert message gives no reason</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "swap", "at": [0, 0.4], "label": "Swap the voices", "who": "7296d0d, 11:01" },
+    { "id": "gate", "at": [1, 0.4], "label": "Gate passes", "tone": "pass", "who": "pre-push and CI" },
+    { "id": "main", "at": [2, 0.4], "label": "main", "shape": "store" },
+    { "id": "revert", "at": [3, 0.4], "label": "Revert", "tone": "accent", "who": "1ada6ce, 13:13" },
+    { "id": "why", "at": [3, 1.4], "label": "Why", "shape": "doc", "tone": "fail", "dashed": true, "who": "no reason given" }
+  ],
+  "edges": [
+    { "from": "swap", "to": "gate" },
+    { "from": "gate", "to": "main" },
+    { "from": "main", "to": "revert" },
+    { "from": "revert", "to": "swap", "label": "two hours later", "tone": "fail", "dashed": true, "via": [[3, -0.25], [0, -0.25]] },
+    { "from": "revert", "to": "why", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>A green gate, a shipped change, and a revert that leaves no reason behind.</figcaption>
+      <ol class="narr">
+        <li><b>A session swaps the voices:</b> local Kokoro and Kitten replace the fallback (7296d0d, 11:01, 15 October).</li>
+        <li><b>The gate passes</b> and the change ships to main.</li>
+        <li><b>Param reverts it</b> at 13:13 (1ada6ce). The revert message gives no reason.</li>
       </ol>
     </figure>
   </section>
@@ -260,11 +548,26 @@
   <section>
     <h2>Review is a click on our own PR, three seconds after opening it</h2>
     <p>A <b>review</b> is a second reader checking a change before it merges. We have three human PRs in total. lwp-academy PR #2 was opened at 15:18:38 and merged at 15:18:41 by the same account.</p>
-    <figure class="flow">
-      <ol>
-        <li data-k="tool" data-who="Claude Code"><b>Open PR #2</b> record the labs on Sundays from 18 October</li>
-        <li data-k="gap" data-who="nobody"><b>Review it</b> no reviewer, no CI on lwp-academy</li>
-        <li data-k="human" data-who="Param"><b>Merge it</b> three seconds later</li>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "open", "at": [0, 0.5], "label": "Open PR #2", "who": "15:18:38" },
+    { "id": "review", "at": [1, 0.5], "label": "Review", "tone": "fail", "dashed": true, "who": "nobody, no CI" },
+    { "id": "merge", "at": [2, 0.5], "label": "Merge", "tone": "accent", "who": "15:18:41" }
+  ],
+  "edges": [
+    { "from": "open", "to": "review", "tone": "fail", "dashed": true },
+    { "from": "review", "to": "merge", "tone": "fail", "dashed": true },
+    { "from": "open", "to": "merge", "label": "three seconds", "via": [[0, -0.2], [2, -0.2]] }
+  ]
+}
+      </script>
+      <figcaption>The review step exists on paper; the merge goes round it.</figcaption>
+      <ol class="narr">
+        <li><b>A session opens PR #2</b> to record the labs on Sundays from 18 October.</li>
+        <li><b>No reviewer and no CI</b> look at it on lwp-academy.</li>
+        <li><b>Param merges it</b> three seconds later.</li>
       </ol>
     </figure>
   </section>
@@ -290,7 +593,8 @@
   <section>
     <h2>Key terms</h2>
     <dl class="terms">
-      <dt>Manual workflow</dt><dd>A path where a person starts, checks and finishes every step.</dd>
+      <dt>Workflow</dt><dd>The path a task takes from the moment it arrives to the moment it is live.</dd>
+      <dt>Manual workflow</dt><dd>A workflow where a person starts, checks and finishes every step.</dd>
       <dt>Gate</dt><dd>A command that can refuse a change; ours is <code>make check</code>.</dd>
       <dt>Missing check</dt><dd>A step where a mistake would ship because no script looks.</dd>
       <dt>Human in the loop</dt><dd>A step only a person may decide: scope, taste, money or trust.</dd>
