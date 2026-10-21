@@ -20,7 +20,7 @@
     <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
     <span class="when">Before any factory</span>
     <h1>Map how we ship each task type by hand, <mark>before any factory</mark></h1>
-    <p class="lede">This page maps how we run kaas.team, lwp-academy and englishmaa today, with no factory. First comes the one workflow every task runs, from triage to merge. Then each task type gets its own drawing, built from a real commit, PR or alert from October 2026.</p>
+    <p class="lede">Before you automate a task, draw how it runs by hand. Start with the one workflow every task follows from triage to merge, then see how each task type bends it.</p>
   </header>
 
   <section>
@@ -42,7 +42,7 @@
 
   <section>
     <h2>Every task runs one workflow from triage to merge, and skips what it does not need</h2>
-    <p>The <b>workflow</b> is the path a task takes from the moment it arrives to the moment it is live. Ours runs in a Claude Code session with the lwp-eng plugin. Param makes every decision, and the session does the rest. Each diamond is a place where the task takes only the steps it needs.</p>
+    <p>A <b>workflow</b> is the path a task takes from arriving to going live. Each diamond is a decision, so a task takes only the steps it needs.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -90,45 +90,28 @@
   ]
 }
       </script>
-      <figcaption>The workflow from triage to merge, as one Claude Code session runs it today.</figcaption>
+      <figcaption>One workflow from triage to merge.</figcaption>
       <ol class="narr">
-        <li><b>A task arrives</b> as a chat message, a Telegram alert from Coolify, a reader email or a page seen broken live. No issue is written; all three repos have zero.</li>
-        <li><b>Big or unclear?</b> Param decides. A one-line fix goes straight to a worktree. An epic or a new product gets research and a spec first.</li>
-        <li><b>Research and write the spec</b> in <code>internal-apps/plan/specs</code>, or as an <code>intent.md</code> through the eng-intent skill. The grilling skill stress-tests it.</li>
-        <li><b>Spec to task list.</b> The session writes one task per piece with TaskCreate. The stop-tasks hook refuses to end a turn while a task is open.</li>
-        <li><b>Changes a page?</b> If yes, the frontend-design skill plans the UI and UX first. A backend fix skips it.</li>
-        <li><b>Build in a worktree,</b> one per task, so parallel sessions never touch the same files. Guard hooks refuse secrets, applied migrations and the wrong e2e port.</li>
-        <li><b>Run the gate.</b> <code>check-affected.py --run</code> runs only the checks the change reaches. The stop-gate hook refuses to end a turn that skipped it. Red goes back to build.</li>
-        <li><b>Run the tests,</b> then <b>Lighthouse</b> only when a page changed. kaas.team and lwp-academy need 100 everywhere, with mobile Performance at a median of 95.</li>
-        <li><b>Plan against done.</b> The verifier agent exercises the change, and the task list is read against the spec. A gap goes back to build.</li>
-        <li><b>Ship.</b> Most changes push to main through the pre-push gate. A PR is rare: five in all three repos, ever.</li>
-        <li><b>Deploy and probe the URL.</b> Coolify deploys on push, and the session curls the live page before it calls the task done.</li>
+        <li><b>A task arrives</b> as a message, an alert, an email or a broken page.</li>
+        <li><b>Big or unclear?</b> A one-line fix goes straight to build. An epic gets research and a spec first.</li>
+        <li><b>Write the spec,</b> then question it until it holds.</li>
+        <li><b>Turn the spec into a task list,</b> one task per piece.</li>
+        <li><b>Changes a page?</b> Plan the UI and UX first. A backend fix skips this.</li>
+        <li><b>Build each task in its own worktree,</b> so parallel work never touches the same files.</li>
+        <li><b>Run the gate</b> on what the change reaches. Red goes back to build.</li>
+        <li><b>Run the tests,</b> then Lighthouse if a page changed.</li>
+        <li><b>Check the plan against what is done.</b> A gap goes back to build.</li>
+        <li><b>Ship</b> by pushing to main, or through a PR when someone should review it.</li>
+        <li><b>Go live and open the URL</b> before you call it done.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> Every diamond is Param. The session cannot start without him, cannot pick a branch without him, and cannot ship without him. The workflow is sound; it just has one person in every decision.</div>
+    <div class="cost"><b>The lesson</b> Every diamond is the same person. The workflow is sound, but nothing moves without them.</div>
   </section>
 
-  <section>
-    <h2>One person, one laptop and three repos run all three businesses</h2>
-    <p>A <b>manual workflow</b> is a path where a person starts, checks and finishes every step. All three apps run the workflow above. The table shows what each repo has around it today.</p>
-    <div class="tw"><table>
-      <thead><tr><th></th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
-      <tbody>
-        <tr><td class="k">Commits, last 30 days</td><td>41</td><td>88</td><td>89</td></tr>
-        <tr><td class="k">Pull requests, ever</td><td>1</td><td>3</td><td>1, from Dependabot</td></tr>
-        <tr><td class="k">GitHub issues and milestones</td><td>none</td><td>none</td><td>none</td></tr>
-        <tr><td class="k">The gate, <code>make check</code></td><td>build, test, browser, lighthouse</td><td>build, test, maven, browser, lighthouse</td><td>impact, server, web, mobile, prose, quality, sdk</td></tr>
-        <tr><td class="k">Who runs the gate</td><td>The pre-push hook</td><td>Param, by hand</td><td>The pre-push hook and CI</td></tr>
-        <tr><td class="k">Dependabot</td><td>off</td><td>off</td><td>alerts and PRs on</td></tr>
-        <tr><td class="k">AGENTS.md or CLAUDE.md</td><td>neither</td><td>neither</td><td>AGENTS.md only</td></tr>
-        <tr><td class="k">Deploy</td><td>Coolify, on push to main</td><td>Coolify, on push to main</td><td>not written in the repo; mobile by a manual button in Actions</td></tr>
-      </tbody>
-    </table></div>
-  </section>
 
   <section>
     <h2>Planning lives in specs and Linear, but no commit points back to them</h2>
-    <p><b>Planning</b> is deciding what to build and in what order. Ours starts as a spec in <code>internal-apps/plan/specs</code>, numbered from <code>00-ladder</code> to <code>09</code>. Linear holds one project per product under the team key LEA. The code never names either.</p>
+    <p><b>Planning</b> is deciding what to build and in what order. Ours lives in spec files and a task board, and the code never links back.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -150,21 +133,20 @@
   ]
 }
       </script>
-      <figcaption>Planning flows one way: from the idea to main. Nothing flows back to say a spec is done.</figcaption>
+      <figcaption>Planning flows one way, from the idea to main.</figcaption>
       <ol class="narr">
-        <li><b>An idea</b> comes up in a session, a call or a review of numbers.</li>
-        <li><b>Param and Claude write the spec</b> as a markdown file in plan/specs. Sometimes a Linear card follows.</li>
-        <li><b>A session builds it</b> in the app repo, with commits straight on main.</li>
-        <li><b>Nothing links back.</b> No commit names a LEA key or a spec, and STATUS.md is edited by hand, or not at all.</li>
+        <li><b>An idea comes up</b> in a session, a call or a look at the numbers.</li>
+        <li><b>Write the spec</b> as a markdown file. Sometimes a card follows.</li>
+        <li><b>Build it</b> with commits straight on main.</li>
+        <li><b>Nothing links back.</b> No commit names the spec, so its status is updated by hand, or never.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> STATUS.md still says 02-email-plunk is not started. Plunk mail shipped in all three apps on 14 and 15 October. The plan and the code drifted within a week.</div>
-    <p class="ev">Evidence: internal-apps/plan/specs/STATUS.md line 8; zero LEA keys in 60 days of commits across the three repos.</p>
+    <div class="cost"><b>The lesson</b> Our status file still listed email as not started a week after it shipped in all three apps.</div>
   </section>
 
   <section>
     <h2>Triage happens in one head, so nothing records what was dropped</h2>
-    <p><b>Triage</b> is deciding whether a report is real, how urgent it is and who takes it. We have no issues in any of the three repos. A report arrives, Param decides on the spot, and the decision leaves no trace.</p>
+    <p><b>Triage</b> is deciding whether a report is real, how urgent it is and who takes it. Ours happens in one head and leaves no trace.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -172,10 +154,10 @@
     { "id": "mail", "at": [0, 0], "label": "Reader email", "shape": "ellipse" },
     { "id": "alert", "at": [0, 1], "label": "Telegram alert", "shape": "ellipse" },
     { "id": "seen", "at": [0, 2], "label": "Seen live", "shape": "ellipse" },
-    { "id": "decide", "at": [1, 1], "label": "Param decides", "shape": "diamond", "tone": "accent" },
+    { "id": "decide", "at": [1, 1], "label": "One person decides", "shape": "diamond", "tone": "accent" },
     { "id": "now", "at": [2, 0], "label": "Fix it now", "who": "the workflow above" },
     { "id": "issue", "at": [2, 1], "label": "Write an issue", "tone": "fail", "dashed": true, "who": "zero, ever" },
-    { "id": "later", "at": [2, 2], "label": "Later", "tone": "wait", "dashed": true, "who": "in Param's memory" },
+    { "id": "later", "at": [2, 2], "label": "Later", "tone": "wait", "dashed": true, "who": "in one head" },
     { "id": "lost", "at": [3, 2], "label": "Forgotten", "shape": "ellipse", "faint": true }
   ],
   "edges": [
@@ -191,25 +173,25 @@
       </script>
       <figcaption>Three ways in, one person deciding, and no record of the tasks that wait.</figcaption>
       <ol class="narr">
-        <li><b>A signal arrives</b> from a reader email, a Coolify alert in Telegram, or a page seen broken on the live site.</li>
-        <li><b>Param decides now or later,</b> with no label, priority or owner written down.</li>
-        <li><b>An urgent task</b> runs the workflow above. Anything else waits in memory until it is fixed or forgotten.</li>
+        <li><b>A signal arrives:</b> an email, an alert or a broken page.</li>
+        <li><b>One person decides</b> now or later, with no label, priority or owner.</li>
+        <li><b>Urgent work</b> runs the workflow. The rest waits in memory until it is fixed or forgotten.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> A factory starts from an issue. With no issue, there is nothing to pick up, and no way to count what we dropped.</div>
+    <div class="cost"><b>The lesson</b> A factory starts from an issue. No issue means nothing to pick up, and no count of what was dropped.</div>
   </section>
 
   <section>
-    <h2>A small bug gets fixed once per repo, by hand, on the same day</h2>
-    <p>A <b>small bug</b> is a wrong behaviour one change can fix and one test can pin. On 15 October a book download subscribed readers to the newsletter. The same Plunk rule lived in three repos, so the fix was made three times.</p>
+    <h2>A small bug gets fixed once per repo, by hand</h2>
+    <p>A <b>small bug</b> is wrong behaviour that one change can fix and one test can pin. Ours: a book download subscribed readers to the newsletter, and the same rule lived in three repos.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "nodes": [
     { "id": "bug", "at": [0, 1], "label": "Download subscribes", "shape": "ellipse", "tone": "fail" },
-    { "id": "kaas", "at": [1, 0], "label": "Fix kaas.team", "who": "0657164" },
-    { "id": "academy", "at": [1, 1], "label": "Remember lwp-academy", "tone": "accent", "who": "fbfc7e0" },
-    { "id": "em", "at": [1, 2], "label": "Remember englishmaa", "tone": "accent", "who": "8aa9273" },
+    { "id": "kaas", "at": [1, 0], "label": "Fix kaas.team", "who": "first" },
+    { "id": "academy", "at": [1, 1], "label": "Remember lwp-academy", "tone": "accent", "who": "by memory" },
+    { "id": "em", "at": [1, 2], "label": "Remember englishmaa", "tone": "accent", "who": "by memory" },
     { "id": "gate", "at": [2, 1], "label": "Gate, push, deploy", "tone": "pass", "who": "per repo" },
     { "id": "search", "at": [3, 1], "label": "Search the siblings", "tone": "fail", "dashed": true, "who": "missing" }
   ],
@@ -224,20 +206,20 @@
   ]
 }
       </script>
-      <figcaption>One bug fans out into three repos, and memory is the only thing that finds the second and third.</figcaption>
+      <figcaption>One bug, three repos, and only memory finds the second and third.</figcaption>
       <ol class="narr">
-        <li><b>Param notices</b> a book download added the reader to the newsletter list.</li>
-        <li><b>kaas.team is fixed first:</b> never subscribe on a download (0657164).</li>
-        <li><b>Param remembers lwp-academy</b> and makes the same fix (fbfc7e0), then <b>englishmaa,</b> where the Plunk mirror is reverted (8aa9273).</li>
-        <li><b>Nothing searches the siblings</b> for the same call, so a fourth copy would stay broken.</li>
+        <li><b>Someone notices</b> a download added the reader to the newsletter.</li>
+        <li><b>Fix the first repo.</b></li>
+        <li><b>Remember the sibling repos</b> and fix each one by hand.</li>
+        <li><b>Nothing searches the siblings,</b> so a fourth copy would stay broken.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> The second and third fixes depend on Param remembering. The support address changed in two repos the same day for the same reason (6516b62, 1d3f1ab).</div>
+    <div class="cost"><b>The lesson</b> The second and third fixes depend on someone remembering.</div>
   </section>
 
   <section>
     <h2>A Dependabot PR passes CI and then waits, because nobody is told</h2>
-    <p>A <b>Dependabot fix</b> is a version bump that GitHub opens as a PR. Only englishmaa has Dependabot on. Its first PR bumps vite from 8.3.0 to 8.3.4 in <code>/web</code>.</p>
+    <p>A <b>Dependabot fix</b> is a version bump that GitHub opens as a PR. Only one of our repos has Dependabot on.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -253,30 +235,30 @@
     { "from": "pr", "to": "ci" },
     { "from": "ci", "to": "told" },
     { "from": "told", "to": "nobody", "tone": "fail" },
-    { "from": "told", "to": "merge", "label": "Param", "tone": "wait", "dashed": true }
+    { "from": "told", "to": "merge", "label": "human", "tone": "wait", "dashed": true }
   ]
 }
       </script>
       <figcaption>The bump is proven green, then stops at a question nobody answers.</figcaption>
       <ol class="narr">
-        <li><b>Dependabot opens PR #1</b> on 21 October: vite 8.3.0 to 8.3.4.</li>
-        <li><b>CI runs make check</b> in ci.yml, and it passes.</li>
-        <li><b>Nothing tells a person</b> that a green bump is ready, so the merge waits until Param happens to look.</li>
-        <li><b>kaas.team and lwp-academy</b> get no bumps at all: Dependabot is off in both.</li>
+        <li><b>Dependabot opens a PR</b> to bump vite.</li>
+        <li><b>CI runs the gate,</b> and it passes.</li>
+        <li><b>Nobody is told</b> the bump is ready, so it waits until someone looks.</li>
+        <li><b>The other two repos</b> get no bumps: Dependabot is off.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> The fix exists and is proven, yet the open vite alerts stay open until a person clicks merge.</div>
+    <div class="cost"><b>The lesson</b> The fix is proven, yet the alert stays open until a person clicks merge.</div>
   </section>
 
   <section>
-    <h2>A vulnerability alert gets one decision, and the reason stays in a dropdown</h2>
-    <p><b>Vulnerability handling</b> is reading a security alert on a dependency and choosing to fix it, accept it or dismiss it. englishmaa has nine alerts so far. Six vite alerts are open today, two of them high.</p>
+    <h2>A vulnerability alert gets one decision, and the reason is lost</h2>
+    <p><b>Vulnerability handling</b> is reading a security alert on a dependency and choosing to fix, accept or dismiss it.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "nodes": [
     { "id": "alert", "at": [0, 1], "label": "Alert", "shape": "ellipse", "who": "GitHub" },
-    { "id": "read", "at": [1, 1], "label": "Read the advisory", "tone": "accent", "who": "Param" },
+    { "id": "read", "at": [1, 1], "label": "Read the advisory", "tone": "accent", "who": "a human" },
     { "id": "reach", "at": [2, 1], "label": "Reachable?", "shape": "diamond", "tone": "accent" },
     { "id": "fix", "at": [3, 0], "label": "Fix it", "tone": "pass", "who": "uuid" },
     { "id": "dismiss", "at": [3, 1], "label": "Dismiss", "tone": "wait", "who": "braces, node-forge" },
@@ -295,29 +277,29 @@
       </script>
       <figcaption>Three outcomes from one decision, and only a dropdown value records why.</figcaption>
       <ol class="narr">
-        <li><b>GitHub raises alerts:</b> uuid, braces and node-forge on 7 October; six for vite on 21 October.</li>
-        <li><b>Param reads the advisory</b> and checks whether the code path is reachable.</li>
-        <li><b>He decides:</b> uuid fixed; braces and node-forge, both high, dismissed the same day; the vite alerts still open.</li>
-        <li><b>The reason</b> is the dropdown value tolerable_risk, with no note and no date to look again.</li>
+        <li><b>GitHub raises an alert</b> on a dependency.</li>
+        <li><b>Read the advisory</b> and check whether your code reaches the broken path.</li>
+        <li><b>Decide:</b> fix it, dismiss it, or leave it open.</li>
+        <li><b>The reason</b> is a dropdown value, with no note and no date to look again.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> The judgement is sound, but it lives in one person's head. A second person, or an agent, cannot tell a reasoned dismissal from a rushed one.</div>
+    <div class="cost"><b>The lesson</b> Nobody else, human or agent, can tell a reasoned dismissal from a rushed one.</div>
   </section>
 
   <section>
     <h2>A security bug is fixed when someone spots it, and no test keeps it fixed</h2>
-    <p>A <b>security bug</b> is a flaw in our own code that lets the wrong thing run or the wrong person in. Both examples below were found while doing other work, and both were one-line fixes.</p>
+    <p>A <b>security bug</b> is a flaw in your own code that lets the wrong thing run or the wrong person in. Both below were found by chance and fixed in one line.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "lanes": [{ "label": "englishmaa CSP", "rows": [0, 0] }, { "label": "lwp-academy cron", "rows": [1, 1] }],
   "nodes": [
     { "id": "s1", "at": [0, 0], "label": "Spot it", "tone": "accent", "who": "every gtm script" },
-    { "id": "f1", "at": [1, 0], "label": "Narrow to two paths", "who": "18db42e" },
+    { "id": "f1", "at": [1, 0], "label": "Narrow to two paths", "who": "CSP header" },
     { "id": "g1", "at": [2, 0], "label": "Gate passes", "tone": "pass", "who": "pre-push and CI" },
     { "id": "t1", "at": [3, 0], "label": "A test pins it", "tone": "fail", "dashed": true, "who": "missing" },
     { "id": "s2", "at": [0, 1], "label": "Spot it", "tone": "accent", "who": "silent 401" },
-    { "id": "f2", "at": [1, 1], "label": "Refuse to boot", "who": "34fb677" },
+    { "id": "f2", "at": [1, 1], "label": "Refuse to boot", "who": "missing secret" },
     { "id": "g2", "at": [2, 1], "label": "Gate by hand", "tone": "accent", "who": "no hook, no CI" },
     { "id": "t2", "at": [3, 1], "label": "A test pins it", "tone": "fail", "dashed": true, "who": "missing" }
   ],
@@ -329,16 +311,16 @@
       </script>
       <figcaption>Two security bugs, two repos, the same shape: a person finds it, a session fixes it, nothing proves it stays fixed.</figcaption>
       <ol class="narr">
-        <li><b>englishmaa:</b> the CSP allowed every script from googletagmanager.com. A session narrowed it to the two gtag paths in edge.rs (18db42e, 18 October). The gate passed, as it did before the fix.</li>
-        <li><b>lwp-academy:</b> the digest cron silently got 401 with no secret set. The server now refuses to boot without CRON_SECRET (34fb677, 19 October). The gate ran by hand.</li>
-        <li><b>Neither commit adds a test,</b> so the next edit can undo either fix and every check stays green.</li>
+        <li><b>A content policy</b> allowed every script from a tracker's domain. It was narrowed to two paths.</li>
+        <li><b>A scheduled job</b> failed silently without its secret. The server now refuses to boot without it.</li>
+        <li><b>Neither fix has a test,</b> so the next edit can undo it while every check stays green.</li>
       </ol>
     </figure>
   </section>
 
   <section>
-    <h2>Security checks run in one repo's browser gate and nowhere else</h2>
-    <p>A <b>security check</b> is a script that fails the build when a known class of mistake appears. We have one. lwp-academy's browser gate keeps analytics and Google One Tap off auth pages, whose URLs carry tokens (94505bc).</p>
+    <h2>Security checks run in one repo, and nowhere else</h2>
+    <p>A <b>security check</b> is a script that fails the build when a known mistake appears. We have one: trackers stay off pages whose URLs carry login tokens.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -361,10 +343,10 @@
       </script>
       <figcaption>Five checks a push could meet. One runs, in one repo.</figcaption>
       <ol class="narr">
-        <li><b>Trackers off token pages</b> runs in lwp-academy's browser gate. It is the only security check we run.</li>
-        <li><b>No make check</b> in any repo audits dependencies or scans for secrets.</li>
-        <li><b>Code scanning</b> is not enabled on any of the three repos.</li>
-        <li><b>Branch protection</b> returns 403: it needs a paid plan on these private repos.</li>
+        <li><b>Trackers off token pages</b> runs in one repo's browser gate.</li>
+        <li><b>No repo</b> audits dependencies or scans for secrets.</li>
+        <li><b>Code scanning</b> is off everywhere.</li>
+        <li><b>Branch protection</b> needs a paid plan on private repos.</li>
       </ol>
     </figure>
     <div class="cost"><b>What it costs</b> Every other security finding depends on a person reading code at the right moment.</div>
@@ -372,7 +354,7 @@
 
   <section>
     <h2>Lighthouse is a real gate in two repos, and missing in the third</h2>
-    <p>A <b>Lighthouse check</b> scores a page for performance, accessibility, best practices and SEO. kaas.team and lwp-academy fail the gate below 100 in any category. Mobile Performance is the exception: the median of three runs must reach 95.</p>
+    <p>A <b>Lighthouse check</b> scores a page for performance, accessibility, best practices and SEO. Two of our repos refuse the push below 100.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -398,28 +380,28 @@
       </script>
       <figcaption>Two loops: a crash is retried, a low score sends the page back to be fixed.</figcaption>
       <ol class="narr">
-        <li><b>Build and serve</b> the site the way production does, then score every page on mobile and desktop.</li>
-        <li><b>A NO_NAVSTART crash</b> gets up to three tries (bbb9ed9). A score is never retried.</li>
-        <li><b>The bar is 100 everywhere,</b> except mobile Performance: median of three, at least 95 (fa6234e).</li>
-        <li><b>A miss</b> sends Param back to fix the page in the same session. englishmaa's make check has no Lighthouse step at all.</li>
+        <li><b>Build the site</b> as production does, and score every page on mobile and desktop.</li>
+        <li><b>A crash is retried</b> up to three times. A low score never is.</li>
+        <li><b>The bar is 100,</b> except mobile Performance: the median of three runs must reach 95.</li>
+        <li><b>A miss</b> sends the page back to be fixed. The third repo has no Lighthouse step.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> The rule took two commits to make honest. One bad run used to fail the push. One crash used to look like a low score.</div>
+    <div class="cost"><b>The lesson</b> Retry a crash, never a score, or the gate lies in both directions.</div>
   </section>
 
   <section>
     <h2>A UI change is judged on the live site, so taste reverts reach production</h2>
-    <p>A <b>UI task</b> changes what a reader sees: layout, copy or a component. No script can say whether copy is right. On kaas.team we judge it after deploy, not before.</p>
+    <p>A <b>UI task</b> changes what a reader sees. No script can say whether copy is right, and we judge it only after deploy.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "nodes": [
     { "id": "ask", "at": [0, 0], "label": "Ask for new copy", "tone": "accent" },
-    { "id": "write", "at": [1, 0], "label": "Write it on main", "who": "2a6d3bb, 12:40" },
+    { "id": "write", "at": [1, 0], "label": "Write it on main", "who": "gate passes" },
     { "id": "gate", "at": [2, 0], "label": "Gate passes", "tone": "pass", "who": "build, Lighthouse" },
     { "id": "live", "at": [3, 0], "label": "Live site", "shape": "store" },
     { "id": "read", "at": [3, 1], "label": "Read it live", "tone": "accent" },
-    { "id": "revert", "at": [2, 1], "label": "Revert", "tone": "fail", "who": "3f4add2, 12:45" },
+    { "id": "revert", "at": [2, 1], "label": "Revert", "tone": "fail", "who": "5 min later" },
     { "id": "preview", "at": [1, 1], "label": "Preview first", "tone": "fail", "dashed": true, "who": "missing" }
   ],
   "edges": [
@@ -435,31 +417,31 @@
       </script>
       <figcaption>The taste check sits after the live site, so the loop closes on production.</figcaption>
       <ol class="narr">
-        <li><b>Param asks for new copy</b> that sells the whole lifecycle, in company voice.</li>
-        <li><b>A session writes it</b> on main (2a6d3bb, 12:40, 6 October). Build, browser and Lighthouse pass, and Coolify deploys.</li>
-        <li><b>Param reads it live</b> and reverts it five minutes later (3f4add2).</li>
+        <li><b>Ask for new copy.</b></li>
+        <li><b>Write it and ship it.</b> Build, browser and Lighthouse pass.</li>
+        <li><b>Read it live,</b> dislike it, and revert five minutes later.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> The gate checked everything a script can check, and the change was still wrong. The taste check happened on production because there is no preview step.</div>
+    <div class="cost"><b>The lesson</b> The gate checked all a script can. Taste needs a preview before production.</div>
   </section>
 
   <section>
-    <h2>An epic lands as one long day of commits straight on main</h2>
-    <p>An <b>epic</b> is a change too big for one commit that ships as a planned series. The lwp-academy cutover moved members, auth and Stripe off lwp-website. It landed as 22 commits on 19 October.</p>
+    <h2>An epic lands as one long day of commits on main</h2>
+    <p>An <b>epic</b> is a change too big for one commit. Ours moved members, login and payments to a new app in 22 commits in one day.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "groups": [{ "label": "22 commits on main, 19 October", "nodes": ["db", "auth", "api", "pay", "proxy"] }],
   "nodes": [
     { "id": "decide", "at": [0, 0], "label": "Decide the cutover", "tone": "accent" },
-    { "id": "db", "at": [1, 0], "label": "Member DB", "who": "74cf864" },
-    { "id": "auth", "at": [2, 0], "label": "Auth on shared tables", "who": "b89a3c4" },
-    { "id": "api", "at": [3, 0], "label": "/api/auth in-process", "who": "8c15898" },
-    { "id": "pay", "at": [2, 1], "label": "Checkout, portal", "who": "83c2a19" },
-    { "id": "proxy", "at": [3, 1], "label": "Drop the proxy", "who": "975e446" },
+    { "id": "db", "at": [1, 0], "label": "Member DB" },
+    { "id": "auth", "at": [2, 0], "label": "Auth on shared tables" },
+    { "id": "api", "at": [3, 0], "label": "/api/auth in-process" },
+    { "id": "pay", "at": [2, 1], "label": "Checkout, portal" },
+    { "id": "proxy", "at": [3, 1], "label": "Drop the proxy" },
     { "id": "gate", "at": [3, 2.2], "label": "Gate by hand", "tone": "accent", "who": "no hook, no CI" },
     { "id": "list", "at": [0, 1], "label": "List of the pieces", "shape": "doc", "tone": "fail", "dashed": true },
-    { "id": "portal", "at": [2, 2.2], "label": "Click the real portal", "tone": "fail", "who": "next day, 0fd5a1a" }
+    { "id": "portal", "at": [2, 2.2], "label": "Click the real portal", "tone": "fail", "who": "a day later" }
   ],
   "edges": [
     { "from": "decide", "to": "db" },
@@ -475,24 +457,24 @@
       </script>
       <figcaption>Five pieces of a cutover in one day on main, with no list to say when it was done.</figcaption>
       <ol class="narr">
-        <li><b>Param decides the cutover:</b> www becomes lwp-academy alone.</li>
-        <li><b>The sessions build it in pieces:</b> member DB (74cf864), auth on shared tables (b89a3c4), /api/auth in-process (8c15898), checkout and portal (83c2a19), then drop the proxy (975e446).</li>
-        <li><b>The gate runs by hand,</b> with no hook, no CI and no PR.</li>
-        <li><b>The next day,</b> clicking the real portal shows a cancel never marked the membership ending (0fd5a1a).</li>
+        <li><b>Decide the cutover.</b></li>
+        <li><b>Build it in pieces:</b> database, login, checkout, then remove the old path.</li>
+        <li><b>Run the gate by hand,</b> with no CI and no PR.</li>
+        <li><b>A day later,</b> clicking the real portal finds a bug.</li>
       </ol>
     </figure>
-    <div class="cost"><b>What it costs</b> There was no list of the pieces, so done meant "Param stopped". The portal bug was found by clicking the real portal, a day after it went live.</div>
+    <div class="cost"><b>The lesson</b> With no list of the pieces, done meant someone stopped.</div>
   </section>
 
   <section>
     <h2>A milestone is a word in a commit message</h2>
-    <p>A <b>milestone</b> is a named group of work with a finish line, such as a store release. englishmaa works in phases. GitHub has zero milestones in all three repos, so a phase exists only where a commit names it.</p>
+    <p>A <b>milestone</b> is a named group of work with a finish line, such as a store release. Ours exist only in commit messages.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "nodes": [
     { "id": "phase", "at": [0, 0], "label": "Phase 6 in the plan", "shape": "doc", "tone": "accent" },
-    { "id": "commit", "at": [1, 0], "label": "One commit", "who": "b563943" },
+    { "id": "commit", "at": [1, 0], "label": "One commit", "who": "on main" },
     { "id": "button", "at": [2, 0], "label": "Press release", "tone": "accent", "who": "manual button" },
     { "id": "store", "at": [3, 0], "label": "App stores", "shape": "ellipse" },
     { "id": "ms", "at": [1, 1], "label": "Milestone", "shape": "store", "tone": "fail", "dashed": true, "who": "GitHub, zero" }
@@ -507,24 +489,24 @@
       </script>
       <figcaption>A phase goes from a plan to the store in one commit and one button press.</figcaption>
       <ol class="narr">
-        <li><b>Param names the phase</b> in the plan, outside GitHub.</li>
-        <li><b>A session ships it in one commit:</b> "Phase 6: in-app account deletion and a store-release kit" (b563943, 7 October).</li>
-        <li><b>The release</b> runs only from a manual button: mobile-release.yml has no other trigger.</li>
+        <li><b>Name the phase</b> in a plan outside GitHub.</li>
+        <li><b>Ship it in one commit.</b></li>
+        <li><b>Release it</b> from a manual button.</li>
       </ol>
     </figure>
   </section>
 
   <section>
     <h2>A revert after a green gate shows what the gate cannot see</h2>
-    <p>A <b>revert</b> undoes a change that already shipped. englishmaa swapped its text to speech fallback to local voices. The gate passed, and the change was undone two hours later.</p>
+    <p>A <b>revert</b> undoes a change that already shipped. Ours swapped the voice engine, passed the gate, and was undone two hours later.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "nodes": [
-    { "id": "swap", "at": [0, 0.4], "label": "Swap the voices", "who": "7296d0d, 11:01" },
+    { "id": "swap", "at": [0, 0.4], "label": "Swap the voices", "who": "local voices" },
     { "id": "gate", "at": [1, 0.4], "label": "Gate passes", "tone": "pass", "who": "pre-push and CI" },
     { "id": "main", "at": [2, 0.4], "label": "main", "shape": "store" },
-    { "id": "revert", "at": [3, 0.4], "label": "Revert", "tone": "accent", "who": "1ada6ce, 13:13" },
+    { "id": "revert", "at": [3, 0.4], "label": "Revert", "tone": "accent", "who": "2 hours later" },
     { "id": "why", "at": [3, 1.4], "label": "Why", "shape": "doc", "tone": "fail", "dashed": true, "who": "no reason given" }
   ],
   "edges": [
@@ -538,16 +520,16 @@
       </script>
       <figcaption>A green gate, a shipped change, and a revert that leaves no reason behind.</figcaption>
       <ol class="narr">
-        <li><b>A session swaps the voices:</b> local Kokoro and Kitten replace the fallback (7296d0d, 11:01, 15 October).</li>
+        <li><b>Swap the voices</b> in one commit.</li>
         <li><b>The gate passes</b> and the change ships to main.</li>
-        <li><b>Param reverts it</b> at 13:13 (1ada6ce). The revert message gives no reason.</li>
+        <li><b>Revert it</b> two hours later, with no reason written.</li>
       </ol>
     </figure>
   </section>
 
   <section>
-    <h2>Review is a click on our own PR, three seconds after opening it</h2>
-    <p>A <b>review</b> is a second reader checking a change before it merges. We have three human PRs in total. lwp-academy PR #2 was opened at 15:18:38 and merged at 15:18:41 by the same account.</p>
+    <h2>Review is a click on our own PR</h2>
+    <p>A <b>review</b> is a second reader checking a change before it merges. Ours took three seconds, by the person who opened it.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -565,16 +547,16 @@
       </script>
       <figcaption>The review step exists on paper; the merge goes round it.</figcaption>
       <ol class="narr">
-        <li><b>A session opens PR #2</b> to record the labs on Sundays from 18 October.</li>
-        <li><b>No reviewer and no CI</b> look at it on lwp-academy.</li>
-        <li><b>Param merges it</b> three seconds later.</li>
+        <li><b>Open a PR.</b></li>
+        <li><b>No reviewer and no CI</b> look at it.</li>
+        <li><b>Merge it</b> three seconds later.</li>
       </ol>
     </figure>
   </section>
 
   <section>
-    <h2>Most task types already have a check, but every one starts and ends with Param</h2>
-    <p>The table sorts the drawings by what a factory could take over. A task type is ready when a script can prove the outcome. It stays human when the outcome is taste, money or trust.</p>
+    <h2>Most task types already have a check, but every one starts and ends with a human</h2>
+    <p>A task type is ready for a factory when a script can prove the outcome. It stays human when the outcome is taste, money or trust.</p>
     <div class="tw"><table>
       <thead><tr><th>Task type</th><th>Check today</th><th>Missing check</th><th>First home</th></tr></thead>
       <tbody>
@@ -601,7 +583,7 @@
     </dl>
   </section>
 
-  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Commit hashes, PRs and alerts come from Param-Harrison/kaas.team, lwp-academy and englishmaa, read on 21 October 2026.</footer>
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>.</footer>
 </main>
 </body>
 </html>

@@ -20,7 +20,7 @@
     <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
     <span class="when">The blueprint</span>
     <h1>Write the blueprint in the <mark>.claude directory</mark>, borrowing from five public skill packs</h1>
-    <p class="lede">The map of <a href="how-we-work-today.html">how we work today</a> showed every task type starting and ending in Param's head. The blueprint moves that knowledge into files an agent reads. We compare five public blueprints, map their skills onto our task types, and decide what each of our three repos adopts.</p>
+    <p class="lede">A <b>blueprint</b> is the set of files that teaches an agent how your repo works. Compare five public ones, map their skills to your task types, and pick what to adopt.</p>
   </header>
 
   <section>
@@ -28,7 +28,7 @@
     <ul>
       <li>What the .claude directory holds in each of our repos today, and what it should hold.</li>
       <li>How owainlewis/blueprint, addyosmani/agent-skills, mattpocock/skills, gstack and pstack each walk a change from idea to merge.</li>
-      <li>Which skills we adopt per task type, and how we vendor them so an upstream edit cannot reach a run unread.</li>
+      <li>Which skills to adopt per task type, and how to pin them so an upstream change never reaches you unread.</li>
     </ul>
     <div class="legend" aria-label="How to read the drawings">
       <span><i class="human"></i>A human owns the step</span>
@@ -40,7 +40,7 @@
 
   <section>
     <h2>Two of our three repos give an agent almost nothing to read</h2>
-    <p>A <b>blueprint</b> is the set of files that tells an agent how this repo works: instructions, rules, skills, hooks and settings. In Claude Code it lives in <code>AGENTS.md</code> or <code>CLAUDE.md</code> and the <code>.claude</code> directory. A factory agent runs in a fresh worktree, so it sees only what the repo holds.</p>
+    <p>A blueprint is the instructions, rules, skills, hooks and settings in AGENTS.md, CLAUDE.md and .claude. A factory agent runs in a fresh worktree, so it sees only what the repo holds.</p>
     <div class="tw"><table>
       <thead><tr><th>File</th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
       <tbody>
@@ -52,7 +52,7 @@
         <tr><td class="k">Pre-push hook</td><td>make check</td><td><span class="tag never">none</span></td><td>make check</td></tr>
       </tbody>
     </table></div>
-    <p>Everything else an agent relies on today comes from Param's home folder and the lwp-claude-plugins enabled on that laptop. A factory run on another machine gets none of it.</p>
+    <p>Anything that lives only on one laptop is invisible to a factory run.</p>
   </section>
 
   <section>
@@ -229,7 +229,7 @@
 
   <section>
     <h2>pstack makes the agent prove a change works before it says done</h2>
-    <p><b>pstack</b> is poteto's skill stack, mirrored at backnotprop/pstack with ports for Claude Code. Its principles are prove-it-works, fix root causes and encode lessons in structure. <code>/interrogate</code> sends a diff to other models to break it.</p>
+    <p>pstack makes the agent prove a change works before it says done. It fixes root causes and turns every lesson into structure. /interrogate sends a diff to other models to break it.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
@@ -272,7 +272,7 @@
 
   <section>
     <h2>Every manual task type has a skill waiting in at least one pack</h2>
-    <p>A <b>task route</b> is the skill path one task type follows. The table maps each of our task types to the skill that would replace a step Param does by hand. The last column is our pick.</p>
+    <p>A <b>task route</b> is the skill path one task type follows. Each row maps a task type to the skills that replace a manual step. The last column is our pick.</p>
     <div class="tw"><table>
       <thead><tr><th>Task type</th><th>blueprint</th><th>agent-skills</th><th>mattpocock</th><th>gstack</th><th>pstack</th><th>We adopt</th></tr></thead>
       <tbody>
@@ -292,14 +292,14 @@
 
   <section>
     <h2>We vendor a skill by commit and hash, so an upstream edit waits for a reader</h2>
-    <p><b>Vendoring</b> copies a skill into our own repo at a pinned version. <code>plugins/lwp-eng/vendor.json</code> in lwp-claude-plugins pins each source to a commit and each file to a sha256. Today it pins addyosmani 1401c8b8, mattpocock 24fe0ef7, obra/superpowers 8ca22dba and trailofbits 82fe8226.</p>
+    <p><b>Vendoring</b> copies a skill into your repo at a pinned commit, with a hash for every file. An upstream edit then fails your check until someone reads it and moves the pin.</p>
     <figure class="scene">
       <script type="application/json" class="scene">
 {
   "lanes": [{ "label": "lwp-claude-plugins", "rows": [0, 1] }, { "label": "each app repo", "rows": [2, 2] }],
   "nodes": [
     { "id": "pick", "at": [0, 0], "label": "Pick one skill", "tone": "accent", "who": "one task type" },
-    { "id": "read", "at": [1, 0], "label": "Read every line", "tone": "accent", "who": "Param" },
+    { "id": "read", "at": [1, 0], "label": "Read every line", "tone": "accent", "who": "a human" },
     { "id": "safe", "at": [2, 0], "label": "Safe?", "shape": "diamond", "tone": "accent" },
     { "id": "pin", "at": [2, 1], "label": "Pin it", "shape": "doc", "who": "vendor.json" },
     { "id": "copy", "at": [1, 1], "label": "Copy it in", "who": "sync-skills.py" },
@@ -319,13 +319,13 @@
   ]
 }
       </script>
-      <figcaption>A skill is read, pinned and hashed in the plugin; the last hop into each app repo is still missing.</figcaption>
+      <figcaption>Read, pin and hash a skill, then copy it into each repo.</figcaption>
       <ol class="narr">
-        <li><b>Param picks one skill</b> for one task type from the table, and <b>reads every line</b>: a skill is a prompt that runs with our tools.</li>
-        <li><b>vendor.json pins it:</b> the source commit, plus a sha256 for every file.</li>
-        <li><b>sync-skills.py copies it</b> into the plugin at the pinned commit and records each hash.</li>
-        <li><b>check-vendored.py</b> runs in make check. An edited file fails until the pin moves.</li>
-        <li><b>The copy into each app repo</b> is missing. A factory worktree has no plugins, so the skill must live in .claude/skills.</li>
+        <li><b>Pick one skill</b> and read every line: a skill is a prompt that runs with your tools.</li>
+        <li><b>Pin it:</b> the source commit, plus a hash for every file.</li>
+        <li><b>Copy it in</b> at the pinned commit.</li>
+        <li><b>A check in make check</b> fails on any edited file until the pin moves.</li>
+        <li><b>Copy it into each app repo,</b> because a factory worktree has no plugins.</li>
       </ol>
     </figure>
   </section>
