@@ -3,6 +3,7 @@
   "name": "factory",
   "gate": "make check",
   "test": "make test",
+  "ci": { "runner": "github" },
   "formatters": {
     ".ts": "bun x biome format --write",
     ".js": "bun x biome format --write",

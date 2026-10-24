@@ -11,7 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  # branch protection requires this job; .agents/repo.json ci.runner says where it runs (a public repo: GitHub)
+  push:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
