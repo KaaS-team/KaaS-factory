@@ -43,7 +43,12 @@ export interface MergeRefusal {
 export type MergeDecision =
   | { readonly outcome: "merge"; readonly headSha: string }
   | { readonly outcome: "refuse"; readonly headSha: string; readonly refusals: readonly MergeRefusal[] }
-  | { readonly outcome: "dry-run"; readonly headSha: string; readonly eligible: boolean; readonly refusals: readonly MergeRefusal[] };
+  | {
+      readonly outcome: "dry-run";
+      readonly headSha: string;
+      readonly eligible: boolean;
+      readonly refusals: readonly MergeRefusal[];
+    };
 
 // Readiness- and CI-derived refusals: the PR's own state, independent of
 // what changed. A head or base that moved since the caller's own snapshot
@@ -53,10 +58,16 @@ export function checkReadiness(readiness: MergeReadiness, ci: CiResult, expected
   if (readiness.state !== "open") refusals.push({ reason: "not-open", detail: `PR state is "${readiness.state}"` });
   if (readiness.isDraft) refusals.push({ reason: "draft", detail: "PR is still a draft" });
   if (readiness.baseRefName !== expectedBaseRefName) {
-    refusals.push({ reason: "base-changed", detail: `base is "${readiness.baseRefName}", expected "${expectedBaseRefName}"` });
+    refusals.push({
+      reason: "base-changed",
+      detail: `base is "${readiness.baseRefName}", expected "${expectedBaseRefName}"`,
+    });
   }
   if (readiness.headRefOid !== ci.headSha) {
-    refusals.push({ reason: "head-changed", detail: `PR head is ${readiness.headRefOid}, CI result is for ${ci.headSha}` });
+    refusals.push({
+      reason: "head-changed",
+      detail: `PR head is ${readiness.headRefOid}, CI result is for ${ci.headSha}`,
+    });
   }
   if (readiness.mergeable !== "MERGEABLE") {
     refusals.push({ reason: "not-mergeable", detail: `mergeable state is "${readiness.mergeable}"` });
@@ -106,19 +117,31 @@ export function autoEligible(
     refusals.push({ reason: "not-auto-eligible", detail: `outside merge.autoPaths: ${outside.join(", ")}` });
   }
   if (changedFiles.length > merge.maxFiles) {
-    refusals.push({ reason: "not-auto-eligible", detail: `${changedFiles.length} files changed, over merge.maxFiles (${merge.maxFiles})` });
+    refusals.push({
+      reason: "not-auto-eligible",
+      detail: `${changedFiles.length} files changed, over merge.maxFiles (${merge.maxFiles})`,
+    });
   }
   const oddModes = changedFiles.filter((f) => f.mode !== undefined && !PLAIN_MODES.has(f.mode));
   if (oddModes.length > 0) {
-    refusals.push({ reason: "not-auto-eligible", detail: `not a plain file (mode): ${oddModes.map((f) => `${f.path} (${f.mode})`).join(", ")}` });
+    refusals.push({
+      reason: "not-auto-eligible",
+      detail: `not a plain file (mode): ${oddModes.map((f) => `${f.path} (${f.mode})`).join(", ")}`,
+    });
   }
   const binaries = changedFiles.filter((f) => f.binary);
   if (binaries.length > 0) {
-    refusals.push({ reason: "not-auto-eligible", detail: `binary, so its size is unknown: ${binaries.map((f) => f.path).join(", ")}` });
+    refusals.push({
+      reason: "not-auto-eligible",
+      detail: `binary, so its size is unknown: ${binaries.map((f) => f.path).join(", ")}`,
+    });
   }
   const totalLines = changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0);
   if (totalLines > merge.maxLines) {
-    refusals.push({ reason: "not-auto-eligible", detail: `${totalLines} lines changed, over merge.maxLines (${merge.maxLines})` });
+    refusals.push({
+      reason: "not-auto-eligible",
+      detail: `${totalLines} lines changed, over merge.maxLines (${merge.maxLines})`,
+    });
   }
   return refusals;
 }
@@ -147,7 +170,11 @@ export function decideMerge(input: DecideMergeInput): MergeDecision {
     return { outcome: "dry-run", headSha, eligible: refusals.length === 0, refusals };
   }
   if (input.merge.policy !== "auto") {
-    return { outcome: "refuse", headSha, refusals: [{ reason: "policy-not-auto", detail: `merge.policy is "${input.merge.policy}"` }] };
+    return {
+      outcome: "refuse",
+      headSha,
+      refusals: [{ reason: "policy-not-auto", detail: `merge.policy is "${input.merge.policy}"` }],
+    };
   }
   if (refusals.length > 0) return { outcome: "refuse", headSha, refusals };
   return { outcome: "merge", headSha };
@@ -158,7 +185,12 @@ export function decideMerge(input: DecideMergeInput): MergeDecision {
 // outcome "merge". A retried call against an already-merged PR re-derives
 // "refuse" (not-open) from a fresh readiness read upstream, so this never
 // double-merges.
-export async function attemptMerge(github: Pick<GitHub, "mergePr">, repo: string, prNumber: number, decision: MergeDecision): Promise<boolean> {
+export async function attemptMerge(
+  github: Pick<GitHub, "mergePr">,
+  repo: string,
+  prNumber: number,
+  decision: MergeDecision,
+): Promise<boolean> {
   if (decision.outcome !== "merge") return false;
   await github.mergePr(repo, prNumber, decision.headSha);
   return true;
@@ -193,7 +225,9 @@ export function renderOperatorAuditComment(decision: MergeDecision): string {
     return `${marker}\nMerge policy: **operator**, approved and merged \`${decision.headSha.slice(0, 7)}\` from the dashboard.`;
   }
   const lines = decision.refusals.map((r) => `- **${r.reason}**: ${r.detail}`);
-  return [marker, "Merge policy: **operator**, blocked.", ...(lines.length ? ["", "Refusals:", ...lines] : [])].join("\n");
+  return [marker, "Merge policy: **operator**, blocked.", ...(lines.length ? ["", "Refusals:", ...lines] : [])].join(
+    "\n",
+  );
 }
 
 // The comment posted to the PR either way: what was decided, and why, so a
@@ -211,5 +245,9 @@ export function renderAuditComment(decision: MergeDecision): string {
         : "would NOT auto-merge"
       : "blocked";
   const lines = decision.refusals.map((r) => `- **${r.reason}**: ${r.detail}`);
-  return [marker, `Merge policy: **${label}** — ${verdict}.`, ...(lines.length ? ["", "Refusals:", ...lines] : [])].join("\n");
+  return [
+    marker,
+    `Merge policy: **${label}** — ${verdict}.`,
+    ...(lines.length ? ["", "Refusals:", ...lines] : []),
+  ].join("\n");
 }

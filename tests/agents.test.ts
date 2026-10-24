@@ -11,7 +11,14 @@ import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/exec
 import { artifactContract, renderPrompt, stripFrontmatter } from "../src/agents/prompt";
 import { CLAUDE_STAGE_DEFAULTS, claudeArgs } from "../src/agents/presets/claude";
 import { PRESETS } from "../src/agents/presets";
-import { COMMENT_FILENAMES, JSON_FILENAMES, MAX_STEP_JSON_BYTES, readStageArtifacts, validateVerdict, writeGateEvidence } from "../src/artifacts";
+import {
+  COMMENT_FILENAMES,
+  JSON_FILENAMES,
+  MAX_STEP_JSON_BYTES,
+  readStageArtifacts,
+  validateVerdict,
+  writeGateEvidence,
+} from "../src/artifacts";
 import { configProblems, DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import type { StageName } from "../src/executor";
 import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../src/stage-permissions";
@@ -31,19 +38,41 @@ describe("claude preset", () => {
   test("the argv is pinned byte for byte (v2.12.0 dropped --no-session-persistence for takeover)", () => {
     const opts = { stage: "build" as const, issue: 12, cwd: "/w", maxBudgetUsd: 5 };
     expect(claudeArgs(opts)).toEqual([
-      "-p", "/factory-build 12",
-      "--output-format", "stream-json", "--verbose",
-      "--permission-mode", "dontAsk", "--permission-prompts", "none",
-      "--setting-sources", "project,local",
+      "-p",
+      "/factory-build 12",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--permission-mode",
+      "dontAsk",
+      "--permission-prompts",
+      "none",
+      "--setting-sources",
+      "project,local",
       "--strict-mcp-config",
-      "--disallowedTools", STAGE_DISALLOWED_TOOLS.join(","),
-      "--tools", "Bash,Read,Write,Skill,Edit",
-      "--settings", stageSettings("build", 12, undefined),
-      "--append-system-prompt", STAGE_GUIDANCE,
-      "--max-budget-usd", "5",
+      "--disallowedTools",
+      STAGE_DISALLOWED_TOOLS.join(","),
+      "--tools",
+      "Bash,Read,Write,Skill,Edit",
+      "--settings",
+      stageSettings("build", 12, undefined),
+      "--append-system-prompt",
+      STAGE_GUIDANCE,
+      "--max-budget-usd",
+      "5",
     ]);
     // Each shape dontAsk refused in the 2.1.289 repro; guard-paths.sh refuses the same set.
-    for (const shape of ["> or >>", "$(...)", "backticks", "$?", "brace expansion", "cd", "VAR=value", "git restore --source="]) expect(STAGE_GUIDANCE).toContain(shape);
+    for (const shape of [
+      "> or >>",
+      "$(...)",
+      "backticks",
+      "$?",
+      "brace expansion",
+      "cd",
+      "VAR=value",
+      "git restore --source=",
+    ])
+      expect(STAGE_GUIDANCE).toContain(shape);
     expect(STAGE_DISALLOWED_TOOLS).toContain("ScheduleWakeup");
     // Only plan and verify dispatch a subagent; only build and verify edit beyond their own artifacts.
     for (const stage of STAGES) {
@@ -57,7 +86,14 @@ describe("claude preset", () => {
   test("a rebuild forks the last build session and is told why it came back", () => {
     const opts = { stage: "build" as const, issue: 12, cwd: "/w", maxBudgetUsd: 5 };
     const resumed = claudeArgs({ ...opts, resume: { sessionId: "s-1", failure: "gate red: test" } });
-    expect(resumed.slice(0, 6)).toEqual(["-p", "/factory-build 12\n\nThe last attempt was sent back. The tail of why:\n\ngate red: test", "--resume", "s-1", "--fork-session", "--output-format"]);
+    expect(resumed.slice(0, 6)).toEqual([
+      "-p",
+      "/factory-build 12\n\nThe last attempt was sent back. The tail of why:\n\ngate red: test",
+      "--resume",
+      "s-1",
+      "--fork-session",
+      "--output-format",
+    ]);
     expect(resumed.slice(5)).toEqual(claudeArgs(opts).slice(2));
   });
 
@@ -82,10 +118,13 @@ describe("claude preset", () => {
   test("each stage gets its default model and effort, and a configured model wins", () => {
     const tail = (stage: StageName, model?: string) => {
       const opts = { stage, issue: 1, cwd: "/w", maxBudgetUsd: 2 };
-      return PRESETS.claude!.command(opts, { preset: "claude", ...(model ? { model } : {}) }, "").argv.slice(claudeArgs(opts).length + 1);
+      return PRESETS.claude!.command(opts, { preset: "claude", ...(model ? { model } : {}) }, "").argv.slice(
+        claudeArgs(opts).length + 1,
+      );
     };
     expect(Object.keys(CLAUDE_STAGE_DEFAULTS).sort()).toEqual([...STAGES].sort());
-    for (const stage of ["triage", "pr", "retro"] as const) expect(tail(stage)).toEqual(["--model", "sonnet", "--effort", "low"]);
+    for (const stage of ["triage", "pr", "retro"] as const)
+      expect(tail(stage)).toEqual(["--model", "sonnet", "--effort", "low"]);
     for (const stage of ["plan", "build", "verify"] as const) expect(tail(stage)).toEqual([]);
     expect(tail("triage", "opus")).toEqual(["--model", "opus", "--effort", "low"]);
   });
@@ -93,18 +132,29 @@ describe("claude preset", () => {
 
 describe("codex preset", () => {
   test("prompt on stdin, JSON events, sandbox by stage policy", () => {
-    const inv = PRESETS.codex!.command({ stage: "build", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex", model: "gpt-5.6-terra" }, "the prompt");
+    const inv = PRESETS.codex!.command(
+      { stage: "build", issue: 1, cwd: "/w", maxBudgetUsd: 2 },
+      { preset: "codex", model: "gpt-5.6-terra" },
+      "the prompt",
+    );
     expect(inv.argv).toEqual(["codex", "exec", "--json", "-s", "workspace-write", "-m", "gpt-5.6-terra", "-"]);
     expect(inv.stdin).toBe("the prompt");
-    for (const stage of ["triage", "plan", "verify"] as const) expect(PRESETS.codex!.command({ stage, issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv).toContain("read-only");
-    expect(PRESETS.codex!.command({ stage: "pr", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv).toContain("workspace-write");
+    for (const stage of ["triage", "plan", "verify"] as const)
+      expect(
+        PRESETS.codex!.command({ stage, issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv,
+      ).toContain("read-only");
+    expect(
+      PRESETS.codex!.command({ stage: "pr", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv,
+    ).toContain("workspace-write");
   });
 });
 
 describe("agents config", () => {
   test("the default is Claude for every stage", () => {
     expect(DEFAULT_CONFIG.stages).toEqual({ default: "claude" });
-    expect(mergeConfig({ repo: "a/b", agents: { codex: { preset: "codex" } }, stages: { verify: "codex" } }).stages).toEqual({ default: "claude", verify: "codex" });
+    expect(
+      mergeConfig({ repo: "a/b", agents: { codex: { preset: "codex" } }, stages: { verify: "codex" } }).stages,
+    ).toEqual({ default: "claude", verify: "codex" });
   });
 
   test.each([
@@ -120,7 +170,13 @@ describe("agents config", () => {
   });
 
   test("a valid mix is accepted", () => {
-    expect(configProblems({ repo: "a/b", agents: { codex: { preset: "codex" }, aider: { command: ["aider", "--message-file", "{{promptFile}}"] } }, stages: { default: "claude", build: "aider" } })).toEqual([]);
+    expect(
+      configProblems({
+        repo: "a/b",
+        agents: { codex: { preset: "codex" }, aider: { command: ["aider", "--message-file", "{{promptFile}}"] } },
+        stages: { default: "claude", build: "aider" },
+      }),
+    ).toEqual([]);
   });
 
   test("resolveAgent picks the stage's agent, else the default, else claude", () => {
@@ -160,7 +216,9 @@ describe("the prompt", () => {
   });
 
   test("a missing skill says how to fix it", async () => {
-    await expect(renderPrompt({ stage: "plan", issue: 1, cwd: scratch, maxBudgetUsd: 1 })).rejects.toThrow(/factory install --update/);
+    await expect(renderPrompt({ stage: "plan", issue: 1, cwd: scratch, maxBudgetUsd: 1 })).rejects.toThrow(
+      /factory install --update/,
+    );
   });
 });
 
@@ -168,7 +226,9 @@ describe("an agent with no preset", () => {
   class SkillGit extends FakeGit {
     override async ensureWorktree(cloneDir: string, worktreeDir: string, issue: number) {
       await super.ensureWorktree(cloneDir, worktreeDir, issue);
-      cpSync(join(import.meta.dir, "../template/.claude/skills"), join(worktreeDir, ".claude/skills"), { recursive: true });
+      cpSync(join(import.meta.dir, "../template/.claude/skills"), join(worktreeDir, ".claude/skills"), {
+        recursive: true,
+      });
     }
   }
 
@@ -186,7 +246,16 @@ describe("an agent with no preset", () => {
       agents: { scripted: { command: [join(import.meta.dir, "fixtures/agents/fake-agent.sh")] } },
       stages: { default: "scripted" },
     });
-    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+    const deps = {
+      github,
+      git: new SkillGit(),
+      state,
+      executor: new CommandExecutor(config.agents, config.stages),
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      cloneDir,
+      workspacesDir,
+    };
     try {
       expect(await processReadyIssue(issue, deps, config)).toBe("shipped");
     } finally {
@@ -194,7 +263,8 @@ describe("an agent with no preset", () => {
     }
     expect(github.createdPrs[0]!.body).toContain("Closes #1");
     // Every stage was handed its contract on stdin.
-    for (const stage of RUN_STAGES) expect(readFileSync(join(log, `${stage}.prompt`), "utf8")).toContain(JSON_FILENAMES[stage]);
+    for (const stage of RUN_STAGES)
+      expect(readFileSync(join(log, `${stage}.prompt`), "utf8")).toContain(JSON_FILENAMES[stage]);
     // The run history names the agent and says the numbers are not reported.
     const rows = state.listStageRuns("acme/widgets");
     expect(rows.map((r) => r.agent)).toEqual(Array(rows.length).fill("scripted"));
@@ -207,7 +277,9 @@ describe("codex with read-only stages", () => {
   class SkillGit extends FakeGit {
     override async ensureWorktree(cloneDir: string, worktreeDir: string, issue: number) {
       await super.ensureWorktree(cloneDir, worktreeDir, issue);
-      cpSync(join(import.meta.dir, "../template/.claude/skills"), join(worktreeDir, ".claude/skills"), { recursive: true });
+      cpSync(join(import.meta.dir, "../template/.claude/skills"), join(worktreeDir, ".claude/skills"), {
+        recursive: true,
+      });
     }
   }
   const bin = mkdtempSync(join(scratch, "bin-"));
@@ -223,8 +295,21 @@ describe("codex with read-only stages", () => {
     const github = new FakeGitHub([issue]);
     const state = new FactoryState(":memory:");
     state.setToggle("auto_approve_low_risk", true);
-    const config = mergeConfig({ repo: "acme/widgets", agents: { codex: { preset: "codex", model: "gpt-5.6-terra", ...(outputSchema ? { outputSchema } : {}) } }, stages: { default: "codex" } });
-    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir: mkdtempSync(join(scratch, "clone-")), workspacesDir: mkdtempSync(join(scratch, "ws-")) };
+    const config = mergeConfig({
+      repo: "acme/widgets",
+      agents: { codex: { preset: "codex", model: "gpt-5.6-terra", ...(outputSchema ? { outputSchema } : {}) } },
+      stages: { default: "codex" },
+    });
+    const deps = {
+      github,
+      git: new SkillGit(),
+      state,
+      executor: new CommandExecutor(config.agents, config.stages),
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      cloneDir: mkdtempSync(join(scratch, "clone-")),
+      workspacesDir: mkdtempSync(join(scratch, "ws-")),
+    };
     try {
       return { result: await processReadyIssue(issue, deps, config), github, state, log };
     } finally {
@@ -237,7 +322,18 @@ describe("codex with read-only stages", () => {
   test("triage, plan and verify run read-only and the runner writes their files; build writes its own", async () => {
     const { result, github, state, log } = await run(5);
     expect(result).toBe("shipped");
-    expect(readFileSync(join(log, "sandboxes"), "utf8").trim().split("\n").map((l) => l.trim())).toEqual(["triage=read-only", "plan=read-only", "build=workspace-write", "verify=read-only", "pr=workspace-write"]);
+    expect(
+      readFileSync(join(log, "sandboxes"), "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => l.trim()),
+    ).toEqual([
+      "triage=read-only",
+      "plan=read-only",
+      "build=workspace-write",
+      "verify=read-only",
+      "pr=workspace-write",
+    ]);
     expect(github.createdPrs[0]!.body).toContain("Closes #5");
     // Cached tokens are stored, and gpt-5.6-terra has no price, so the cost is "not reported".
     const [row] = state.listStageRuns("acme/widgets");
@@ -248,7 +344,18 @@ describe("codex with read-only stages", () => {
   test("outputSchema hands the read-only stages a schema file, and only those", async () => {
     const { result, log, state } = await run(7, undefined, true);
     expect(result).toBe("shipped");
-    expect(readFileSync(join(log, "sandboxes"), "utf8").trim().split("\n").map((l) => l.trim())).toEqual(["triage=read-only schema", "plan=read-only schema", "build=workspace-write", "verify=read-only schema", "pr=workspace-write"]);
+    expect(
+      readFileSync(join(log, "sandboxes"), "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => l.trim()),
+    ).toEqual([
+      "triage=read-only schema",
+      "plan=read-only schema",
+      "build=workspace-write",
+      "verify=read-only schema",
+      "pr=workspace-write",
+    ]);
     state.close();
   });
 
@@ -262,11 +369,19 @@ describe("codex with read-only stages", () => {
 describe("the runner refuses a self-contradicting verdict", () => {
   test("pass with a blocking finding goes to a human, and the verdict is never posted", async () => {
     const workspacesDir = mkdtempSync(join(scratch, "ws-"));
-    process.env.FAKE_VERDICT = JSON.stringify({ result: "pass", rounds: 1, findings: [{ severity: "must", confidence: 5, what: "drops a cent" }] });
+    process.env.FAKE_VERDICT = JSON.stringify({
+      result: "pass",
+      rounds: 1,
+      findings: [{ severity: "must", confidence: 5, what: "drops a cent" }],
+    });
     const issue = baseIssue(2, [LABEL.ready]);
     const github = new FakeGitHub([issue]);
     const state = new FactoryState(":memory:");
-    const config = mergeConfig({ repo: "acme/widgets", agents: { scripted: { command: [join(import.meta.dir, "fixtures/agents/fake-agent.sh")] } }, stages: { default: "scripted" } });
+    const config = mergeConfig({
+      repo: "acme/widgets",
+      agents: { scripted: { command: [join(import.meta.dir, "fixtures/agents/fake-agent.sh")] } },
+      stages: { default: "scripted" },
+    });
     class SkillGit extends FakeGit {
       override async ensureWorktree(c: string, w: string, n: number) {
         await super.ensureWorktree(c, w, n);
@@ -274,7 +389,16 @@ describe("the runner refuses a self-contradicting verdict", () => {
       }
     }
     try {
-      const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir: scratch, workspacesDir };
+      const deps = {
+        github,
+        git: new SkillGit(),
+        state,
+        executor: new CommandExecutor(config.agents, config.stages),
+        gateRunner: new FakeGateRunner(),
+        holdoutRunner: new FakeHoldoutRunner(),
+        cloneDir: scratch,
+        workspacesDir,
+      };
       state.setToggle("auto_approve_low_risk", true);
       expect(await processReadyIssue(issue, deps, config)).toBe("needs-human");
     } finally {
@@ -292,7 +416,11 @@ describe("every preset is diagnosable", () => {
       expect(preset.name).toBe(name);
       expect(preset.binary.length).toBeGreaterThan(0);
       expect(preset.parseLine("")).toEqual([]);
-      const inv = preset.command({ stage: "plan", issue: 1, cwd: "/w", maxBudgetUsd: 1 }, { preset: name }, "SECRET-PROMPT");
+      const inv = preset.command(
+        { stage: "plan", issue: 1, cwd: "/w", maxBudgetUsd: 1 },
+        { preset: name },
+        "SECRET-PROMPT",
+      );
       expect(inv.argv[0]).toBe(preset.binary);
       if (!preset.ownsPrompt && inv.stdin !== undefined) expect(inv.argv.join(" ")).not.toContain("SECRET-PROMPT");
     }
@@ -304,7 +432,9 @@ describe("verdict rules", () => {
   const check = (v: unknown) => validateVerdict(v);
 
   test("a consistent verdict is accepted, old string findings included", () => {
-    expect(check({ result: "pass", rounds: 1, findings: [], criteria: [{ id: "AC-1", status: "pass" }] }).ok).toBe(true);
+    expect(check({ result: "pass", rounds: 1, findings: [], criteria: [{ id: "AC-1", status: "pass" }] }).ok).toBe(
+      true,
+    );
     expect(check({ result: "reject", rounds: 1, findings: ["a", f("must", 5)] }).ok).toBe(true);
     expect(check({ result: "pass", rounds: 1, findings: ["note", f("could", 5), f("must", 2)] }).ok).toBe(true);
   });
@@ -318,7 +448,10 @@ describe("verdict rules", () => {
     [{ result: "pass", rounds: 1, findings: [{ ...f("must", 1), color: "red" }] }, /unknown field "color"/],
     [{ result: "pass", rounds: 1, findings: [f("must", 4)] }, /pass but lists a blocking finding/],
     [{ result: "pass", rounds: 1, findings: [f("should", 3)] }, /pass but lists a blocking finding/],
-    [{ result: "pass", rounds: 1, findings: [], criteria: [{ id: "AC-2", status: "unverified" }] }, /AC-2 is unverified/],
+    [
+      { result: "pass", rounds: 1, findings: [], criteria: [{ id: "AC-2", status: "unverified" }] },
+      /AC-2 is unverified/,
+    ],
     [{ result: "pass", rounds: 1, findings: [], criteria: [{ id: "two", status: "pass" }] }, /look like AC-1/],
   ])("refuses %j", (v, want) => {
     const r = check(v);
@@ -330,7 +463,11 @@ describe("verdict rules", () => {
     const cwd = mkdtempSync(join(scratch, "art-"));
     const dir = join(cwd, ".factory/runs/issue-3");
     mkdirSync(dir, { recursive: true });
-    for (const [body, name] of [["x".repeat(MAX_STEP_JSON_BYTES + 1), "big"], ["{nope", "junk"], ["[1]", "array"]] as const) {
+    for (const [body, name] of [
+      ["x".repeat(MAX_STEP_JSON_BYTES + 1), "big"],
+      ["{nope", "junk"],
+      ["[1]", "array"],
+    ] as const) {
       writeFileSync(join(dir, "verdict.json"), name === "big" ? JSON.stringify({ result: "pass", pad: body }) : body);
       expect((await readStageArtifacts(cwd, 3, "verify")).json, name).toBeUndefined();
     }
@@ -339,15 +476,32 @@ describe("verdict rules", () => {
   test("build hands the verifier gate evidence tied to the tree it measured", async () => {
     const cwd = mkdtempSync(join(scratch, "gate-"));
     await writeGateEvidence(cwd, 5, { line: "FACTORY_GATES: status=GREEN", status: "GREEN", tree: "abc" });
-    expect(JSON.parse(readFileSync(join(cwd, ".factory/runs/issue-5/gate.json"), "utf8"))).toEqual({ line: "FACTORY_GATES: status=GREEN", status: "GREEN", tree: "abc" });
+    expect(JSON.parse(readFileSync(join(cwd, ".factory/runs/issue-5/gate.json"), "utf8"))).toEqual({
+      line: "FACTORY_GATES: status=GREEN",
+      status: "GREEN",
+      tree: "abc",
+    });
   });
 
   test("the verify skill and reviewer teach the same schema the runner enforces", () => {
     const skill = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/SKILL.md"), "utf8");
-    for (const word of ["gate.json", "proof.json", "passes-without", "unverified", "must|should|could", "16 KiB", "AC-1"]) expect(skill).toContain(word);
+    for (const word of [
+      "gate.json",
+      "proof.json",
+      "passes-without",
+      "unverified",
+      "must|should|could",
+      "16 KiB",
+      "AC-1",
+    ])
+      expect(skill).toContain(word);
     // The tree check moved with the hand proof into prove.md, read when the runner could not run it.
-    expect(readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/references/prove.md"), "utf8")).toContain("HEAD^{tree}");
-    expect(readFileSync(join(import.meta.dir, "../template/.claude/agents/factory-reviewer.md"), "utf8")).toContain("confidence 0-5");
+    expect(
+      readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/references/prove.md"), "utf8"),
+    ).toContain("HEAD^{tree}");
+    expect(readFileSync(join(import.meta.dir, "../template/.claude/agents/factory-reviewer.md"), "utf8")).toContain(
+      "confidence 0-5",
+    );
   });
 });
 
@@ -360,7 +514,10 @@ describe("skill text the runner depends on", () => {
     for (const n of ["triage", "plan", "build", "verify"]) expect(skill(`factory-${n}`), n).toContain("outcome");
   });
   test("the verdict template renders a per-criterion status", () => {
-    const t = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-comment/assets/verdict.md"), "utf8");
+    const t = readFileSync(
+      join(import.meta.dir, "../template/.claude/skills/factory-comment/assets/verdict.md"),
+      "utf8",
+    );
     expect(t).toContain("{{pass|fail|unverified}}");
     expect(t).not.toContain("pass_or_fail");
   });
@@ -381,9 +538,22 @@ describe("hardening from the verifier report", () => {
 
   test("doctor does not require claude when every stage names another agent", async () => {
     const { runDoctor } = await import("../src/doctor");
-    const deps = { github: { authStatus: async () => ({ ok: true, detail: "" }), listLabels: async () => [] } as never, git: { run: async () => ({ stdout: "x", stderr: "", code: 0 }) }, which: async () => true, fileExists: async () => true, readFile: async () => "{}", isExecutable: async () => true };
+    const deps = {
+      github: { authStatus: async () => ({ ok: true, detail: "" }), listLabels: async () => [] } as never,
+      git: { run: async () => ({ stdout: "x", stderr: "", code: 0 }) },
+      which: async () => true,
+      fileExists: async () => true,
+      readFile: async () => "{}",
+      isExecutable: async () => true,
+    };
     const all = Object.fromEntries(STAGES.map((s) => [s, "codex"]));
-    const checks = await runDoctor(deps, { repo: "a/b", cloneDir: "/x", baselineTag: "b", agents: { claude: { preset: "claude" }, codex: { preset: "codex" } }, stages: { default: "claude", ...all } });
+    const checks = await runDoctor(deps, {
+      repo: "a/b",
+      cloneDir: "/x",
+      baselineTag: "b",
+      agents: { claude: { preset: "claude" }, codex: { preset: "codex" } },
+      stages: { default: "claude", ...all },
+    });
     expect(checks.map((c) => c.name)).toContain("codex on PATH");
     expect(checks.map((c) => c.name)).not.toContain("claude on PATH");
   });
@@ -392,7 +562,9 @@ describe("hardening from the verifier report", () => {
     const cwd = mkdtempSync(join(scratch, "setsid-"));
     cpSync(join(import.meta.dir, "../template/.claude/skills"), join(cwd, ".claude/skills"), { recursive: true });
     const script = join(cwd, "escape.sh");
-    writeFileSync(script, `#!/bin/sh\nperl -e 'use POSIX; POSIX::setsid(); exec "sleep","4719"' &\nsleep 30\n`, { mode: 0o755 });
+    writeFileSync(script, `#!/bin/sh\nperl -e 'use POSIX; POSIX::setsid(); exec "sleep","4719"' &\nsleep 30\n`, {
+      mode: 0o755,
+    });
     const ex = new CommandExecutor({ x: { command: [script] } }, { default: "x" });
     const t0 = Date.now();
     const r = await ex.runStage({ stage: "triage", issue: 1, cwd, maxBudgetUsd: 1, timeoutMinutes: 0.02 });
@@ -404,12 +576,20 @@ describe("hardening from the verifier report", () => {
 
 describe("preset-less command agents", () => {
   test("a bare codex exec command gets the codex preset and --json", () => {
-    const a = resolveAgent({ codex: { command: ["env", "X=1", "codex", "exec", "{{prompt}}"] } }, { default: "codex" }, "triage");
+    const a = resolveAgent(
+      { codex: { command: ["env", "X=1", "codex", "exec", "{{prompt}}"] } },
+      { default: "codex" },
+      "triage",
+    );
     expect(a.preset).toBe(PRESETS.codex);
     expect(a.config.command).toEqual(["env", "X=1", "codex", "exec", "--json", "{{prompt}}"]);
   });
   test("an unrecognised command is left alone", () => {
-    const a = resolveAgent({ aider: { command: ["aider", "--message", "{{prompt}}"] } }, { default: "aider" }, "triage");
+    const a = resolveAgent(
+      { aider: { command: ["aider", "--message", "{{prompt}}"] } },
+      { default: "aider" },
+      "triage",
+    );
     expect(a.preset).toBeUndefined();
   });
 });

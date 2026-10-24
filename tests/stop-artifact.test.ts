@@ -28,16 +28,28 @@ function arm(stage: ArtifactStage): void {
   writeFileSync(join(scratch, "artifact.schema.json"), JSON.stringify(stopArtifactSpec(stage, TYPE_LABELS)));
 }
 
-async function stop(env: Record<string, string> = { FACTORY_STAGE: "build", FACTORY_SCRATCH_DIR: scratch, FACTORY_ARTIFACT_DIR: artifacts }): Promise<{ code: number; reason?: string }> {
+async function stop(
+  env: Record<string, string> = {
+    FACTORY_STAGE: "build",
+    FACTORY_SCRATCH_DIR: scratch,
+    FACTORY_ARTIFACT_DIR: artifacts,
+  },
+): Promise<{ code: number; reason?: string }> {
   const { FACTORY_STAGE: _s, FACTORY_SCRATCH_DIR: _d, FACTORY_ARTIFACT_DIR: _a, ...base } = process.env;
-  const proc = Bun.spawn(["bash", HOOK], { stdin: new Blob([JSON.stringify({ hook_event_name: "Stop", stop_hook_active: false })]), stdout: "pipe", stderr: "pipe", env: { ...base, ...env } });
+  const proc = Bun.spawn(["bash", HOOK], {
+    stdin: new Blob([JSON.stringify({ hook_event_name: "Stop", stop_hook_active: false })]),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...base, ...env },
+  });
   const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
   const reply = out.trim() ? (JSON.parse(out) as { decision: string; reason: string }) : undefined;
   if (reply) expect(reply.decision).toBe("block");
   return { code, reason: reply?.reason };
 }
 
-const write = (stage: ArtifactStage, body: unknown) => writeFileSync(join(artifacts, JSON_FILENAMES[stage]), typeof body === "string" ? body : JSON.stringify(body));
+const write = (stage: ArtifactStage, body: unknown) =>
+  writeFileSync(join(artifacts, JSON_FILENAMES[stage]), typeof body === "string" ? body : JSON.stringify(body));
 
 describe("stop-artifact hook", () => {
   test("passes a valid artifact", async () => {
@@ -69,7 +81,10 @@ describe("stop-artifact hook", () => {
   });
 
   test("pr and retro are never checked: the runner requires no file from them", () => {
-    expect([stopArtifactSpec("pr", TYPE_LABELS), stopArtifactSpec("retro", TYPE_LABELS)]).toEqual([undefined, undefined]);
+    expect([stopArtifactSpec("pr", TYPE_LABELS), stopArtifactSpec("retro", TYPE_LABELS)]).toEqual([
+      undefined,
+      undefined,
+    ]);
   });
 
   test("a broken schema file lets the stop through", async () => {
@@ -83,10 +98,54 @@ describe("stop-artifact hook", () => {
 // rejects a step file, naming the same problem; for verify, whose validator is
 // deeper, it must never block a verdict the runner accepts.
 const CASES: [ArtifactStage, unknown][] = [
-  ["triage", { disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["a"], gate_level: "full", confidence: 0.5 }],
-  ["triage", { disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["a"], gate_level: "full", confidence: 1.5 }],
-  ["triage", { disposition: "maybe", type: "bug", risk: "low", done_when: "x", files_expected: [], gate_level: "full", confidence: 0 }],
-  ["triage", { disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: [1], gate_level: "full", confidence: 0 }],
+  [
+    "triage",
+    {
+      disposition: "proceed",
+      type: "bug",
+      risk: "low",
+      done_when: "x",
+      files_expected: ["a"],
+      gate_level: "full",
+      confidence: 0.5,
+    },
+  ],
+  [
+    "triage",
+    {
+      disposition: "proceed",
+      type: "bug",
+      risk: "low",
+      done_when: "x",
+      files_expected: ["a"],
+      gate_level: "full",
+      confidence: 1.5,
+    },
+  ],
+  [
+    "triage",
+    {
+      disposition: "maybe",
+      type: "bug",
+      risk: "low",
+      done_when: "x",
+      files_expected: [],
+      gate_level: "full",
+      confidence: 0,
+    },
+  ],
+  [
+    "triage",
+    {
+      disposition: "proceed",
+      type: "bug",
+      risk: "low",
+      done_when: "x",
+      files_expected: [1],
+      gate_level: "full",
+      confidence: 0,
+    },
+  ],
   ["triage", { outcome: "blocked", summary: "no access" }],
   ["triage", { outcome: "blocked", summary: "  " }],
   ["triage", { outcome: "later" }],
@@ -107,8 +166,24 @@ const CASES: [ArtifactStage, unknown][] = [
   ["build", "not json"],
   ["build", '{"status":"green","gate_line":"ok","rounds":NaN}'],
   ["verify", { result: "pass", rounds: 1, findings: [] }],
-  ["verify", { result: "reject", rounds: 2, findings: [{ severity: "must", confidence: 4, what: "x" }], criteria: [{ id: "AC-1", status: "fail" }] }],
-  ["verify", { result: "uncertain", rounds: 1, findings: [], criteria: [{ id: "AC-1", status: "unverified", gap: "no access" }] }],
+  [
+    "verify",
+    {
+      result: "reject",
+      rounds: 2,
+      findings: [{ severity: "must", confidence: 4, what: "x" }],
+      criteria: [{ id: "AC-1", status: "fail" }],
+    },
+  ],
+  [
+    "verify",
+    {
+      result: "uncertain",
+      rounds: 1,
+      findings: [],
+      criteria: [{ id: "AC-1", status: "unverified", gap: "no access" }],
+    },
+  ],
   ["verify", { result: "pass", rounds: 1, findings: [], summary: "\u001f" }],
   ["verify", { outcome: "blocked", summary: "denied" }],
   ["verify", { outcome: "blocked", summary: "no access", result: "maybe" }],

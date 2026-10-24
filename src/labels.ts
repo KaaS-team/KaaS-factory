@@ -73,7 +73,7 @@ const TYPE_COLOR: Record<TypeLabel, string> = {
 
 const STATE_DESCRIPTIONS: Record<StateLabel, string> = {
   "factory:ready": "Human marked this ready for the loop to pick up",
-  "factory:blocked": "Waiting on its \"Blocked by\" issues to close; promotes to ready automatically",
+  "factory:blocked": 'Waiting on its "Blocked by" issues to close; promotes to ready automatically',
   "factory:triaging": "factory-triage is classifying this issue",
   "factory:planning": "factory-plan is writing the plan comment",
   "factory:awaiting-approval": "Plan posted, waiting on /factory approve",
@@ -139,13 +139,26 @@ const CUSTOM_TYPE_COLOR = "c5def5"; // light blue: a type this repo added itself
 // TYPE_LABELS), so `factory doctor --fix` creates those labels too.
 // `stepLabels` are a workflow's own step labels; one the factory does not
 // already ship (a custom check step's `factory:linting`) is created too.
-export function labelsFor(routes: Readonly<Record<string, unknown>> | undefined, stepLabels: readonly string[] = []): readonly FactoryLabel[] {
+export function labelsFor(
+  routes: Readonly<Record<string, unknown>> | undefined,
+  stepLabels: readonly string[] = [],
+): readonly FactoryLabel[] {
   const extra = Object.keys(routes ?? {})
     .filter((t) => !(TYPE_LABELS as readonly string[]).includes(t))
-    .map((name) => ({ name, color: CUSTOM_TYPE_COLOR, description: `Type added by this repo's config.routes`, category: "type" as const }));
+    .map((name) => ({
+      name,
+      color: CUSTOM_TYPE_COLOR,
+      description: `Type added by this repo's config.routes`,
+      category: "type" as const,
+    }));
   const steps = [...new Set(stepLabels)]
     .filter((name) => !LABELS.some((l) => l.name === name))
-    .map((name) => ({ name, color: CUSTOM_STEP_COLOR, description: "A step of this repo's workflow", category: "state" as const }));
+    .map((name) => ({
+      name,
+      color: CUSTOM_STEP_COLOR,
+      description: "A step of this repo's workflow",
+      category: "state" as const,
+    }));
   return [...LABELS, ...extra, ...steps];
 }
 
@@ -173,7 +186,10 @@ export function typesFor(routes: Readonly<Record<string, unknown>> | undefined):
 
 // The one label on an issue that names its type, or undefined if none of its
 // labels is in the repo's type list (routes keys plus TYPE_LABELS).
-export function issueType(routes: Readonly<Record<string, unknown>> | undefined, labelNames: readonly string[]): string | undefined {
+export function issueType(
+  routes: Readonly<Record<string, unknown>> | undefined,
+  labelNames: readonly string[],
+): string | undefined {
   const types = new Set(typesFor(routes));
   return labelNames.find((n) => types.has(n));
 }

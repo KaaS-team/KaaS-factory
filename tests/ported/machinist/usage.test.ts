@@ -36,43 +36,75 @@ describe("codex usage", () => {
     ["overflow", '{"type":"turn.completed","usage":{"input_tokens":9223372036854775807,"output_tokens":1}}', null],
   ])("leaves invalid usage unavailable: %s", (_name, line, want) => {
     // "missing event" has no terminal event at all: nothing to trust or distrust, so zero tokens, not "unavailable".
-    expect(codex(line + "\n").total).toBe(want);
+    expect(codex(`${line}\n`).total).toBe(want);
   });
 
   test("uses the last completed turn, and a malformed final one makes usage unavailable", () => {
-    expect(codex('{"type":"turn.completed","usage":{"input_tokens":4,"output_tokens":5}}\n{"type":"turn.completed","usage":{"input_tokens":"invalid","output_tokens":5}}\n').total).toBeNull();
+    expect(
+      codex(
+        '{"type":"turn.completed","usage":{"input_tokens":4,"output_tokens":5}}\n{"type":"turn.completed","usage":{"input_tokens":"invalid","output_tokens":5}}\n',
+      ).total,
+    ).toBeNull();
   });
 
   test("a truncated final completed turn invalidates usage", () => {
-    expect(codex('{"type":"turn.completed","usage":{"input_tokens":4,"output_tokens":5}}\n{"type":"turn.completed","usage":{"input_tokens":8').total).toBeNull();
+    expect(
+      codex(
+        '{"type":"turn.completed","usage":{"input_tokens":4,"output_tokens":5}}\n{"type":"turn.completed","usage":{"input_tokens":8',
+      ).total,
+    ).toBeNull();
   });
 
   test("unrelated malformed output is ignored", () => {
-    expect(codex('{"type":"turn.completed","usage":{"input_tokens":4,"output_tokens":5}}\n{"type":"item.completed","item":').total).toBe(9);
+    expect(
+      codex('{"type":"turn.completed","usage":{"input_tokens":4,"output_tokens":5}}\n{"type":"item.completed","item":')
+        .total,
+    ).toBe(9);
   });
 
   test.each([
-    ["result", claudePreset, '{"type":"result","usage":{"input_tokens":4,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":5}}'],
+    [
+      "result",
+      claudePreset,
+      '{"type":"result","usage":{"input_tokens":4,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":5}}',
+    ],
     ["turn.completed", codexPreset, '{"type":"turn.completed","usage":{"input_tokens":4,"output_tokens":5}}'],
   ] as const)("a nested malformed %s event is ignored", (type, preset, valid) => {
-    expect(collect(preset, valid + "\n", `{"item":{"type":"${type}","usage":`).total).toBe(9);
+    expect(collect(preset, `${valid}\n`, `{"item":{"type":"${type}","usage":`).total).toBe(9);
   });
 });
 
 describe("claude usage", () => {
   test("reads all usage fields, cache included", () => {
-    expect(claude('{"type":"system","subtype":"init"}\n{"type":"result","usage":{"input_tokens":100,"cache_creation_input_tokens":20,"cache_read_input_tokens":30,"output_tokens":4}}').total).toBe(154);
+    expect(
+      claude(
+        '{"type":"system","subtype":"init"}\n{"type":"result","usage":{"input_tokens":100,"cache_creation_input_tokens":20,"cache_read_input_tokens":30,"output_tokens":4}}',
+      ).total,
+    ).toBe(154);
   });
 
   test.each([
-    ["missing field", '{"type":"result","usage":{"input_tokens":1,"cache_creation_input_tokens":2,"cache_read_input_tokens":3}}'],
+    [
+      "missing field",
+      '{"type":"result","usage":{"input_tokens":1,"cache_creation_input_tokens":2,"cache_read_input_tokens":3}}',
+    ],
     ["malformed", '{"type":"result","usage":'],
-    ["negative", '{"type":"result","usage":{"input_tokens":-1,"cache_creation_input_tokens":2,"cache_read_input_tokens":3,"output_tokens":4}}'],
-    ["fractional", '{"type":"result","usage":{"input_tokens":1.5,"cache_creation_input_tokens":2,"cache_read_input_tokens":3,"output_tokens":4}}'],
-    ["overflow", '{"type":"result","usage":{"input_tokens":9223372036854775807,"cache_creation_input_tokens":1,"cache_read_input_tokens":0,"output_tokens":0}}'],
+    [
+      "negative",
+      '{"type":"result","usage":{"input_tokens":-1,"cache_creation_input_tokens":2,"cache_read_input_tokens":3,"output_tokens":4}}',
+    ],
+    [
+      "fractional",
+      '{"type":"result","usage":{"input_tokens":1.5,"cache_creation_input_tokens":2,"cache_read_input_tokens":3,"output_tokens":4}}',
+    ],
+    [
+      "overflow",
+      '{"type":"result","usage":{"input_tokens":9223372036854775807,"cache_creation_input_tokens":1,"cache_read_input_tokens":0,"output_tokens":0}}',
+    ],
     ["malformed field before type", '{"usage":invalid,"type":"result"}'],
   ])("rejects an invalid final usage: %s", (_name, line) => {
-    const good = '{"type":"result","usage":{"input_tokens":1,"cache_creation_input_tokens":2,"cache_read_input_tokens":3,"output_tokens":4}}';
-    expect(claude(good + "\n" + line + "\n").total).toBeNull();
+    const good =
+      '{"type":"result","usage":{"input_tokens":1,"cache_creation_input_tokens":2,"cache_read_input_tokens":3,"output_tokens":4}}';
+    expect(claude(`${good}\n${line}\n`).total).toBeNull();
   });
 });

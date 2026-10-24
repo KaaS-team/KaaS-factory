@@ -53,7 +53,12 @@ export function previousSummary(issue: GhIssue): string {
   return "no summary was recorded";
 }
 
-export function buildRevision(worktree: string, issue: GhIssue, comment: Pick<GhComment, "id">, feedback: string): Revision {
+export function buildRevision(
+  worktree: string,
+  issue: GhIssue,
+  comment: Pick<GhComment, "id">,
+  feedback: string,
+): Revision {
   const artifacts: Record<string, string> = {};
   for (const stage of Object.keys(JSON_FILENAMES) as (keyof typeof JSON_FILENAMES)[]) {
     for (const name of [JSON_FILENAMES[stage], COMMENT_FILENAMES[stage]]) {
@@ -71,7 +76,12 @@ export function buildRevision(worktree: string, issue: GhIssue, comment: Pick<Gh
 
 // `revise.md` keeps the latest feedback verbatim (the stage skills read it);
 // `revision.md` is the full review history the next attempt is asked to honour.
-export async function writeRevision(worktree: string, issue: GhIssue, comment: Pick<GhComment, "id">, feedback: string): Promise<void> {
+export async function writeRevision(
+  worktree: string,
+  issue: GhIssue,
+  comment: Pick<GhComment, "id">,
+  feedback: string,
+): Promise<void> {
   const dir = `${worktree}/${runDir(issue.number)}`;
   const revision = buildRevision(worktree, issue, comment, feedback);
   const inputs = Object.fromEntries(Object.keys(revision.artifacts).map((alias) => [alias, `${dir}/${alias}`]));

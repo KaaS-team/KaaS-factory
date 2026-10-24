@@ -43,7 +43,8 @@ describe("runPool", () => {
     const run = runPool(items, 2, async (item) => {
       active += 1;
       maxActive = Math.max(maxActive, active);
-      if (item === 1) await gate.promise; // hold worker 1 open until both slots are busy
+      if (item === 1)
+        await gate.promise; // hold worker 1 open until both slots are busy
       else await new Promise((r) => setTimeout(r, 5));
       active -= 1;
       return item;

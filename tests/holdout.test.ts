@@ -15,7 +15,15 @@ import { runHoldout, type HoldoutRunner } from "../src/holdout";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { advanceIssue } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import {
+  baseIssue,
+  FakeGateRunner,
+  FakeGit,
+  FakeGitHub,
+  FakeHoldoutRunner,
+  fixtureFor,
+  MultiStageExecutor,
+} from "./harness";
 
 // ---------- pure function: runHoldout ----------
 
@@ -28,7 +36,12 @@ class FixedHoldoutRunner implements HoldoutRunner {
 
 describe("runHoldout", () => {
   test("ok is true, detail is the runner's own stdout, when it exits 0", async () => {
-    const result = await runHoldout(new FixedHoldoutRunner({ stdout: "3 pass", stderr: "", code: 0 }), "/tmp/w", "main", { paths: [], cmd: "true" });
+    const result = await runHoldout(
+      new FixedHoldoutRunner({ stdout: "3 pass", stderr: "", code: 0 }),
+      "/tmp/w",
+      "main",
+      { paths: [], cmd: "true" },
+    );
     expect(result).toEqual({ ok: true, detail: "3 pass" });
   });
 
@@ -45,7 +58,10 @@ describe("runHoldout", () => {
 
   test("truncates detail to the last 2000 characters, never a full log dump", async () => {
     const long = "x".repeat(5000);
-    const result = await runHoldout(new FixedHoldoutRunner({ stdout: long, stderr: "", code: 1 }), "/tmp/w", "main", { paths: [], cmd: "x" });
+    const result = await runHoldout(new FixedHoldoutRunner({ stdout: long, stderr: "", code: 1 }), "/tmp/w", "main", {
+      paths: [],
+      cmd: "x",
+    });
     expect(result.detail.length).toBe(2000);
     expect(result.detail).toBe(long.slice(-2000));
   });
@@ -70,7 +86,8 @@ function setup(initial: string[], overrides: Parameters<typeof mergeConfig>[0] =
   const holdoutRunner = new FakeHoldoutRunner();
   const config = mergeConfig({ repo: "acme/widgets", ...overrides });
   const deps = { github, git, state, executor, gateRunner, holdoutRunner, cloneDir, workspacesDir };
-  const push = (stage: StageName, files: Record<string, string>, result?: Partial<StageRunResult>) => executor.push(stage, n, fixtureFor(stage, n), files, result);
+  const push = (stage: StageName, files: Record<string, string>, result?: Partial<StageRunResult>) =>
+    executor.push(stage, n, fixtureFor(stage, n), files, result);
   const step = () => advanceIssue(deps, config, github.issues.get(n)!);
   return { n, github, git, state, holdoutRunner, config, deps, push, step, workspacesDir };
 }
@@ -83,16 +100,34 @@ const OUTSIDE_HOLDOUT_CONFIG = { paths: ["holdout-tests/**"], cmd: "bun test hol
 
 const triage = (o: object = {}) => ({
   "triage-comment.md": "<!-- factory:triage v1 -->\ntriage",
-  "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["src/a.ts"], gate_level: "make check", confidence: 0.9, ...o }),
+  "triage.json": JSON.stringify({
+    disposition: "proceed",
+    type: "bug",
+    risk: "low",
+    done_when: "x",
+    files_expected: ["src/a.ts"],
+    gate_level: "make check",
+    confidence: 0.9,
+    ...o,
+  }),
 });
 const plan = () => ({
   "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",
   "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true }),
 });
-const build = () => ({ "status-comment.md": "<!-- factory:status v1 -->\nbuilding", "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) });
-const verdict = (result: "pass" | "reject") => ({ "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict", "verdict.json": JSON.stringify({ result, rounds: 1, findings: [] }) });
+const build = () => ({
+  "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
+  "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+});
+const verdict = (result: "pass" | "reject") => ({
+  "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
+  "verdict.json": JSON.stringify({ result, rounds: 1, findings: [] }),
+});
 const pr = () => ({ "pr-body.md": "Did it.\nCloses #1" });
-const retro = () => ({ "retro-comment.md": "<!-- factory:retro v1 -->\nnothing new", "retro.json": JSON.stringify({ outcome: "complete", summary: "nothing new" }) });
+const retro = () => ({
+  "retro-comment.md": "<!-- factory:retro v1 -->\nnothing new",
+  "retro.json": JSON.stringify({ outcome: "complete", summary: "nothing new" }),
+});
 
 describe("holdout off (default config)", () => {
   test("the runner never runs, and a normal build still ships", async () => {
@@ -126,7 +161,9 @@ describe("holdout on", () => {
     const comments = c.github.issues.get(c.n)!.comments.map((cm) => cm.body);
     expect(comments.some((b) => b.includes("Holdout tests failed") && b.includes("expect(total).toBe(10)"))).toBe(true);
     // A pass posts nothing, so the run page reads the last result from the run's own folder.
-    const saved = JSON.parse(readFileSync(join(c.workspacesDir, `issue-${c.n}`, `.factory/runs/issue-${c.n}/holdout.json`), "utf8"));
+    const saved = JSON.parse(
+      readFileSync(join(c.workspacesDir, `issue-${c.n}`, `.factory/runs/issue-${c.n}/holdout.json`), "utf8"),
+    );
     expect(saved).toMatchObject({ ok: true, cmd: HOLDOUT_CONFIG.cmd });
   });
 
@@ -154,6 +191,8 @@ describe("holdout on", () => {
 
     expect(await c.step()).toBe("needs-human");
     expect(c.state.getRun("acme/widgets", c.n)!.reason).toContain("holdout tests failed 3 times");
-    expect(c.state.listRetros("acme/widgets")).toEqual([expect.objectContaining({ issue: c.n, outcome: "gave-up", status: "done" })]);
+    expect(c.state.listRetros("acme/widgets")).toEqual([
+      expect.objectContaining({ issue: c.n, outcome: "gave-up", status: "done" }),
+    ]);
   });
 });

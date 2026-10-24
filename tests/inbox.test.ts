@@ -5,7 +5,18 @@
 import { describe, expect, test } from "bun:test";
 import { parseChatOps } from "../src/chatops";
 import type { GhIssue } from "../src/github";
-import { InboxError, inboxPositionals, parkReasons, type InboxChannel, type InboxAction, WAITING, WAITING_LABELS, act, buildInbox, commandText } from "../src/inbox";
+import {
+  InboxError,
+  inboxPositionals,
+  parkReasons,
+  type InboxChannel,
+  type InboxAction,
+  WAITING,
+  WAITING_LABELS,
+  act,
+  buildInbox,
+  commandText,
+} from "../src/inbox";
 import { LABELS, LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
 
 const at = (n: number) => `2026-09-2${n}T10:00:00Z`;
@@ -26,7 +37,14 @@ describe("inbox structure", () => {
   });
 
   test("every factory state or parked label yields one item with actions, or none for in-flight labels", () => {
-    const inFlight = new Set<string>([LABEL.ready, LABEL.blocked, LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying]);
+    const inFlight = new Set<string>([
+      LABEL.ready,
+      LABEL.blocked,
+      LABEL.triaging,
+      LABEL.planning,
+      LABEL.building,
+      LABEL.verifying,
+    ]);
     for (const l of LABELS.filter((x) => x.category === "state" || x.category === "parked")) {
       const items = buildInbox([issue(1, l.name)]);
       if (inFlight.has(l.name)) expect(items, l.name).toHaveLength(0);
@@ -62,8 +80,8 @@ describe("buildInbox", () => {
 
   test("orders the longest-waiting item first, strips markers and control codes, and caps the ask", () => {
     const items = buildInbox([
-      issue(2, LABEL.failed, "<!-- factory:data {\"stage\":\"build\"} -->\n\x1b[31mBuild broke\x1b[0m", at(3)),
-      issue(1, LABEL.awaitingApproval, "<!-- factory:plan v1 -->\n" + "x".repeat(5000), at(2)),
+      issue(2, LABEL.failed, '<!-- factory:data {"stage":"build"} -->\n\x1b[31mBuild broke\x1b[0m', at(3)),
+      issue(1, LABEL.awaitingApproval, `<!-- factory:plan v1 -->\n${"x".repeat(5000)}`, at(2)),
     ]);
     expect(items.map((i) => i.issue)).toEqual([1, 2]);
     expect(items[0]!.ask.length).toBe(1200);
@@ -77,7 +95,9 @@ describe("buildInbox", () => {
   });
 
   test("an in-review PR with a merge-policy dry-run comment gets its own kind, not the generic review-pr", () => {
-    const items = buildInbox([issue(3, LABEL.inReview, "<!-- factory:merge-policy:abc123 -->\nMerge policy: **dry-run** — would auto-merge.")]);
+    const items = buildInbox([
+      issue(3, LABEL.inReview, "<!-- factory:merge-policy:abc123 -->\nMerge policy: **dry-run** — would auto-merge."),
+    ]);
     expect(items[0]!.kind).toBe("merge-dry-run");
   });
 
@@ -122,7 +142,8 @@ describe("ChatOps commands, structurally", () => {
   });
 
   test("a command typed in a comment is only a command when it starts the comment", () => {
-    for (const a of ["approve", "retry", "cancel"] as const) expect(parseChatOps(`please /factory ${a}`).type).toBe("answer");
+    for (const a of ["approve", "retry", "cancel"] as const)
+      expect(parseChatOps(`please /factory ${a}`).type).toBe("answer");
   });
 });
 
@@ -142,7 +163,9 @@ describe("InboxChannel", () => {
     await channel.send(items);
     expect(seen).toEqual([5]);
     const posted: string[] = [];
-    expect(await act({ commentIssue: async (_r, _n, body) => (posted.push(body), 1) }, "a/b", items[0]!, "approve")).toBe("/factory approve");
+    expect(
+      await act({ commentIssue: async (_r, _n, body) => (posted.push(body), 1) }, "a/b", items[0]!, "approve"),
+    ).toBe("/factory approve");
     expect(posted).toEqual(["/factory approve"]);
   });
 });

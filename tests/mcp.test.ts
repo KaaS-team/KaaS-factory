@@ -27,7 +27,9 @@ const TRACKER = { type: "http", url: "https://tracker.example/mcp" };
 
 describe("workflow mcp:", () => {
   const flow = (mcp: string, uses = "build") =>
-    parseWorkflowText(`name: m\nsteps:\n  b:\n    uses: ${uses}\n    label: factory:building\n${uses === "check" ? "    run: make lint\n" : ""}    mcp: ${mcp}\n    next: p\n  p:\n    uses: pr\n    label: factory:in-review\n`);
+    parseWorkflowText(
+      `name: m\nsteps:\n  b:\n    uses: ${uses}\n    label: factory:building\n${uses === "check" ? "    run: make lint\n" : ""}    mcp: ${mcp}\n    next: p\n  p:\n    uses: pr\n    label: factory:in-review\n`,
+    );
 
   test("an agent step keeps its server names", () => {
     const r = flow("[docs, tracker]");
@@ -35,7 +37,7 @@ describe("workflow mcp:", () => {
   });
   test.each([
     ["docs", /a list of server names/, "build"],
-    ["[\"has space\"]", /a list of server names/, "build"],
+    ['["has space"]', /a list of server names/, "build"],
     ["[docs]", /a check step runs no agent/, "check"],
   ])("refuses %s", (mcp, msg, uses) => {
     const r = flow(mcp, uses);
@@ -50,7 +52,9 @@ describe("mcpServersFor", () => {
   });
   test("an unknown name or a missing registry throws before anything runs", () => {
     expect(() => mcpServersFor(repoWith({ docs: DOCS }), ["tracker"])).toThrow(McpError);
-    expect(() => mcpServersFor(repoWith({ docs: DOCS }), ["tracker"])).toThrow(/"tracker" is not in \.factory\/mcp\.json \(has: docs\)/);
+    expect(() => mcpServersFor(repoWith({ docs: DOCS }), ["tracker"])).toThrow(
+      /"tracker" is not in \.factory\/mcp\.json \(has: docs\)/,
+    );
     expect(() => mcpServersFor(repoWith(undefined), ["docs"])).toThrow(/not found/);
   });
 });
@@ -76,13 +80,22 @@ describe("the executor", () => {
     const bin = mkdtempSync(join(scratch, "bin-"));
     const out = join(bin, "seen.json");
     // A stand-in claude: records the --mcp-config file it was given, then exits.
-    writeFileSync(join(bin, "claude"), `#!/bin/sh\nwhile [ $# -gt 0 ]; do if [ "$1" = --mcp-config ]; then cp "$2" ${out}; fi; shift; done\n`);
+    writeFileSync(
+      join(bin, "claude"),
+      `#!/bin/sh\nwhile [ $# -gt 0 ]; do if [ "$1" = --mcp-config ]; then cp "$2" ${out}; fi; shift; done\n`,
+    );
     chmodSync(join(bin, "claude"), 0o755);
     const saved = process.env.PATH;
     process.env.PATH = `${bin}:${saved}`;
     try {
       const cwd = repoWith(undefined);
-      await new CommandExecutor({ claude: { preset: "claude" } }, { default: "claude" }).runStage({ stage: "build", issue: 4, cwd, maxBudgetUsd: 1, mcp: { docs: DOCS } });
+      await new CommandExecutor({ claude: { preset: "claude" } }, { default: "claude" }).runStage({
+        stage: "build",
+        issue: 4,
+        cwd,
+        maxBudgetUsd: 1,
+        mcp: { docs: DOCS },
+      });
     } finally {
       process.env.PATH = saved;
     }
@@ -91,6 +104,8 @@ describe("the executor", () => {
 
   test("a step with servers refuses an agent that cannot load them", async () => {
     const exec = new CommandExecutor({ sh: { command: ["true"] } }, { default: "sh" });
-    expect(exec.runStage({ stage: "build", issue: 5, cwd: repoWith(undefined), maxBudgetUsd: 1, mcp: { docs: DOCS } })).rejects.toThrow(McpError);
+    expect(
+      exec.runStage({ stage: "build", issue: 5, cwd: repoWith(undefined), maxBudgetUsd: 1, mcp: { docs: DOCS } }),
+    ).rejects.toThrow(McpError);
   });
 });

@@ -60,7 +60,10 @@ export interface StepCtx {
 }
 
 // `facts` is the step's JSON, which later edges' `if:` read by the step's id.
-export type StepResult = { readonly kind: "next"; readonly facts?: unknown } | { readonly kind: "reject" } | { readonly kind: "stop"; readonly outcome: Outcome };
+export type StepResult =
+  | { readonly kind: "next"; readonly facts?: unknown }
+  | { readonly kind: "reject" }
+  | { readonly kind: "stop"; readonly outcome: Outcome };
 
 export interface StepType extends StepKind {
   run(sc: StepCtx): Promise<StepResult>;
@@ -77,7 +80,11 @@ async function askOrHandOver(sc: StepCtx, question: string | undefined): Promise
     return stop("needs-human");
   }
   ctx.questionRound += 1;
-  if (question) await postComment(deps, config, issue.number, question, { stage: "question", json: { round: ctx.questionRound, stage: step.id } });
+  if (question)
+    await postComment(deps, config, issue.number, question, {
+      stage: "question",
+      json: { round: ctx.questionRound, stage: step.id },
+    });
   await moveLabel(deps, config, issue.number, step.label, LABEL.needsInfo);
   finish(deps, config, issue.number, "needs-info");
   return stop("needs-info");
@@ -101,7 +108,13 @@ const triage: StepType = {
     const { json, problem } = stageJson<TriageArtifact>("triage", art.json, typesFor(config.routes));
     if (result.exitCode !== 0 || !json) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.failed);
-      finish(deps, config, issueNumber, "failed", problem ?? stageFailure(result, "triage produced no valid triage.json"));
+      finish(
+        deps,
+        config,
+        issueNumber,
+        "failed",
+        problem ?? stageFailure(result, "triage produced no valid triage.json"),
+      );
       return stop("failed");
     }
     const triageStop = stepStop(json);
@@ -157,14 +170,22 @@ const build: StepType = {
     const issueNumber = issue.number;
     if (hasNoGates(worktree)) {
       await postComment(deps, config, issueNumber, NO_GATES_COMMENT);
-      return stop(await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: "no gates in .factory/config.json" }));
+      return stop(
+        await stopStep(deps, config, issueNumber, step.label, {
+          status: "needs-human",
+          reason: "no gates in .factory/config.json",
+        }),
+      );
     }
     const result = await runStage(deps, config, issue, "build", worktree, { ...rebuildFrom(sc), mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "build");
     const built = stageJson<BuildArtifact>("build", art.json);
     const problem = built.problem;
     // The runner owns the attempt count: the agent's copy of the file is cleared every round.
-    const json = built.json && { ...built.json, rounds: deps.state.listStageRuns(config.repo, { issue: issueNumber }).filter((r) => r.stage === "build").length };
+    const json = built.json && {
+      ...built.json,
+      rounds: deps.state.listStageRuns(config.repo, { issue: issueNumber }).filter((r) => r.stage === "build").length,
+    };
     const buildStop = stepStop(json);
     if (buildStop) return stop(await stopStep(deps, config, issueNumber, step.label, buildStop));
 
@@ -172,7 +193,8 @@ const build: StepType = {
     // crash), matched to the runner's exact spelling (audit finding #5:
     // the skill used to say `needs_info`).
     if (json?.status === "needs-info") {
-      if (sc.ctx.questionRound < sc.workflow.limits.questions && art.comment) await upsertStatusComment(deps, config, issue, art.comment, json);
+      if (sc.ctx.questionRound < sc.workflow.limits.questions && art.comment)
+        await upsertStatusComment(deps, config, issue, art.comment, json);
       return askOrHandOver(sc, art.question);
     }
 
@@ -185,7 +207,8 @@ const build: StepType = {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.failed);
       deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
       const reason =
-        problem ?? stageFailure(result) ??
+        problem ??
+        stageFailure(result) ??
         `gates ${gate.status.toLowerCase()}${gate.failedGates.length ? `: ${gate.failedGates.join(", ")}` : ""}`;
       finish(deps, config, issueNumber, "failed", reason);
       return stop("failed");
@@ -203,7 +226,9 @@ const build: StepType = {
     // `.factory/**` is already unconditionally protected below (ALWAYS_PROTECTED_PATHS),
     // covering the default holdout location; this adds any holdout path a
     // repo configured outside it.
-    const protectedPaths = holdoutEnabled(config.holdout) ? [...config.protectedPaths, ...config.holdout.paths] : config.protectedPaths;
+    const protectedPaths = holdoutEnabled(config.holdout)
+      ? [...config.protectedPaths, ...config.holdout.paths]
+      : config.protectedPaths;
     const hits = touchesProtectedPath(changed, protectedPaths);
     if (hits.length) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
@@ -212,7 +237,11 @@ const build: StepType = {
     }
 
     deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
-    await writeGateEvidence(worktree, issueNumber, { line: gate.raw, status: gate.status, tree: await deps.git.treeHash(worktree) });
+    await writeGateEvidence(worktree, issueNumber, {
+      line: gate.raw,
+      status: gate.status,
+      tree: await deps.git.treeHash(worktree),
+    });
     await deps.git.push(worktree, issueNumber);
     return { kind: "next", facts: json };
   },
@@ -239,7 +268,13 @@ const verify: StepType = {
         ctx.failure = failureTail(fresh.raw);
         if (ctx.rejectRound > maxRejects) {
           await moveLabel(deps, config, issueNumber, step.label, LABEL.failed);
-          finish(deps, config, issueNumber, "failed", `gates ${fresh.status.toLowerCase()} before verify, ${ctx.rejectRound} times`);
+          finish(
+            deps,
+            config,
+            issueNumber,
+            "failed",
+            `gates ${fresh.status.toLowerCase()} before verify, ${ctx.rejectRound} times`,
+          );
           return stop("failed");
         }
         return { kind: "reject" };
@@ -255,11 +290,17 @@ const verify: StepType = {
     if (holdoutEnabled(config.holdout)) {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
       // A pass leaves no comment, so the run page reads the result from here.
-      await Bun.write(`${worktree}/${runDir(issueNumber)}/holdout.json`, `${JSON.stringify({ ok: holdout.ok, cmd: config.holdout.cmd, tail: holdout.detail }, null, 2)}\n`);
+      await Bun.write(
+        `${worktree}/${runDir(issueNumber)}/holdout.json`,
+        `${JSON.stringify({ ok: holdout.ok, cmd: config.holdout.cmd, tail: holdout.detail }, null, 2)}\n`,
+      );
       if (!holdout.ok) {
         ctx.rejectRound += 1;
         ctx.failure = failureTail(`Holdout tests failed:\n${holdout.detail}`);
-        await postComment(deps, config, issueNumber, `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``, { stage: "verify", json: { holdout: holdout.detail } });
+        await postComment(deps, config, issueNumber, `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``, {
+          stage: "verify",
+          json: { holdout: holdout.detail },
+        });
         if (ctx.rejectRound > maxRejects) {
           await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
           await runRetro(deps, config, issue, "gave-up");
@@ -270,13 +311,21 @@ const verify: StepType = {
       }
     }
     if (deps.proofGit) {
-      const planJson = (await readStageArtifacts(worktree, issueNumber, "plan")).json as { proof?: "test" | "check" } | undefined;
+      const planJson = (await readStageArtifacts(worktree, issueNumber, "plan")).json as
+        | { proof?: "test" | "check" }
+        | undefined;
       const testCmd = testGate(config.gates)?.cmd;
       let proof: ProofResult;
       try {
         proof = await runProof(deps.proofGit, worktree, config.base, planJson?.proof, testCmd);
       } catch (err) {
-        proof = { status: "skipped", reverted: [], tests: [], cmd: testCmd ?? "", tail: `the runner could not run the proof: ${(err as Error).message}` };
+        proof = {
+          status: "skipped",
+          reverted: [],
+          tests: [],
+          cmd: testCmd ?? "",
+          tail: `the runner could not run the proof: ${(err as Error).message}`,
+        };
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
     }
@@ -300,12 +349,20 @@ const verify: StepType = {
     if (verifyStop) return stop(await stopStep(deps, config, issueNumber, step.label, verifyStop));
     if (result.exitCode !== 0 || !json || json.result === "uncertain") {
       // The human needs the verdict to act on, and the post is the marker that retires the retry that led here.
-      if (art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+      if (art.comment)
+        await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
-      finish(deps, config, issueNumber, "needs-human", stageFailure(result, json ? "verify uncertain" : "verify produced no valid verdict.json"));
+      finish(
+        deps,
+        config,
+        issueNumber,
+        "needs-human",
+        stageFailure(result, json ? "verify uncertain" : "verify produced no valid verdict.json"),
+      );
       return stop("needs-human");
     }
-    if (art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+    if (art.comment)
+      await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
     if (json.result === "reject") {
       ctx.rejectRound += 1;
       ctx.failure = failureTail(art.comment ?? JSON.stringify(json.findings, null, 2));
@@ -348,10 +405,23 @@ const pr: StepType = {
         base: config.base,
         head,
         title: `${issue.title} (#${issueNumber})`,
-        body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx, readProofStatus(worktree, issueNumber)),
+        body: prBody(
+          deps,
+          config,
+          issue,
+          art.comment ?? `Closes #${issueNumber}`,
+          ctx,
+          readProofStatus(worktree, issueNumber),
+        ),
         draft: true,
       }));
-    if (!existing) emitEvent(deps.bus, "factory.pr.opened", { repo: config.repo, issue: issueNumber, url: prUrl, head }, `issue/${issueNumber}`);
+    if (!existing)
+      emitEvent(
+        deps.bus,
+        "factory.pr.opened",
+        { repo: config.repo, issue: issueNumber, url: prUrl, head },
+        `issue/${issueNumber}`,
+      );
     // Opened as a draft while the factory works; ready is the hand-off to a human.
     await deps.github.markReady(config.repo, head, true);
     deps.state.updateRun(config.repo, issueNumber, { pr_url: prUrl });
@@ -372,7 +442,13 @@ const check: StepType = {
     const out = await runtime.run(step.run!, worktree);
     if (out.code === 0) return { kind: "next", facts: { ok: true } };
     const tail = `${out.stdout}\n${out.stderr}`.trim().slice(-4000);
-    await postComment(deps, config, issue.number, `Step \`${step.id}\` failed: \`${step.run}\` exited ${out.code}.\n\n\`\`\`\n${tail}\n\`\`\``, { stage: step.id, json: { ok: false, code: out.code } });
+    await postComment(
+      deps,
+      config,
+      issue.number,
+      `Step \`${step.id}\` failed: \`${step.run}\` exited ${out.code}.\n\n\`\`\`\n${tail}\n\`\`\``,
+      { stage: step.id, json: { ok: false, code: out.code } },
+    );
     await moveLabel(deps, config, issue.number, step.label, LABEL.failed);
     finish(deps, config, issue.number, "failed", `${step.id}: \`${step.run}\` exited ${out.code}`);
     return stop("failed");

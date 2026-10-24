@@ -64,7 +64,14 @@ function httpSandbox(): () => void {
       let sandbox: ReturnType<typeof startSandbox>;
       beforeAll(() => (sandbox = startSandbox("s3cret")));
       afterAll(() => sandbox.stop());
-      executionContract("http", () => new HttpSandboxExecution({ kind: "http", url: sandbox.url, tokenEnv: "SANDBOX_TOKEN" }, { SANDBOX_TOKEN: "s3cret" }));
+      executionContract(
+        "http",
+        () =>
+          new HttpSandboxExecution(
+            { kind: "http", url: sandbox.url, tokenEnv: "SANDBOX_TOKEN" },
+            { SANDBOX_TOKEN: "s3cret" },
+          ),
+      );
     });
 }
 
@@ -74,15 +81,27 @@ const REGISTRY: Record<string, () => void> = {
     spendContract("github-store", () => {
       const github = new FakeGitHub([1, 2, 3, 4].map((n) => baseIssue(n, [])));
       github.repoLabels = new Set(); // a repo set up before the ledger label existed
-      return { store: new GitHubSpend(github, "a/b", "me"), worker: (holder) => new GitHubSpend(github, "a/b", holder) };
+      return {
+        store: new GitHubSpend(github, "a/b", "me"),
+        worker: (holder) => new GitHubSpend(github, "a/b", holder),
+      };
     }),
   local: () => executionContract("local", () => new LocalExecution()),
   docker: onFakePath(() => executionContract("docker", () => new DockerExecution({ kind: "docker", image: "img" }))),
   lwpr: onFakePath(() => executionContract("lwpr", () => new LwprExecution())),
   // A launcher that is just `env`: the argv templating is what is under test.
-  wrap: () => executionContract("wrap", () => new WrapExecution({ kind: "wrap", argv: ["env", "FACTORY_WRAPPED=1", "bash", "-c", "{cmd}"] })),
+  wrap: () =>
+    executionContract(
+      "wrap",
+      () => new WrapExecution({ kind: "wrap", argv: ["env", "FACTORY_WRAPPED=1", "bash", "-c", "{cmd}"] }),
+    ),
   "http-sandbox": httpSandbox(),
-  ssh: onFakePath(() => executionContract("ssh", () => new SshExecution({ kind: "ssh", host: "box", dir: join(tmpdir(), `factory-ssh-${process.pid}`) }))),
+  ssh: onFakePath(() =>
+    executionContract(
+      "ssh",
+      () => new SshExecution({ kind: "ssh", host: "box", dir: join(tmpdir(), `factory-ssh-${process.pid}`) }),
+    ),
+  ),
 };
 
 describe("adapters", () => {

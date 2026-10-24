@@ -63,13 +63,20 @@ describe("factory learn", () => {
   test("batches a skill edit into that skill's PROPOSED_EDITS.md, not the real SKILL.md", async () => {
     const { deps, repo, git, state } = setup();
     const id = state.queueRetro(repo, 9, "gave-up");
-    state.completeRetro(id, { skill_name: "factory-build", skill_edit: "Call out the exact acceptance criterion wording." });
+    state.completeRetro(id, {
+      skill_name: "factory-build",
+      skill_edit: "Call out the exact acceptance criterion wording.",
+    });
 
     git.changed = [".claude/skills/factory-build/PROPOSED_EDITS.md"];
     const result = await runLearn(deps, repo, "main", NOW);
 
     expect(result.batched).toBe(1);
-    const path = join(deps.workspacesDir, branchNameFor(NOW).replace(/\//g, "-"), ".claude/skills/factory-build/PROPOSED_EDITS.md");
+    const path = join(
+      deps.workspacesDir,
+      branchNameFor(NOW).replace(/\//g, "-"),
+      ".claude/skills/factory-build/PROPOSED_EDITS.md",
+    );
     const body = await Bun.file(path).text();
     expect(body).toContain("Call out the exact acceptance criterion wording.");
     expect(body).toContain("#9");

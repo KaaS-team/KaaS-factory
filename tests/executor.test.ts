@@ -8,14 +8,22 @@
 
 import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../src/stage-permissions";
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { aggregateStageEvents, ReplayExecutor, type StageName } from "../src/executor";
+import { aggregateStageEvents, ReplayExecutor } from "../src/executor";
 import { claudeArgs, parseStreamJsonLine } from "../src/agents/presets/claude";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import {
+  baseIssue,
+  FakeGateRunner,
+  FakeGit,
+  FakeGitHub,
+  FakeHoldoutRunner,
+  fixtureFor,
+  MultiStageExecutor,
+} from "./harness";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue, resumeNeedsInfo } from "../src/watch";
@@ -176,7 +184,16 @@ describe("full happy-path pipeline (triage -> plan -> build -> verify -> pr)", (
       "pr-body.md": "## Summary\nDid the thing.\nCloses #1",
     });
 
-    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+    const deps = {
+      github,
+      git,
+      state,
+      executor,
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      cloneDir,
+      workspacesDir,
+    };
     const outcome = await processReadyIssue(issue, deps, config);
 
     expect(outcome).toBe("shipped");
@@ -229,7 +246,16 @@ describe("needs-info path", () => {
       "question-comment.md": "<!-- factory:question v1 -->\n1. Which environment?\na) staging\nb) production",
     });
 
-    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+    const deps = {
+      github,
+      git,
+      state,
+      executor,
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      cloneDir,
+      workspacesDir,
+    };
     const outcome = await processReadyIssue(issue, deps, config);
 
     expect(outcome).toBe("needs-info");
@@ -238,7 +264,13 @@ describe("needs-info path", () => {
     expect(state.getRun("acme/widgets", 2)!.status).toBe("needs-info");
 
     // An untrusted reply does not resume the loop.
-    issue.comments.push({ id: 9001, author: "rando", authorAssociation: "NONE", body: "staging please", createdAt: new Date().toISOString() });
+    issue.comments.push({
+      id: 9001,
+      author: "rando",
+      authorAssociation: "NONE",
+      body: "staging please",
+      createdAt: new Date().toISOString(),
+    });
     const stillWaiting = await resumeNeedsInfo(issue, deps, config);
     expect(stillWaiting).toBe("waiting");
 
@@ -246,7 +278,13 @@ describe("needs-info path", () => {
     // via a second queued round for the same stage:issue key.
     await new Promise((r) => setTimeout(r, 5));
     github.roles.set("param", "admin");
-    issue.comments.push({ id: 9002, author: "param", authorAssociation: "OWNER", body: "staging", createdAt: new Date().toISOString() });
+    issue.comments.push({
+      id: 9002,
+      author: "param",
+      authorAssociation: "OWNER",
+      body: "staging",
+      createdAt: new Date().toISOString(),
+    });
     executor.push("triage", 2, fixtureFor("triage", 2), {
       "triage.json": JSON.stringify({
         disposition: "proceed",

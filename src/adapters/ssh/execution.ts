@@ -20,7 +20,18 @@ export function sshArgs(spec: SshSpec, cmd: string, cwd: string): { sync: string
   const excludes = [".git", ...(spec.exclude ?? ["node_modules"])].map((x) => `--exclude=${x}`);
   return {
     // --rsync-path creates the directory first; openrsync (macOS) has no --mkpath.
-    sync: ["rsync", "-a", "--delete", ...excludes, "-e", "ssh -o BatchMode=yes", "--rsync-path", `mkdir -p ${shq(remote)} && rsync`, `${cwd}/`, `${spec.host}:${remote}/`],
+    sync: [
+      "rsync",
+      "-a",
+      "--delete",
+      ...excludes,
+      "-e",
+      "ssh -o BatchMode=yes",
+      "--rsync-path",
+      `mkdir -p ${shq(remote)} && rsync`,
+      `${cwd}/`,
+      `${spec.host}:${remote}/`,
+    ],
     // ssh joins its arguments into one remote shell line, so the whole command is one quoted word.
     run: ["ssh", "-o", "BatchMode=yes", spec.host, `bash -c ${shq(`cd ${shq(remote)} && ${cmd}`)}`],
   };
@@ -28,7 +39,11 @@ export function sshArgs(spec: SshSpec, cmd: string, cwd: string): { sync: string
 
 async function spawn(argv: string[], cwd: string): Promise<ExecResult> {
   const proc = Bun.spawn(argv, { cwd, env: process.env, stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
   return { stdout, stderr, code };
 }
 
@@ -37,7 +52,8 @@ export class SshExecution implements ExecutionPort {
   async run(cmd: string, cwd: string): Promise<ExecResult> {
     const { sync, run } = sshArgs(this.spec, cmd, cwd);
     const synced = await spawn(sync, cwd);
-    if (synced.code !== 0) return { stdout: "", stderr: `rsync to ${this.spec.host} failed:\n${synced.stderr}`, code: synced.code };
+    if (synced.code !== 0)
+      return { stdout: "", stderr: `rsync to ${this.spec.host} failed:\n${synced.stderr}`, code: synced.code };
     return spawn(run, cwd);
   }
 }

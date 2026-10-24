@@ -43,8 +43,19 @@ describe("claude stage env", () => {
 
 describe("claude init problems", () => {
   test("a failed MCP server and reported plugin errors become startup_error events", () => {
-    const events = parseStreamJsonLine(init({ mcp_servers: [{ name: "ok", status: "connected" }, { name: "bad", status: "failed" }], plugin_errors: ["lwp-eng: manifest invalid"] }));
-    expect(events.filter((e) => e.kind === "startup_error").map((e) => e.text)).toEqual(["MCP server bad failed to start", "lwp-eng: manifest invalid"]);
+    const events = parseStreamJsonLine(
+      init({
+        mcp_servers: [
+          { name: "ok", status: "connected" },
+          { name: "bad", status: "failed" },
+        ],
+        plugin_errors: ["lwp-eng: manifest invalid"],
+      }),
+    );
+    expect(events.filter((e) => e.kind === "startup_error").map((e) => e.text)).toEqual([
+      "MCP server bad failed to start",
+      "lwp-eng: manifest invalid",
+    ]);
   });
 
   test("a clean init has none", () => {
@@ -62,11 +73,16 @@ describe("claude init problems", () => {
 });
 
 describe("claude tool lines in the transcript", () => {
-  const call = (name: string, input: object) => parseStreamJsonLine(JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name, input }] } }));
+  const call = (name: string, input: object) =>
+    parseStreamJsonLine(
+      JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name, input }] } }),
+    );
 
   test("a watcher sees the file or command each call touched", () => {
     expect(renderEvent(call("Read", { file_path: "src/csv.ts" })[0]!)).toBe("> Read src/csv.ts");
-    expect(renderEvent(call("Bash", { command: "make test\necho done", description: "run" })[0]!)).toBe("> Bash make test");
+    expect(renderEvent(call("Bash", { command: "make test\necho done", description: "run" })[0]!)).toBe(
+      "> Bash make test",
+    );
   });
 
   test("a path inside the worktree prints relative to it", () => {

@@ -44,7 +44,11 @@ const readIfThere: ReadFile = async (path) => {
 // The repo's own file wins over the bundled one of the same name; a missing
 // file falls back to it, and a broken one is an error, never a silent default.
 // `read` is doctor's file reader, so its checks see what the watcher would.
-export async function loadWorkflow(cloneDir: string, name: string = DEFAULT_WORKFLOW, read: ReadFile = readIfThere): Promise<WorkflowResult> {
+export async function loadWorkflow(
+  cloneDir: string,
+  name: string = DEFAULT_WORKFLOW,
+  read: ReadFile = readIfThere,
+): Promise<WorkflowResult> {
   if (!/^[\w-]+$/.test(name)) return { ok: false, problems: [`workflow "${name}": letters, digits, - and _ only`] };
   for (const dir of [join(cloneDir, ".factory", "workflows"), BUNDLED_DIR]) {
     const text = await read(join(dir, `${name}.yml`));
@@ -62,8 +66,15 @@ export async function workflowFor(cloneDir: string, config: Pick<FactoryConfig, 
 
 // Every workflow a route names (routes.<type>.workflow) other than the repo's, by name. Loaded at
 // boot like the repo's, so a typo stops the watcher instead of parking the first issue of that type.
-export async function routeWorkflowsFor(cloneDir: string, config: Pick<FactoryConfig, "workflow" | "routes">): Promise<Record<string, Workflow>> {
-  const names = new Set(Object.entries(config.routes ?? {}).flatMap(([type, r]) => (type.startsWith("_") || !r?.workflow || r.workflow === config.workflow ? [] : [r.workflow])));
+export async function routeWorkflowsFor(
+  cloneDir: string,
+  config: Pick<FactoryConfig, "workflow" | "routes">,
+): Promise<Record<string, Workflow>> {
+  const names = new Set(
+    Object.entries(config.routes ?? {}).flatMap(([type, r]) =>
+      type.startsWith("_") || !r?.workflow || r.workflow === config.workflow ? [] : [r.workflow],
+    ),
+  );
   const out: Record<string, Workflow> = {};
   for (const name of names) out[name] = await workflowFor(cloneDir, { workflow: name });
   return out;

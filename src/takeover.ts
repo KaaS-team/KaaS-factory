@@ -44,14 +44,22 @@ export async function stopRunningStage(liveFile: string, live: LiveStage, timeou
 }
 
 // Only Claude sessions can be reopened today; any other agent is refused by name.
-export function resumeArgv(agentName: string, agents: Readonly<Record<string, AgentConfig>>, sessionId: string): string[] {
+export function resumeArgv(
+  agentName: string,
+  agents: Readonly<Record<string, AgentConfig>>,
+  sessionId: string,
+): string[] {
   const preset = agents[agentName]?.preset ?? (agentName === "claude" ? "claude" : undefined);
-  if (preset !== "claude") throw new Error(`agent ${agentName} cannot be resumed: only the claude preset keeps a session`);
+  if (preset !== "claude")
+    throw new Error(`agent ${agentName} cannot be resumed: only the claude preset keeps a session`);
   return ["claude", "--resume", sessionId];
 }
 
 // What takeover prints before handing the terminal to the agent. A fresh
 // worktree is a folder Claude has not seen, so it asks to trust it first.
 export function takeoverBanner(argv: readonly string[], worktree: string): string[] {
-  return [`factory takeover: ${argv.join(" ")}  (in ${worktree}; exit to hand back)`, "factory takeover: Claude will ask to trust this worktree: choose Yes"];
+  return [
+    `factory takeover: ${argv.join(" ")}  (in ${worktree}; exit to hand back)`,
+    "factory takeover: Claude will ask to trust this worktree: choose Yes",
+  ];
 }

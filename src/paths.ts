@@ -24,7 +24,8 @@ function repoHome(repo: string, env: NodeJS.ProcessEnv): string {
   // The repo arrives from a URL query too, so `../..` must never reach the path.
   const [owner, name, extra] = repo.split("/");
   const part = (s?: string) => !!s && /^[A-Za-z0-9_.-]+$/.test(s) && s !== "." && s !== "..";
-  if (!part(owner) || !part(name) || extra !== undefined) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
+  if (!part(owner) || !part(name) || extra !== undefined)
+    throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
   return `${factoryHome(env)}/${owner}/${name}`;
 }
 
@@ -55,7 +56,8 @@ export function discoverRepos(env: NodeJS.ProcessEnv = process.env): string[] {
     if (!owner.isDirectory() || RESERVED_TOP_LEVEL.has(owner.name)) continue;
     const ownerDir = `${home}/${owner.name}`;
     for (const name of readdirSync(ownerDir, { withFileTypes: true })) {
-      if (name.isDirectory() && existsSync(`${ownerDir}/${name.name}/factory.db`)) repos.push(`${owner.name}/${name.name}`);
+      if (name.isDirectory() && existsSync(`${ownerDir}/${name.name}/factory.db`))
+        repos.push(`${owner.name}/${name.name}`);
     }
   }
   return repos.sort();
@@ -86,5 +88,5 @@ export function livePath(repo: string, issue: number, env: NodeJS.ProcessEnv = p
 // Written by `factory takeover` before it stops the stage, so the executor
 // can tell an operator's stop from a crash.
 export function takeoverMarker(liveFile: string): string {
-  return liveFile.replace(/\.json$/, "") + ".takeover";
+  return `${liveFile.replace(/\.json$/, "")}.takeover`;
 }

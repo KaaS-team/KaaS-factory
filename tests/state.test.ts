@@ -9,9 +9,21 @@ const dir = mkdtempSync(join(tmpdir(), "factory-state-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 const row = (issue: number, over: Partial<StageRunInput> = {}): StageRunInput => ({
-  repo: "acme/widgets", issue, stage: "build", agent: "claude", model: null,
-  started_at: "2026-01-01T00:00:00.000Z", finished_at: "2026-01-01T00:00:02.000Z", duration_ms: 2000,
-  tool_calls: 3, tokens_in: 10, tokens_out: 20, cost_usd: 0.5, exit_code: 0, killed_reason: null, ...over,
+  repo: "acme/widgets",
+  issue,
+  stage: "build",
+  agent: "claude",
+  model: null,
+  started_at: "2026-01-01T00:00:00.000Z",
+  finished_at: "2026-01-01T00:00:02.000Z",
+  duration_ms: 2000,
+  tool_calls: 3,
+  tokens_in: 10,
+  tokens_out: 20,
+  cost_usd: 0.5,
+  exit_code: 0,
+  killed_reason: null,
+  ...over,
 });
 
 test("stage_runs keeps every attempt of a stage, where runs keeps only the latest", () => {
@@ -20,7 +32,10 @@ test("stage_runs keeps every attempt of a stage, where runs keeps only the lates
   state.recordStageRun(row(1, { exit_code: 1, killed_reason: "timeout" }));
   state.recordStageRun(row(1));
   const rows = state.listStageRuns("acme/widgets", { issue: 1 });
-  expect(rows.map((r) => [r.stage, r.exit_code, r.killed_reason])).toEqual([["build", 1, "timeout"], ["build", 0, null]]);
+  expect(rows.map((r) => [r.stage, r.exit_code, r.killed_reason])).toEqual([
+    ["build", 1, "timeout"],
+    ["build", 0, null],
+  ]);
   expect(state.listRuns()).toHaveLength(1);
   state.close();
 });
@@ -40,8 +55,12 @@ test("stage_runs pages by keyset across more than one page and filters by repo",
 test("migrating twice, and on a database from v2.2 without stage_runs, keeps the data", () => {
   const path = join(dir, "old.db");
   const old = new Database(path);
-  old.exec("CREATE TABLE runs (id INTEGER PRIMARY KEY AUTOINCREMENT, issue INTEGER NOT NULL, repo TEXT NOT NULL, title TEXT NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, updated_at TEXT NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, gate_line TEXT, pr_url TEXT, reason TEXT, status_comment_id INTEGER, UNIQUE(repo, issue))");
-  old.exec("INSERT INTO runs (issue, repo, title, stage, status, started_at, updated_at) VALUES (7, 'acme/widgets', 'kept', 'plan', 'shipped', 'a', 'b')");
+  old.exec(
+    "CREATE TABLE runs (id INTEGER PRIMARY KEY AUTOINCREMENT, issue INTEGER NOT NULL, repo TEXT NOT NULL, title TEXT NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, updated_at TEXT NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, gate_line TEXT, pr_url TEXT, reason TEXT, status_comment_id INTEGER, UNIQUE(repo, issue))",
+  );
+  old.exec(
+    "INSERT INTO runs (issue, repo, title, stage, status, started_at, updated_at) VALUES (7, 'acme/widgets', 'kept', 'plan', 'shipped', 'a', 'b')",
+  );
   old.close();
   new FactoryState(path).close();
   const state = new FactoryState(path);
@@ -54,8 +73,12 @@ test("migrating twice, and on a database from v2.2 without stage_runs, keeps the
 test("a v2.5.0 stage_runs table gains tokens_cached and usage_complete once, keeping its rows", () => {
   const path = join(dir, "v250.db");
   const old = new Database(path);
-  old.exec("CREATE TABLE stage_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, repo TEXT NOT NULL, issue INTEGER NOT NULL, stage TEXT NOT NULL, agent TEXT NOT NULL, model TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, exit_code INTEGER NOT NULL, killed_reason TEXT)");
-  old.exec("INSERT INTO stage_runs (repo, issue, stage, agent, started_at, finished_at, duration_ms, exit_code) VALUES ('acme/widgets', 7, 'plan', 'claude', 'a', 'b', 1, 0)");
+  old.exec(
+    "CREATE TABLE stage_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, repo TEXT NOT NULL, issue INTEGER NOT NULL, stage TEXT NOT NULL, agent TEXT NOT NULL, model TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, exit_code INTEGER NOT NULL, killed_reason TEXT)",
+  );
+  old.exec(
+    "INSERT INTO stage_runs (repo, issue, stage, agent, started_at, finished_at, duration_ms, exit_code) VALUES ('acme/widgets', 7, 'plan', 'claude', 'a', 'b', 1, 0)",
+  );
   old.close();
   for (let i = 0; i < 2; i++) new FactoryState(path).close();
   const state = new FactoryState(path);
@@ -67,8 +90,12 @@ test("a v2.5.0 stage_runs table gains tokens_cached and usage_complete once, kee
 test("an old NOT NULL cost_usd column is rebuilt nullable, twice over, and an unknown cost stays NULL", () => {
   const path = join(dir, "v251.db");
   const old = new Database(path);
-  old.exec("CREATE TABLE stage_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, repo TEXT NOT NULL, issue INTEGER NOT NULL, stage TEXT NOT NULL, agent TEXT NOT NULL, model TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, exit_code INTEGER NOT NULL, killed_reason TEXT, tokens_cached INTEGER NOT NULL DEFAULT 0, usage_complete INTEGER NOT NULL DEFAULT 1)");
-  old.exec("INSERT INTO stage_runs (repo, issue, stage, agent, started_at, finished_at, duration_ms, cost_usd, exit_code, usage_complete) VALUES ('acme/widgets', 7, 'plan', 'claude', 'a', 'b', 1, 0.25, 0, 1), ('acme/widgets', 7, 'build', 'codex', 'a', 'b', 1, 0, 0, 0)");
+  old.exec(
+    "CREATE TABLE stage_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, repo TEXT NOT NULL, issue INTEGER NOT NULL, stage TEXT NOT NULL, agent TEXT NOT NULL, model TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, exit_code INTEGER NOT NULL, killed_reason TEXT, tokens_cached INTEGER NOT NULL DEFAULT 0, usage_complete INTEGER NOT NULL DEFAULT 1)",
+  );
+  old.exec(
+    "INSERT INTO stage_runs (repo, issue, stage, agent, started_at, finished_at, duration_ms, cost_usd, exit_code, usage_complete) VALUES ('acme/widgets', 7, 'plan', 'claude', 'a', 'b', 1, 0.25, 0, 1), ('acme/widgets', 7, 'build', 'codex', 'a', 'b', 1, 0, 0, 0)",
+  );
   old.close();
   for (let i = 0; i < 2; i++) new FactoryState(path).close();
   const state = new FactoryState(path);
@@ -77,7 +104,12 @@ test("an old NOT NULL cost_usd column is rebuilt nullable, twice over, and an un
   expect(costs).toEqual([0.25, null, null]);
   state.close();
   const check = new Database(path);
-  expect(check.query("PRAGMA index_list(stage_runs)").all().map((i) => (i as { name: string }).name)).toContain("stage_runs_repo_issue_id");
+  expect(
+    check
+      .query("PRAGMA index_list(stage_runs)")
+      .all()
+      .map((i) => (i as { name: string }).name),
+  ).toContain("stage_runs_repo_issue_id");
   check.close();
 });
 
@@ -117,12 +149,23 @@ test("queueRetro starts a row queued; completeRetro fills in the proposal, statu
   const state = new FactoryState(path);
   const id = state.queueRetro("acme/widgets", 1, "merged");
   expect(state.listQueuedRetros("acme/widgets").map((r) => r.id)).toEqual([id]);
-  state.completeRetro(id, { lesson: "keep acceptance criteria checkable", skill_name: "factory-plan", skill_edit: "require a done_when per AC" });
+  state.completeRetro(id, {
+    lesson: "keep acceptance criteria checkable",
+    skill_name: "factory-plan",
+    skill_edit: "require a done_when per AC",
+  });
   expect(state.listQueuedRetros("acme/widgets")).toEqual([]);
   state.close();
   const check = new Database(path);
-  const stored = check.query("SELECT status, lesson, skill_name, skill_edit, completed_at FROM retros WHERE id = $id").get({ $id: id }) as Record<string, unknown>;
-  expect(stored).toMatchObject({ status: "done", lesson: "keep acceptance criteria checkable", skill_name: "factory-plan", skill_edit: "require a done_when per AC" });
+  const stored = check
+    .query("SELECT status, lesson, skill_name, skill_edit, completed_at FROM retros WHERE id = $id")
+    .get({ $id: id }) as Record<string, unknown>;
+  expect(stored).toMatchObject({
+    status: "done",
+    lesson: "keep acceptance criteria checkable",
+    skill_name: "factory-plan",
+    skill_edit: "require a done_when per AC",
+  });
   expect(stored.completed_at).not.toBeNull();
   check.close();
 });
@@ -136,7 +179,11 @@ test("completeRetro with no proposal defaults to done with null proposal fields;
   state.completeRetro(failedId, undefined, "failed");
   state.close();
   const check = new Database(path);
-  const rows = check.query("SELECT id, status, lesson FROM retros ORDER BY id").all() as { id: number; status: string; lesson: string | null }[];
+  const rows = check.query("SELECT id, status, lesson FROM retros ORDER BY id").all() as {
+    id: number;
+    status: string;
+    lesson: string | null;
+  }[];
   expect(rows).toEqual([
     { id: doneId, status: "done", lesson: null },
     { id: failedId, status: "failed", lesson: null },

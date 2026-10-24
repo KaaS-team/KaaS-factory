@@ -15,12 +15,22 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 
-const configure = (postEditCommand: unknown) => writeFileSync(join(cwd, ".factory", "config.json"), JSON.stringify({ postEditCommand }));
+const configure = (postEditCommand: unknown) =>
+  writeFileSync(join(cwd, ".factory", "config.json"), JSON.stringify({ postEditCommand }));
 
-async function edited(file: string, stage: string | null = "build", extra: Record<string, string> = {}): Promise<{ code: number; reason?: string }> {
+async function edited(
+  file: string,
+  stage: string | null = "build",
+  extra: Record<string, string> = {},
+): Promise<{ code: number; reason?: string }> {
   const { FACTORY_STAGE: _s, ...base } = process.env;
   const input = { hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: file }, cwd };
-  const proc = Bun.spawn(["bash", HOOK], { stdin: new Blob([JSON.stringify(input)]), stdout: "pipe", stderr: "pipe", env: stage ? { ...base, ...extra, FACTORY_STAGE: stage } : base });
+  const proc = Bun.spawn(["bash", HOOK], {
+    stdin: new Blob([JSON.stringify(input)]),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: stage ? { ...base, ...extra, FACTORY_STAGE: stage } : base,
+  });
   const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
   const reply = out.trim() ? (JSON.parse(out) as { decision: string; reason: string }) : undefined;
   if (reply) expect(reply.decision).toBe("block");

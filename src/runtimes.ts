@@ -14,13 +14,21 @@ import type { ExecutionPort } from "./ports/execution";
 
 export type RuntimeSpec = { readonly kind: "local" } | DockerSpec | SshSpec | LwprSpec | WrapSpec | HttpSandboxSpec;
 
-export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = { local: { kind: "local" }, lwpr: { kind: "lwpr" } };
+export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = {
+  local: { kind: "local" },
+  lwpr: { kind: "lwpr" },
+};
 
 const NAME = /^[\w-]{1,64}$/;
 type Field = "string" | "posInt" | "boolean" | "strings";
-const SHAPES: Readonly<Record<RuntimeSpec["kind"], { required: readonly string[]; fields: Readonly<Record<string, Field>> }>> = {
+const SHAPES: Readonly<
+  Record<RuntimeSpec["kind"], { required: readonly string[]; fields: Readonly<Record<string, Field>> }>
+> = {
   local: { required: [], fields: {} },
-  docker: { required: ["image"], fields: { image: "string", network: "string", memory: "string", cpus: "posInt", pids: "posInt", runtime: "string" } },
+  docker: {
+    required: ["image"],
+    fields: { image: "string", network: "string", memory: "string", cpus: "posInt", pids: "posInt", runtime: "string" },
+  },
   ssh: { required: ["host", "dir"], fields: { host: "string", dir: "string", exclude: "strings" } },
   lwpr: { required: [], fields: { app: "string", timeoutMin: "posInt", setup: "boolean" } },
   wrap: { required: ["argv"], fields: { argv: "strings" } },
@@ -29,8 +37,14 @@ const SHAPES: Readonly<Record<RuntimeSpec["kind"], { required: readonly string[]
 
 // What a field's shape cannot say.
 function kindProblems(at: string, s: Record<string, unknown>): string[] {
-  if (s.kind === "wrap" && Array.isArray(s.argv) && s.argv.filter((a) => a === CMD).length !== 1) return [`${at}.argv: needs "${CMD}" as exactly one element, where the bash command goes`];
-  if (s.kind === "http" && typeof s.url === "string" && !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(s.url)) return [`${at}.url: https (plain http only to localhost), since the worktree is sent to it`];
+  if (s.kind === "wrap" && Array.isArray(s.argv) && s.argv.filter((a) => a === CMD).length !== 1)
+    return [`${at}.argv: needs "${CMD}" as exactly one element, where the bash command goes`];
+  if (
+    s.kind === "http" &&
+    typeof s.url === "string" &&
+    !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(s.url)
+  )
+    return [`${at}.url: https (plain http only to localhost), since the worktree is sent to it`];
   return [];
 }
 
@@ -59,7 +73,8 @@ export function runtimeProblems(raw: unknown, where = "runtimes"): string[] {
     for (const [k, v] of Object.entries(s)) {
       if (k === "kind" || k.startsWith("_")) continue;
       const f = shape.fields[k];
-      if (!f) problems.push(`${at}.${k}: unknown key for ${s.kind} (allowed: kind, ${Object.keys(shape.fields).join(", ")})`);
+      if (!f)
+        problems.push(`${at}.${k}: unknown key for ${s.kind} (allowed: kind, ${Object.keys(shape.fields).join(", ")})`);
       else if (!fieldOk(v, f)) problems.push(`${at}.${k}: expected ${f}, got ${JSON.stringify(v)}`);
     }
     problems.push(...kindProblems(at, s));
@@ -69,29 +84,52 @@ export function runtimeProblems(raw: unknown, where = "runtimes"): string[] {
 
 export function executionFor(spec: RuntimeSpec): ExecutionPort {
   switch (spec.kind) {
-    case "local": return new LocalExecution();
-    case "docker": return new DockerExecution(spec);
-    case "ssh": return new SshExecution(spec);
-    case "lwpr": return new LwprExecution(spec);
-    case "wrap": return new WrapExecution(spec);
-    case "http": return new HttpSandboxExecution(spec);
+    case "local":
+      return new LocalExecution();
+    case "docker":
+      return new DockerExecution(spec);
+    case "ssh":
+      return new SshExecution(spec);
+    case "lwpr":
+      return new LwprExecution(spec);
+    case "wrap":
+      return new WrapExecution(spec);
+    case "http":
+      return new HttpSandboxExecution(spec);
   }
 }
 
 // Built-ins plus the machine's own, one ExecutionPort each.
-export function runtimesFrom(machine: Readonly<Record<string, RuntimeSpec>> = {}): Readonly<Record<string, ExecutionPort>> {
-  return Object.fromEntries(Object.entries({ ...BUILTIN_RUNTIMES, ...machine }).map(([name, spec]) => [name, executionFor(spec)]));
+export function runtimesFrom(
+  machine: Readonly<Record<string, RuntimeSpec>> = {},
+): Readonly<Record<string, ExecutionPort>> {
+  return Object.fromEntries(
+    Object.entries({ ...BUILTIN_RUNTIMES, ...machine }).map(([name, spec]) => [name, executionFor(spec)]),
+  );
 }
 
 // The runtime names a repo's config and workflow ask for, each with where it was asked.
-export function runtimeRefs(config: { readonly runtime?: { readonly gates?: string; readonly check?: string } }, steps: Readonly<Record<string, { readonly runtime?: string }>>): Array<{ where: string; name: string }> {
+export function runtimeRefs(
+  config: { readonly runtime?: { readonly gates?: string; readonly check?: string } },
+  steps: Readonly<Record<string, { readonly runtime?: string }>>,
+): Array<{ where: string; name: string }> {
   return [
     ...(config.runtime?.gates ? [{ where: "runtime.gates", name: config.runtime.gates }] : []),
     ...(config.runtime?.check ? [{ where: "runtime.check", name: config.runtime.check }] : []),
-    ...Object.entries(steps).flatMap(([id, s]) => (s.runtime ? [{ where: `steps.${id}.runtime`, name: s.runtime }] : [])),
+    ...Object.entries(steps).flatMap(([id, s]) =>
+      s.runtime ? [{ where: `steps.${id}.runtime`, name: s.runtime }] : [],
+    ),
   ];
 }
 
-export function unknownRuntimes(refs: ReadonlyArray<{ where: string; name: string }>, known: Readonly<Record<string, unknown>>): string[] {
-  return refs.filter((r) => !Object.hasOwn(known, r.name)).map((r) => `${r.where}: no runtime "${r.name}" (have: ${Object.keys(known).join(", ")}; add it to FACTORY_HOME/machine.json runtimes)`);
+export function unknownRuntimes(
+  refs: ReadonlyArray<{ where: string; name: string }>,
+  known: Readonly<Record<string, unknown>>,
+): string[] {
+  return refs
+    .filter((r) => !Object.hasOwn(known, r.name))
+    .map(
+      (r) =>
+        `${r.where}: no runtime "${r.name}" (have: ${Object.keys(known).join(", ")}; add it to FACTORY_HOME/machine.json runtimes)`,
+    );
 }

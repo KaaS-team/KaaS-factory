@@ -91,7 +91,9 @@ export async function contextFileLoadsAgentsMd(cwd: string, contextFile: string 
 export async function skillsIndex(cwd: string): Promise<string> {
   let names: string[];
   try {
-    names = readdirSync(`${cwd}/.claude/skills`).filter((n) => !n.startsWith("factory-")).sort();
+    names = readdirSync(`${cwd}/.claude/skills`)
+      .filter((n) => !n.startsWith("factory-"))
+      .sort();
   } catch {
     return "";
   }
@@ -179,6 +181,11 @@ function assemble(built: readonly Section[]): string {
 
 // "" means there is nothing to add: callers skip injecting it rather than
 // appending an empty "## Context pack" header.
-export async function buildContextPack(stage: StageName, issue: number, cwd: string, opts: PackOptions = {}): Promise<string> {
+export async function buildContextPack(
+  stage: StageName,
+  issue: number,
+  cwd: string,
+  opts: PackOptions = {},
+): Promise<string> {
   return assemble(await sections(stage, issue, cwd, opts));
 }

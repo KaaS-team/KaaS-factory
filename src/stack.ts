@@ -49,9 +49,21 @@ function node(files: RepoFiles): Stack | undefined {
   } catch {
     return { name: "node", setup: [], gates: [], commands: [], notes: ["package.json is not valid JSON"] };
   }
-  const pm = files.exists("bun.lock") || files.exists("bun.lockb") ? "bun" : files.exists("pnpm-lock.yaml") ? "pnpm" : files.exists("yarn.lock") ? "yarn" : "npm";
+  const pm =
+    files.exists("bun.lock") || files.exists("bun.lockb")
+      ? "bun"
+      : files.exists("pnpm-lock.yaml")
+        ? "pnpm"
+        : files.exists("yarn.lock")
+          ? "yarn"
+          : "npm";
   const run = (s: string) => (pm === "yarn" ? `yarn ${s}` : `${pm} run ${s}`);
-  const setup = { bun: "bun install --frozen-lockfile", pnpm: "pnpm install --frozen-lockfile", yarn: "yarn install --frozen-lockfile", npm: "npm ci" }[pm]!;
+  const setup = {
+    bun: "bun install --frozen-lockfile",
+    pnpm: "pnpm install --frozen-lockfile",
+    yarn: "yarn install --frozen-lockfile",
+    npm: "npm ci",
+  }[pm]!;
   const gates: GateSpec[] = [];
   const test = scripts.test && !NPM_PLACEHOLDER.test(scripts.test) ? "test" : undefined;
   if (test) gates.push({ name: "test", cmd: run(test), required: true, role: "test" });
@@ -59,7 +71,13 @@ function node(files: RepoFiles): Stack | undefined {
   if (typecheck) gates.push({ name: "typecheck", cmd: run(typecheck), required: true, role: "typecheck" });
   if (scripts.lint) gates.push({ name: "lint", cmd: run("lint"), required: true, role: "lint" });
   if (scripts.build) gates.push({ name: "build", cmd: run("build"), required: true, role: "build" });
-  return { name: pm, setup: [setup], gates, commands: [`${pm} *`, ...(pm === "npm" ? ["npx *"] : pm === "bun" ? ["bunx *"] : [])], notes: [] };
+  return {
+    name: pm,
+    setup: [setup],
+    gates,
+    commands: [`${pm} *`, ...(pm === "npm" ? ["npx *"] : pm === "bun" ? ["bunx *"] : [])],
+    notes: [],
+  };
 }
 
 function python(files: RepoFiles): Stack | undefined {
@@ -68,12 +86,23 @@ function python(files: RepoFiles): Stack | undefined {
   const text = `${pyproject ?? ""}\n${files.read("requirements.txt") ?? ""}\n${files.read("requirements-dev.txt") ?? ""}`;
   const pm = files.exists("uv.lock") ? "uv" : files.exists("poetry.lock") ? "poetry" : "pip";
   const run = (cmd: string) => (pm === "pip" ? `python -m ${cmd}` : `${pm} run ${cmd}`);
-  const setup = { uv: "uv sync --frozen", poetry: "poetry install --no-interaction", pip: "python -m pip install -r requirements.txt" }[pm]!;
+  const setup = {
+    uv: "uv sync --frozen",
+    poetry: "poetry install --no-interaction",
+    pip: "python -m pip install -r requirements.txt",
+  }[pm]!;
   const gates: GateSpec[] = [];
-  if (/\bpytest\b/.test(text) || files.exists("tests") || files.exists("test")) gates.push({ name: "test", cmd: run("pytest"), required: true, role: "test" });
+  if (/\bpytest\b/.test(text) || files.exists("tests") || files.exists("test"))
+    gates.push({ name: "test", cmd: run("pytest"), required: true, role: "test" });
   if (/\bruff\b/.test(text)) gates.push({ name: "lint", cmd: run("ruff check ."), required: true, role: "lint" });
   if (/\bmypy\b/.test(text)) gates.push({ name: "typecheck", cmd: run("mypy ."), required: true, role: "typecheck" });
-  return { name: pm, setup: pm === "pip" && !files.exists("requirements.txt") ? [] : [setup], gates, commands: pm === "pip" ? ["python *", "pytest *"] : [`${pm} *`], notes: [] };
+  return {
+    name: pm,
+    setup: pm === "pip" && !files.exists("requirements.txt") ? [] : [setup],
+    gates,
+    commands: pm === "pip" ? ["python *", "pytest *"] : [`${pm} *`],
+    notes: [],
+  };
 }
 
 function go(files: RepoFiles): Stack | undefined {
@@ -94,10 +123,18 @@ function ruby(files: RepoFiles): Stack | undefined {
   if (!files.exists("Gemfile")) return undefined;
   const lock = `${files.read("Gemfile.lock") ?? ""}\n${files.read("Gemfile") ?? ""}`;
   const gates: GateSpec[] = [];
-  if (files.exists("spec") || /\brspec\b/.test(lock)) gates.push({ name: "test", cmd: "bundle exec rspec", required: true, role: "test" });
-  else if (files.exists("bin/rails") && files.exists("test")) gates.push({ name: "test", cmd: "bin/rails test", required: true, role: "test" });
+  if (files.exists("spec") || /\brspec\b/.test(lock))
+    gates.push({ name: "test", cmd: "bundle exec rspec", required: true, role: "test" });
+  else if (files.exists("bin/rails") && files.exists("test"))
+    gates.push({ name: "test", cmd: "bin/rails test", required: true, role: "test" });
   if (/\brubocop\b/.test(lock)) gates.push({ name: "lint", cmd: "bundle exec rubocop", required: true, role: "lint" });
-  return { name: files.exists("bin/rails") ? "rails" : "ruby", setup: ["bundle install"], gates, commands: ["bundle *", ...(files.exists("bin/rails") ? ["bin/rails *"] : [])], notes: [] };
+  return {
+    name: files.exists("bin/rails") ? "rails" : "ruby",
+    setup: ["bundle install"],
+    gates,
+    commands: ["bundle *", ...(files.exists("bin/rails") ? ["bin/rails *"] : [])],
+    notes: [],
+  };
 }
 
 function rust(files: RepoFiles): Stack | undefined {
@@ -139,9 +176,12 @@ export function detectStack(files: RepoFiles): Stack {
   }
   const stack = found ?? { name: "unknown", setup: [], gates: [], commands: [], notes: [] };
   const gates = [...stack.gates];
-  if (!gates.some((g) => g.role === "test") && targets.has("test")) gates.unshift({ name: "test", cmd: "make test", required: true, role: "test" });
+  if (!gates.some((g) => g.role === "test") && targets.has("test"))
+    gates.unshift({ name: "test", cmd: "make test", required: true, role: "test" });
   const notes = [...stack.notes];
-  if (gates.length === 0) notes.push("no test, lint or build command found: add a gate by hand, or the factory parks every issue");
-  else if (!gates.some((g) => g.role === "test")) notes.push("no test command found: the proof will be unavailable on every PR");
+  if (gates.length === 0)
+    notes.push("no test, lint or build command found: add a gate by hand, or the factory parks every issue");
+  else if (!gates.some((g) => g.role === "test"))
+    notes.push("no test command found: the proof will be unavailable on every PR");
   return { ...stack, gates, commands: [...stack.commands, ...(targets.size ? ["make *"] : [])], ci, notes };
 }

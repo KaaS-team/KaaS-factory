@@ -72,12 +72,29 @@ export interface DoctorContext {
 
 // Flags that let a CLI run headless without waiting on an approval prompt.
 export const BYPASS_FLAGS: ReadonlySet<string> = new Set([
-  "--dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox", "--yolo", "--force", "-f", "--auto", "--full-auto",
-  "--yes", "--yes-always", "-y", "--permission-mode", "--approval-mode", "--auto-approve", "--trust", "--allow-all",
+  "--dangerously-skip-permissions",
+  "--dangerously-bypass-approvals-and-sandbox",
+  "--yolo",
+  "--force",
+  "-f",
+  "--auto",
+  "--full-auto",
+  "--yes",
+  "--yes-always",
+  "-y",
+  "--permission-mode",
+  "--approval-mode",
+  "--auto-approve",
+  "--trust",
+  "--allow-all",
 ]);
 
 // The checks for one agent a stage uses; the dashboard's Agents page shows the same rows.
-export async function agentChecks(name: string, agents: Readonly<Record<string, AgentConfig>>, deps: Pick<DoctorDeps, "which" | "versionOf">): Promise<DoctorCheck[]> {
+export async function agentChecks(
+  name: string,
+  agents: Readonly<Record<string, AgentConfig>>,
+  deps: Pick<DoctorDeps, "which" | "versionOf">,
+): Promise<DoctorCheck[]> {
   const out: DoctorCheck[] = [];
   const agent = agents[name];
   const preset = agent?.preset ? PRESETS[agent.preset] : undefined;
@@ -101,7 +118,10 @@ export async function agentChecks(name: string, agents: Readonly<Record<string, 
       name: `${binary} is version ${preset.version}`,
       ok: found?.includes(preset.version) ?? false,
       warn: true,
-      detail: found === undefined ? `could not read \`${binary} --version\`` : `found "${found.split("\n")[0]!.trim()}", pinned ${preset.version} (Dockerfile and CI install the pin)`,
+      detail:
+        found === undefined
+          ? `could not read \`${binary} --version\``
+          : `found "${found.split("\n")[0]!.trim()}", pinned ${preset.version} (Dockerfile and CI install the pin)`,
       fixable: false,
     });
   }
@@ -115,11 +135,15 @@ export async function agentChecks(name: string, agents: Readonly<Record<string, 
     });
   }
   if (agent?.command && !preset) {
-    const hasBypass = agent.command.some((a) => BYPASS_FLAGS.has(a) || [...BYPASS_FLAGS].some((f) => a.startsWith(`${f}=`)));
+    const hasBypass = agent.command.some(
+      (a) => BYPASS_FLAGS.has(a) || [...BYPASS_FLAGS].some((f) => a.startsWith(`${f}=`)),
+    );
     out.push({
       name: `agent "${name}" runs without prompting`,
       ok: hasBypass,
-      detail: hasBypass ? "its command carries an approval-bypass flag" : `its command has no approval-bypass flag (${[...BYPASS_FLAGS].slice(0, 6).join(", ")}, ...): an unattended run would wait for a prompt until the timeout`,
+      detail: hasBypass
+        ? "its command carries an approval-bypass flag"
+        : `its command has no approval-bypass flag (${[...BYPASS_FLAGS].slice(0, 6).join(", ")}, ...): an unattended run would wait for a prompt until the timeout`,
       fixable: false,
     });
   }
@@ -127,7 +151,8 @@ export async function agentChecks(name: string, agents: Readonly<Record<string, 
     out.push({
       name: `agent "${name}" reports usage`,
       ok: true,
-      detail: "no preset, so tokens show as not reported and the tool-call cap is not enforced; the timeout is the backstop (consider a sandbox)",
+      detail:
+        "no preset, so tokens show as not reported and the tool-call cap is not enforced; the timeout is the backstop (consider a sandbox)",
       fixable: false,
     });
   }
@@ -171,8 +196,16 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     fixable: false,
   });
   const kind = deps.tracker?.kind ?? "github";
-  const trackerAuth = kind === "github" ? { ok: auth.ok, detail: "issues and labels on GitHub, through gh" } : await deps.tracker!.authStatus();
-  checks.push({ name: `tracker: ${kind}, authenticated`, ok: trackerAuth.ok, detail: trackerAuth.detail, fixable: false });
+  const trackerAuth =
+    kind === "github"
+      ? { ok: auth.ok, detail: "issues and labels on GitHub, through gh" }
+      : await deps.tracker!.authStatus();
+  checks.push({
+    name: `tracker: ${kind}, authenticated`,
+    ok: trackerAuth.ok,
+    detail: trackerAuth.detail,
+    fixable: false,
+  });
 
   checks.push({
     name: "target has .factory/config.json",
@@ -204,13 +237,17 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     checks.push({
       name: ".factory/config.json defines at least one gate",
       ok: gateCount > 0,
-      detail: gateCount > 0 ? `${gateCount} gate(s)` : "no gates: run `factory init`, or add one (a docs-only repo needs only a lint or link check)",
+      detail:
+        gateCount > 0
+          ? `${gateCount} gate(s)`
+          : "no gates: run `factory init`, or add one (a docs-only repo needs only a lint or link check)",
       fixable: false,
     });
   }
   if (ctx.templateSkills) {
     const stale: string[] = [];
-    const overridden = (path: string) => (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
+    const overridden = (path: string) =>
+      (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
     for (const [path, want] of Object.entries(ctx.templateSkills)) {
       if (overridden(path)) continue;
       if ((await deps.readFile(`${ctx.cloneDir}/${path}`)) !== want) stale.push(path);
@@ -218,7 +255,9 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     checks.push({
       name: "installed skills match this runner",
       ok: stale.length === 0,
-      detail: stale.length ? `${stale.length} differ or are missing (${stale[0]}); run \`factory install --update\`` : "up to date",
+      detail: stale.length
+        ? `${stale.length} differ or are missing (${stale[0]}); run \`factory install --update\``
+        : "up to date",
       fixable: false,
       warn: true,
     });
@@ -228,7 +267,8 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   const manifest = parseManifest(await deps.readFile(`${ctx.cloneDir}/.factory/manifest.json`));
   if (manifest) {
     const edited: string[] = [];
-    const overridden = (path: string) => (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
+    const overridden = (path: string) =>
+      (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
     for (const [path, sha] of Object.entries(manifest)) {
       if (overridden(path)) continue;
       const text = await deps.readFile(`${ctx.cloneDir}/${path}`);
@@ -251,7 +291,9 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     checks.push({
       name: `workflow ${ctx.workflow} is valid`,
       ok: loaded.ok,
-      detail: loaded.ok ? `${Object.keys(loaded.workflow.steps).length} steps from ${loaded.workflow.start}` : loaded.problems.join("; "),
+      detail: loaded.ok
+        ? `${Object.keys(loaded.workflow.steps).length} steps from ${loaded.workflow.start}`
+        : loaded.problems.join("; "),
       fixable: false,
     });
     const refs = runtimeRefs({ runtime: ctx.runtime }, loaded.ok ? loaded.workflow.steps : {});
@@ -264,7 +306,9 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
         fixable: false,
       });
     }
-    const named = loaded.ok ? Object.values(loaded.workflow.steps).flatMap((s) => (s.mcp ?? []).map((n) => ({ step: s.id, n }))) : [];
+    const named = loaded.ok
+      ? Object.values(loaded.workflow.steps).flatMap((s) => (s.mcp ?? []).map((n) => ({ step: s.id, n })))
+      : [];
     if (named.length > 0) {
       const registry = parseMcpRegistry(await deps.readFile(`${ctx.cloneDir}/${MCP_REGISTRY}`));
       const problems = mcpProblems(registry, [...new Set(named.map((x) => x.n))]);
@@ -277,7 +321,12 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     }
   }
   if (ctx.tmux) {
-    checks.push({ name: "tmux is installed (tmux.enabled)", ok: await deps.which("tmux"), detail: "install tmux, or set tmux.enabled to false", fixable: false });
+    checks.push({
+      name: "tmux is installed (tmux.enabled)",
+      ok: await deps.which("tmux"),
+      detail: "install tmux, or set tmux.enabled to false",
+      fixable: false,
+    });
   }
   if (ctx.factoryMode === "actions") {
     checks.push({
@@ -355,7 +404,12 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   return checks;
 }
 
-export async function fixDoctor(github: ScmPort, repo: string, routes?: Readonly<Record<string, RouteConfig>>, workflow?: Workflow): Promise<void> {
+export async function fixDoctor(
+  github: ScmPort,
+  repo: string,
+  routes?: Readonly<Record<string, RouteConfig>>,
+  workflow?: Workflow,
+): Promise<void> {
   for (const label of labelsFor(routes, workflow ? workflowLabels(workflow) : [])) {
     await github.ensureLabel(repo, label.name, label.color, label.description);
   }

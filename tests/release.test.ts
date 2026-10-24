@@ -44,7 +44,7 @@ describe("the CI template", () => {
     const scanJob = ci.slice(ci.indexOf("\n  scan:"), ci.indexOf("\n  manual:"));
     expect(ci).toMatch(/OSV_SCANNER_VERSION: "\d+\.\d+\.\d+"/);
     expect(ci).toMatch(/OSV_SCANNER_SHA256: [0-9a-f]{64}\n/);
-    expect(scanJob).toContain('sha256sum -c -');
+    expect(scanJob).toContain("sha256sum -c -");
     expect(scanJob.indexOf("sha256sum -c -")).toBeLessThan(scanJob.indexOf("factory scan --repo-dir"));
   });
 

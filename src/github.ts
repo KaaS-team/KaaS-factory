@@ -27,14 +27,46 @@ export class GhCommandRunner implements CommandRunner {
   }
 }
 
-import type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort, TrackerPort, CodeHostPort } from "./ports/scm";
-export type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort, TrackerPort, CodeHostPort };
+import type {
+  GhIssue,
+  GhComment,
+  CreatePrOptions,
+  GhPr,
+  CiCheck,
+  PrStatus,
+  MergeReadiness,
+  RepoRole,
+  ScmPort,
+  TrackerPort,
+  CodeHostPort,
+} from "./ports/scm";
+export type {
+  GhIssue,
+  GhComment,
+  CreatePrOptions,
+  GhPr,
+  CiCheck,
+  PrStatus,
+  MergeReadiness,
+  RepoRole,
+  ScmPort,
+  TrackerPort,
+  CodeHostPort,
+};
 
 // gh prints a comment's author as {login}; everything past this file trusts a login string, and an
 // object reached roleOf as "[object Object]", a 404, so no /factory approve was ever trusted.
-type RawIssue = Omit<GhIssue, "comments"> & { comments?: (Omit<GhComment, "author"> & { author?: { login?: string } | string })[] };
+type RawIssue = Omit<GhIssue, "comments"> & {
+  comments?: (Omit<GhComment, "author"> & { author?: { login?: string } | string })[];
+};
 function issueFrom(raw: RawIssue): GhIssue {
-  return { ...raw, comments: (raw.comments ?? []).map((c) => ({ ...c, author: typeof c.author === "string" ? c.author : (c.author?.login ?? "") })) };
+  return {
+    ...raw,
+    comments: (raw.comments ?? []).map((c) => ({
+      ...c,
+      author: typeof c.author === "string" ? c.author : (c.author?.login ?? ""),
+    })),
+  };
 }
 
 class GhError extends Error {
@@ -157,7 +189,12 @@ export class GitHub implements TrackerPort, CodeHostPort {
   }
 
   async roleOf(repo: string, login: string): Promise<RepoRole> {
-    const result = await this.runner.run(["api", `repos/${repo}/collaborators/${encodeURIComponent(login)}/permission`, "--jq", ".role_name // .permission"]);
+    const result = await this.runner.run([
+      "api",
+      `repos/${repo}/collaborators/${encodeURIComponent(login)}/permission`,
+      "--jq",
+      ".role_name // .permission",
+    ]);
     // 404: not a collaborator at all. Any other failure is not an answer, so it throws.
     if (result.code !== 0 && /HTTP 404/.test(result.stderr)) return "none";
     if (result.code !== 0) throw new GhError(["api", "collaborators/permission"], result);
@@ -213,7 +250,15 @@ export class GitHub implements TrackerPort, CodeHostPort {
   }
 
   async getPr(repo: string, number: number): Promise<GhPr> {
-    const result = await this.exec(["pr", "view", String(number), "--repo", repo, "--json", "number,url,state,headRefName,isDraft,closingIssuesReferences"]);
+    const result = await this.exec([
+      "pr",
+      "view",
+      String(number),
+      "--repo",
+      repo,
+      "--json",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences",
+    ]);
     return JSON.parse(result.stdout);
   }
 
@@ -224,8 +269,18 @@ export class GitHub implements TrackerPort, CodeHostPort {
 
   async mergedPrByHead(repo: string, head: string): Promise<GhPr | undefined> {
     const result = await this.exec([
-      "pr", "list", "--repo", repo, "--head", head, "--state", "merged",
-      "--json", "number,url,state,headRefName,isDraft,closingIssuesReferences", "--limit", "1",
+      "pr",
+      "list",
+      "--repo",
+      repo,
+      "--head",
+      head,
+      "--state",
+      "merged",
+      "--json",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences",
+      "--limit",
+      "1",
     ]);
     return (JSON.parse(result.stdout || "[]") as GhPr[]).find((p) => p.headRefName === head);
   }
@@ -233,15 +288,16 @@ export class GitHub implements TrackerPort, CodeHostPort {
   // Comments and review bodies on the PR, shaped like issue comments so the
   // same trust and command parsing applies. Empty when no PR exists yet.
   async prFeedback(repo: string, head: string): Promise<GhComment[]> {
-    const result = await this.runner.run([
-      "pr", "view", head, "--repo", repo, "--json", "comments,reviews",
-    ]);
+    const result = await this.runner.run(["pr", "view", head, "--repo", repo, "--json", "comments,reviews"]);
     if (result.code !== 0) return [];
     const data = JSON.parse(result.stdout || "{}") as {
       comments?: { author?: { login?: string }; authorAssociation: string; body: string; createdAt: string }[];
       reviews?: { author?: { login?: string }; authorAssociation: string; body: string; submittedAt: string }[];
     };
-    const toComment = (c: { author?: { login?: string }; authorAssociation: string; body: string }, createdAt: string): GhComment => ({
+    const toComment = (
+      c: { author?: { login?: string }; authorAssociation: string; body: string },
+      createdAt: string,
+    ): GhComment => ({
       id: 0,
       author: c.author?.login ?? "",
       authorAssociation: c.authorAssociation,
@@ -270,8 +326,13 @@ export class GitHub implements TrackerPort, CodeHostPort {
   // "open"/"closed" convention elsewhere in this codebase.
   async prStatus(repo: string, number: number): Promise<PrStatus> {
     const result = await this.exec([
-      "pr", "view", String(number), "--repo", repo,
-      "--json", "state,headRefOid,closingIssuesReferences,statusCheckRollup",
+      "pr",
+      "view",
+      String(number),
+      "--repo",
+      repo,
+      "--json",
+      "state,headRefOid,closingIssuesReferences,statusCheckRollup",
     ]);
     const data = JSON.parse(result.stdout) as {
       state: string;
@@ -292,8 +353,13 @@ export class GitHub implements TrackerPort, CodeHostPort {
   // GraphQL exposes. state is lowercased for the same reason as prStatus.
   async mergeReadiness(repo: string, number: number): Promise<MergeReadiness> {
     const result = await this.exec([
-      "pr", "view", String(number), "--repo", repo,
-      "--json", "state,isDraft,baseRefName,headRefOid,mergeable,reviewDecision",
+      "pr",
+      "view",
+      String(number),
+      "--repo",
+      repo,
+      "--json",
+      "state,isDraft,baseRefName,headRefOid,mergeable,reviewDecision",
     ]);
     const data = JSON.parse(result.stdout) as {
       state: string;
@@ -305,7 +371,12 @@ export class GitHub implements TrackerPort, CodeHostPort {
     };
     const [owner, name] = repo.split("/");
     if (!owner || !name) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
-    const { hasUnresolvedReviewThreads, changesRequestedStale } = await this.reviewState(owner, name, number, data.headRefOid);
+    const { hasUnresolvedReviewThreads, changesRequestedStale } = await this.reviewState(
+      owner,
+      name,
+      number,
+      data.headRefOid,
+    );
     return {
       state: data.state.toLowerCase() as MergeReadiness["state"],
       isDraft: data.isDraft,
@@ -329,11 +400,16 @@ export class GitHub implements TrackerPort, CodeHostPort {
   ): Promise<{ hasUnresolvedReviewThreads: boolean; changesRequestedStale: boolean }> {
     const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}reviews(last:50){nodes{state commit{oid}}}}}}`;
     const result = await this.exec([
-      "api", "graphql",
-      "-f", `query=${query}`,
-      "-F", `owner=${owner}`,
-      "-F", `name=${name}`,
-      "-F", `number=${number}`,
+      "api",
+      "graphql",
+      "-f",
+      `query=${query}`,
+      "-F",
+      `owner=${owner}`,
+      "-F",
+      `name=${name}`,
+      "-F",
+      `number=${number}`,
     ]);
     const data = JSON.parse(result.stdout) as {
       data: {
@@ -365,7 +441,9 @@ export class GitHub implements TrackerPort, CodeHostPort {
   async prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }): Promise<GhPr | undefined> {
     const prs = await this.listPrs(repo, { state: "open" });
     return prs.find(
-      (p) => (!opts?.excludeHead || p.headRefName !== opts.excludeHead) && p.closingIssuesReferences?.some((r) => r.number === issueNumber),
+      (p) =>
+        (!opts?.excludeHead || p.headRefName !== opts.excludeHead) &&
+        p.closingIssuesReferences?.some((r) => r.number === issueNumber),
     );
   }
 

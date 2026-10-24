@@ -14,7 +14,12 @@ import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
 
 async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
-  const proc = Bun.spawn(["git", ...args], { cwd, env: env ? { ...process.env, ...env } : undefined, stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn(["git", ...args], {
+    cwd,
+    env: env ? { ...process.env, ...env } : undefined,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -26,7 +31,12 @@ async function spawnGit(args: string[], cwd?: string, env?: Record<string, strin
 // A bare CI runner or container has no git identity, and `commit` and
 // `commit-tree` refuse to run without one. Supply a fallback only when none is
 // configured, so a developer's own identity is never overridden.
-export const FALLBACK_IDENTITY = ["-c", "user.name=software-factory", "-c", "user.email=factory@users.noreply.github.com"];
+export const FALLBACK_IDENTITY = [
+  "-c",
+  "user.name=software-factory",
+  "-c",
+  "user.email=factory@users.noreply.github.com",
+];
 
 // Pure so it's unit-testable without a real repo: non-cone sparse-checkout
 // wants a leading "/*" (everything) followed by a "!"-negated pattern per
@@ -41,7 +51,8 @@ export class GitCommandRunner implements CommandRunner {
     if (args[0] === "commit" || args[0] === "commit-tree") {
       const name = await spawnGit(["config", "user.name"], opts?.cwd);
       const email = await spawnGit(["config", "user.email"], opts?.cwd);
-      if (name.stdout.trim() === "" || email.stdout.trim() === "") return spawnGit([...FALLBACK_IDENTITY, ...args], opts?.cwd, opts?.env);
+      if (name.stdout.trim() === "" || email.stdout.trim() === "")
+        return spawnGit([...FALLBACK_IDENTITY, ...args], opts?.cwd, opts?.env);
     }
     return spawnGit(args, opts?.cwd, opts?.env);
   }
@@ -180,7 +191,9 @@ export class Git {
     const dir = mkdtempSync(join(tmpdir(), "factory-index-"));
     try {
       const env = { GIT_INDEX_FILE: join(dir, "index") };
-      const index = (await this.runner.run(["rev-parse", "--path-format=absolute", "--git-path", "index"], { cwd: worktreeDir })).stdout.trim();
+      const index = (
+        await this.runner.run(["rev-parse", "--path-format=absolute", "--git-path", "index"], { cwd: worktreeDir })
+      ).stdout.trim();
       copyFileSync(index, env.GIT_INDEX_FILE);
       await this.runner.run(["add", "-A", "--", ".", ":!.factory/runs"], { cwd: worktreeDir, env });
       const result = await this.runner.run(["write-tree"], { cwd: worktreeDir, env });
@@ -223,7 +236,8 @@ export class Git {
       this.runner.run(["diff", "--numstat", "--no-renames", "-z", range], { cwd: worktreeDir }),
       this.runner.run(["diff", "--raw", "--no-renames", "-z", range], { cwd: worktreeDir }),
     ]);
-    if (numstat.code !== 0 || raw.code !== 0) throw new Error(`git diff ${range} failed: ${numstat.stderr || raw.stderr}`);
+    if (numstat.code !== 0 || raw.code !== 0)
+      throw new Error(`git diff ${range} failed: ${numstat.stderr || raw.stderr}`);
     const modes = new Map<string, string>();
     const rawParts = raw.stdout.split("\0");
     for (let i = 0; i + 1 < rawParts.length; i += 2) modes.set(rawParts[i + 1]!, rawParts[i]!.split(" ")[1]!);
@@ -234,8 +248,13 @@ export class Git {
         const [add, del, ...rest] = entry.split("\t");
         const path = rest.join("\t");
         const binary = add === "-" && del === "-";
-        return { path, additions: Number(add) || 0, deletions: Number(del) || 0, mode: modes.get(path) ?? "100644", ...(binary ? { binary } : {}) };
+        return {
+          path,
+          additions: Number(add) || 0,
+          deletions: Number(del) || 0,
+          mode: modes.get(path) ?? "100644",
+          ...(binary ? { binary } : {}),
+        };
       });
   }
-
 }

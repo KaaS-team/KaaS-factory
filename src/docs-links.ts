@@ -92,7 +92,8 @@ export function checkMarkdown(errors: string[], root: string): void {
     const rel = relative(root, path);
     const text = readFileSync(path, "utf8");
     if (hasUnbalancedFence(text)) errors.push(`Unbalanced fenced code block: ${rel}`);
-    for (const label of missingReferenceDefinitions(text)) errors.push(`Missing reference definition in ${rel}: ${label}`);
+    for (const label of missingReferenceDefinitions(text))
+      errors.push(`Missing reference definition in ${rel}: ${label}`);
     for (const raw of localTargets(text)) {
       const target = linkDestination(raw);
       if (/^(https?:|mailto:|#)/.test(target)) continue;

@@ -14,6 +14,13 @@ export function stationStates(run, stages) {
     const stopped = i === at && !live && WAITING.has(run.status);
     const failed = !!last && !last.ok && (i < at || stopped);
     const done = i < at || run.status === "shipped" || (i === at && !!last && last.ok && !live);
-    return { name, ms: attempts.reduce((n, s) => n + s.duration_ms, 0), live, failed, done, waiting: stopped && !failed };
+    return {
+      name,
+      ms: attempts.reduce((n, s) => n + s.duration_ms, 0),
+      live,
+      failed,
+      done,
+      waiting: stopped && !failed,
+    };
   });
 }

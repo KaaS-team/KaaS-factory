@@ -5,7 +5,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { type ArtifactStage, COMMENT_FILENAMES, JSON_FILENAMES, MAX_STEP_JSON_BYTES, runDir } from "../artifacts";
 
-export type Reply = { ok: true; artifact: Record<string, unknown>; comment?: string; question?: string } | { ok: false; reason: string };
+export type Reply =
+  | { ok: true; artifact: Record<string, unknown>; comment?: string; question?: string }
+  | { ok: false; reason: string };
 
 export function parseReply(text: string | undefined): Reply {
   if (!text?.trim()) return { ok: false, reason: "the read-only agent returned no final message" };
@@ -16,20 +18,34 @@ export function parseReply(text: string | undefined): Reply {
   } catch (e) {
     return { ok: false, reason: `the final message is not JSON: ${e instanceof Error ? e.message : String(e)}` };
   }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return { ok: false, reason: "the final message is not a JSON object" };
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return { ok: false, reason: "the final message is not a JSON object" };
   const o = value as Record<string, unknown>;
   const extra = Object.keys(o).find((k) => !["artifact", "comment", "question"].includes(k));
   if (extra) return { ok: false, reason: `the final message has unknown field "${extra}"` };
-  if (typeof o.artifact !== "object" || o.artifact === null || Array.isArray(o.artifact)) return { ok: false, reason: 'the final message has no "artifact" object' };
-  for (const k of ["comment", "question"]) if (o[k] !== undefined && typeof o[k] !== "string") return { ok: false, reason: `"${k}" must be a string` };
+  if (typeof o.artifact !== "object" || o.artifact === null || Array.isArray(o.artifact))
+    return { ok: false, reason: 'the final message has no "artifact" object' };
+  for (const k of ["comment", "question"])
+    if (o[k] !== undefined && typeof o[k] !== "string") return { ok: false, reason: `"${k}" must be a string` };
   const artifact = o.artifact as Record<string, unknown>;
-  if (Buffer.byteLength(JSON.stringify(artifact)) > MAX_STEP_JSON_BYTES) return { ok: false, reason: `the artifact is over ${MAX_STEP_JSON_BYTES} bytes` };
-  return { ok: true, artifact, ...(o.comment ? { comment: o.comment as string } : {}), ...(o.question ? { question: o.question as string } : {}) };
+  if (Buffer.byteLength(JSON.stringify(artifact)) > MAX_STEP_JSON_BYTES)
+    return { ok: false, reason: `the artifact is over ${MAX_STEP_JSON_BYTES} bytes` };
+  return {
+    ok: true,
+    artifact,
+    ...(o.comment ? { comment: o.comment as string } : {}),
+    ...(o.question ? { question: o.question as string } : {}),
+  };
 }
 
 // Writes the envelope's parts where the runner reads them. Returns the reason
 // when the reply is unusable, so the caller can fail the stage with it.
-export async function writeReply(cwd: string, issue: number, stage: ArtifactStage, text: string | undefined): Promise<string | undefined> {
+export async function writeReply(
+  cwd: string,
+  issue: number,
+  stage: ArtifactStage,
+  text: string | undefined,
+): Promise<string | undefined> {
   const reply = parseReply(text);
   if (!reply.ok) return reply.reason;
   const dir = `${cwd}/${runDir(issue)}`;

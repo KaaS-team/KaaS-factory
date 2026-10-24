@@ -5,7 +5,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { EVENT_TYPES, FACTORY_EVENTS, EVENT_SIGNATURE_HEADER, parseEvent, signEvent, verifyEvent } from "../src/core/event";
+import {
+  EVENT_TYPES,
+  FACTORY_EVENTS,
+  EVENT_SIGNATURE_HEADER,
+  parseEvent,
+  signEvent,
+  verifyEvent,
+} from "../src/core/event";
 import { EventBus, backoffMs } from "../src/engine/bus";
 import { FactoryState } from "../src/state";
 import { configProblems, DEFAULT_EVENTS_SECRET_ENV } from "../src/config";
@@ -48,7 +55,14 @@ describe("event catalogue", () => {
   });
 
   test("parseEvent checks the envelope", () => {
-    const good = { specversion: "1.0", id: "e1", source: "tasks", type: "tasks.task.ready", time: "2026-10-11T00:00:00Z", data: { n: 1 } };
+    const good = {
+      specversion: "1.0",
+      id: "e1",
+      source: "tasks",
+      type: "tasks.task.ready",
+      time: "2026-10-11T00:00:00Z",
+      data: { n: 1 },
+    };
     expect(parseEvent(good)).toEqual({ ok: true, event: good as never });
     expect(parseEvent({ ...good, specversion: "0.3" }).ok).toBe(false);
     expect(parseEvent({ ...good, id: "" }).ok).toBe(false);
@@ -77,8 +91,17 @@ describe("signature", () => {
 
 describe("events config", () => {
   test("a sink needs a URL and an env var name, and types from the catalogue", () => {
-    expect(configProblems({ events: { sinks: [{ url: "https://x.test/e", secretEnv: "KAAS_SECRET", types: ["factory.pr.merged"] }], inboundSecretEnv: "IN_SECRET" } })).toEqual([]);
-    const bad = configProblems({ events: { sinks: [{ url: "ftp://x", secretEnv: "a literal secret", types: ["nope.x.y"] }], extra: 1 } });
+    expect(
+      configProblems({
+        events: {
+          sinks: [{ url: "https://x.test/e", secretEnv: "KAAS_SECRET", types: ["factory.pr.merged"] }],
+          inboundSecretEnv: "IN_SECRET",
+        },
+      }),
+    ).toEqual([]);
+    const bad = configProblems({
+      events: { sinks: [{ url: "ftp://x", secretEnv: "a literal secret", types: ["nope.x.y"] }], extra: 1 },
+    });
     expect(bad.some((p) => p.includes("events.extra: unknown key"))).toBe(true);
     expect(bad.some((p) => p.includes("events.sinks[0].url"))).toBe(true);
     expect(bad.some((p) => p.includes("events.sinks[0].secretEnv"))).toBe(true);
@@ -189,7 +212,18 @@ describe("bus", () => {
     bus.subscribe("*", (e) => void heard.push(e.type));
     bus.subscribe("wiki.page.updated", (e) => void heard.push(`only:${e.id}`));
     bus.emit("factory.issue.ready", { issue: 1 });
-    expect(state.recordBusEvent({ id: "in-1", direction: "in", type: "wiki.page.updated", source: "wiki", subject: null, time: new Date().toISOString(), data: "{}", handled_at: null })).toBe(true);
+    expect(
+      state.recordBusEvent({
+        id: "in-1",
+        direction: "in",
+        type: "wiki.page.updated",
+        source: "wiki",
+        subject: null,
+        time: new Date().toISOString(),
+        data: "{}",
+        handled_at: null,
+      }),
+    ).toBe(true);
     expect(bus.drainInbound()).toBe(1);
     expect(bus.drainInbound()).toBe(0);
     expect(heard).toEqual(["factory.issue.ready", "only:in-1", "wiki.page.updated"]);
@@ -206,17 +240,31 @@ describe("POST /events", () => {
     const before = process.env[DEFAULT_EVENTS_SECRET_ENV];
     if (secret === undefined) delete process.env[DEFAULT_EVENTS_SECRET_ENV];
     else process.env[DEFAULT_EVENTS_SECRET_ENV] = secret;
-    restore = () => (before === undefined ? delete process.env[DEFAULT_EVENTS_SECRET_ENV] : (process.env[DEFAULT_EVENTS_SECRET_ENV] = before));
+    restore = () =>
+      before === undefined
+        ? delete process.env[DEFAULT_EVENTS_SECRET_ENV]
+        : (process.env[DEFAULT_EVENTS_SECRET_ENV] = before);
     const state = new FactoryState(":memory:");
     return { state, dashboard: createDashboard(state, new FakeGitHub([]), "acme/widgets", false, "/nonexistent") };
   }
 
-  const event = (over: Record<string, unknown> = {}) => ({ specversion: "1.0", id: "wiki-1", source: "wiki", type: "wiki.page.updated", time: "2026-10-11T00:00:00Z", data: { page: "setup" }, ...over });
+  const event = (over: Record<string, unknown> = {}) => ({
+    specversion: "1.0",
+    id: "wiki-1",
+    source: "wiki",
+    type: "wiki.page.updated",
+    time: "2026-10-11T00:00:00Z",
+    data: { page: "setup" },
+    ...over,
+  });
   function post(body: object, opts: { secret?: string; sig?: string; type?: string } = {}) {
     const raw = JSON.stringify(body);
     return new Request("http://factory.example:4100/events", {
       method: "POST",
-      headers: { "content-type": opts.type ?? "application/cloudevents+json", [EVENT_SIGNATURE_HEADER]: opts.sig ?? signEvent(opts.secret ?? IN_SECRET, raw) },
+      headers: {
+        "content-type": opts.type ?? "application/cloudevents+json",
+        [EVENT_SIGNATURE_HEADER]: opts.sig ?? signEvent(opts.secret ?? IN_SECRET, raw),
+      },
       body: raw,
     });
   }
@@ -239,7 +287,9 @@ describe("POST /events", () => {
     expect((await d.dashboard.handle(post(event({ data: { page: "other" } })), OFF_BOX)).status).toBe(200);
     expect((await d.dashboard.handle(post(event(), { type: "application/json" }), OFF_BOX)).status).toBe(200);
     const rows = d.state.busEvents();
-    expect(rows.map((r) => [r.id, r.direction, r.type, r.handled_at, JSON.parse(r.data)])).toEqual([["wiki-1", "in", "wiki.page.updated", null, { page: "setup" }]]);
+    expect(rows.map((r) => [r.id, r.direction, r.type, r.handled_at, JSON.parse(r.data)])).toEqual([
+      ["wiki-1", "in", "wiki.page.updated", null, { page: "setup" }],
+    ]);
   });
 
   test("a factory type or an unknown type is ignored (202); a bad envelope is 400", async () => {

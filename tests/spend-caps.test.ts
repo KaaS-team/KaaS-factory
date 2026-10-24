@@ -27,7 +27,16 @@ function setup(config: Parameters<typeof mergeConfig>[0]) {
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   const github = new FakeGitHub([baseIssue(1, ["factory:ready"])]);
   const state = new FactoryState(":memory:");
-  const deps = { github, git: new FakeGit(), state, executor: new ThrowingExecutor(), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+  const deps = {
+    github,
+    git: new FakeGit(),
+    state,
+    executor: new ThrowingExecutor(),
+    gateRunner: new FakeGateRunner(),
+    holdoutRunner: new FakeHoldoutRunner(),
+    cloneDir,
+    workspacesDir,
+  };
   const merged = mergeConfig({ repo: "acme/repo", concurrency: 1, ...config });
   return { deps, config: merged, github, state, workspacesDir, cloneDir };
 }
@@ -41,9 +50,22 @@ describe("checkSpendCap parks an issue before any stage runs", () => {
   test("an issue at or over its own perIssueUsd cap parks with a budget inbox item", async () => {
     const ctx = setup({ spend: { perIssueUsd: 5 } });
     ctx.state.recordStageRun({
-      repo: "acme/repo", issue: 1, stage: "triage", agent: "claude", model: "claude-sonnet-5",
-      started_at: "2020-01-01T00:00:00Z", finished_at: "2020-01-01T00:01:00Z", duration_ms: 60_000,
-      tool_calls: 1, tokens_in: 1, tokens_out: 1, tokens_cached: 0, cost_usd: 5, usage_complete: 1, exit_code: 0, killed_reason: null,
+      repo: "acme/repo",
+      issue: 1,
+      stage: "triage",
+      agent: "claude",
+      model: "claude-sonnet-5",
+      started_at: "2020-01-01T00:00:00Z",
+      finished_at: "2020-01-01T00:01:00Z",
+      duration_ms: 60_000,
+      tool_calls: 1,
+      tokens_in: 1,
+      tokens_out: 1,
+      tokens_cached: 0,
+      cost_usd: 5,
+      usage_complete: 1,
+      exit_code: 0,
+      killed_reason: null,
     });
 
     const outcome = await processReadyIssue(ctx.github.issues.get(1)!, ctx.deps, ctx.config);
@@ -60,9 +82,22 @@ describe("checkSpendCap parks an issue before any stage runs", () => {
   test("a repo at or over its dailyUsd cap parks a fresh issue the same way", async () => {
     const ctx = setup({ spend: { dailyUsd: 2 } });
     ctx.state.recordStageRun({
-      repo: "acme/repo", issue: 99, stage: "build", agent: "claude", model: "claude-sonnet-5",
-      started_at: new Date().toISOString(), finished_at: new Date().toISOString(), duration_ms: 1000,
-      tool_calls: 1, tokens_in: 1, tokens_out: 1, tokens_cached: 0, cost_usd: 2, usage_complete: 1, exit_code: 0, killed_reason: null,
+      repo: "acme/repo",
+      issue: 99,
+      stage: "build",
+      agent: "claude",
+      model: "claude-sonnet-5",
+      started_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
+      duration_ms: 1000,
+      tool_calls: 1,
+      tokens_in: 1,
+      tokens_out: 1,
+      tokens_cached: 0,
+      cost_usd: 2,
+      usage_complete: 1,
+      exit_code: 0,
+      killed_reason: null,
     });
 
     const outcome = await processReadyIssue(ctx.github.issues.get(1)!, ctx.deps, ctx.config);
@@ -77,9 +112,22 @@ describe("checkSpendCap parks an issue before any stage runs", () => {
     const ctx = setup({ spend: { maxUnreportedRuns: 2 } });
     for (let i = 0; i < 2; i++) {
       ctx.state.recordStageRun({
-        repo: "acme/repo", issue: 1, stage: "triage", agent: "claude", model: "claude-sonnet-5",
-        started_at: "2020-01-01T00:00:00Z", finished_at: "2020-01-01T00:01:00Z", duration_ms: 60_000,
-        tool_calls: 1, tokens_in: 1, tokens_out: 1, tokens_cached: 0, cost_usd: null, usage_complete: 0, exit_code: 0, killed_reason: null,
+        repo: "acme/repo",
+        issue: 1,
+        stage: "triage",
+        agent: "claude",
+        model: "claude-sonnet-5",
+        started_at: "2020-01-01T00:00:00Z",
+        finished_at: "2020-01-01T00:01:00Z",
+        duration_ms: 60_000,
+        tool_calls: 1,
+        tokens_in: 1,
+        tokens_out: 1,
+        tokens_cached: 0,
+        cost_usd: null,
+        usage_complete: 0,
+        exit_code: 0,
+        killed_reason: null,
       });
     }
 
@@ -98,7 +146,10 @@ describe("checkSpendCap parks an issue before any stage runs", () => {
     machineSpend.record("acme/other-repo", 10); // a different repo, same machine
 
     const ctx = setup({});
-    const deps = { ...ctx.deps, machine: { leases: new MachineLeases(":memory:"), config: { slots: 2, dailyUsd: 5 }, spend: machineSpend } };
+    const deps = {
+      ...ctx.deps,
+      machine: { leases: new MachineLeases(":memory:"), config: { slots: 2, dailyUsd: 5 }, spend: machineSpend },
+    };
 
     const outcome = await processReadyIssue(ctx.github.issues.get(1)!, deps, ctx.config);
 
@@ -116,9 +167,22 @@ describe("pollOnce pauses new pickups while a daily spend cap is hit", () => {
     const ctx = setup({ spend: { dailyUsd: 1 } });
     ctx.github.issues.set(2, baseIssue(2, ["factory:needs-human"]));
     ctx.state.recordStageRun({
-      repo: "acme/repo", issue: 50, stage: "build", agent: "claude", model: "claude-sonnet-5",
-      started_at: new Date().toISOString(), finished_at: new Date().toISOString(), duration_ms: 1000,
-      tool_calls: 1, tokens_in: 1, tokens_out: 1, tokens_cached: 0, cost_usd: 1, usage_complete: 1, exit_code: 0, killed_reason: null,
+      repo: "acme/repo",
+      issue: 50,
+      stage: "build",
+      agent: "claude",
+      model: "claude-sonnet-5",
+      started_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
+      duration_ms: 1000,
+      tool_calls: 1,
+      tokens_in: 1,
+      tokens_out: 1,
+      tokens_cached: 0,
+      cost_usd: 1,
+      usage_complete: 1,
+      exit_code: 0,
+      killed_reason: null,
     });
 
     const result = await pollOnce(ctx.deps, ctx.config);
@@ -137,7 +201,14 @@ describe("with spend on GitHub, caps count every worker's spend", () => {
 
   test("another worker's spend on this issue parks it here, though this machine spent nothing", async () => {
     const ctx = setup({ spend: { perIssueUsd: 5 } });
-    await new GitHubSpend(ctx.github, "acme/repo", "ci-job").record({ issue: 1, stage: "build", costUsd: 6, tokensIn: 1, tokensOut: 1, at: today() });
+    await new GitHubSpend(ctx.github, "acme/repo", "ci-job").record({
+      issue: 1,
+      stage: "build",
+      costUsd: 6,
+      tokensIn: 1,
+      tokensOut: 1,
+      at: today(),
+    });
     const deps = { ...ctx.deps, spend: new GitHubSpend(ctx.github, "acme/repo", "laptop") };
     expect(await processReadyIssue(ctx.github.issues.get(1)!, deps, ctx.config)).toBe("needs-human");
     expect(ctx.github.issues.get(1)!.comments.at(-1)?.body).toContain("perIssueUsd");
@@ -147,8 +218,18 @@ describe("with spend on GitHub, caps count every worker's spend", () => {
   test("another worker's spend today pauses pickups here", async () => {
     const ctx = setup({ spend: { dailyUsd: 1 } });
     ctx.github.issues.set(50, baseIssue(50, []));
-    await new GitHubSpend(ctx.github, "acme/repo", "cloud").record({ issue: 50, stage: "build", costUsd: 1, tokensIn: 1, tokensOut: 1, at: today() });
-    const result = await pollOnce({ ...ctx.deps, spend: new GitHubSpend(ctx.github, "acme/repo", "laptop") }, ctx.config);
+    await new GitHubSpend(ctx.github, "acme/repo", "cloud").record({
+      issue: 50,
+      stage: "build",
+      costUsd: 1,
+      tokensIn: 1,
+      tokensOut: 1,
+      at: today(),
+    });
+    const result = await pollOnce(
+      { ...ctx.deps, spend: new GitHubSpend(ctx.github, "acme/repo", "laptop") },
+      ctx.config,
+    );
     expect(result.paused).toBe(true);
     expect(result.processed).not.toContain(1);
     cleanup(ctx);
@@ -157,9 +238,22 @@ describe("with spend on GitHub, caps count every worker's spend", () => {
   test("a store that lost a write never reads below this machine's own spend", async () => {
     const ctx = setup({ spend: { perIssueUsd: 5 } });
     ctx.state.recordStageRun({
-      repo: "acme/repo", issue: 1, stage: "triage", agent: "claude", model: "claude-sonnet-5",
-      started_at: "2020-01-01T00:00:00Z", finished_at: "2020-01-01T00:01:00Z", duration_ms: 60_000,
-      tool_calls: 1, tokens_in: 1, tokens_out: 1, tokens_cached: 0, cost_usd: 5, usage_complete: 1, exit_code: 0, killed_reason: null,
+      repo: "acme/repo",
+      issue: 1,
+      stage: "triage",
+      agent: "claude",
+      model: "claude-sonnet-5",
+      started_at: "2020-01-01T00:00:00Z",
+      finished_at: "2020-01-01T00:01:00Z",
+      duration_ms: 60_000,
+      tool_calls: 1,
+      tokens_in: 1,
+      tokens_out: 1,
+      tokens_cached: 0,
+      cost_usd: 5,
+      usage_complete: 1,
+      exit_code: 0,
+      killed_reason: null,
     });
     const deps = { ...ctx.deps, spend: new GitHubSpend(ctx.github, "acme/repo", "laptop") };
     expect(await processReadyIssue(ctx.github.issues.get(1)!, deps, ctx.config)).toBe("needs-human");
@@ -170,7 +264,11 @@ describe("with spend on GitHub, caps count every worker's spend", () => {
     const ctx = setup({ spend: { perIssueUsd: 5 } });
     const spend = new GitHubSpend(ctx.github, "acme/repo", "laptop");
     await spend.record({ issue: 1, stage: "build", costUsd: 6, tokensIn: 1, tokensOut: 1, at: today() });
-    await ctx.github.commentIssue("acme/repo", 1, `<!-- factory:spend ${JSON.stringify({ holder: "x", costUsd: -100, unreportedRuns: 0, runs: 1 })} -->`);
+    await ctx.github.commentIssue(
+      "acme/repo",
+      1,
+      `<!-- factory:spend ${JSON.stringify({ holder: "x", costUsd: -100, unreportedRuns: 0, runs: 1 })} -->`,
+    );
     expect((await spend.issue(1)).costUsd).toBe(6);
     cleanup(ctx);
   });

@@ -10,7 +10,15 @@ import type { GhComment, GhIssue, GhPr, GitHub } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
 import type { Run } from "./state";
 
-export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "merge-dry-run" | "parked" | "failed" | "budget" | "learning-pr";
+export type InboxKind =
+  | "approve-plan"
+  | "answer-question"
+  | "review-pr"
+  | "merge-dry-run"
+  | "parked"
+  | "failed"
+  | "budget"
+  | "learning-pr";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
 
 // Actions that carry the human's own words.
@@ -47,7 +55,9 @@ function stripMarkers(body: string): string {
 
 // The runner's latest comment is what the human is being asked about.
 function latestRunnerComment(comments: readonly GhComment[]): GhComment | undefined {
-  return [...comments].reverse().find((c) => c.body.includes("<!-- factory:") && !c.body.includes("<!-- factory:status"));
+  return [...comments]
+    .reverse()
+    .find((c) => c.body.includes("<!-- factory:") && !c.body.includes("<!-- factory:status"));
 }
 
 // `needsHuman` covers every kind of park (a failed setup, a budget cap, a
@@ -73,7 +83,11 @@ function isMergeDryRun(label: string, comment: GhComment | undefined): boolean {
 // Why the runner parked each issue (runs.reason). The latest factory comment can
 // be an older plan, so a parked item leads with this instead.
 export function parkReasons(runs: readonly Pick<Run, "issue" | "status" | "reason">[]): Map<number, string> {
-  return new Map(runs.filter((r) => (r.status === "needs-human" || r.status === "failed") && r.reason).map((r) => [r.issue, r.reason!]));
+  return new Map(
+    runs
+      .filter((r) => (r.status === "needs-human" || r.status === "failed") && r.reason)
+      .map((r) => [r.issue, r.reason!]),
+  );
 }
 
 const PARKED_KINDS: ReadonlySet<InboxKind> = new Set(["parked", "failed", "budget"]);
@@ -140,7 +154,8 @@ export async function act(
   if (ACTIONS_WITH_TEXT.includes(action) && !words) throw new InboxError(`${action} needs text`);
   const body = commandText(action, words);
   // Round-trip through the parser so a UI command fails exactly like a typed one would.
-  if (action !== "answer" && parseChatOps(body).type !== action) throw new InboxError(`not a recognized /factory command: ${body}`);
+  if (action !== "answer" && parseChatOps(body).type !== action)
+    throw new InboxError(`not a recognized /factory command: ${body}`);
   await github.commentIssue(repo, item.issue, body);
   return body;
 }
@@ -157,7 +172,8 @@ export function inboxPositionals(argv: readonly string[]): string[] {
   const out: string[] = [];
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === "--json") continue;
-    if (argv[i]!.startsWith("--")) i++; // a flag and its value
+    if (argv[i]!.startsWith("--"))
+      i++; // a flag and its value
     else out.push(argv[i]!);
   }
   return out;

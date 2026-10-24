@@ -11,7 +11,14 @@ export const WEBHOOK_SECRET_ENV = "FACTORY_WEBHOOK_SECRET";
 export const WEBHOOK_MAX_BYTES = 1024 * 1024;
 
 // The events that can move an issue: a label, a comment, a review, a merge.
-export const WAKING_EVENTS: ReadonlySet<string> = new Set(["issues", "issue_comment", "pull_request", "pull_request_review", "pull_request_review_comment", "check_suite"]);
+export const WAKING_EVENTS: ReadonlySet<string> = new Set([
+  "issues",
+  "issue_comment",
+  "pull_request",
+  "pull_request_review",
+  "pull_request_review_comment",
+  "check_suite",
+]);
 
 export function signatureOf(secret: string, body: string | Uint8Array): string {
   return `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
@@ -43,7 +50,10 @@ export function readDelivery(headers: Headers, payload: unknown): Delivery | und
 
 // The body, or undefined once it passes `max` bytes. Reads the stream itself, so
 // a chunked request with no Content-Length is cut off at the cap, not buffered whole.
-export async function readCapped(body: ReadableStream<Uint8Array> | null, max: number): Promise<Uint8Array | undefined> {
+export async function readCapped(
+  body: ReadableStream<Uint8Array> | null,
+  max: number,
+): Promise<Uint8Array | undefined> {
   if (!body) return new Uint8Array();
   const chunks: Uint8Array[] = [];
   let size = 0;

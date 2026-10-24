@@ -34,7 +34,7 @@ function cell(text: string): string {
 
 // A verify row reports its verdict: a clean exit with an uncertain verdict is not "ok".
 function outcome(run: Pick<StageRun, "exit_code" | "killed_reason" | "verdict">): string {
-  return run.killed_reason ?? (run.exit_code !== 0 ? `exit ${run.exit_code}` : run.verdict ?? "ok");
+  return run.killed_reason ?? (run.exit_code !== 0 ? `exit ${run.exit_code}` : (run.verdict ?? "ok"));
 }
 
 function succeeded(run: StageRun): boolean {
@@ -48,15 +48,19 @@ export function renderRunSummary(runs: readonly StageRun[], ctx: RunSummaryCtx):
     "",
     "| Stage | Agent | Duration | Tool calls | Cost | Outcome |",
     "|---|---|---|---|---|---|",
-    ...rows.map((r) =>
-      `| ${r.stage} | ${cell(r.model ? `${r.agent} (${r.model})` : r.agent)} | ${seconds(r.duration_ms)} | ${r.tool_calls} | ${r.cost_usd === null ? "not reported" : `$${r.cost_usd.toFixed(2)}`} | ${cell(outcome(r))} |`,
+    ...rows.map(
+      (r) =>
+        `| ${r.stage} | ${cell(r.model ? `${r.agent} (${r.model})` : r.agent)} | ${seconds(r.duration_ms)} | ${r.tool_calls} | ${r.cost_usd === null ? "not reported" : `$${r.cost_usd.toFixed(2)}`} | ${cell(outcome(r))} |`,
     ),
   ];
   const known = rows.filter((r) => r.cost_usd !== null).reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
   const unknown = rows.filter((r) => r.cost_usd === null).length;
   const total = rows.reduce((sum, r) => sum + r.duration_ms, 0);
   if (ctx.proof) lines.push("", `Proof: ${PROOF_LINE[ctx.proof]}.`);
-  lines.push("", `${rows.length} stage runs, ${seconds(total)}, $${known.toFixed(2)}${unknown ? ` plus ${unknown} not reported` : ""}.`);
+  lines.push(
+    "",
+    `${rows.length} stage runs, ${seconds(total)}, $${known.toFixed(2)}${unknown ? ` plus ${unknown} not reported` : ""}.`,
+  );
 
   const stages = [...new Set(rows.map((r) => r.stage))];
   const firstTry = stages.filter((s) => {

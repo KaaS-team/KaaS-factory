@@ -33,7 +33,10 @@ describe("buildContextPack", () => {
     mkdirSync(`${cwd}/.claude/skills/writing`, { recursive: true });
     writeFileSync(`${cwd}/.claude/skills/writing/SKILL.md`, "---\nname: writing\n---\nWrite in plain language.");
     mkdirSync(`${cwd}/${runDir(1)}`, { recursive: true });
-    writeFileSync(`${cwd}/${runDir(1)}/plan.json`, JSON.stringify({ risk: "low", revision: 1, files: ["src/foo.ts"], autoApproveEligible: true }));
+    writeFileSync(
+      `${cwd}/${runDir(1)}/plan.json`,
+      JSON.stringify({ risk: "low", revision: 1, files: ["src/foo.ts"], autoApproveEligible: true }),
+    );
     mkdirSync(`${cwd}/src`, { recursive: true });
     writeFileSync(`${cwd}/src/foo.ts`, "export const foo = 1;");
 
@@ -53,7 +56,10 @@ describe("buildContextPack", () => {
     const cwd = worktree();
     writeFileSync(`${cwd}/AGENTS.md`, "Small and essential.");
     mkdirSync(`${cwd}/${runDir(1)}`, { recursive: true });
-    writeFileSync(`${cwd}/${runDir(1)}/plan.json`, JSON.stringify({ risk: "low", revision: 1, files: ["src/big.ts"], autoApproveEligible: true }));
+    writeFileSync(
+      `${cwd}/${runDir(1)}/plan.json`,
+      JSON.stringify({ risk: "low", revision: 1, files: ["src/big.ts"], autoApproveEligible: true }),
+    );
     mkdirSync(`${cwd}/src`, { recursive: true });
     writeFileSync(`${cwd}/src/big.ts`, "x".repeat(MAX_CONTEXT_PACK_BYTES));
 
@@ -71,7 +77,10 @@ describe("buildContextPack", () => {
   test("a plan file that does not exist on disk is skipped, not reported as dropped", async () => {
     const cwd = worktree();
     mkdirSync(`${cwd}/${runDir(1)}`, { recursive: true });
-    writeFileSync(`${cwd}/${runDir(1)}/plan.json`, JSON.stringify({ risk: "low", revision: 1, files: ["src/missing.ts"], autoApproveEligible: true }));
+    writeFileSync(
+      `${cwd}/${runDir(1)}/plan.json`,
+      JSON.stringify({ risk: "low", revision: 1, files: ["src/missing.ts"], autoApproveEligible: true }),
+    );
 
     const pack = await buildContextPack("build", 1, cwd);
 
@@ -82,7 +91,10 @@ describe("buildContextPack", () => {
   test("holds .factory/memory/lessons.md (v2.10.0 item 2)", async () => {
     const cwd = worktree();
     mkdirSync(`${cwd}/.factory/memory`, { recursive: true });
-    writeFileSync(`${cwd}/.factory/memory/lessons.md`, "- 2026-09-01: the checkout API needs a 30s timeout, not the default.");
+    writeFileSync(
+      `${cwd}/.factory/memory/lessons.md`,
+      "- 2026-09-01: the checkout API needs a 30s timeout, not the default.",
+    );
 
     const pack = await buildContextPack("build", 1, cwd);
 
@@ -115,7 +127,10 @@ describe("v3.0: each stage gets only what it uses", () => {
     writeFileSync(`${cwd}/.factory/charter.md`, "Never touch src/auth.");
     writeFileSync(`${cwd}/.factory/memory/lessons.md`, "- a lesson");
     mkdirSync(`${cwd}/.claude/skills/handling-money`, { recursive: true });
-    writeFileSync(`${cwd}/.claude/skills/handling-money/SKILL.md`, "---\nname: handling-money\ndescription: Integer cents only.\n---\nLong body that the index must not carry.");
+    writeFileSync(
+      `${cwd}/.claude/skills/handling-money/SKILL.md`,
+      "---\nname: handling-money\ndescription: Integer cents only.\n---\nLong body that the index must not carry.",
+    );
     return cwd;
   }
 
@@ -131,7 +146,8 @@ describe("v3.0: each stage gets only what it uses", () => {
 
   test("triage and plan carry the charter, so the skills no longer Read it", async () => {
     const cwd = fullRepo();
-    for (const stage of ["triage", "plan"] as const) expect(await buildContextPack(stage, 1, cwd)).toContain("Never touch src/auth.");
+    for (const stage of ["triage", "plan"] as const)
+      expect(await buildContextPack(stage, 1, cwd)).toContain("Never touch src/auth.");
     expect(await buildContextPack("verify", 1, cwd)).not.toContain("Never touch src/auth.");
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -163,7 +179,12 @@ describe("v3.0: each stage gets only what it uses", () => {
 describe("the context pack reaches both agent paths", () => {
   test("a non-Claude agent gets it inlined into the rendered prompt", async () => {
     const cwd = worktree();
-    const prompt = await renderPrompt({ stage: "build", issue: 3, cwd, maxBudgetUsd: 1 }, false, undefined, "## Context pack\n\n### AGENTS.md\n\nUse tabs.");
+    const prompt = await renderPrompt(
+      { stage: "build", issue: 3, cwd, maxBudgetUsd: 1 },
+      false,
+      undefined,
+      "## Context pack\n\n### AGENTS.md\n\nUse tabs.",
+    );
     expect(prompt).toContain("## Context pack");
     expect(prompt).toContain("Use tabs.");
   });

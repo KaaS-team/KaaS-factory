@@ -24,7 +24,15 @@ function dataMarker(stage: string, json: unknown): string {
 describe("rehydrate", () => {
   test("recovers every earlier stage's comment and json from the thread", async () => {
     const worktree = mkdtempSync(join(tmpdir(), "factory-rehydrate-"));
-    const triageJson = { disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: [], gate_level: "make check", confidence: 0.9 };
+    const triageJson = {
+      disposition: "proceed",
+      type: "bug",
+      risk: "low",
+      done_when: "x",
+      files_expected: [],
+      gate_level: "make check",
+      confidence: 0.9,
+    };
     const planJson = { risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true };
     const buildJson = { status: "green", gate_line: "make check: 10 pass", rounds: 1 };
     const verdictJson = { result: "pass", rounds: 1, findings: [] };
@@ -47,7 +55,9 @@ describe("rehydrate", () => {
     await rehydrate(worktree, issue);
     const dir = `${worktree}/${runDir(9)}`;
 
-    expect(await Bun.file(`${dir}/triage-comment.md`).text()).toBe("<!-- factory:triage v1 -->\nLooks like a real bug.");
+    expect(await Bun.file(`${dir}/triage-comment.md`).text()).toBe(
+      "<!-- factory:triage v1 -->\nLooks like a real bug.",
+    );
     expect(await Bun.file(`${dir}/triage.json`).json()).toEqual(triageJson);
 
     expect(await Bun.file(`${dir}/plan-comment.md`).text()).toBe("<!-- factory:plan v1 rev=1 -->\nHere's the plan.");
@@ -71,8 +81,14 @@ describe("rehydrate", () => {
       body: "b",
       labels: [{ name: "factory:building" }],
       comments: [
-        comment(`<!-- factory:verdict v1 -->\nfirst reject\n\n${dataMarker("verify", { result: "reject", rounds: 1, findings: ["a"] })}`, 1),
-        comment(`<!-- factory:verdict v1 -->\nsecond reject\n\n${dataMarker("verify", { result: "reject", rounds: 2, findings: ["b"] })}`, 2),
+        comment(
+          `<!-- factory:verdict v1 -->\nfirst reject\n\n${dataMarker("verify", { result: "reject", rounds: 1, findings: ["a"] })}`,
+          1,
+        ),
+        comment(
+          `<!-- factory:verdict v1 -->\nsecond reject\n\n${dataMarker("verify", { result: "reject", rounds: 2, findings: ["b"] })}`,
+          2,
+        ),
       ],
     };
     await rehydrate(worktree, issue);
@@ -90,7 +106,9 @@ describe("rehydrate", () => {
       title: "t",
       body: "b",
       labels: [{ name: "factory:verifying" }],
-      comments: [comment(`<!-- factory:status v1 -->\nbuilt\n\n${dataMarker("build", { build, gate: { status: "GREEN" } })}`, 1)],
+      comments: [
+        comment(`<!-- factory:status v1 -->\nbuilt\n\n${dataMarker("build", { build, gate: { status: "GREEN" } })}`, 1),
+      ],
     };
     await rehydrate(worktree, issue);
     expect(await Bun.file(`${worktree}/${runDir(5)}/build.json`).json()).toEqual(build);

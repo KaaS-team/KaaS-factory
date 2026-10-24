@@ -18,13 +18,24 @@ const TMUX_TIMEOUT_MS = 5000;
 
 // `socket` is a `tmux -L` name; tests use their own so they never touch yours.
 export class ShellTmuxRunner implements TmuxRunner {
-  constructor(private readonly socket?: string, private readonly timeoutMs = TMUX_TIMEOUT_MS) {}
+  constructor(
+    private readonly socket?: string,
+    private readonly timeoutMs = TMUX_TIMEOUT_MS,
+  ) {}
 
   async run(args: readonly string[]): Promise<TmuxResult> {
-    const proc = Bun.spawn(["tmux", ...(this.socket ? ["-L", this.socket] : []), ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+    const proc = Bun.spawn(["tmux", ...(this.socket ? ["-L", this.socket] : []), ...args], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const timer = setTimeout(() => proc.kill(), this.timeoutMs);
     try {
-      const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+      const [stdout, stderr, code] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ]);
       return { code, stdout, stderr };
     } finally {
       clearTimeout(timer);
@@ -42,7 +53,10 @@ export function issueWindow(repo: string, issue: number): string {
 }
 
 export class Tmux {
-  constructor(private readonly runner: TmuxRunner, readonly session: string) {}
+  constructor(
+    private readonly runner: TmuxRunner,
+    readonly session: string,
+  ) {}
 
   private async must(args: readonly string[]): Promise<TmuxResult> {
     const result = await this.runner.run(args);
@@ -88,7 +102,8 @@ export interface IssueView {
 // `factory` is the command line that runs this CLI; the window renders the stage's raw stream in colour.
 export function tmuxIssueView(tmux: Tmux, repo: string, factory: string): IssueView {
   return {
-    show: (issue, file) => tmux.ensureWindow(issueWindow(repo, issue), `${factory} view ${shellQuote(streamPath(file))} --follow`),
+    show: (issue, file) =>
+      tmux.ensureWindow(issueWindow(repo, issue), `${factory} view ${shellQuote(streamPath(file))} --follow`),
     close: (issue) => tmux.killWindow(issueWindow(repo, issue)),
   };
 }

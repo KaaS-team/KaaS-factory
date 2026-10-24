@@ -31,7 +31,8 @@ function machineDbPath(env: NodeJS.ProcessEnv): string {
 }
 
 function positiveInt(value: unknown, where: string): number {
-  if (!Number.isInteger(value) || (value as number) < 1) throw new Error(`${where} must be a positive integer, got ${JSON.stringify(value)}`);
+  if (!Number.isInteger(value) || (value as number) < 1)
+    throw new Error(`${where} must be a positive integer, got ${JSON.stringify(value)}`);
   return value as number;
 }
 
@@ -53,7 +54,11 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     const problems = runtimeProblems(raw.runtimes, `${path}: runtimes`);
     if (problems.length) throw new Error(problems.join("\n"));
   }
-  return { slots, dailyUsd: raw.dailyUsd as number | undefined, ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}) };
+  return {
+    slots,
+    dailyUsd: raw.dailyUsd as number | undefined,
+    ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}),
+  };
 }
 
 // Advice only (`factory doctor` prints it, nothing enforces it): roughly one
@@ -168,12 +173,18 @@ export class MachineSpend {
   // Only a known cost is recorded: an unreported run counts against a repo's
   // own maxUnreportedRuns cap (state.ts), never silently as $0 here.
   record(repo: string, costUsd: number): void {
-    this.db.query("INSERT INTO spend (repo, cost_usd, recorded_at) VALUES ($repo, $cost, $now)").run({ $repo: repo, $cost: costUsd, $now: new Date().toISOString() });
+    this.db
+      .query("INSERT INTO spend (repo, cost_usd, recorded_at) VALUES ($repo, $cost, $now)")
+      .run({ $repo: repo, $cost: costUsd, $now: new Date().toISOString() });
   }
 
   todayUsd(): number {
     const since = `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
-    return (this.db.query("SELECT COALESCE(SUM(cost_usd), 0) AS n FROM spend WHERE recorded_at >= $since").get({ $since: since }) as { n: number }).n;
+    return (
+      this.db
+        .query("SELECT COALESCE(SUM(cost_usd), 0) AS n FROM spend WHERE recorded_at >= $since")
+        .get({ $since: since }) as { n: number }
+    ).n;
   }
 
   close(): void {

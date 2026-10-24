@@ -66,6 +66,15 @@ export function agentCatalog(agents: Readonly<Record<string, AgentConfig>>, stag
   });
   const used = new Set(rows.map((r) => r.preset));
   for (const p of Object.values(PRESETS))
-    if (!used.has(p.name)) rows.push({ name: p.name, preset: p.name, binary: p.binary, pin: p.version, verified: p.verified, configured: false, stages: [] });
+    if (!used.has(p.name))
+      rows.push({
+        name: p.name,
+        preset: p.name,
+        binary: p.binary,
+        pin: p.version,
+        verified: p.verified,
+        configured: false,
+        stages: [],
+      });
   return rows;
 }

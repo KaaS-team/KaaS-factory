@@ -11,7 +11,8 @@ export type Expr =
 
 export class ExprError extends Error {}
 
-const TOKEN = /\s*(?:(\d+(?:\.\d+)?)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|([A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)|(==|!=|&&|\|\||!|\(|\)))/y;
+const TOKEN =
+  /\s*(?:(\d+(?:\.\d+)?)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|([A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)|(==|!=|&&|\|\||!|\(|\)))/y;
 
 function tokenize(src: string): string[] {
   const out: string[] = [];
@@ -32,7 +33,8 @@ export function parseExpr(src: string): Expr {
   const peek = () => tokens[i];
   const take = (t?: string) => {
     const got = tokens[i];
-    if (t !== undefined && got !== t) throw new ExprError(`expected "${t}", got ${got === undefined ? "the end" : `"${got}"`}`);
+    if (t !== undefined && got !== t)
+      throw new ExprError(`expected "${t}", got ${got === undefined ? "the end" : `"${got}"`}`);
     i += 1;
     return got;
   };
@@ -96,7 +98,8 @@ export function evalExpr(expr: Expr, ctx: Readonly<Record<string, unknown>>): un
       return expr.value;
     case "path": {
       let v: unknown = ctx;
-      for (const k of expr.path) v = v !== null && typeof v === "object" ? (v as Record<string, unknown>)[k] : undefined;
+      for (const k of expr.path)
+        v = v !== null && typeof v === "object" ? (v as Record<string, unknown>)[k] : undefined;
       return v;
     }
     case "not":

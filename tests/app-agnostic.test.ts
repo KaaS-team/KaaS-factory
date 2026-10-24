@@ -3,7 +3,16 @@
 // key, no Makefile, no bun) loads, gates and refuses a wrong origin.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { loadConfig, repoFromRemoteUrl } from "../src/config";
@@ -23,14 +32,19 @@ function walk(dir: string): string[] {
 describe("runtime code does not name the demo app", () => {
   // A comment may say where a fact was found; a string or identifier may not depend on it.
   const APP = /splitbill|learnwithparam\/(?!software-factory)/i;
-  const files = ["src", "bin", "template", "dashboard", "scripts"].flatMap((d) => walk(join(ROOT, d))).concat(join(ROOT, "install.sh"));
+  const files = ["src", "bin", "template", "dashboard", "scripts"]
+    .flatMap((d) => walk(join(ROOT, d)))
+    .concat(join(ROOT, "install.sh"));
 
   test("every mention is on a comment line", () => {
     const offenders: string[] = [];
     for (const file of files) {
-      readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-        if (APP.test(line) && !/^\s*(\/\/|#|\*|<!--)/.test(line)) offenders.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 80)}`);
-      });
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (APP.test(line) && !/^\s*(\/\/|#|\*|<!--)/.test(line))
+            offenders.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 80)}`);
+        });
     }
     expect(offenders).toEqual([]);
   });
@@ -51,9 +65,11 @@ describe("stage skills and agents name no stack tool", () => {
     expect(files.length).toBeGreaterThan(0);
     const offenders: string[] = [];
     for (const file of files) {
-      readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-        if (STACK_TOOL.test(line)) offenders.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 80)}`);
-      });
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (STACK_TOOL.test(line)) offenders.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 80)}`);
+        });
     }
     expect(offenders).toEqual([]);
   });
@@ -97,7 +113,10 @@ describe("a Python repo on a trunk branch", () => {
     writeFileSync(join(dir, ".factory/config.json"), JSON.stringify(config));
     copyFileSync(join(ROOT, "template/.factory/gates.sh"), join(dir, ".factory/gates.sh"));
     mkdirSync(join(dir, "tests"));
-    writeFileSync(join(dir, "tests/test_math.py"), "import unittest\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(1 + 1, 2)\n");
+    writeFileSync(
+      join(dir, "tests/test_math.py"),
+      "import unittest\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(1 + 1, 2)\n",
+    );
     return dir;
   }
 
@@ -115,7 +134,9 @@ describe("a Python repo on a trunk branch", () => {
   });
 
   test("a config that names a different repo than origin is refused", async () => {
-    await expect(loadConfig(pyRepo({ repo: "acme/other", gates }))).rejects.toThrow(/"repo" is acme\/other but this clone's origin is acme\/pyapp/);
+    await expect(loadConfig(pyRepo({ repo: "acme/other", gates }))).rejects.toThrow(
+      /"repo" is acme\/other but this clone's origin is acme\/pyapp/,
+    );
   });
 
   test("a matching repo passes, ignoring case", async () => {
@@ -126,7 +147,10 @@ describe("a Python repo on a trunk branch", () => {
     if (!Bun.which("jq")) return; // gates.sh needs jq, which `factory doctor` also requires
     const dir = pyRepo({ base: "trunk", gates });
     expect(runGatesSh(dir)).toBe("GREEN");
-    writeFileSync(join(dir, "tests/test_math.py"), "import unittest\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(1 + 1, 3)\n");
+    writeFileSync(
+      join(dir, "tests/test_math.py"),
+      "import unittest\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(1 + 1, 3)\n",
+    );
     expect(runGatesSh(dir)).toBe("RED");
   });
 });
@@ -164,7 +188,10 @@ describe("two repos sharing one FACTORY_HOME never collide", () => {
   });
 
   test("a repo from a URL query cannot climb out of FACTORY_HOME", () => {
-    for (const bad of ["../..", "a/..", "./b", "a/b/c", "a/b%2f..", "a/ b"]) expect(() => workspacesDir(env, bad)).toThrow(/repo must be/);
-    expect(workspacesDir(env, "learnwithparam/claude-verification-harness")).toEndWith("/claude-verification-harness/workspaces");
+    for (const bad of ["../..", "a/..", "./b", "a/b/c", "a/b%2f..", "a/ b"])
+      expect(() => workspacesDir(env, bad)).toThrow(/repo must be/);
+    expect(workspacesDir(env, "learnwithparam/claude-verification-harness")).toEndWith(
+      "/claude-verification-harness/workspaces",
+    );
   });
 });

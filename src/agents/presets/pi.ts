@@ -37,7 +37,8 @@ export function parsePiLine(line: string): StageEvent[] {
   const output = count(u?.output);
   const read = count(u?.cacheRead ?? 0);
   const write = count(u?.cacheWrite ?? 0);
-  if (input === null || output === null || read === null || write === null) events.push({ kind: "usage", invalid: true });
+  if (input === null || output === null || read === null || write === null)
+    events.push({ kind: "usage", invalid: true });
   else events.push({ kind: "usage", tokensIn: input + read + write, tokensOut: output, tokensCached: read });
   return events;
 }
@@ -47,7 +48,17 @@ export const piPreset: AgentPreset = {
   binary: "pi",
   verified: false,
   version: "0.73.1",
-  envKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY"],
+  envKeys: [
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "OPENROUTER_API_KEY",
+    "MISTRAL_API_KEY",
+    "GROQ_API_KEY",
+    "XAI_API_KEY",
+    "DEEPSEEK_API_KEY",
+  ],
   readOnlyBy: "`--tools read,grep,find,ls`",
   skillsDir: ".pi/skills",
   contextFile: "AGENTS.md",
@@ -55,7 +66,15 @@ export const piPreset: AgentPreset = {
   evidence: "docs/agent-research/pi/stdin.md:5",
   returnsArtifact: true,
   command: (opts, agent, prompt) => ({
-    argv: ["pi", "-p", "--mode", "json", "--no-session", ...(stagePolicy(opts.stage).write ? [] : ["--tools", "read,grep,find,ls"]), ...(agent.model ? ["--model", agent.model] : [])],
+    argv: [
+      "pi",
+      "-p",
+      "--mode",
+      "json",
+      "--no-session",
+      ...(stagePolicy(opts.stage).write ? [] : ["--tools", "read,grep,find,ls"]),
+      ...(agent.model ? ["--model", agent.model] : []),
+    ],
     stdin: prompt,
   }),
   parseLine: parsePiLine,

@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "GitHub-native SDLC loop for coding agents: triage, plan, build, verify, PR.",
-  "engines": { "bun": ">=1.3" },
+  "engines": {
+    "bun": ">=1.3"
+  },
   "bin": {
     "factory": "./bin/factory"
   },
@@ -14,6 +16,7 @@
     "dashboard": "bun run dashboard/server.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.14",
     "@types/bun": "^1.3.4",
     "typescript": "^5.9.3"
   }

@@ -22,7 +22,9 @@ export function encodeLease(r: LeaseRecord): string {
 export function decodeLease(text: string): LeaseRecord | undefined {
   try {
     const v = JSON.parse(text.trim()) as Partial<LeaseRecord>;
-    return typeof v.holder === "string" && typeof v.expiresAt === "number" ? { holder: v.holder, expiresAt: v.expiresAt } : undefined;
+    return typeof v.holder === "string" && typeof v.expiresAt === "number"
+      ? { holder: v.holder, expiresAt: v.expiresAt }
+      : undefined;
   } catch {
     return undefined;
   }

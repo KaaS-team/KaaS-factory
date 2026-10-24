@@ -92,17 +92,37 @@ export interface DaemonRunner {
 }
 
 // The commands that start (or stop) the daemon once its file is written.
-export function daemonCommands(platform: DaemonPlatform, file: string, uid: number, action: "install" | "uninstall"): string[][] {
+export function daemonCommands(
+  platform: DaemonPlatform,
+  file: string,
+  uid: number,
+  action: "install" | "uninstall",
+): string[][] {
   if (platform === "launchd") {
     const domain = `gui/${uid}`;
     // bootout first so a reinstall picks up the new file; it fails harmlessly when nothing is loaded.
-    return action === "install" ? [["launchctl", "bootout", domain, file], ["launchctl", "bootstrap", domain, file]] : [["launchctl", "bootout", domain, file]];
+    return action === "install"
+      ? [
+          ["launchctl", "bootout", domain, file],
+          ["launchctl", "bootstrap", domain, file],
+        ]
+      : [["launchctl", "bootout", domain, file]];
   }
   const unit = file.split("/").pop()!;
-  return action === "install" ? [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", unit]] : [["systemctl", "--user", "disable", "--now", unit]];
+  return action === "install"
+    ? [
+        ["systemctl", "--user", "daemon-reload"],
+        ["systemctl", "--user", "enable", "--now", unit],
+      ]
+    : [["systemctl", "--user", "disable", "--now", unit]];
 }
 
-export async function installDaemon(platform: DaemonPlatform, spec: DaemonSpec, uid: number, runner: DaemonRunner): Promise<string> {
+export async function installDaemon(
+  platform: DaemonPlatform,
+  spec: DaemonSpec,
+  uid: number,
+  runner: DaemonRunner,
+): Promise<string> {
   const file = daemonFile(platform, spec.home, spec.repo);
   mkdirSync(dirname(file), { recursive: true });
   mkdirSync(spec.logDir, { recursive: true });
@@ -116,7 +136,13 @@ export async function installDaemon(platform: DaemonPlatform, spec: DaemonSpec, 
   return file;
 }
 
-export async function uninstallDaemon(platform: DaemonPlatform, home: string, repo: string, uid: number, runner: DaemonRunner): Promise<string> {
+export async function uninstallDaemon(
+  platform: DaemonPlatform,
+  home: string,
+  repo: string,
+  uid: number,
+  runner: DaemonRunner,
+): Promise<string> {
   const file = daemonFile(platform, home, repo);
   for (const cmd of daemonCommands(platform, file, uid, "uninstall")) await runner.run(cmd); // not loaded is fine
   rmSync(file, { force: true });

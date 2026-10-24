@@ -22,7 +22,7 @@ describe("signatureMatches", () => {
     ["a changed body", signatureOf(SECRET, enc('{"zen":"x"}'))],
     ["no header", null],
     ["the bare hex", signatureOf(SECRET, body).slice(7)],
-    ["sha1", "sha1=" + "0".repeat(40)],
+    ["sha1", `sha1=${"0".repeat(40)}`],
   ])("refuses %s", (_name, header) => {
     expect(signatureMatches(SECRET, body, header)).toBe(false);
   });
@@ -34,7 +34,12 @@ describe("signatureMatches", () => {
 describe("readDelivery", () => {
   const h = (id: string, event: string) => new Headers({ "x-github-delivery": id, "x-github-event": event });
   test("reads id, event, action and repo", () => {
-    expect(readDelivery(h("72d3162e-cc78-11e3-81ab-4c9367dc0958", "issues"), { action: "labeled", repository: { full_name: "acme/widgets" } })).toEqual({
+    expect(
+      readDelivery(h("72d3162e-cc78-11e3-81ab-4c9367dc0958", "issues"), {
+        action: "labeled",
+        repository: { full_name: "acme/widgets" },
+      }),
+    ).toEqual({
       id: "72d3162e-cc78-11e3-81ab-4c9367dc0958",
       event: "issues",
       action: "labeled",
@@ -71,7 +76,8 @@ async function dashboardWith(secret: string | undefined) {
   return {
     state,
     dashboard,
-    restore: () => (before === undefined ? delete process.env[WEBHOOK_SECRET_ENV] : (process.env[WEBHOOK_SECRET_ENV] = before)),
+    restore: () =>
+      before === undefined ? delete process.env[WEBHOOK_SECRET_ENV] : (process.env[WEBHOOK_SECRET_ENV] = before),
   };
 }
 
@@ -128,7 +134,10 @@ describe("POST /webhook/github", () => {
   test("another repo's event, an event that moves nothing, and ping are not recorded", async () => {
     const d = await dashboardWith(SECRET);
     restore = d.restore;
-    expect((await d.dashboard.handle(delivery({ ...labeled, repository: { full_name: "evil/fork" } }, { id: "a" }), OFF_BOX)).status).toBe(202);
+    expect(
+      (await d.dashboard.handle(delivery({ ...labeled, repository: { full_name: "evil/fork" } }, { id: "a" }), OFF_BOX))
+        .status,
+    ).toBe(202);
     expect((await d.dashboard.handle(delivery(labeled, { id: "b", event: "star" }), OFF_BOX)).status).toBe(202);
     expect((await d.dashboard.handle(delivery({ zen: "z" }, { id: "c", event: "ping" }), OFF_BOX)).status).toBe(200);
     expect(d.state.latestDelivery()).toBe(0);

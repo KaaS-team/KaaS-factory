@@ -8,8 +8,19 @@ import { defaultWorkflow } from "../src/engine/workflows";
 
 // The bundled workflow's own plan -> build condition, not a copy of it.
 const autoApprove = defaultWorkflow().steps.plan!.next[0]!;
-const skipsGate = (config: FactoryConfig, risk: string, eligible = true, toggle = config.riskPolicy.autoApproveLowRisk) =>
-  Boolean(evalExpr(autoApprove.if!, { plan: { risk, autoApproveEligible: eligible }, toggles: { autoApproveLowRisk: toggle }, config }));
+const skipsGate = (
+  config: FactoryConfig,
+  risk: string,
+  eligible = true,
+  toggle = config.riskPolicy.autoApproveLowRisk,
+) =>
+  Boolean(
+    evalExpr(autoApprove.if!, {
+      plan: { risk, autoApproveEligible: eligible },
+      toggles: { autoApproveLowRisk: toggle },
+      config,
+    }),
+  );
 
 describe("profile defaults", () => {
   test("no profile is the team behaviour the factory always had", () => {
@@ -33,7 +44,12 @@ describe("profile defaults", () => {
   });
 
   test("a key the repo sets wins over its profile, field by field", () => {
-    const c = mergeConfig({ repo: "a/b", profile: "enterprise", maxOpenFactoryPrs: 2, riskPolicy: { autoApproveLowRisk: true } as FactoryConfig["riskPolicy"] });
+    const c = mergeConfig({
+      repo: "a/b",
+      profile: "enterprise",
+      maxOpenFactoryPrs: 2,
+      riskPolicy: { autoApproveLowRisk: true } as FactoryConfig["riskPolicy"],
+    });
     expect(c.maxOpenFactoryPrs).toBe(2);
     expect(c.riskPolicy.autoApproveLowRisk).toBe(true);
     expect(c.riskPolicy.autoApproveMaxRisk).toBe("low");
@@ -50,7 +66,8 @@ describe("the bundled plan gate under each profile", () => {
     ["scaleup", { low: false, medium: false, high: false }],
     ["enterprise", { low: false, medium: false, high: false }],
   ] as const)("%s skips the plan gate for %o", (profile, want) => {
-    for (const risk of ["low", "medium", "high"] as const) expect([risk, skipsGate(cfg(profile), risk)]).toEqual([risk, want[risk]]);
+    for (const risk of ["low", "medium", "high"] as const)
+      expect([risk, skipsGate(cfg(profile), risk)]).toEqual([risk, want[risk]]);
   });
 
   test("the planner's own 'not eligible' and the dashboard switch still stop it", () => {
@@ -61,7 +78,9 @@ describe("the bundled plan gate under each profile", () => {
 
 describe("profile validation", () => {
   test("names the bad profile and the bad ceiling", () => {
-    const p = configProblems({ repo: "a/b", profile: "megacorp", riskPolicy: { autoApproveMaxRisk: "high" } }).join("\n");
+    const p = configProblems({ repo: "a/b", profile: "megacorp", riskPolicy: { autoApproveMaxRisk: "high" } }).join(
+      "\n",
+    );
     expect(p).toMatch(/profile: expected one of solo, team, startup, scaleup, enterprise/);
     expect(p).toMatch(/riskPolicy\.autoApproveMaxRisk: expected "low" or "medium"/);
   });

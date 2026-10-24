@@ -12,13 +12,33 @@ import { LABEL } from "../src/labels";
 import { isTestPath, runProof, ShellProofGit, type ProofGit } from "../src/proof";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import {
+  baseIssue,
+  FakeGateRunner,
+  FakeGit,
+  FakeGitHub,
+  FakeHoldoutRunner,
+  fixtureFor,
+  MultiStageExecutor,
+} from "./harness";
 
 const dirs: string[] = [];
-afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+});
 
 function run(args: string[], cwd: string): string {
-  const r = Bun.spawnSync(args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+  const r = Bun.spawnSync(args, {
+    cwd,
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_AUTHOR_NAME: "t",
+      GIT_AUTHOR_EMAIL: "t@t",
+      GIT_COMMITTER_NAME: "t",
+      GIT_COMMITTER_EMAIL: "t@t",
+    },
+  });
   if (r.exitCode !== 0) throw new Error(`${args.join(" ")}: ${r.stderr}`);
   return r.stdout.toString();
 }
@@ -105,18 +125,55 @@ describe("runProof", () => {
 });
 
 test("isTestPath knows the common conventions and nothing else", () => {
-  for (const p of ["tests/a.ts", "src/__tests__/a.ts", "src/a.test.ts", "a.spec.tsx", "pkg/test_x.py", "x_test.go", "a_spec.rb", "spec/a.rb"]) expect(isTestPath(p)).toBe(true);
-  for (const p of ["src/testing.ts", "src/contest.ts", "README.md", "src/latest/a.ts"]) expect(isTestPath(p)).toBe(false);
+  for (const p of [
+    "tests/a.ts",
+    "src/__tests__/a.ts",
+    "src/a.test.ts",
+    "a.spec.tsx",
+    "pkg/test_x.py",
+    "x_test.go",
+    "a_spec.rb",
+    "spec/a.rb",
+  ])
+    expect(isTestPath(p)).toBe(true);
+  for (const p of ["src/testing.ts", "src/contest.ts", "README.md", "src/latest/a.ts"])
+    expect(isTestPath(p)).toBe(false);
 });
 
 // Wiring: watch.ts runs the proof with the plan's proof and the `test` gate, and proof.json is
 // on disk when the verify session starts.
 describe("watch.ts runs the proof before verify", () => {
   const stageFiles = {
-    triage: { "triage-comment.md": "<!-- factory:triage v1 -->\nt", "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["src/a.ts"], gate_level: "make check", confidence: 0.9 }) },
-    plan: { "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\np", "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true, proof: "test" }) },
-    build: { "status-comment.md": "<!-- factory:status v1 -->\nb", "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) },
-    verify: { "verdict-comment.md": "<!-- factory:verdict v1 -->\nv", "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }) },
+    triage: {
+      "triage-comment.md": "<!-- factory:triage v1 -->\nt",
+      "triage.json": JSON.stringify({
+        disposition: "proceed",
+        type: "bug",
+        risk: "low",
+        done_when: "x",
+        files_expected: ["src/a.ts"],
+        gate_level: "make check",
+        confidence: 0.9,
+      }),
+    },
+    plan: {
+      "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\np",
+      "plan.json": JSON.stringify({
+        risk: "low",
+        revision: 1,
+        files: ["src/a.ts"],
+        autoApproveEligible: true,
+        proof: "test",
+      }),
+    },
+    build: {
+      "status-comment.md": "<!-- factory:status v1 -->\nb",
+      "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+    },
+    verify: {
+      "verdict-comment.md": "<!-- factory:verdict v1 -->\nv",
+      "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+    },
     pr: { "pr-body.md": "Did it.\nCloses #1" },
   } as const;
 
@@ -135,21 +192,51 @@ describe("watch.ts runs the proof before verify", () => {
     };
     const calls: string[] = [];
     const proofGit: ProofGit = {
-      async changes() { return [{ status: "M", path: "src/a.ts" }, { status: "A", path: "tests/a.test.ts" }]; },
-      async restoreFromBase(_w, _b, paths) { calls.push(`restore ${paths.join(",")}`); },
+      async changes() {
+        return [
+          { status: "M", path: "src/a.ts" },
+          { status: "A", path: "tests/a.test.ts" },
+        ];
+      },
+      async restoreFromBase(_w, _b, paths) {
+        calls.push(`restore ${paths.join(",")}`);
+      },
       async remove() {},
-      async restoreHead() { calls.push("head"); },
-      async dirty() { return []; },
-      async test(_w, cmd) { calls.push(`test ${cmd}`); return { stdout: "expected 3, received -1", stderr: "", code: 1 }; },
+      async restoreHead() {
+        calls.push("head");
+      },
+      async dirty() {
+        return [];
+      },
+      async test(_w, cmd) {
+        calls.push(`test ${cmd}`);
+        return { stdout: "expected 3, received -1", stderr: "", code: 1 };
+      },
     };
     const state = new FactoryState(":memory:");
     state.setToggle("auto_approve_low_risk", true);
     const config = mergeConfig({ repo: "acme/widgets", gates: [{ name: "test", cmd: "make test", required: true }] });
-    const deps = { github, git: new FakeGit(), state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), proofGit, cloneDir, workspacesDir };
-    for (const stage of ["triage", "plan", "build", "verify", "pr"] as const) inner.push(stage, 1, fixtureFor(stage, 1), stageFiles[stage]);
+    const deps = {
+      github,
+      git: new FakeGit(),
+      state,
+      executor,
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      proofGit,
+      cloneDir,
+      workspacesDir,
+    };
+    for (const stage of ["triage", "plan", "build", "verify", "pr"] as const)
+      inner.push(stage, 1, fixtureFor(stage, 1), stageFiles[stage]);
     expect(await advanceIssue(deps, config, github.issues.get(1)!)).toBe("shipped");
     expect(calls).toEqual(["restore src/a.ts", "test make test", "head"]);
-    expect(seen).toMatchObject({ status: "bites", tests: ["tests/a.test.ts"], reverted: ["src/a.ts"], cmd: "make test" });
+    expect(seen).toMatchObject({
+      status: "bites",
+      tests: ["tests/a.test.ts"],
+      reverted: ["src/a.ts"],
+      cmd: "make test",
+    });
     expect(github.createdPrs[0]!.body).toContain("Proof: the new test fails without the change.");
   });
 });

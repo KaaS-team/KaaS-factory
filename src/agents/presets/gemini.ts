@@ -41,7 +41,10 @@ export function createGeminiParser(): (line: string) => StageEvent[] {
     const tokensOut = count(parsed.stats?.output_tokens);
     const events: StageEvent[] = closing ? [{ kind: "text", text: "", finalText: closing }] : [];
     if (tokensIn === null || tokensOut === null) return [...events, { kind: "usage", invalid: true }];
-    return [...events, { kind: "usage", tokensIn, tokensOut, tokensCached: count(parsed.stats?.cached) ?? 0, total: true }];
+    return [
+      ...events,
+      { kind: "usage", tokensIn, tokensOut, tokensCached: count(parsed.stats?.cached) ?? 0, total: true },
+    ];
   };
 }
 
@@ -59,7 +62,16 @@ export const geminiPreset: AgentPreset = {
   returnsArtifact: true,
   command: (opts, agent, prompt) => ({
     // Headless runs have no one to approve a tool call, so write stages use yolo.
-    argv: ["gemini", "-o", "stream-json", "--approval-mode", stagePolicy(opts.stage).write ? "yolo" : "plan", ...(agent.model ? ["-m", agent.model] : []), "-p", ""],
+    argv: [
+      "gemini",
+      "-o",
+      "stream-json",
+      "--approval-mode",
+      stagePolicy(opts.stage).write ? "yolo" : "plan",
+      ...(agent.model ? ["-m", agent.model] : []),
+      "-p",
+      "",
+    ],
     stdin: prompt,
   }),
   parseLine: (line) => createGeminiParser()(line),

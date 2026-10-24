@@ -5,7 +5,14 @@
 import { expect, test } from "bun:test";
 import type { CiCheck, CiResult } from "../src/ci";
 import type { MergeReadiness } from "../src/github";
-import { attemptMerge, checkReadiness, decideMerge, decideOperatorMerge, renderOperatorAuditComment, type DecideMergeInput } from "../src/merge-policy";
+import {
+  attemptMerge,
+  checkReadiness,
+  decideMerge,
+  decideOperatorMerge,
+  renderOperatorAuditComment,
+  type DecideMergeInput,
+} from "../src/merge-policy";
 
 const passingCheck: CiCheck = { name: "build", status: "COMPLETED", conclusion: "SUCCESS" };
 
@@ -38,10 +45,18 @@ function fakeMergePr() {
 }
 
 test("a CHANGES_REQUESTED review against a superseded commit no longer blocks", () => {
-  const stale = checkReadiness(readiness({ reviewDecision: "CHANGES_REQUESTED", changesRequestedStale: true }), ci(), "main");
+  const stale = checkReadiness(
+    readiness({ reviewDecision: "CHANGES_REQUESTED", changesRequestedStale: true }),
+    ci(),
+    "main",
+  );
   expect(stale.map((r) => r.reason)).not.toContain("reviews-required");
 
-  const fresh = checkReadiness(readiness({ reviewDecision: "CHANGES_REQUESTED", changesRequestedStale: false }), ci(), "main");
+  const fresh = checkReadiness(
+    readiness({ reviewDecision: "CHANGES_REQUESTED", changesRequestedStale: false }),
+    ci(),
+    "main",
+  );
   expect(fresh.map((r) => r.reason)).toContain("reviews-required");
 });
 

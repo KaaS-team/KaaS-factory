@@ -36,5 +36,9 @@ describe("parseExpr refuses at load", () => {
 });
 
 test("rootsOf names every first path segment, not literals", () => {
-  expect(rootsOf(parseExpr("plan.risk == 'low' && !(toggles.x || config.y.z) && true"))).toEqual(["plan", "toggles", "config"]);
+  expect(rootsOf(parseExpr("plan.risk == 'low' && !(toggles.x || config.y.z) && true"))).toEqual([
+    "plan",
+    "toggles",
+    "config",
+  ]);
 });

@@ -148,7 +148,8 @@ describe("install.sh scaffold", () => {
     for (const update of [true, false]) {
       const target = scratchTarget();
       mkdirSync(join(target, ".claude", "agents"), { recursive: true });
-      for (const f of ["factory-verifier.md", "factory-explorer.md"]) writeFileSync(join(target, ".claude", "agents", f), "old");
+      for (const f of ["factory-verifier.md", "factory-explorer.md"])
+        writeFileSync(join(target, ".claude", "agents", f), "old");
       const { stdout } = run(update ? [target, "--update"] : [target]);
       for (const f of ["factory-verifier.md", "factory-explorer.md"]) {
         expect(existsSync(join(target, ".claude", "agents", f))).toBe(!update);
@@ -198,7 +199,10 @@ describe("factory install calls fixDoctor", () => {
   const cmdInstall = bin.slice(start, end);
 
   test("calls fixDoctor after a real install", () => {
-    expect(cmdInstall).toContain("await fixDoctor(makeScm(config), config.repo, config.routes, await workflowFor(resolve(target), config)");
+    // Whitespace-blind, so the formatter can wrap the call.
+    expect(cmdInstall.replace(/\s+/g, "")).toContain(
+      "awaitfixDoctor(makeScm(config),config.repo,config.routes,awaitworkflowFor(resolve(target),config)",
+    );
   });
 
   test("returns before fixDoctor when --dry-run is set", () => {
@@ -223,7 +227,10 @@ describe("install.sh --agents", () => {
     for (const p of Object.values(PRESETS)) {
       if (p.skillsDir === ".claude/skills") continue;
       expect(lstatSync(join(target, p.skillsDir)).isSymbolicLink(), p.skillsDir).toBe(true);
-      expect(existsSync(join(target, p.skillsDir, "factory-plan", "SKILL.md")), `${p.skillsDir} does not resolve (${readlinkSync(join(target, p.skillsDir))})`).toBe(true);
+      expect(
+        existsSync(join(target, p.skillsDir, "factory-plan", "SKILL.md")),
+        `${p.skillsDir} does not resolve (${readlinkSync(join(target, p.skillsDir))})`,
+      ).toBe(true);
     }
     rmSync(target, { recursive: true, force: true });
   });
@@ -255,7 +262,14 @@ describe("install manifest and doctor drift", () => {
   const drift = async (target: string, templateOverrides?: string[]) => {
     const readFile = async (p: string) => (existsSync(p) ? readFileSync(p, "utf8") : undefined);
     const github = { authStatus: async () => ({ ok: true, detail: "" }) } as never;
-    const d = { github, git: {} as never, which: async () => true, fileExists: async () => true, readFile, isExecutable: async () => true };
+    const d = {
+      github,
+      git: {} as never,
+      which: async () => true,
+      fileExists: async () => true,
+      readFile,
+      isExecutable: async () => true,
+    };
     const checks = await runDoctor(d, { repo: "a/b", cloneDir: target, baselineTag: "", templateOverrides });
     return checks.find((c) => c.name === "factory files unchanged since install");
   };

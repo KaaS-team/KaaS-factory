@@ -23,7 +23,8 @@ describe("lightning-2 demo script", () => {
     const walkthrough = readFileSync(join(root, "teach/lightning-2.md"), "utf8");
     for (const w of windows) expect(walkthrough).toContain(`| \`${w}\` |`);
     expect(out).toContain("scene\\ 0:\\ setup");
-    for (const line of out.split("\n").filter((l) => /^tmux (new-session|new-window|split-window)/.test(l))) expect(line).toContain("GH_PAGER=cat");
+    for (const line of out.split("\n").filter((l) => /^tmux (new-session|new-window|split-window)/.test(l)))
+      expect(line).toContain("GH_PAGER=cat");
   });
 
   test("--tmux passes --tmux to the watcher through make up; without it the watcher is unchanged", () => {
@@ -37,7 +38,14 @@ describe("lightning-2 demo script", () => {
   test("up refuses, naming the holder, when the dashboard port is already taken", async () => {
     const server = Bun.serve({ port: 0, fetch: () => new Response("x") });
     try {
-      const p = Bun.spawnSync([script, "up"], { env: { ...process.env, FACTORY_HOME: "/tmp/fh", DEMO_SESSION: `port-guard-${process.pid}`, FACTORY_DASHBOARD_PORT: String(server.port) } });
+      const p = Bun.spawnSync([script, "up"], {
+        env: {
+          ...process.env,
+          FACTORY_HOME: "/tmp/fh",
+          DEMO_SESSION: `port-guard-${process.pid}`,
+          FACTORY_DASHBOARD_PORT: String(server.port),
+        },
+      });
       expect(p.exitCode).toBe(1);
       expect(p.stderr.toString()).toContain(`port ${server.port} is held by pid ${process.pid}`);
     } finally {
@@ -60,7 +68,9 @@ describe("lightning-2 demo script", () => {
 
   test("snapshot and replay print the backup, the copy and the dashboard on the replay port", () => {
     const snap = dry("snapshot", "/tmp/snap").out;
-    expect(snap).toContain("sqlite3 /tmp/fh/learnwithparam/splitbill-demo/factory.db .backup\\ \\'/tmp/snap/learnwithparam/splitbill-demo/factory.db\\'");
+    expect(snap).toContain(
+      "sqlite3 /tmp/fh/learnwithparam/splitbill-demo/factory.db .backup\\ \\'/tmp/snap/learnwithparam/splitbill-demo/factory.db\\'",
+    );
     const replay = dry("replay", "/tmp/snap").out;
     expect(replay).toContain("FACTORY_HOME=/tmp/snap bun");
     expect(replay).toContain("dashboard --repo learnwithparam/splitbill-demo --port 4101");
@@ -76,7 +86,22 @@ describe("lightning-2 demo script", () => {
     writeFileSync(join(runs, "plan.md"), "plan for seven");
     const state = new FactoryState(join(repoHome, "factory.db"));
     state.upsertRun({ issue: 7, repo: "acme/widgets", title: "README run steps", stage: "verify", status: "shipped" });
-    state.recordStageRun({ repo: "acme/widgets", issue: 7, stage: "build", agent: "claude", model: null, started_at: "2026-10-01T00:00:00Z", finished_at: "2026-10-01T00:01:00Z", duration_ms: 60000, tool_calls: 3, tokens_in: 10, tokens_out: 5, cost_usd: 0.25, exit_code: 0, killed_reason: null });
+    state.recordStageRun({
+      repo: "acme/widgets",
+      issue: 7,
+      stage: "build",
+      agent: "claude",
+      model: null,
+      started_at: "2026-10-01T00:00:00Z",
+      finished_at: "2026-10-01T00:01:00Z",
+      duration_ms: 60000,
+      tool_calls: 3,
+      tokens_in: 10,
+      tokens_out: 5,
+      cost_usd: 0.25,
+      exit_code: 0,
+      killed_reason: null,
+    });
     const env = { ...process.env, FACTORY_HOME: home, DEMO_REPO: "acme/widgets" };
     const out = join(tmp, "snapshot");
     let server: ReturnType<typeof Bun.spawn> | undefined;
@@ -93,11 +118,17 @@ describe("lightning-2 demo script", () => {
       const free = Bun.serve({ port: 0, fetch: () => new Response("") });
       const port = free.port;
       free.stop(true);
-      server = Bun.spawn([script, "replay", out], { env: { ...env, REPLAY_PORT: String(port) }, stdout: "pipe", stderr: "pipe" });
+      server = Bun.spawn([script, "replay", out], {
+        env: { ...env, REPLAY_PORT: String(port) },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       const base = `http://127.0.0.1:${port}`;
       let line: { rows: { run: { issue: number }; stages: { stage: string; ok: boolean }[] }[] } | undefined;
       for (let i = 0; i < 100 && !line; i++) {
-        line = await fetch(`${base}/api/line`).then((r) => r.json() as never).catch(() => undefined);
+        line = await fetch(`${base}/api/line`)
+          .then((r) => r.json() as never)
+          .catch(() => undefined);
         if (!line) await Bun.sleep(100);
       }
       expect(line?.rows.map((r) => r.run.issue)).toEqual([7]);
@@ -114,15 +145,22 @@ describe("lightning-2 demo script", () => {
   });
 
   test("replay refuses a dir with no snapshot", () => {
-    const p = Bun.spawnSync([script, "replay", "/nonexistent/snap"], { env: { ...process.env, FACTORY_HOME: "/tmp/fh" } });
+    const p = Bun.spawnSync([script, "replay", "/nonexistent/snap"], {
+      env: { ...process.env, FACTORY_HOME: "/tmp/fh" },
+    });
     expect(p.exitCode).toBe(1);
     expect(p.stderr.toString()).toContain("no snapshot at /nonexistent/snap");
   });
 
   test("snap.ts renders colour, bold and reset, and escapes html", () => {
-    expect(ansiToHtml("\x1b[1;32mok\x1b[0m <b>")).toBe('<span style="color:#23d18b;font-weight:bold">ok</span> &lt;b&gt;');
+    expect(ansiToHtml("\x1b[1;32mok\x1b[0m <b>")).toBe(
+      '<span style="color:#23d18b;font-weight:bold">ok</span> &lt;b&gt;',
+    );
     expect(ansiToHtml("\x1b[38;5;196mred")).toBe('<span style="color:rgb(255,0,0)">red</span>');
-    const page = renderPage("s:w", [{ left: 0, top: 0, width: 80, height: 10, text: "a" }, { left: 0, top: 11, width: 80, height: 10, text: "b" }]);
+    const page = renderPage("s:w", [
+      { left: 0, top: 0, width: 80, height: 10, text: "a" },
+      { left: 0, top: 11, width: 80, height: 10, text: "b" },
+    ]);
     expect(page.match(/<pre /g)?.length).toBe(2);
     expect(page).toContain("top:calc(11 * var(--lh))");
   });

@@ -39,7 +39,13 @@ export function cronWindow(store: CronStore, key: string, now: Date): { from: nu
 }
 
 // Returns the numbers of the issues it filed.
-export async function fireCron(github: ScmPort, store: CronStore, repo: string, workflow: Workflow, now: Date): Promise<number[]> {
+export async function fireCron(
+  github: ScmPort,
+  store: CronStore,
+  repo: string,
+  workflow: Workflow,
+  now: Date,
+): Promise<number[]> {
   const triggers = workflow.triggers.cron;
   if (triggers.length === 0) return [];
   const key = `cron:last:${repo}:${workflow.name}`;
@@ -76,7 +82,12 @@ const EVENT_DATA_MAX = 4000;
 // minion's agent-written answer) files it unlabelled: a valid HMAC proves who
 // sent it, not that its data is fit to run, so a maintainer adds factory:ready
 // and pickup checks who did, as for any issue (readyIsTrusted).
-export async function fireEvent(github: ScmPort, repo: string, workflow: Workflow, event: CloudEvent): Promise<number | undefined> {
+export async function fireEvent(
+  github: ScmPort,
+  repo: string,
+  workflow: Workflow,
+  event: CloudEvent,
+): Promise<number | undefined> {
   if (!workflow.triggers.event.includes(event.type)) return undefined;
   const marker = eventMarker(workflow.name, event.id);
   const open = await github.listOpenIssues(repo);
@@ -85,7 +96,9 @@ export async function fireEvent(github: ScmPort, repo: string, workflow: Workflo
   const shown = data.length > EVENT_DATA_MAX ? `${data.slice(0, EVENT_DATA_MAX)}\n... (truncated)` : data;
   const title = `${event.type}${event.subject ? `: ${event.subject}` : ""}`.slice(0, 200);
   const own = !isExternalEventType(event.type);
-  const gate = own ? "" : `\n\nThis event came from outside the factory, so it does not start on its own. A maintainer who has read the data below adds \`${LABEL.ready}\` to run it.`;
+  const gate = own
+    ? ""
+    : `\n\nThis event came from outside the factory, so it does not start on its own. A maintainer who has read the data below adds \`${LABEL.ready}\` to run it.`;
   const body = `Filed by the \`${workflow.name}\` workflow on the \`${event.type}\` event from \`${event.source}\` (id \`${event.id}\`).${gate}\n\n\`\`\`json\n${shown}\n\`\`\`\n\n${marker}`;
   return await github.createIssue(repo, title, body, own ? [LABEL.ready] : []);
 }

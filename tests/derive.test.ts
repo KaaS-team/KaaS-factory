@@ -133,10 +133,7 @@ describe("deriveIssueState: round counts", () => {
 
 describe("deriveIssueState: statusCommentId", () => {
   test("recovers the runner's own status comment id from the thread", () => {
-    const issue = issueWith(
-      [LABEL.building],
-      [comment("<!-- factory:status v1 -->\nbuilding...", 4242)],
-    );
+    const issue = issueWith([LABEL.building], [comment("<!-- factory:status v1 -->\nbuilding...", 4242)]);
     expect(deriveIssueState(issue).statusCommentId).toBe(4242);
   });
 

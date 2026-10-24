@@ -56,7 +56,13 @@ function toIssue(raw: Partial<GhIssue> & { comments?: GhComment[] }): GhIssue {
     title: raw.title ?? "",
     body: raw.body ?? "",
     labels: (raw.labels ?? []).map((l) => ({ name: l.name })),
-    comments: (raw.comments ?? []).map((c) => ({ id: Number(c.id), author: c.author, authorAssociation: c.authorAssociation, body: c.body, createdAt: c.createdAt })),
+    comments: (raw.comments ?? []).map((c) => ({
+      id: Number(c.id),
+      author: c.author,
+      authorAssociation: c.authorAssociation,
+      body: c.body,
+      createdAt: c.createdAt,
+    })),
     state: raw.state === "CLOSED" ? "CLOSED" : "OPEN",
     stateReason: raw.stateReason ?? null,
   };
@@ -68,7 +74,11 @@ export class HttpTracker implements TrackerPort {
     private readonly env: NodeJS.ProcessEnv = process.env,
   ) {}
 
-  private async call<T>(route: Route, params: Record<string, string | number>, opts: { query?: Record<string, string>; body?: unknown } = {}): Promise<T> {
+  private async call<T>(
+    route: Route,
+    params: Record<string, string | number>,
+    opts: { query?: Record<string, string>; body?: unknown } = {},
+  ): Promise<T> {
     const [method, template] = route.split(" ") as [string, string];
     const path = template.replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(String(params[k])));
     const query = opts.query ? `?${new URLSearchParams(opts.query)}` : "";
@@ -77,7 +87,10 @@ export class HttpTracker implements TrackerPort {
     if (!token) throw new TrackerHttpError(`tracker ${this.spec.url}: env var ${this.spec.tokenEnv} is not set`, 0);
     const res = await fetch(`${this.spec.url.replace(/\/+$/, "")}${TRACKER_PREFIX}${path}${query}`, {
       method,
-      headers: { authorization: `Bearer ${token}`, ...(opts.body === undefined ? {} : { "content-type": "application/json" }) },
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(opts.body === undefined ? {} : { "content-type": "application/json" }),
+      },
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
     });
     const text = await res.text();
@@ -99,7 +112,11 @@ export class HttpTracker implements TrackerPort {
   }
 
   async listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]> {
-    const rows = await this.call<GhIssue[]>(TRACKER_ROUTES.listIssuesByLabel, { project: this.p(repo) }, { query: { state: "open", label } });
+    const rows = await this.call<GhIssue[]>(
+      TRACKER_ROUTES.listIssuesByLabel,
+      { project: this.p(repo) },
+      { query: { state: "open", label } },
+    );
     return rows.map(toIssue);
   }
 
@@ -108,12 +125,20 @@ export class HttpTracker implements TrackerPort {
   }
 
   async listOpenIssues(repo: string): Promise<GhIssue[]> {
-    const rows = await this.call<GhIssue[]>(TRACKER_ROUTES.listOpenIssues, { project: this.p(repo) }, { query: { state: "open" } });
+    const rows = await this.call<GhIssue[]>(
+      TRACKER_ROUTES.listOpenIssues,
+      { project: this.p(repo) },
+      { query: { state: "open" } },
+    );
     return rows.map(toIssue);
   }
 
   async commentIssue(repo: string, number: number, body: string): Promise<number | undefined> {
-    const r = await this.call<{ id?: number }>(TRACKER_ROUTES.commentIssue, { project: this.p(repo), n: number }, { body: { body } });
+    const r = await this.call<{ id?: number }>(
+      TRACKER_ROUTES.commentIssue,
+      { project: this.p(repo), n: number },
+      { body: { body } },
+    );
     return r.id === undefined ? undefined : Number(r.id);
   }
 
@@ -136,7 +161,12 @@ export class HttpTracker implements TrackerPort {
 
   // One request, so the issue is never seen with both labels or neither.
   async setStateLabel(repo: string, number: number, current: string[], next: string): Promise<void> {
-    await this.labels(repo, number, current.includes(next) ? [] : [next], current.filter((l) => l !== next));
+    await this.labels(
+      repo,
+      number,
+      current.includes(next) ? [] : [next],
+      current.filter((l) => l !== next),
+    );
   }
 
   async closeIssue(repo: string, number: number): Promise<void> {
@@ -148,7 +178,11 @@ export class HttpTracker implements TrackerPort {
   }
 
   async createIssue(repo: string, title: string, body: string, labels: string[]): Promise<number> {
-    const r = await this.call<{ number: number }>(TRACKER_ROUTES.createIssue, { project: this.p(repo) }, { body: { title, body, labels } });
+    const r = await this.call<{ number: number }>(
+      TRACKER_ROUTES.createIssue,
+      { project: this.p(repo) },
+      { body: { title, body, labels } },
+    );
     return Number(r.number);
   }
 
@@ -165,7 +199,11 @@ export class HttpTracker implements TrackerPort {
   }
 
   async labeledBy(repo: string, number: number, label: string): Promise<string | undefined> {
-    const r = await this.call<{ actor: string | null }>(TRACKER_ROUTES.labeledBy, { project: this.p(repo), n: number }, { query: { label } });
+    const r = await this.call<{ actor: string | null }>(
+      TRACKER_ROUTES.labeledBy,
+      { project: this.p(repo), n: number },
+      { query: { label } },
+    );
     return r.actor ?? undefined;
   }
 

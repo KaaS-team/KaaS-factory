@@ -50,7 +50,11 @@ describe("tracker comments show no operator detail", () => {
     expect(visibleLeaks(`${leaked.replace(hostname(), "Params-MacBook-Pro-2.local")}`)).toContain(".local host");
     expect(visibleLeaks(`${leaked}`).some((l) => l.startsWith("hostname"))).toBe(true);
     expect(visibleLeaks("ran on claude-sonnet-5 (model)")).toContain("model");
-    expect(visibleLeaks(`Factory usage record.\n<!-- factory:spend {"holder":"${hostname()}","costUsd":0.54,"model":"x"} -->`)).toEqual([]);
+    expect(
+      visibleLeaks(
+        `Factory usage record.\n<!-- factory:spend {"holder":"${hostname()}","costUsd":0.54,"model":"x"} -->`,
+      ),
+    ).toEqual([]);
   });
 
   test("every src file that writes to a tracker is listed, with its call-site count", () => {

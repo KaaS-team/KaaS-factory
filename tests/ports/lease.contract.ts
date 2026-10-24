@@ -32,7 +32,8 @@ export function leaseContract(name: string, make: () => { port: LeasePort; peer:
     });
     test("racing workers: exactly one wins a free lease, and exactly one an expired one", async () => {
       const { port, peer } = make();
-      const race = (at: number) => Promise.all(Array.from({ length: 6 }, (_, i) => (i === 0 ? port : peer()).acquire("9", `w${i}`, T, at)));
+      const race = (at: number) =>
+        Promise.all(Array.from({ length: 6 }, (_, i) => (i === 0 ? port : peer()).acquire("9", `w${i}`, T, at)));
       expect((await race(1_000)).filter(Boolean)).toHaveLength(1);
       expect((await race(1_000 + T)).filter(Boolean)).toHaveLength(1);
     });

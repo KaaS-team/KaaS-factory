@@ -12,7 +12,8 @@ import type { ExecutionPort } from "../src/ports/execution";
 
 const roots: string[] = [];
 afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
-const git = (cwd: string, ...args: string[]) => Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, stdout: "pipe" });
+const git = (cwd: string, ...args: string[]) =>
+  Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, stdout: "pipe" });
 
 // A clone with two linked worktrees, like the factory's per-issue ones.
 function clone(): { main: string; a: string; b: string } {
@@ -68,7 +69,14 @@ describe("FACTORY_PORT reaches the stage and the gates", () => {
     const { a } = clone();
     mkdirSync(join(a, ".claude/skills/factory-plan"), { recursive: true });
     writeFileSync(join(a, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
-    const executor = new CommandExecutor({ x: { command: ["sh", "-c", 'cat >/dev/null; echo "$FACTORY_PORT" > "$FACTORY_ARTIFACT_DIR/port.txt"', "agent"] } }, { default: "x" });
+    const executor = new CommandExecutor(
+      {
+        x: {
+          command: ["sh", "-c", 'cat >/dev/null; echo "$FACTORY_PORT" > "$FACTORY_ARTIFACT_DIR/port.txt"', "agent"],
+        },
+      },
+      { default: "x" },
+    );
     await executor.runStage({ stage: "plan", issue: 7, cwd: a, maxBudgetUsd: 1 });
     expect(Number(readFileSync(join(a, ".factory/runs/issue-7/port.txt"), "utf8"))).toBe(worktreePort(a)!);
   });

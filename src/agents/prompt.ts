@@ -14,7 +14,11 @@ export function stripFrontmatter(text: string): string {
 
 // `types` bounds the triage schema's `type` enum to the repo's actual type
 // list (typesFor(config.routes)); omitted, it falls back to TYPE_LABELS.
-export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">, readOnly = false, types?: readonly string[]): string {
+export function artifactContract(
+  opts: Pick<StageRunOptions, "stage" | "issue">,
+  readOnly = false,
+  types?: readonly string[],
+): string {
   if (readOnly) {
     return [
       "## Artifact contract",
@@ -42,9 +46,16 @@ export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">,
 // `contextPack` (buildContextPack, plan v2.7.0 item 3) is inlined here for
 // every non-Claude agent; Claude gets the same text through
 // --append-system-prompt instead (see agents/presets/claude.ts).
-export async function renderPrompt(opts: StageRunOptions, readOnly = false, types?: readonly string[], contextPack = ""): Promise<string> {
+export async function renderPrompt(
+  opts: StageRunOptions,
+  readOnly = false,
+  types?: readonly string[],
+  contextPack = "",
+): Promise<string> {
   const skill = await readFile(`${opts.cwd}/.claude/skills/factory-${opts.stage}/SKILL.md`, "utf8").catch(() => {
-    throw new Error(`stage skill .claude/skills/factory-${opts.stage}/SKILL.md not found in ${opts.cwd}; run \`factory install --update\``);
+    throw new Error(
+      `stage skill .claude/skills/factory-${opts.stage}/SKILL.md not found in ${opts.cwd}; run \`factory install --update\``,
+    );
   });
   return [
     `Stage: ${opts.stage}. Issue number: ${opts.issue}. Wherever the instructions say <N>, use ${opts.issue}.`,

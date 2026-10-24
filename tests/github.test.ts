@@ -17,7 +17,15 @@ describe("GitHub.editComment", () => {
 
 describe("GitHub.listPrs", () => {
   const prs = [
-    { number: 1, url: "u1", state: "OPEN", headRefName: "factory/issue-5", isDraft: false, isCrossRepository: true, closingIssuesReferences: [{ number: 5 }] },
+    {
+      number: 1,
+      url: "u1",
+      state: "OPEN",
+      headRefName: "factory/issue-5",
+      isDraft: false,
+      isCrossRepository: true,
+      closingIssuesReferences: [{ number: 5 }],
+    },
     { number: 2, url: "u2", state: "OPEN", headRefName: "factory/issue-5", isDraft: false, isCrossRepository: false },
   ];
   const gh = () => new GitHub({ run: async () => ({ code: 0, stdout: JSON.stringify(prs), stderr: "" }) });
@@ -37,21 +45,51 @@ describe("GitHub.mergedPrByHead", () => {
     const gh = new GitHub({
       run: async (args: string[]) => {
         calls.push(args);
-        return { code: 0, stdout: JSON.stringify([{ number: 4, url: "u", state: "MERGED", headRefName: "factory/issue-2", isDraft: false }]), stderr: "" };
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            { number: 4, url: "u", state: "MERGED", headRefName: "factory/issue-2", isDraft: false },
+          ]),
+          stderr: "",
+        };
       },
     });
     expect((await gh.mergedPrByHead("o/r", "factory/issue-2"))?.number).toBe(4);
     expect(await gh.mergedPrByHead("o/r", "factory/issue-3")).toBeUndefined();
     expect(calls[0]).toEqual([
-      "pr", "list", "--repo", "o/r", "--head", "factory/issue-2", "--state", "merged",
-      "--json", "number,url,state,headRefName,isDraft,closingIssuesReferences", "--limit", "1",
+      "pr",
+      "list",
+      "--repo",
+      "o/r",
+      "--head",
+      "factory/issue-2",
+      "--state",
+      "merged",
+      "--json",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences",
+      "--limit",
+      "1",
     ]);
   });
 });
 
 describe("GitHub issue reads", () => {
   // gh's own shape: the author is an object. Every reader hands the watcher a login string.
-  const raw = { number: 7, title: "t", body: "b", labels: [], comments: [{ id: "IC_1", author: { login: "octo" }, authorAssociation: "MEMBER", body: "/factory approve", createdAt: "2026-10-13T08:19:09Z" }] };
+  const raw = {
+    number: 7,
+    title: "t",
+    body: "b",
+    labels: [],
+    comments: [
+      {
+        id: "IC_1",
+        author: { login: "octo" },
+        authorAssociation: "MEMBER",
+        body: "/factory approve",
+        createdAt: "2026-10-13T08:19:09Z",
+      },
+    ],
+  };
   const gh = (out: unknown) => new GitHub({ run: async () => ({ code: 0, stdout: JSON.stringify(out), stderr: "" }) });
 
   test("every reader gives each comment's author as its login", async () => {

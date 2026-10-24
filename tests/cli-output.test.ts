@@ -12,7 +12,11 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 async function factory(...args: string[]) {
   const proc = Bun.spawn(["bun", bin, ...args], { stdout: "pipe", stderr: "pipe" });
-  const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
   return { out, err, code };
 }
 
@@ -29,7 +33,10 @@ describe("--json contract", () => {
   test("envelopes", () => {
     expect(JSON.parse(successJson({ a: 1 }))).toEqual({ ok: true, data: { a: 1 } });
     expect(JSON.parse(successJson({}, false)).ok).toBe(false);
-    expect(JSON.parse(failureJson(new ConfigError("bad")))).toEqual({ ok: false, error: { kind: "config", message: "bad" } });
+    expect(JSON.parse(failureJson(new ConfigError("bad")))).toEqual({
+      ok: false,
+      error: { kind: "config", message: "bad" },
+    });
   });
 
   test("an invalid config is {ok:false,error.kind:config} on stderr, stdout empty, exit 1", async () => {

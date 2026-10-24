@@ -39,16 +39,37 @@ class FakeGitHub extends GitHub {
   // is enough for the route-walk and inbox tests, which never depend on its shape.
   override async prForIssue(_repo: string, issueNumber: number): Promise<GhPr | undefined> {
     if (!this.issues.some((i) => i.number === issueNumber)) return undefined;
-    return { number: 100 + issueNumber, url: `https://github.com/acme/widgets/pull/${100 + issueNumber}`, state: "open", headRefName: `issue-${issueNumber}`, isDraft: false, closingIssuesReferences: [{ number: issueNumber }] };
+    return {
+      number: 100 + issueNumber,
+      url: `https://github.com/acme/widgets/pull/${100 + issueNumber}`,
+      state: "open",
+      headRefName: `issue-${issueNumber}`,
+      isDraft: false,
+      closingIssuesReferences: [{ number: issueNumber }],
+    };
   }
   override async prDiff(): Promise<string> {
     return "diff --git a/file b/file\n+added\n";
   }
   override async prStatus(): Promise<PrStatus> {
-    return { state: "open", headRefOid: "sha1", closingIssuesReferences: [{ number: 1 }], statusCheckRollup: [{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" }] };
+    return {
+      state: "open",
+      headRefOid: "sha1",
+      closingIssuesReferences: [{ number: 1 }],
+      statusCheckRollup: [{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" }],
+    };
   }
   override async mergeReadiness(): Promise<MergeReadiness> {
-    return { state: "open", isDraft: false, baseRefName: "main", headRefOid: "sha1", mergeable: "MERGEABLE", reviewDecision: "APPROVED", hasUnresolvedReviewThreads: false, changesRequestedStale: false };
+    return {
+      state: "open",
+      isDraft: false,
+      baseRefName: "main",
+      headRefOid: "sha1",
+      mergeable: "MERGEABLE",
+      reviewDecision: "APPROVED",
+      hasUnresolvedReviewThreads: false,
+      changesRequestedStale: false,
+    };
   }
   override async mergePr(repo: string, prNumber: number, headSha: string): Promise<void> {
     this.merged.push({ repo, prNumber, headSha });
@@ -60,7 +81,15 @@ const waiting = (n: number, label: string): GhIssue => ({
   title: `Issue ${n}`,
   body: "",
   labels: [{ name: label }],
-  comments: [{ id: n, author: "bot", authorAssociation: "NONE", body: "<!-- factory:plan v1 -->\nThe plan\u001b[31m", createdAt: "2026-09-20T10:00:00Z" }],
+  comments: [
+    {
+      id: n,
+      author: "bot",
+      authorAssociation: "NONE",
+      body: "<!-- factory:plan v1 -->\nThe plan\u001b[31m",
+      createdAt: "2026-09-20T10:00:00Z",
+    },
+  ],
 });
 
 const TOKEN = "s3cret-token";
@@ -74,7 +103,12 @@ async function make(token: string, issues: GhIssue[] = [], project?: DashboardPr
     const mod = await import(`../dashboard/server.ts?token=${token || "none"}`);
     const state = new FactoryState(":memory:");
     const github = new FakeGitHub(issues);
-    return { mod, state, github, dashboard: mod.createDashboard(state, github, "acme/widgets", false, scratch, undefined, undefined, project) };
+    return {
+      mod,
+      state,
+      github,
+      dashboard: mod.createDashboard(state, github, "acme/widgets", false, scratch, undefined, undefined, project),
+    };
   } finally {
     if (before === undefined) delete process.env.FACTORY_DASHBOARD_TOKEN;
     else process.env.FACTORY_DASHBOARD_TOKEN = before;
@@ -83,7 +117,7 @@ async function make(token: string, issues: GhIssue[] = [], project?: DashboardPr
 
 const samplePath = (label: string) => label.split(" ")[1]!.replace(":n", "1").replace(":id", "1");
 const call = (label: string, headers: Record<string, string> = {}) => {
-  const [method, ] = label.split(" ");
+  const [method] = label.split(" ");
   return new Request(`http://localhost:4100${samplePath(label)}`, {
     method,
     headers: { ...(method === "POST" ? { "content-type": "application/json" } : {}), ...headers },
@@ -109,7 +143,8 @@ describe("route walk", () => {
 
   test("the token in a query string no longer works; the header and the session cookie do", async () => {
     const { dashboard } = await make(TOKEN);
-    const at = (path: string, headers: Record<string, string> = {}) => dashboard.handle(new Request(`http://localhost:4100${path}`, { headers }), "203.0.113.7");
+    const at = (path: string, headers: Record<string, string> = {}) =>
+      dashboard.handle(new Request(`http://localhost:4100${path}`, { headers }), "203.0.113.7");
     expect((await at(`/api/runs?token=${TOKEN}`)).status).toBe(401);
     expect((await at("/api/runs", { authorization: `Bearer ${TOKEN}` })).status).toBe(200);
     expect((await at("/api/runs", { authorization: "Bearer wrong-token-value" })).status).toBe(401);
@@ -117,7 +152,11 @@ describe("route walk", () => {
     const bad = await dashboard.handle(call("POST /api/session"), "203.0.113.7");
     expect(bad.status).toBe(401);
     const login = await dashboard.handle(
-      new Request("http://localhost:4100/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: TOKEN }) }),
+      new Request("http://localhost:4100/api/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: TOKEN }),
+      }),
       "203.0.113.7",
     );
     expect(login.status).toBe(200);
@@ -126,9 +165,20 @@ describe("route walk", () => {
     expect(setCookie).toContain("SameSite=Strict");
     expect(setCookie).not.toContain("Secure");
     const secureLogin = (url: string, headers: Record<string, string> = {}) =>
-      dashboard.handle(new Request(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ token: TOKEN }) }), "203.0.113.7");
+      dashboard.handle(
+        new Request(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...headers },
+          body: JSON.stringify({ token: TOKEN }),
+        }),
+        "203.0.113.7",
+      );
     expect((await secureLogin("https://dash.example/api/session")).headers.get("set-cookie")).toContain("; Secure");
-    expect((await secureLogin("http://localhost:4100/api/session", { "x-forwarded-proto": "https" })).headers.get("set-cookie")).toContain("; Secure");
+    expect(
+      (await secureLogin("http://localhost:4100/api/session", { "x-forwarded-proto": "https" })).headers.get(
+        "set-cookie",
+      ),
+    ).toContain("; Secure");
     expect((await at("/api/runs", { cookie: setCookie.split(";")[0]! })).status).toBe(200);
   });
 
@@ -143,18 +193,29 @@ describe("inbox routes", () => {
     const { dashboard, state } = await make("", [waiting(6, LABEL.needsHuman)]);
     state.upsertRun({ issue: 6, repo: "acme/widgets", title: "t", stage: "verify", status: "running" });
     state.updateRun("acme/widgets", 6, { status: "needs-human", reason: "verify uncertain" });
-    const list = (await (await dashboard.handle(call("GET /api/inbox"), "127.0.0.1")).json()) as { items: { ask: string }[] };
+    const list = (await (await dashboard.handle(call("GET /api/inbox"), "127.0.0.1")).json()) as {
+      items: { ask: string }[];
+    };
     expect(list.items[0]!.ask).toBe("Parked: verify uncertain\n\nThe plan");
   });
 
   test("lists what waits and posts the same comment a human would", async () => {
     const { dashboard, github } = await make("", [waiting(3, LABEL.awaitingApproval), waiting(4, LABEL.building)]);
-    const list = (await (await dashboard.handle(call("GET /api/inbox"), "127.0.0.1")).json()) as { items: { issue: number; ask: string; actions: string[] }[] };
+    const list = (await (await dashboard.handle(call("GET /api/inbox"), "127.0.0.1")).json()) as {
+      items: { issue: number; ask: string; actions: string[] }[];
+    };
     expect(list.items.map((i) => i.issue)).toEqual([3]);
     expect(list.items[0]!.ask).toBe("The plan");
 
     const act = (n: number, body: unknown) =>
-      dashboard.handle(new Request(`http://localhost:4100/api/inbox/${n}/act`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), "127.0.0.1");
+      dashboard.handle(
+        new Request(`http://localhost:4100/api/inbox/${n}/act`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        "127.0.0.1",
+      );
     expect((await act(3, { action: "approve" })).status).toBe(200);
     expect(github.posted).toEqual([{ issue: 3, body: "/factory approve" }]);
     expect((await act(3, { action: "retry" })).status).toBe(400);
@@ -169,7 +230,14 @@ describe("review and merge routes", () => {
     const { dashboard } = await make("", [waiting(5, LABEL.inReview)]);
     const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/5/review"), "127.0.0.1");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { pr: { number: number }; diff: string; ci: { status: string }; gate: unknown; verify: unknown; stages: unknown[] };
+    const body = (await res.json()) as {
+      pr: { number: number };
+      diff: string;
+      ci: { status: string };
+      gate: unknown;
+      verify: unknown;
+      stages: unknown[];
+    };
     expect(body.pr.number).toBe(105);
     expect(body.diff).toContain("diff --git");
     expect(body.ci.status).toBe("passed");
@@ -187,7 +255,11 @@ describe("review and merge routes", () => {
   test("approve-and-merge calls the same mergePr the automated policy uses, and posts the operator audit comment", async () => {
     const { dashboard, github } = await make("", [waiting(6, LABEL.inReview)]);
     const res = await dashboard.handle(
-      new Request("http://localhost:4100/api/issues/6/merge", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+      new Request("http://localhost:4100/api/issues/6/merge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
       "127.0.0.1",
     );
     expect(res.status).toBe(200);
@@ -203,7 +275,11 @@ describe("review and merge routes", () => {
     const original = github.mergeReadiness.bind(github);
     github.mergeReadiness = async () => ({ ...(await original()), isDraft: true });
     const res = await dashboard.handle(
-      new Request("http://localhost:4100/api/issues/7/merge", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+      new Request("http://localhost:4100/api/issues/7/merge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
       "127.0.0.1",
     );
     expect(res.status).toBe(200);
@@ -217,7 +293,14 @@ describe("review and merge routes", () => {
 
   test("the merge route 404s when no open PR closes the issue", async () => {
     const { dashboard } = await make("", []);
-    const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/9/merge", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), "127.0.0.1");
+    const res = await dashboard.handle(
+      new Request("http://localhost:4100/api/issues/9/merge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
+      "127.0.0.1",
+    );
     expect(res.status).toBe(404);
   });
 });
@@ -228,8 +311,11 @@ describe("multi-repo inbox", () => {
     process.env.FACTORY_REPOS = "acme/widgets,acme/gadgets";
     try {
       const { dashboard } = await make("", [waiting(3, LABEL.awaitingApproval)]);
-      const all = (await (await dashboard.handle(new Request("http://localhost:4100/api/inbox"), "127.0.0.1")).json()) as {
-        repos: string[]; items: { issue: number; repo: string }[];
+      const all = (await (
+        await dashboard.handle(new Request("http://localhost:4100/api/inbox"), "127.0.0.1")
+      ).json()) as {
+        repos: string[];
+        items: { issue: number; repo: string }[];
       };
       expect(all.repos).toEqual(["acme/widgets", "acme/gadgets"]);
       // FakeGitHub answers the same issue list for every repo, so the same
@@ -238,7 +324,10 @@ describe("multi-repo inbox", () => {
         ["acme/gadgets", 3],
         ["acme/widgets", 3],
       ]);
-      const filtered = await dashboard.handle(new Request("http://localhost:4100/api/inbox?repo=acme/widgets"), "127.0.0.1");
+      const filtered = await dashboard.handle(
+        new Request("http://localhost:4100/api/inbox?repo=acme/widgets"),
+        "127.0.0.1",
+      );
       expect(filtered.status).toBe(200);
       const body = (await filtered.json()) as { items: { issue: number; repo: string }[] };
       expect(body.items).toEqual([{ ...body.items[0]!, issue: 3, repo: "acme/widgets" }]);
@@ -251,7 +340,11 @@ describe("multi-repo inbox", () => {
   test("inbox/:n/act resolves the repo from the request body, defaulting to the configured repo", async () => {
     const { dashboard, github } = await make("", [waiting(3, LABEL.awaitingApproval)]);
     const res = await dashboard.handle(
-      new Request("http://localhost:4100/api/inbox/3/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "approve", repo: "acme/widgets" }) }),
+      new Request("http://localhost:4100/api/inbox/3/act", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "approve", repo: "acme/widgets" }),
+      }),
       "127.0.0.1",
     );
     expect(res.status).toBe(200);
@@ -261,19 +354,35 @@ describe("multi-repo inbox", () => {
 
 describe("analytics and stages", () => {
   const stage = (i: number, agent: string): StageRunInput => ({
-    repo: "acme/widgets", issue: 1 + (i % 3), stage: "build", agent, model: null, started_at: "2026-09-24T00:00:00Z",
-    finished_at: new Date().toISOString(), duration_ms: 1000, tool_calls: 1, tokens_in: 10, tokens_out: 5, cost_usd: 0.01,
-    exit_code: i % 10 === 0 ? 1 : 0, killed_reason: null,
+    repo: "acme/widgets",
+    issue: 1 + (i % 3),
+    stage: "build",
+    agent,
+    model: null,
+    started_at: "2026-09-24T00:00:00Z",
+    finished_at: new Date().toISOString(),
+    duration_ms: 1000,
+    tool_calls: 1,
+    tokens_in: 10,
+    tokens_out: 5,
+    cost_usd: 0.01,
+    exit_code: i % 10 === 0 ? 1 : 0,
+    killed_reason: null,
   });
 
   test("sums more than one page (1100 attempts) and reports per agent", async () => {
     const { dashboard, state } = await make("");
     for (let i = 0; i < 1100; i++) state.recordStageRun(stage(i, i % 2 ? "claude" : "codex"));
     const a = (await (await dashboard.handle(call("GET /api/analytics"), "127.0.0.1")).json()) as {
-      spend7dUsd: number; byStage: { attempts: number }[]; byAgent: { key: string; attempts: number; failures: number }[];
+      spend7dUsd: number;
+      byStage: { attempts: number }[];
+      byAgent: { key: string; attempts: number; failures: number }[];
     };
     expect(a.byStage[0]!.attempts).toBe(1100);
-    expect(a.byAgent.map((b) => [b.key, b.attempts])).toEqual([["claude", 550], ["codex", 550]]);
+    expect(a.byAgent.map((b) => [b.key, b.attempts])).toEqual([
+      ["claude", 550],
+      ["codex", 550],
+    ]);
     expect(a.spend7dUsd).toBeCloseTo(11, 5);
     expect(a.byAgent.reduce((n, b) => n + b.failures, 0)).toBe(110);
   });
@@ -283,9 +392,13 @@ describe("analytics and stages", () => {
     state.upsertRun({ issue: 1, repo: "acme/widgets", title: "t", stage: "build", status: "running" });
     state.recordStageRun(stage(3, "claude"));
     const run = state.listRuns("acme/widgets")[0]!;
-    const ok = (await (await dashboard.handle(new Request(`http://localhost:4100/api/runs/${run.id}/stages`), "127.0.0.1")).json()) as { stages?: unknown[] };
+    const ok = (await (
+      await dashboard.handle(new Request(`http://localhost:4100/api/runs/${run.id}/stages`), "127.0.0.1")
+    ).json()) as { stages?: unknown[] };
     expect(ok.stages).toHaveLength(1);
-    expect((await dashboard.handle(new Request("http://localhost:4100/api/runs/999/stages"), "127.0.0.1")).status).toBe(404);
+    expect((await dashboard.handle(new Request("http://localhost:4100/api/runs/999/stages"), "127.0.0.1")).status).toBe(
+      404,
+    );
   });
 });
 
@@ -303,7 +416,7 @@ describe("artifacts", () => {
 
   test("lists regular files, sends text only with sandbox headers, caps at 1 MiB, downloads as attachment", async () => {
     const list = (await (await get("")).json()) as { files: { name: string }[] };
-    expect(list.files.map((f) => f.name).sort()).toEqual(["big.log", "plan.md"]) // the symlink is not listed;
+    expect(list.files.map((f) => f.name).sort()).toEqual(["big.log", "plan.md"]); // the symlink is not listed;
     const res = await get("?file=plan.md");
     expect(res.headers.get("content-type")).toContain("text/plain");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
@@ -352,18 +465,51 @@ describe("line and assets", () => {
     const { dashboard, state } = await make("");
     state.upsertRun({ issue: 1, repo: "acme/widgets", title: "t", stage: "build", status: "running" });
     state.recordStageRun({
-      repo: "acme/widgets", issue: 1, stage: "triage", agent: "claude", model: null, started_at: "2026-09-24T00:00:00Z",
-      finished_at: "2026-09-24T00:00:05Z", duration_ms: 5000, tool_calls: 1, tokens_in: 1, tokens_out: 1, cost_usd: 0.01, exit_code: 0, killed_reason: null,
+      repo: "acme/widgets",
+      issue: 1,
+      stage: "triage",
+      agent: "claude",
+      model: null,
+      started_at: "2026-09-24T00:00:00Z",
+      finished_at: "2026-09-24T00:00:05Z",
+      duration_ms: 5000,
+      tool_calls: 1,
+      tokens_in: 1,
+      tokens_out: 1,
+      cost_usd: 0.01,
+      exit_code: 0,
+      killed_reason: null,
     });
-    const verify = { repo: "acme/widgets", issue: 1, stage: "verify", agent: "claude", model: null, started_at: "2026-09-24T00:00:06Z", finished_at: "2026-09-24T00:00:09Z", duration_ms: 3000, tool_calls: 1, tokens_in: 1, tokens_out: 1, cost_usd: 0.01, exit_code: 0, killed_reason: null } as const;
+    const verify = {
+      repo: "acme/widgets",
+      issue: 1,
+      stage: "verify",
+      agent: "claude",
+      model: null,
+      started_at: "2026-09-24T00:00:06Z",
+      finished_at: "2026-09-24T00:00:09Z",
+      duration_ms: 3000,
+      tool_calls: 1,
+      tokens_in: 1,
+      tokens_out: 1,
+      cost_usd: 0.01,
+      exit_code: 0,
+      killed_reason: null,
+    } as const;
     state.recordStageRun(verify);
     state.setVerifyVerdict("acme/widgets", 1, "uncertain");
     state.recordStageRun(verify);
     state.setVerifyVerdict("acme/widgets", 1, "pass");
-    const body = (await (await dashboard.handle(call("GET /api/line"), "127.0.0.1")).json()) as { rows: { stages: { stage: string; ok: boolean }[] }[] };
+    const body = (await (await dashboard.handle(call("GET /api/line"), "127.0.0.1")).json()) as {
+      rows: { stages: { stage: string; ok: boolean }[] }[];
+    };
     expect(body.rows).toHaveLength(1);
     // A clean exit with an uncertain verdict is not an ok verify; the stamp only touches the newest row.
-    expect(body.rows[0]!.stages).toMatchObject([{ stage: "triage", ok: true }, { stage: "verify", ok: false }, { stage: "verify", ok: true }]);
+    expect(body.rows[0]!.stages).toMatchObject([
+      { stage: "triage", ok: true },
+      { stage: "verify", ok: false },
+      { stage: "verify", ok: true },
+    ]);
   });
 
   test("the Line, the live feed and the proof span every repo the inbox reads", async () => {
@@ -374,8 +520,15 @@ describe("line and assets", () => {
     try {
       const { dashboard, state } = await make("");
       state.upsertRun({ issue: 1, repo: "acme/widgets", title: "widgets bug", stage: "build", status: "running" });
-      new FactoryState(join(home, "acme", "harness", "factory.db")).upsertRun({ issue: 7, repo: "acme/harness", title: "harness bug", stage: "plan", status: "running" });
-      const get = async (path: string) => (await dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1")).json();
+      new FactoryState(join(home, "acme", "harness", "factory.db")).upsertRun({
+        issue: 7,
+        repo: "acme/harness",
+        title: "harness bug",
+        stage: "plan",
+        status: "running",
+      });
+      const get = async (path: string) =>
+        (await dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1")).json();
       const line = (await get("/api/line")) as { rows: { repo: string; run: { issue: number } }[] };
       expect(line.rows.map((r) => `${r.repo}#${r.run.issue}`).sort()).toEqual(["acme/harness#7", "acme/widgets#1"]);
 
@@ -384,14 +537,27 @@ describe("line and assets", () => {
       cpSync(join(import.meta.dir, "fixtures/agents/claude/build.jsonl"), join(transcripts, "issue-7.stream.jsonl"));
       const live = (await get("/api/issues/7/live?repo=acme/harness")) as { items: { kind: string }[]; next: number };
       expect(live.items.some((i) => i.kind === "tool")).toBe(true);
-      expect(((await get(`/api/issues/7/live?repo=acme/harness&from=${live.next}`)) as { items: unknown[] }).items).toEqual([]);
+      expect(
+        ((await get(`/api/issues/7/live?repo=acme/harness&from=${live.next}`)) as { items: unknown[] }).items,
+      ).toEqual([]);
 
-      cpSync(join(import.meta.dir, "fixtures/runs/issue-186"), join(home, "acme", "harness", "workspaces", "issue-7", ".factory", "runs", "issue-7"), { recursive: true });
-      const proof = (await get("/api/issues/7/proof?repo=acme/harness")) as { criteria: unknown[]; gate: { status: string }; revert: { status: string } };
+      cpSync(
+        join(import.meta.dir, "fixtures/runs/issue-186"),
+        join(home, "acme", "harness", "workspaces", "issue-7", ".factory", "runs", "issue-7"),
+        { recursive: true },
+      );
+      const proof = (await get("/api/issues/7/proof?repo=acme/harness")) as {
+        criteria: unknown[];
+        gate: { status: string };
+        revert: { status: string };
+      };
       expect(proof).toMatchObject({ gate: { status: "GREEN" }, revert: { status: "bites" } });
       expect(proof.criteria).toHaveLength(4);
     } finally {
-      for (const [k, v] of [["FACTORY_HOME", saved.home], ["FACTORY_REPOS", saved.repos]] as const) {
+      for (const [k, v] of [
+        ["FACTORY_HOME", saved.home],
+        ["FACTORY_REPOS", saved.repos],
+      ] as const) {
         if (v === undefined) delete process.env[k];
         else process.env[k] = v;
       }
@@ -410,7 +576,9 @@ describe("line and assets", () => {
     const font = await dashboard.handle(new Request("http://localhost:4100/fonts/geist.woff2"), "10.0.0.9");
     expect(font.status).toBe(200);
     expect(font.headers.get("content-type")).toContain("font/woff2");
-    expect((await dashboard.handle(new Request("http://localhost:4100/lib/..%2Fserver.js"), "10.0.0.9")).status).toBe(401);
+    expect((await dashboard.handle(new Request("http://localhost:4100/lib/..%2Fserver.js"), "10.0.0.9")).status).toBe(
+      401,
+    );
   });
 });
 
@@ -419,12 +587,23 @@ function project(over: Partial<DashboardProject> = {}): DashboardProject {
   const cloneDir = mkdtempSync(join(scratch, "clone-"));
   mkdirSync(join(cloneDir, ".factory", "workflows"), { recursive: true });
   writeFileSync(join(cloneDir, ".factory", "workflows", "broken.yml"), "name: broken\nsteps: [\n");
-  const config = { ...DEFAULT_CONFIG, runtime: { gates: "box" }, routes: { ...DEFAULT_CONFIG.routes, bug: { ...DEFAULT_CONFIG.routes?.bug, workflow: "bug-to-pr" }, chore: { workflow: "nowhere" } } } as unknown as FactoryConfig;
+  const config = {
+    ...DEFAULT_CONFIG,
+    runtime: { gates: "box" },
+    routes: {
+      ...DEFAULT_CONFIG.routes,
+      bug: { ...DEFAULT_CONFIG.routes?.bug, workflow: "bug-to-pr" },
+      chore: { workflow: "nowhere" },
+    },
+  } as unknown as FactoryConfig;
   return {
     cloneDir,
     config,
     machine: { slots: 3, runtimes: { box: { kind: "ssh", host: "build-1", dir: "/w" } } },
-    leases: async () => [{ key: "issue-4", holder: "laptop", expiresAt: Date.now() + 20_000 }, { key: "issue-5", holder: "ci", expiresAt: 0 }],
+    leases: async () => [
+      { key: "issue-4", holder: "laptop", expiresAt: Date.now() + 20_000 },
+      { key: "issue-5", holder: "ci", expiresAt: 0 },
+    ],
     ...over,
   };
 }
@@ -433,7 +612,9 @@ describe("workflows and settings", () => {
   test("with no repo dir, both pages say how to get one instead of guessing", async () => {
     const { dashboard } = await make("");
     for (const path of ["/api/workflows", "/api/settings"]) {
-      const body = (await (await dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1")).json()) as { available: boolean; reason: string };
+      const body = (await (
+        await dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1")
+      ).json()) as { available: boolean; reason: string };
       expect(body).toMatchObject({ available: false });
       expect(body.reason).toContain("--repo-dir");
     }
@@ -441,13 +622,15 @@ describe("workflows and settings", () => {
 
   test("/api/workflows is the harness report: every workflow, its routes, and each problem", async () => {
     const { dashboard } = await make("", [], project());
-    const body = (await (await dashboard.handle(new Request("http://localhost:4100/api/workflows"), "127.0.0.1")).json()) as {
+    const body = (await (
+      await dashboard.handle(new Request("http://localhost:4100/api/workflows"), "127.0.0.1")
+    ).json()) as {
       problems: string[];
       workflows: { name: string; source: string; routedTypes: string[]; problems: string[]; steps: { id: string }[] }[];
     };
     const byName = Object.fromEntries(body.workflows.map((w) => [w.name, w]));
-    expect(byName["broken"]).toMatchObject({ source: "repo", steps: [] });
-    expect(byName["broken"]!.problems.length).toBeGreaterThan(0);
+    expect(byName.broken).toMatchObject({ source: "repo", steps: [] });
+    expect(byName.broken!.problems.length).toBeGreaterThan(0);
     expect(byName["bug-to-pr"]).toMatchObject({ source: "runner", routedTypes: ["bug"] });
     expect(byName["feature-to-pr"]!.routedTypes).toContain("*");
     expect(byName["feature-to-pr"]!.steps.length).toBeGreaterThan(3);
@@ -457,7 +640,9 @@ describe("workflows and settings", () => {
 
   test("/api/settings lists built-in and machine runtimes with what uses them, and every lease", async () => {
     const { dashboard } = await make("", [], project());
-    const body = (await (await dashboard.handle(new Request("http://localhost:4100/api/settings"), "127.0.0.1")).json()) as {
+    const body = (await (
+      await dashboard.handle(new Request("http://localhost:4100/api/settings"), "127.0.0.1")
+    ).json()) as {
       slots: number;
       runtimes: { name: string; kind: string; builtin: boolean; target: string; usedBy: string[] }[];
       leases: { key: string; live: boolean }[];
@@ -465,14 +650,30 @@ describe("workflows and settings", () => {
     };
     expect(body.slots).toBe(3);
     expect(body.runtimes.map((r) => r.name)).toEqual(["local", "lwpr", "box"]);
-    expect(body.runtimes.find((r) => r.name === "box")).toMatchObject({ kind: "ssh", builtin: false, target: "build-1:/w", usedBy: ["runtime.gates"] });
+    expect(body.runtimes.find((r) => r.name === "box")).toMatchObject({
+      kind: "ssh",
+      builtin: false,
+      target: "build-1:/w",
+      usedBy: ["runtime.gates"],
+    });
     expect(body.runtimes.find((r) => r.name === "local")).toMatchObject({ builtin: true, usedBy: [] });
-    expect(body.leases).toEqual([expect.objectContaining({ key: "issue-4", live: true }), expect.objectContaining({ key: "issue-5", live: false })]);
+    expect(body.leases).toEqual([
+      expect.objectContaining({ key: "issue-4", live: true }),
+      expect.objectContaining({ key: "issue-5", live: false }),
+    ]);
     expect(body.leasesError).toBeNull();
   });
 
   test("a remote that cannot be read is said on the page, and the rest still loads", async () => {
-    const { dashboard } = await make("", [], project({ leases: async () => { throw new Error("git ls-remote: no route to host"); } }));
+    const { dashboard } = await make(
+      "",
+      [],
+      project({
+        leases: async () => {
+          throw new Error("git ls-remote: no route to host");
+        },
+      }),
+    );
     const res = await dashboard.handle(new Request("http://localhost:4100/api/settings"), "127.0.0.1");
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ leases: [], leasesError: "git ls-remote: no route to host" });
@@ -485,27 +686,42 @@ describe("session cookie and terminal-safe text", () => {
   test("the cookie is a random id, not the token, and it is not accepted as a Bearer token", async () => {
     const { dashboard } = await make(TOKEN);
     const login = async () =>
-      dashboard.handle(new Request("http://localhost:4100/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: TOKEN }) }), "203.0.113.7");
+      dashboard.handle(
+        new Request("http://localhost:4100/api/session", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: TOKEN }),
+        }),
+        "203.0.113.7",
+      );
     const one = (await login()).headers.get("set-cookie")!;
     const two = (await login()).headers.get("set-cookie")!;
     expect(one).not.toContain(TOKEN);
     expect(one.split(";")[0]).not.toBe(two.split(";")[0]);
     const id = one.split(";")[0]!.split("=")[1]!;
-    const at = (headers: Record<string, string>) => dashboard.handle(new Request("http://localhost:4100/api/runs", { headers }), "203.0.113.7");
+    const at = (headers: Record<string, string>) =>
+      dashboard.handle(new Request("http://localhost:4100/api/runs", { headers }), "203.0.113.7");
     expect((await at({ authorization: `Bearer ${id}` })).status).toBe(401);
     expect((await at({ cookie: `factory_session=${TOKEN}` })).status).toBe(401);
     expect((await at({ cookie: `factory_session=${id}` })).status).toBe(200);
   });
 
   test("thread, run titles and artifact previews carry no terminal escapes; a download stays raw", async () => {
-    const issue: GhIssue = { number: 1, title: `T${ESC}`, body: `B${ESC}`, labels: [], comments: [{ id: 1, author: "a", authorAssociation: "NONE", body: `C${ESC}`, createdAt: "2026-09-20T10:00:00Z" }] };
+    const issue: GhIssue = {
+      number: 1,
+      title: `T${ESC}`,
+      body: `B${ESC}`,
+      labels: [],
+      comments: [{ id: 1, author: "a", authorAssociation: "NONE", body: `C${ESC}`, createdAt: "2026-09-20T10:00:00Z" }],
+    };
     const { dashboard, state } = await make("", [issue]);
     state.upsertRun({ issue: 1, repo: "acme/widgets", title: `Run${ESC}`, stage: "build", status: "running" });
     const dir = join(scratch, "issue-1", ".factory", "runs", "issue-1");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "plan.md"), `plan${ESC}`);
     const get = async (path: string) => dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1");
-    for (const path of ["/api/runs", "/api/issues/1/thread", "/api/issues/1/artifacts?file=plan.md", "/api/line"]) expect(await (await get(path)).text(), path).not.toContain("\u001b");
+    for (const path of ["/api/runs", "/api/issues/1/thread", "/api/issues/1/artifacts?file=plan.md", "/api/line"])
+      expect(await (await get(path)).text(), path).not.toContain("\u001b");
     expect(await (await get("/api/issues/1/artifacts?file=plan.md&download=1")).text()).toContain("\u001b");
   });
 });
@@ -517,22 +733,59 @@ describe("text is plain()-ed on every read route", () => {
 
   test("no GET route returns an escape sequence that came from an issue, agent or artifact", async () => {
     const issue: GhIssue = {
-      number: 1, title: `t${ESC}`, body: `b${ESC}`, labels: [{ name: LABEL.needsInfo }],
-      comments: [{ id: 1, author: "bot", authorAssociation: "NONE", body: `<!-- factory:plan v1 -->\nplan${ESC}`, createdAt: "2026-09-20T10:00:00Z" }],
+      number: 1,
+      title: `t${ESC}`,
+      body: `b${ESC}`,
+      labels: [{ name: LABEL.needsInfo }],
+      comments: [
+        {
+          id: 1,
+          author: "bot",
+          authorAssociation: "NONE",
+          body: `<!-- factory:plan v1 -->\nplan${ESC}`,
+          createdAt: "2026-09-20T10:00:00Z",
+        },
+      ],
     };
-    const { dashboard, state } = await make("", [issue], project({ leases: async () => [{ key: "issue-1", holder: `w${ESC}`, expiresAt: 1 }], machine: { slots: 1, runtimes: { box: { kind: "docker", image: `img${ESC}` } } } }));
-    const run = state.upsertRun({ issue: 1, repo: "acme/widgets", title: `run${ESC}`, stage: "build", status: "running" });
+    const { dashboard, state } = await make(
+      "",
+      [issue],
+      project({
+        leases: async () => [{ key: "issue-1", holder: `w${ESC}`, expiresAt: 1 }],
+        machine: { slots: 1, runtimes: { box: { kind: "docker", image: `img${ESC}` } } },
+      }),
+    );
+    const run = state.upsertRun({
+      issue: 1,
+      repo: "acme/widgets",
+      title: `run${ESC}`,
+      stage: "build",
+      status: "running",
+    });
     state.appendEvent(run.id, "build", "text", `event${ESC}`);
     state.recordStageRun({
-      repo: "acme/widgets", issue: 1, stage: "build", agent: `agent${ESC}`, model: null, started_at: "2026-09-24T00:00:00Z",
-      finished_at: "2026-09-24T00:00:01Z", duration_ms: 1000, tool_calls: 1, tokens_in: 1, tokens_out: 1, cost_usd: 0,
-      exit_code: 1, killed_reason: `killed${ESC}`,
+      repo: "acme/widgets",
+      issue: 1,
+      stage: "build",
+      agent: `agent${ESC}`,
+      model: null,
+      started_at: "2026-09-24T00:00:00Z",
+      finished_at: "2026-09-24T00:00:01Z",
+      duration_ms: 1000,
+      tool_calls: 1,
+      tokens_in: 1,
+      tokens_out: 1,
+      cost_usd: 0,
+      exit_code: 1,
+      killed_reason: `killed${ESC}`,
     });
     const dir = join(scratch, "issue-1", ".factory", "runs", "issue-1");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "plan.md"), `plan${ESC}`);
 
-    const gets = (dashboard.routeLabels as string[]).filter((l) => l.startsWith("GET ") && !["GET /", "GET /assets", "GET /api/stream"].includes(l));
+    const gets = (dashboard.routeLabels as string[]).filter(
+      (l) => l.startsWith("GET ") && !["GET /", "GET /assets", "GET /api/stream"].includes(l),
+    );
     expect(gets.length).toBeGreaterThan(8);
     for (const label of gets) {
       const url = `http://localhost:4100${samplePath(label).replace(/\/artifacts$/, "/artifacts?file=plan.md")}`;

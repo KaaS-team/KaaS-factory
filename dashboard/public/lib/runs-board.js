@@ -36,13 +36,16 @@ export function groupJobsByBoardColumn(jobs) {
 }
 
 export function jobCounts(jobs) {
-  return jobs.reduce((result, job) => {
-    result.all += 1;
-    if (activeStates.has(job.state)) result.active += 1;
-    if (failedStates.has(job.state)) result.failed += 1;
-    if (job.state === "succeeded") result.succeeded += 1;
-    return result;
-  }, { all: 0, active: 0, failed: 0, succeeded: 0 });
+  return jobs.reduce(
+    (result, job) => {
+      result.all += 1;
+      if (activeStates.has(job.state)) result.active += 1;
+      if (failedStates.has(job.state)) result.failed += 1;
+      if (job.state === "succeeded") result.succeeded += 1;
+      return result;
+    },
+    { all: 0, active: 0, failed: 0, succeeded: 0 },
+  );
 }
 
 export function currentRun(job) {

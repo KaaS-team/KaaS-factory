@@ -22,13 +22,25 @@ const dirs: string[] = [];
 afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
 function setup(labeler: string | undefined, role?: RepoRole) {
-  const [cloneDir, workspacesDir] = [mkdtempSync(join(tmpdir(), "trust-clone-")), mkdtempSync(join(tmpdir(), "trust-ws-"))];
+  const [cloneDir, workspacesDir] = [
+    mkdtempSync(join(tmpdir(), "trust-clone-")),
+    mkdtempSync(join(tmpdir(), "trust-ws-")),
+  ];
   dirs.push(cloneDir, workspacesDir);
   const github = new FakeGitHub([baseIssue(1, [LABEL.ready])]);
   github.labelers.set(1, labeler);
   if (labeler && role) github.roles.set(labeler, role);
   const git = new FakeGit();
-  const deps = { github, git, state: new FactoryState(":memory:"), executor: new MultiStageExecutor(), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+  const deps = {
+    github,
+    git,
+    state: new FactoryState(":memory:"),
+    executor: new MultiStageExecutor(),
+    gateRunner: new FakeGateRunner(),
+    holdoutRunner: new FakeHoldoutRunner(),
+    cloneDir,
+    workspacesDir,
+  };
   const run = () => advanceIssue(deps, mergeConfig({ repo: "acme/widgets" }), github.issues.get(1)!);
   return { github, git, run };
 }
@@ -37,14 +49,17 @@ const labels = (gh: FakeGitHub) => gh.issues.get(1)!.labels.map((l) => l.name);
 const lastComment = (gh: FakeGitHub) => gh.issues.get(1)!.comments.at(-1)?.body ?? "";
 
 describe("intake trust", () => {
-  test.each(["read", "triage", "none"] as const)("a %s user's factory:ready is removed with a reason, and nothing runs", async (role) => {
-    const { github, git, run } = setup("drive-by", role);
-    expect(await run()).toBe("untrusted");
-    expect(labels(github)).not.toContain(LABEL.ready);
-    expect(labels(github)).not.toContain(LABEL.triaging);
-    expect(lastComment(github)).toContain(`@drive-by has the ${role} role`);
-    expect(git.claims).toBe(0);
-  });
+  test.each(["read", "triage", "none"] as const)(
+    "a %s user's factory:ready is removed with a reason, and nothing runs",
+    async (role) => {
+      const { github, git, run } = setup("drive-by", role);
+      expect(await run()).toBe("untrusted");
+      expect(labels(github)).not.toContain(LABEL.ready);
+      expect(labels(github)).not.toContain(LABEL.triaging);
+      expect(lastComment(github)).toContain(`@drive-by has the ${role} role`);
+      expect(git.claims).toBe(0);
+    },
+  );
 
   test("no labelled event in the history is not trusted either", async () => {
     const { github, run } = setup(undefined);
@@ -63,45 +78,88 @@ describe("intake trust", () => {
 });
 
 describe("a signed inbound event", () => {
-  test.each([true, false])("naming an issue an untrusted user labelled ready runs nothing: the event only wakes the poll, and the poll's trust gate refuses it (a workflow listens: %p)", async (listens) => {
-    const before = process.env[DEFAULT_EVENTS_SECRET_ENV];
-    process.env[DEFAULT_EVENTS_SECRET_ENV] = "in-secret";
-    try {
-      const { github, git } = setup("drive-by", "none");
-      const state = new FactoryState(":memory:");
-      const bus = new EventBus({ store: state, sinks: [], source: "factory/acme/widgets", autoDeliver: false, log: () => {} });
-      // Empty: any stage that started would throw "no executor registered".
-      const executor = new MultiStageExecutor();
-      // A workflow listening for the type, so the event takes every path it can.
-      const wf = parseWorkflowText("name: tasks\non:\n  event: tasks.task.ready\nsteps:\n  triage:\n    uses: triage\n    label: factory:triaging\n    next: pr\n  pr:\n    uses: pr\n    label: factory:in-review\n");
-      if (!wf.ok) throw new Error(wf.problems.join("\n"));
-      const [cloneDir, workspacesDir] = [mkdtempSync(join(tmpdir(), "trust-ev-")), mkdtempSync(join(tmpdir(), "trust-ev-ws-"))];
-      dirs.push(cloneDir, workspacesDir);
-      const deps = { github, git, state, bus, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, ...(listens ? { routeWorkflows: { task: wf.workflow } } : {}) };
-      // The sender is genuine; its data names issue 1 and a maintainer as the actor.
-      const body = JSON.stringify({ specversion: "1.0", id: "t-1", source: "tasks", type: "tasks.task.ready", time: "2026-10-11T00:00:00Z", data: { issue: 1, repo: "acme/widgets", actor: "maintainer", labeledBy: "maintainer" } });
-      const res = await createDashboard(state, github, "acme/widgets", false, "/nonexistent").handle(
-        new Request("http://factory.example/events", { method: "POST", headers: { "content-type": "application/cloudevents+json", [EVENT_SIGNATURE_HEADER]: signEvent("in-secret", body) }, body }),
-        "203.0.113.7",
-      );
-      expect(res.status).toBe(201);
-      const ticks: unknown[] = [];
-      const stop = startWatch(deps as never, mergeConfig({ repo: "acme/widgets", pollIntervalSeconds: 3600 }), (r) => void ticks.push(r));
-      bus.drainInbound();
-      for (let i = 0; i < 100 && ticks.length < 2; i++) await Bun.sleep(10);
-      stop();
-      expect(ticks.length).toBeGreaterThanOrEqual(2);
-      // Issue 1 was refused by the label path's own gate; the event's issue is filed unlabelled.
-      expect(labels(github)).not.toContain(LABEL.ready);
-      expect(lastComment(github)).toContain("@drive-by has the none role");
-      expect(git.claims).toBe(0);
-      const filed = [...github.issues.values()].filter((i) => i.number !== 1);
-      expect(filed.map((i) => i.labels.map((l) => l.name))).toEqual(listens ? [[]] : []);
-    } finally {
-      if (before === undefined) delete process.env[DEFAULT_EVENTS_SECRET_ENV];
-      else process.env[DEFAULT_EVENTS_SECRET_ENV] = before;
-    }
-  });
+  test.each([true, false])(
+    "naming an issue an untrusted user labelled ready runs nothing: the event only wakes the poll, and the poll's trust gate refuses it (a workflow listens: %p)",
+    async (listens) => {
+      const before = process.env[DEFAULT_EVENTS_SECRET_ENV];
+      process.env[DEFAULT_EVENTS_SECRET_ENV] = "in-secret";
+      try {
+        const { github, git } = setup("drive-by", "none");
+        const state = new FactoryState(":memory:");
+        const bus = new EventBus({
+          store: state,
+          sinks: [],
+          source: "factory/acme/widgets",
+          autoDeliver: false,
+          log: () => {},
+        });
+        // Empty: any stage that started would throw "no executor registered".
+        const executor = new MultiStageExecutor();
+        // A workflow listening for the type, so the event takes every path it can.
+        const wf = parseWorkflowText(
+          "name: tasks\non:\n  event: tasks.task.ready\nsteps:\n  triage:\n    uses: triage\n    label: factory:triaging\n    next: pr\n  pr:\n    uses: pr\n    label: factory:in-review\n",
+        );
+        if (!wf.ok) throw new Error(wf.problems.join("\n"));
+        const [cloneDir, workspacesDir] = [
+          mkdtempSync(join(tmpdir(), "trust-ev-")),
+          mkdtempSync(join(tmpdir(), "trust-ev-ws-")),
+        ];
+        dirs.push(cloneDir, workspacesDir);
+        const deps = {
+          github,
+          git,
+          state,
+          bus,
+          executor,
+          gateRunner: new FakeGateRunner(),
+          holdoutRunner: new FakeHoldoutRunner(),
+          cloneDir,
+          workspacesDir,
+          ...(listens ? { routeWorkflows: { task: wf.workflow } } : {}),
+        };
+        // The sender is genuine; its data names issue 1 and a maintainer as the actor.
+        const body = JSON.stringify({
+          specversion: "1.0",
+          id: "t-1",
+          source: "tasks",
+          type: "tasks.task.ready",
+          time: "2026-10-11T00:00:00Z",
+          data: { issue: 1, repo: "acme/widgets", actor: "maintainer", labeledBy: "maintainer" },
+        });
+        const res = await createDashboard(state, github, "acme/widgets", false, "/nonexistent").handle(
+          new Request("http://factory.example/events", {
+            method: "POST",
+            headers: {
+              "content-type": "application/cloudevents+json",
+              [EVENT_SIGNATURE_HEADER]: signEvent("in-secret", body),
+            },
+            body,
+          }),
+          "203.0.113.7",
+        );
+        expect(res.status).toBe(201);
+        const ticks: unknown[] = [];
+        const stop = startWatch(
+          deps as never,
+          mergeConfig({ repo: "acme/widgets", pollIntervalSeconds: 3600 }),
+          (r) => void ticks.push(r),
+        );
+        bus.drainInbound();
+        for (let i = 0; i < 100 && ticks.length < 2; i++) await Bun.sleep(10);
+        stop();
+        expect(ticks.length).toBeGreaterThanOrEqual(2);
+        // Issue 1 was refused by the label path's own gate; the event's issue is filed unlabelled.
+        expect(labels(github)).not.toContain(LABEL.ready);
+        expect(lastComment(github)).toContain("@drive-by has the none role");
+        expect(git.claims).toBe(0);
+        const filed = [...github.issues.values()].filter((i) => i.number !== 1);
+        expect(filed.map((i) => i.labels.map((l) => l.name))).toEqual(listens ? [[]] : []);
+      } finally {
+        if (before === undefined) delete process.env[DEFAULT_EVENTS_SECRET_ENV];
+        else process.env[DEFAULT_EVENTS_SECRET_ENV] = before;
+      }
+    },
+  );
 });
 
 describe("GitHub.labeledBy and roleOf", () => {
@@ -132,11 +190,23 @@ describe("GitHub.labeledBy and roleOf", () => {
 describe("commands need write access too", () => {
   // A read or triage collaborator still shows as COLLABORATOR on the comment.
   function parked(role: RepoRole, command = "/factory retry") {
-    const [cloneDir, workspacesDir] = [mkdtempSync(join(tmpdir(), "trust-clone-")), mkdtempSync(join(tmpdir(), "trust-ws-"))];
+    const [cloneDir, workspacesDir] = [
+      mkdtempSync(join(tmpdir(), "trust-clone-")),
+      mkdtempSync(join(tmpdir(), "trust-ws-")),
+    ];
     dirs.push(cloneDir, workspacesDir);
     const github = new FakeGitHub([baseIssue(1, [LABEL.failed])]);
     github.roles.set("human", role);
-    const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor: new MultiStageExecutor(), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+    const deps = {
+      github,
+      git: new FakeGit(),
+      state: new FactoryState(":memory:"),
+      executor: new MultiStageExecutor(),
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      cloneDir,
+      workspacesDir,
+    };
     github.say(1, command, "COLLABORATOR");
     return { github, run: () => advanceIssue(deps, mergeConfig({ repo: "acme/widgets" }), github.issues.get(1)!) };
   }

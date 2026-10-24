@@ -67,7 +67,14 @@ describe("live transcript and live file", () => {
     const env = { FACTORY_HOME: dir };
     const liveFile = livePath("acme/widgets", 4, env);
     const ex = agent(`echo working\nsleep 30`);
-    const running = ex.runStage({ stage: "build", issue: 4, cwd: dir, maxBudgetUsd: 1, transcriptFile: transcriptPath("acme/widgets", 4, env), liveFile });
+    const running = ex.runStage({
+      stage: "build",
+      issue: 4,
+      cwd: dir,
+      maxBudgetUsd: 1,
+      transcriptFile: transcriptPath("acme/widgets", 4, env),
+      liveFile,
+    });
     await until(() => existsSync(liveFile));
     const { pid } = JSON.parse(readFileSync(liveFile, "utf8"));
     writeFileSync(takeoverMarker(liveFile), "");
@@ -97,7 +104,23 @@ describe("claude session id", () => {
 
   test("state keeps the newest session per issue for takeover", () => {
     const state = new FactoryState(":memory:");
-    const row = { repo: "a/b", issue: 1, agent: "claude", model: null, started_at: "", finished_at: "", duration_ms: 1, tool_calls: 0, tokens_in: 0, tokens_out: 0, tokens_cached: 0, cost_usd: null, usage_complete: 0, exit_code: 0, killed_reason: null };
+    const row = {
+      repo: "a/b",
+      issue: 1,
+      agent: "claude",
+      model: null,
+      started_at: "",
+      finished_at: "",
+      duration_ms: 1,
+      tool_calls: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+      tokens_cached: 0,
+      cost_usd: null,
+      usage_complete: 0,
+      exit_code: 0,
+      killed_reason: null,
+    };
     expect(state.lastSession("a/b", 1)).toBeUndefined();
     state.recordStageRun({ ...row, stage: "plan", session_id: "s-plan" });
     state.recordStageRun({ ...row, stage: "build", session_id: "s-build" });
@@ -108,10 +131,34 @@ describe("claude session id", () => {
 });
 
 describe("renderRunSummary", () => {
-  const run = (over: Partial<StageRun>): StageRun => ({ id: 1, repo: "a/b", issue: 1, stage: "build", agent: "claude", model: "opus", started_at: "", finished_at: "", duration_ms: 65_000, tool_calls: 4, tokens_in: 0, tokens_out: 0, tokens_cached: 0, cost_usd: 0.5, usage_complete: 1, exit_code: 0, killed_reason: null, session_id: null, verdict: null, ...over });
+  const run = (over: Partial<StageRun>): StageRun => ({
+    id: 1,
+    repo: "a/b",
+    issue: 1,
+    stage: "build",
+    agent: "claude",
+    model: "opus",
+    started_at: "",
+    finished_at: "",
+    duration_ms: 65_000,
+    tool_calls: 4,
+    tokens_in: 0,
+    tokens_out: 0,
+    tokens_cached: 0,
+    cost_usd: 0.5,
+    usage_complete: 1,
+    exit_code: 0,
+    killed_reason: null,
+    session_id: null,
+    verdict: null,
+    ...over,
+  });
 
   test("a clean run lists every stage under went well and nothing under needed help", () => {
-    const out = renderRunSummary([run({ stage: "triage" }), run({ stage: "verify" }), run({ stage: "retro" as StageRun["stage"] })], { rejectRounds: 0, retries: 0 });
+    const out = renderRunSummary(
+      [run({ stage: "triage" }), run({ stage: "verify" }), run({ stage: "retro" as StageRun["stage"] })],
+      { rejectRounds: 0, retries: 0 },
+    );
     expect(out).toContain("| triage | claude (opus) | 1m 5s | 4 | $0.50 | ok |");
     expect(out).not.toContain("| retro |");
     expect(out).toContain("2 stage runs, 2m 10s, $1.00.");
@@ -121,19 +168,30 @@ describe("renderRunSummary", () => {
   });
 
   test("a verify row shows its verdict, and an uncertain one is help, not a first-try pass", () => {
-    const out = renderRunSummary([run({ stage: "triage" }), run({ stage: "verify", verdict: "uncertain" })], { rejectRounds: 0, retries: 0 });
+    const out = renderRunSummary([run({ stage: "triage" }), run({ stage: "verify", verdict: "uncertain" })], {
+      rejectRounds: 0,
+      retries: 0,
+    });
     expect(out).toContain("| verify | claude (opus) | 1m 5s | 4 | $0.50 | uncertain |");
     expect(out).toContain("- triage passed on the first attempt");
     expect(out).not.toContain("verify approved");
     expect(out).toContain("- verify: uncertain");
-    expect(renderRunSummary([run({ stage: "verify", verdict: "pass" })], { rejectRounds: 0, retries: 0 })).toContain("- verify approved on the first round");
-    expect(renderRunSummary([run({ stage: "verify" })], { rejectRounds: 0, retries: 0, proof: "unavailable" })).toContain("Proof: unavailable: the repo has no test gate");
+    expect(renderRunSummary([run({ stage: "verify", verdict: "pass" })], { rejectRounds: 0, retries: 0 })).toContain(
+      "- verify approved on the first round",
+    );
+    expect(
+      renderRunSummary([run({ stage: "verify" })], { rejectRounds: 0, retries: 0, proof: "unavailable" }),
+    ).toContain("Proof: unavailable: the repo has no test gate");
     expect(renderRunSummary([run({ stage: "verify" })], { rejectRounds: 0, retries: 0 })).not.toContain("Proof:");
   });
 
   test("takeovers, reruns, rejections, retries and unknown cost are all named", () => {
     const out = renderRunSummary(
-      [run({ killed_reason: OPERATOR_TAKEOVER, exit_code: 143 }), run({ cost_usd: null }), run({ stage: "verify", killed_reason: "a | b" })],
+      [
+        run({ killed_reason: OPERATOR_TAKEOVER, exit_code: 143 }),
+        run({ cost_usd: null }),
+        run({ stage: "verify", killed_reason: "a | b" }),
+      ],
       { rejectRounds: 1, retries: 2 },
     );
     expect(out).toContain("$1.00 plus 1 not reported");
@@ -169,7 +227,11 @@ describe("factory takeover helpers", () => {
 
   test("only a claude session can be resumed; any other agent is refused by name", () => {
     expect(resumeArgv("claude", { claude: { preset: "claude" } }, "s1")).toEqual(["claude", "--resume", "s1"]);
-    expect(resumeArgv("opus", { opus: { preset: "claude", model: "opus" } }, "s2")).toEqual(["claude", "--resume", "s2"]);
+    expect(resumeArgv("opus", { opus: { preset: "claude", model: "opus" } }, "s2")).toEqual([
+      "claude",
+      "--resume",
+      "s2",
+    ]);
     expect(() => resumeArgv("codex", { codex: { preset: "codex" } }, "s3")).toThrow("agent codex cannot be resumed");
   });
 

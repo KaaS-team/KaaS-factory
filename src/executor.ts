@@ -6,7 +6,14 @@
 import { truncateFinalMessage } from "./agents/final-message";
 import { parseStreamJsonLine } from "./agents/presets/claude";
 
-import { OPERATOR_TAKEOVER, type StageName, type StageEvent, type StageRunOptions, type StageRunResult, type Executor } from "./ports/agent";
+import {
+  OPERATOR_TAKEOVER,
+  type StageName,
+  type StageEvent,
+  type StageRunOptions,
+  type StageRunResult,
+  type Executor,
+} from "./ports/agent";
 export { OPERATOR_TAKEOVER };
 export type { StageName, StageEvent, StageRunOptions, StageRunResult, Executor };
 
@@ -52,7 +59,20 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
     tokensCached = final.cached;
   }
   const finalMessage = finalText === undefined ? undefined : truncateFinalMessage(finalText);
-  const result = { events, toolCalls, tokensIn, tokensOut, tokensCached, costUsd, costReported, exitCode, permissionDenials, usageComplete: final !== "invalid", ...(finalMessage ? { finalMessage } : {}), ...(sessionId ? { sessionId } : {}) };
+  const result = {
+    events,
+    toolCalls,
+    tokensIn,
+    tokensOut,
+    tokensCached,
+    costUsd,
+    costReported,
+    exitCode,
+    permissionDenials,
+    usageComplete: final !== "invalid",
+    ...(finalMessage ? { finalMessage } : {}),
+    ...(sessionId ? { sessionId } : {}),
+  };
   return exitCode !== 0 && stderrTail ? { ...result, stderrTail } : result;
 }
 

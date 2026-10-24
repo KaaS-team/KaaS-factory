@@ -5,13 +5,26 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { COMMANDS } from "../src/help";
 
-interface Session { id: string; title: string; tag: string; planned: boolean; checkpoint: string | null; issue: string; demo: string[]; walkthrough?: string }
+interface Session {
+  id: string;
+  title: string;
+  tag: string;
+  planned: boolean;
+  checkpoint: string | null;
+  issue: string;
+  demo: string[];
+  walkthrough?: string;
+}
 const root = join(import.meta.dir, "..");
 const { sessions } = JSON.parse(readFileSync(join(root, "teach/sessions.json"), "utf8")) as { sessions: Session[] };
 const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
-const splitbill = [process.env.SPLITBILL_DIR, join(root, "../../../splitbill-demo"), join(root, "../splitbill-demo"), join(root, "../../../splitbill"), join(root, "../splitbill")].find(
-  (d) => d && existsSync(join(d, "DEMO.md")),
-);
+const splitbill = [
+  process.env.SPLITBILL_DIR,
+  join(root, "../../../splitbill-demo"),
+  join(root, "../splitbill-demo"),
+  join(root, "../../../splitbill"),
+  join(root, "../splitbill"),
+].find((d) => d && existsSync(join(d, "DEMO.md")));
 
 describe("teach/sessions.json", () => {
   test("ids and tags are unique, and checkpoints are used once", () => {
@@ -21,7 +34,11 @@ describe("teach/sessions.json", () => {
   });
 
   test("a shipped session's tag has a CHANGELOG entry, and a planned one does not", () => {
-    for (const s of sessions) expect({ id: s.id, shipped: new RegExp(`^## ${s.tag.replace(/\./g, "\\.")}\\b`, "m").test(changelog) }).toEqual({ id: s.id, shipped: !s.planned });
+    for (const s of sessions)
+      expect({ id: s.id, shipped: new RegExp(`^## ${s.tag.replace(/\./g, "\\.")}\\b`, "m").test(changelog) }).toEqual({
+        id: s.id,
+        shipped: !s.planned,
+      });
   });
 
   test("a walkthrough exists and every bin/factory verb in it is a real command", () => {
@@ -37,19 +54,30 @@ describe("teach/sessions.json", () => {
   test("every demo step is a section or a numbered step in splitbill's DEMO.md or docs/sessions.md", () => {
     if (!splitbill) return console.log("teach: no splitbill checkout, DEMO.md steps not checked");
     const demo = ["DEMO.md", "docs/sessions.md"].map((f) => readFileSync(join(splitbill, f), "utf8")).join("\n");
-    for (const s of sessions) for (const step of s.demo) {
-      const num = /^Live sequence (\d+)$/.exec(step);
-      expect({ id: s.id, step, found: num ? new RegExp(`^\\| ${num[1]} \\|`, "m").test(demo) : new RegExp(`^## ${step}$`, "m").test(demo) }).toEqual({ id: s.id, step, found: true });
-    }
+    for (const s of sessions)
+      for (const step of s.demo) {
+        const num = /^Live sequence (\d+)$/.exec(step);
+        expect({
+          id: s.id,
+          step,
+          found: num ? new RegExp(`^\\| ${num[1]} \\|`, "m").test(demo) : new RegExp(`^## ${step}$`, "m").test(demo),
+        }).toEqual({ id: s.id, step, found: true });
+      }
   });
 
   test("every seeded issue exists in splitbill and every checkpoint tag exists there", () => {
     if (!splitbill) return console.log("teach: no splitbill checkout, issues and branches not checked");
     const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
     for (const s of sessions) {
-      expect({ id: s.id, issue: existsSync(join(splitbill, ".factory/issues", s.issue)) }).toEqual({ id: s.id, issue: true });
+      expect({ id: s.id, issue: existsSync(join(splitbill, ".factory/issues", s.issue)) }).toEqual({
+        id: s.id,
+        issue: true,
+      });
       if (!s.checkpoint) continue;
-      const ok = spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/tags/checkpoint/${s.checkpoint}`], { cwd: splitbill }).status === 0;
+      const ok =
+        spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/tags/checkpoint/${s.checkpoint}`], {
+          cwd: splitbill,
+        }).status === 0;
       expect({ id: s.id, tag: ok }).toEqual({ id: s.id, tag: true });
     }
   });

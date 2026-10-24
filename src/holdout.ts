@@ -17,10 +17,18 @@ export interface HoldoutResult {
 }
 
 export interface HoldoutRunner {
-  run(worktreeDir: string, base: string, holdout: HoldoutConfig): Promise<{ stdout: string; stderr: string; code: number }>;
+  run(
+    worktreeDir: string,
+    base: string,
+    holdout: HoldoutConfig,
+  ): Promise<{ stdout: string; stderr: string; code: number }>;
 }
 
-async function exec(cmd: string[], cwd: string, stdin?: ReadableStream): Promise<{ stdout: string; stderr: string; code: number }> {
+async function exec(
+  cmd: string[],
+  cwd: string,
+  stdin?: ReadableStream,
+): Promise<{ stdout: string; stderr: string; code: number }> {
   const proc = Bun.spawn(cmd, { cwd, stdin, stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -31,7 +39,11 @@ async function exec(cmd: string[], cwd: string, stdin?: ReadableStream): Promise
 }
 
 export class ShellHoldoutRunner implements HoldoutRunner {
-  async run(worktreeDir: string, base: string, holdout: HoldoutConfig): Promise<{ stdout: string; stderr: string; code: number }> {
+  async run(
+    worktreeDir: string,
+    base: string,
+    holdout: HoldoutConfig,
+  ): Promise<{ stdout: string; stderr: string; code: number }> {
     const scratch = mkdtempSync(join(tmpdir(), "factory-holdout-"));
     try {
       // The built tree, from git's object store rather than the working
@@ -46,7 +58,10 @@ export class ShellHoldoutRunner implements HoldoutRunner {
       // depth in case a holdout path ever reached HEAD altered, despite the
       // boundary check and the sparse-checkout exclusion both refusing that.
       if (holdout.paths.length > 0) {
-        const pristine = Bun.spawn(["git", "archive", `origin/${base}`, "--", ...holdout.paths], { cwd: worktreeDir, stdout: "pipe" });
+        const pristine = Bun.spawn(["git", "archive", `origin/${base}`, "--", ...holdout.paths], {
+          cwd: worktreeDir,
+          stdout: "pipe",
+        });
         await exec(["tar", "-x", "-C", scratch], scratch, pristine.stdout);
         await pristine.exited;
       }
@@ -60,7 +75,12 @@ export class ShellHoldoutRunner implements HoldoutRunner {
 
 // Truncation mirrors src/gates.ts's own convention: a failure detail is the
 // test name and assertion message, never a full log dump of the source.
-export async function runHoldout(runner: HoldoutRunner, worktreeDir: string, base: string, holdout: HoldoutConfig): Promise<HoldoutResult> {
+export async function runHoldout(
+  runner: HoldoutRunner,
+  worktreeDir: string,
+  base: string,
+  holdout: HoldoutConfig,
+): Promise<HoldoutResult> {
   const result = await runner.run(worktreeDir, base, holdout);
   const combined = `${result.stdout}\n${result.stderr}`.trim();
   return { ok: result.code === 0, detail: combined.slice(-2000) };

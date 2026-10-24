@@ -9,7 +9,8 @@ const ROOT = join(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(ROOT, path), "utf8");
 // Scans the tree, not `git ls-files`: check-mutations runs this in a copy without .git.
 const matchesAFile = (glob: string): boolean => {
-  for (const f of new Bun.Glob(glob).scanSync({ cwd: ROOT, dot: true })) if (!f.startsWith("node_modules/")) return true;
+  for (const f of new Bun.Glob(glob).scanSync({ cwd: ROOT, dot: true }))
+    if (!f.startsWith("node_modules/")) return true;
   return false;
 };
 // lwp-* rules are vendored from the house standard and owned there.
@@ -37,17 +38,28 @@ test("every rule scopes itself to paths that match a file, and names only real p
   expect(OWN_RULES.length).toBeGreaterThan(0);
   for (const rule of OWN_RULES) {
     const text = read(`.claude/rules/${rule}`);
-    const globs = [...(/^---\npaths:\n((?:  - .+\n)+)---/.exec(text)?.[1] ?? "").matchAll(/- "(.+)"/g)].map((m) => m[1]!);
+    const globs = [...(/^---\npaths:\n((?: {2}- .+\n)+)---/.exec(text)?.[1] ?? "").matchAll(/- "(.+)"/g)].map(
+      (m) => m[1]!,
+    );
     expect(globs.length, rule).toBeGreaterThan(0);
     for (const g of globs) expect(matchesAFile(g), `${rule}: ${g}`).toBe(true);
-    expect(pathsIn(text).filter((p) => !existsSync(join(ROOT, p))), rule).toEqual([]);
+    expect(
+      pathsIn(text).filter((p) => !existsSync(join(ROOT, p))),
+      rule,
+    ).toEqual([]);
   }
 });
 
 test("settings name their schema and deny secrets, token spend and force-push", () => {
   const s = JSON.parse(read(".claude/settings.json")) as { $schema?: string; permissions: { deny: string[] } };
   expect(s.$schema).toContain("claude-code-settings");
-  for (const rule of ["Read(./.env*)", "Bash(make agent-matrix)", "Bash(bun scripts/agent-matrix.ts)", "Bash(git push --force *)"]) expect(s.permissions.deny).toContain(rule);
+  for (const rule of [
+    "Read(./.env*)",
+    "Bash(make agent-matrix)",
+    "Bash(bun scripts/agent-matrix.ts)",
+    "Bash(git push --force *)",
+  ])
+    expect(s.permissions.deny).toContain(rule);
 });
 
 test("CI runs the gate with an empty HOME, so nothing passes only on one machine", () => {

@@ -32,8 +32,12 @@ interface StreamJsonLine {
 
 // What on the init event means the stage started without the setup it asked for.
 function startupProblems(init: StreamJsonLine): string[] {
-  const failed = (init.mcp_servers ?? []).filter((s) => s.status === "failed").map((s) => `MCP server ${s.name ?? "?"} failed to start`);
-  const errors = [...(init.plugin_errors ?? []), ...(init.mcp_server_errors ?? [])].map((e) => (typeof e === "string" ? e : JSON.stringify(e)));
+  const failed = (init.mcp_servers ?? [])
+    .filter((s) => s.status === "failed")
+    .map((s) => `MCP server ${s.name ?? "?"} failed to start`);
+  const errors = [...(init.plugin_errors ?? []), ...(init.mcp_server_errors ?? [])].map((e) =>
+    typeof e === "string" ? e : JSON.stringify(e),
+  );
   return [...failed, ...errors];
 }
 
@@ -66,7 +70,11 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
         events.push({ kind: "text", text: block.text });
       } else if (block.type === "tool_use" && block.name) {
         const target = toolTarget(block.input);
-        events.push(target ? { kind: "tool_use", toolName: block.name, toolTarget: target } : { kind: "tool_use", toolName: block.name });
+        events.push(
+          target
+            ? { kind: "tool_use", toolName: block.name, toolTarget: target }
+            : { kind: "tool_use", toolName: block.name },
+        );
       }
     }
     if (parsed.message.usage) {
@@ -77,17 +85,29 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
       });
     }
   } else if (parsed.type === "result") {
-    const denials = (parsed.permission_denials ?? []).map(
-      (d) => `${d.tool_name ?? "tool"} ${d.tool_input?.file_path ?? d.tool_input?.command ?? ""}`.trim(),
+    const denials = (parsed.permission_denials ?? []).map((d) =>
+      `${d.tool_name ?? "tool"} ${d.tool_input?.file_path ?? d.tool_input?.command ?? ""}`.trim(),
     );
     // Cumulative usage incl. cache tokens (machinist codex_usage.go); a result with no usage keeps the per-message sums.
     if (parsed.usage !== undefined) {
       const usage = readUsage(parsed.usage, true);
-      events.push(usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, tokensCached: usage.tokensCached, total: true } : { kind: "usage", invalid: true });
+      events.push(
+        usage
+          ? {
+              kind: "usage",
+              tokensIn: usage.tokensIn,
+              tokensOut: usage.tokensOut,
+              tokensCached: usage.tokensCached,
+              total: true,
+            }
+          : { kind: "usage", invalid: true },
+      );
     }
     events.push({
       kind: "result",
-      ...(parsed.total_cost_usd ?? parsed.cost_usd) === undefined ? {} : { costUsd: parsed.total_cost_usd ?? parsed.cost_usd },
+      ...((parsed.total_cost_usd ?? parsed.cost_usd) === undefined
+        ? {}
+        : { costUsd: parsed.total_cost_usd ?? parsed.cost_usd }),
       text: parsed.subtype,
       ...(denials.length ? { denials } : {}),
       ...(parsed.result ? { finalText: parsed.result } : {}),
@@ -166,7 +186,9 @@ export const claudePreset: AgentPreset = {
   // `prompt` is the context pack for an ownsPrompt agent: Claude runs its own
   // skill and ignores everything else spawnStage would otherwise put there.
   mcp: true,
-  command: (opts, agent, prompt, ctx) => ({ argv: ["claude", ...claudeArgs(opts, prompt, ctx?.mcpConfig), ...claudeModelArgs(opts.stage, agent.model)] }),
+  command: (opts, agent, prompt, ctx) => ({
+    argv: ["claude", ...claudeArgs(opts, prompt, ctx?.mcpConfig), ...claudeModelArgs(opts.stage, agent.model)],
+  }),
   parseLine: parseStreamJsonLine,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "result"),
 };

@@ -24,7 +24,10 @@ import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } fro
 // it measures real concurrent execution directly, independent of whether the
 // lease mechanism under test is the thing actually bounding it.
 class SlowTriageExecutor {
-  constructor(private readonly delayMs: number, private readonly shared: { active: number; max: number }) {}
+  constructor(
+    private readonly delayMs: number,
+    private readonly shared: { active: number; max: number },
+  ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
     this.shared.active += 1;
@@ -35,15 +38,39 @@ class SlowTriageExecutor {
     writeFileSync(join(dir, "triage-comment.md"), "<!-- factory:triage v1 -->\ntriage");
     writeFileSync(
       join(dir, "triage.json"),
-      JSON.stringify({ disposition: "needs-info", type: "bug", risk: "low", done_when: "x", files_expected: ["src/a.ts"], gate_level: "make check", confidence: 0.9 }),
+      JSON.stringify({
+        disposition: "needs-info",
+        type: "bug",
+        risk: "low",
+        done_when: "x",
+        files_expected: ["src/a.ts"],
+        gate_level: "make check",
+        confidence: 0.9,
+      }),
     );
     writeFileSync(join(dir, "question-comment.md"), "<!-- factory:question v1 -->\nWhich one?");
     this.shared.active -= 1;
-    return { events: [], toolCalls: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.01, costReported: true, exitCode: 0, permissionDenials: [] };
+    return {
+      events: [],
+      toolCalls: 0,
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: 0.01,
+      costReported: true,
+      exitCode: 0,
+      permissionDenials: [],
+    };
   }
 }
 
-function makeDeps(repo: string, issues: number[], executor: SlowTriageExecutor, leases: MachineLeases, slots: number, spend: MachineSpend) {
+function makeDeps(
+  repo: string,
+  issues: number[],
+  executor: SlowTriageExecutor,
+  leases: MachineLeases,
+  slots: number,
+  spend: MachineSpend,
+) {
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   const github = new FakeGitHub(issues.map((n) => baseIssue(n, ["factory:ready"])));
@@ -91,6 +118,7 @@ describe("pollOnce respects a machine-wide lease across two independent WatchDep
     leasesB.close();
     spendA.close();
     spendB.close();
-    for (const dir of [a.workspacesDir, a.cloneDir, b.workspacesDir, b.cloneDir, dbDir]) rmSync(dir, { recursive: true, force: true });
+    for (const dir of [a.workspacesDir, a.cloneDir, b.workspacesDir, b.cloneDir, dbDir])
+      rmSync(dir, { recursive: true, force: true });
   });
 });

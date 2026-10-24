@@ -42,6 +42,8 @@ for (const page of pages) {
   test(`${page}: no ordinal labels`, () => {
     expect(page).not.toMatch(/week-?\d|assignment-?\d/i);
     const text = html.replace(/<[^>]+>/g, " ");
-    expect(text.match(/\b(weeks? (one|two|three|four|\d)|assignment \d|next week|last week|this week)\b/gi) ?? []).toEqual([]);
+    expect(
+      text.match(/\b(weeks? (one|two|three|four|\d)|assignment \d|next week|last week|this week)\b/gi) ?? [],
+    ).toEqual([]);
   });
 }

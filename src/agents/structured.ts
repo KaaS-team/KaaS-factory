@@ -9,8 +9,11 @@ export interface Structured {
 }
 
 const base = (s: string): string => (s.split("/").pop() ?? s).toLowerCase().replace(/\.exe$/, "");
-const named = (executor: string, tool: string): boolean => executor.toLowerCase().split(/[-_.]+/).includes(tool);
-const startsWithOpt = (arg: string, opts: readonly string[]): boolean => opts.some((o) => arg === o || arg.startsWith(`${o}=`));
+const named = (executor: string, tool: string): boolean =>
+  executor
+    .toLowerCase()
+    .split(/[-_.]+/)
+    .includes(tool);
 
 // [recognized, takesNextValue]
 type Opt = readonly [boolean, boolean];
@@ -41,7 +44,19 @@ function envProgramIndex(cmd: readonly string[]): number {
     const a = cmd[i]!;
     if (a === "--") return i + 1 < cmd.length ? i + 1 : -1;
     if (a.includes("=") && !a.startsWith("-")) continue;
-    if (a === "-" || ["--ignore-environment", "--null", "--debug", "--block-signal", "--default-signal", "--ignore-signal", "--list-signal-handling"].includes(a)) continue;
+    if (
+      a === "-" ||
+      [
+        "--ignore-environment",
+        "--null",
+        "--debug",
+        "--block-signal",
+        "--default-signal",
+        "--ignore-signal",
+        "--list-signal-handling",
+      ].includes(a)
+    )
+      continue;
     if (envSplitString(a)) return -1;
     const [ok, next] = envShort(a);
     if (ok) {
@@ -53,7 +68,12 @@ function envProgramIndex(cmd: readonly string[]): number {
       i++;
       continue;
     }
-    if (["--unset=", "--chdir=", "--argv0=", "--block-signal=", "--default-signal=", "--ignore-signal="].some((p) => a.startsWith(p))) continue;
+    if (
+      ["--unset=", "--chdir=", "--argv0=", "--block-signal=", "--default-signal=", "--ignore-signal="].some((p) =>
+        a.startsWith(p),
+      )
+    )
+      continue;
     if (a.startsWith("-")) return -1;
     return i;
   }
@@ -65,7 +85,21 @@ function miseGlobal(a: string): Opt {
     if (a === o) return [true, true];
     if (a.startsWith(`${o}=`)) return [true, false];
   }
-  if (["--quiet", "--verbose", "--yes", "--raw", "--locked", "--silent", "--no-config", "--no-env", "--no-hooks", "--help"].includes(a)) return [true, false];
+  if (
+    [
+      "--quiet",
+      "--verbose",
+      "--yes",
+      "--raw",
+      "--locked",
+      "--silent",
+      "--no-config",
+      "--no-env",
+      "--no-hooks",
+      "--help",
+    ].includes(a)
+  )
+    return [true, false];
   if (a.length >= 2 && a[0] === "-" && a[1] !== "-") {
     for (let i = 1; i < a.length; i++) {
       const c = a[i]!;
@@ -101,10 +135,17 @@ function wrappedProgramIndex(cmd: readonly string[]): number {
   while (at < cmd.length) {
     let nested: number;
     switch (base(cmd[at]!)) {
-      case "env": nested = envProgramIndex(cmd.slice(at)); break;
-      case "mise": nested = miseProgramIndex(cmd.slice(at)); break;
-      case "direnv": nested = direnvProgramIndex(cmd.slice(at)); break;
-      default: return at;
+      case "env":
+        nested = envProgramIndex(cmd.slice(at));
+        break;
+      case "mise":
+        nested = miseProgramIndex(cmd.slice(at));
+        break;
+      case "direnv":
+        nested = direnvProgramIndex(cmd.slice(at));
+        break;
+      default:
+        return at;
     }
     if (nested < 1) return -1;
     at += nested;
@@ -113,11 +154,47 @@ function wrappedProgramIndex(cmd: readonly string[]): number {
 }
 
 function codexRoot(a: string): Opt {
-  for (const o of ["-c", "--config", "--enable", "--disable", "--remote", "--remote-auth-token-env", "-i", "--image", "-m", "--model", "--local-provider", "-p", "--profile", "-s", "--sandbox", "-C", "--cd", "--add-dir", "-a", "--ask-for-approval"]) {
+  for (const o of [
+    "-c",
+    "--config",
+    "--enable",
+    "--disable",
+    "--remote",
+    "--remote-auth-token-env",
+    "-i",
+    "--image",
+    "-m",
+    "--model",
+    "--local-provider",
+    "-p",
+    "--profile",
+    "-s",
+    "--sandbox",
+    "-C",
+    "--cd",
+    "--add-dir",
+    "-a",
+    "--ask-for-approval",
+  ]) {
     if (a === o) return [true, true];
     if (a.startsWith(`${o}=`) || (o.length === 2 && a.startsWith(o) && a.length > 2)) return [true, false];
   }
-  return ["--strict-config", "--oss", "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--approve-for-me", "--not-so-yolo", "--search", "--no-alt-screen", "-h", "--help", "-V", "--version"].includes(a) ? [true, false] : NO;
+  return [
+    "--strict-config",
+    "--oss",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--dangerously-bypass-hook-trust",
+    "--approve-for-me",
+    "--not-so-yolo",
+    "--search",
+    "--no-alt-screen",
+    "-h",
+    "--help",
+    "-V",
+    "--version",
+  ].includes(a)
+    ? [true, false]
+    : NO;
 }
 
 function codexExecAfter(cmd: readonly string[], program: number): number {
@@ -135,10 +212,11 @@ function codexExecAfter(cmd: readonly string[], program: number): number {
 
 function codexExecIndex(executor: string, cmd: readonly string[]): number {
   if (named(executor, "codex")) {
-    for (let p = 0; p < cmd.length; p++) if (base(cmd[p]!) === "codex") {
-      const at = codexExecAfter(cmd, p);
-      if (at >= 0) return at;
-    }
+    for (let p = 0; p < cmd.length; p++)
+      if (base(cmd[p]!) === "codex") {
+        const at = codexExecAfter(cmd, p);
+        if (at >= 0) return at;
+      }
   }
   const program = wrappedProgramIndex(cmd);
   if (program < 0 || (base(cmd[program]!) !== "codex" && !named(executor, "codex"))) return -1;
@@ -157,9 +235,85 @@ function claudeProgramIndex(cmd: readonly string[]): number {
   return p;
 }
 
-const CLAUDE_VALUE = ["--advisor", "--agent", "--agents", "--append-subagent-system-prompt", "--append-system-prompt", "--append-system-prompt-file", "--betas", "--debug-file", "--disallowedTools", "--dangerously-load-development-channels", "--disallowed-tools", "--effort", "--fallback-model", "--from-pr", "--input-format", "--json-schema", "--max-budget-usd", "--max-turns", "--mcp-config", "--model", "--name", "-n", "--output-format", "--permission-mode", "--permission-prompt-tool", "--plugin-dir", "--plugin-url", "--session-id", "--settings", "--system-prompt", "--system-prompt-file", "--setting-sources", "--teammate-mode", "--tools", "--worktree", "-w"];
-const CLAUDE_BOOL = ["--allow-dangerously-skip-permissions", "--ax-screen-reader", "--bare", "--chrome", "--continue", "-c", "--dangerously-skip-permissions", "--disable-slash-commands", "--enable-auto-mode", "--exclude-dynamic-system-prompt-sections", "--debug", "--fork-session", "--forward-subagent-text", "--ide", "--include-hook-events", "--include-partial-messages", "--init", "--init-only", "--maintenance", "--no-chrome", "--no-session-persistence", "--print", "-p", "--replay-user-messages", "--restricted", "--safe-mode", "--strict-mcp-config", "--teleport", "--verbose"];
-const CLAUDE_VARIADIC = ["--add-dir", "--allowedTools", "--allowed-tools", "--betas", "--disallowedTools", "--disallowed-tools", "--mcp-config", "--tools"];
+const CLAUDE_VALUE = [
+  "--advisor",
+  "--agent",
+  "--agents",
+  "--append-subagent-system-prompt",
+  "--append-system-prompt",
+  "--append-system-prompt-file",
+  "--betas",
+  "--debug-file",
+  "--disallowedTools",
+  "--dangerously-load-development-channels",
+  "--disallowed-tools",
+  "--effort",
+  "--fallback-model",
+  "--from-pr",
+  "--input-format",
+  "--json-schema",
+  "--max-budget-usd",
+  "--max-turns",
+  "--mcp-config",
+  "--model",
+  "--name",
+  "-n",
+  "--output-format",
+  "--permission-mode",
+  "--permission-prompt-tool",
+  "--plugin-dir",
+  "--plugin-url",
+  "--session-id",
+  "--settings",
+  "--system-prompt",
+  "--system-prompt-file",
+  "--setting-sources",
+  "--teammate-mode",
+  "--tools",
+  "--worktree",
+  "-w",
+];
+const CLAUDE_BOOL = [
+  "--allow-dangerously-skip-permissions",
+  "--ax-screen-reader",
+  "--bare",
+  "--chrome",
+  "--continue",
+  "-c",
+  "--dangerously-skip-permissions",
+  "--disable-slash-commands",
+  "--enable-auto-mode",
+  "--exclude-dynamic-system-prompt-sections",
+  "--debug",
+  "--fork-session",
+  "--forward-subagent-text",
+  "--ide",
+  "--include-hook-events",
+  "--include-partial-messages",
+  "--init",
+  "--init-only",
+  "--maintenance",
+  "--no-chrome",
+  "--no-session-persistence",
+  "--print",
+  "-p",
+  "--replay-user-messages",
+  "--restricted",
+  "--safe-mode",
+  "--strict-mcp-config",
+  "--teleport",
+  "--verbose",
+];
+const CLAUDE_VARIADIC = [
+  "--add-dir",
+  "--allowedTools",
+  "--allowed-tools",
+  "--betas",
+  "--disallowedTools",
+  "--disallowed-tools",
+  "--mcp-config",
+  "--tools",
+];
 const claudeOptional = (a: string): boolean => a === "--resume" || a === "-r";
 
 function claudeRoot(a: string): Opt {
@@ -222,12 +376,26 @@ export function structuredCommand(executor: string, command: readonly string[]):
   const exec = codexExecIndex(executor, command);
   if (exec >= 1) {
     const json = command.slice(exec + 1).includes("--json");
-    return { preset: "codex", command: json ? [...command] : [...command.slice(0, exec + 1), "--json", ...command.slice(exec + 1)] };
+    return {
+      preset: "codex",
+      command: json ? [...command] : [...command.slice(0, exec + 1), "--json", ...command.slice(exec + 1)],
+    };
   }
   const info = claudeInfo(executor, command);
   if (!info) return undefined;
   if (info.hasOutputFormat) {
-    return info.outputFormat === "json" || info.outputFormat === "stream-json" ? { preset: "claude", command: [...command] } : undefined;
+    return info.outputFormat === "json" || info.outputFormat === "stream-json"
+      ? { preset: "claude", command: [...command] }
+      : undefined;
   }
-  return { preset: "claude", command: [...command.slice(0, info.printIndex + 1), ...(info.hasVerbose ? [] : ["--verbose"]), "--output-format", "stream-json", ...command.slice(info.printIndex + 1)] };
+  return {
+    preset: "claude",
+    command: [
+      ...command.slice(0, info.printIndex + 1),
+      ...(info.hasVerbose ? [] : ["--verbose"]),
+      "--output-format",
+      "stream-json",
+      ...command.slice(info.printIndex + 1),
+    ],
+  };
 }

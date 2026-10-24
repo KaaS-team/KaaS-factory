@@ -21,7 +21,11 @@ const NO_VERDICT = /could not verify|couldn't verify|can't give a verdict|could 
 
 export function scoreTranscript(text: string): Score {
   let stage = "";
-  let builds = 0, verifies = 0, verifyDenials = 0, couldNotVerify = 0, scheduleWakeups = 0;
+  let builds = 0,
+    verifies = 0,
+    verifyDenials = 0,
+    couldNotVerify = 0,
+    scheduleWakeups = 0;
   for (const line of text.split("\n")) {
     const header = HEADER.exec(line);
     if (header) {

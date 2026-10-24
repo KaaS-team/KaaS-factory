@@ -41,7 +41,9 @@ export function loadMinions(cloneDir: string, config: Pick<FactoryConfig, "agent
   const problems: string[] = [];
   const registryPath = join(cloneDir, MCP_REGISTRY);
   const registry = parseMcpRegistry(existsSync(registryPath) ? readFileSync(registryPath, "utf8") : undefined);
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".yml") || f.endsWith(".yaml")).sort()) {
+  for (const file of readdirSync(dir)
+    .filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"))
+    .sort()) {
     const where = `${MINIONS_DIR}/${file}`;
     let raw: unknown;
     try {
@@ -58,8 +60,10 @@ export function loadMinions(cloneDir: string, config: Pick<FactoryConfig, "agent
     const m = parsed.minion;
     const own: string[] = [];
     if (file.replace(/\.ya?ml$/, "") !== m.name) own.push(`name: "${m.name}" must match the file name`);
-    if (m.agent !== undefined && !Object.hasOwn(config.agents, m.agent)) own.push(`agent: "${m.agent}" is not in config.agents`);
-    if (m.skill !== undefined && !existsSync(skillPath(cloneDir, m.skill))) own.push(`skill: .claude/skills/${m.skill}/SKILL.md not found`);
+    if (m.agent !== undefined && !Object.hasOwn(config.agents, m.agent))
+      own.push(`agent: "${m.agent}" is not in config.agents`);
+    if (m.skill !== undefined && !existsSync(skillPath(cloneDir, m.skill)))
+      own.push(`skill: .claude/skills/${m.skill}/SKILL.md not found`);
     own.push(...mcpProblems(registry, m.mcp).map((p) => `mcp: ${p}`));
     if (minions.some((x) => x.name === m.name)) own.push(`name: "${m.name}" is defined twice`);
     if (own.length > 0) problems.push(...own.map((p) => `${where}: ${p}`));
@@ -89,7 +93,12 @@ export function fenceEvent(event: CloudEvent): string {
 }
 
 // The skill body, the minion's prompt, the event that woke it, and how to answer.
-export function minionPrompt(minion: Minion, skillBody: string | undefined, event: CloudEvent | undefined, outputFile: string): string {
+export function minionPrompt(
+  minion: Minion,
+  skillBody: string | undefined,
+  event: CloudEvent | undefined,
+  outputFile: string,
+): string {
   return [
     skillBody ? `${skillBody.replace(/^---\n[\s\S]*?\n---\n/, "").trim()}\n\n---\n` : "",
     minion.prompt.trim(),
@@ -118,7 +127,10 @@ export function minionOutput(outputFile: string, finalMessage: string | undefine
   return undefined;
 }
 
-export type MinionDeps = Pick<WatchDeps, "executor" | "state" | "cloneDir" | "workspacesDir" | "bus" | "machine" | "spend">;
+export type MinionDeps = Pick<
+  WatchDeps,
+  "executor" | "state" | "cloneDir" | "workspacesDir" | "bus" | "machine" | "spend"
+>;
 
 export interface MinionRun {
   readonly minion: string;
@@ -131,10 +143,16 @@ export interface MinionRun {
 // One run at a time per minion in this process: an event storm queues nothing.
 const running = new Set<string>();
 
-export async function runMinion(deps: MinionDeps, config: FactoryConfig, minion: Minion, event?: CloudEvent): Promise<MinionRun> {
+export async function runMinion(
+  deps: MinionDeps,
+  config: FactoryConfig,
+  minion: Minion,
+  event?: CloudEvent,
+): Promise<MinionRun> {
   if (running.has(minion.name)) return { minion: minion.name, status: "skipped", reason: "already running" };
   // The same gates as a new issue's pickup: intake paused, or a daily cap hit.
-  if (!deps.state.getToggle("auto_start", true)) return { minion: minion.name, status: "skipped", reason: "intake is paused (auto_start is off)" };
+  if (!deps.state.getToggle("auto_start", true))
+    return { minion: minion.name, status: "skipped", reason: "intake is paused (auto_start is off)" };
   const capped = await spendCapHit(deps as WatchDeps, config);
   if (capped) return { minion: minion.name, status: "skipped", reason: capped };
   running.add(minion.name);
@@ -145,7 +163,12 @@ export async function runMinion(deps: MinionDeps, config: FactoryConfig, minion:
   }
 }
 
-async function runOnce(deps: MinionDeps, config: FactoryConfig, minion: Minion, event: CloudEvent | undefined): Promise<MinionRun> {
+async function runOnce(
+  deps: MinionDeps,
+  config: FactoryConfig,
+  minion: Minion,
+  event: CloudEvent | undefined,
+): Promise<MinionRun> {
   const cwd = join(deps.workspacesDir, `minion-${minion.name}`);
   const outputFile = join(cwd, runDir(MINION_ISSUE), MINION_OUTPUT);
   mkdirSync(join(cwd, runDir(MINION_ISSUE)), { recursive: true });
@@ -169,7 +192,12 @@ async function runOnce(deps: MinionDeps, config: FactoryConfig, minion: Minion, 
     });
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    emitEvent(deps.bus, "factory.minion.completed", { repo: config.repo, minion: minion.name, ok: false, reason, trigger: event?.id ?? null }, `minion/${minion.name}`);
+    emitEvent(
+      deps.bus,
+      "factory.minion.completed",
+      { repo: config.repo, minion: minion.name, ok: false, reason, trigger: event?.id ?? null },
+      `minion/${minion.name}`,
+    );
     return { minion: minion.name, status: "failed", reason };
   }
   const finishedAt = new Date();
@@ -194,10 +222,21 @@ async function runOnce(deps: MinionDeps, config: FactoryConfig, minion: Minion, 
     session_id: result.sessionId ?? null,
   });
   // The machine tally and the shared ledger, so every worker's daily cap counts it.
-  await recordSpend(deps, config, { issue: MINION_ISSUE, stage: `minion:${minion.name}`, costUsd, tokensIn: result.tokensIn, tokensOut: result.tokensOut, at: startedAt.toISOString() });
-  const output = result.exitCode === 0 && !result.killedReason ? minionOutput(outputFile, result.finalMessage) : undefined;
+  await recordSpend(deps, config, {
+    issue: MINION_ISSUE,
+    stage: `minion:${minion.name}`,
+    costUsd,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
+    at: startedAt.toISOString(),
+  });
+  const output =
+    result.exitCode === 0 && !result.killedReason ? minionOutput(outputFile, result.finalMessage) : undefined;
   const ok = output !== undefined;
-  const reason = ok ? undefined : result.killedReason ?? (result.exitCode !== 0 ? `agent exited ${result.exitCode}` : "the agent gave no JSON answer");
+  const reason = ok
+    ? undefined
+    : (result.killedReason ??
+      (result.exitCode !== 0 ? `agent exited ${result.exitCode}` : "the agent gave no JSON answer"));
   emitEvent(
     deps.bus,
     "factory.minion.completed",
@@ -211,7 +250,13 @@ async function runOnce(deps: MinionDeps, config: FactoryConfig, minion: Minion, 
       console.error(`minion ${minion.name}: emit ${minion.emit} failed: ${String(e)}`);
     }
   }
-  return { minion: minion.name, status: ok ? "ok" : "failed", costUsd, ...(reason ? { reason } : {}), ...(ok ? { output } : {}) };
+  return {
+    minion: minion.name,
+    status: ok ? "ok" : "failed",
+    costUsd,
+    ...(reason ? { reason } : {}),
+    ...(ok ? { output } : {}),
+  };
 }
 
 // Minions whose schedule matched since the last poll; remembers the minute it checked.

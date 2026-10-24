@@ -16,7 +16,7 @@ import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
-import { deriveIssueState, latestDataFor, parseDataMarkers } from "./derive";
+import { deriveIssueState, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
@@ -49,7 +49,6 @@ import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
 import { TRUSTED_ROLES, type RepoRole } from "./ports/scm";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
-
 
 export interface PollResult {
   readonly paused: boolean;
@@ -88,18 +87,33 @@ async function chooseWorkflow(deps: WatchDeps, config: FactoryConfig, issue: GhI
   if (!name || !deps.routeWorkflows?.[name] || name === workflowOf(deps).name || recordedWorkflow(issue)) return issue;
   const body = withDataMarker(`Running workflow \`${name}\` (\`routes.${type}.workflow\`).`, WORKFLOW_MARKER, { name });
   const id = await deps.github.commentIssue(config.repo, issue.number, body);
-  return { ...issue, comments: [...issue.comments, { id: id ?? 0, author: "factory", authorAssociation: "OWNER", body, createdAt: new Date().toISOString() }] };
+  return {
+    ...issue,
+    comments: [
+      ...issue.comments,
+      { id: id ?? 0, author: "factory", authorAssociation: "OWNER", body, createdAt: new Date().toISOString() },
+    ],
+  };
 }
 
 function labelOf(deps: WatchDeps, issue: GhIssue, stepId: string): string {
   return workflowOf(deps, issue).steps[stepId]!.label;
 }
 
-function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, stepId: string, worktree: string, ctx?: RunCtx): Promise<Outcome> {
+function runFromStage(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  stepId: string,
+  worktree: string,
+  ctx?: RunCtx,
+): Promise<Outcome> {
   // With leases on, only the lease holder walks the steps: a second worker
   // (another machine, a CI job) gets "waiting", and a dead worker's issue is
   // reclaimed by whoever resumes it after the TTL.
-  return leased(deps, issue.number, () => runWorkflow(deps, config, workflowOf(deps, issue), issue, stepId, worktree, ctx));
+  return leased(deps, issue.number, () =>
+    runWorkflow(deps, config, workflowOf(deps, issue), issue, stepId, worktree, ctx),
+  );
 }
 
 // Intake trust (P36): a label is a request to spend tokens and push a branch,
@@ -162,7 +176,12 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.ready))) return "needs-human";
   issue = await chooseWorkflow(deps, config, issue);
-  emitEvent(deps.bus, "factory.issue.ready", { repo: config.repo, issue: issue.number, title: issue.title, workflow: workflowOf(deps, issue).name }, `issue/${issue.number}`);
+  emitEvent(
+    deps.bus,
+    "factory.issue.ready",
+    { repo: config.repo, issue: issue.number, title: issue.title, workflow: workflowOf(deps, issue).name },
+    `issue/${issue.number}`,
+  );
   const start = workflowOf(deps, issue).start;
   await deps.github.setStateLabel(config.repo, issue.number, [LABEL.ready], labelOf(deps, issue, start));
   return runFromStage(deps, config, issue, start, worktree);
@@ -177,7 +196,12 @@ async function cancelRun(issue: GhIssue, deps: WatchDeps, config: FactoryConfig)
   const head = deps.git.branchName(issue.number);
   const pr = await deps.github.findPrByHead(config.repo, head);
   if (pr) await deps.github.closePr(config.repo, pr.number);
-  await postComment(deps, config, issue.number, `Cancelled by \`/factory cancel\`. The branch \`${head}\` is kept; label the issue \`${LABEL.ready}\` after deleting it to start over.`);
+  await postComment(
+    deps,
+    config,
+    issue.number,
+    `Cancelled by \`/factory cancel\`. The branch \`${head}\` is kept; label the issue \`${LABEL.ready}\` after deleting it to start over.`,
+  );
   await deps.github.closeIssue(config.repo, issue.number);
   await runRetro(deps, config, issue, "rejected");
   await dropWorkspace(deps, issue.number);
@@ -188,7 +212,9 @@ async function cancelRun(issue: GhIssue, deps: WatchDeps, config: FactoryConfig)
 // A run that is over needs its workspace no more; the branch keeps the work. A failed
 // removal is logged, never fatal: the run's outcome is already decided.
 async function dropWorkspace(deps: WatchDeps, issueNumber: number): Promise<void> {
-  await deps.git.removeWorktree(deps.cloneDir, worktreeFor(deps, issueNumber)).catch((err) => console.error(`removing #${issueNumber}'s workspace failed:`, err));
+  await deps.git
+    .removeWorktree(deps.cloneDir, worktreeFor(deps, issueNumber))
+    .catch((err) => console.error(`removing #${issueNumber}'s workspace failed:`, err));
 }
 
 // The runner's own data marker counts too: an agent that drops the marker line
@@ -196,7 +222,9 @@ async function dropWorkspace(deps: WatchDeps, issueNumber: number): Promise<void
 const RUNNER_QUESTION_MARKER = '<!-- factory:data {"stage":"question"';
 
 function findQuestionComment(issue: GhIssue): GhComment | undefined {
-  return [...issue.comments].reverse().find((c) => c.body.includes("<!-- factory:question v1 -->") || c.body.includes(RUNNER_QUESTION_MARKER));
+  return [...issue.comments]
+    .reverse()
+    .find((c) => c.body.includes("<!-- factory:question v1 -->") || c.body.includes(RUNNER_QUESTION_MARKER));
 }
 
 function findPlanComment(issue: GhIssue): GhComment | undefined {
@@ -212,7 +240,11 @@ function ctxFrom(deps: WatchDeps, issue: GhIssue): RunCtx {
 // the reply appended as context (plan section 3). The stage to resume comes
 // from deriveIssueState, not SQLite, so this works after a restart with an
 // empty DB (audit finding #21).
-export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
+export async function resumeNeedsInfo(
+  issue: GhIssue,
+  deps: WatchDeps,
+  config: FactoryConfig,
+): Promise<Outcome | undefined> {
   const question = findQuestionComment(issue);
   if (!question) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, question.createdAt);
@@ -223,14 +255,23 @@ export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: F
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.needsInfo))) return "needs-human";
   await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, reply.body);
-  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.needsInfo], labelOf(deps, issue, derived.resumeStage));
+  await deps.github.setStateLabel(
+    config.repo,
+    issue.number,
+    [LABEL.needsInfo],
+    labelOf(deps, issue, derived.resumeStage),
+  );
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, ctxFrom(deps, issue));
 }
 
 // `/factory approve|revise|retry|cancel` on a plan awaiting approval (plan
 // section 4). A plain reply here is not a command and is ignored: only a
 // question comment accepts a plain-text answer.
-export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
+export async function resumeAwaitingApproval(
+  issue: GhIssue,
+  deps: WatchDeps,
+  config: FactoryConfig,
+): Promise<Outcome | undefined> {
   const plan = findPlanComment(issue);
   if (!plan) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, plan.createdAt);
@@ -243,7 +284,8 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
   const edge = parkEdgeOf(workflowOf(deps, issue), deriveIssueState(issue, workflowOf(deps, issue)).resumeStage);
   if (!edge) return "waiting";
   const resumeAt = async (stepId: string): Promise<Outcome> => {
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval)))
+      return "needs-human";
     if (command.type === "revise") await writeRevision(worktree, issue, reply, command.text);
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, issue, stepId));
     return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
@@ -257,7 +299,11 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
 // `/factory retry` on a `failed` or `needs-human` issue (audit finding #18):
 // before this, both were dead ends. Resumes from whichever stage last
 // posted a data marker, recovered by deriveIssueState.
-export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
+export async function resumeParked(
+  issue: GhIssue,
+  deps: WatchDeps,
+  config: FactoryConfig,
+): Promise<Outcome | undefined> {
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
   if (!latest) return undefined;
   const verb = parseChatOps(latest.body).type;
@@ -274,7 +320,11 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
-  await deps.github.commentIssue(config.repo, issue.number, `Retrying from ${derived.resumeStage}.\n\n<!-- factory:retry v1 -->`);
+  await deps.github.commentIssue(
+    config.repo,
+    issue.number,
+    `Retrying from ${derived.resumeStage}.\n\n<!-- factory:retry v1 -->`,
+  );
   await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, issue, derived.resumeStage));
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
     rejectRound: derived.rejectRounds,
@@ -298,7 +348,10 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     if (!pr) return;
     await validatePr(deps.github, config.repo, issueNumber, pr.number);
 
-    const [ci, readiness] = await Promise.all([ciStatusNow(deps.github, config.repo, pr.number), deps.github.mergeReadiness(config.repo, pr.number)]);
+    const [ci, readiness] = await Promise.all([
+      ciStatusNow(deps.github, config.repo, pr.number),
+      deps.github.mergeReadiness(config.repo, pr.number),
+    ]);
     const worktree = worktreeFor(deps, issueNumber);
     // The PR head, not the worktree's: the policy judges the commit --match-head-commit merges.
     const changedFiles = await deps.git.diffStat(worktree, config.base, readiness.headRefOid);
@@ -315,7 +368,8 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     });
 
     const marker = mergePolicyMarker(decision.headSha);
-    if (!issue.comments.some((c) => c.body.includes(marker))) await postComment(deps, config, issueNumber, renderAuditComment(decision));
+    if (!issue.comments.some((c) => c.body.includes(marker)))
+      await postComment(deps, config, issueNumber, renderAuditComment(decision));
     const merged = await attemptMerge(deps.github, config.repo, pr.number, decision);
     if (merged) return await recordMerge(deps, config, issue, pr.number, "factory");
   } catch (err) {
@@ -333,18 +387,31 @@ export function mergedMarker(prNumber: number): string {
 // the issue, since a tracker other than GitHub only learns of it here (a factory
 // merge already closed it in ComposedScm.mergePr); a GitHub issue that is already
 // closed makes that close a no-op, and a failed close is logged, never fatal.
-async function recordMerge(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, prNumber: number, by: "factory" | "human"): Promise<Outcome> {
+async function recordMerge(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  prNumber: number,
+  by: "factory" | "human",
+): Promise<Outcome> {
   const marker = mergedMarker(prNumber);
   if (issue.comments.some((c) => isTrusted(c) && c.body.includes(marker))) return "waiting";
   const who = by === "human" ? "by a human on the code host" : "by the merge policy";
   await postComment(deps, config, issue.number, `PR #${prNumber} was merged ${who}.\n\n${marker}`);
   if (by === "human") {
-    await deps.github.closeIssue(config.repo, issue.number).catch((err) => console.error(`closing #${issue.number} after its merge failed:`, err));
+    await deps.github
+      .closeIssue(config.repo, issue.number)
+      .catch((err) => console.error(`closing #${issue.number} after its merge failed:`, err));
   }
   // Whatever state the run sat in: a parked run's PR can be merged by hand too.
   const lifecycle = labelsOf(issue).filter((n) => n.startsWith("factory:") && n !== LABEL.monitor);
   if (lifecycle.length > 0) await deps.github.removeLabels(config.repo, issue.number, lifecycle);
-  emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: issue.number, pr: prNumber, by }, `issue/${issue.number}`);
+  emitEvent(
+    deps.bus,
+    "factory.pr.merged",
+    { repo: config.repo, issue: issue.number, pr: prNumber, by },
+    `issue/${issue.number}`,
+  );
   await runRetro(deps, config, issue, "merged");
   await dropWorkspace(deps, issue.number);
   finish(deps, config, issue.number, "shipped");
@@ -364,7 +431,11 @@ async function shipIfMerged(deps: WatchDeps, config: FactoryConfig, issue: GhIss
   }
 }
 
-export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
+export async function resumeInReview(
+  issue: GhIssue,
+  deps: WatchDeps,
+  config: FactoryConfig,
+): Promise<Outcome | undefined> {
   const merged = await shipIfMerged(deps, config, issue);
   if (merged) return merged;
   // Feedback counts only if it is newer than the runner's last marker
@@ -406,7 +477,12 @@ const PARKED_STATUSES = new Set<string>(["needs-info", "awaiting-approval", "nee
 // parked and its tmux window open. Shipped if its PR merged, else cancelled.
 // Each issue is held in inFlight while it is checked, so an overlapping poll
 // never records it twice.
-export async function reconcileClosed(deps: WatchDeps, config: FactoryConfig, listed: Set<number>, inFlight?: Set<number>): Promise<number[]> {
+export async function reconcileClosed(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  listed: Set<number>,
+  inFlight?: Set<number>,
+): Promise<number[]> {
   const ended: number[] = [];
   for (const run of deps.state.listRuns(config.repo)) {
     if (!PARKED_STATUSES.has(run.status) || listed.has(run.issue) || inFlight?.has(run.issue)) continue;
@@ -435,10 +511,12 @@ export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, issue
   const names = labelsOf(issue);
   if (names.includes(LABEL.ready)) return processReadyIssue(issue, deps, config);
   // A parked run's PR merged by hand ships it; nothing else would, since only in-review checks.
-  if (WAITING_LABELS.some((l) => names.includes(l)) && (await shipIfMerged(deps, config, issue)) === "shipped") return "shipped";
+  if (WAITING_LABELS.some((l) => names.includes(l)) && (await shipIfMerged(deps, config, issue)) === "shipped")
+    return "shipped";
   if (names.includes(LABEL.needsInfo)) return (await resumeNeedsInfo(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.awaitingApproval)) return (await resumeAwaitingApproval(issue, deps, config)) ?? "waiting";
-  if (names.includes(LABEL.failed) || names.includes(LABEL.needsHuman)) return (await resumeParked(issue, deps, config)) ?? "waiting";
+  if (names.includes(LABEL.failed) || names.includes(LABEL.needsHuman))
+    return (await resumeParked(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.inReview)) return (await resumeInReview(issue, deps, config)) ?? "waiting";
   return "waiting";
 }
@@ -506,7 +584,8 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     );
   }
   // A minion runs for minutes: started here, never awaited by the poll.
-  for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date())) startMinion(deps, config, minion);
+  for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date()))
+    startMinion(deps, config, minion);
   const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
     intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
@@ -559,10 +638,18 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     const outcomes = await runPool(candidates, dispatchConcurrency(deps, config), (issue) =>
       dispatch(deps, config, issue).finally(() => release(inFlight, issue.number)),
     );
-    const processed = candidates.filter((_, i) => outcomes[i] && outcomes[i] !== "waiting").map((issue) => issue.number);
+    const processed = candidates
+      .filter((_, i) => outcomes[i] && outcomes[i] !== "waiting")
+      .map((issue) => issue.number);
     processed.push(...(await reconcileClosed(deps, config, new Set(buckets.flat().map((i) => i.number)), inFlight)));
-    if (stopIf) return { paused: true, reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`, processed };
-    if (budgetPaused) return { paused: true, reason: "budget: today's spend cap is hit, new pickups are paused", processed };
+    if (stopIf)
+      return {
+        paused: true,
+        reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`,
+        processed,
+      };
+    if (budgetPaused)
+      return { paused: true, reason: "budget: today's spend cap is hit, new pickups are paused", processed };
     return { paused: false, processed };
   } finally {
     for (const issue of candidates) inFlight?.delete(issue.number);
@@ -575,13 +662,20 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
 // Call once, before the first poll.
 export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): Promise<number[]> {
   // Every label a step holds while it runs; a terminal step's (in-review) is a waiting state.
-  const running = new Set(allWorkflows(deps).flatMap((w) => Object.values(w.steps).filter((s) => !STEP_TYPES[s.uses]!.terminal).map((s) => s.label)));
+  const running = new Set(
+    allWorkflows(deps).flatMap((w) =>
+      Object.values(w.steps)
+        .filter((s) => !STEP_TYPES[s.uses]!.terminal)
+        .map((s) => s.label),
+    ),
+  );
   const lists = await Promise.all([...running].map((l) => deps.github.listIssuesByLabel(config.repo, l)));
   const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()];
   await runPool(issues, dispatchConcurrency(deps, config), async (issue) => {
     const derived = deriveIssueState(issue, workflowOf(deps, issue));
     const worktree = worktreeFor(deps, issue.number);
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, labelOf(deps, issue, derived.resumeStage)))) return "needs-human";
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, labelOf(deps, issue, derived.resumeStage))))
+      return "needs-human";
     return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
       rejectRound: derived.rejectRounds,
       questionRound: derived.questionRounds,
@@ -602,14 +696,21 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
 // waiting out the interval.
 export const WEBHOOK_CHECK_MS = 2000;
 
-export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: PollResult) => void, webhookCheckMs = WEBHOOK_CHECK_MS): () => void {
+export function startWatch(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  onTick?: (r: PollResult) => void,
+  webhookCheckMs = WEBHOOK_CHECK_MS,
+): () => void {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const inFlight = new Set<number>();
   let seenDelivery = deps.state.latestDelivery();
   // Another app's event only wakes the poll, which then applies every normal check (readyIsTrusted,
   // intake, caps). Nothing reads an issue or an actor out of event data.
-  const unsubscribe = deps.bus?.subscribe("*", (e) => handleEvent(deps, config, e).then((filed) => void ((filed > 0 || isExternalEventType(e.type)) && tick())));
+  const unsubscribe = deps.bus?.subscribe("*", (e) =>
+    handleEvent(deps, config, e).then((filed) => void ((filed > 0 || isExternalEventType(e.type)) && tick())),
+  );
 
   function tick(): void {
     if (stopped) return;
@@ -643,7 +744,9 @@ export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: 
 
 function startMinion(deps: WatchDeps, config: FactoryConfig, minion: Minion, event?: CloudEvent): void {
   void runMinion(deps, config, minion, event)
-    .then((r) => r.status !== "ok" && console.error(`factory watch: minion ${minion.name} ${r.status}: ${r.reason ?? ""}`))
+    .then(
+      (r) => r.status !== "ok" && console.error(`factory watch: minion ${minion.name} ${r.status}: ${r.reason ?? ""}`),
+    )
     .catch((err) => console.error(`factory watch: minion ${minion.name} failed`, err));
 }
 
@@ -659,7 +762,13 @@ export async function handleEvent(deps: WatchDeps, config: FactoryConfig, event:
       filed++;
       // Not the repo's workflow: record it on the issue so pickup runs this one (recordedWorkflow).
       if (workflow.name !== workflowOf(deps).name) {
-        await deps.github.commentIssue(config.repo, n, withDataMarker(`Running workflow \`${workflow.name}\` (\`on: event: ${event.type}\`).`, WORKFLOW_MARKER, { name: workflow.name }));
+        await deps.github.commentIssue(
+          config.repo,
+          n,
+          withDataMarker(`Running workflow \`${workflow.name}\` (\`on: event: ${event.type}\`).`, WORKFLOW_MARKER, {
+            name: workflow.name,
+          }),
+        );
       }
     } catch (err) {
       console.error(`factory watch: event trigger ${workflow.name} on ${event.type} failed`, err);

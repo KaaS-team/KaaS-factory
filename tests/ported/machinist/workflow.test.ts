@@ -16,7 +16,10 @@ async function readBuild(body: string | undefined, issue: number) {
 }
 
 test("complete: a valid step result is read and does not stop the run", async () => {
-  const json = await readBuild('{"outcome":"complete","summary":"PR created","status":"green","gate_line":"ok","rounds":1}', 1);
+  const json = await readBuild(
+    '{"outcome":"complete","summary":"PR created","status":"green","gate_line":"ok","rounds":1}',
+    1,
+  );
   expect(validateStepJson("build", json)).toEqual({ ok: true });
   expect(stepStop(json as never)).toBeUndefined();
 });
@@ -33,15 +36,23 @@ test("missing: no file reads as no result", async () => {
 
 test("invalid: an outcome outside complete|blocked|failed is refused", async () => {
   const json = await readBuild('{"outcome":"approved","summary":"ok"}', 4);
-  expect(validateStepJson("build", json)).toEqual({ ok: false, reason: "build.json: step outcome must be complete, blocked, or failed" });
+  expect(validateStepJson("build", json)).toEqual({
+    ok: false,
+    reason: "build.json: step outcome must be complete, blocked, or failed",
+  });
 });
 
 test("a summary must not be blank, and unknown fields are refused", () => {
   expect(validateStepJson("build", { outcome: "complete", summary: "  " }).ok).toBe(false);
-  expect(validateStepJson("build", { outcome: "complete", extra: 1 })).toEqual({ ok: false, reason: 'build.json has unknown field "extra"' });
+  expect(validateStepJson("build", { outcome: "complete", extra: 1 })).toEqual({
+    ok: false,
+    reason: 'build.json has unknown field "extra"',
+  });
 });
 
 test("more than one JSON object, or a body over 16 KiB, reads as no result", async () => {
   expect(await readBuild('{"outcome":"complete"}{"outcome":"complete"}', 5)).toBeUndefined();
-  expect(await readBuild(JSON.stringify({ outcome: "complete", summary: "x".repeat(MAX_STEP_JSON_BYTES) }), 6)).toBeUndefined();
+  expect(
+    await readBuild(JSON.stringify({ outcome: "complete", summary: "x".repeat(MAX_STEP_JSON_BYTES) }), 6),
+  ).toBeUndefined();
 });

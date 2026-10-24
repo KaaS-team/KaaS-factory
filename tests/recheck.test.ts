@@ -47,7 +47,10 @@ const DIFF = [
 const at = (where?: string): Finding => ({ severity: "must", confidence: 4, what: "w", ...(where ? { where } : {}) });
 
 test("changedLines reads each file's new-side hunk ranges and skips deleted files", () => {
-  expect([...changedLines(DIFF)]).toEqual([["src/a.ts", [[10, 14]]], ["src/b.ts", [[1, 3]]]]);
+  expect([...changedLines(DIFF)]).toEqual([
+    ["src/a.ts", [[10, 14]]],
+    ["src/b.ts", [[1, 3]]],
+  ]);
 });
 
 test("a finding is supported only when its where overlaps a changed hunk", async () => {

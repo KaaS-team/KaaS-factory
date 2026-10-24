@@ -27,12 +27,23 @@ export function parseCodexLine(line: string): StageEvent[] {
   const item = parsed.item;
   if (parsed.type === "item.completed" && item) {
     if (item.type === "agent_message" && item.text) return [{ kind: "text", text: item.text, finalText: item.text }];
-    if (item.type && TOOL_ITEMS.has(item.type)) return [{ kind: "tool_use", toolName: item.type === "command_execution" ? "Bash" : item.type }];
+    if (item.type && TOOL_ITEMS.has(item.type))
+      return [{ kind: "tool_use", toolName: item.type === "command_execution" ? "Bash" : item.type }];
     return [];
   }
   if (parsed.type === "turn.completed") {
     const usage = readUsage(parsed.usage, false);
-    return [usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, tokensCached: usage.tokensCached, total: true } : { kind: "usage", invalid: true }];
+    return [
+      usage
+        ? {
+            kind: "usage",
+            tokensIn: usage.tokensIn,
+            tokensOut: usage.tokensOut,
+            tokensCached: usage.tokensCached,
+            total: true,
+          }
+        : { kind: "usage", invalid: true },
+    ];
   }
   return [];
 }

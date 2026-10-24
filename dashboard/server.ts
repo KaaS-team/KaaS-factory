@@ -30,7 +30,14 @@ import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from ".
 import { analytics } from "./analytics";
 import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
 import { harnessReport } from "../src/harness";
-import { readCapped, readDelivery, signatureMatches, WAKING_EVENTS, WEBHOOK_MAX_BYTES, WEBHOOK_SECRET_ENV } from "../src/webhook";
+import {
+  readCapped,
+  readDelivery,
+  signatureMatches,
+  WAKING_EVENTS,
+  WEBHOOK_MAX_BYTES,
+  WEBHOOK_SECRET_ENV,
+} from "../src/webhook";
 import { EVENT_SIGNATURE_HEADER, isExternalEventType, parseEvent, verifyEvent } from "../src/core/event";
 import { eventsInboundSecretEnv } from "../src/config";
 
@@ -79,9 +86,19 @@ function cookie(req: Request, name: string): string {
 
 // The only routes reachable without a token. Everything else is default-deny;
 // tests/dashboard-routes.test.ts walks every route against this list.
-export const PUBLIC_ROUTES: readonly string[] = ["GET /", "GET /assets", "POST /api/session", WEBHOOK_ROUTE, EVENTS_ROUTE];
+export const PUBLIC_ROUTES: readonly string[] = [
+  "GET /",
+  "GET /assets",
+  "POST /api/session",
+  WEBHOOK_ROUTE,
+  EVENTS_ROUTE,
+];
 
-const ASSET_TYPES: Record<string, string> = { css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", woff2: "font/woff2" };
+const ASSET_TYPES: Record<string, string> = {
+  css: "text/css; charset=utf-8",
+  js: "text/javascript; charset=utf-8",
+  woff2: "font/woff2",
+};
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
 
@@ -95,10 +112,24 @@ function plainStage<T extends { agent: string; killed_reason: string | null }>(s
 }
 
 function plainIssue<T extends { title: string; body: string; comments: { body: string }[] }>(issue: T): T {
-  return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
+  return {
+    ...issue,
+    title: plain(issue.title),
+    body: plain(issue.body),
+    comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })),
+  };
 }
 
-export function createDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, workspaces = workspacesDir(process.env, repo || undefined), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }, project?: DashboardProject) {
+export function createDashboard(
+  state: FactoryState,
+  github: ScmPort,
+  repo: string,
+  autoApproveDefault = false,
+  workspaces = workspacesDir(process.env, repo || undefined),
+  fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG,
+  probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf },
+  project?: DashboardProject,
+) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
   // Read by name on every request; the value is never logged or returned.
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
@@ -131,7 +162,17 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const checks = await agentChecks(a.name, fleet.agents, probes);
         const installed = await probes.which(a.binary);
         const version = installed ? ((await probes.versionOf(a.binary)) ?? "").split("\n")[0]!.trim() || null : null;
-        return { ...row, installed, version: version === null ? null : plain(version), checks: checks.map((c) => ({ name: plain(c.name), ok: c.ok, warn: c.warn === true, detail: plain(c.detail) })) };
+        return {
+          ...row,
+          installed,
+          version: version === null ? null : plain(version),
+          checks: checks.map((c) => ({
+            name: plain(c.name),
+            ok: c.ok,
+            warn: c.warn === true,
+            detail: plain(c.detail),
+          })),
+        };
       }),
     )
       .then((rows) => {
@@ -206,7 +247,10 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
   // FACTORY_REPOS list, else the single configured repo, else whatever repos
   // have ever run under FACTORY_HOME.
   function inboxRepos(): string[] {
-    const fromEnv = (process.env.FACTORY_REPOS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    const fromEnv = (process.env.FACTORY_REPOS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (fromEnv.length > 0) return fromEnv;
     return repo ? [repo] : discoverRepos();
   }
@@ -291,9 +335,12 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       "content-security-policy": "sandbox; default-src 'none'",
       "x-artifact-truncated": String(truncated),
     };
-    if (url.searchParams.get("download")) headers["content-disposition"] = `attachment; filename="${name.replace(/[^\w.-]/g, "_")}"`;
+    if (url.searchParams.get("download"))
+      headers["content-disposition"] = `attachment; filename="${name.replace(/[^\w.-]/g, "_")}"`;
     // A preview is text for a person; a download stays byte for byte.
-    return new Response(url.searchParams.get("download") ? body : plain(Buffer.from(body).toString("utf8")), { headers });
+    return new Response(url.searchParams.get("download") ? body : plain(Buffer.from(body).toString("utf8")), {
+      headers,
+    });
   }
 
   type Handler = (req: Request, url: URL, m: RegExpMatchArray) => Response | Promise<Response>;
@@ -307,7 +354,12 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
   // The routing table is the only place a route exists, so the route-walk test
   // (tests/dashboard-routes.test.ts) sees every one of them.
   const routes: readonly Route[] = [
-    { method: "GET", pattern: /^\/(index\.html)?$/, label: "GET /", handler: () => new Response(indexHtml, { headers: { "content-type": "text/html; charset=utf-8" } }) },
+    {
+      method: "GET",
+      pattern: /^\/(index\.html)?$/,
+      label: "GET /",
+      handler: () => new Response(indexHtml, { headers: { "content-type": "text/html; charset=utf-8" } }),
+    },
     {
       // Static files of the page itself: no data, so public like the shell.
       method: "GET",
@@ -316,7 +368,9 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       handler: (_req, _url, m) => {
         try {
           const bytes = readFileSync(join(here, "public", m[1]!));
-          return new Response(bytes, { headers: { "content-type": ASSET_TYPES[m[1]!.split(".").pop()!]!, "cache-control": "no-cache" } });
+          return new Response(bytes, {
+            headers: { "content-type": ASSET_TYPES[m[1]!.split(".").pop()!]!, "cache-control": "no-cache" },
+          });
         } catch {
           return json({ error: "not found" }, { status: 404 });
         }
@@ -341,7 +395,14 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         // Behind a TLS-terminating proxy the request arrives as http, so X-Forwarded-Proto counts too.
         const https = new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
         const secure = https ? "; Secure" : "";
-        return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}` } });
+        return json(
+          { ok: true },
+          {
+            headers: {
+              "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`,
+            },
+          },
+        );
       },
     },
     {
@@ -351,10 +412,12 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       handler: async (req) => {
         const secret = webhookSecret();
         if (!secret) return json({ error: "not found" }, { status: 404 });
-        if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES) return json({ error: "too large" }, { status: 413 });
+        if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES)
+          return json({ error: "too large" }, { status: 413 });
         const body = await readCapped(req.body, WEBHOOK_MAX_BYTES);
         if (!body) return json({ error: "too large" }, { status: 413 });
-        if (!signatureMatches(secret, body, req.headers.get("x-hub-signature-256"))) return json({ error: "bad signature" }, { status: 401 });
+        if (!signatureMatches(secret, body, req.headers.get("x-hub-signature-256")))
+          return json({ error: "bad signature" }, { status: 401 });
         let payload: unknown;
         try {
           payload = JSON.parse(new TextDecoder().decode(body));
@@ -364,7 +427,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const d = readDelivery(req.headers, payload);
         if (!d) return json({ error: "missing X-GitHub-Delivery or X-GitHub-Event" }, { status: 400 });
         if (d.event === "ping") return json({ ok: true, pong: true });
-        if (!WAKING_EVENTS.has(d.event) || (repo && d.repo.toLowerCase() !== repo.toLowerCase())) return json({ ok: true, ignored: true }, { status: 202 });
+        if (!WAKING_EVENTS.has(d.event) || (repo && d.repo.toLowerCase() !== repo.toLowerCase()))
+          return json({ ok: true, ignored: true }, { status: 202 });
         const fresh = state.recordDelivery(d);
         return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
       },
@@ -376,11 +440,13 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       handler: async (req) => {
         const secret = eventsSecret();
         if (!secret) return json({ error: "not found" }, { status: 404 });
-        if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES) return json({ error: "too large" }, { status: 413 });
+        if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES)
+          return json({ error: "too large" }, { status: 413 });
         const bytes = await readCapped(req.body, WEBHOOK_MAX_BYTES);
         if (!bytes) return json({ error: "too large" }, { status: 413 });
         const body = new TextDecoder().decode(bytes);
-        if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER))) return json({ error: "bad signature" }, { status: 401 });
+        if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER)))
+          return json({ error: "bad signature" }, { status: 401 });
         let raw: unknown;
         try {
           raw = JSON.parse(body);
@@ -392,11 +458,25 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const e = parsed.event;
         if (!isExternalEventType(e.type)) return json({ ok: true, ignored: true }, { status: 202 });
         // Deduped on id: a sender's retry of an event already stored is acknowledged, not re-run.
-        const fresh = state.recordBusEvent({ id: e.id, direction: "in", type: e.type, source: e.source, subject: e.subject ?? null, time: e.time, data: JSON.stringify(e.data), handled_at: null });
+        const fresh = state.recordBusEvent({
+          id: e.id,
+          direction: "in",
+          type: e.type,
+          source: e.source,
+          subject: e.subject ?? null,
+          time: e.time,
+          data: JSON.stringify(e.data),
+          handled_at: null,
+        });
         return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
       },
     },
-    { method: "GET", pattern: /^\/api\/runs$/, label: "GET /api/runs", handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }) },
+    {
+      method: "GET",
+      pattern: /^\/api\/runs$/,
+      label: "GET /api/runs",
+      handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }),
+    },
     {
       method: "GET",
       pattern: /^\/api\/board$/,
@@ -454,7 +534,16 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
           readStageArtifacts(cwd, issueNumber, "verify"),
         ]);
         const stages = state.listStageRuns(r, { issue: issueNumber }).map(plainStage);
-        return json({ repo: r, issue: issueNumber, pr: { number: pr.number, url: pr.url }, diff: plain(diff), ci, gate, verify: verify.json ?? null, stages });
+        return json({
+          repo: r,
+          issue: issueNumber,
+          pr: { number: pr.number, url: pr.url },
+          diff: plain(diff),
+          ci,
+          gate,
+          verify: verify.json ?? null,
+          stages,
+        });
       },
     },
     {
@@ -471,7 +560,10 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const issueNumber = Number(m[1]);
         const pr = await github.prForIssue(r, issueNumber);
         if (!pr) return json({ error: "no open PR closes that issue" }, { status: 404 });
-        const [readiness, ci] = await Promise.all([github.mergeReadiness(r, pr.number), ciStatusNow(github, r, pr.number)]);
+        const [readiness, ci] = await Promise.all([
+          github.mergeReadiness(r, pr.number),
+          ciStatusNow(github, r, pr.number),
+        ]);
         const decision = decideOperatorMerge(readiness, ci);
         const merged = await attemptMerge(github, r, pr.number, decision);
         await github.commentIssue(r, issueNumber, renderOperatorAuditComment(decision));
@@ -493,7 +585,12 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       handler: (_req, url, m) => {
         const r = url.searchParams.get("repo") || repo;
         if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
-        return json(liveItems(streamPath(transcriptPath(r, Number(m[1]), process.env)), Number(url.searchParams.get("from") ?? "0") || 0));
+        return json(
+          liveItems(
+            streamPath(transcriptPath(r, Number(m[1]), process.env)),
+            Number(url.searchParams.get("from") ?? "0") || 0,
+          ),
+        );
       },
     },
     {
@@ -506,9 +603,21 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
         const n = Number(m[1]);
         const cwd = join(workspacesFor(r), `issue-${n}`);
-        const [plan, verify, gate] = await Promise.all([readStageArtifacts(cwd, n, "plan"), readStageArtifacts(cwd, n, "verify"), readGateEvidence(cwd, n)]);
-        const [proof, holdout] = await Promise.all(["proof.json", "holdout.json"].map((f) => Bun.file(join(cwd, runDir(n), f)).json().catch(() => undefined)));
-        return json(proofView({ planComment: plan.comment, verdict: verify.json, gateLine: gate?.line, proof, holdout }));
+        const [plan, verify, gate] = await Promise.all([
+          readStageArtifacts(cwd, n, "plan"),
+          readStageArtifacts(cwd, n, "verify"),
+          readGateEvidence(cwd, n),
+        ]);
+        const [proof, holdout] = await Promise.all(
+          ["proof.json", "holdout.json"].map((f) =>
+            Bun.file(join(cwd, runDir(n), f))
+              .json()
+              .catch(() => undefined),
+          ),
+        );
+        return json(
+          proofView({ planComment: plan.comment, verdict: verify.json, gateLine: gate?.line, proof, holdout }),
+        );
       },
     },
     {
@@ -527,7 +636,10 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       handler: (_req, _url, m) => {
         const run = state.listRuns(repo || undefined).find((r) => r.id === Number(m[1]));
         if (!run) return json({ error: "no such run" }, { status: 404 });
-        return json({ run: plainRun(run), stages: state.listStageRuns(run.repo, { issue: run.issue }).map(plainStage) });
+        return json({
+          run: plainRun(run),
+          stages: state.listStageRuns(run.repo, { issue: run.issue }).map(plainStage),
+        });
       },
     },
     {
@@ -546,7 +658,13 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
             run: plainRun(run),
             stages: attempts
               .filter((a) => a.issue === run.issue)
-              .map((a) => ({ stage: a.stage, agent: a.agent, duration_ms: a.duration_ms, cost_usd: a.cost_usd, ok: a.exit_code === 0 && !a.killed_reason && (a.verdict ?? "pass") === "pass" })),
+              .map((a) => ({
+                stage: a.stage,
+                agent: a.agent,
+                duration_ms: a.duration_ms,
+                cost_usd: a.cost_usd,
+                ok: a.exit_code === 0 && !a.killed_reason && (a.verdict ?? "pass") === "pass",
+              })),
           }));
         });
         rows.sort((a, b) => b.run.started_at.localeCompare(a.run.started_at));
@@ -569,7 +687,10 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       method: "GET",
       pattern: /^\/api\/workflows$/,
       label: "GET /api/workflows",
-      handler: async () => (project ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) }) : json({ available: false, reason: NO_PROJECT })),
+      handler: async () =>
+        project
+          ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) })
+          : json({ available: false, reason: NO_PROJECT }),
     },
     {
       method: "GET",
@@ -577,7 +698,10 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       label: "GET /api/settings",
       handler: async () => {
         if (!project) return json({ available: false, reason: NO_PROJECT });
-        const [report, leases] = await Promise.all([harnessReport(project.cloneDir, project.config), heldLeases(project)]);
+        const [report, leases] = await Promise.all([
+          harnessReport(project.cloneDir, project.config),
+          heldLeases(project),
+        ]);
         return json({ available: true, ...settingsView(project, report, leases, Date.now()) });
       },
     },
@@ -595,11 +719,15 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const perRepo = await Promise.all(
           repos.map(async (r) => [
             // Park reasons live in this dashboard's own DB, so only its repo has them.
-            ...buildInbox(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map((i) => ({ ...i, repo: r })),
+            ...buildInbox(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
+              (i) => ({ ...i, repo: r }),
+            ),
             ...learningPrItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
           ]),
         );
-        const items = perRepo.flat().sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
+        const items = perRepo
+          .flat()
+          .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
         return json({ repos: inboxRepos(), repo, items });
       },
     },
@@ -639,7 +767,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       label: "POST /api/toggles",
       handler: async (req) => {
         const body = (await req.json()) as { key: string; value: boolean };
-        if (body.key !== "auto_start" && body.key !== "auto_approve_low_risk") return json({ error: "unknown toggle" }, { status: 400 });
+        if (body.key !== "auto_start" && body.key !== "auto_approve_low_risk")
+          return json({ error: "unknown toggle" }, { status: 400 });
         state.setToggle(body.key, Boolean(body.value));
         return json({ ok: true });
       },
@@ -663,13 +792,18 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       pattern: /^\/api\/command$/,
       label: "POST /api/command",
       handler: async (req) => {
-        const body = (await req.json()) as { issue: number; command: "approve" | "revise" | "retry" | "cancel"; text?: string };
+        const body = (await req.json()) as {
+          issue: number;
+          command: "approve" | "revise" | "retry" | "cancel";
+          text?: string;
+        };
         const missing = needRepo();
         if (missing) return missing;
         const text = body.command === "revise" ? `/factory revise ${body.text ?? ""}` : `/factory ${body.command}`;
         // Round-trip through parseChatOps so a malformed command from the UI
         // fails the same way an equivalent typed comment would.
-        if (parseChatOps(text).type === "answer") return json({ error: "not a recognized /factory command" }, { status: 400 });
+        if (parseChatOps(text).type === "answer")
+          return json({ error: "not a recognized /factory command" }, { status: 400 });
         await github.commentIssue(repo, body.issue, text);
         return json({ ok: true });
       },
@@ -694,7 +828,9 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
             });
           },
         });
-        return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" } });
+        return new Response(stream, {
+          headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" },
+        });
       },
     },
   ];
@@ -716,9 +852,14 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
     const isPublic = route !== undefined && PUBLIC_ROUTES.includes(route.label);
 
     // The webhook carries its own HMAC, so GitHub may reach it with no dashboard token set.
-    const signedWebhook = (route?.label === WEBHOOK_ROUTE && webhookSecret() !== "") || (route?.label === EVENTS_ROUTE && eventsSecret() !== "");
+    const signedWebhook =
+      (route?.label === WEBHOOK_ROUTE && webhookSecret() !== "") ||
+      (route?.label === EVENTS_ROUTE && eventsSecret() !== "");
     if (!loopback && !DASHBOARD_TOKEN && !signedWebhook) {
-      return json({ error: "refused: reachable from a non-loopback address with no FACTORY_DASHBOARD_TOKEN set" }, { status: 503 });
+      return json(
+        { error: "refused: reachable from a non-loopback address with no FACTORY_DASHBOARD_TOKEN set" },
+        { status: 503 },
+      );
     }
     // Token, when set, guards every non-public route for every caller, so an
     // unknown path is refused before it can 404 (no route probing).
@@ -729,7 +870,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
     if (req.method === "POST") {
       const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
       const cloudEvent = route?.label === EVENTS_ROUTE && contentType.startsWith("application/cloudevents+json");
-      if (!contentType.startsWith("application/json") && !cloudEvent) return json({ error: "expected application/json" }, { status: 415 });
+      if (!contentType.startsWith("application/json") && !cloudEvent)
+        return json({ error: "expected application/json" }, { status: 415 });
       const origin = req.headers.get("origin");
       if (origin) {
         let originHost: string;

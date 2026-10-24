@@ -29,7 +29,9 @@ export function taskAnalytics(jobs, days, now = new Date()) {
     failedTasks: terminalTasks.length - succeededTasks,
     activeTasks: tasks.filter((task) => activeTaskStates.has(task.state)).length,
     averageTaskDurationMillis: contributingDurations.length
-      ? Math.round(contributingDurations.reduce((total, duration) => total + duration, 0) / contributingDurations.length)
+      ? Math.round(
+          contributingDurations.reduce((total, duration) => total + duration, 0) / contributingDurations.length,
+        )
       : null,
     contributingTasks: contributingDurations.length,
   };
@@ -51,7 +53,8 @@ export function formatDurationMillis(milliseconds) {
   if (milliseconds < 1000) return `${milliseconds}ms`;
   const seconds = Math.floor(milliseconds / 1000);
   const remainder = milliseconds % 1000;
-  if (seconds < 60) return remainder ? `${seconds}.${String(remainder).padStart(3, "0").replace(/0+$/, "")}s` : `${seconds}s`;
+  if (seconds < 60)
+    return remainder ? `${seconds}.${String(remainder).padStart(3, "0").replace(/0+$/, "")}s` : `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
@@ -65,7 +68,9 @@ export function formatElapsed(milliseconds) {
 }
 
 export function formatTokenUsage(value) {
-  return typeof value === "string" && /^(0|[1-9]\d*)$/.test(value) ? value.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "Unavailable";
+  return typeof value === "string" && /^(0|[1-9]\d*)$/.test(value)
+    ? value.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    : "Unavailable";
 }
 
 export function formatSuccessRate(rate) {
@@ -130,10 +135,19 @@ export function runDetails(run) {
   if (run.worker_name) values.push(run.worker_name);
   if (run.model) values.push(run.model);
   if (Number.isSafeInteger(run.duration_millis)) values.push(formatDurationMillis(run.duration_millis));
-  if (validDate(run.completed_at)) values.push(validTokenUsage(run.token_usage) ? `${formatTokenUsage(run.token_usage)} tokens` : "Token usage unavailable");
+  if (validDate(run.completed_at))
+    values.push(
+      validTokenUsage(run.token_usage) ? `${formatTokenUsage(run.token_usage)} tokens` : "Token usage unavailable",
+    );
   return values.join(" · ");
 }
 
-function validTokenUsage(value) { return typeof value === "string" && /^(0|[1-9]\d*)$/.test(value); }
-function validDate(value) { return Boolean(value && value !== zeroTime && Number.isFinite(Date.parse(value))); }
-function validDuration(value) { return Number.isSafeInteger(value) && value >= 0; }
+function validTokenUsage(value) {
+  return typeof value === "string" && /^(0|[1-9]\d*)$/.test(value);
+}
+function validDate(value) {
+  return Boolean(value && value !== zeroTime && Number.isFinite(Date.parse(value)));
+}
+function validDuration(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}

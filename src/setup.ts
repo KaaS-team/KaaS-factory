@@ -21,7 +21,11 @@ export interface SetupResult {
 
 const MARKER = ".factory/runs/setup.done";
 
-export async function ensureSetup(runner: SetupRunner, worktreeDir: string, commands: readonly string[]): Promise<SetupResult> {
+export async function ensureSetup(
+  runner: SetupRunner,
+  worktreeDir: string,
+  commands: readonly string[],
+): Promise<SetupResult> {
   if (commands.length === 0) return { ok: true, ran: false, log: "" };
   const marker = `${worktreeDir}/${MARKER}`;
   if (await Bun.file(marker).exists()) return { ok: true, ran: false, log: "" };

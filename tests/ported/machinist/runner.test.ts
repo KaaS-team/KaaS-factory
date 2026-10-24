@@ -21,7 +21,13 @@ function repo(): string {
 }
 
 const run = (cwd: string, script: string, extra: Record<string, unknown> = {}) =>
-  new CommandExecutor({ a: { command: ["sh", "-c", script, "agent"] } }, { default: "a" }).runStage({ stage: "plan", issue: 7, cwd, maxBudgetUsd: 1, ...extra });
+  new CommandExecutor({ a: { command: ["sh", "-c", script, "agent"] } }, { default: "a" }).runStage({
+    stage: "plan",
+    issue: 7,
+    cwd,
+    maxBudgetUsd: 1,
+    ...extra,
+  });
 
 describe("environment", () => {
   test("the agent gets the factory's directories and none of the runner's secrets", async () => {
@@ -30,12 +36,19 @@ describe("environment", () => {
     process.env.GH_TOKEN = "secret";
     process.env.FACTORY_DASHBOARD_TOKEN = "secret";
     try {
-      await run(cwd, 'cat >/dev/null; printf "%s\\n" "$FACTORY_STAGE" "$FACTORY_ISSUE" "$FACTORY_ARTIFACT_DIR" "${GH_TOKEN:-none}" "${FACTORY_DASHBOARD_TOKEN:-none}" "$FACTORY_SCRATCH_DIR" > "$FACTORY_ARTIFACT_DIR/env.txt"');
+      await run(
+        cwd,
+        'cat >/dev/null; printf "%s\\n" "$FACTORY_STAGE" "$FACTORY_ISSUE" "$FACTORY_ARTIFACT_DIR" "${GH_TOKEN:-none}" "${FACTORY_DASHBOARD_TOKEN:-none}" "$FACTORY_SCRATCH_DIR" > "$FACTORY_ARTIFACT_DIR/env.txt"',
+      );
     } finally {
-      if (before.gh === undefined) delete process.env.GH_TOKEN; else process.env.GH_TOKEN = before.gh;
-      if (before.fac === undefined) delete process.env.FACTORY_DASHBOARD_TOKEN; else process.env.FACTORY_DASHBOARD_TOKEN = before.fac;
+      if (before.gh === undefined) delete process.env.GH_TOKEN;
+      else process.env.GH_TOKEN = before.gh;
+      if (before.fac === undefined) delete process.env.FACTORY_DASHBOARD_TOKEN;
+      else process.env.FACTORY_DASHBOARD_TOKEN = before.fac;
     }
-    const [stage, issue, dir, gh, dash, scratch] = readFileSync(join(cwd, ".factory/runs/issue-7/env.txt"), "utf8").trim().split("\n");
+    const [stage, issue, dir, gh, dash, scratch] = readFileSync(join(cwd, ".factory/runs/issue-7/env.txt"), "utf8")
+      .trim()
+      .split("\n");
     expect([stage, issue, dir, gh, dash]).toEqual(["plan", "7", join(cwd, ".factory/runs/issue-7"), "none", "none"]);
     expect(scratch).toContain("factory-scratch-7-");
     expect(existsSync(scratch!)).toBe(false); // removed when the stage ends
@@ -57,14 +70,23 @@ describe("environment", () => {
     try {
       await run(requested, 'cat >/dev/null; git rev-parse --show-toplevel > "$FACTORY_ARTIFACT_DIR/top.txt"');
     } finally {
-      if (before.d === undefined) delete process.env.GIT_DIR; else process.env.GIT_DIR = before.d;
-      if (before.w === undefined) delete process.env.GIT_WORK_TREE; else process.env.GIT_WORK_TREE = before.w;
+      if (before.d === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = before.d;
+      if (before.w === undefined) delete process.env.GIT_WORK_TREE;
+      else process.env.GIT_WORK_TREE = before.w;
     }
     expect(readFileSync(join(requested, ".factory/runs/issue-7/top.txt"), "utf8").trim()).toBe(requested);
   });
 
   test("sanitizeEnv drops repository git variables but keeps identity and PATH", () => {
-    const clean = sanitizeEnv({ PATH: "/bin", GIT_DIR: "x", GIT_INDEX_FILE: "y", GIT_CONFIG_KEY_0: "k", GIT_AUTHOR_NAME: "a", ANTHROPIC_API_KEY: "k" });
+    const clean = sanitizeEnv({
+      PATH: "/bin",
+      GIT_DIR: "x",
+      GIT_INDEX_FILE: "y",
+      GIT_CONFIG_KEY_0: "k",
+      GIT_AUTHOR_NAME: "a",
+      ANTHROPIC_API_KEY: "k",
+    });
     expect(Object.keys(clean).sort()).toEqual(["ANTHROPIC_API_KEY", "GIT_AUTHOR_NAME", "PATH"]);
   });
 });
@@ -80,7 +102,14 @@ describe("process group", () => {
     expect(result.exitCode).not.toBe(0);
     const pid = Number(readFileSync(marker, "utf8"));
     // SIGKILL lands asynchronously; under load the grandchild can outlive the stage by a few ms.
-    const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    const alive = () => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
     for (let waited = 0; alive() && waited < 2_000; waited += 50) await Bun.sleep(50);
     expect(alive()).toBe(false); // the grandchild is gone
   });
@@ -99,5 +128,7 @@ test("a command that cannot start is a failed stage with the reason, not a crash
   const result = await new CommandExecutor({ a: { command: [join(cwd, "not-an-agent")] } }, { default: "a" })
     .runStage({ stage: "plan", issue: 7, cwd, maxBudgetUsd: 1 })
     .catch((e: Error) => e);
-  expect(result instanceof Error ? result.message : `exit ${result.exitCode}`).toMatch(/not-an-agent|ENOENT|exit [1-9]/);
+  expect(result instanceof Error ? result.message : `exit ${result.exitCode}`).toMatch(
+    /not-an-agent|ENOENT|exit [1-9]/,
+  );
 });

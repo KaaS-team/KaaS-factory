@@ -54,7 +54,9 @@ async function appendLessons(worktreeDir: string, rows: readonly RetroRow[]): Pr
 // One proposal file per named skill, never the real SKILL.md: incorporating
 // the wording change is left to a human during PR review.
 async function appendProposedEdits(worktreeDir: string, rows: readonly RetroRow[]): Promise<void> {
-  const skillNames = new Set(rows.filter((r): r is RetroRow & { skill_name: string } => Boolean(r.skill_name)).map((r) => r.skill_name));
+  const skillNames = new Set(
+    rows.filter((r): r is RetroRow & { skill_name: string } => Boolean(r.skill_name)).map((r) => r.skill_name),
+  );
   for (const name of skillNames) {
     const path = `${worktreeDir}/.claude/skills/${name}/PROPOSED_EDITS.md`;
     const entries = rows
@@ -68,7 +70,9 @@ async function appendProposedEdits(worktreeDir: string, rows: readonly RetroRow[
 }
 
 function buildPrBody(rows: readonly RetroRow[]): string {
-  const lines = rows.map((r) => `- #${r.issue} (${r.outcome}): ${r.lesson ?? `skill edit proposed for \`${r.skill_name}\``}`);
+  const lines = rows.map(
+    (r) => `- #${r.issue} (${r.outcome}): ${r.lesson ?? `skill edit proposed for \`${r.skill_name}\``}`,
+  );
   return [
     `Batches ${rows.length} pending retro proposal(s) into repo-local memory and skill-edit proposals.`,
     "",
@@ -85,7 +89,12 @@ function buildPrBody(rows: readonly RetroRow[]): string {
 // should never happen since only src/state.ts and this file write these
 // paths, but is checked anyway as defense in depth (mirrors
 // touchesProtectedPath's use in watch.ts).
-export async function runLearn(deps: LearnDeps, repo: string, base: string, now: Date = new Date()): Promise<LearnResult> {
+export async function runLearn(
+  deps: LearnDeps,
+  repo: string,
+  base: string,
+  now: Date = new Date(),
+): Promise<LearnResult> {
   const pending = deps.state.pendingLessons(repo);
   if (pending.length === 0) return { batched: 0 };
 
@@ -118,6 +127,9 @@ export async function runLearn(deps: LearnDeps, repo: string, base: string, now:
         body: buildPrBody(pending),
       });
 
-  deps.state.markLearned(pending.map((r) => r.id), now.toISOString());
+  deps.state.markLearned(
+    pending.map((r) => r.id),
+    now.toISOString(),
+  );
   return { batched: pending.length, prUrl, branch };
 }

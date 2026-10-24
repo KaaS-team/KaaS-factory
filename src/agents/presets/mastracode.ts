@@ -40,7 +40,8 @@ export function createMastraParser(): (line: string) => StageEvent[] {
         buffer = "";
         return [];
       case "message_update":
-        if (parsed.id === assistantId && parsed.event?.type === "text-delta" && parsed.event.delta) buffer += parsed.event.delta;
+        if (parsed.id === assistantId && parsed.event?.type === "text-delta" && parsed.event.delta)
+          buffer += parsed.event.delta;
         return [];
       case "message_end": {
         if (parsed.id !== assistantId || !buffer) return [];
@@ -53,7 +54,9 @@ export function createMastraParser(): (line: string) => StageEvent[] {
       case "usage_update": {
         const tokensIn = count(parsed.usage?.promptTokens);
         const tokensOut = count(parsed.usage?.completionTokens);
-        return tokensIn === null || tokensOut === null ? [{ kind: "usage", invalid: true }] : [{ kind: "usage", tokensIn, tokensOut, total: true }];
+        return tokensIn === null || tokensOut === null
+          ? [{ kind: "usage", invalid: true }]
+          : [{ kind: "usage", tokensIn, tokensOut, total: true }];
       }
       default:
         return [];
@@ -66,7 +69,17 @@ export const mastracodePreset: AgentPreset = {
   binary: "mastracode",
   verified: false,
   version: "0.42.0",
-  envKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY"],
+  envKeys: [
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "OPENROUTER_API_KEY",
+    "MISTRAL_API_KEY",
+    "GROQ_API_KEY",
+    "XAI_API_KEY",
+    "DEEPSEEK_API_KEY",
+  ],
   readOnlyBy: "`--mode plan`",
   skillsDir: ".mastracode/skills",
   contextFile: "AGENTS.md",

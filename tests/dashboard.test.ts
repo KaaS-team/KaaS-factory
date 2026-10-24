@@ -34,7 +34,9 @@ class FakeGitHub extends GitHub {
       title: "An issue",
       body: "body",
       labels: [],
-      comments: [{ id: 1, author: "octocat", authorAssociation: "OWNER", body: "hello", createdAt: new Date().toISOString() }],
+      comments: [
+        { id: 1, author: "octocat", authorAssociation: "OWNER", body: "hello", createdAt: new Date().toISOString() },
+      ],
     };
   }
 }
@@ -84,7 +86,10 @@ describe("dashboard (no FACTORY_DASHBOARD_TOKEN set — the default local case)"
   });
 
   test("GET /api/board builds cards from GitHub labels", async () => {
-    const { dashboard } = await freshDashboard([issue(1, "Fix login", ["bug"]), issue(2, "Upgrade hono", [LABEL.building])]);
+    const { dashboard } = await freshDashboard([
+      issue(1, "Fix login", ["bug"]),
+      issue(2, "Upgrade hono", [LABEL.building]),
+    ]);
     const res = await dashboard.handle(req("/api/board"), LOOPBACK);
     expect(res.status).toBe(200);
     const data = (await res.json()) as { cards: { issue: number; column: string }[] };
@@ -121,7 +126,11 @@ describe("dashboard (no FACTORY_DASHBOARD_TOKEN set — the default local case)"
   test("rejects a mutating request whose content-type is not application/json (CSRF)", async () => {
     const { dashboard } = await freshDashboard([issue(1, "x")]);
     const res = await dashboard.handle(
-      req("/api/mark-ready", { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ issue: 1 }) }),
+      req("/api/mark-ready", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: JSON.stringify({ issue: 1 }),
+      }),
       LOOPBACK,
     );
     expect(res.status).toBe(415);

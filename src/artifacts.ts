@@ -105,15 +105,27 @@ function unknownKey(obj: object, allowed: Set<string>): string | undefined {
 }
 
 function stepEnvelopeProblem(o: Record<string, unknown>): string | undefined {
-  if (o.outcome !== undefined && !STEP_OUTCOMES.includes(o.outcome as string)) return "step outcome must be complete, blocked, or failed";
-  if (o.summary !== undefined && (typeof o.summary !== "string" || !o.summary.trim())) return "step summary must be a non-empty string";
+  if (o.outcome !== undefined && !STEP_OUTCOMES.includes(o.outcome as string))
+    return "step outcome must be complete, blocked, or failed";
+  if (o.summary !== undefined && (typeof o.summary !== "string" || !o.summary.trim()))
+    return "step summary must be a non-empty string";
   return undefined;
 }
 
 // Every stage artifact rejects a field it does not define, so a typo cannot
 // pass as a silent no-op. The verdict has its own, deeper validator above.
 export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string[]> = {
-  triage: ["disposition", "type", "risk", "done_when", "files_expected", "gate_level", "confidence", "outcome", "summary"],
+  triage: [
+    "disposition",
+    "type",
+    "risk",
+    "done_when",
+    "files_expected",
+    "gate_level",
+    "confidence",
+    "outcome",
+    "summary",
+  ],
   plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "proof", "outcome", "summary"],
   build: ["status", "gate_line", "rounds", "screenshots", "outcome", "summary"],
   pr: ["outcome", "summary"],
@@ -122,9 +134,14 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
 
 // `types` bounds triage's `type` enum to the repo's actual type list
 // (typesFor(config.routes)); omit it to fall back to the fixed TYPE_LABELS.
-export function validateStepJson(stage: Exclude<ArtifactStage, "verify">, raw: unknown, types?: readonly string[]): { ok: true } | { ok: false; reason: string } {
+export function validateStepJson(
+  stage: Exclude<ArtifactStage, "verify">,
+  raw: unknown,
+  types?: readonly string[],
+): { ok: true } | { ok: false; reason: string } {
   const name = JSON_FILENAMES[stage];
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ok: false, reason: `${name} is not a JSON object` };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    return { ok: false, reason: `${name} is not a JSON object` };
   const o = raw as Record<string, unknown>;
   const extra = unknownKey(o, new Set(STEP_KEYS[stage]));
   if (extra) return { ok: false, reason: `${name} has unknown field "${extra}"` };
@@ -133,8 +150,11 @@ export function validateStepJson(stage: Exclude<ArtifactStage, "verify">, raw: u
 }
 
 // Where a step that reported "blocked" or "failed" stops. Undefined means carry on.
-export function stepStop(json: { outcome?: StepOutcome; summary?: string } | undefined): { status: "needs-human" | "failed"; reason: string } | undefined {
-  if (json?.outcome === "blocked") return { status: "needs-human", reason: json.summary ?? "the agent reported it was blocked" };
+export function stepStop(
+  json: { outcome?: StepOutcome; summary?: string } | undefined,
+): { status: "needs-human" | "failed"; reason: string } | undefined {
+  if (json?.outcome === "blocked")
+    return { status: "needs-human", reason: json.summary ?? "the agent reported it was blocked" };
   if (json?.outcome === "failed") return { status: "failed", reason: json.summary ?? "the agent reported failure" };
   return undefined;
 }
@@ -151,8 +171,10 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
   if (envelope) return bad(envelope);
   // A blocked or failed verify owes no verdict; the runner routes it by outcome.
   if (v.outcome === "blocked" || v.outcome === "failed") return { ok: true, verdict: v as unknown as VerdictArtifact };
-  if (v.result !== "pass" && v.result !== "reject" && v.result !== "uncertain") return bad('verdict.json "result" must be pass, reject or uncertain');
-  if (!Number.isInteger(v.rounds) || (v.rounds as number) < 0) return bad('verdict.json "rounds" must be a non-negative integer');
+  if (v.result !== "pass" && v.result !== "reject" && v.result !== "uncertain")
+    return bad('verdict.json "result" must be pass, reject or uncertain');
+  if (!Number.isInteger(v.rounds) || (v.rounds as number) < 0)
+    return bad('verdict.json "rounds" must be a non-negative integer');
   if (!Array.isArray(v.findings)) return bad('verdict.json "findings" must be an array');
   for (const f of v.findings) {
     if (typeof f === "string") continue;
@@ -160,9 +182,11 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
     const key = unknownKey(f, FINDING_KEYS);
     if (key) return bad(`a finding has unknown field "${key}"`);
     const o = f as Record<string, unknown>;
-    if (o.severity !== "must" && o.severity !== "should" && o.severity !== "could") return bad("a finding's severity must be must, should or could");
-    if (!Number.isInteger(o.confidence) || (o.confidence as number) < 0 || (o.confidence as number) > 5) return bad("a finding's confidence must be an integer from 0 to 5");
-    if (typeof o.what !== "string" || !o.what.trim()) return bad("a finding needs a non-empty \"what\"");
+    if (o.severity !== "must" && o.severity !== "should" && o.severity !== "could")
+      return bad("a finding's severity must be must, should or could");
+    if (!Number.isInteger(o.confidence) || (o.confidence as number) < 0 || (o.confidence as number) > 5)
+      return bad("a finding's confidence must be an integer from 0 to 5");
+    if (typeof o.what !== "string" || !o.what.trim()) return bad('a finding needs a non-empty "what"');
   }
   if (v.criteria !== undefined) {
     if (!Array.isArray(v.criteria)) return bad('verdict.json "criteria" must be an array');
@@ -172,12 +196,15 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
       if (key) return bad(`a criterion has unknown field "${key}"`);
       const o = c as Record<string, unknown>;
       if (typeof o.id !== "string" || !/^AC-\d+$/.test(o.id)) return bad("a criterion id must look like AC-1");
-      if (o.status !== "pass" && o.status !== "fail" && o.status !== "unverified") return bad("a criterion status must be pass, fail or unverified");
+      if (o.status !== "pass" && o.status !== "fail" && o.status !== "unverified")
+        return bad("a criterion status must be pass, fail or unverified");
     }
   }
   const verdict = v as unknown as VerdictArtifact;
   if (verdict.result === "pass") {
-    const blocking = verdict.findings.find((f) => typeof f !== "string" && f.severity !== "could" && f.confidence >= BLOCKING_CONFIDENCE);
+    const blocking = verdict.findings.find(
+      (f) => typeof f !== "string" && f.severity !== "could" && f.confidence >= BLOCKING_CONFIDENCE,
+    );
     if (blocking) return bad(`verdict is pass but lists a blocking finding: ${(blocking as Finding).what}`);
     const open = verdict.criteria?.find((c) => c.status !== "pass");
     if (open) return bad(`verdict is pass but ${open.id} is ${open.status}`);
@@ -240,7 +267,9 @@ export async function writeGateEvidence(cwd: string, issue: number, evidence: Ga
 
 export async function readGateEvidence(cwd: string, issue: number): Promise<GateEvidence | undefined> {
   const v = await readJson<Partial<GateEvidence>>(`${cwd}/${runDir(issue)}/gate.json`);
-  return typeof v?.tree === "string" && typeof v.line === "string" && typeof v.status === "string" ? { line: v.line, status: v.status, tree: v.tree } : undefined;
+  return typeof v?.tree === "string" && typeof v.line === "string" && typeof v.status === "string"
+    ? { line: v.line, status: v.status, tree: v.tree }
+    : undefined;
 }
 
 async function readText(path: string): Promise<string | undefined> {

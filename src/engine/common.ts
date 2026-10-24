@@ -6,10 +6,23 @@ import { holdoutEnabled, type FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
 import { costFor } from "../pricing";
-import { OPERATOR_TAKEOVER, type Executor, type StageName, type StageRunOptions, type StageRunResult } from "../executor";
+import {
+  OPERATOR_TAKEOVER,
+  type Executor,
+  type StageName,
+  type StageRunOptions,
+  type StageRunResult,
+} from "../executor";
 import { renderRunSummary } from "../run-summary";
 import type { IssueView } from "../tmux";
-import { clearStageArtifacts, validateStepJson, readStageArtifacts, runDir, type RetroArtifact, type VerdictArtifact } from "../artifacts";
+import {
+  clearStageArtifacts,
+  validateStepJson,
+  readStageArtifacts,
+  runDir,
+  type RetroArtifact,
+  type VerdictArtifact,
+} from "../artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isHumanComment, parseChatOps } from "../chatops";
 import { mcpServersFor } from "../mcp";
@@ -26,7 +39,7 @@ import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
 import type { Workflow } from "../core/workflow";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
-import { FactoryState, type RetroTrigger, type Stage } from "../state";
+import type { FactoryState, RetroTrigger, Stage } from "../state";
 import { LABEL, issueType } from "../labels";
 import { emitEvent, type EventBus } from "./bus";
 import type { Minion } from "../core/minion";
@@ -64,7 +77,12 @@ export interface WatchDeps {
   // advance holds the issue's lease (src/engine/lease.ts) for its whole run,
   // so workers on other machines, CI jobs and cloud routines never run the
   // same issue at once, and a crashed worker's issue is reclaimed after the TTL.
-  readonly leases?: { readonly port: LeasePort; readonly holder: string; readonly opts?: LeaseOpts; readonly held: Map<number, Held> };
+  readonly leases?: {
+    readonly port: LeasePort;
+    readonly holder: string;
+    readonly opts?: LeaseOpts;
+    readonly held: Map<number, Held>;
+  };
   // Absent: caps read this machine's SQLite. Present: every stage's spend is
   // also recorded here and caps read the larger of the two, so they hold
   // across every worker.
@@ -113,7 +131,13 @@ export function labelsOf(issue: Pick<GhIssue, "labels">): string[] {
 // resume function is leaving) — rather than guessing at the issue's current
 // label list, which is what let a restarted process reconstruct the wrong
 // state (audit finding #21).
-export async function moveLabel(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, to: string): Promise<void> {
+export async function moveLabel(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issueNumber: number,
+  from: string,
+  to: string,
+): Promise<void> {
   await deps.github.setStateLabel(config.repo, issueNumber, [from], to);
 }
 
@@ -135,7 +159,12 @@ export async function ensureWorktreeReady(
   const result = await ensureSetup(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.setup);
   if (result.ok) return true;
   await moveLabel(deps, config, issueNumber, fromLabel, LABEL.needsHuman);
-  await postComment(deps, config, issueNumber, `Setup failed in the worktree, so this parked instead of starting a stage:\n\n\`\`\`\n${result.log.slice(-4000)}\n\`\`\``);
+  await postComment(
+    deps,
+    config,
+    issueNumber,
+    `Setup failed in the worktree, so this parked instead of starting a stage:\n\n\`\`\`\n${result.log.slice(-4000)}\n\`\`\``,
+  );
   finish(deps, config, issueNumber, "needs-human", "setup failed");
   return false;
 }
@@ -149,14 +178,20 @@ export function withDataMarker(body: string, stage: string, json: unknown): stri
 export async function leased(deps: WatchDeps, issueNumber: number, work: () => Promise<Outcome>): Promise<Outcome> {
   const l = deps.leases;
   if (!l) return work();
-  const out = await withLease(l.port, String(issueNumber), l.holder, async (held) => {
-    l.held.set(issueNumber, held);
-    try {
-      return await work();
-    } finally {
-      l.held.delete(issueNumber);
-    }
-  }, l.opts);
+  const out = await withLease(
+    l.port,
+    String(issueNumber),
+    l.holder,
+    async (held) => {
+      l.held.set(issueNumber, held);
+      try {
+        return await work();
+      } finally {
+        l.held.delete(issueNumber);
+      }
+    },
+    l.opts,
+  );
   return out ?? "waiting";
 }
 
@@ -169,7 +204,11 @@ export async function postComment(
 ): Promise<void> {
   if (!body.trim()) return;
   // No marker means it would read as an OWNER-authored human comment.
-  const full = dataTag ? withDataMarker(body, dataTag.stage, dataTag.json) : body.includes("<!-- factory:") ? body : `${body}\n\n<!-- factory:notice -->`;
+  const full = dataTag
+    ? withDataMarker(body, dataTag.stage, dataTag.json)
+    : body.includes("<!-- factory:")
+      ? body
+      : `${body}\n\n<!-- factory:notice -->`;
   await deps.github.commentIssue(config.repo, issueNumber, full);
 }
 
@@ -188,7 +227,10 @@ export async function recheckFindings(
   if (dropped.length === 0) return { verdict, note: "" };
   const result = verdict.result === "reject" && !hasBlocking(kept) ? "uncertain" : verdict.result;
   const list = dropped.map((f) => `- ${f.what}`).join("\n");
-  return { verdict: { ...verdict, findings: kept, result }, note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a line it changed, so they were dropped:\n${list}` };
+  return {
+    verdict: { ...verdict, findings: kept, result },
+    note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a line it changed, so they were dropped:\n${list}`,
+  };
 }
 
 // Build's status-comment.md is the one comment the runner keeps and edits in
@@ -242,13 +284,19 @@ export async function writeIssueSnapshot(worktree: string, issue: GhIssue): Prom
 export function stageFailure(result: StageRunResult, fallback: string): string;
 export function stageFailure(result: StageRunResult): string | undefined;
 export function stageFailure(result: StageRunResult, fallback?: string): string | undefined {
-  const denied = result.permissionDenials.length ? `permission denied: ${result.permissionDenials.join("; ")}` : undefined;
+  const denied = result.permissionDenials.length
+    ? `permission denied: ${result.permissionDenials.join("; ")}`
+    : undefined;
   return result.killedReason ?? denied ?? result.stderrTail ?? fallback;
 }
 
 // The agent's own cost wins; otherwise price the tokens. No price means the
 // cost is unknown, which is stored as NULL with usage_complete = 0, never as $0.
-export function priceResult(result: StageRunResult): { cached: number; costUsd: number | null; usageComplete: boolean } {
+export function priceResult(result: StageRunResult): {
+  cached: number;
+  costUsd: number | null;
+  usageComplete: boolean;
+} {
   const cached = result.tokensCached ?? 0;
   const priced =
     result.costReported === false
@@ -282,7 +330,13 @@ export async function runStage(
   await writeIssueSnapshot(worktree, issue);
   await clearStageArtifacts(worktree, issueNumber, stage);
 
-  deps.state.upsertRun({ issue: issueNumber, repo: config.repo, title: issue.title, stage: stage as Stage, status: "running" });
+  deps.state.upsertRun({
+    issue: issueNumber,
+    repo: config.repo,
+    title: issue.title,
+    stage: stage as Stage,
+    status: "running",
+  });
   const run = deps.state.getRun(config.repo, issueNumber)!;
   const files = await stageFiles(deps, issueNumber);
   const startedAt = new Date();
@@ -299,7 +353,13 @@ export async function runStage(
     ...rest,
     ...(mcp ? { mcp } : {}),
   });
-  for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
+  for (const e of result.events)
+    deps.state.appendEvent(
+      run.id,
+      stage as Stage,
+      e.kind === "truncated" ? TRUNCATION_KIND : e.kind,
+      e.text ?? e.toolName ?? "",
+    );
   const finishedAt = new Date();
   const { cached, costUsd, usageComplete } = priceResult(result);
   deps.state.recordStageRun({
@@ -321,7 +381,14 @@ export async function runStage(
     killed_reason: result.killedReason ?? null,
     session_id: result.sessionId ?? null,
   });
-  await recordSpend(deps, config, { issue: issueNumber, stage, costUsd, tokensIn: result.tokensIn, tokensOut: result.tokensOut, at: startedAt.toISOString() });
+  await recordSpend(deps, config, {
+    issue: issueNumber,
+    stage,
+    costUsd,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
+    at: startedAt.toISOString(),
+  });
   deps.state.updateRun(config.repo, issueNumber, {
     tool_calls: run.tool_calls + result.toolCalls,
     tokens_in: run.tokens_in + result.tokensIn,
@@ -335,14 +402,23 @@ export async function runStage(
 // The machine's tally and the shared store, after stage_runs. A shared store
 // that can't be written is logged, not fatal: the stage's work is done, and
 // SQLite still has the row.
-export async function recordSpend(deps: Pick<WatchDeps, "machine" | "spend">, config: FactoryConfig, e: SpendEntry): Promise<void> {
+export async function recordSpend(
+  deps: Pick<WatchDeps, "machine" | "spend">,
+  config: FactoryConfig,
+  e: SpendEntry,
+): Promise<void> {
   if (e.costUsd !== null) deps.machine?.spend.record(config.repo, e.costUsd);
-  await deps.spend?.record(e).catch((err) => console.error(`[spend] #${e.issue} ${e.stage}: ${err instanceof Error ? err.message : err}`));
+  await deps.spend
+    ?.record(e)
+    .catch((err) => console.error(`[spend] #${e.issue} ${e.stage}: ${err instanceof Error ? err.message : err}`));
 }
 
 // The transcript and live-file paths for a stage, and the issue's window
 // opened on the transcript. Both are optional; a view error is only logged.
-export async function stageFiles(deps: WatchDeps, issueNumber: number): Promise<{ transcriptFile?: string; liveFile?: string }> {
+export async function stageFiles(
+  deps: WatchDeps,
+  issueNumber: number,
+): Promise<{ transcriptFile?: string; liveFile?: string }> {
   if (!deps.runFiles) return {};
   const transcriptFile = deps.runFiles.transcript(issueNumber);
   if (deps.view) {
@@ -360,7 +436,13 @@ export async function stageFiles(deps: WatchDeps, issueNumber: number): Promise<
 // operator-merge route, which has no Executor to run this itself) and is now
 // being drained by runQueuedRetros; the three watch.ts triggers queue and run
 // in the same call.
-export async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, outcome: RetroTrigger, existingId?: number): Promise<void> {
+export async function runRetro(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  outcome: RetroTrigger,
+  existingId?: number,
+): Promise<void> {
   const id = existingId ?? deps.state.queueRetro(config.repo, issue.number, outcome);
   const issueNumber = issue.number;
   const worktree = worktreeFor(deps, issueNumber);
@@ -377,7 +459,9 @@ export async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: Gh
       timeoutMinutes: config.stageTimeoutMinutes,
       maxToolCalls: config.maxToolCalls,
       agentCommands: config.agentCommands,
-      ...(deps.runFiles ? { transcriptFile: deps.runFiles.transcript(issueNumber), liveFile: deps.runFiles.live(issueNumber) } : {}),
+      ...(deps.runFiles
+        ? { transcriptFile: deps.runFiles.transcript(issueNumber), liveFile: deps.runFiles.live(issueNumber) }
+        : {}),
     });
     const finishedAt = new Date();
     const { cached, costUsd, usageComplete } = priceResult(result);
@@ -400,7 +484,14 @@ export async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: Gh
       killed_reason: result.killedReason ?? null,
       session_id: result.sessionId ?? null,
     });
-    await recordSpend(deps, config, { issue: issueNumber, stage: "retro", costUsd, tokensIn: result.tokensIn, tokensOut: result.tokensOut, at: startedAt.toISOString() });
+    await recordSpend(deps, config, {
+      issue: issueNumber,
+      stage: "retro",
+      costUsd,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+      at: startedAt.toISOString(),
+    });
     const art = await readStageArtifacts(worktree, issueNumber, "retro");
     deps.state.completeRetro(id, art.json as RetroArtifact | undefined);
   } catch (err) {
@@ -416,7 +507,13 @@ export async function runQueuedRetros(deps: WatchDeps, config: FactoryConfig): P
     try {
       const issue = await deps.github.getIssue(config.repo, row.issue);
       // The dashboard's merge route queues "merged" after the operator merged the PR.
-      if (row.outcome === "merged") emitEvent(deps.bus, "factory.pr.merged", { repo: config.repo, issue: row.issue, by: "operator" }, `issue/${row.issue}`);
+      if (row.outcome === "merged")
+        emitEvent(
+          deps.bus,
+          "factory.pr.merged",
+          { repo: config.repo, issue: row.issue, by: "operator" },
+          `issue/${row.issue}`,
+        );
       await runRetro(deps, config, issue, row.outcome, row.id);
     } catch (err) {
       console.error(`queued retro failed for #${row.issue}:`, err);
@@ -428,13 +525,23 @@ export async function runQueuedRetros(deps: WatchDeps, config: FactoryConfig): P
 // A stage's JSON, or why it cannot be used: an unknown field is refused, and
 // an `outcome` of blocked or failed stops the run where the agent said it did.
 export type StepStage = "triage" | "plan" | "build";
-export function stageJson<T extends { outcome?: "complete" | "blocked" | "failed"; summary?: string }>(stage: StepStage, raw: unknown, types?: readonly string[]): { json?: T; problem?: string } {
+export function stageJson<T extends { outcome?: "complete" | "blocked" | "failed"; summary?: string }>(
+  stage: StepStage,
+  raw: unknown,
+  types?: readonly string[],
+): { json?: T; problem?: string } {
   if (raw === undefined) return {};
   const checked = validateStepJson(stage, raw, types);
   return checked.ok ? { json: raw as T } : { problem: checked.reason };
 }
 
-export async function stopStep(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, stop: { status: "needs-human" | "failed"; reason: string }): Promise<Outcome> {
+export async function stopStep(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issueNumber: number,
+  from: string,
+  stop: { status: "needs-human" | "failed"; reason: string },
+): Promise<Outcome> {
   await moveLabel(deps, config, issueNumber, from, stop.status === "failed" ? LABEL.failed : LABEL.needsHuman);
   finish(deps, config, issueNumber, stop.status, stop.reason);
   return stop.status;
@@ -452,7 +559,12 @@ export const FAILURE_TAIL_BYTES = 12 * 1024;
 
 export function failureTail(text: string): string {
   const bytes = Buffer.from(text);
-  return bytes.length <= FAILURE_TAIL_BYTES ? text : bytes.subarray(bytes.length - FAILURE_TAIL_BYTES).toString().replace(/^\uFFFD+/, "");
+  return bytes.length <= FAILURE_TAIL_BYTES
+    ? text
+    : bytes
+        .subarray(bytes.length - FAILURE_TAIL_BYTES)
+        .toString()
+        .replace(/^\uFFFD+/, "");
 }
 
 export const EPOCH = "1970-01-01T00:00:00.000Z";
@@ -462,9 +574,11 @@ export const EPOCH = "1970-01-01T00:00:00.000Z";
 // this machine's cap across all its repos.
 export async function spendCapHit(deps: WatchDeps, config: FactoryConfig): Promise<string | undefined> {
   const repoDailyUsd = config.spend.dailyUsd;
-  if (repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd) return `the repo's daily spend cap ($${repoDailyUsd}) is reached`;
+  if (repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd)
+    return `the repo's daily spend cap ($${repoDailyUsd}) is reached`;
   const machineDailyUsd = deps.machine?.config.dailyUsd;
-  if (machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd) return `this machine's daily spend cap ($${machineDailyUsd}) is reached`;
+  if (machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd)
+    return `this machine's daily spend cap ($${machineDailyUsd}) is reached`;
   return undefined;
 }
 
@@ -477,7 +591,10 @@ export async function repoSpendToday(deps: WatchDeps, config: FactoryConfig): Pr
 // a write (an outage, a missing label) can never read lower than it.
 function larger(local: SpendTotal, shared: SpendTotal | undefined): SpendTotal {
   if (!shared) return local;
-  return { costUsd: Math.max(local.costUsd, shared.costUsd), unreportedRuns: Math.max(local.unreportedRuns, shared.unreportedRuns) };
+  return {
+    costUsd: Math.max(local.costUsd, shared.costUsd),
+    unreportedRuns: Math.max(local.unreportedRuns, shared.unreportedRuns),
+  };
 }
 
 export function startOfTodayUtc(): string {
@@ -488,9 +605,16 @@ export function startOfTodayUtc(): string {
 // spend and unreported-run count, this repo's spend today, and — when a
 // machine is configured — the whole machine's spend today. The first
 // breached cap wins and its message is what parks the issue.
-export async function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issueNumber: number): Promise<string | undefined> {
+export async function checkSpendCap(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issueNumber: number,
+): Promise<string | undefined> {
   const { perIssueUsd, dailyUsd, maxUnreportedRuns } = config.spend;
-  const perIssue = larger(deps.state.spendSummary(config.repo, EPOCH, issueNumber), await deps.spend?.issue(issueNumber));
+  const perIssue = larger(
+    deps.state.spendSummary(config.repo, EPOCH, issueNumber),
+    await deps.spend?.issue(issueNumber),
+  );
   if (perIssueUsd !== undefined && perIssue.costUsd >= perIssueUsd) {
     return `this issue has spent $${perIssue.costUsd.toFixed(2)}, at or over its perIssueUsd cap of $${perIssueUsd.toFixed(2)}`;
   }
@@ -511,7 +635,14 @@ export async function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issu
   return undefined;
 }
 // The PR body, plus the "Factory run" summary unless config.prRunSummary is off.
-export function prBody(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, body: string, ctx: RunCtx, proof?: ProofStatus): string {
+export function prBody(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  body: string,
+  ctx: RunCtx,
+  proof?: ProofStatus,
+): string {
   if (!config.prRunSummary) return body;
   const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
   const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;

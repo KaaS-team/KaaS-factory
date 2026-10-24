@@ -93,7 +93,9 @@ const STAGE_MARKER_NAMES = new Set(["triage", "plan", "build", "verify"]);
 // With a workflow, its steps' labels and ids replace the built-in ones, so a
 // custom step (a `check`, say) is resumed and retried like any other.
 export function deriveIssueState(issue: GhIssue, workflow?: Pick<Workflow, "steps">): DerivedIssueState {
-  const byLabel = workflow ? Object.fromEntries(Object.values(workflow.steps).map((s) => [s.label, s.id])) : STAGE_BY_LABEL;
+  const byLabel = workflow
+    ? Object.fromEntries(Object.values(workflow.steps).map((s) => [s.label, s.id]))
+    : STAGE_BY_LABEL;
   const markerNames = workflow ? new Set(Object.keys(workflow.steps)) : STAGE_MARKER_NAMES;
   const labelNames = issue.labels.map((l) => l.name);
   const markers = parseDataMarkers(issue.comments);

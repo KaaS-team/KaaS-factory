@@ -16,7 +16,10 @@ for (const name of skipped) console.log(`skipped ${name}: CLI not on PATH`);
 let failed = 0;
 for (const name of run) {
   console.log(`\n== ${name}`);
-  const proc = Bun.spawn(["bun", resolve(import.meta.dir, "../bin/factory"), "verify-agent", name, "--repo-dir", repoDir, "--issue", issue], { stdout: "inherit", stderr: "inherit" });
+  const proc = Bun.spawn(
+    ["bun", resolve(import.meta.dir, "../bin/factory"), "verify-agent", name, "--repo-dir", repoDir, "--issue", issue],
+    { stdout: "inherit", stderr: "inherit" },
+  );
   if ((await proc.exited) !== 0) failed += 1;
 }
 console.log(`\nagent-matrix: ${run.length - failed} passed, ${failed} failed, ${skipped.length} skipped`);

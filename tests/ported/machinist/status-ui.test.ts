@@ -5,13 +5,19 @@ import { test } from "bun:test";
 import { analyticsState } from "../../../dashboard/public/lib/analytics-state.js";
 import { createStatusLoader } from "../../../dashboard/public/lib/status-loader.js";
 
-const measuredJob = { created_at: "2026-08-25T10:00:00Z", state: "succeeded", runs: [{
-  id: "run_latest",
-  command: "build",
-  completed_at: "2026-08-25T12:00:00Z",
-  duration_millis: 1250,
-  token_usage: "4321",
-}] };
+const measuredJob = {
+  created_at: "2026-08-25T10:00:00Z",
+  state: "succeeded",
+  runs: [
+    {
+      id: "run_latest",
+      command: "build",
+      completed_at: "2026-08-25T12:00:00Z",
+      duration_millis: 1250,
+      token_usage: "4321",
+    },
+  ],
+};
 const now = new Date("2026-08-25T15:00:00Z");
 
 test("analytics shows loading instead of empty metrics before status loads", () => {
@@ -26,16 +32,22 @@ test("analytics shows an initial status failure instead of empty metrics", () =>
 });
 
 test("analytics hides prior metrics when a refresh fails", () => {
-  assert.deepEqual(analyticsState({ jobs: [measuredJob], days: "30", loaded: true, error: "network unavailable", now }), {
-    kind: "error",
-    message: "network unavailable",
-  });
+  assert.deepEqual(
+    analyticsState({ jobs: [measuredJob], days: "30", loaded: true, error: "network unavailable", now }),
+    {
+      kind: "error",
+      message: "network unavailable",
+    },
+  );
 });
 
 test("analytics presents measured runs from successful status data", () => {
   const state = analyticsState({ jobs: [measuredJob], days: "30", loaded: true, error: "", now });
   assert.equal(state.kind, "ready");
-  assert.deepEqual(state.runs.map((run) => run.id), ["run_latest"]);
+  assert.deepEqual(
+    state.runs.map((run) => run.id),
+    ["run_latest"],
+  );
 });
 
 test("analytics presents the empty state only after a successful status response", () => {
@@ -63,8 +75,8 @@ test("an older success cannot replace a newer request failure", async () => {
 });
 
 function deferred() {
-  let resolve;
-  let reject;
+  let resolve!: (value?: unknown) => void;
+  let reject!: (reason?: unknown) => void;
   const promise = new Promise((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
     reject = rejectPromise;

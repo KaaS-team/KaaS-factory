@@ -41,10 +41,7 @@ export function parseChatOps(body: string): Command {
 }
 
 // Latest trusted comment posted after `afterIso`, or undefined if none.
-export function latestTrustedCommentAfter(
-  comments: readonly GhComment[],
-  afterIso: string,
-): GhComment | undefined {
+export function latestTrustedCommentAfter(comments: readonly GhComment[], afterIso: string): GhComment | undefined {
   const after = Date.parse(afterIso);
   const trusted = comments.filter((c) => isHumanComment(c) && Date.parse(c.createdAt) > after);
   if (trusted.length === 0) return undefined;

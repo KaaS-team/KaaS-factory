@@ -12,7 +12,10 @@ import { aggregateStageEvents } from "../../../src/executor";
 import type { AgentPreset } from "../../../src/agents/types";
 
 const finalOf = (preset: AgentPreset, output: string) =>
-  aggregateStageEvents(output.split("\n").flatMap((l) => preset.parseLine(l)), 0).finalMessage;
+  aggregateStageEvents(
+    output.split("\n").flatMap((l) => preset.parseLine(l)),
+    0,
+  ).finalMessage;
 
 test("the collector keeps the last Codex agent message", () => {
   const out =
@@ -31,7 +34,10 @@ test("the collector keeps the Claude result", () => {
 
 test("long messages are truncated on a character boundary", () => {
   const text = "é".repeat(MAX_FINAL_MESSAGE_BYTES);
-  const got = finalOf(codexPreset, JSON.stringify({ type: "item.completed", item: { type: "agent_message", text } }) + "\n")!;
+  const got = finalOf(
+    codexPreset,
+    `${JSON.stringify({ type: "item.completed", item: { type: "agent_message", text } })}\n`,
+  )!;
   expect(got.endsWith("[truncated]")).toBe(true);
   expect(Buffer.byteLength(got)).toBeLessThanOrEqual(MAX_FINAL_MESSAGE_BYTES + "\n\n[truncated]".length);
   expect(got.startsWith("éé")).toBe(true);
@@ -44,7 +50,10 @@ test("a real child's final agent message is recorded", async () => {
     mkdirSync(join(cwd, ".claude/skills/factory-triage"), { recursive: true });
     writeFileSync(join(cwd, ".claude/skills/factory-triage/SKILL.md"), "---\nname: factory-triage\n---\nDo it.\n");
     const output = '{"type":"item.completed","item":{"type":"agent_message","text":"Triaged 9 issues."}}\n';
-    const executor = new CommandExecutor({ codex: { preset: "codex", command: ["sh", "-c", `cat >/dev/null; printf '%s' '${output}'`] } }, { default: "codex" });
+    const executor = new CommandExecutor(
+      { codex: { preset: "codex", command: ["sh", "-c", `cat >/dev/null; printf '%s' '${output}'`] } },
+      { default: "codex" },
+    );
     const result = await executor.runStage({ stage: "triage", issue: 1, cwd, maxBudgetUsd: 1 });
     expect(result.finalMessage).toBe("Triaged 9 issues.");
     expect(result.agent).toBe("codex");

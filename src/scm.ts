@@ -11,7 +11,18 @@
 import type { FactoryConfig, TrackerConfig } from "./config";
 import { GitHub } from "./github";
 import { issueBranch, issueOfBranch } from "./git";
-import type { CodeHostPort, CreatePrOptions, GhComment, GhIssue, GhPr, MergeReadiness, PrStatus, RepoRole, ScmPort, TrackerPort } from "./ports/scm";
+import type {
+  CodeHostPort,
+  CreatePrOptions,
+  GhComment,
+  GhIssue,
+  GhPr,
+  MergeReadiness,
+  PrStatus,
+  RepoRole,
+  ScmPort,
+  TrackerPort,
+} from "./ports/scm";
 import { HttpTracker } from "./adapters/http-tracker";
 
 export const PR_LINK_MARKER = "<!-- factory:pr-link v1 -->";
@@ -104,24 +115,58 @@ export class ComposedScm implements ScmPort {
   ) {}
 
   // ---- tracker
-  listIssuesByLabel(repo: string, label: string) { return this.tracker.listIssuesByLabel(repo, label); }
-  getIssue(repo: string, number: number) { return this.tracker.getIssue(repo, number); }
-  listOpenIssues(repo: string) { return this.tracker.listOpenIssues(repo); }
-  commentIssue(repo: string, number: number, body: string) { return this.tracker.commentIssue(repo, number, body); }
-  editComment(repo: string, commentId: number, body: string) { return this.tracker.editComment(repo, commentId, body); }
-  addLabels(repo: string, number: number, labels: string[]) { return this.tracker.addLabels(repo, number, labels); }
-  removeLabels(repo: string, number: number, labels: string[]) { return this.tracker.removeLabels(repo, number, labels); }
-  setStateLabel(repo: string, number: number, current: string[], next: string) { return this.tracker.setStateLabel(repo, number, current, next); }
-  closeIssue(repo: string, number: number) { return this.tracker.closeIssue(repo, number); }
-  reopenIssue(repo: string, number: number) { return this.tracker.reopenIssue(repo, number); }
-  createIssue(repo: string, title: string, body: string, labels: string[]) { return this.tracker.createIssue(repo, title, body, labels); }
-  listLabels(repo: string) { return this.tracker.listLabels(repo); }
-  ensureLabel(repo: string, name: string, color: string, description: string) { return this.tracker.ensureLabel(repo, name, color, description); }
-  currentLogin() { return this.tracker.currentLogin(); }
-  labeledBy(repo: string, number: number, label: string) { return this.tracker.labeledBy(repo, number, label); }
-  roleOf(repo: string, login: string): Promise<RepoRole> { return this.tracker.roleOf(repo, login); }
+  listIssuesByLabel(repo: string, label: string) {
+    return this.tracker.listIssuesByLabel(repo, label);
+  }
+  getIssue(repo: string, number: number) {
+    return this.tracker.getIssue(repo, number);
+  }
+  listOpenIssues(repo: string) {
+    return this.tracker.listOpenIssues(repo);
+  }
+  commentIssue(repo: string, number: number, body: string) {
+    return this.tracker.commentIssue(repo, number, body);
+  }
+  editComment(repo: string, commentId: number, body: string) {
+    return this.tracker.editComment(repo, commentId, body);
+  }
+  addLabels(repo: string, number: number, labels: string[]) {
+    return this.tracker.addLabels(repo, number, labels);
+  }
+  removeLabels(repo: string, number: number, labels: string[]) {
+    return this.tracker.removeLabels(repo, number, labels);
+  }
+  setStateLabel(repo: string, number: number, current: string[], next: string) {
+    return this.tracker.setStateLabel(repo, number, current, next);
+  }
+  closeIssue(repo: string, number: number) {
+    return this.tracker.closeIssue(repo, number);
+  }
+  reopenIssue(repo: string, number: number) {
+    return this.tracker.reopenIssue(repo, number);
+  }
+  createIssue(repo: string, title: string, body: string, labels: string[]) {
+    return this.tracker.createIssue(repo, title, body, labels);
+  }
+  listLabels(repo: string) {
+    return this.tracker.listLabels(repo);
+  }
+  ensureLabel(repo: string, name: string, color: string, description: string) {
+    return this.tracker.ensureLabel(repo, name, color, description);
+  }
+  currentLogin() {
+    return this.tracker.currentLogin();
+  }
+  labeledBy(repo: string, number: number, label: string) {
+    return this.tracker.labeledBy(repo, number, label);
+  }
+  roleOf(repo: string, login: string): Promise<RepoRole> {
+    return this.tracker.roleOf(repo, login);
+  }
   // gh's auth: PRs need it whatever the tracker is. Doctor checks the tracker's own separately.
-  authStatus() { return this.codeHost.authStatus(); }
+  authStatus() {
+    return this.codeHost.authStatus();
+  }
 
   // ---- code host
   // In branch mode a PR closes the tracker issue its head names, never what GitHub parsed from its body.
@@ -133,13 +178,21 @@ export class ComposedScm implements ScmPort {
 
   async createPr(opts: CreatePrOptions): Promise<string> {
     if (this.link === "closes") return this.codeHost.createPr(opts);
-    const url = await this.codeHost.createPr({ ...opts, title: unlinkClosingKeywords(opts.title), body: unlinkClosingKeywords(opts.body) });
+    const url = await this.codeHost.createPr({
+      ...opts,
+      title: unlinkClosingKeywords(opts.title),
+      body: unlinkClosingKeywords(opts.body),
+    });
     const n = issueOfBranch(opts.head);
     if (n !== undefined) await this.tracker.commentIssue(opts.repo, n, `Pull request: ${url}\n\n${PR_LINK_MARKER}`);
     return url;
   }
-  async listPrs(repo: string, opts?: { state?: string }) { return (await this.codeHost.listPrs(repo, opts)).map(this.linked); }
-  async getPr(repo: string, number: number) { return this.linked(await this.codeHost.getPr(repo, number)); }
+  async listPrs(repo: string, opts?: { state?: string }) {
+    return (await this.codeHost.listPrs(repo, opts)).map(this.linked);
+  }
+  async getPr(repo: string, number: number) {
+    return this.linked(await this.codeHost.getPr(repo, number));
+  }
   async findPrByHead(repo: string, head: string) {
     const pr = await this.codeHost.findPrByHead(repo, head);
     return pr && this.linked(pr);
@@ -148,16 +201,26 @@ export class ComposedScm implements ScmPort {
     const pr = await this.codeHost.mergedPrByHead(repo, head);
     return pr && this.linked(pr);
   }
-  prFeedback(repo: string, head: string): Promise<GhComment[]> { return this.codeHost.prFeedback(repo, head); }
-  markReady(repo: string, ref: string | number, ready: boolean) { return this.codeHost.markReady(repo, ref, ready); }
-  closePr(repo: string, number: number) { return this.codeHost.closePr(repo, number); }
+  prFeedback(repo: string, head: string): Promise<GhComment[]> {
+    return this.codeHost.prFeedback(repo, head);
+  }
+  markReady(repo: string, ref: string | number, ready: boolean) {
+    return this.codeHost.markReady(repo, ref, ready);
+  }
+  closePr(repo: string, number: number) {
+    return this.codeHost.closePr(repo, number);
+  }
   async prStatus(repo: string, number: number): Promise<PrStatus> {
     const status = await this.codeHost.prStatus(repo, number);
     if (this.link === "closes") return status;
     return { ...status, closingIssuesReferences: (await this.getPr(repo, number)).closingIssuesReferences ?? [] };
   }
-  mergeReadiness(repo: string, number: number): Promise<MergeReadiness> { return this.codeHost.mergeReadiness(repo, number); }
-  prDiff(repo: string, prNumber: number) { return this.codeHost.prDiff(repo, prNumber); }
+  mergeReadiness(repo: string, number: number): Promise<MergeReadiness> {
+    return this.codeHost.mergeReadiness(repo, number);
+  }
+  prDiff(repo: string, prNumber: number) {
+    return this.codeHost.prDiff(repo, prNumber);
+  }
   async prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }) {
     if (this.link === "closes") return this.codeHost.prForIssue(repo, issueNumber, opts);
     const head = issueBranch(issueNumber);
@@ -173,11 +236,18 @@ export class ComposedScm implements ScmPort {
 }
 
 // The tracker config names, built. `env` is where http's token is read from.
-export function makeTracker(tracker: TrackerConfig, env: NodeJS.ProcessEnv = process.env, github: GitHub = new GitHub()): TrackerPort {
+export function makeTracker(
+  tracker: TrackerConfig,
+  env: NodeJS.ProcessEnv = process.env,
+  github: GitHub = new GitHub(),
+): TrackerPort {
   return tracker.kind === "http" ? new HttpTracker(tracker, env) : github;
 }
 
-export function makeScm(config: Pick<FactoryConfig, "tracker" | "labels">, env: NodeJS.ProcessEnv = process.env): ComposedScm {
+export function makeScm(
+  config: Pick<FactoryConfig, "tracker" | "labels">,
+  env: NodeJS.ProcessEnv = process.env,
+): ComposedScm {
   const github = new GitHub();
   const base = makeTracker(config.tracker, env, github);
   const tracker = Object.keys(config.labels).length ? new LabelMappedTracker(base, config.labels) : base;

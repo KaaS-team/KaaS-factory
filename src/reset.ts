@@ -43,7 +43,9 @@ export interface ResetContext {
 
 export class NotResettableError extends Error {
   constructor(repo: string) {
-    super(`${repo} is not resettable: set "resettable": true in .factory/config.json to allow \`factory reset\`/\`rebaseline\` on it`);
+    super(
+      `${repo} is not resettable: set "resettable": true in .factory/config.json to allow \`factory reset\`/\`rebaseline\` on it`,
+    );
   }
 }
 
@@ -123,7 +125,10 @@ function parseRemoteBranches(lsRemoteOutput: string): string[] {
 export async function commitsAheadOfTag(deps: ResetDeps, ctx: ResetContext): Promise<string[]> {
   await deps.git.run(["fetch", "origin", ctx.base], { cwd: ctx.cloneDir });
   const log = await deps.git.run(["log", "--oneline", `${ctx.baselineTag}..origin/${ctx.base}`], { cwd: ctx.cloneDir });
-  return log.stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+  return log.stdout
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 }
 
 async function checked(deps: ResetDeps, ctx: ResetContext, args: string[]): Promise<void> {
@@ -156,7 +161,11 @@ export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<Res
   for (const commit of await commitsAheadOfTag(deps, ctx)) {
     actions.push({ kind: "drop-commit", detail: commit });
   }
-  actions.push({ kind: "force-main", detail: `${ctx.base} <- ` + (sha || `<tag ${ctx.baselineTag} not found>`), data: { sha } });
+  actions.push({
+    kind: "force-main",
+    detail: `${ctx.base} <- ${sha || `<tag ${ctx.baselineTag} not found>`}`,
+    data: { sha },
+  });
 
   const prs = await deps.github.listPrs(ctx.repo, { state: "open" });
   for (const pr of prs.filter((p) => p.headRefName.startsWith("factory/"))) {
@@ -196,7 +205,7 @@ export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<Res
 async function applyAction(deps: ResetDeps, ctx: ResetContext, action: ResetAction): Promise<void> {
   switch (action.kind) {
     case "close-pr":
-      await deps.github.closePr(ctx.repo, (action.data!.number as number));
+      await deps.github.closePr(ctx.repo, action.data!.number as number);
       return;
     case "delete-branch":
       await checked(deps, ctx, ["push", "origin", "--delete", action.data!.branch as string]);

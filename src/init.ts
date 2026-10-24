@@ -16,7 +16,11 @@ export function isFilledIn(text: string | undefined): boolean {
   }
 }
 
-export function initConfig(example: Record<string, unknown>, stack: Stack, repo: string | undefined): Record<string, unknown> {
+export function initConfig(
+  example: Record<string, unknown>,
+  stack: Stack,
+  repo: string | undefined,
+): Record<string, unknown> {
   const agentCommands = (example.agentCommands ?? {}) as Record<string, unknown>;
   return {
     ...example,
@@ -31,7 +35,9 @@ export function describeStack(stack: Stack): string[] {
   return [
     `stack: ${stack.name}${stack.ci ? `, CI: ${stack.ci}` : ""}`,
     ...(stack.setup.length ? [`setup: ${stack.setup.join(" && ")}`] : []),
-    ...(stack.gates.length ? stack.gates.map((g) => `gate ${g.name} (${g.role ?? "no role"}): ${g.cmd}`) : ["gates: none"]),
+    ...(stack.gates.length
+      ? stack.gates.map((g) => `gate ${g.name} (${g.role ?? "no role"}): ${g.cmd}`)
+      : ["gates: none"]),
     ...stack.notes.map((n) => `note: ${n}`),
   ];
 }

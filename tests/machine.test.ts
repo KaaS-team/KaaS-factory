@@ -56,7 +56,7 @@ describe("MachineLeases", () => {
     const procA = new MachineLeases(path);
     const procB = new MachineLeases(path);
     let maxHeld = 0;
-    let observedSlots: string[] = [];
+    const observedSlots: string[] = [];
 
     async function job(leases: MachineLeases, holder: string): Promise<void> {
       for (let i = 0; i < 8; i++) {

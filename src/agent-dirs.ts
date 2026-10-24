@@ -34,8 +34,15 @@ export function skillsDirFor(agent: AgentDirs, scope: Scope, projectRoot: string
 }
 
 // Built-ins merged with per-field overrides and additions.
-export function agentRegistry(overrides: Record<string, AgentDirs> = {}): { get(name: string): (AgentDirs & { name: string }) | undefined } {
+export function agentRegistry(overrides: Record<string, AgentDirs> = {}): {
+  get(name: string): (AgentDirs & { name: string }) | undefined;
+} {
   const m = builtin();
-  for (const [name, ov] of Object.entries(overrides)) m[name] = { ...m[name], ...(ov.global ? { global: ov.global } : {}), ...(ov.project ? { project: ov.project } : {}) };
+  for (const [name, ov] of Object.entries(overrides))
+    m[name] = {
+      ...m[name],
+      ...(ov.global ? { global: ov.global } : {}),
+      ...(ov.project ? { project: ov.project } : {}),
+    };
   return { get: (name) => (m[name] ? { ...m[name], name } : undefined) };
 }

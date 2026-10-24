@@ -42,18 +42,39 @@ function field(src: string, name: string, lo: number, hi: number): Set<number> {
 
 export function parseCron(src: string): Cron {
   const parts = src.trim().split(/\s+/);
-  if (parts.length !== 5) throw new CronError(`"${src}" needs 5 fields (minute hour day-of-month month day-of-week), has ${parts.length}`);
+  if (parts.length !== 5)
+    throw new CronError(`"${src}" needs 5 fields (minute hour day-of-month month day-of-week), has ${parts.length}`);
   const [minute, hour, dom, month, dowRaw] = FIELDS.map(([name, lo, hi], i) => field(parts[i]!, name, lo, hi));
   // 7 is Sunday too.
   const dow = new Set([...dowRaw!].map((d) => d % 7));
-  return { src, minute: minute!, hour: hour!, dom: dom!, month: month!, dow, domAny: parts[2] === "*", dowAny: parts[4] === "*" };
+  return {
+    src,
+    minute: minute!,
+    hour: hour!,
+    dom: dom!,
+    month: month!,
+    dow,
+    domAny: parts[2] === "*",
+    dowAny: parts[4] === "*",
+  };
 }
 
 // The wall-clock fields of `at` in `tz`, which must be an IANA zone name.
-export function wallClock(at: Date, tz: string): { minute: number; hour: number; dom: number; month: number; dow: number } {
+export function wallClock(
+  at: Date,
+  tz: string,
+): { minute: number; hour: number; dom: number; month: number; dow: number } {
   let fmt: Intl.DateTimeFormat;
   try {
-    fmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", minute: "numeric", hour: "numeric", day: "numeric", month: "numeric", weekday: "short" });
+    fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hourCycle: "h23",
+      minute: "numeric",
+      hour: "numeric",
+      day: "numeric",
+      month: "numeric",
+      weekday: "short",
+    });
   } catch {
     throw new CronError(`"${tz}" is not an IANA time zone`);
   }

@@ -76,7 +76,9 @@ const REQUIRED: Record<ArtifactStage, readonly string[]> = {
 // other agents' structured-output flags (codex --output-schema) that may not accept draft-07's
 // `dependencies` or `not`. A retro proposes one change: a skill edit names its skill, and a
 // lesson never comes with a skill edit.
-const COMBINATIONS: Partial<Record<ArtifactStage, { needs: Record<string, readonly string[]>; apart: readonly (readonly string[])[] }>> = {
+const COMBINATIONS: Partial<
+  Record<ArtifactStage, { needs: Record<string, readonly string[]>; apart: readonly (readonly string[])[] }>
+> = {
   retro: { needs: { skill_name: ["skill_edit"], skill_edit: ["skill_name"] }, apart: [["lesson", "skill_edit"]] },
 };
 
@@ -88,7 +90,13 @@ export function stageSchema(stage: ArtifactStage, types: readonly string[] = TYP
   const types_ = typesOf(stage, types);
   const properties: Record<string, Prop> = {};
   for (const k of keys) properties[k] = k === "outcome" ? outcome : k === "summary" ? str : (types_[k] ?? {});
-  return { $schema: "http://json-schema.org/draft-07/schema#", type: "object", properties, required: REQUIRED[stage], additionalProperties: false };
+  return {
+    $schema: "http://json-schema.org/draft-07/schema#",
+    type: "object",
+    properties,
+    required: REQUIRED[stage],
+    additionalProperties: false,
+  };
 }
 
 // The read-only reply envelope around a stage's schema.
@@ -105,7 +113,11 @@ export function replySchema(stage: ArtifactStage, types: readonly string[] = TYP
 // Checks a parsed artifact against its own schema: required fields, types and
 // enums. A step that reports blocked or failed owes only its outcome, so the
 // required list is skipped for it.
-export function schemaProblem(stage: ArtifactStage, o: Record<string, unknown>, types: readonly string[] = TYPE_LABELS): string | undefined {
+export function schemaProblem(
+  stage: ArtifactStage,
+  o: Record<string, unknown>,
+  types: readonly string[] = TYPE_LABELS,
+): string | undefined {
   const schema = stageSchema(stage, types) as { properties: Record<string, Prop>; required: readonly string[] };
   if (o.outcome !== "blocked" && o.outcome !== "failed") {
     const missing = schema.required.find((k) => o[k] === undefined);
@@ -120,7 +132,8 @@ export function schemaProblem(stage: ArtifactStage, o: Record<string, unknown>, 
     if (missing) return `"${k}" needs "${missing}"`;
   }
   for (const fields of combos?.apart ?? []) {
-    if (fields.every((k) => o[k] !== undefined)) return `${fields.map((k) => `"${k}"`).join(" and ")} cannot appear together`;
+    if (fields.every((k) => o[k] !== undefined))
+      return `${fields.map((k) => `"${k}"`).join(" and ")} cannot appear together`;
   }
   return undefined;
 }
@@ -136,7 +149,11 @@ function fits(prop: Prop, v: unknown): boolean {
     case "boolean":
       return typeof v === "boolean";
     case "number":
-      return typeof v === "number" && v >= ((prop.minimum as number | undefined) ?? -Infinity) && v <= ((prop.maximum as number | undefined) ?? Infinity);
+      return (
+        typeof v === "number" &&
+        v >= ((prop.minimum as number | undefined) ?? -Infinity) &&
+        v <= ((prop.maximum as number | undefined) ?? Infinity)
+      );
     case "array":
       return Array.isArray(v) && v.every((x) => fits((prop.items as Prop | undefined) ?? {}, x));
     case "object":

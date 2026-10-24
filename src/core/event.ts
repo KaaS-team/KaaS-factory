@@ -56,7 +56,14 @@ export interface CloudEvent {
   readonly data: unknown;
 }
 
-export function makeEvent(e: { id: string; source: string; type: string; subject?: string; time: Date; data: unknown }): CloudEvent {
+export function makeEvent(e: {
+  id: string;
+  source: string;
+  type: string;
+  subject?: string;
+  time: Date;
+  data: unknown;
+}): CloudEvent {
   return {
     specversion: "1.0",
     id: e.id,
@@ -70,15 +77,18 @@ export function makeEvent(e: { id: string; source: string; type: string; subject
 
 // Checks the envelope shape only; whether the type is known is the caller's call.
 export function parseEvent(raw: unknown): { ok: true; event: CloudEvent } | { ok: false; problem: string } {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return { ok: false, problem: "event must be a JSON object" };
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw))
+    return { ok: false, problem: "event must be a JSON object" };
   const r = raw as Record<string, unknown>;
   if (r.specversion !== "1.0") return { ok: false, problem: 'specversion must be "1.0"' };
   for (const k of ["id", "source", "type", "time"] as const) {
-    if (typeof r[k] !== "string" || (r[k] as string).length === 0) return { ok: false, problem: `${k} must be a non-empty string` };
+    if (typeof r[k] !== "string" || (r[k] as string).length === 0)
+      return { ok: false, problem: `${k} must be a non-empty string` };
   }
   if ((r.id as string).length > 200) return { ok: false, problem: "id is longer than 200 characters" };
   if (Number.isNaN(Date.parse(r.time as string))) return { ok: false, problem: "time must be an RFC 3339 timestamp" };
-  if (r.subject !== undefined && typeof r.subject !== "string") return { ok: false, problem: "subject must be a string" };
+  if (r.subject !== undefined && typeof r.subject !== "string")
+    return { ok: false, problem: "subject must be a string" };
   return {
     ok: true,
     event: {

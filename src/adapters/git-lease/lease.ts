@@ -14,7 +14,11 @@ const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 async function git(args: string[], cwd: string): Promise<CommandResult> {
   const proc = Bun.spawn(["git", ...args], { cwd, env: process.env, stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
   return { stdout, stderr, code };
 }
 
@@ -28,7 +32,9 @@ export class GitLeases implements LeasePort {
   }
 
   // The remote's current lease commit and its record, or undefined when none exists.
-  private async read(ref: string): Promise<{ sha: string; record: ReturnType<typeof decodeLease> } | undefined | "error"> {
+  private async read(
+    ref: string,
+  ): Promise<{ sha: string; record: ReturnType<typeof decodeLease> } | undefined | "error"> {
     const ls = await git(["ls-remote", "origin", ref], this.cloneDir);
     if (ls.code !== 0) return "error";
     const sha = ls.stdout.split("\t")[0]?.trim();
@@ -40,7 +46,10 @@ export class GitLeases implements LeasePort {
   }
 
   private async write(ref: string, parent: string | undefined, message: string): Promise<boolean> {
-    const commit = await git([...FALLBACK_IDENTITY, "commit-tree", EMPTY_TREE, ...(parent ? ["-p", parent] : []), "-m", message], this.cloneDir);
+    const commit = await git(
+      [...FALLBACK_IDENTITY, "commit-tree", EMPTY_TREE, ...(parent ? ["-p", parent] : []), "-m", message],
+      this.cloneDir,
+    );
     const sha = commit.stdout.trim();
     if (commit.code !== 0 || !sha) return false;
     return (await git(["push", "-q", "origin", `${sha}:${ref}`], this.cloneDir)).code === 0;
@@ -66,9 +75,13 @@ export class GitLeases implements LeasePort {
   async held(): Promise<Array<{ key: string; holder: string; expiresAt: number }>> {
     const ls = await git(["ls-remote", "origin", "refs/factory/lease/*"], this.cloneDir);
     if (ls.code !== 0) throw new Error(`git ls-remote: ${ls.stderr.trim() || `exit ${ls.code}`}`);
-    const refs = ls.stdout.split("\n").map((l) => l.split("\t")).filter((p): p is [string, string] => p.length === 2 && p[1]!.startsWith("refs/factory/lease/"));
+    const refs = ls.stdout
+      .split("\n")
+      .map((l) => l.split("\t"))
+      .filter((p): p is [string, string] => p.length === 2 && p[1]!.startsWith("refs/factory/lease/"));
     if (refs.length === 0) return [];
-    if ((await git(["fetch", "-q", "origin", ...refs.map(([sha]) => sha)], this.cloneDir)).code !== 0) throw new Error("git fetch of the lease commits failed");
+    if ((await git(["fetch", "-q", "origin", ...refs.map(([sha]) => sha)], this.cloneDir)).code !== 0)
+      throw new Error("git fetch of the lease commits failed");
     const out: Array<{ key: string; holder: string; expiresAt: number }> = [];
     for (const [sha, ref] of refs) {
       const record = decodeLease((await git(["log", "-1", "--format=%B", sha], this.cloneDir)).stdout);

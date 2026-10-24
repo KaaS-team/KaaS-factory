@@ -110,7 +110,11 @@ export function parseAuditFindings(json: string): ScanFinding[] {
   for (const [pkg, advisoriesRaw] of Object.entries(report)) {
     const advisories = Array.isArray(advisoriesRaw) ? advisoriesRaw : [];
     if (advisories.length === 0) continue;
-    const list = advisories.map((a) => ({ id: ghsaId(a), severity: a.severity ?? "unknown", title: a.title ?? "untitled advisory" }));
+    const list = advisories.map((a) => ({
+      id: ghsaId(a),
+      severity: a.severity ?? "unknown",
+      title: a.title ?? "untitled advisory",
+    }));
     findings.push(packageFinding(pkg, list, "`bun audit --json`"));
   }
   return findings;
@@ -122,7 +126,12 @@ interface OsvVulnerability {
   readonly database_specific?: { readonly severity?: string };
 }
 interface OsvReport {
-  readonly results?: { readonly packages?: { readonly package?: { readonly name?: string }; readonly vulnerabilities?: OsvVulnerability[] }[] }[];
+  readonly results?: {
+    readonly packages?: {
+      readonly package?: { readonly name?: string };
+      readonly vulnerabilities?: OsvVulnerability[];
+    }[];
+  }[];
 }
 
 // `osv-scanner scan source -r --format json`: results per lockfile, packages
@@ -138,7 +147,11 @@ export function parseOsvFindings(json: string): ScanFinding[] {
       const advisories = byPackage.get(pkg) ?? new Map<string, Advisory>();
       for (const v of entry.vulnerabilities ?? []) {
         if (!v.id) continue;
-        advisories.set(v.id, { id: v.id, severity: (v.database_specific?.severity ?? "unknown").toLowerCase(), title: v.summary ?? "untitled advisory" });
+        advisories.set(v.id, {
+          id: v.id,
+          severity: (v.database_specific?.severity ?? "unknown").toLowerCase(),
+          title: v.summary ?? "untitled advisory",
+        });
       }
       if (advisories.size) byPackage.set(pkg, advisories);
     }
@@ -168,13 +181,23 @@ const OSV_OK = new Set([0, 1]);
 const OSV_NO_PACKAGES = 128;
 export const OSV_ARGV = ["osv-scanner", "scan", "source", "-r", "--format", "json", "."];
 
-async function findingsOf(deps: ScanDeps, cloneDir: string): Promise<{ findings: ScanFinding[]; source: ScanResult["source"] } | { skippedReason: string }> {
+async function findingsOf(
+  deps: ScanDeps,
+  cloneDir: string,
+): Promise<{ findings: ScanFinding[]; source: ScanResult["source"] } | { skippedReason: string }> {
   const osv = await deps.runner.run(OSV_ARGV, { cwd: cloneDir });
   if (OSV_OK.has(osv.code)) return { findings: parseOsvFindings(osv.stdout), source: "osv-scanner" };
   if (osv.code === OSV_NO_PACKAGES) return { skippedReason: "osv-scanner found no lockfile it reads here" };
   const bunProject = existsSync(`${cloneDir}/bun.lock`) || existsSync(`${cloneDir}/bun.lockb`);
-  if (osv.code !== 127) return { skippedReason: `osv-scanner failed (exit ${osv.code}): ${osv.stderr.trim().split("\n").slice(-3).join(" ")}` };
-  if (!bunProject) return { skippedReason: "osv-scanner is not installed, and with no bun.lock (or bun.lockb) `bun audit` cannot stand in: install osv-scanner" };
+  if (osv.code !== 127)
+    return {
+      skippedReason: `osv-scanner failed (exit ${osv.code}): ${osv.stderr.trim().split("\n").slice(-3).join(" ")}`,
+    };
+  if (!bunProject)
+    return {
+      skippedReason:
+        "osv-scanner is not installed, and with no bun.lock (or bun.lockb) `bun audit` cannot stand in: install osv-scanner",
+    };
   const audit = await deps.runner.run(["bun", "audit", "--json"], { cwd: cloneDir });
   return { findings: parseAuditFindings(audit.stdout), source: "bun audit" };
 }

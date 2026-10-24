@@ -7,7 +7,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
+import { type DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
 import { OPERATOR_TAKEOVER, type StageName, type StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
@@ -16,7 +16,16 @@ import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { EPOCH, startOfTodayUtc } from "../src/engine/common";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
 import { EventBus } from "../src/engine/bus";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeLeases, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import {
+  baseIssue,
+  FakeGateRunner,
+  FakeGit,
+  FakeGitHub,
+  FakeLeases,
+  FakeHoldoutRunner,
+  fixtureFor,
+  MultiStageExecutor,
+} from "./harness";
 
 const seen = new Set<string>();
 const initialLabels = new Map<object, string[]>();
@@ -48,12 +57,27 @@ type Ctx = ReturnType<typeof setup>;
 
 const triage = (o: object = {}) => ({
   "triage-comment.md": "<!-- factory:triage v1 -->\ntriage",
-  "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["src/a.ts"], gate_level: "make check", confidence: 0.9, ...o }),
+  "triage.json": JSON.stringify({
+    disposition: "proceed",
+    type: "bug",
+    risk: "low",
+    done_when: "x",
+    files_expected: ["src/a.ts"],
+    gate_level: "make check",
+    confidence: 0.9,
+    ...o,
+  }),
 });
 const question = (text = "Which one?") => ({ "question-comment.md": `<!-- factory:question v1 -->\n${text}` });
 const plan = (risk: "low" | "medium", extra: object = {}, rev = 1) => ({
   "plan-comment.md": `<!-- factory:plan v1 rev=${rev} -->\nplan`,
-  "plan.json": JSON.stringify({ risk, revision: rev, files: ["src/a.ts"], autoApproveEligible: risk === "low", ...extra }),
+  "plan.json": JSON.stringify({
+    risk,
+    revision: rev,
+    files: ["src/a.ts"],
+    autoApproveEligible: risk === "low",
+    ...extra,
+  }),
 });
 const build = () => ({
   "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
@@ -82,7 +106,10 @@ afterAll(() => {
 });
 
 function mergedEvents(c: Ctx): Record<string, unknown>[] {
-  return c.state.busEvents().filter((e) => e.type === "factory.pr.merged").map((e) => JSON.parse(e.data));
+  return c.state
+    .busEvents()
+    .filter((e) => e.type === "factory.pr.merged")
+    .map((e) => JSON.parse(e.data));
 }
 
 function done(c: Ctx) {
@@ -115,14 +142,26 @@ describe("approval paths", () => {
     c.state.setToggle("auto_approve_low_risk", true);
     const bus = new EventBus({ store: c.state, sinks: [], source: "factory/acme/widgets", autoDeliver: false });
     const heard: string[] = [];
-    bus.subscribe("*", (e) => void heard.push(e.type === "factory.step.started" || e.type === "factory.step.completed" ? `${e.type}:${(e.data as { step: string }).step}` : e.type));
+    bus.subscribe(
+      "*",
+      (e) =>
+        void heard.push(
+          e.type === "factory.step.started" || e.type === "factory.step.completed"
+            ? `${e.type}:${(e.data as { step: string }).step}`
+            : e.type,
+        ),
+    );
     Object.assign(c.deps, { bus });
     happy(c);
     expect(await c.step()).toBe("shipped");
     const steps = ["triage", "plan", "build", "verify", "pr"];
     expect(heard).toEqual([
       "factory.issue.ready",
-      ...steps.flatMap((s) => [`factory.step.started:${s}`, ...(s === "pr" ? ["factory.pr.opened"] : []), `factory.step.completed:${s}`]),
+      ...steps.flatMap((s) => [
+        `factory.step.started:${s}`,
+        ...(s === "pr" ? ["factory.pr.opened"] : []),
+        `factory.step.completed:${s}`,
+      ]),
       "factory.run.completed",
     ]);
     done(c);
@@ -137,7 +176,9 @@ describe("approval paths", () => {
     c.push("triage", triage({ risk: "medium" }));
     c.push("plan", plan("medium"));
     expect(await c.step()).toBe("awaiting-approval");
-    expect(parked).toEqual([{ repo: "acme/widgets", issue: 1, workflow: "feature-to-pr", step: "plan", outcome: "awaiting-approval" }]);
+    expect(parked).toEqual([
+      { repo: "acme/widgets", issue: 1, workflow: "feature-to-pr", step: "plan", outcome: "awaiting-approval" },
+    ]);
     done(c);
   });
 
@@ -162,7 +203,9 @@ describe("approval paths", () => {
     c.push("plan", plan("medium", {}, 2));
     c.github.say(1, "/factory revise also cover the empty case");
     expect(await c.step()).toBe("awaiting-approval");
-    expect(readFileSync(join(c.workspacesDir, "issue-1", runDir(1), "revise.md"), "utf8")).toBe("also cover the empty case");
+    expect(readFileSync(join(c.workspacesDir, "issue-1", runDir(1), "revise.md"), "utf8")).toBe(
+      "also cover the empty case",
+    );
     expect(c.github.issues.get(1)!.comments.filter((x) => x.body.includes("factory:plan v1")).length).toBe(2);
     build_to_pr(c);
     c.github.say(1, "/factory approve");
@@ -232,7 +275,14 @@ describe("approval paths", () => {
     c.push("pr", pr());
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("shipped");
-    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual(["triage", "plan", "build", "build", "verify", "pr"]);
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual([
+      "triage",
+      "plan",
+      "build",
+      "build",
+      "verify",
+      "pr",
+    ]);
     done(c);
   });
 
@@ -346,7 +396,11 @@ describe("needs-info paths", () => {
     c.push("triage", triage({ risk: "medium" }));
     c.push("plan", plan("medium"));
     await c.step();
-    c.push("build", { ...build(), "build.json": JSON.stringify({ status: "needs-info", gate_line: "", rounds: 1 }), ...question("Rename it?") });
+    c.push("build", {
+      ...build(),
+      "build.json": JSON.stringify({ status: "needs-info", gate_line: "", rounds: 1 }),
+      ...question("Rename it?"),
+    });
     c.github.say(1, "/factory approve");
     expect(await c.step()).toBe("needs-info");
     build_to_pr(c);
@@ -360,7 +414,11 @@ describe("needs-info paths", () => {
     c.push("triage", triage({ risk: "medium" }));
     c.push("plan", plan("medium"));
     await c.step();
-    c.push("build", { ...build(), "build.json": JSON.stringify({ status: "needs-info", gate_line: "", rounds: 1 }), "question-comment.md": "## Question\nDelete the files?" });
+    c.push("build", {
+      ...build(),
+      "build.json": JSON.stringify({ status: "needs-info", gate_line: "", rounds: 1 }),
+      "question-comment.md": "## Question\nDelete the files?",
+    });
     c.github.say(1, "/factory approve");
     expect(await c.step()).toBe("needs-info");
     expect(await c.step()).toBe("waiting");
@@ -437,7 +495,9 @@ describe("failure paths", () => {
     c.push("verify", verdict("uncertain"));
     expect(await c.step()).toBe("needs-human");
     expect(c.github.issues.get(1)!.comments.at(-1)!.body).toContain("<!-- factory:verdict");
-    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).find((r) => r.stage === "verify")!.verdict).toBe("uncertain");
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).find((r) => r.stage === "verify")!.verdict).toBe(
+      "uncertain",
+    );
     c.push("verify", verdict("uncertain"));
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("needs-human");
@@ -478,13 +538,20 @@ describe("failure paths", () => {
     c.push("triage", triage());
     c.push("plan", plan("low"));
     c.push("build", build(), { sessionId: "s-build-1" });
-    c.push("verify", { ...verdict("reject"), "verdict-comment.md": "<!-- factory:verdict v1 -->\nthe empty list still throws" }, { sessionId: "s-verify-1" });
+    c.push(
+      "verify",
+      { ...verdict("reject"), "verdict-comment.md": "<!-- factory:verdict v1 -->\nthe empty list still throws" },
+      { sessionId: "s-verify-1" },
+    );
     c.push("build", build(), { sessionId: "s-build-2" });
     c.push("verify", verdict("pass"));
     c.push("pr", pr());
     expect(await c.step()).toBe("shipped");
     // Runs in order: triage, plan, build, verify, the rebuild, verify, pr.
-    expect(c.executor.resumed[4]).toEqual({ sessionId: "s-build-1", failure: "<!-- factory:verdict v1 -->\nthe empty list still throws" });
+    expect(c.executor.resumed[4]).toEqual({
+      sessionId: "s-build-1",
+      failure: "<!-- factory:verdict v1 -->\nthe empty list still throws",
+    });
     // Only the rebuild resumes: triage, plan, the first build and every verify start fresh.
     expect(c.executor.resumed.filter(Boolean)).toHaveLength(1);
     done(c);
@@ -565,7 +632,14 @@ describe("failure paths", () => {
     back.push("verify", verdict("pass"));
     back.push("pr", pr());
     expect(await back.step()).toBe("shipped");
-    expect(back.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual(["triage", "plan", "build", "build", "verify", "pr"]);
+    expect(back.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual([
+      "triage",
+      "plan",
+      "build",
+      "build",
+      "verify",
+      "pr",
+    ]);
 
     const capped = setup(["factory:ready"]);
     capped.git.trees = ["a", "b", "c", "d", "e", "f"];
@@ -589,7 +663,10 @@ describe("failure paths", () => {
     c.push("verify", verdict("pass"));
     c.push("pr", pr());
     expect(await c.step()).toBe("shipped");
-    const markers = c.github.issues.get(1)!.comments.map((m) => m.body).join("\n");
+    const markers = c.github.issues
+      .get(1)!
+      .comments.map((m) => m.body)
+      .join("\n");
     expect(markers).toContain('"rounds":2,"findings"');
     expect(markers).toContain('"rounds":1,"findings"');
     done(c);
@@ -597,18 +674,26 @@ describe("failure paths", () => {
 
   test("14h. a tool-free re-check drops unsupported findings, and a reject left with none goes to a human", async () => {
     const finding = (what: string) => ({ severity: "must", confidence: 4, what });
-    const rejected = (findings: unknown[]) => ({ "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict", "verdict.json": JSON.stringify({ result: "reject", rounds: 1, findings }) });
+    const rejected = (findings: unknown[]) => ({
+      "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
+      "verdict.json": JSON.stringify({ result: "reject", rounds: 1, findings }),
+    });
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);
     const asked: unknown[] = [];
-    (c.deps as { rechecker?: unknown }).rechecker = { supported: async (f: unknown[]) => (asked.push(f), [] as number[]) };
+    (c.deps as { rechecker?: unknown }).rechecker = {
+      supported: async (f: unknown[]) => (asked.push(f), [] as number[]),
+    };
     c.push("triage", triage());
     c.push("plan", plan("low"));
     c.push("build", build());
     c.push("verify", rejected([finding("invented bug")]));
     expect(await c.step()).toBe("needs-human");
     expect(asked).toHaveLength(1);
-    const body = c.github.issues.get(1)!.comments.map((m) => m.body).join("\n");
+    const body = c.github.issues
+      .get(1)!
+      .comments.map((m) => m.body)
+      .join("\n");
     expect(body).toContain("does not support 1 finding(s)");
     expect(body).toContain("- invented bug");
     // A supported finding stands: the reject still sends the issue back to build.
@@ -630,10 +715,21 @@ describe("failure paths", () => {
 
   test("14e. triage refuses an issue another open PR already closes, and spends no tokens", async () => {
     const c = setup(["factory:ready"]);
-    c.github.prs.push({ number: 9, url: "u", state: "open", headRefName: "someone/fix", isDraft: false, closingIssuesReferences: [{ number: c.n }] });
+    c.github.prs.push({
+      number: 9,
+      url: "u",
+      state: "open",
+      headRefName: "someone/fix",
+      isDraft: false,
+      closingIssuesReferences: [{ number: c.n }],
+    });
     happy(c);
     expect(await c.step()).toBe("needs-human");
-    expect((c.state as unknown as { db: { query(q: string): { all(): unknown[] } } }).db.query("SELECT 1 FROM stage_runs").all()).toHaveLength(0);
+    expect(
+      (c.state as unknown as { db: { query(q: string): { all(): unknown[] } } }).db
+        .query("SELECT 1 FROM stage_runs")
+        .all(),
+    ).toHaveLength(0);
   });
 
   test("14c. outcome failed fails the run; an outcome complete does not hide a non-zero exit", async () => {
@@ -681,7 +777,11 @@ describe("in-review and claim paths", () => {
     expect(await c.step()).toBe("shipped");
     expect(c.github.createdPrs).toHaveLength(1);
     // Back to draft for the rebuild, then ready again.
-    expect(c.github.readyCalls).toEqual([["factory/issue-1", true], ["factory/issue-1", false], ["factory/issue-1", true]]);
+    expect(c.github.readyCalls).toEqual([
+      ["factory/issue-1", true],
+      ["factory/issue-1", false],
+      ["factory/issue-1", true],
+    ]);
     expect(c.github.prs[0]!.isDraft).toBe(false);
     expect(await c.step()).toBe("waiting"); // handled once, not re-triggered
     done(c);
@@ -712,7 +812,13 @@ describe("in-review and claim paths", () => {
   test("20. recoverInFlight re-drives an issue left in factory:building", async () => {
     const c = setup([LABEL.building]);
     c.github.issues.get(1)!.comments = [
-      { id: 1, author: "bot", authorAssociation: "OWNER", body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`, createdAt: "2026-01-01T00:00:00Z" },
+      {
+        id: 1,
+        author: "bot",
+        authorAssociation: "OWNER",
+        body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`,
+        createdAt: "2026-01-01T00:00:00Z",
+      },
     ];
     build_to_pr(c);
     expect(await recoverInFlight(c.deps, c.config)).toEqual([1]);
@@ -723,7 +829,13 @@ describe("in-review and claim paths", () => {
   test("20b. with leases, recovery leaves an issue a live worker holds and reclaims one whose worker died", async () => {
     const c = setup([LABEL.building]);
     c.github.issues.get(1)!.comments = [
-      { id: 1, author: "bot", authorAssociation: "OWNER", body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`, createdAt: "2026-01-01T00:00:00Z" },
+      {
+        id: 1,
+        author: "bot",
+        authorAssociation: "OWNER",
+        body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`,
+        createdAt: "2026-01-01T00:00:00Z",
+      },
     ];
     build_to_pr(c);
     const port = new FakeLeases();
@@ -744,7 +856,15 @@ describe("in-review and claim paths", () => {
       c.github.prs.push({ number: 90 + i, url: "u", state: "open", headRefName: head, isDraft: true });
     }
     const waiting = baseIssue(2, [LABEL.awaitingApproval]);
-    waiting.comments = [{ id: 5, author: "bot", authorAssociation: "OWNER", body: "<!-- factory:plan v1 rev=1 -->", createdAt: "2026-01-01T00:00:00Z" }];
+    waiting.comments = [
+      {
+        id: 5,
+        author: "bot",
+        authorAssociation: "OWNER",
+        body: "<!-- factory:plan v1 rev=1 -->",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
+    ];
     c.github.issues.set(2, waiting);
     c.github.say(2, "/factory cancel");
     const result = await pollOnce(c.deps, c.config);
@@ -1026,11 +1146,17 @@ describe("parked runs ended outside the factory", () => {
     mkdirSync(join(c.workspacesDir, "issue-1"), { recursive: true });
     const closedViews: number[] = [];
     const deps = { ...c.deps, view: { show: async () => {}, close: async (n: number) => void closedViews.push(n) } };
-    const mergePr = () => c.github.prs.push({ number: 7, url: "u", state: "merged", headRefName: c.git.branchName(1), isDraft: false });
+    const mergePr = () =>
+      c.github.prs.push({ number: 7, url: "u", state: "merged", headRefName: c.git.branchName(1), isDraft: false });
     return { c, deps, closedViews, mergePr };
   }
 
-  for (const [label, status] of [[LABEL.needsHuman, "needs-human"], [LABEL.needsInfo, "needs-info"], [LABEL.awaitingApproval, "awaiting-approval"], [LABEL.failed, "needs-human"]] as const) {
+  for (const [label, status] of [
+    [LABEL.needsHuman, "needs-human"],
+    [LABEL.needsInfo, "needs-info"],
+    [LABEL.awaitingApproval, "awaiting-approval"],
+    [LABEL.failed, "needs-human"],
+  ] as const) {
     test(`a ${label} run whose PR a human merged ships, drops its labels and workspace and closes its window`, async () => {
       const { c, deps, closedViews, mergePr } = parked(label, status);
       mergePr();

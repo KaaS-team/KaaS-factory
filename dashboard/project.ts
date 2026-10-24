@@ -19,7 +19,8 @@ export interface DashboardProject {
   readonly leases: () => Promise<ReadonlyArray<{ key: string; holder: string; expiresAt: number }>>;
 }
 
-export const NO_PROJECT = "Start the dashboard with --repo-dir (or `factory up`) to see this repo's workflows and runtimes.";
+export const NO_PROJECT =
+  "Start the dashboard with --repo-dir (or `factory up`) to see this repo's workflows and runtimes.";
 
 export function workflowsView(report: HarnessReport) {
   return {
@@ -29,8 +30,16 @@ export function workflowsView(report: HarnessReport) {
       source: e.source,
       routedTypes: e.routedTypes.map(plain),
       problems: e.problems.map(plain),
-      steps: e.workflow ? Object.values(e.workflow.steps).map((s) => ({ id: plain(s.id), uses: plain(s.uses), runtime: s.runtime ? plain(s.runtime) : null })) : [],
-      cron: e.workflow ? e.workflow.triggers.cron.map((c) => ({ schedule: plain(c.cron.src), tz: plain(c.tz), title: plain(c.title) })) : [],
+      steps: e.workflow
+        ? Object.values(e.workflow.steps).map((s) => ({
+            id: plain(s.id),
+            uses: plain(s.uses),
+            runtime: s.runtime ? plain(s.runtime) : null,
+          }))
+        : [],
+      cron: e.workflow
+        ? e.workflow.triggers.cron.map((c) => ({ schedule: plain(c.cron.src), tz: plain(c.tz), title: plain(c.title) }))
+        : [],
       events: e.workflow ? e.workflow.triggers.event.map(plain) : [],
     })),
   };
@@ -38,19 +47,32 @@ export function workflowsView(report: HarnessReport) {
 
 function target(spec: RuntimeSpec): string {
   switch (spec.kind) {
-    case "local": return "this machine";
-    case "docker": return spec.image;
-    case "ssh": return `${spec.host}:${spec.dir}`;
-    case "lwpr": return spec.app ? `lwpr app ${spec.app}` : "the lwpr build box";
-    case "wrap": return spec.argv.join(" ");
-    case "http": return spec.url;
+    case "local":
+      return "this machine";
+    case "docker":
+      return spec.image;
+    case "ssh":
+      return `${spec.host}:${spec.dir}`;
+    case "lwpr":
+      return spec.app ? `lwpr app ${spec.app}` : "the lwpr build box";
+    case "wrap":
+      return spec.argv.join(" ");
+    case "http":
+      return spec.url;
   }
 }
 
-export function settingsView(project: DashboardProject, report: HarnessReport, leases: Awaited<ReturnType<DashboardProject["leases"]>> | Error, now: number) {
+export function settingsView(
+  project: DashboardProject,
+  report: HarnessReport,
+  leases: Awaited<ReturnType<DashboardProject["leases"]>> | Error,
+  now: number,
+) {
   const refs = [
     ...runtimeRefs(project.config, {}),
-    ...report.entries.flatMap((e) => (e.workflow ? runtimeRefs({}, e.workflow.steps).map((r) => ({ ...r, where: `${e.name}: ${r.where}` })) : [])),
+    ...report.entries.flatMap((e) =>
+      e.workflow ? runtimeRefs({}, e.workflow.steps).map((r) => ({ ...r, where: `${e.name}: ${r.where}` })) : [],
+    ),
   ];
   const specs: Record<string, RuntimeSpec> = { ...BUILTIN_RUNTIMES, ...(project.machine.runtimes ?? {}) };
   return {
@@ -64,6 +86,14 @@ export function settingsView(project: DashboardProject, report: HarnessReport, l
       usedBy: refs.filter((r) => r.name === name).map((r) => plain(r.where)),
     })),
     leasesError: leases instanceof Error ? plain(leases.message) : null,
-    leases: leases instanceof Error ? [] : leases.map((l) => ({ key: plain(l.key), holder: plain(l.holder), expiresAt: l.expiresAt, live: l.expiresAt > now })),
+    leases:
+      leases instanceof Error
+        ? []
+        : leases.map((l) => ({
+            key: plain(l.key),
+            holder: plain(l.holder),
+            expiresAt: l.expiresAt,
+            live: l.expiresAt > now,
+          })),
   };
 }

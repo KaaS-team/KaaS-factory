@@ -12,7 +12,10 @@ test("unknown usage is not zero", () => {
 
 test("provider cache accounting", () => {
   const codex = readUsage({ input_tokens: 100, output_tokens: 20, cached_input_tokens: 80 }, false)!;
-  const claude = readUsage({ input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 40, cache_creation_input_tokens: 15 }, true)!;
+  const claude = readUsage(
+    { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 40, cache_creation_input_tokens: 15 },
+    true,
+  )!;
   // Claude adds cache reads and writes to input; Codex's cached tokens are already inside input.
   expect(codex.tokensIn + codex.tokensOut + claude.tokensIn + claude.tokensOut).toBe(190);
   expect(codex.tokensIn + claude.tokensIn).toBe(165);
@@ -27,5 +30,8 @@ test("an unpriced model has no cost, a priced one bills cache reads at the cache
   expect(costFor("gpt-not-priced", { tokensIn: 1, tokensOut: 1 })).toBeUndefined();
   expect(costFor(null, { tokensIn: 1, tokensOut: 1 })).toBeUndefined();
   // haiku 4.5: 20 fresh in at $1, 80 cached at $0.10, 10 out at $5, per million.
-  expect(costFor("claude-haiku-4-5-20251001", { tokensIn: 100, tokensOut: 10, tokensCached: 80 })).toBeCloseTo((20 * 1 + 80 * 0.1 + 10 * 5) / 1e6, 12);
+  expect(costFor("claude-haiku-4-5-20251001", { tokensIn: 100, tokensOut: 10, tokensCached: 80 })).toBeCloseTo(
+    (20 * 1 + 80 * 0.1 + 10 * 5) / 1e6,
+    12,
+  );
 });

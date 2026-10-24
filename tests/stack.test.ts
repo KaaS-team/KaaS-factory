@@ -63,10 +63,15 @@ describe("factory init", () => {
     const dir = mkdtempSync(join(tmpdir(), `init-${name}-`));
     dirs.push(dir);
     cpSync(join(FIXTURES, name), dir, { recursive: true });
-    for (const argv of [["git", "init", "-q", "-b", "main"], ["git", "remote", "add", "origin", "https://github.com/acme/widgets.git"]]) Bun.spawnSync(argv, { cwd: dir });
+    for (const argv of [
+      ["git", "init", "-q", "-b", "main"],
+      ["git", "remote", "add", "origin", "https://github.com/acme/widgets.git"],
+    ])
+      Bun.spawnSync(argv, { cwd: dir });
     return dir;
   }
-  const init = (dir: string, ...extra: string[]) => Bun.spawnSync(["bun", cli, "init", "--repo-dir", dir, ...extra], { stdout: "pipe", stderr: "pipe" });
+  const init = (dir: string, ...extra: string[]) =>
+    Bun.spawnSync(["bun", cli, "init", "--repo-dir", dir, ...extra], { stdout: "pipe", stderr: "pipe" });
 
   for (const name of ["bun", "no-tests"]) {
     test(`${name}: the written config is valid, filled in, and its gates go green`, () => {
@@ -99,7 +104,15 @@ describe("factory init", () => {
   test("--dry-run prints the config and writes nothing", () => {
     const dir = copy("go");
     const r = init(dir, "--dry-run");
-    expect(JSON.parse(r.stdout.toString().split("\n").filter((l) => !l.startsWith("factory init:")).join("\n")).gates[0].cmd).toBe("go test ./...");
+    expect(
+      JSON.parse(
+        r.stdout
+          .toString()
+          .split("\n")
+          .filter((l) => !l.startsWith("factory init:"))
+          .join("\n"),
+      ).gates[0].cmd,
+    ).toBe("go test ./...");
     expect(existsSync(join(dir, ".factory"))).toBe(false);
   });
 });

@@ -9,7 +9,8 @@ import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
 const SOURCE_DIRS = ["src", "bin", "dashboard"];
-const LABEL_LITERAL = /"factory:(ready|triaging|planning|awaiting-approval|building|verifying|in-review|needs-info|needs-human|failed|monitor)"/g;
+const LABEL_LITERAL =
+  /"factory:(ready|triaging|planning|awaiting-approval|building|verifying|in-review|needs-info|needs-human|failed|monitor)"/g;
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -26,7 +27,7 @@ describe("labels.ts is the only source of factory:* label strings", () => {
   for (const dir of SOURCE_DIRS) {
     const files = walk(join(ROOT, dir)).filter((f) => !f.endsWith(`${join("src", "labels.ts")}`));
     for (const file of files) {
-      test(`${file.replace(ROOT + "/", "")} does not hardcode a label string`, () => {
+      test(`${file.replace(`${ROOT}/`, "")} does not hardcode a label string`, () => {
         const text = readFileSync(file, "utf8");
         const matches = [...text.matchAll(LABEL_LITERAL)];
         expect(matches.map((m) => m[0])).toEqual([]);

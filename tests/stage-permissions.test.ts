@@ -29,7 +29,8 @@ describe("stageSettings", () => {
     for (const stage of STAGES) {
       const allow: string[] = JSON.parse(stageSettings(stage, 1)).permissions.allow;
       expect(allow.includes("Bash(.factory/mutate.sh *)")).toBe(stage === "verify");
-      if (stage === "verify") expect(allow.filter((r) => r.startsWith("Edit("))).toEqual(["Edit(.factory/runs/issue-1/**)"]);
+      if (stage === "verify")
+        expect(allow.filter((r) => r.startsWith("Edit("))).toEqual(["Edit(.factory/runs/issue-1/**)"]);
     }
   });
 });

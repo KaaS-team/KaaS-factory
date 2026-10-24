@@ -7,7 +7,15 @@ import { replySchema, stageSchema } from "../src/schemas";
 
 const STAGES: ArtifactStage[] = ["triage", "plan", "build", "verify", "pr", "retro"];
 const GOOD: Record<ArtifactStage, object> = {
-  triage: { disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: [], gate_level: "g", confidence: 0.9 },
+  triage: {
+    disposition: "proceed",
+    type: "bug",
+    risk: "low",
+    done_when: "x",
+    files_expected: [],
+    gate_level: "g",
+    confidence: 0.9,
+  },
   plan: { risk: "low", revision: 1, files: [], autoApproveEligible: true },
   build: { status: "green", gate_line: "l", rounds: 1 },
   verify: { result: "pass", rounds: 1, findings: [] },
@@ -19,7 +27,8 @@ test("every stage has a schema whose properties are exactly the validator's fiel
   for (const stage of STAGES) {
     const s = stageSchema(stage) as { properties: object; required: string[]; additionalProperties: boolean };
     const keys = Object.keys(s.properties);
-    if (stage !== "verify") expect(keys.sort(), stage).toEqual([...STEP_KEYS[stage as Exclude<ArtifactStage, "verify">]].sort());
+    if (stage !== "verify")
+      expect(keys.sort(), stage).toEqual([...STEP_KEYS[stage as Exclude<ArtifactStage, "verify">]].sort());
     expect(s.additionalProperties).toBe(false);
     for (const r of s.required) expect(keys, `${stage}: required ${r} is not a property`).toContain(r);
   }
@@ -28,7 +37,8 @@ test("every stage has a schema whose properties are exactly the validator's fiel
 test("a good artifact for each stage satisfies the schema's required list and the validator", () => {
   for (const stage of STAGES) {
     const good = GOOD[stage] as Record<string, unknown>;
-    for (const r of (stageSchema(stage) as { required: string[] }).required) expect(good, `${stage}.${r}`).toHaveProperty(r);
+    for (const r of (stageSchema(stage) as { required: string[] }).required)
+      expect(good, `${stage}.${r}`).toHaveProperty(r);
     expect(stage === "verify" ? validateVerdict(good).ok : validateStepJson(stage, good).ok, stage).toBe(true);
   }
 });
@@ -40,7 +50,10 @@ test("the reply schema wraps the stage schema", () => {
 
 describe("validators enforce the schema, not just the key list", () => {
   test("a missing required field or a bad enum fails; a blocked step owes only its outcome", () => {
-    expect(validateStepJson("plan", { risk: "low" })).toEqual({ ok: false, reason: 'plan.json: "revision" is required' });
+    expect(validateStepJson("plan", { risk: "low" })).toEqual({
+      ok: false,
+      reason: 'plan.json: "revision" is required',
+    });
     expect(validateStepJson("build", { status: "purple", gate_line: "x", rounds: 1 }).ok).toBe(false);
     expect(validateStepJson("triage", { outcome: "blocked", summary: "no sandbox key" })).toEqual({ ok: true });
   });
@@ -79,21 +92,31 @@ describe("build's screenshots field", () => {
 });
 
 describe("triage's type enum follows the repo's routes, not a fixed list", () => {
-  const contentTriage = { disposition: "proceed", type: "content", risk: "low", done_when: "x", files_expected: [], gate_level: "g", confidence: 0.9 };
+  const contentTriage = {
+    disposition: "proceed",
+    type: "content",
+    risk: "low",
+    done_when: "x",
+    files_expected: [],
+    gate_level: "g",
+    confidence: 0.9,
+  };
 
   test("a route-added type is rejected against the default TYPE_LABELS", () => {
     expect(validateStepJson("triage", contentTriage).ok).toBe(false);
   });
 
   test("the same type validates once the repo's type list is passed", () => {
-    expect(validateStepJson("triage", contentTriage, ["bug", "feature", "docs", "security", "dependency", "content"])).toEqual({ ok: true });
+    expect(
+      validateStepJson("triage", contentTriage, ["bug", "feature", "docs", "security", "dependency", "content"]),
+    ).toEqual({ ok: true });
   });
 });
 
 // v2.7.0 item 8: build/verify read `proof` from the plan artifact, never the
 // type name, so the plan schema has to carry and validate it.
 describe("plan's proof field", () => {
-  test("\"test\" and \"check\" both validate; a typo does not", () => {
+  test('"test" and "check" both validate; a typo does not', () => {
     const base = { risk: "low", revision: 1, files: [] as string[], autoApproveEligible: true };
     expect(validateStepJson("plan", { ...base, proof: "test" })).toEqual({ ok: true });
     expect(validateStepJson("plan", { ...base, proof: "check" })).toEqual({ ok: true });
@@ -101,7 +124,9 @@ describe("plan's proof field", () => {
   });
 
   test("proof is optional: an older plan with none still validates", () => {
-    expect(validateStepJson("plan", { risk: "low", revision: 1, files: [], autoApproveEligible: true })).toEqual({ ok: true });
+    expect(validateStepJson("plan", { risk: "low", revision: 1, files: [], autoApproveEligible: true })).toEqual({
+      ok: true,
+    });
   });
 });
 
@@ -114,8 +139,17 @@ describe("a retro proposes one change", () => {
   });
 
   test("a lesson with a skill edit fails, and so does half a skill edit", () => {
-    expect(validateStepJson("retro", { ...ok, lesson: "l", skill_name: "factory-build", skill_edit: "e" })).toEqual({ ok: false, reason: 'retro.json: "lesson" and "skill_edit" cannot appear together' });
-    expect(validateStepJson("retro", { ...ok, skill_name: "factory-build" })).toEqual({ ok: false, reason: 'retro.json: "skill_name" needs "skill_edit"' });
-    expect(validateStepJson("retro", { ...ok, skill_edit: "e" })).toEqual({ ok: false, reason: 'retro.json: "skill_edit" needs "skill_name"' });
+    expect(validateStepJson("retro", { ...ok, lesson: "l", skill_name: "factory-build", skill_edit: "e" })).toEqual({
+      ok: false,
+      reason: 'retro.json: "lesson" and "skill_edit" cannot appear together',
+    });
+    expect(validateStepJson("retro", { ...ok, skill_name: "factory-build" })).toEqual({
+      ok: false,
+      reason: 'retro.json: "skill_name" needs "skill_edit"',
+    });
+    expect(validateStepJson("retro", { ...ok, skill_edit: "e" })).toEqual({
+      ok: false,
+      reason: 'retro.json: "skill_edit" needs "skill_name"',
+    });
   });
 });

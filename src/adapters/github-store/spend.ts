@@ -56,7 +56,10 @@ function restId(c: GhComment): number | undefined {
   return typeof c.id === "number" ? c.id : undefined;
 }
 
-type Scm = Pick<GitHub, "getIssue" | "commentIssue" | "editComment" | "listIssuesByLabel" | "createIssue" | "ensureLabel">;
+type Scm = Pick<
+  GitHub,
+  "getIssue" | "commentIssue" | "editComment" | "listIssuesByLabel" | "createIssue" | "ensureLabel"
+>;
 
 export class GitHubSpend implements SpendStore {
   private readonly ids = new Map<string, number>();
@@ -64,7 +67,11 @@ export class GitHubSpend implements SpendStore {
   private chain = Promise.resolve();
   private ledger?: number;
 
-  constructor(private readonly scm: Scm, private readonly repo: string, private readonly holder: string) {}
+  constructor(
+    private readonly scm: Scm,
+    private readonly repo: string,
+    private readonly holder: string,
+  ) {}
 
   record(e: SpendEntry): Promise<void> {
     // One write at a time: two stages finishing together would otherwise both read and write this worker's ledger comment.
@@ -95,7 +102,14 @@ export class GitHubSpend implements SpendStore {
       const label = LABELS.find((l) => l.name === LABEL.ledger)!;
       await this.scm.ensureLabel(this.repo, label.name, label.color, label.description);
     }
-    this.ledger = open[0]?.number ?? (await this.scm.createIssue(this.repo, "Factory spend ledger", "Each worker keeps one comment per UTC day here with its spend. The factory reads them for spend.dailyUsd; please leave this issue open.", [LABEL.ledger]));
+    this.ledger =
+      open[0]?.number ??
+      (await this.scm.createIssue(
+        this.repo,
+        "Factory spend ledger",
+        "Each worker keeps one comment per UTC day here with its spend. The factory reads them for spend.dailyUsd; please leave this issue open.",
+        [LABEL.ledger],
+      ));
     return this.ledger;
   }
 
@@ -104,7 +118,9 @@ export class GitHubSpend implements SpendStore {
     let id = this.ids.get(key);
     let cur = this.totals.get(key);
     if (id === undefined) {
-      const mine = (await this.scm.getIssue(this.repo, issue)).comments.find((c) => tallies([c]).some((t) => t.holder === this.holder && t.day === day));
+      const mine = (await this.scm.getIssue(this.repo, issue)).comments.find((c) =>
+        tallies([c]).some((t) => t.holder === this.holder && t.day === day),
+      );
       if (mine) {
         id = restId(mine);
         cur = tallies([mine])[0];

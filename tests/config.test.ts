@@ -40,7 +40,7 @@ describe("loadConfig", () => {
 // silently point PRs and reset at a branch that does not exist (plan v2.6.2
 // item 3). Local `--repo-dir` mode has no `ensureRepoClone` (VM/CI-only) to
 // resolve this, so loadConfig has to do it itself.
-describe("base branch defaults to origin/HEAD, not the hard-coded \"main\"", () => {
+describe('base branch defaults to origin/HEAD, not the hard-coded "main"', () => {
   function git(cwd: string, ...args: string[]): void {
     const r = Bun.spawnSync(["git", ...args], { cwd, stderr: "pipe" });
     if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.toString()}`);
@@ -67,7 +67,7 @@ describe("base branch defaults to origin/HEAD, not the hard-coded \"main\"", () 
     expect(c.base).toBe("trunk");
   });
 
-  test("a config that names base explicitly, even \"main\", is never overridden", async () => {
+  test('a config that names base explicitly, even "main", is never overridden', async () => {
     const wd = cloneOfTrunkRepo();
     mkdirSync(join(wd, ".factory"));
     writeFileSync(join(wd, ".factory/config.json"), JSON.stringify({ repo: "acme/x", base: "main", gates: [] }));
@@ -86,17 +86,40 @@ describe("holdoutEnabled", () => {
 
 describe("config validation at boot", () => {
   test("an unknown top-level key refuses to start and names the key", async () => {
-    await expect(loadConfig(repoWith({ repo: "a/b", maxOpenFactoryPr: 3 }))).rejects.toThrow(/maxOpenFactoryPr: unknown key/);
+    await expect(loadConfig(repoWith({ repo: "a/b", maxOpenFactoryPr: 3 }))).rejects.toThrow(
+      /maxOpenFactoryPr: unknown key/,
+    );
   });
 
   test("a test gate's fileCmd is a string, and a typo of it is an unknown key", () => {
-    expect(configProblems({ repo: "a/b", gates: [{ name: "check", cmd: "make check", fileCmd: "bun test", required: true, role: "test" }] })).toEqual([]);
-    expect(configProblems({ repo: "a/b", gates: [{ name: "check", cmd: "make check", fileCmd: 1, required: true, role: "test" }] })).toEqual([expect.stringContaining("gates[0].fileCmd")]);
-    expect(configProblems({ repo: "a/b", gates: [{ name: "check", cmd: "make check", filecmd: "bun test", required: true }] })).toEqual([expect.stringContaining("gates[0].filecmd: unknown key")]);
+    expect(
+      configProblems({
+        repo: "a/b",
+        gates: [{ name: "check", cmd: "make check", fileCmd: "bun test", required: true, role: "test" }],
+      }),
+    ).toEqual([]);
+    expect(
+      configProblems({
+        repo: "a/b",
+        gates: [{ name: "check", cmd: "make check", fileCmd: 1, required: true, role: "test" }],
+      }),
+    ).toEqual([expect.stringContaining("gates[0].fileCmd")]);
+    expect(
+      configProblems({
+        repo: "a/b",
+        gates: [{ name: "check", cmd: "make check", filecmd: "bun test", required: true }],
+      }),
+    ).toEqual([expect.stringContaining("gates[0].filecmd: unknown key")]);
   });
 
   test("a wrong type is refused, and every problem is listed at once", () => {
-    const problems = configProblems({ repo: "a/b", concurrency: "3", riskPolicy: { autoApproveLowRisk: "yes" }, maxBudgetUsd: { build: 0, bulid: 1 }, gates: [{ name: "t", cmd: "x", required: 1 }] });
+    const problems = configProblems({
+      repo: "a/b",
+      concurrency: "3",
+      riskPolicy: { autoApproveLowRisk: "yes" },
+      maxBudgetUsd: { build: 0, bulid: 1 },
+      gates: [{ name: "t", cmd: "x", required: 1 }],
+    });
     expect(problems).toHaveLength(5);
     expect(problems.join("\n")).toMatch(/concurrency: expected posInt/);
     expect(problems.join("\n")).toMatch(/riskPolicy\.autoApproveLowRisk: expected boolean/);
@@ -107,28 +130,55 @@ describe("config validation at boot", () => {
 
   test("postEditCommand must be an argv list, so the hook never gets a shell string", () => {
     expect(configProblems({ repo: "a/b", postEditCommand: ["biome", "check", "{file}"] })).toEqual([]);
-    expect(configProblems({ repo: "a/b", postEditCommand: "biome check {file}" })).toEqual(['postEditCommand: expected strings, got "biome check {file}"']);
+    expect(configProblems({ repo: "a/b", postEditCommand: "biome check {file}" })).toEqual([
+      'postEditCommand: expected strings, got "biome check {file}"',
+    ]);
   });
 
   test("tracker defaults to GitHub; http needs an https url and a token env var name", () => {
     expect(DEFAULT_CONFIG.tracker).toEqual({ kind: "github" });
     expect(configProblems({ repo: "a/b", tracker: { kind: "github" } })).toEqual([]);
-    expect(configProblems({ repo: "a/b", tracker: { kind: "http", url: "https://tasks.example.com", tokenEnv: "TASKS_TOKEN", project: "web" } })).toEqual([]);
-    expect(configProblems({ repo: "a/b", tracker: { kind: "http", url: "http://127.0.0.1:9000", tokenEnv: "T" } })).toEqual([]);
-    expect(configProblems({ repo: "a/b", tracker: { kind: "jira" } })).toEqual(['tracker.kind: expected "github" or "http", got "jira"']);
-    expect(configProblems({ repo: "a/b", tracker: { kind: "github", url: "https://x" } })).toEqual([expect.stringContaining("tracker.url: unknown key")]);
-    expect(configProblems({ repo: "a/b", tracker: { kind: "http", url: "http://tasks.example.com", tokenEnv: "sk-live-abc" } })).toEqual([
+    expect(
+      configProblems({
+        repo: "a/b",
+        tracker: { kind: "http", url: "https://tasks.example.com", tokenEnv: "TASKS_TOKEN", project: "web" },
+      }),
+    ).toEqual([]);
+    expect(
+      configProblems({ repo: "a/b", tracker: { kind: "http", url: "http://127.0.0.1:9000", tokenEnv: "T" } }),
+    ).toEqual([]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "jira" } })).toEqual([
+      'tracker.kind: expected "github" or "http", got "jira"',
+    ]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "github", url: "https://x" } })).toEqual([
+      expect.stringContaining("tracker.url: unknown key"),
+    ]);
+    expect(
+      configProblems({
+        repo: "a/b",
+        tracker: { kind: "http", url: "http://tasks.example.com", tokenEnv: "sk-live-abc" },
+      }),
+    ).toEqual([
       'tracker.url: https (plain http only to localhost), got "http://tasks.example.com"',
       'tracker.tokenEnv: expected an env var name, got "sk-live-abc"',
     ]);
-    expect(configProblems({ repo: "a/b", tracker: { kind: "http" } })).toEqual(["tracker.url: required", "tracker.tokenEnv: required (the name of the env var holding the token)"]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "http" } })).toEqual([
+      "tracker.url: required",
+      "tracker.tokenEnv: required (the name of the env var holding the token)",
+    ]);
   });
 
   test("labels maps factory labels to a team's names, one to one", () => {
     expect(configProblems({ repo: "a/b", labels: { "factory:ready": "ready-for-ai", _note: "x" } })).toEqual([]);
-    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "ai", "factory:failed": "ai" } })).toEqual(['labels.factory:failed: "ai" is already the name for factory:ready']);
-    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "factory:failed" } })).toEqual(['labels.factory:ready: "factory:failed" is itself a factory label name']);
-    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "" } })).toEqual(['labels.factory:ready: expected a label name, got ""']);
+    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "ai", "factory:failed": "ai" } })).toEqual([
+      'labels.factory:failed: "ai" is already the name for factory:ready',
+    ]);
+    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "factory:failed" } })).toEqual([
+      'labels.factory:ready: "factory:failed" is itself a factory label name',
+    ]);
+    expect(configProblems({ repo: "a/b", labels: { "factory:ready": "" } })).toEqual([
+      'labels.factory:ready: expected a label name, got ""',
+    ]);
   });
 
   test("agent-facing riskCriteria and _comment keys are allowed", () => {
@@ -146,8 +196,20 @@ describe("config validation at boot", () => {
   });
 
   test("tmux, prRunSummary and templateOverrides are accepted, and wrong types are named", () => {
-    expect(configProblems({ repo: "a/b", tmux: { enabled: true, session: "demo" }, prRunSummary: false, templateOverrides: [".claude/skills/x/"] })).toEqual([]);
-    const problems = configProblems({ repo: "a/b", tmux: { enabled: "yes", window: 1 }, prRunSummary: "no", templateOverrides: "x" }).join("\n");
+    expect(
+      configProblems({
+        repo: "a/b",
+        tmux: { enabled: true, session: "demo" },
+        prRunSummary: false,
+        templateOverrides: [".claude/skills/x/"],
+      }),
+    ).toEqual([]);
+    const problems = configProblems({
+      repo: "a/b",
+      tmux: { enabled: "yes", window: 1 },
+      prRunSummary: "no",
+      templateOverrides: "x",
+    }).join("\n");
     expect(problems).toMatch(/tmux\.enabled: expected boolean/);
     expect(problems).toMatch(/tmux\.window: unknown key/);
     expect(problems).toMatch(/prRunSummary: expected boolean/);
@@ -162,14 +224,25 @@ describe("config validation at boot", () => {
 });
 
 describe("packages", () => {
-  const fixture = JSON.parse(readFileSync(join(import.meta.dir, "fixtures", "monorepo", ".factory", "config.json"), "utf8"));
+  const fixture = JSON.parse(
+    readFileSync(join(import.meta.dir, "fixtures", "monorepo", ".factory", "config.json"), "utf8"),
+  );
 
   test("the two-package fixture is a valid config", () => {
     expect(configProblems(fixture)).toEqual([]);
   });
 
   test("a package needs a relative path and its own valid gates", () => {
-    expect(configProblems({ repo: "a/b", packages: [{ path: "../x", gates: [] }, { gates: [{ name: "t", cmd: "x", required: true, role: "unit" }] }, { path: "p", gates: [], owners: ["@a"] }] })).toEqual([
+    expect(
+      configProblems({
+        repo: "a/b",
+        packages: [
+          { path: "../x", gates: [] },
+          { gates: [{ name: "t", cmd: "x", required: true, role: "unit" }] },
+          { path: "p", gates: [], owners: ["@a"] },
+        ],
+      }),
+    ).toEqual([
       'packages[0].path: must be relative to the repo root, got "../x"',
       "packages[1].path: required",
       'packages[1].gates[0].role: "unit" is not one of test, lint, typecheck, build, format, audit, docs',
@@ -178,7 +251,11 @@ describe("packages", () => {
   });
 
   test("package gates count as gates: doctor, init and the build step's no-gates park agree", () => {
-    const onlyPackages = { repo: "a/b", gates: [], packages: [{ path: "p", gates: [{ name: "t", cmd: "x", required: true }] }] };
+    const onlyPackages = {
+      repo: "a/b",
+      gates: [],
+      packages: [{ path: "p", gates: [{ name: "t", cmd: "x", required: true }] }],
+    };
     expect(gateCount(fixture)).toBe(4);
     expect(gateCount(onlyPackages)).toBe(1);
     expect(isFilledIn(JSON.stringify(onlyPackages))).toBe(true);
@@ -190,10 +267,12 @@ describe("packages", () => {
 
 describe("gate roles", () => {
   test("a gate may name its role; an unknown role is refused", () => {
-    expect(configProblems({ repo: "a/b", gates: [{ name: "unit", cmd: "x", required: true, role: "test" }] })).toEqual([]);
-    expect(configProblems({ repo: "a/b", gates: [{ name: "unit", cmd: "x", required: true, role: "tests" }] })).toEqual([
-      'gates[0].role: "tests" is not one of test, lint, typecheck, build, format, audit, docs',
-    ]);
+    expect(configProblems({ repo: "a/b", gates: [{ name: "unit", cmd: "x", required: true, role: "test" }] })).toEqual(
+      [],
+    );
+    expect(configProblems({ repo: "a/b", gates: [{ name: "unit", cmd: "x", required: true, role: "tests" }] })).toEqual(
+      ['gates[0].role: "tests" is not one of test, lint, typecheck, build, format, audit, docs'],
+    );
   });
 
   test("the test gate is the one with role test, else the one named test", () => {

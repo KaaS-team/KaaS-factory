@@ -10,13 +10,16 @@ import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
 import { resolveAgent, resolveRoute } from "../src/agents/executor";
 import { configProblems, DEFAULT_CONFIG, loadConfig, mergeConfig, type FactoryConfig } from "../src/config";
-import type { StageName } from "../src/executor";
 import { issueType, labelsFor, TYPE_LABELS, typesFor } from "../src/labels";
 
 const STAGES: readonly (keyof FactoryConfig["stages"] & string)[] = ["triage", "plan", "build", "verify", "pr"];
 
 describe("resolveRoute", () => {
-  const agents = { opus: { preset: "claude", model: "opus" }, sonnet: { preset: "claude", model: "sonnet" }, haiku: { preset: "claude", model: "haiku" } };
+  const agents = {
+    opus: { preset: "claude", model: "opus" },
+    sonnet: { preset: "claude", model: "sonnet" },
+    haiku: { preset: "claude", model: "haiku" },
+  };
   const stages = { default: "sonnet", triage: "haiku" };
   const routes = { docs: { stages: { build: "haiku" } } };
 
@@ -32,7 +35,7 @@ describe("resolveRoute", () => {
     expect(resolveRoute(agents, stages, routes, "pr", "docs").name).toBe("sonnet");
   });
 
-  test("falls back to \"claude\" when nothing names an agent and there is no default", () => {
+  test('falls back to "claude" when nothing names an agent and there is no default', () => {
     expect(resolveRoute({ claude: { preset: "claude" } }, {}, undefined, "pr", undefined).name).toBe("claude");
   });
 
@@ -42,11 +45,18 @@ describe("resolveRoute", () => {
   });
 
   test("an unrouted type behaves exactly like resolveAgent", () => {
-    expect(resolveRoute(agents, stages, routes, "verify", "bug").name).toBe(resolveAgent(agents, stages, "verify").name);
+    expect(resolveRoute(agents, stages, routes, "verify", "bug").name).toBe(
+      resolveAgent(agents, stages, "verify").name,
+    );
   });
 
   test("every type in routes and TYPE_LABELS, crossed with every stage, resolves to a defined agent", () => {
-    const config = mergeConfig({ repo: "a/b", agents, stages: { default: "sonnet", triage: "haiku", plan: "opus", build: "sonnet", verify: "sonnet", pr: "haiku" }, routes });
+    const config = mergeConfig({
+      repo: "a/b",
+      agents,
+      stages: { default: "sonnet", triage: "haiku", plan: "opus", build: "sonnet", verify: "sonnet", pr: "haiku" },
+      routes,
+    });
     for (const type of typesFor(config.routes)) {
       for (const stage of STAGES) {
         expect(() => resolveRoute(config.agents, config.stages, config.routes, stage, type)).not.toThrow();
@@ -67,16 +77,25 @@ describe("resolveRoute", () => {
 
 describe("config validation of routes", () => {
   test("a route naming an agent outside config.agents is refused", () => {
-    const problems = configProblems({ ...DEFAULT_CONFIG, repo: "a/b", agents: { claude: { preset: "claude" } }, routes: { docs: { stages: { build: "ghost" } } } });
+    const problems = configProblems({
+      ...DEFAULT_CONFIG,
+      repo: "a/b",
+      agents: { claude: { preset: "claude" } },
+      routes: { docs: { stages: { build: "ghost" } } },
+    });
     expect(problems).toContain('routes.docs.stages.build: "ghost" is not an agent in config.agents');
   });
 
   test("a route naming triage is refused: triage never routes on type", () => {
-    const problems = configProblems({ ...DEFAULT_CONFIG, repo: "a/b", routes: { docs: { stages: { triage: "claude" } } } });
+    const problems = configProblems({
+      ...DEFAULT_CONFIG,
+      repo: "a/b",
+      routes: { docs: { stages: { triage: "claude" } } },
+    });
     expect(problems).toContain("routes.docs.stages.triage: unknown stage (allowed: plan, build, verify, pr, retro)");
   });
 
-  test("proof must be \"test\" or \"check\"", () => {
+  test('proof must be "test" or "check"', () => {
     const problems = configProblems({ ...DEFAULT_CONFIG, repo: "a/b", routes: { content: { proof: "vibes" } } });
     expect(problems).toContain('routes.content.proof: expected "test" or "check", got "vibes"');
   });
@@ -105,7 +124,9 @@ describe("loadConfig checks every routed skill exists on disk", () => {
 
   test("a route naming a skill with no SKILL.md on disk is refused at boot, not left to no-op mid-run", async () => {
     const target = repoWith({ repo: "a/b", routes: { docs: { skills: ["writing"] } } });
-    await expect(loadConfig(target)).rejects.toThrow(/routes\.docs\.skills: "writing" \(\.claude\/skills\/writing\/SKILL\.md not found\)/);
+    await expect(loadConfig(target)).rejects.toThrow(
+      /routes\.docs\.skills: "writing" \(\.claude\/skills\/writing\/SKILL\.md not found\)/,
+    );
   });
 
   test("a route naming a skill that is on disk loads cleanly", async () => {
@@ -141,7 +162,15 @@ describe("typesFor / issueType", () => {
 
 describe("labelsFor", () => {
   test("with no routes, labelsFor is exactly LABELS", () => {
-    expect(labelsFor(undefined).map((l) => l.name).sort()).toEqual(labelsFor({}).map((l) => l.name).sort());
+    expect(
+      labelsFor(undefined)
+        .map((l) => l.name)
+        .sort(),
+    ).toEqual(
+      labelsFor({})
+        .map((l) => l.name)
+        .sort(),
+    );
   });
 
   test("a repo-added type gets one extra label doctor can create", () => {

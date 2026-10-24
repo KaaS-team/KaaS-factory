@@ -11,7 +11,9 @@ import { parseGateLine, runGates, type GateRunner } from "../src/gates";
 
 describe("parseGateLine", () => {
   test("parses a well-formed GREEN line", () => {
-    const result = parseGateLine("some noise\nFACTORY_GATES: status=GREEN passed=12 failed=0 skipped=1 failed_gates=-\nmore noise");
+    const result = parseGateLine(
+      "some noise\nFACTORY_GATES: status=GREEN passed=12 failed=0 skipped=1 failed_gates=-\nmore noise",
+    );
     expect(result).toEqual({
       status: "GREEN",
       passed: 12,
@@ -81,7 +83,8 @@ describe("gates.sh packages", () => {
   const dirs: string[] = [];
   afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
   const root = resolve(import.meta.dir, "..");
-  const git = (dir: string, ...args: string[]) => Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir });
+  const git = (dir: string, ...args: string[]) =>
+    Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir });
 
   // A main commit (with the seed files), then a branch that adds the touch files.
   function repo(touch: string[], seed: string[] = []): string {
@@ -100,7 +103,11 @@ describe("gates.sh packages", () => {
     return dir;
   }
   const gates = (dir: string, base = "main") => {
-    const r = Bun.spawnSync(["bash", ".factory/gates.sh"], { cwd: dir, stdout: "pipe", env: { ...process.env, FACTORY_GATES_BASE: base } });
+    const r = Bun.spawnSync(["bash", ".factory/gates.sh"], {
+      cwd: dir,
+      stdout: "pipe",
+      env: { ...process.env, FACTORY_GATES_BASE: base },
+    });
     return { out: r.stdout.toString(), ran: ["api", "web", "shared"].filter((p) => existsSync(join(dir, `${p}.ran`))) };
   };
 

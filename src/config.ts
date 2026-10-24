@@ -191,12 +191,22 @@ export type Profile = "solo" | "team" | "startup" | "scaleup" | "enterprise";
 // behaviour; the others trade autonomy for review as the company grows.
 // solo: auto-approve up to medium risk, auto-merge what merge-policy allows.
 // scaleup and enterprise: every plan waits for a human, nothing auto-merges.
-export const PROFILES: Readonly<Record<Profile, Partial<Pick<FactoryConfig, "riskPolicy" | "maxOpenFactoryPrs" | "merge">>>> = {
-  solo: { riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "medium" }, maxOpenFactoryPrs: 3, merge: { policy: "auto", autoPaths: [], maxFiles: 10, maxLines: 200 } },
+export const PROFILES: Readonly<
+  Record<Profile, Partial<Pick<FactoryConfig, "riskPolicy" | "maxOpenFactoryPrs" | "merge">>>
+> = {
+  solo: {
+    riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "medium" },
+    maxOpenFactoryPrs: 3,
+    merge: { policy: "auto", autoPaths: [], maxFiles: 10, maxLines: 200 },
+  },
   team: { riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 5 },
   startup: { riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 10 },
   scaleup: { riskPolicy: { autoApproveLowRisk: false, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 10 },
-  enterprise: { riskPolicy: { autoApproveLowRisk: false, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 10, merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 } },
+  enterprise: {
+    riskPolicy: { autoApproveLowRisk: false, autoApproveMaxRisk: "low" },
+    maxOpenFactoryPrs: 10,
+    merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
+  },
 };
 
 export interface TmuxConfig {
@@ -339,16 +349,27 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
 
 function kindOk(value: unknown, kind: Kind): boolean {
   switch (kind) {
-    case "string": return typeof value === "string" && value.length > 0;
-    case "posInt": return Number.isInteger(value) && (value as number) >= 1;
-    case "positive": return typeof value === "number" && Number.isFinite(value) && value > 0;
-    case "boolean": return typeof value === "boolean";
-    case "strings": return Array.isArray(value) && value.every((v) => typeof v === "string");
-    case "object": return typeof value === "object" && value !== null;
+    case "string":
+      return typeof value === "string" && value.length > 0;
+    case "posInt":
+      return Number.isInteger(value) && (value as number) >= 1;
+    case "positive":
+      return typeof value === "number" && Number.isFinite(value) && value > 0;
+    case "boolean":
+      return typeof value === "boolean";
+    case "strings":
+      return Array.isArray(value) && value.every((v) => typeof v === "string");
+    case "object":
+      return typeof value === "object" && value !== null;
   }
 }
 
-function checkKeys(obj: Record<string, unknown>, allowed: Record<string, Kind>, where: string, problems: string[]): void {
+function checkKeys(
+  obj: Record<string, unknown>,
+  allowed: Record<string, Kind>,
+  where: string,
+  problems: string[],
+): void {
   for (const [key, value] of Object.entries(obj)) {
     if (key.startsWith("_")) continue;
     const kind = allowed[key];
@@ -365,13 +386,23 @@ export function configProblems(raw: unknown): string[] {
   checkKeys(cfg, TOP_LEVEL, "", problems);
   const nested = (key: string, shape: Record<string, Kind>) => {
     const v = cfg[key];
-    if (v !== undefined && kindOk(v, "object") && !Array.isArray(v)) checkKeys(v as Record<string, unknown>, shape, `${key}.`, problems);
+    if (v !== undefined && kindOk(v, "object") && !Array.isArray(v))
+      checkKeys(v as Record<string, unknown>, shape, `${key}.`, problems);
   };
   nested("riskPolicy", { autoApproveLowRisk: "boolean", autoApproveMaxRisk: "string" });
   const maxRisk = (cfg.riskPolicy as Record<string, unknown> | undefined)?.autoApproveMaxRisk;
-  if (maxRisk !== undefined && maxRisk !== "low" && maxRisk !== "medium") problems.push(`riskPolicy.autoApproveMaxRisk: expected "low" or "medium", got ${JSON.stringify(maxRisk)}`);
-  if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string)) problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
-  nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive", retro: "positive" });
+  if (maxRisk !== undefined && maxRisk !== "low" && maxRisk !== "medium")
+    problems.push(`riskPolicy.autoApproveMaxRisk: expected "low" or "medium", got ${JSON.stringify(maxRisk)}`);
+  if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))
+    problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
+  nested("maxBudgetUsd", {
+    triage: "positive",
+    plan: "positive",
+    build: "positive",
+    verify: "positive",
+    pr: "positive",
+    retro: "positive",
+  });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
   nested("runtime", { gates: "string", check: "string" });
   nested("merge", { policy: "string", autoPaths: "strings", maxFiles: "posInt", maxLines: "posInt" });
@@ -387,27 +418,32 @@ export function configProblems(raw: unknown): string[] {
     const holdout = cfg.holdout as Record<string, unknown>;
     for (const [key, value] of Object.entries(holdout)) {
       if (key.startsWith("_")) continue;
-      if (key === "paths") { if (!kindOk(value, "strings")) problems.push(`holdout.paths: expected strings, got ${JSON.stringify(value)}`); }
+      if (key === "paths") {
+        if (!kindOk(value, "strings")) problems.push(`holdout.paths: expected strings, got ${JSON.stringify(value)}`);
+      }
       // "" is the explicit off switch (holdoutEnabled), so unlike every other
       // "string" key here, empty is allowed: only a non-string is a problem.
-      else if (key === "cmd") { if (typeof value !== "string") problems.push(`holdout.cmd: expected string, got ${JSON.stringify(value)}`); }
-      else problems.push(`holdout.${key}: unknown key (allowed: paths, cmd)`);
+      else if (key === "cmd") {
+        if (typeof value !== "string") problems.push(`holdout.cmd: expected string, got ${JSON.stringify(value)}`);
+      } else problems.push(`holdout.${key}: unknown key (allowed: paths, cmd)`);
     }
   }
   if (cfg.events !== undefined) eventsProblems(cfg.events, problems);
   if (cfg.gates !== undefined) gateProblems(cfg.gates, "gates", problems);
   if (cfg.packages !== undefined) {
     if (!Array.isArray(cfg.packages)) problems.push("packages: expected a list");
-    else cfg.packages.forEach((p, i) => {
-      const where = `packages[${i}]`;
-      if (typeof p !== "object" || p === null) return problems.push(`${where}: expected an object`);
-      const pkg = p as Record<string, unknown>;
-      checkKeys(pkg, { path: "string", gates: "object", always: "boolean" }, `${where}.`, problems);
-      if (typeof pkg.path !== "string" || !pkg.path) problems.push(`${where}.path: required`);
-      else if (pkg.path.startsWith("/") || pkg.path.split("/").includes("..")) problems.push(`${where}.path: must be relative to the repo root, got ${JSON.stringify(pkg.path)}`);
-      if (pkg.gates === undefined) problems.push(`${where}.gates: required`);
-      else gateProblems(pkg.gates, `${where}.gates`, problems);
-    });
+    else
+      cfg.packages.forEach((p, i) => {
+        const where = `packages[${i}]`;
+        if (typeof p !== "object" || p === null) return problems.push(`${where}: expected an object`);
+        const pkg = p as Record<string, unknown>;
+        checkKeys(pkg, { path: "string", gates: "object", always: "boolean" }, `${where}.`, problems);
+        if (typeof pkg.path !== "string" || !pkg.path) problems.push(`${where}.path: required`);
+        else if (pkg.path.startsWith("/") || pkg.path.split("/").includes(".."))
+          problems.push(`${where}.path: must be relative to the repo root, got ${JSON.stringify(pkg.path)}`);
+        if (pkg.gates === undefined) problems.push(`${where}.gates: required`);
+        else gateProblems(pkg.gates, `${where}.gates`, problems);
+      });
   }
   problems.push(...agentProblems(cfg.agents, cfg.stages, cfg.routes));
   if (cfg.tracker !== undefined) problems.push(...trackerProblems(cfg.tracker));
@@ -424,9 +460,12 @@ function trackerProblems(raw: unknown): string[] {
     checkKeys(t, { kind: "string", url: "string", tokenEnv: "string", project: "string" }, "tracker.", problems);
     if (typeof t.url !== "string") problems.push("tracker.url: required");
     // The bearer token goes to this URL, so plain http only to loopback.
-    else if (!/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(t.url)) problems.push(`tracker.url: https (plain http only to localhost), got ${JSON.stringify(t.url)}`);
-    if (typeof t.tokenEnv !== "string") problems.push("tracker.tokenEnv: required (the name of the env var holding the token)");
-    else if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(t.tokenEnv)) problems.push(`tracker.tokenEnv: expected an env var name, got ${JSON.stringify(t.tokenEnv)}`);
+    else if (!/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(t.url))
+      problems.push(`tracker.url: https (plain http only to localhost), got ${JSON.stringify(t.url)}`);
+    if (typeof t.tokenEnv !== "string")
+      problems.push("tracker.tokenEnv: required (the name of the env var holding the token)");
+    else if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(t.tokenEnv))
+      problems.push(`tracker.tokenEnv: expected an env var name, got ${JSON.stringify(t.tokenEnv)}`);
   } else problems.push(`tracker.kind: expected "github" or "http", got ${JSON.stringify(t.kind)}`);
   return problems;
 }
@@ -440,9 +479,13 @@ function labelMapProblems(raw: unknown): string[] {
   const seen = new Map<string, string>();
   const unmapped = new Set<string>(Object.values(LABEL).filter((l) => !entries.some(([k]) => k === l)));
   for (const [from, to] of entries) {
-    if (typeof to !== "string" || to.trim() === "") { problems.push(`labels.${from}: expected a label name, got ${JSON.stringify(to)}`); continue; }
+    if (typeof to !== "string" || to.trim() === "") {
+      problems.push(`labels.${from}: expected a label name, got ${JSON.stringify(to)}`);
+      continue;
+    }
     if (seen.has(to)) problems.push(`labels.${from}: "${to}" is already the name for ${seen.get(to)}`);
-    else if (unmapped.has(to) || (to !== from && entries.some(([k]) => k === to))) problems.push(`labels.${from}: "${to}" is itself a factory label name`);
+    else if (unmapped.has(to) || (to !== from && entries.some(([k]) => k === to)))
+      problems.push(`labels.${from}: "${to}" is itself a factory label name`);
     seen.set(to, from);
   }
   return problems;
@@ -451,10 +494,14 @@ function labelMapProblems(raw: unknown): string[] {
 const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
 
 function eventsProblems(raw: unknown, problems: string[]): void {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return void problems.push("events: expected an object");
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    return void problems.push("events: expected an object");
   const ev = raw as Record<string, unknown>;
   checkKeys(ev, { sinks: "object", inboundSecretEnv: "string" }, "events.", problems);
-  if (typeof ev.inboundSecretEnv === "string" && !ENV_NAME.test(ev.inboundSecretEnv)) problems.push(`events.inboundSecretEnv: expected an env var name like "FACTORY_EVENTS_SECRET", got ${JSON.stringify(ev.inboundSecretEnv)}`);
+  if (typeof ev.inboundSecretEnv === "string" && !ENV_NAME.test(ev.inboundSecretEnv))
+    problems.push(
+      `events.inboundSecretEnv: expected an env var name like "FACTORY_EVENTS_SECRET", got ${JSON.stringify(ev.inboundSecretEnv)}`,
+    );
   if (ev.sinks === undefined) return;
   if (!Array.isArray(ev.sinks)) return void problems.push("events.sinks: expected a list");
   ev.sinks.forEach((s, i) => {
@@ -462,10 +509,14 @@ function eventsProblems(raw: unknown, problems: string[]): void {
     if (typeof s !== "object" || s === null || Array.isArray(s)) return problems.push(`${where}: expected an object`);
     const sink = s as Record<string, unknown>;
     checkKeys(sink, { url: "string", secretEnv: "string", types: "strings" }, `${where}.`, problems);
-    if (typeof sink.url !== "string" || !/^https?:\/\/./.test(sink.url)) problems.push(`${where}.url: expected an http(s) URL`);
+    if (typeof sink.url !== "string" || !/^https?:\/\/./.test(sink.url))
+      problems.push(`${where}.url: expected an http(s) URL`);
     // A name, never a value: a secret pasted here would sit in a committed file.
-    if (typeof sink.secretEnv !== "string" || !ENV_NAME.test(sink.secretEnv)) problems.push(`${where}.secretEnv: expected an env var name like "KAAS_EVENTS_SECRET"`);
-    if (Array.isArray(sink.types)) for (const t of sink.types) if (!isEventType(t)) problems.push(`${where}.types: "${String(t)}" is not an event type (see docs/events.md)`);
+    if (typeof sink.secretEnv !== "string" || !ENV_NAME.test(sink.secretEnv))
+      problems.push(`${where}.secretEnv: expected an env var name like "KAAS_EVENTS_SECRET"`);
+    if (Array.isArray(sink.types))
+      for (const t of sink.types)
+        if (!isEventType(t)) problems.push(`${where}.types: "${String(t)}" is not an event type (see docs/events.md)`);
   });
 }
 
@@ -474,8 +525,14 @@ function gateProblems(list: unknown, where: string, problems: string[]): void {
   list.forEach((g, i) => {
     if (typeof g !== "object" || g === null) return problems.push(`${where}[${i}]: expected an object`);
     const gate = g as Record<string, unknown>;
-    checkKeys(gate, { name: "string", cmd: "string", fileCmd: "string", required: "boolean", role: "string" }, `${where}[${i}].`, problems);
-    if (typeof gate.role === "string" && !(GATE_ROLES as readonly string[]).includes(gate.role)) problems.push(`${where}[${i}].role: "${gate.role}" is not one of ${GATE_ROLES.join(", ")}`);
+    checkKeys(
+      gate,
+      { name: "string", cmd: "string", fileCmd: "string", required: "boolean", role: "string" },
+      `${where}[${i}].`,
+      problems,
+    );
+    if (typeof gate.role === "string" && !(GATE_ROLES as readonly string[]).includes(gate.role))
+      problems.push(`${where}[${i}].role: "${gate.role}" is not one of ${GATE_ROLES.join(", ")}`);
   });
 }
 
@@ -499,14 +556,19 @@ function agentProblems(agents: unknown, stages: unknown, routes?: unknown): stri
       }
       const a = raw as Record<string, unknown>;
       checkKeys(a, { preset: "string", command: "strings", model: "string", outputSchema: "boolean" }, where, problems);
-      if (typeof a.preset === "string" && !PRESETS[a.preset]) problems.push(`${where}preset: unknown "${a.preset}" (built in: ${Object.keys(PRESETS).join(", ")})`);
+      if (typeof a.preset === "string" && !PRESETS[a.preset])
+        problems.push(`${where}preset: unknown "${a.preset}" (built in: ${Object.keys(PRESETS).join(", ")})`);
       if (a.preset === undefined && a.command === undefined) problems.push(`${where}needs a "preset" or a "command"`);
       if (Array.isArray(a.command)) {
         if (a.command.length === 0) problems.push(`${where}command: must not be empty`);
         else if (!String(a.command[0]).trim()) problems.push(`${where}command: the executable must not be empty`);
-        else if (/\{\{/.test(String(a.command[0]))) problems.push(`${where}command: the executable cannot be a placeholder`);
+        else if (/\{\{/.test(String(a.command[0])))
+          problems.push(`${where}command: the executable cannot be a placeholder`);
         // `sh -c "{{prompt}}"` would run issue text as shell code.
-        else if (/^(ba|z|da|k|c)?sh$/.test(String(a.command[0]).split("/").pop()!) && a.command.slice(1).some((x) => /\{\{prompt\}\}/.test(String(x)))) {
+        else if (
+          /^(ba|z|da|k|c)?sh$/.test(String(a.command[0]).split("/").pop()!) &&
+          a.command.slice(1).some((x) => /\{\{prompt\}\}/.test(String(x)))
+        ) {
           problems.push(`${where}command: {{prompt}} must not be an argument of a shell (use {{promptFile}} or stdin)`);
         }
       }
@@ -515,8 +577,10 @@ function agentProblems(agents: unknown, stages: unknown, routes?: unknown): stri
   if (stages !== undefined && typeof stages === "object" && stages !== null && !Array.isArray(stages)) {
     for (const [stage, agent] of Object.entries(stages as Record<string, unknown>)) {
       if (stage.startsWith("_")) continue;
-      if (!STAGE_KEYS.includes(stage)) problems.push(`stages.${stage}: unknown stage (allowed: ${STAGE_KEYS.join(", ")})`);
-      else if (typeof agent !== "string" || !named.has(agent)) problems.push(`stages.${stage}: "${String(agent)}" is not an agent in config.agents`);
+      if (!STAGE_KEYS.includes(stage))
+        problems.push(`stages.${stage}: unknown stage (allowed: ${STAGE_KEYS.join(", ")})`);
+      else if (typeof agent !== "string" || !named.has(agent))
+        problems.push(`stages.${stage}: "${String(agent)}" is not an agent in config.agents`);
     }
   } else if (stages !== undefined) problems.push("stages: expected an object");
   if (routes !== undefined && typeof routes === "object" && routes !== null && !Array.isArray(routes)) {
@@ -529,15 +593,22 @@ function agentProblems(agents: unknown, stages: unknown, routes?: unknown): stri
       }
       const r = raw as Record<string, unknown>;
       checkKeys(r, { stages: "object", skills: "strings", proof: "string", workflow: "string" }, where, problems);
-      if (typeof r.workflow === "string" && !/^[\w-]+$/.test(r.workflow)) problems.push(`${where}workflow: expected a workflow name like "docs-to-pr", got ${JSON.stringify(r.workflow)}`);
-      if (r.proof !== undefined && r.proof !== "test" && r.proof !== "check") problems.push(`${where}proof: expected "test" or "check", got ${JSON.stringify(r.proof)}`);
+      if (typeof r.workflow === "string" && !/^[\w-]+$/.test(r.workflow))
+        problems.push(
+          `${where}workflow: expected a workflow name like "docs-to-pr", got ${JSON.stringify(r.workflow)}`,
+        );
+      if (r.proof !== undefined && r.proof !== "test" && r.proof !== "check")
+        problems.push(`${where}proof: expected "test" or "check", got ${JSON.stringify(r.proof)}`);
       if (r.stages !== undefined) {
-        if (typeof r.stages !== "object" || r.stages === null || Array.isArray(r.stages)) problems.push(`${where}stages: expected an object`);
+        if (typeof r.stages !== "object" || r.stages === null || Array.isArray(r.stages))
+          problems.push(`${where}stages: expected an object`);
         else {
           for (const [stage, agent] of Object.entries(r.stages as Record<string, unknown>)) {
             if (stage.startsWith("_")) continue;
-            if (!ROUTABLE_STAGE_KEYS.includes(stage)) problems.push(`${where}stages.${stage}: unknown stage (allowed: ${ROUTABLE_STAGE_KEYS.join(", ")})`);
-            else if (typeof agent !== "string" || !named.has(agent)) problems.push(`${where}stages.${stage}: "${String(agent)}" is not an agent in config.agents`);
+            if (!ROUTABLE_STAGE_KEYS.includes(stage))
+              problems.push(`${where}stages.${stage}: unknown stage (allowed: ${ROUTABLE_STAGE_KEYS.join(", ")})`);
+            else if (typeof agent !== "string" || !named.has(agent))
+              problems.push(`${where}stages.${stage}: "${String(agent)}" is not an agent in config.agents`);
           }
         }
       }
@@ -552,7 +623,9 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   const path = `${targetRepoDir}/.factory/config.json`;
   const file = Bun.file(path);
   if (!(await file.exists())) {
-    throw new ConfigError(`${path} not found: run \`factory install ${targetRepoDir}\`, then copy config.example.json to config.json and fill it in`);
+    throw new ConfigError(
+      `${path} not found: run \`factory install ${targetRepoDir}\`, then copy config.example.json to config.json and fill it in`,
+    );
   }
   const raw = await file.json();
   const problems = configProblems(raw);
@@ -573,7 +646,9 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
     throw new ConfigError(`${path}: "repo" must be "owner/name", got ${JSON.stringify(config.repo)}`);
   }
   if (origin && origin.toLowerCase() !== config.repo.toLowerCase()) {
-    throw new ConfigError(`${path}: "repo" is ${config.repo} but this clone's origin is ${origin}; fix "repo" or remove it to use the origin`);
+    throw new ConfigError(
+      `${path}: "repo" is ${config.repo} but this clone's origin is ${origin}; fix "repo" or remove it to use the origin`,
+    );
   }
   // configProblems is pure and cannot see the worktree, so a route naming a
   // skill that was never installed would otherwise only surface as a silent
@@ -581,10 +656,12 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   const missing: string[] = [];
   for (const [type, route] of Object.entries(config.routes)) {
     for (const name of route.skills ?? []) {
-      if (!existsSync(`${targetRepoDir}/.claude/skills/${name}/SKILL.md`)) missing.push(`routes.${type}.skills: "${name}" (.claude/skills/${name}/SKILL.md not found)`);
+      if (!existsSync(`${targetRepoDir}/.claude/skills/${name}/SKILL.md`))
+        missing.push(`routes.${type}.skills: "${name}" (.claude/skills/${name}/SKILL.md not found)`);
     }
   }
-  if (missing.length > 0) throw new ConfigError(`${path} names a skill that does not exist:\n  - ${missing.join("\n  - ")}`);
+  if (missing.length > 0)
+    throw new ConfigError(`${path} names a skill that does not exist:\n  - ${missing.join("\n  - ")}`);
   return config;
 }
 
@@ -592,7 +669,13 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
 // GH_HOST's Enterprise server); anything else (a file path, another host) is not ours to judge.
 export function repoFromRemoteUrl(url: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
   const host = githubHost(env).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const m = url.trim().match(new RegExp(`^(?:https?://(?:[^@/]+@)?${host}/|git@${host}:|ssh://git@${host}/)([^/\\s]+)/([^/\\s]+?)(?:\\.git)?/?$`));
+  const m = url
+    .trim()
+    .match(
+      new RegExp(
+        `^(?:https?://(?:[^@/]+@)?${host}/|git@${host}:|ssh://git@${host}/)([^/\\s]+)/([^/\\s]+?)(?:\\.git)?/?$`,
+      ),
+    );
   return m ? `${m[1]}/${m[2]}` : undefined;
 }
 
@@ -610,7 +693,10 @@ function originRepo(dir: string): string | undefined {
 // callers fall back to DEFAULT_CONFIG.base ("main") in that case.
 function defaultBranchOf(dir: string): string | undefined {
   if (!existsSync(`${dir}/.git`)) return undefined;
-  const r = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--abbrev-ref", "origin/HEAD"], { stdout: "pipe", stderr: "ignore" });
+  const r = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--abbrev-ref", "origin/HEAD"], {
+    stdout: "pipe",
+    stderr: "ignore",
+  });
   if (r.exitCode !== 0) return undefined;
   const ref = r.stdout.toString().trim();
   return ref.startsWith("origin/") ? ref.slice("origin/".length) : undefined;

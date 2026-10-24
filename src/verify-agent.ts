@@ -56,14 +56,18 @@ export function formatReport(r: VerifyReport): string {
     `${r.pass ? "PASS" : "FAIL"} ${r.agent}: outcome ${r.outcome}, ${r.stages} stages, ${secs}s`,
     `cost $${r.costUsd.toFixed(4)}, tokens ${r.tokensIn} in / ${r.tokensOut} out`,
     ...(r.failedStages.length ? [`failed stages: ${r.failedStages.join(", ")}`] : []),
-    r.pass ? `Next: commit the recorded fixture and open a PR that sets verified: true on the "${r.agent}" preset.` : "Do not flip `verified`; open an issue with this output instead.",
+    r.pass
+      ? `Next: commit the recorded fixture and open a PR that sets verified: true on the "${r.agent}" preset.`
+      : "Do not flip `verified`; open an issue with this output instead.",
   ].join("\n");
 }
 
 // The agents `make agent-matrix` can run here, and the ones it names as skipped.
-export async function matrixPlan(which: (bin: string) => Promise<boolean>): Promise<{ run: string[]; skipped: string[] }> {
+export async function matrixPlan(
+  which: (bin: string) => Promise<boolean>,
+): Promise<{ run: string[]; skipped: string[] }> {
   const run: string[] = [];
   const skipped: string[] = [];
-  for (const [name, preset] of Object.entries(PRESETS)) (await which(preset.binary) ? run : skipped).push(name);
+  for (const [name, preset] of Object.entries(PRESETS)) ((await which(preset.binary)) ? run : skipped).push(name);
   return { run, skipped };
 }

@@ -6,7 +6,14 @@
 // them to the same subscribers. Emitting never throws into the engine: a run
 // must not fail because a webhook sink is down.
 
-import { EVENT_SIGNATURE_HEADER, makeEvent, signEvent, type CloudEvent, type EventType, type FactoryEventType } from "../core/event";
+import {
+  EVENT_SIGNATURE_HEADER,
+  makeEvent,
+  signEvent,
+  type CloudEvent,
+  type EventType,
+  type FactoryEventType,
+} from "../core/event";
 import type { EventSink } from "../config";
 import type { BusDeliveryRow, BusEventRow } from "../state";
 
@@ -17,7 +24,11 @@ export interface BusStore {
   queueBusDelivery(eventId: string, sink: string, at?: Date): void;
   requeueBusDeliveries(eventId: string, at?: Date): number;
   dueBusDeliveries(now?: Date): BusDeliveryRow[];
-  markBusDelivery(id: number, d: { status: "pending" | "delivered" | "dead"; attempts: number; nextAt: Date; error?: string }, at?: Date): void;
+  markBusDelivery(
+    id: number,
+    d: { status: "pending" | "delivered" | "dead"; attempts: number; nextAt: Date; error?: string },
+    at?: Date,
+  ): void;
   unhandledInbound(): BusEventRow[];
   markBusHandled(id: string, at?: Date): void;
 }
@@ -92,7 +103,14 @@ export class EventBus {
 
   // The engine passes a FactoryEventType through emitEvent; a minion passes its `emit:` type.
   emit(type: EventType, data: unknown, subject?: string): CloudEvent {
-    const event = makeEvent({ id: this.opts.newId?.() ?? crypto.randomUUID(), source: this.opts.source, type, subject, time: this.now(), data });
+    const event = makeEvent({
+      id: this.opts.newId?.() ?? crypto.randomUUID(),
+      source: this.opts.source,
+      type,
+      subject,
+      time: this.now(),
+      data,
+    });
     this.opts.store.recordBusEvent({
       id: event.id,
       direction: "out",
@@ -103,7 +121,8 @@ export class EventBus {
       data: JSON.stringify(event.data),
       handled_at: event.time,
     });
-    for (const sink of this.opts.sinks) if (sinkWants(sink, type)) this.opts.store.queueBusDelivery(event.id, sink.url, this.now());
+    for (const sink of this.opts.sinks)
+      if (sinkWants(sink, type)) this.opts.store.queueBusDelivery(event.id, sink.url, this.now());
     this.publish(event);
     if (this.opts.autoDeliver !== false) void this.deliver();
     return event;
@@ -113,7 +132,9 @@ export class EventBus {
   publish(event: CloudEvent): void {
     for (const fn of [...(this.subs.get(event.type) ?? []), ...(this.subs.get("*") ?? [])]) {
       try {
-        void Promise.resolve(fn(event)).catch((e) => this.log(`event subscriber for ${event.type} failed: ${String(e)}`));
+        void Promise.resolve(fn(event)).catch((e) =>
+          this.log(`event subscriber for ${event.type} failed: ${String(e)}`),
+        );
       } catch (e) {
         this.log(`event subscriber for ${event.type} failed: ${String(e)}`);
       }
@@ -161,7 +182,12 @@ export class EventBus {
     const sink = this.opts.sinks.find((s) => s.url === d.sink);
     const row = this.opts.store.busEvent(d.event_id);
     if (!sink || !row) {
-      this.opts.store.markBusDelivery(d.id, { status: "dead", attempts, nextAt: this.now(), error: !sink ? "sink no longer configured" : "event row missing" });
+      this.opts.store.markBusDelivery(d.id, {
+        status: "dead",
+        attempts,
+        nextAt: this.now(),
+        error: !sink ? "sink no longer configured" : "event row missing",
+      });
       return false;
     }
     let error: string;
@@ -172,7 +198,10 @@ export class EventBus {
       try {
         const res = await this.send(sink.url, {
           method: "POST",
-          headers: { "content-type": "application/cloudevents+json", [EVENT_SIGNATURE_HEADER]: signEvent(secret, body) },
+          headers: {
+            "content-type": "application/cloudevents+json",
+            [EVENT_SIGNATURE_HEADER]: signEvent(secret, body),
+          },
           body,
         });
         if (res.ok) {
@@ -187,7 +216,9 @@ export class EventBus {
     const dead = attempts >= (this.opts.maxAttempts ?? BUS_MAX_ATTEMPTS);
     const nextAt = new Date(this.now().getTime() + backoffMs(attempts, this.opts.baseDelayMs));
     this.opts.store.markBusDelivery(d.id, { status: dead ? "dead" : "pending", attempts, nextAt, error });
-    this.log(`event ${row.type} ${row.id} to ${sink.url}: attempt ${attempts} failed (${error})${dead ? ", giving up" : ""}`);
+    this.log(
+      `event ${row.type} ${row.id} to ${sink.url}: attempt ${attempts} failed (${error})${dead ? ", giving up" : ""}`,
+    );
     return false;
   }
 }

@@ -10,7 +10,8 @@ import { COLOR_LITERAL, DECORATIVE, LEVELS, PAIRS, TOKENS_CSS, loadTokens, ratio
 
 const tokens = loadTokens();
 const PUBLIC = join(import.meta.dir, "..", "dashboard", "public");
-const walk = (dir: string): string[] => readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? walk(join(dir, f)) : [join(dir, f)]));
+const walk = (dir: string): string[] =>
+  readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? walk(join(dir, f)) : [join(dir, f)]));
 const rootBlock = (css: string) => /^:root\{[\s\S]*?\}$/m.exec(css)?.[0] ?? "";
 
 // KAAS_TEAM_DIR, else kaas.team (or kaaslabs/kaas.team) beside this repo or any parent of it.
@@ -18,7 +19,8 @@ function kaasTeam(): string | null {
   const found = (d?: string) => !!d && existsSync(join(d, "src/styles/base.css"));
   if (found(process.env.KAAS_TEAM_DIR)) return process.env.KAAS_TEAM_DIR!;
   for (let dir = join(import.meta.dir, ".."); dir !== dirname(dir); dir = dirname(dir)) {
-    for (const d of [join(dirname(dir), "kaas.team"), join(dirname(dir), "kaaslabs", "kaas.team")]) if (found(d)) return d;
+    for (const d of [join(dirname(dir), "kaas.team"), join(dirname(dir), "kaaslabs", "kaas.team")])
+      if (found(d)) return d;
   }
   return null;
 }
@@ -26,15 +28,26 @@ const kaas = kaasTeam();
 
 describe("design tokens", () => {
   test("every pair reaches its level, and every colour token is in a pair", () => {
-    const low = PAIRS.filter(([fg, bg, level]) => ratio(tokens[fg]!, tokens[bg]!) < LEVELS[level])
-      .map(([fg, bg, level]) => `${fg} on ${bg} is ${ratio(tokens[fg]!, tokens[bg]!).toFixed(2)}:1, needs ${level}`);
+    const low = PAIRS.filter(([fg, bg, level]) => ratio(tokens[fg]!, tokens[bg]!) < LEVELS[level]).map(
+      ([fg, bg, level]) => `${fg} on ${bg} is ${ratio(tokens[fg]!, tokens[bg]!).toFixed(2)}:1, needs ${level}`,
+    );
     expect(low).toEqual([]);
-    const paired = new Set(PAIRS.flatMap(([fg, bg]) => [fg, bg]));
+    const paired = new Set(PAIRS.flat());
     expect(Object.keys(tokens).filter((t) => !DECORATIVE.includes(t) && !paired.has(t))).toEqual([]);
   });
 
   test("the kaas brand colours are the ones in the token block", () => {
-    for (const t of ["--page:#f7f7f7", "--surface:#fff", "--ink:#171717", "--muted:#5c5c5c", "--line:#e5e5e5", "--wait:#f8d749", "--fail:#b4233a", "--pass:#1f7a45"]) expect(rootBlock(readFileSync(TOKENS_CSS, "utf8"))).toContain(t);
+    for (const t of [
+      "--page:#f7f7f7",
+      "--surface:#fff",
+      "--ink:#171717",
+      "--muted:#5c5c5c",
+      "--line:#e5e5e5",
+      "--wait:#f8d749",
+      "--fail:#b4233a",
+      "--pass:#1f7a45",
+    ])
+      expect(rootBlock(readFileSync(TOKENS_CSS, "utf8"))).toContain(t);
   });
 
   test.skipIf(!kaas)("tokens.css :root block equals kaas.team base.css, line for line", () => {
@@ -43,13 +56,19 @@ describe("design tokens", () => {
   });
 
   test.skipIf(!kaas)("Geist is byte-identical to kaas.team's", () => {
-    expect(Bun.hash(readFileSync(join(PUBLIC, "fonts", "geist.woff2")))).toBe(Bun.hash(readFileSync(join(kaas!, "public/fonts/geist.woff2"))));
+    expect(Bun.hash(readFileSync(join(PUBLIC, "fonts", "geist.woff2")))).toBe(
+      Bun.hash(readFileSync(join(kaas!, "public/fonts/geist.woff2"))),
+    );
   });
 
   test("no colour literal outside tokens.css", () => {
     const hits = walk(PUBLIC)
       .filter((f) => f !== TOKENS_CSS && /\.(css|js|html)$/.test(f))
-      .flatMap((f) => readFileSync(f, "utf8").split("\n").flatMap((line, i) => (COLOR_LITERAL.test(line) ? [`${relative(PUBLIC, f)}:${i + 1}: ${line.trim()}`] : [])));
+      .flatMap((f) =>
+        readFileSync(f, "utf8")
+          .split("\n")
+          .flatMap((line, i) => (COLOR_LITERAL.test(line) ? [`${relative(PUBLIC, f)}:${i + 1}: ${line.trim()}`] : [])),
+      );
     expect(hits).toEqual([]);
   });
 
@@ -57,7 +76,11 @@ describe("design tokens", () => {
     const defined = new Set([...readFileSync(TOKENS_CSS, "utf8").matchAll(/--([\w-]+):/g)].map((m) => m[1]));
     const used = walk(PUBLIC)
       .filter((f) => /\.(css|js)$/.test(f))
-      .flatMap((f) => [...readFileSync(f, "utf8").matchAll(/var\(--([\w-]+)/g)].map((m) => `${relative(PUBLIC, f)}: --${m[1]}`).filter((u) => !defined.has(u.split("--").pop())));
+      .flatMap((f) =>
+        [...readFileSync(f, "utf8").matchAll(/var\(--([\w-]+)/g)]
+          .map((m) => `${relative(PUBLIC, f)}: --${m[1]}`)
+          .filter((u) => !defined.has(u.split("--").pop())),
+      );
     expect(used).toEqual([]);
   });
 });

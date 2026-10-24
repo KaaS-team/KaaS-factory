@@ -4,9 +4,19 @@
 import { describe, expect, test } from "bun:test";
 import type { SpendEntry, SpendStore } from "../../src/ports/spend";
 
-const entry = (issue: number, costUsd: number | null, at = "2026-10-09T08:00:00.000Z"): SpendEntry => ({ issue, stage: "build", costUsd, tokensIn: 10, tokensOut: 5, at });
+const entry = (issue: number, costUsd: number | null, at = "2026-10-09T08:00:00.000Z"): SpendEntry => ({
+  issue,
+  stage: "build",
+  costUsd,
+  tokensIn: 10,
+  tokensOut: 5,
+  at,
+});
 
-export function spendContract(name: string, make: () => { store: SpendStore; worker: (holder: string) => SpendStore }): void {
+export function spendContract(
+  name: string,
+  make: () => { store: SpendStore; worker: (holder: string) => SpendStore },
+): void {
   describe(`SpendStore contract: ${name}`, () => {
     test("an issue's total and the day's total add up what was recorded", async () => {
       const { store } = make();

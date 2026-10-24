@@ -35,9 +35,14 @@ const repo = mkdtempSync(join(tmpdir(), "factory-budget-"));
 afterAll(() => rmSync(repo, { recursive: true, force: true }));
 cpSync(join(ROOT, "tests", "fixtures", "splitbill"), repo, { recursive: true });
 for (const skill of readdirSync(join(ROOT, "template", ".claude", "skills")))
-  cpSync(join(ROOT, "template", ".claude", "skills", skill), join(repo, ".claude", "skills", skill), { recursive: true });
+  cpSync(join(ROOT, "template", ".claude", "skills", skill), join(repo, ".claude", "skills", skill), {
+    recursive: true,
+  });
 mkdirSync(join(repo, runDir(ISSUE)), { recursive: true });
-writeFileSync(join(repo, runDir(ISSUE), "plan.json"), JSON.stringify({ risk: "low", revision: 1, files: ["src/money/cents.ts"], autoApproveEligible: true }));
+writeFileSync(
+  join(repo, runDir(ISSUE), "plan.json"),
+  JSON.stringify({ risk: "low", revision: 1, files: ["src/money/cents.ts"], autoApproveEligible: true }),
+);
 
 async function stageBytes(stage: StageName): Promise<number> {
   const pack = await buildContextPack(stage, ISSUE, repo, { skills: ["handling-money"], contextFile: "CLAUDE.md" });
@@ -57,7 +62,11 @@ describe("each stage's prompt stays under its pinned byte cap", () => {
 });
 
 test("AGENTS.md reaches no pack, since the fixture's CLAUDE.md imports it", async () => {
-  const agents = readFileSync(join(repo, "AGENTS.md"), "utf8").split("\n").find((l) => l.trim().length > 40)!;
+  const agents = readFileSync(join(repo, "AGENTS.md"), "utf8")
+    .split("\n")
+    .find((l) => l.trim().length > 40)!;
   for (const stage of Object.keys(CAP) as StageName[])
-    expect(await buildContextPack(stage, ISSUE, repo, { skills: ["handling-money"], contextFile: "CLAUDE.md" })).not.toContain(agents);
+    expect(
+      await buildContextPack(stage, ISSUE, repo, { skills: ["handling-money"], contextFile: "CLAUDE.md" }),
+    ).not.toContain(agents);
 });

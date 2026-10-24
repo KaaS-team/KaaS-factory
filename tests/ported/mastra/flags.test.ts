@@ -1,7 +1,12 @@
 // Ported from mastra-ai/mastra@68fece5 mastracode/sdk/src/headless/cli.test.ts:49-150,279-310 (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Deviations: vitest becomes bun:test; parseHeadlessArgs lives in cli.ts, which is not ported, so each case asserts through the flag table's own coerce functions; mastraArgv cases are new.
 
 import { describe, expect, it } from "bun:test";
-import { FLAGS, buildParseArgsOptions, mastraArgv, renderFlagUsage } from "../../../src/agents/presets/mastracode-flags";
+import {
+  FLAGS,
+  buildParseArgsOptions,
+  mastraArgv,
+  renderFlagUsage,
+} from "../../../src/agents/presets/mastracode-flags";
 
 const coerce = (key: string, raw: string) => FLAGS.find((f) => f.key === key)!.coerce!(raw);
 
@@ -55,7 +60,14 @@ describe("flag spec", () => {
 
 describe("mastraArgv", () => {
   it("emits validated pairs in table order and rejects bad or unknown flags", () => {
-    expect(mastraArgv({ mode: "plan", timeout: "60", output: "jsonl" })).toEqual(["--timeout", "60", "--output", "jsonl", "--mode", "plan"]);
+    expect(mastraArgv({ mode: "plan", timeout: "60", output: "jsonl" })).toEqual([
+      "--timeout",
+      "60",
+      "--output",
+      "jsonl",
+      "--mode",
+      "plan",
+    ]);
     expect(() => mastraArgv({ timeout: "0" })).toThrow(/--timeout/);
     expect(() => mastraArgv({ bogus: "1" })).toThrow(/unknown Mastra Code flag/);
   });

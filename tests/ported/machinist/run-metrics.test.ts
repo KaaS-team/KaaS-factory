@@ -2,7 +2,20 @@
 // @ts-nocheck
 import assert from "node:assert/strict";
 import { test } from "bun:test";
-import { completedRuns, formatDurationMillis, formatReportingCoverage, formatSuccessRate, formatTaskTokenUsage, formatTokenUsage, runDetails, runModelSummary, taskAnalytics, taskDurationMillis, tasksInWindow, tokenUsageSummary } from "../../../dashboard/public/lib/run-metrics.js";
+import {
+  completedRuns,
+  formatDurationMillis,
+  formatReportingCoverage,
+  formatSuccessRate,
+  formatTaskTokenUsage,
+  formatTokenUsage,
+  runDetails,
+  runModelSummary,
+  taskAnalytics,
+  taskDurationMillis,
+  tasksInWindow,
+  tokenUsageSummary,
+} from "../../../dashboard/public/lib/run-metrics.js";
 
 function localDate(year, month, day, hour = 0) {
   return new Date(year, month - 1, day, hour).toISOString();
@@ -11,17 +24,41 @@ function localDate(year, month, day, hour = 0) {
 test("tasksInWindow starts at local midnight and drives completed run detail", () => {
   const now = new Date(2026, 7, 25, 15);
   const jobs = [
-    { id: "inside", created_at: localDate(2026, 8, 19), runs: [
-      { id: "run_reported", command: "build", completed_at: localDate(2026, 8, 25, 12), duration_millis: 1250, token_usage: "4321" },
-      { id: "run_missing", command: "review", completed_at: localDate(2026, 8, 18, 11), duration_millis: 500 },
-      { id: "run_unmeasured", command: "plan", completed_at: localDate(2026, 8, 25, 10) },
-    ] },
-    { id: "outside", created_at: localDate(2026, 8, 18, 23), runs: [{ id: "run_outside", completed_at: localDate(2026, 8, 25), duration_millis: 100 }] },
-    { id: "future", created_at: localDate(2026, 8, 25, 16), runs: [{ id: "run_future", completed_at: localDate(2026, 8, 25), duration_millis: 100 }] },
+    {
+      id: "inside",
+      created_at: localDate(2026, 8, 19),
+      runs: [
+        {
+          id: "run_reported",
+          command: "build",
+          completed_at: localDate(2026, 8, 25, 12),
+          duration_millis: 1250,
+          token_usage: "4321",
+        },
+        { id: "run_missing", command: "review", completed_at: localDate(2026, 8, 18, 11), duration_millis: 500 },
+        { id: "run_unmeasured", command: "plan", completed_at: localDate(2026, 8, 25, 10) },
+      ],
+    },
+    {
+      id: "outside",
+      created_at: localDate(2026, 8, 18, 23),
+      runs: [{ id: "run_outside", completed_at: localDate(2026, 8, 25), duration_millis: 100 }],
+    },
+    {
+      id: "future",
+      created_at: localDate(2026, 8, 25, 16),
+      runs: [{ id: "run_future", completed_at: localDate(2026, 8, 25), duration_millis: 100 }],
+    },
   ];
-  assert.deepEqual(tasksInWindow(jobs, "7", now).map((job) => job.id), ["inside"]);
+  assert.deepEqual(
+    tasksInWindow(jobs, "7", now).map((job) => job.id),
+    ["inside"],
+  );
   const runs = completedRuns(jobs, "7", now);
-  assert.deepEqual(runs.map((run) => run.id), ["run_reported", "run_unmeasured", "run_missing"]);
+  assert.deepEqual(
+    runs.map((run) => run.id),
+    ["run_reported", "run_unmeasured", "run_missing"],
+  );
   assert.equal(runs[0].token_usage, "4321");
   assert.equal(runs[1].token_usage, undefined);
   assert.equal(runs[1].duration_millis, undefined);
@@ -33,32 +70,35 @@ test("tasksInWindow applies the 30-day boundary to task creation time", () => {
     { id: "first-day", created_at: localDate(2026, 8, 1), runs: [] },
     { id: "previous-day", created_at: localDate(2026, 7, 31, 23), runs: [] },
   ];
-  assert.deepEqual(tasksInWindow(jobs, "30", now).map((job) => job.id), ["first-day"]);
+  assert.deepEqual(
+    tasksInWindow(jobs, "30", now).map((job) => job.id),
+    ["first-day"],
+  );
 });
 
 test("taskAnalytics calculates task outcomes and averages complete terminal timings", () => {
   const created_at = localDate(2026, 8, 25, 9);
   const jobs = [
-	{ id: "success", state: "succeeded", created_at, runs: [{ state: "succeeded", duration_millis: 1000 }] },
-	{ id: "failed", state: "failed", created_at, runs: [{ state: "failed", duration_millis: 2000 }] },
+    { id: "success", state: "succeeded", created_at, runs: [{ state: "succeeded", duration_millis: 1000 }] },
+    { id: "failed", state: "failed", created_at, runs: [{ state: "failed", duration_millis: 2000 }] },
     { id: "running", state: "running", created_at, runs: [{ state: "running", duration_millis: 500 }] },
-	{ id: "queued", state: "queued", created_at, runs: [{ state: "queued" }] },
+    { id: "queued", state: "queued", created_at, runs: [{ state: "queued" }] },
   ];
   const metrics = taskAnalytics(jobs, "7", new Date(2026, 7, 25, 15));
   assert.equal(metrics.totalTasks, 4);
   assert.equal(metrics.successRate, 0.5);
   assert.equal(metrics.failedTasks, 1);
   assert.equal(metrics.activeTasks, 2);
-	assert.equal(metrics.averageTaskDurationMillis, 1500);
+  assert.equal(metrics.averageTaskDurationMillis, 1500);
   assert.equal(metrics.contributingTasks, 2);
 });
 
 test("taskAnalytics excludes terminal tasks with missing or invalid duration", () => {
   const created_at = localDate(2026, 8, 25, 9);
   const jobs = [
-	{ state: "succeeded", created_at, runs: [{ state: "succeeded" }] },
+    { state: "succeeded", created_at, runs: [{ state: "succeeded" }] },
     { state: "failed", created_at, runs: [{ state: "failed", duration_millis: -1 }] },
-	{ state: "succeeded", created_at, runs: [{ state: "succeeded" }] },
+    { state: "succeeded", created_at, runs: [{ state: "succeeded" }] },
   ];
   const metrics = taskAnalytics(jobs, "7", new Date(2026, 7, 25, 15));
   assert.equal(metrics.averageTaskDurationMillis, null);
@@ -67,13 +107,21 @@ test("taskAnalytics excludes terminal tasks with missing or invalid duration", (
 });
 
 test("taskDurationMillis reports the single run duration", () => {
-	assert.equal(taskDurationMillis([{ state: "failed", duration_millis: 1250 }]), 1250);
-	assert.equal(taskDurationMillis([{ state: "failed" }]), undefined);
+  assert.equal(taskDurationMillis([{ state: "failed", duration_millis: 1250 }]), 1250);
+  assert.equal(taskDurationMillis([{ state: "failed" }]), undefined);
 });
 
 test("taskAnalytics returns explicit zero counts and unavailable rates for no data", () => {
   const metrics = taskAnalytics([], "30", new Date(2026, 7, 25, 15));
-  assert.deepEqual(metrics, { tasks: [], totalTasks: 0, successRate: null, failedTasks: 0, activeTasks: 0, averageTaskDurationMillis: null, contributingTasks: 0 });
+  assert.deepEqual(metrics, {
+    tasks: [],
+    totalTasks: 0,
+    successRate: null,
+    failedTasks: 0,
+    activeTasks: 0,
+    averageTaskDurationMillis: null,
+    contributingTasks: 0,
+  });
   assert.equal(formatDurationMillis(metrics.averageTaskDurationMillis), "Unavailable");
   assert.equal(formatSuccessRate(metrics.successRate), "Unavailable");
 });
@@ -122,7 +170,10 @@ test("formatTaskTokenUsage marks partial totals as reported", () => {
 
 test("runModelSummary reports every distinct configured model and honest fallbacks", () => {
   assert.equal(runModelSummary([{ model: "gpt-5.6-sol" }, { model: "gpt-5.6-sol" }]), "gpt-5.6-sol");
-  assert.equal(runModelSummary([{ model: "deepseek-v4-flash" }, { model: "gpt-5.6-sol" }]), "deepseek-v4-flash · gpt-5.6-sol");
+  assert.equal(
+    runModelSummary([{ model: "deepseek-v4-flash" }, { model: "gpt-5.6-sol" }]),
+    "deepseek-v4-flash · gpt-5.6-sol",
+  );
   assert.equal(runModelSummary([{ model: "gpt-5.6-sol" }, {}]), "gpt-5.6-sol · Executor default");
   assert.equal(runModelSummary([{ model: "Not specified" }]), "Not specified");
   assert.equal(runModelSummary([{}]), "Executor default");
@@ -131,7 +182,14 @@ test("runModelSummary reports every distinct configured model and honest fallbac
 });
 
 test("runDetails always surfaces the executor, even when a worker has claimed the run", () => {
-  const claimed = { executor: "codex", worker_name: "my-macbook", model: "sonnet", duration_millis: 1250, completed_at: "2026-08-25T12:00:00Z", token_usage: "4321" };
+  const claimed = {
+    executor: "codex",
+    worker_name: "my-macbook",
+    model: "sonnet",
+    duration_millis: 1250,
+    completed_at: "2026-08-25T12:00:00Z",
+    token_usage: "4321",
+  };
   assert.equal(runDetails(claimed), "codex · my-macbook · sonnet · 1.25s · 4,321 tokens");
 
   const completedWithoutUsage = { executor: "codex", duration_millis: 250, completed_at: "2026-08-25T12:00:00Z" };

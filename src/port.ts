@@ -26,7 +26,9 @@ function readPort(file: string): number | undefined {
 
 // Ports the clone's other worktrees hold: <common>/worktrees/*/factory-port.
 function heldPorts(gitDir: string): Set<number> {
-  const common = existsSync(join(gitDir, "commondir")) ? resolve(gitDir, readFileSync(join(gitDir, "commondir"), "utf8").trim()) : gitDir;
+  const common = existsSync(join(gitDir, "commondir"))
+    ? resolve(gitDir, readFileSync(join(gitDir, "commondir"), "utf8").trim())
+    : gitDir;
   const worktrees = join(common, "worktrees");
   const dirs = [common, ...(existsSync(worktrees) ? readdirSync(worktrees).map((d) => join(worktrees, d)) : [])];
   return new Set(dirs.map((d) => readPort(join(d, FILE))).filter((p): p is number => p !== undefined));

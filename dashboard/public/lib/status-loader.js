@@ -16,6 +16,8 @@ export function createStatusLoader({ request, apply }) {
 
   return {
     refresh,
-    cancel() { latestRequest += 1; },
+    cancel() {
+      latestRequest += 1;
+    },
   };
 }

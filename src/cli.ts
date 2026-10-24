@@ -27,7 +27,13 @@ import { loadMachineConfig, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard } from "../dashboard/server";
 import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
-import { workspacesDir as defaultWorkspacesDir, defaultStatePath, factoryHome, livePath, transcriptPath } from "./paths";
+import {
+  workspacesDir as defaultWorkspacesDir,
+  defaultStatePath,
+  factoryHome,
+  livePath,
+  transcriptPath,
+} from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
 import { followStream } from "./view";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
@@ -96,7 +102,9 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
   try {
     await tmux.version();
   } catch (err) {
-    throw new Error(`tmux is enabled (config tmux.enabled or --tmux) but \`tmux -V\` failed: ${err instanceof Error ? err.message : err}`);
+    throw new Error(
+      `tmux is enabled (config tmux.enabled or --tmux) but \`tmux -V\` failed: ${err instanceof Error ? err.message : err}`,
+    );
   }
 }
 
@@ -113,7 +121,13 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
   const routeWorkflows = await routeWorkflowsFor(cloneDir, config);
   const machineConfig = loadMachineConfig();
   const runtimes = runtimesFrom(machineConfig.runtimes);
-  const unknown = [...new Set([workflow, ...Object.values(routeWorkflows)].flatMap((w) => unknownRuntimes(runtimeRefs(config, w.steps), runtimes)))];
+  const unknown = [
+    ...new Set(
+      [workflow, ...Object.values(routeWorkflows)].flatMap((w) =>
+        unknownRuntimes(runtimeRefs(config, w.steps), runtimes),
+      ),
+    ),
+  ];
   if (unknown.length) throw new Error(unknown.join("\n"));
   // Every minion is checked at boot: a bad file stops the watcher, not its first run.
   const loaded = loadMinions(cloneDir, config);
@@ -241,22 +255,34 @@ async function cmdPark(): Promise<void> {
 
 async function cmdLogs(): Promise<void> {
   const issue = Number(args[1]);
-  if (!Number.isInteger(issue) || issue < 1) throw new UsageError("logs: an issue number is required, e.g. `factory logs 12 --follow`");
+  if (!Number.isInteger(issue) || issue < 1)
+    throw new UsageError("logs: an issue number is required, e.g. `factory logs 12 --follow`");
   const repoDir = flag("repo-dir");
   // With no --repo/--repo-dir/FACTORY_REPO hint, this stays on the legacy
   // shared DB (pre-v2.6.2 installs); with one, it opens that repo's own DB
   // (per-repo since v2.6.2) instead of guessing at the shared one.
-  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? (repoDir ? (await loadConfig(resolve(repoDir))).repo : undefined);
-  const state = new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH));
+  const repo =
+    flag("repo") ?? process.env.FACTORY_REPO ?? (repoDir ? (await loadConfig(resolve(repoDir))).repo : undefined);
+  const state = new FactoryState(
+    flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH),
+  );
   const resolvedRepo = repo ?? state.listRuns().find((r) => r.issue === issue)?.repo ?? "";
   const controller = new AbortController();
   process.on("SIGINT", () => controller.abort());
-  await streamLogs(state, resolvedRepo, issue, { follow: has("follow"), stage: flag("stage"), json: has("json"), signal: controller.signal });
+  await streamLogs(state, resolvedRepo, issue, {
+    follow: has("follow"),
+    stage: flag("stage"),
+    json: has("json"),
+    signal: controller.signal,
+  });
 }
 
 async function cmdView(): Promise<void> {
   const file = args[1];
-  if (!file) throw new UsageError("view: a stream file is required, e.g. `factory view ~/.factory/<owner>/<repo>/transcripts/issue-12.stream.jsonl --follow`");
+  if (!file)
+    throw new UsageError(
+      "view: a stream file is required, e.g. `factory view ~/.factory/<owner>/<repo>/transcripts/issue-12.stream.jsonl --follow`",
+    );
   const controller = new AbortController();
   process.on("SIGINT", () => controller.abort());
   await followStream(file, (text) => process.stdout.write(text), { follow: has("follow"), signal: controller.signal });
@@ -272,7 +298,10 @@ async function cmdInbox(): Promise<void> {
   // Only read the watcher's DB if it exists; the inbox must not create one.
   const db = flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, repo);
   const reasons = existsSync(db) ? parkReasons(new FactoryState(db).listRuns(repo)) : undefined;
-  const items = [...buildInbox(await github.listOpenIssues(repo), reasons), ...learningPrItems(await github.listPrs(repo, { state: "open" }))];
+  const items = [
+    ...buildInbox(await github.listOpenIssues(repo), reasons),
+    ...learningPrItems(await github.listPrs(repo, { state: "open" })),
+  ];
   const [issueArg, actionArg] = inboxPositionals(args);
   if (issueArg) {
     const item = items.find((i) => i.issue === Number(issueArg));
@@ -308,7 +337,9 @@ async function cmdScan(): Promise<void> {
     console.log(`factory scan: skipped — ${result.skippedReason}`);
     return;
   }
-  console.log(`factory scan (${result.source}): filed ${result.filed.length}, skipped ${result.skipped.length} (already open)`);
+  console.log(
+    `factory scan (${result.source}): filed ${result.filed.length}, skipped ${result.skipped.length} (already open)`,
+  );
   for (const t of result.filed) console.log(`  + ${t}`);
 }
 
@@ -348,7 +379,9 @@ async function cmdRebaseline(): Promise<void> {
     resettable: config.resettable,
   };
   const moved = await rebaseline({ github: makeScm(config), git: new GitCommandRunner() }, ctx, dryRun);
-  console.log(`factory rebaseline${dryRun ? " --dry-run" : ""}: ${config.baselineTag} -> origin/${config.base} (${moved.length} commit(s))`);
+  console.log(
+    `factory rebaseline${dryRun ? " --dry-run" : ""}: ${config.baselineTag} -> origin/${config.base} (${moved.length} commit(s))`,
+  );
   for (const c of moved) console.log(`  ${c}`);
 }
 
@@ -369,11 +402,26 @@ function templateSkills(): Record<string, string> {
 
 async function cmdDoctor(): Promise<void> {
   const cloneDir = await resolveCloneDir();
-  let config;
+  let config: FactoryConfig;
   try {
     config = await loadConfig(cloneDir);
   } catch (err) {
-    if (has("json")) console.log(successJson({ checks: [{ name: ".factory/config.json is usable", ok: false, detail: err instanceof Error ? err.message : String(err), fixable: false }] }, false));
+    if (has("json"))
+      console.log(
+        successJson(
+          {
+            checks: [
+              {
+                name: ".factory/config.json is usable",
+                ok: false,
+                detail: err instanceof Error ? err.message : String(err),
+                fixable: false,
+              },
+            ],
+          },
+          false,
+        ),
+      );
     else console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
     process.exit(EXIT.checksFailed);
   }
@@ -433,7 +481,14 @@ async function cmdDoctor(): Promise<void> {
 // and remoteAddress passed through so handle() can enforce it. Shared by
 // `dashboard` (cockpit only, any mode) and `up` (Docker's single-process
 // entrypoint: watch + dashboard together).
-function serveDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">, project?: DashboardProject): number {
+function serveDashboard(
+  state: FactoryState,
+  github: ScmPort,
+  repo: string,
+  autoApproveDefault = false,
+  fleet?: Pick<FactoryConfig, "agents" | "stages">,
+  project?: DashboardProject,
+): number {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
   const dashboard = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet, undefined, project);
@@ -456,10 +511,18 @@ async function cmdDashboard(): Promise<void> {
   const repoDir = flag("repo-dir");
   const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
   const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo ?? "";
-  const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH);
+  const dbPath =
+    flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH);
   const state = new FactoryState(dbPath);
   const github = makeScm(config ?? DEFAULT_CONFIG);
-  serveDashboard(state, github, repo, false, config, repoDir && config ? dashboardProject(resolve(repoDir), config) : undefined);
+  serveDashboard(
+    state,
+    github,
+    repo,
+    false,
+    config,
+    repoDir && config ? dashboardProject(resolve(repoDir), config) : undefined,
+  );
   await new Promise(() => {}); // keep the process alive
 }
 
@@ -480,7 +543,14 @@ async function cmdUp(): Promise<void> {
     if (r.paused) console.log(`factory up: paused — ${r.reason}`);
     else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
   });
-  serveDashboard(deps.state, deps.github, config.repo, config.riskPolicy.autoApproveLowRisk, config, dashboardProject(cloneDir, config));
+  serveDashboard(
+    deps.state,
+    deps.github,
+    config.repo,
+    config.riskPolicy.autoApproveLowRisk,
+    config,
+    dashboardProject(cloneDir, config),
+  );
   console.log(`factory up: polling ${config.repo} every ${config.pollIntervalSeconds}s. Ctrl+C to stop.`);
   await new Promise(() => {}); // keep the process alive
 }
@@ -521,17 +591,26 @@ async function cmdAttach(): Promise<void> {
   if (!(await tmux.hasSession())) throw new Error(`no tmux session "${session}": start one with factory up --tmux`);
   if (n) {
     const name = issueWindow(repo, n);
-    if (!(await tmux.windows()).includes(name)) throw new Error(`#${n} has no window in "${session}" (no stage has run since the watcher started)`);
+    if (!(await tmux.windows()).includes(name))
+      throw new Error(`#${n} has no window in "${session}" (no stage has run since the watcher started)`);
     await new ShellTmuxRunner().run(["select-window", "-t", `=${session}:=${name}`]);
   }
   // Inside tmux already: switch this client instead of nesting a second one.
-  const argv = process.env.TMUX ? ["tmux", "switch-client", "-t", `=${session}`] : ["tmux", "attach", "-t", `=${session}`];
+  const argv = process.env.TMUX
+    ? ["tmux", "switch-client", "-t", `=${session}`]
+    : ["tmux", "attach", "-t", `=${session}`];
   process.exit(await Bun.spawn(argv, { stdin: "inherit", stdout: "inherit", stderr: "inherit" }).exited);
 }
 
 // Waits for the watcher to park the issue after a takeover, so the hand-back
 // retry lands on a parked issue and never races the stage it stopped.
-async function waitForLabel(github: ScmPort, repo: string, n: number, label: string, timeoutMs = 60_000): Promise<boolean> {
+async function waitForLabel(
+  github: ScmPort,
+  repo: string,
+  n: number,
+  label: string,
+  timeoutMs = 60_000,
+): Promise<boolean> {
   const end = Date.now() + timeoutMs;
   for (;;) {
     const issue = await github.getIssue(repo, n);
@@ -545,17 +624,25 @@ async function waitForLabel(github: ScmPort, repo: string, n: number, label: str
 // at login, restarted when it exits (src/daemon.ts).
 async function cmdDaemon(): Promise<void> {
   const action = args[1];
-  if (action !== "install" && action !== "uninstall") throw new UsageError("daemon: usage: factory daemon (install | uninstall) (--repo-dir <path> | --repo <owner/name>)");
+  if (action !== "install" && action !== "uninstall")
+    throw new UsageError(
+      "daemon: usage: factory daemon (install | uninstall) (--repo-dir <path> | --repo <owner/name>)",
+    );
   const platform = daemonPlatform(process.platform);
-  if (!platform) throw new Error(`daemon: no launchd or systemd on ${process.platform}; run \`factory up\` under your own supervisor`);
+  if (!platform)
+    throw new Error(
+      `daemon: no launchd or systemd on ${process.platform}; run \`factory up\` under your own supervisor`,
+    );
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   const home = homedir();
   const uid = process.getuid?.() ?? 0;
-  const runner = { run: async (argv: readonly string[]) => {
-    const p = Bun.spawn([...argv], { stdout: "ignore", stderr: "pipe" });
-    return { exitCode: await p.exited, stderr: await new Response(p.stderr).text() };
-  } };
+  const runner = {
+    run: async (argv: readonly string[]) => {
+      const p = Bun.spawn([...argv], { stdout: "ignore", stderr: "pipe" });
+      return { exitCode: await p.exited, stderr: await new Response(p.stderr).text() };
+    },
+  };
   if (action === "uninstall") {
     console.log(`factory daemon: removed ${await uninstallDaemon(platform, home, config.repo, uid, runner)}`);
     return;
@@ -563,13 +650,21 @@ async function cmdDaemon(): Promise<void> {
   const pass = ["db", "workspaces"].flatMap((f) => (flag(f) ? [`--${f}`, flag(f)!] : []));
   const argv = [process.execPath, Bun.main, "up", "--repo-dir", cloneDir, ...pass];
   const logDir = join(factoryHome(), "logs");
-  const file = await installDaemon(platform, { repo: config.repo, argv, workdir: cloneDir, logDir, path: process.env.PATH ?? "/usr/bin:/bin", home }, uid, runner);
+  const file = await installDaemon(
+    platform,
+    { repo: config.repo, argv, workdir: cloneDir, logDir, path: process.env.PATH ?? "/usr/bin:/bin", home },
+    uid,
+    runner,
+  );
   console.log(`factory daemon: ${platform} runs \`factory up\` for ${config.repo} from ${file}; logs in ${logDir}`);
 }
 
 async function cmdTakeover(): Promise<void> {
   const n = Number(args[1]);
-  if (!n) throw new UsageError("takeover: usage: factory takeover <N> (--repo-dir <path> | --repo <owner/name>) [--no-handback]");
+  if (!n)
+    throw new UsageError(
+      "takeover: usage: factory takeover <N> (--repo-dir <path> | --repo <owner/name>) [--no-handback]",
+    );
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   const repo = config.repo;
@@ -582,8 +677,10 @@ async function cmdTakeover(): Promise<void> {
   let sessionId: string | undefined;
   if (live) {
     console.log(`factory takeover: stopping ${live.stage} on #${n} (pid ${live.pid})`);
-    if (!(await stopRunningStage(liveFile, live))) throw new Error(`#${n}: the ${live.stage} stage did not stop within 60s`);
-    if (!(await waitForLabel(github, repo, n, LABEL.needsHuman))) throw new Error(`#${n} was stopped but not parked within 60s; is the watcher running?`);
+    if (!(await stopRunningStage(liveFile, live)))
+      throw new Error(`#${n}: the ${live.stage} stage did not stop within 60s`);
+    if (!(await waitForLabel(github, repo, n, LABEL.needsHuman)))
+      throw new Error(`#${n} was stopped but not parked within 60s; is the watcher running?`);
     agent = live.agent;
     sessionId = live.sessionId;
   } else {
@@ -606,7 +703,9 @@ async function cmdTakeover(): Promise<void> {
     const posted = await act(github, repo, item, "retry");
     console.log(`factory takeover: handed #${n} back ("${posted}")`);
   } else if (item) {
-    console.log(`factory takeover: #${n} is waiting on you (${item.kind}); choose: factory inbox ${n} <${item.actions.join("|")}> --repo ${repo}`);
+    console.log(
+      `factory takeover: #${n} is waiting on you (${item.kind}); choose: factory inbox ${n} <${item.actions.join("|")}> --repo ${repo}`,
+    );
   } else {
     console.log(`factory takeover: #${n} is not parked; nothing to hand back`);
   }
@@ -622,10 +721,15 @@ async function cmdVerifyAgent(): Promise<void> {
   const loaded = await loadConfig(cloneDir);
   const config: FactoryConfig = { ...loaded, ...configFor(name) };
   const out = flag("out") ? resolve(flag("out")!) : defaultFixtureDir(name);
-  const deps = { ...(await buildWatchDeps(cloneDir, config)), executor: new CommandExecutor(config.agents, config.stages, config.routes, new FixtureRecorder(out, name)) };
+  const deps = {
+    ...(await buildWatchDeps(cloneDir, config)),
+    executor: new CommandExecutor(config.agents, config.stages, config.routes, new FixtureRecorder(out, name)),
+  };
   const outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
   if (outcome === "awaiting-approval") {
-    console.log(`Plan gate: read the plan on #${issueNumber}, approve it (/factory approve), then run this command again to finish and record the rest.`);
+    console.log(
+      `Plan gate: read the plan on #${issueNumber}, approve it (/factory approve), then run this command again to finish and record the rest.`,
+    );
   }
   const report = reportFor(name, deps.state.listStageRuns(config.repo, { issue: issueNumber }), outcome);
   console.log(formatReport(report));
@@ -651,7 +755,8 @@ async function cmdLearn(): Promise<void> {
 
 async function cmdInstall(): Promise<void> {
   const target = args[1];
-  if (!target) throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]");
+  if (!target)
+    throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]");
   const passthrough = [
     ...(has("dry-run") ? ["--dry-run"] : []),
     ...(has("update") ? ["--update"] : []),
@@ -666,7 +771,12 @@ async function cmdInstall(): Promise<void> {
   // "next:" hint above, and `doctor --fix` stays the authoritative fixer.
   try {
     const config = await loadConfig(resolve(target));
-    await fixDoctor(makeScm(config), config.repo, config.routes, await workflowFor(resolve(target), config).catch(() => undefined));
+    await fixDoctor(
+      makeScm(config),
+      config.repo,
+      config.routes,
+      await workflowFor(resolve(target), config).catch(() => undefined),
+    );
     console.log(`factory install: labels ensured on ${config.repo}`);
   } catch {
     // no usable config.json yet
@@ -674,7 +784,10 @@ async function cmdInstall(): Promise<void> {
 }
 
 async function runInstallScript(target: string, extra: string[] = []): Promise<void> {
-  const proc = Bun.spawn(["bash", resolve(import.meta.dir, "..", "install.sh"), target, ...extra], { stdout: "inherit", stderr: "inherit" });
+  const proc = Bun.spawn(["bash", resolve(import.meta.dir, "..", "install.sh"), target, ...extra], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   const code = await proc.exited;
   if (code !== 0) process.exit(code);
 }
@@ -696,14 +809,16 @@ async function cmdInit(): Promise<void> {
   }
   const remote = Bun.spawnSync(["git", "remote", "get-url", "origin"], { cwd: dir });
   const repo = remote.exitCode === 0 ? repoFromRemoteUrl(remote.stdout.toString().trim()) : undefined;
-  const example = JSON.parse(readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "config.example.json"), "utf8")) as Record<string, unknown>;
+  const example = JSON.parse(
+    readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "config.example.json"), "utf8"),
+  ) as Record<string, unknown>;
   const text = `${JSON.stringify(initConfig(example, stack, repo), null, 2)}\n`;
   if (dry) {
     process.stdout.write(text);
     return;
   }
   await Bun.write(target, text);
-  console.log(`factory init: wrote ${target}${repo ? "" : " (no github origin remote: set \"repo\" by hand)"}`);
+  console.log(`factory init: wrote ${target}${repo ? "" : ' (no github origin remote: set "repo" by hand)'}`);
   if (has("pr")) {
     const git = (...a: string[]) => {
       const r = Bun.spawnSync(["git", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" });
@@ -713,21 +828,50 @@ async function cmdInit(): Promise<void> {
     git("add", "-A", ".factory", ".claude", ".agents", "AGENTS.md");
     git("commit", "-m", `factory: init for a ${stack.name} repo`);
     git("push", "-u", "origin", "factory/init");
-    const pr = Bun.spawnSync(["gh", "pr", "create", "--head", "factory/init", "--title", "factory: init", "--body", describeStack(stack).map((l) => `- ${l}`).join("\n")], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+    const pr = Bun.spawnSync(
+      [
+        "gh",
+        "pr",
+        "create",
+        "--head",
+        "factory/init",
+        "--title",
+        "factory: init",
+        "--body",
+        describeStack(stack)
+          .map((l) => `- ${l}`)
+          .join("\n"),
+      ],
+      { cwd: dir, stdout: "pipe", stderr: "pipe" },
+    );
     if (pr.exitCode !== 0) throw new Error(`gh pr create failed: ${pr.stderr.toString().trim()}`);
     console.log(`factory init: opened ${pr.stdout.toString().trim()}`);
   }
-  console.log("factory init: next, fill the TODOs in .factory/charter.md, then run `factory doctor --repo-dir " + dir + "`");
+  console.log(
+    `factory init: next, fill the TODOs in .factory/charter.md, then run \`factory doctor --repo-dir ${dir}\``,
+  );
 }
 
 // `factory harness validate|inventory`: the repo's workflows, checked as the watcher loads them, or listed.
 async function cmdHarness(): Promise<void> {
   const sub = args[1];
-  if (sub !== "validate" && sub !== "inventory") throw new UsageError("usage: factory harness (validate | inventory) --repo-dir <path> [--json]");
+  if (sub !== "validate" && sub !== "inventory")
+    throw new UsageError("usage: factory harness (validate | inventory) --repo-dir <path> [--json]");
   const dir = resolve(flag("repo-dir") ?? ".");
   const report = await harnessReport(dir, await loadConfig(dir));
   if (has("json")) {
-    console.log(successJson({ problems: report.problems, workflows: report.entries.map(({ workflow, ...e }) => ({ ...e, steps: workflow ? Object.keys(workflow.steps) : [] })) }, sub === "inventory" || !report.problems.length));
+    console.log(
+      successJson(
+        {
+          problems: report.problems,
+          workflows: report.entries.map(({ workflow, ...e }) => ({
+            ...e,
+            steps: workflow ? Object.keys(workflow.steps) : [],
+          })),
+        },
+        sub === "inventory" || !report.problems.length,
+      ),
+    );
   } else if (sub === "inventory") {
     for (const line of formatInventory(report)) console.log(line);
   } else {
@@ -740,13 +884,31 @@ async function cmdHarness(): Promise<void> {
 // `factory minion list|run <name> [--event <json-file>]`: the repo's minions, or one run now.
 async function cmdMinion(): Promise<void> {
   const sub = args[1];
-  if (sub !== "list" && sub !== "run") throw new UsageError("usage: factory minion (list | run <name> [--event <json-file>]) --repo-dir <path> [--json]");
+  if (sub !== "list" && sub !== "run")
+    throw new UsageError("usage: factory minion (list | run <name> [--event <json-file>]) --repo-dir <path> [--json]");
   if (sub === "list") {
     const dir = resolve(flag("repo-dir") ?? ".");
     const { minions, problems } = loadMinions(dir, await loadConfig(dir));
-    if (has("json")) console.log(successJson({ problems, minions: minions.map((m) => ({ name: m.name, description: m.description, on: "event" in m.on ? { event: m.on.event } : { cron: m.on.cron.src, tz: m.on.tz }, emit: m.emit ?? null })) }, !problems.length));
+    if (has("json"))
+      console.log(
+        successJson(
+          {
+            problems,
+            minions: minions.map((m) => ({
+              name: m.name,
+              description: m.description,
+              on: "event" in m.on ? { event: m.on.event } : { cron: m.on.cron.src, tz: m.on.tz },
+              emit: m.emit ?? null,
+            })),
+          },
+          !problems.length,
+        ),
+      );
     else {
-      for (const m of minions) console.log(`${m.name}  ${"event" in m.on ? `on ${m.on.event}` : `cron ${m.on.cron.src} ${m.on.tz}`}${m.emit ? `  emits ${m.emit}` : ""}  ${m.description}`);
+      for (const m of minions)
+        console.log(
+          `${m.name}  ${"event" in m.on ? `on ${m.on.event}` : `cron ${m.on.cron.src} ${m.on.tz}`}${m.emit ? `  emits ${m.emit}` : ""}  ${m.description}`,
+        );
       for (const p of problems) console.log(`factory minion: ${p}`);
       if (!minions.length && !problems.length) console.log("factory minion: no minions in .factory/minions");
     }
@@ -760,7 +922,7 @@ async function cmdMinion(): Promise<void> {
   const deps = await buildWatchDeps(cloneDir, config);
   const minion = deps.minions?.find((m) => m.name === name);
   if (!minion) throw new UsageError(`minion run: no minion "${name}" in .factory/minions`);
-  let event;
+  let event: Parameters<typeof runMinion>[3];
   const eventFile = flag("event");
   if (eventFile) {
     const parsed = parseEvent(JSON.parse(readFileSync(eventFile, "utf8")));
@@ -776,21 +938,34 @@ async function cmdMinion(): Promise<void> {
 // `factory events tail|replay <id>`: the outbox and inbox, newest last, or one event sent again.
 async function cmdEvents(): Promise<void> {
   const sub = args[1];
-  if (sub !== "tail" && sub !== "replay") throw new UsageError("usage: factory events (tail [--limit N] | replay <id>) --repo-dir <path> [--json]");
+  if (sub !== "tail" && sub !== "replay")
+    throw new UsageError("usage: factory events (tail [--limit N] | replay <id>) --repo-dir <path> [--json]");
   const cloneDir = resolve(flag("repo-dir") ?? ".");
   const config = await loadConfig(cloneDir);
   const state = new FactoryState(stateDbPath(config.repo));
   if (sub === "tail") {
     const rows = state.busEvents(Number(flag("limit") ?? 50));
     for (const r of rows) {
-      if (has("json")) console.log(JSON.stringify({ ...r, data: JSON.parse(r.data), deliveries: state.busDeliveries(r.id) }));
-      else console.log(`${r.time}  ${r.direction === "in" ? "<-" : "->"}  ${r.type}  ${r.id}${r.subject ? `  ${r.subject}` : ""}${state.busDeliveries(r.id).map((d) => `  [${d.status} ${d.sink}]`).join("")}`);
+      if (has("json"))
+        console.log(JSON.stringify({ ...r, data: JSON.parse(r.data), deliveries: state.busDeliveries(r.id) }));
+      else
+        console.log(
+          `${r.time}  ${r.direction === "in" ? "<-" : "->"}  ${r.type}  ${r.id}${r.subject ? `  ${r.subject}` : ""}${state
+            .busDeliveries(r.id)
+            .map((d) => `  [${d.status} ${d.sink}]`)
+            .join("")}`,
+        );
     }
     return;
   }
   const id = args[2];
   if (!id || id.startsWith("--")) throw new UsageError("events replay: an event id is required");
-  const bus = new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}`, autoDeliver: false });
+  const bus = new EventBus({
+    store: state,
+    sinks: config.events.sinks,
+    source: `factory/${config.repo}`,
+    autoDeliver: false,
+  });
   const queued = bus.replay(id);
   if (!queued) throw new UsageError(`events replay: no event "${id}" with a configured sink`);
   const delivered = await bus.deliver();

@@ -72,7 +72,8 @@ describe("every preset is fully registered", () => {
   });
 
   test("the CI template pins, installs and passes the key of every preset", () => {
-    const pkg = (text: string, name: string) => new RegExp(`\\b${name}\\) pkg="([^"]+)"`).exec(text)?.[1]?.replace(/\$\{[A-Z_]+\}/, "");
+    const pkg = (text: string, name: string) =>
+      new RegExp(`\\b${name}\\) pkg="([^"]+)"`).exec(text)?.[1]?.replace(/\$\{[A-Z_]+\}/, "");
     const secrets = new Set(Object.values(PRESETS).flatMap((p) => p.envKeys));
     for (const p of Object.values(PRESETS)) {
       if (p.docker !== false) {

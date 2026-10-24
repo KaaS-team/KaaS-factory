@@ -31,7 +31,8 @@ export function parseCursorLine(line: string): StageEvent[] {
     const key = Object.keys(parsed.tool_call ?? {})[0] ?? "tool";
     return [{ kind: "tool_use", toolName: key.replace(/ToolCall$/, "") }];
   }
-  if (parsed.type === "result" && parsed.result) return [{ kind: "text", text: parsed.result, finalText: parsed.result }];
+  if (parsed.type === "result" && parsed.result)
+    return [{ kind: "text", text: parsed.result, finalText: parsed.result }];
   return [];
 }
 

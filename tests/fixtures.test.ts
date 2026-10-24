@@ -7,13 +7,16 @@ import { PRESETS } from "../src/agents/presets";
 import { aggregateStageEvents } from "../src/executor";
 
 const root = join(import.meta.dir, "fixtures/agents");
-const jsonl = (name: string) => (existsSync(join(root, name)) ? readdirSync(join(root, name)).filter((f) => f.endsWith(".jsonl")) : []);
+const jsonl = (name: string) =>
+  existsSync(join(root, name)) ? readdirSync(join(root, name)).filter((f) => f.endsWith(".jsonl")) : [];
 
 describe("recorded agent fixtures", () => {
   for (const [name, preset] of Object.entries(PRESETS)) {
     for (const file of jsonl(name)) {
       test(`${name}/${file} replays through the ${name} preset`, () => {
-        const lines = readFileSync(join(root, name, file), "utf8").split("\n").filter(Boolean);
+        const lines = readFileSync(join(root, name, file), "utf8")
+          .split("\n")
+          .filter(Boolean);
         expect(lines.length).toBeGreaterThan(1);
         const parse = preset.newParser?.() ?? preset.parseLine;
         const events = lines.flatMap((l) => parse(l));

@@ -14,7 +14,7 @@ describe("lease record", () => {
     expect(mayTake({ holder: "b", expiresAt: 10 }, "a", 9)).toBe(false);
   });
   test("round-trips, and anything unreadable is free", () => {
-    expect(decodeLease(encodeLease({ holder: "h-1", expiresAt: 42 }) + "\n")).toEqual({ holder: "h-1", expiresAt: 42 });
+    expect(decodeLease(`${encodeLease({ holder: "h-1", expiresAt: 42 })}\n`)).toEqual({ holder: "h-1", expiresAt: 42 });
     expect(decodeLease("factory: claim")).toBeUndefined();
     expect(decodeLease('{"holder":1,"expiresAt":2}')).toBeUndefined();
   });
@@ -36,11 +36,17 @@ describe("withLease", () => {
   });
   test("a failed renewal marks it lost, and a lost lease is not released", async () => {
     const port = new FakeLeases();
-    const lost = await withLease(port, "1", "me", async (held) => {
-      port.table.set("1", { holder: "other", expiresAt: Date.now() + 60_000 });
-      await Bun.sleep(30);
-      return held.lost;
-    }, { everyMs: 5 });
+    const lost = await withLease(
+      port,
+      "1",
+      "me",
+      async (held) => {
+        port.table.set("1", { holder: "other", expiresAt: Date.now() + 60_000 });
+        await Bun.sleep(30);
+        return held.lost;
+      },
+      { everyMs: 5 },
+    );
     expect(lost).toBe(true);
     expect(port.log).not.toContain("release 1 me");
   });

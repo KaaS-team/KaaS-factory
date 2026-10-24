@@ -6,10 +6,23 @@ import { taskPresentation } from "../../../dashboard/public/lib/task-presentatio
 
 test("review shows the bound revision, with earlier attempts in history", () => {
   const runs = [{ id: "original" }, { id: "old-gate" }, { id: "revised" }, { id: "gate", reviewed_run_id: "revised" }];
-  const view = taskPresentation({ state: "awaiting_approval", runs, workflow: { steps: ["plan", "build"], current_step: 1 } });
+  const view = taskPresentation({
+    state: "awaiting_approval",
+    runs,
+    workflow: { steps: ["plan", "build"], current_step: 1 },
+  });
   assert.equal(view.result.id, "revised");
-  assert.deepEqual(view.history.map(r => r.id), ["original", "old-gate"]);
-  assert.deepEqual(view.stages.map(s => [s.complete, s.current]), [[true, false], [false, true]]);
+  assert.deepEqual(
+    view.history.map((r) => r.id),
+    ["original", "old-gate"],
+  );
+  assert.deepEqual(
+    view.stages.map((s) => [s.complete, s.current]),
+    [
+      [true, false],
+      [false, true],
+    ],
+  );
 });
 
 test("initial approval has no fabricated result; running revision shows itself", () => {
@@ -20,6 +33,10 @@ test("initial approval has no fabricated result; running revision shows itself",
 });
 
 test("successful task marks all stages complete", () => {
-  const view = taskPresentation({ state: "succeeded", runs: [{ id: "done" }], workflow: { steps: ["plan", "build"], current_step: 1 } });
-  assert.ok(view.stages.every(s => s.complete && !s.current));
+  const view = taskPresentation({
+    state: "succeeded",
+    runs: [{ id: "done" }],
+    workflow: { steps: ["plan", "build"], current_step: 1 },
+  });
+  assert.ok(view.stages.every((s) => s.complete && !s.current));
 });

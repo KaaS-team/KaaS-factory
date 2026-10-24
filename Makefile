@@ -1,13 +1,18 @@
-.PHONY: agent-matrix demo install check check-mutations typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix demo install check check-mutations lint typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
 
-# make check = typecheck + test + skills validation. Hard-fails if uvx is
+# make check = lint + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
 # check did not ship (see the lwp-eng plugin's engineering.md, Rule 0).
-check: typecheck test skills-check
+check: lint typecheck test skills-check
 	@echo "make check: ok"
+
+# Biome is the one formatter and linter. The rules biome.json turns off are house idioms
+# (`!` in tests, comma and forEach shorthand, literal `${}` in test strings).
+lint:
+	bun x biome ci .
 
 typecheck:
 	bun x tsc --noEmit

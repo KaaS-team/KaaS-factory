@@ -87,16 +87,25 @@ describe("runDoctor", () => {
   test("reports the tracker's kind and auth: GitHub's is gh's, http asks the tracker", async () => {
     const gh = (await runDoctor(deps(), ctx)).find((c) => c.name.startsWith("tracker:"))!;
     expect(gh).toMatchObject({ name: "tracker: github, authenticated", ok: true });
-    const down = { kind: "http" as const, authStatus: async () => ({ ok: false, detail: "tracker GET /me answered 401: bad token" }) };
+    const down = {
+      kind: "http" as const,
+      authStatus: async () => ({ ok: false, detail: "tracker GET /me answered 401: bad token" }),
+    };
     const http = (await runDoctor({ ...deps(), tracker: down }, ctx)).find((c) => c.name.startsWith("tracker:"))!;
-    expect(http).toMatchObject({ name: "tracker: http, authenticated", ok: false, detail: expect.stringContaining("401") });
+    expect(http).toMatchObject({
+      name: "tracker: http, authenticated",
+      ok: false,
+      detail: expect.stringContaining("401"),
+    });
   });
 
   test("flags a config with no gates", async () => {
     files.set("text", '{"gates": []}');
     const checks = await runDoctor(deps(), ctx);
     files.clear();
-    expect(checks.find((c) => c.name === ".factory/config.json defines at least one gate")).toMatchObject({ ok: false });
+    expect(checks.find((c) => c.name === ".factory/config.json defines at least one gate")).toMatchObject({
+      ok: false,
+    });
   });
 
   test("flags TODO markers left in the scaffolded config and charter", async () => {
@@ -170,7 +179,9 @@ describe("baseline tag, gated on resettable", () => {
   });
 
   test("fails when resettable is true and the tag doesn't exist", async () => {
-    const failingGit: CommandRunner = { run: async () => ({ stdout: "", stderr: "fatal: bad revision 'baseline'", code: 128 }) };
+    const failingGit: CommandRunner = {
+      run: async () => ({ stdout: "", stderr: "fatal: bad revision 'baseline'", code: 128 }),
+    };
     const checks = await runDoctor({ ...deps(), git: failingGit }, { ...ctx, resettable: true });
     const check = checks.find((c) => c.name.includes("baseline tag"))!;
     expect(check.ok).toBe(false);
@@ -185,10 +196,19 @@ describe("baseline tag, gated on resettable", () => {
 });
 
 describe("agents in doctor", () => {
-  const agents = { claude: { preset: "claude" }, codex: { preset: "codex" }, aider: { command: ["aider", "--yes"] }, unused: { preset: "codex" } };
+  const agents = {
+    claude: { preset: "claude" },
+    codex: { preset: "codex" },
+    aider: { command: ["aider", "--yes"] },
+    unused: { preset: "codex" },
+  };
 
   test("checks the binary of every agent a stage uses, and only those", async () => {
-    const checks = await runDoctor(deps({ which: new Set(["gh", "claude", "python3", "jq"]) }), { ...ctx, agents, stages: { default: "claude", verify: "codex", build: "aider" } });
+    const checks = await runDoctor(deps({ which: new Set(["gh", "claude", "python3", "jq"]) }), {
+      ...ctx,
+      agents,
+      stages: { default: "claude", verify: "codex", build: "aider" },
+    });
     const on = (n: string) => checks.find((c) => c.name === `${n} on PATH`);
     expect(on("claude")!.ok).toBe(true);
     expect(on("codex")!.ok).toBe(false);
@@ -197,14 +217,21 @@ describe("agents in doctor", () => {
   });
 
   test("a preset-less agent gets a usage warning, a preset agent does not", async () => {
-    const checks = await runDoctor(deps({ which: new Set(["gh", "claude", "aider", "python3", "jq"]) }), { ...ctx, agents, stages: { default: "aider" } });
+    const checks = await runDoctor(deps({ which: new Set(["gh", "claude", "aider", "python3", "jq"]) }), {
+      ...ctx,
+      agents,
+      stages: { default: "aider" },
+    });
     expect(checks.map((c) => c.name)).toContain('agent "aider" reports usage');
     expect((await runDoctor(deps(), ctx)).map((c) => c.name)).not.toContain('agent "claude" reports usage');
   });
 
   test("a CLI with no --version flag is not probed", async () => {
     let probed = false;
-    const d = { ...deps({ which: new Set(["gh", "mastracode", "python3", "jq"]) }), versionOf: async () => ((probed = true), "x") };
+    const d = {
+      ...deps({ which: new Set(["gh", "mastracode", "python3", "jq"]) }),
+      versionOf: async () => ((probed = true), "x"),
+    };
     const checks = await runDoctor(d, { ...ctx, agents: { m: { preset: "mastracode" } }, stages: { default: "m" } });
     expect(probed).toBe(false);
     expect(checks.find((c) => c.name === "mastracode is version 0.42.0")!.ok).toBe(true);
@@ -212,12 +239,15 @@ describe("agents in doctor", () => {
 
   test("a custom command with no approval-bypass flag fails, one with a flag passes", async () => {
     const which = new Set(["gh", "aider", "python3", "jq"]);
-    const run = (command: string[]) => runDoctor(deps({ which }), { ...ctx, agents: { x: { command } }, stages: { default: "x" } });
+    const run = (command: string[]) =>
+      runDoctor(deps({ which }), { ...ctx, agents: { x: { command } }, stages: { default: "x" } });
     const bare = (await run(["aider", "--model", "m"])).find((c) => c.name === 'agent "x" runs without prompting')!;
     expect(bare.ok).toBe(false);
     expect(bare.warn).toBeUndefined();
     expect((await run(["aider", "--yes"])).find((c) => c.name === 'agent "x" runs without prompting')!.ok).toBe(true);
-    expect((await run(["tool", "--permission-mode=auto"])).find((c) => c.name === 'agent "x" runs without prompting')!.ok).toBe(true);
+    expect(
+      (await run(["tool", "--permission-mode=auto"])).find((c) => c.name === 'agent "x" runs without prompting')!.ok,
+    ).toBe(true);
   });
 });
 
@@ -225,7 +255,9 @@ describe("installed skills drift", () => {
   const shipped = { ".claude/skills/factory-build/SKILL.md": "new text" };
   const drift = async (installed: string | undefined) => {
     const d = { ...deps(), readFile: async (p: string) => (p.endsWith("factory-build/SKILL.md") ? installed : "{}") };
-    return (await runDoctor(d, { ...ctx, templateSkills: shipped })).find((c) => c.name === "installed skills match this runner")!;
+    return (await runDoctor(d, { ...ctx, templateSkills: shipped })).find(
+      (c) => c.name === "installed skills match this runner",
+    )!;
   };
 
   test("warns with the fix when an installed skill differs or is missing", async () => {
@@ -244,7 +276,9 @@ describe("installed skills drift", () => {
   test("skips files and directories listed in templateOverrides", async () => {
     const d = { ...deps(), readFile: async (p: string) => (p.endsWith("SKILL.md") ? "customised" : "{}") };
     const check = async (templateOverrides: string[]) =>
-      (await runDoctor(d, { ...ctx, templateSkills: shipped, templateOverrides })).find((c) => c.name === "installed skills match this runner")!.ok;
+      (await runDoctor(d, { ...ctx, templateSkills: shipped, templateOverrides })).find(
+        (c) => c.name === "installed skills match this runner",
+      )!.ok;
     expect(await check([])).toBe(false);
     expect(await check([".claude/skills/factory-build/SKILL.md"])).toBe(true);
     expect(await check([".claude/skills/factory-build/"])).toBe(true);
@@ -255,7 +289,9 @@ describe("installed skills drift", () => {
 
 describe("tmux check", () => {
   const tmuxCheck = async (installed: boolean, tmux?: boolean) =>
-    (await runDoctor({ ...deps(), which: async (b: string) => b !== "tmux" || installed }, { ...ctx, tmux })).find((c) => c.name.startsWith("tmux is installed"));
+    (await runDoctor({ ...deps(), which: async (b: string) => b !== "tmux" || installed }, { ...ctx, tmux })).find(
+      (c) => c.name.startsWith("tmux is installed"),
+    );
 
   test("fails when tmux.enabled is set and tmux is missing, and is absent when tmux is off", async () => {
     expect((await tmuxCheck(false, true))!.ok).toBe(false);
@@ -276,18 +312,34 @@ describe("fixDoctor", () => {
     const want = labelsFor(routes);
     expect(github.ensured.length).toBe(want.length);
     for (const label of want) {
-      expect(github.ensured).toContainEqual({ repo: "acme/widgets", name: label.name, color: label.color, description: label.description });
+      expect(github.ensured).toContainEqual({
+        repo: "acme/widgets",
+        name: label.name,
+        color: label.color,
+        description: label.description,
+      });
     }
     expect(github.ensured.some((l) => l.name === "content")).toBe(true);
   });
 
   test("a workflow's own step label is created, the shipped ones are not duplicated", async () => {
     const github = new TrackingGitHub();
-    const wf = parseWorkflowText("name: q\nsteps:\n  b: { uses: build, label: factory:building, next: lint }\n  lint: { uses: check, label: factory:linting, run: make lint, next: p }\n  p: { uses: pr, label: factory:in-review }\n");
+    const wf = parseWorkflowText(
+      "name: q\nsteps:\n  b: { uses: build, label: factory:building, next: lint }\n  lint: { uses: check, label: factory:linting, run: make lint, next: p }\n  p: { uses: pr, label: factory:in-review }\n",
+    );
     if (!wf.ok) throw new Error(wf.problems.join("; "));
     await fixDoctor(github, "acme/widgets", undefined, wf.workflow);
     expect(github.ensured.map((l) => l.name).sort()).toEqual([...LABELS.map((l) => l.name), "factory:linting"].sort());
-    const missing = await runDoctor({ ...deps(), readFile: async (p) => (p.endsWith("q.yml") ? "name: q\nsteps:\n  b: { uses: build, label: factory:building, next: lint }\n  lint: { uses: check, label: factory:linting, run: make lint, next: p }\n  p: { uses: pr, label: factory:in-review }\n" : undefined) }, { ...ctx, workflow: "q" });
+    const missing = await runDoctor(
+      {
+        ...deps(),
+        readFile: async (p) =>
+          p.endsWith("q.yml")
+            ? "name: q\nsteps:\n  b: { uses: build, label: factory:building, next: lint }\n  lint: { uses: check, label: factory:linting, run: make lint, next: p }\n  p: { uses: pr, label: factory:in-review }\n"
+            : undefined,
+      },
+      { ...ctx, workflow: "q" },
+    );
     expect(missing.find((c) => c.name === "all factory labels exist")!.detail).toContain("factory:linting");
   });
 
@@ -301,7 +353,10 @@ describe("fixDoctor", () => {
 describe("runDoctor agent versions", () => {
   const agents = { gemini: { preset: "gemini" } };
   const stages = { default: "gemini" } as const;
-  const withVersion = (found: string | undefined) => ({ ...deps({ which: new Set(["gh", "gemini", "python3", "jq"]) }), versionOf: async () => found });
+  const withVersion = (found: string | undefined) => ({
+    ...deps({ which: new Set(["gh", "gemini", "python3", "jq"]) }),
+    versionOf: async () => found,
+  });
 
   test("warns, never fails, when the installed version is not the pin", async () => {
     const checks = await runDoctor(withVersion("0.25.2"), { ...ctx, agents, stages });
@@ -320,20 +375,32 @@ describe("runDoctor agent versions", () => {
   test("every preset that is not verified live warns with the participant path", async () => {
     const { PRESETS } = await import("../src/agents/presets");
     for (const preset of Object.values(PRESETS)) {
-      const d = { ...deps({ which: new Set(["gh", preset.binary, "python3", "jq"]) }), versionOf: async () => preset.version };
+      const d = {
+        ...deps({ which: new Set(["gh", preset.binary, "python3", "jq"]) }),
+        versionOf: async () => preset.version,
+      };
       const checks = await runDoctor(d, { ...ctx, agents: { a: { preset: preset.name } }, stages: { default: "a" } });
       const v = checks.find((c) => c.name === `agent "a" is verified`);
       expect(v === undefined, preset.name).toBe(preset.verified);
-      expect(checks.filter((c) => !c.ok && !c.warn), preset.name).toEqual([]);
+      expect(
+        checks.filter((c) => !c.ok && !c.warn),
+        preset.name,
+      ).toEqual([]);
     }
   });
 
   test("the configured workflow: the bundled one passes, a broken repo copy or a missing name fails", async () => {
     const reading = (repoFile?: string): DoctorDeps => ({
       ...deps(),
-      readFile: async (path) => (path.startsWith("/tmp/x/.factory/workflows/") ? repoFile : Bun.file(path).text().catch(() => undefined)),
+      readFile: async (path) =>
+        path.startsWith("/tmp/x/.factory/workflows/")
+          ? repoFile
+          : Bun.file(path)
+              .text()
+              .catch(() => undefined),
     });
-    const check = async (d: DoctorDeps, workflow: string) => (await runDoctor(d, { ...ctx, workflow })).find((c) => c.name === `workflow ${workflow} is valid`)!;
+    const check = async (d: DoctorDeps, workflow: string) =>
+      (await runDoctor(d, { ...ctx, workflow })).find((c) => c.name === `workflow ${workflow} is valid`)!;
     expect((await check(reading(), "feature-to-pr")).ok).toBe(true);
     const broken = await check(reading("name: x\nsteps:\n  a: { uses: nope, label: l }\n"), "feature-to-pr");
     expect(broken.ok).toBe(false);
@@ -345,12 +412,15 @@ describe("runDoctor agent versions", () => {
 });
 
 describe("doctor: mcp: servers", () => {
-  const flow = "name: m\nsteps:\n  b: { uses: build, label: factory:building, mcp: [docs, tracker], next: p }\n  p: { uses: pr, label: factory:in-review }\n";
+  const flow =
+    "name: m\nsteps:\n  b: { uses: build, label: factory:building, mcp: [docs, tracker], next: p }\n  p: { uses: pr, label: factory:in-review }\n";
   const reading = (registry?: string): DoctorDeps => ({
     ...deps(),
-    readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : path.endsWith(".factory/mcp.json") ? registry : undefined),
+    readFile: async (path) =>
+      path.endsWith("workflows/m.yml") ? flow : path.endsWith(".factory/mcp.json") ? registry : undefined,
   });
-  const check = async (registry?: string) => (await runDoctor(reading(registry), { ...ctx, workflow: "m" })).find((c) => c.name.startsWith("every mcp: server"));
+  const check = async (registry?: string) =>
+    (await runDoctor(reading(registry), { ...ctx, workflow: "m" })).find((c) => c.name.startsWith("every mcp: server"));
 
   test("every named server is in .factory/mcp.json", async () => {
     expect((await check(JSON.stringify({ mcpServers: { docs: {}, tracker: {} } })))!.ok).toBe(true);
@@ -362,15 +432,25 @@ describe("doctor: mcp: servers", () => {
     expect((await check(undefined))!.detail).toContain(".factory/mcp.json not found");
   });
   test("a workflow that names no server adds no check", async () => {
-    expect(await runDoctor(deps(), { ...ctx, workflow: "feature-to-pr" }).then((cs) => cs.find((c) => c.name.startsWith("every mcp:")))).toBeUndefined();
+    expect(
+      await runDoctor(deps(), { ...ctx, workflow: "feature-to-pr" }).then((cs) =>
+        cs.find((c) => c.name.startsWith("every mcp:")),
+      ),
+    ).toBeUndefined();
   });
 });
 
 describe("doctor: runtimes", () => {
-  const flow = "name: m\nsteps:\n  l: { uses: check, label: factory:linting, run: make lint, runtime: gpu, next: p }\n  p: { uses: pr, label: factory:in-review }\n";
-  const reading: DoctorDeps = { ...deps(), readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : undefined) };
+  const flow =
+    "name: m\nsteps:\n  l: { uses: check, label: factory:linting, run: make lint, runtime: gpu, next: p }\n  p: { uses: pr, label: factory:in-review }\n";
+  const reading: DoctorDeps = {
+    ...deps(),
+    readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : undefined),
+  };
   const check = async (runtimeNames: string[], workflow = "m") =>
-    (await runDoctor(reading, { ...ctx, workflow, runtime: { gates: "lwpr" }, runtimeNames })).find((c) => c.name.startsWith("every runtime"));
+    (await runDoctor(reading, { ...ctx, workflow, runtime: { gates: "lwpr" }, runtimeNames })).find((c) =>
+      c.name.startsWith("every runtime"),
+    );
 
   test("a name this machine has passes; one it lacks fails with the name", async () => {
     expect((await check(["local", "lwpr", "gpu"]))!.ok).toBe(true);

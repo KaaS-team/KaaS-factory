@@ -26,10 +26,7 @@ let projectDir: string;
 beforeEach(() => {
   projectDir = mkdtempSync(join(tmpdir(), "factory-guard-"));
   mkdirSync(join(projectDir, ".factory"), { recursive: true });
-  writeFileSync(
-    join(projectDir, ".factory", "config.json"),
-    JSON.stringify({ protectedPaths: ["src/payments/**"] }),
-  );
+  writeFileSync(join(projectDir, ".factory", "config.json"), JSON.stringify({ protectedPaths: ["src/payments/**"] }));
 });
 
 afterEach(() => {
@@ -134,7 +131,7 @@ describe("guard-paths.sh", () => {
     "git --super-prefix x/ merge y",
     "git submodule foreach sh -c 'git push -f origin HEAD'",
     "git bisect run sh -c 'git merge x'",
-    "git submodule foreach bash -c \"git merge origin/main\"",
+    'git submodule foreach bash -c "git merge origin/main"',
     "git -C git push -f",
   ];
   for (const command of mergeOrForce) {
@@ -143,7 +140,18 @@ describe("guard-paths.sh", () => {
     });
   }
 
-  for (const command of ["git merge-base main HEAD", "gh pr merge-queue", "git push origin main", "git log --grep=force -- push", "git branch --merged", "grep -rn git src", "git log --oneline --grep='git merge'", "git commit -m 'fix merge of totals'", "gh pr view 12 -R o/r --json mergeable", "git push -u origin \\\n  feature"]) {
+  for (const command of [
+    "git merge-base main HEAD",
+    "gh pr merge-queue",
+    "git push origin main",
+    "git log --grep=force -- push",
+    "git branch --merged",
+    "grep -rn git src",
+    "git log --oneline --grep='git merge'",
+    "git commit -m 'fix merge of totals'",
+    "gh pr view 12 -R o/r --json mergeable",
+    "git push -u origin \\\n  feature",
+  ]) {
     test(`allows a read-only command near merge or push: ${command}`, async () => {
       expect((await runHook({ tool_name: "Bash", tool_input: { command } })).code).toBe(0);
     });
@@ -160,11 +168,15 @@ describe("guard-paths.sh", () => {
     const codes = [];
     for (const config of ['{"protectedPaths":[1]}', '{"protectedPaths":null}', '{"protectedPaths":"src/**"}', "{bad"]) {
       writeFileSync(join(projectDir, ".factory", "config.json"), config);
-      codes.push((await runHook({ tool_name: "Write", tool_input: { file_path: `${projectDir}/src/widgets/list.ts` } })).code);
+      codes.push(
+        (await runHook({ tool_name: "Write", tool_input: { file_path: `${projectDir}/src/widgets/list.ts` } })).code,
+      );
     }
     rmSync(join(projectDir, ".factory", "config.json"));
     symlinkSync(join(projectDir, "missing.json"), join(projectDir, ".factory", "config.json"));
-    codes.push((await runHook({ tool_name: "Write", tool_input: { file_path: `${projectDir}/src/widgets/list.ts` } })).code);
+    codes.push(
+      (await runHook({ tool_name: "Write", tool_input: { file_path: `${projectDir}/src/widgets/list.ts` } })).code,
+    );
     expect(codes).toEqual([2, 2, 2, 2, 2]);
   });
 
@@ -188,7 +200,10 @@ describe("guard-paths.sh", () => {
   // the file would teach every later run without review.
   test("blocks an edit of .factory/memory/lessons.md: only the runner writes lessons", async () => {
     for (const tool_name of ["Edit", "Write"]) {
-      const { code } = await runHook({ tool_name, tool_input: { file_path: `${projectDir}/.factory/memory/lessons.md` } });
+      const { code } = await runHook({
+        tool_name,
+        tool_input: { file_path: `${projectDir}/.factory/memory/lessons.md` },
+      });
       expect(code).toBe(2);
     }
   });
@@ -202,7 +217,12 @@ describe("guard-paths.sh", () => {
   });
 
   test("fails CLOSED (blocks) when its input is not valid JSON", async () => {
-    const proc = Bun.spawn([HOOK], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir } });
+    const proc = Bun.spawn([HOOK], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+    });
     proc.stdin.write("not json");
     await proc.stdin.end();
     expect(await proc.exited).toBe(2);
@@ -227,7 +247,9 @@ describe("guard-paths.sh", () => {
       stderr: "pipe",
       env: { CLAUDE_PROJECT_DIR: projectDir, PATH: binDir },
     });
-    proc.stdin.write(JSON.stringify({ tool_name: "Edit", tool_input: { file_path: `${projectDir}/src/widgets/list.ts` } }));
+    proc.stdin.write(
+      JSON.stringify({ tool_name: "Edit", tool_input: { file_path: `${projectDir}/src/widgets/list.ts` } }),
+    );
     await proc.stdin.end();
     const stderr = await new Response(proc.stderr).text();
     const code = await proc.exited;
@@ -237,7 +259,10 @@ describe("guard-paths.sh", () => {
   });
 
   test("blocks a NotebookEdit to a protected path", async () => {
-    const { code } = await runHook({ tool_name: "NotebookEdit", tool_input: { notebook_path: `${projectDir}/.claude/x.ipynb` } });
+    const { code } = await runHook({
+      tool_name: "NotebookEdit",
+      tool_input: { notebook_path: `${projectDir}/.claude/x.ipynb` },
+    });
     expect(code).toBe(2);
   });
 
@@ -245,7 +270,9 @@ describe("guard-paths.sh", () => {
   // file lives in a linked worktree with its own protected paths.
   test("protects paths relative to the git worktree that holds the file, not CLAUDE_PROJECT_DIR", async () => {
     const git = (...args: string[]) =>
-      Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", projectDir, ...args], { stderr: "pipe" });
+      Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", projectDir, ...args], {
+        stderr: "pipe",
+      });
     git("init", "-q");
     git("commit", "-q", "--allow-empty", "-m", "init");
     const other = `${projectDir}-wt`;
@@ -264,7 +291,10 @@ describe("guard-paths.sh", () => {
   test("a planted .git marker does not move the root", async () => {
     mkdirSync(join(projectDir, "src"), { recursive: true });
     writeFileSync(join(projectDir, "src", ".git"), "gitdir: /elsewhere\n");
-    const { code } = await runHook({ tool_name: "Edit", tool_input: { file_path: `${projectDir}/src/payments/charge.ts` } });
+    const { code } = await runHook({
+      tool_name: "Edit",
+      tool_input: { file_path: `${projectDir}/src/payments/charge.ts` },
+    });
     expect(code).toBe(2);
   });
 });
@@ -273,7 +303,10 @@ describe("guard-paths.sh", () => {
 // (docs/decisions/stage-shell-shapes.md). In a stage the hook names the shape and
 // the fix; the CLI's own message read "Bash denied" and verifiers gave up.
 describe("guard-paths.sh subagent dispatch", () => {
-  const agent = (run_in_background: boolean) => ({ tool_name: "Agent", tool_input: { subagent_type: "factory-reviewer", prompt: "review", run_in_background } });
+  const agent = (run_in_background: boolean) => ({
+    tool_name: "Agent",
+    tool_input: { subagent_type: "factory-reviewer", prompt: "review", run_in_background },
+  });
   test("inside a stage a backgrounded subagent is refused, a foreground one passes", async () => {
     const bg = await runHook(agent(true), { FACTORY_STAGE: "verify" });
     expect(bg.code).toBe(2);
@@ -322,7 +355,10 @@ describe("guard-paths.sh shell shapes inside a stage", () => {
   ];
   for (const [command, hint] of refused)
     test(`refuses: ${command}`, async () => {
-      const { code, stderr } = await runHook({ tool_name: "Bash", tool_input: { command } }, { FACTORY_STAGE: "verify" });
+      const { code, stderr } = await runHook(
+        { tool_name: "Bash", tool_input: { command } },
+        { FACTORY_STAGE: "verify" },
+      );
       expect(code).toBe(2);
       expect(stderr).toContain(hint);
       expect(stderr).toContain("Bash still works");
@@ -355,7 +391,10 @@ describe("guard-paths.sh shell shapes inside a stage", () => {
   ];
   for (const command of allowed)
     test(`allows: ${command}`, async () => {
-      const { code, stderr } = await runHook({ tool_name: "Bash", tool_input: { command } }, { FACTORY_STAGE: "verify" });
+      const { code, stderr } = await runHook(
+        { tool_name: "Bash", tool_input: { command } },
+        { FACTORY_STAGE: "verify" },
+      );
       expect(stderr).toBe("");
       expect(code).toBe(0);
     });
@@ -365,13 +404,17 @@ describe("guard-paths.sh shell shapes inside a stage", () => {
     const nested = ["bash -c", "bash -c", "bash -c"].reduce((c, w) => `${w} '${c.replaceAll("'", "'\\''")}'`, pushes);
     const started = Date.now();
     const codes = [];
-    for (const command of [nested, `echo ${"1".repeat(99000)}`, `{${".".repeat(99000)}`, "! ".repeat(100000)]) codes.push((await runHook({ tool_name: "Bash", tool_input: { command } }, { FACTORY_STAGE: "build" })).code);
+    for (const command of [nested, `echo ${"1".repeat(99000)}`, `{${".".repeat(99000)}`, "! ".repeat(100000)])
+      codes.push((await runHook({ tool_name: "Bash", tool_input: { command } }, { FACTORY_STAGE: "build" })).code);
     expect(codes).toEqual([0, 0, 0, 0]);
     expect(Date.now() - started).toBeLessThan(4000);
   });
 
   test("fails CLOSED on a non-string command, path or cwd, or a tool_input that is not an object", async () => {
-    const nullCommand = await runHook({ tool_name: "Bash", tool_input: { command: null } }, { FACTORY_STAGE: "verify" });
+    const nullCommand = await runHook(
+      { tool_name: "Bash", tool_input: { command: null } },
+      { FACTORY_STAGE: "verify" },
+    );
     const stringInput = await runHook({ tool_name: "Bash", tool_input: "ls" });
     const numberPath = await runHook({ tool_name: "Write", tool_input: { file_path: 123 } });
     const numberCwd = await runHook({ tool_name: "Write", tool_input: { file_path: "a.txt" }, cwd: 5 });
@@ -383,4 +426,3 @@ describe("guard-paths.sh shell shapes inside a stage", () => {
     expect(code).toBe(0);
   });
 });
-

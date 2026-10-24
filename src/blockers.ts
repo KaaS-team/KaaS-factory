@@ -77,7 +77,10 @@ export async function resolveBlockers(
     if (open.length > 0) continue;
     const names = issue.labels.map((l) => l.name);
     await github.setStateLabel(repo, issue.number, names, LABEL.ready);
-    clear.push({ ...issue, labels: [...names.filter((n) => n !== LABEL.blocked), LABEL.ready].map((name) => ({ name })) });
+    clear.push({
+      ...issue,
+      labels: [...names.filter((n) => n !== LABEL.blocked), LABEL.ready].map((name) => ({ name })),
+    });
   }
 
   return { clear };

@@ -88,7 +88,8 @@ class FakeRunner implements CommandRunner {
 }
 // bun audit exits non-zero when it finds advisories; so does osv-scanner (1).
 const bunOnly = (stdout = FIXTURE) => new FakeRunner({ bun: { stdout, stderr: "", code: 1 } });
-const osv = (stdout: string, code = 1) => new FakeRunner({ "osv-scanner": { stdout, stderr: "", code }, bun: { stdout: FIXTURE, stderr: "", code: 1 } });
+const osv = (stdout: string, code = 1) =>
+  new FakeRunner({ "osv-scanner": { stdout, stderr: "", code }, bun: { stdout: FIXTURE, stderr: "", code: 1 } });
 
 function issue(number: number, body: string): GhIssue {
   return { number, title: "seed", body, labels: [], comments: [] };
@@ -143,11 +144,17 @@ describe("scan()", () => {
     const result = await scan({ github, runner }, "acme/widgets", pyDir);
     rmSync(pyDir, { recursive: true, force: true });
     expect(runner.calls).toEqual([OSV_ARGV]);
-    expect(result).toMatchObject({ source: "osv-scanner", filed: [expect.stringContaining("nanoid")], skipped: [expect.stringContaining("hono")] });
+    expect(result).toMatchObject({
+      source: "osv-scanner",
+      filed: [expect.stringContaining("nanoid")],
+      skipped: [expect.stringContaining("hono")],
+    });
   });
 
   test("osv-scanner with no lockfile it reads, or an error, skips: its output is never read as zero findings", async () => {
-    expect((await scan({ github: new FakeGitHub([]), runner: osv("", 128) }, "a/b", bunProjectDir)).skippedReason).toContain("no lockfile");
+    expect(
+      (await scan({ github: new FakeGitHub([]), runner: osv("", 128) }, "a/b", bunProjectDir)).skippedReason,
+    ).toContain("no lockfile");
     const failed = await scan({ github: new FakeGitHub([]), runner: osv("", 2) }, "a/b", bunProjectDir);
     expect(failed.skippedReason).toContain("osv-scanner failed (exit 2)");
   });

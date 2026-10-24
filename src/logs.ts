@@ -39,7 +39,7 @@ export async function streamLogs(
         if (options.stage && event.stage !== options.stage) continue;
         matched = true;
         const text = plain(event.text);
-        if (options.json) print(JSON.stringify({ issue, stage: event.stage, kind: event.kind, text }) + "\n");
+        if (options.json) print(`${JSON.stringify({ issue, stage: event.stage, kind: event.kind, text })}\n`);
         else {
           if (lastStage !== event.stage) print(`\n--- ${event.stage} ---\n`);
           print(`${text}\n`);

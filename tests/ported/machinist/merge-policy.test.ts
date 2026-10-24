@@ -58,7 +58,12 @@ function input(overrides: Partial<DecideMergeInput> = {}): DecideMergeInput {
 
 function fakeMergePr() {
   const calls: { repo: string; prNumber: number; headSha: string }[] = [];
-  return { calls, mergePr: async (repo: string, prNumber: number, headSha: string) => { calls.push({ repo, prNumber, headSha }); } };
+  return {
+    calls,
+    mergePr: async (repo: string, prNumber: number, headSha: string) => {
+      calls.push({ repo, prNumber, headSha });
+    },
+  };
 }
 
 test("only a small, low-risk docs change auto-merges", () => {
@@ -111,7 +116,8 @@ test("failed CI, pending (timed-out) CI, missing checks, and a required review e
 
   const reviewRequired = decideMerge(input({ readiness: readiness({ reviewDecision: "REVIEW_REQUIRED" }) }));
   expect(reviewRequired.outcome).toBe("refuse");
-  if (reviewRequired.outcome === "refuse") expect(reviewRequired.refusals.map((r) => r.reason)).toContain("reviews-required");
+  if (reviewRequired.outcome === "refuse")
+    expect(reviewRequired.refusals.map((r) => r.reason)).toContain("reviews-required");
 });
 
 test("a draft PR, or one with merge conflicts, blocks even with every other gate green", () => {
@@ -170,10 +176,20 @@ test("a file under protectedPaths is never auto-eligible, even when it also matc
 });
 
 test("too many files or too many lines blocks auto-eligibility on its own", () => {
-  const tooManyFiles = autoEligible("low", [file("docs/a.md"), file("docs/b.md")], { autoPaths: ["docs/**"], maxFiles: 1, maxLines: 200 }, []);
+  const tooManyFiles = autoEligible(
+    "low",
+    [file("docs/a.md"), file("docs/b.md")],
+    { autoPaths: ["docs/**"], maxFiles: 1, maxLines: 200 },
+    [],
+  );
   expect(tooManyFiles.map((r) => r.reason)).toContain("not-auto-eligible");
 
-  const tooManyLines = autoEligible("low", [file("docs/a.md", 500, 0)], { autoPaths: ["docs/**"], maxFiles: 10, maxLines: 200 }, []);
+  const tooManyLines = autoEligible(
+    "low",
+    [file("docs/a.md", 500, 0)],
+    { autoPaths: ["docs/**"], maxFiles: 10, maxLines: 200 },
+    [],
+  );
   expect(tooManyLines.map((r) => r.reason)).toContain("not-auto-eligible");
 });
 

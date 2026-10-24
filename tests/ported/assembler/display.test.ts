@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { plain } from "../../../src/display";
 
 test("terminal escape codes are removed", () => {
-  const value = "\x1b[2J" + "line\n".repeat(100);
+  const value = `\x1b[2J${"line\n".repeat(100)}`;
   expect(plain(value).includes("\x1b")).toBe(false);
 });
 

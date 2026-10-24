@@ -52,7 +52,9 @@ describe("http tracker auth", () => {
 describe("Tracker API v1 routes", () => {
   // The docs table's first column, query strings dropped: the published contract.
   const doc = readFileSync(join(import.meta.dir, "..", "docs", "tracker-api.md"), "utf8");
-  const docRoutes = [...doc.matchAll(/^\| `(GET|POST|PUT|PATCH|DELETE) ([^`?]+)(?:\?[^`]*)?` \|/gm)].map((m) => `${m[1]} ${m[2]}`);
+  const docRoutes = [...doc.matchAll(/^\| `(GET|POST|PUT|PATCH|DELETE) ([^`?]+)(?:\?[^`]*)?` \|/gm)].map(
+    (m) => `${m[1]} ${m[2]}`,
+  );
   const set = (xs: readonly string[]) => [...new Set(xs)].sort();
 
   test("every TrackerPort method has a route the server serves and the docs list, and no extras", () => {
@@ -78,14 +80,30 @@ describe("branch-mode linking", () => {
   test("createPr comments the PR URL on the tracker issue and keeps #n out of the body", async () => {
     const { tracker, host, scm } = composed();
     const n = await tracker.createIssue("acme/w", "x", "", []);
-    const url = await scm.createPr({ repo: "acme/w", head: `factory/issue-${n}`, base: "main", title: "Fix #1 widget", body: "Closes #1", draft: true });
+    const url = await scm.createPr({
+      repo: "acme/w",
+      head: `factory/issue-${n}`,
+      base: "main",
+      title: "Fix #1 widget",
+      body: "Closes #1",
+      draft: true,
+    });
     expect(host.createdPrs[0]).toMatchObject({ title: "Fix tracker issue 1 widget", body: "Closes tracker issue 1" });
-    expect((await tracker.getIssue("acme/w", n)).comments.map((c) => c.body)).toEqual([`Pull request: ${url}\n\n${PR_LINK_MARKER}`]);
+    expect((await tracker.getIssue("acme/w", n)).comments.map((c) => c.body)).toEqual([
+      `Pull request: ${url}\n\n${PR_LINK_MARKER}`,
+    ]);
   });
 
   test("prForIssue finds the PR by head branch and honours excludeHead; references come from the head", async () => {
     const { host, scm } = composed();
-    await host.createPr({ repo: "acme/w", head: "factory/issue-7", base: "main", title: "t", body: "Closes #99", draft: false });
+    await host.createPr({
+      repo: "acme/w",
+      head: "factory/issue-7",
+      base: "main",
+      title: "t",
+      body: "Closes #99",
+      draft: false,
+    });
     expect((await scm.prForIssue("acme/w", 7))?.number).toBe(1);
     expect(await scm.prForIssue("acme/w", 7, { excludeHead: "factory/issue-7" })).toBeUndefined();
     expect(await scm.prForIssue("acme/w", 99)).toBeUndefined();
@@ -97,7 +115,14 @@ describe("branch-mode linking", () => {
   test("a merge closes the tracker issue the head names", async () => {
     const { tracker, host, scm } = composed();
     const n = await tracker.createIssue("acme/w", "x", "", []);
-    await host.createPr({ repo: "acme/w", head: `factory/issue-${n}`, base: "main", title: "t", body: "", draft: false });
+    await host.createPr({
+      repo: "acme/w",
+      head: `factory/issue-${n}`,
+      base: "main",
+      title: "t",
+      body: "",
+      draft: false,
+    });
     host.mergePr = async () => {};
     await scm.mergePr("acme/w", 1, "abc");
     expect((await tracker.getIssue("acme/w", n)).state).toBe("CLOSED");
@@ -130,21 +155,46 @@ describe("end to end on an http tracker", () => {
     const state = new FactoryState(":memory:");
     state.setToggle("auto_approve_low_risk", true);
     const executor = new MultiStageExecutor();
-    const push = (stage: Parameters<typeof fixtureFor>[0], files: Record<string, string>) => executor.push(stage, n, fixtureFor(stage, n), files);
+    const push = (stage: Parameters<typeof fixtureFor>[0], files: Record<string, string>) =>
+      executor.push(stage, n, fixtureFor(stage, n), files);
     push("triage", {
       "triage-comment.md": "<!-- factory:triage v1 -->\ntriage",
-      "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["src/a.ts"], gate_level: "make check", confidence: 0.9 }),
+      "triage.json": JSON.stringify({
+        disposition: "proceed",
+        type: "bug",
+        risk: "low",
+        done_when: "x",
+        files_expected: ["src/a.ts"],
+        gate_level: "make check",
+        confidence: 0.9,
+      }),
     });
     push("plan", {
       "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",
       "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true }),
     });
-    push("build", { "status-comment.md": "<!-- factory:status v1 -->\nbuilding", "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) });
-    push("verify", { "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict", "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }) });
+    push("build", {
+      "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
+      "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+    });
+    push("verify", {
+      "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
+      "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+    });
     push("pr", { "pr-body.md": `Did it.\nCloses #${n}` });
 
     const bus = new EventBus({ store: state, sinks: [], source: "s", autoDeliver: false });
-    const deps = { github, git: new FakeGit(), state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, bus };
+    const deps = {
+      github,
+      git: new FakeGit(),
+      state,
+      executor,
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      cloneDir,
+      workspacesDir,
+      bus,
+    };
     await pollOnce(deps, mergeConfig({ repo }));
     return { repo, n, host, state, deps };
   }
@@ -170,7 +220,11 @@ describe("end to end on an http tracker", () => {
     const issue = await server.store.getIssue(repo, n);
     expect(issue.state).toBe("CLOSED");
     expect(issue.labels).toEqual([]);
-    const merged = () => state.busEvents().filter((e) => e.type === "factory.pr.merged").map((e) => JSON.parse(e.data));
+    const merged = () =>
+      state
+        .busEvents()
+        .filter((e) => e.type === "factory.pr.merged")
+        .map((e) => JSON.parse(e.data));
     expect(merged()).toEqual([{ repo, issue: n, pr: 1, by: "human" }]);
     expect(state.listRetros(repo).map((r) => r.outcome)).toEqual(["merged"]);
     await pollOnce(deps, mergeConfig({ repo }));

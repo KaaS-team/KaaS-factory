@@ -34,11 +34,21 @@ describe("visual system", () => {
     const named = [...css.matchAll(/url\("\/(fonts\/[\w-]+\.woff2)"\)/g)].map((m) => m[1]!);
     expect(named).toEqual(["fonts/geist.woff2"]);
     for (const f of named) expect(existsSync(join(dir, f)), f).toBe(true);
-    expect(readFileSync(join(dir, "fonts", "LICENSE-geist.txt"), "utf8")).toContain("SIL Open Font License, Version 1.1");
+    expect(readFileSync(join(dir, "fonts", "LICENSE-geist.txt"), "utf8")).toContain(
+      "SIL Open Font License, Version 1.1",
+    );
   });
 
   test("every top-level view is built with the shared heading", () => {
-    for (const view of ["lineView", "inboxView", "runsView", "workflowsView", "analyticsView", "agentsView", "settingsView"]) {
+    for (const view of [
+      "lineView",
+      "inboxView",
+      "runsView",
+      "workflowsView",
+      "analyticsView",
+      "agentsView",
+      "settingsView",
+    ]) {
       const body = app.slice(app.indexOf(`function ${view}`));
       expect(body.slice(0, body.indexOf("\n}\n")), view).toMatch(/heading\(/);
     }

@@ -14,7 +14,7 @@ export function trackerContract(name: string, make: () => TrackerPort): void {
     test("an issue's title and body come back byte for byte, with no labels or comments lost", async () => {
       const t = make();
       const repo = fresh();
-      const body = "Line one\n\n<!-- factory:data v1 -->\n```json\n{\"a\": 1}\n```\nnaïve café ✓ \"quoted\" & <tags>\n";
+      const body = 'Line one\n\n<!-- factory:data v1 -->\n```json\n{"a": 1}\n```\nnaïve café ✓ "quoted" & <tags>\n';
       const n = await t.createIssue(repo, "Fix the ✓ thing", body, ["bug", "factory:ready"]);
       const issue = await t.getIssue(repo, n);
       expect(issue).toMatchObject({ number: n, title: "Fix the ✓ thing", body, state: "OPEN" });

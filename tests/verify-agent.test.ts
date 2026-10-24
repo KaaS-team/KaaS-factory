@@ -9,7 +9,28 @@ import { runDoctor } from "../src/doctor";
 import { configFor, formatReport, matrixPlan, reportFor } from "../src/verify-agent";
 import type { StageRun } from "../src/state";
 
-const run = (over: Partial<StageRun>): StageRun => ({ id: 1, repo: "a/b", issue: 1, stage: "build", agent: "codex", model: null, started_at: "", finished_at: "", duration_ms: 1500, tool_calls: 2, tokens_in: 10, tokens_out: 5, tokens_cached: 0, cost_usd: 0.25, usage_complete: 1, exit_code: 0, killed_reason: null, session_id: null, verdict: null, ...over });
+const run = (over: Partial<StageRun>): StageRun => ({
+  id: 1,
+  repo: "a/b",
+  issue: 1,
+  stage: "build",
+  agent: "codex",
+  model: null,
+  started_at: "",
+  finished_at: "",
+  duration_ms: 1500,
+  tool_calls: 2,
+  tokens_in: 10,
+  tokens_out: 5,
+  tokens_cached: 0,
+  cost_usd: 0.25,
+  usage_complete: 1,
+  exit_code: 0,
+  killed_reason: null,
+  session_id: null,
+  verdict: null,
+  ...over,
+});
 
 describe("verify-agent", () => {
   test("configFor runs every stage on the preset and rejects an unknown name", () => {
@@ -29,11 +50,19 @@ describe("verify-agent", () => {
   });
 
   test("the matrix runs installed presets and names the skipped", async () => {
-    expect(await matrixPlan(async (bin) => bin === "claude")).toEqual({ run: ["claude"], skipped: Object.keys(PRESETS).filter((n) => n !== "claude") });
+    expect(await matrixPlan(async (bin) => bin === "claude")).toEqual({
+      run: ["claude"],
+      skipped: Object.keys(PRESETS).filter((n) => n !== "claude"),
+    });
   });
 
   test("scrubbing removes env secrets, key shapes and home paths", () => {
-    const line = JSON.stringify({ a: "token supersecretvalue1", b: "sk-abcdefghijklmnopqrstuv", c: "/Users/x/work/f.ts", d: "keep me" });
+    const line = JSON.stringify({
+      a: "token supersecretvalue1",
+      b: "sk-abcdefghijklmnopqrstuv",
+      c: "/Users/x/work/f.ts",
+      d: "keep me",
+    });
     const out = scrubLine(line, { MY_API_KEY: "supersecretvalue1", PLAIN: "keep" }, ["/Users/x"]);
     expect(out).not.toContain("supersecretvalue1");
     expect(out).not.toContain("sk-abcdef");
@@ -58,8 +87,21 @@ describe("verify-agent", () => {
   });
 
   test("doctor warns, without failing, on an unverified preset", async () => {
-    const deps = { github: { authStatus: async () => ({ ok: true, detail: "" }), listLabels: async () => [] } as never, git: { run: async () => ({ code: 0, stdout: "", stderr: "" }) } as never, which: async () => true, fileExists: async () => true, readFile: async () => "", isExecutable: async () => true };
-    const checks = await runDoctor(deps, { repo: "a/b", cloneDir: "/x", baselineTag: "t", agents: { codex: { preset: "codex" } }, stages: { default: "codex" } });
+    const deps = {
+      github: { authStatus: async () => ({ ok: true, detail: "" }), listLabels: async () => [] } as never,
+      git: { run: async () => ({ code: 0, stdout: "", stderr: "" }) } as never,
+      which: async () => true,
+      fileExists: async () => true,
+      readFile: async () => "",
+      isExecutable: async () => true,
+    };
+    const checks = await runDoctor(deps, {
+      repo: "a/b",
+      cloneDir: "/x",
+      baselineTag: "t",
+      agents: { codex: { preset: "codex" } },
+      stages: { default: "codex" },
+    });
     const c = checks.find((k) => k.name === 'agent "codex" is verified');
     expect(c).toMatchObject({ ok: false, warn: true });
     expect(c?.detail).toContain("factory verify-agent codex");
@@ -82,7 +124,10 @@ describe("verify-agent", () => {
     rec.line("triage", "one");
     rec.line("triage", "two");
     expect(readFileSync(join(dir, "triage.jsonl"), "utf8")).toBe("one\ntwo\n");
-    expect(JSON.parse(readFileSync(join(dir, "fixture.json"), "utf8"))).toEqual({ agent: "x", synthetic: false, reportsUsage: false });
+    expect(JSON.parse(readFileSync(join(dir, "fixture.json"), "utf8"))).toEqual({
+      agent: "x",
+      synthetic: false,
+      reportsUsage: false,
+    });
   });
 });
-

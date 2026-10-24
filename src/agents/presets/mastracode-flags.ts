@@ -12,15 +12,15 @@
  * Adding a flag means adding one row here; parsing, validation, and the usage
  * listing all follow automatically.
  */
-export type OutputMode = 'human' | 'json' | 'jsonl';
-export type RunMode = 'build' | 'plan' | 'fast';
-export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-export type PermissionMode = 'auto' | 'deny';
-export const VALID_MODES = ['build', 'plan', 'fast'] as const;
-export const VALID_THINKING_LEVELS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-export const VALID_PERMISSION_MODES = ['auto', 'deny'] as const;
+export type OutputMode = "human" | "json" | "jsonl";
+export type RunMode = "build" | "plan" | "fast";
+export type ThinkingLevel = "off" | "low" | "medium" | "high" | "xhigh" | "max";
+export type PermissionMode = "auto" | "deny";
+export const VALID_MODES = ["build", "plan", "fast"] as const;
+export const VALID_THINKING_LEVELS = ["off", "low", "medium", "high", "xhigh", "max"] as const;
+export const VALID_PERMISSION_MODES = ["auto", "deny"] as const;
 
-export const VALID_OUTPUTS = ['human', 'json', 'jsonl'] as const;
+export const VALID_OUTPUTS = ["human", "json", "jsonl"] as const;
 
 /** Reusable validators. Each throws a descriptive Error or returns the typed value. */
 const validate = {
@@ -28,7 +28,7 @@ const validate = {
   enum<T extends string>(flag: string, allowed: readonly T[]) {
     return (raw: string): T => {
       if (!(allowed as readonly string[]).includes(raw)) {
-        throw new Error(`${flag} must be one of: ${allowed.join(', ')}`);
+        throw new Error(`${flag} must be one of: ${allowed.join(", ")}`);
       }
       return raw as T;
     };
@@ -61,7 +61,7 @@ export interface FlagSpec {
   /** Single-character alias (without the leading `-`), if any. */
   short?: string;
   /** Whether the flag takes a value (`string`) or is a switch (`boolean`). */
-  type: 'string' | 'boolean';
+  type: "string" | "boolean";
   /** Target field on `HeadlessArgs`. Omit for flags handled out-of-band (e.g. help). */
   field?: string;
   /** Coerce/validate a string value. Required for `type: 'string'` flags that map to a field. */
@@ -74,140 +74,140 @@ export interface FlagSpec {
 
 export const FLAGS: FlagSpec[] = [
   {
-    key: 'prompt',
-    short: 'p',
-    type: 'string',
-    field: 'prompt',
+    key: "prompt",
+    short: "p",
+    type: "string",
+    field: "prompt",
     coerce: validate.string,
-    placeholder: '<text>',
-    help: 'The task to execute (required, or pipe via stdin)',
+    placeholder: "<text>",
+    help: "The task to execute (required, or pipe via stdin)",
   },
   {
-    key: 'continue',
-    short: 'c',
-    type: 'boolean',
-    field: 'continue_',
-    help: 'Resume the most recent thread instead of creating a new one',
+    key: "continue",
+    short: "c",
+    type: "boolean",
+    field: "continue_",
+    help: "Resume the most recent thread instead of creating a new one",
   },
   {
-    key: 'thread',
-    short: 't',
-    type: 'string',
-    field: 'thread',
+    key: "thread",
+    short: "t",
+    type: "string",
+    field: "thread",
     coerce: validate.string,
-    placeholder: '<id>',
-    help: 'Resume a specific thread by ID',
+    placeholder: "<id>",
+    help: "Resume a specific thread by ID",
   },
   {
-    key: 'title',
-    type: 'string',
-    field: 'title',
+    key: "title",
+    type: "string",
+    field: "title",
     coerce: validate.string,
-    placeholder: '<title>',
-    help: 'Set or rename the thread title',
+    placeholder: "<title>",
+    help: "Set or rename the thread title",
   },
   {
-    key: 'clone-thread',
-    type: 'boolean',
-    field: 'cloneThread',
-    help: 'Clone the current thread before running (work on a copy)',
+    key: "clone-thread",
+    type: "boolean",
+    field: "cloneThread",
+    help: "Clone the current thread before running (work on a copy)",
   },
   {
-    key: 'resource-id',
-    type: 'string',
-    field: 'resourceId',
+    key: "resource-id",
+    type: "string",
+    field: "resourceId",
     coerce: validate.string,
-    placeholder: '<id>',
-    help: 'Set the resource ID for thread scoping',
+    placeholder: "<id>",
+    help: "Set the resource ID for thread scoping",
   },
   {
-    key: 'timeout',
-    type: 'string',
-    field: 'timeout',
-    coerce: validate.positiveInt('--timeout'),
-    placeholder: '<seconds>',
-    help: 'Exit with code 2 if not complete within timeout',
+    key: "timeout",
+    type: "string",
+    field: "timeout",
+    coerce: validate.positiveInt("--timeout"),
+    placeholder: "<seconds>",
+    help: "Exit with code 2 if not complete within timeout",
   },
   {
-    key: 'max-turns',
-    type: 'string',
-    field: 'maxTurns',
-    coerce: validate.positiveInt('--max-turns'),
-    placeholder: '<n>',
-    help: 'Abort after N agentic turns (exit code 1)',
+    key: "max-turns",
+    type: "string",
+    field: "maxTurns",
+    coerce: validate.positiveInt("--max-turns"),
+    placeholder: "<n>",
+    help: "Abort after N agentic turns (exit code 1)",
   },
   {
-    key: 'permission-mode',
-    type: 'string',
-    field: 'permissionMode',
-    coerce: validate.enum<PermissionMode>('--permission-mode', VALID_PERMISSION_MODES),
-    placeholder: '<mode>',
+    key: "permission-mode",
+    type: "string",
+    field: "permissionMode",
+    coerce: validate.enum<PermissionMode>("--permission-mode", VALID_PERMISSION_MODES),
+    placeholder: "<mode>",
     help: [
-      'How tool approvals/suspensions resolve:',
-      '  auto   approve everything (default)',
-      '  deny   refuse approvals, abort on suspension',
+      "How tool approvals/suspensions resolve:",
+      "  auto   approve everything (default)",
+      "  deny   refuse approvals, abort on suspension",
     ],
   },
   {
-    key: 'output',
-    short: 'o',
-    type: 'string',
-    field: 'output',
-    coerce: validate.enum<OutputMode>('--output', VALID_OUTPUTS),
-    placeholder: '<mode>',
+    key: "output",
+    short: "o",
+    type: "string",
+    field: "output",
+    coerce: validate.enum<OutputMode>("--output", VALID_OUTPUTS),
+    placeholder: "<mode>",
     help: [
       'Output mode: "human" (default), "json", or "jsonl"',
-      '  human  streaming text to stdout, activity to stderr',
-      '  json   single final JSON object (text, usage, tools)',
-      '  jsonl  newline-delimited JSON event stream',
+      "  human  streaming text to stdout, activity to stderr",
+      "  json   single final JSON object (text, usage, tools)",
+      "  jsonl  newline-delimited JSON event stream",
     ],
   },
   {
-    key: 'model',
-    short: 'm',
-    type: 'string',
-    field: 'model',
+    key: "model",
+    short: "m",
+    type: "string",
+    field: "model",
     coerce: validate.string,
-    placeholder: '<id>',
-    help: 'Model override (e.g., a provider/model id)',
+    placeholder: "<id>",
+    help: "Model override (e.g., a provider/model id)",
   },
   {
-    key: 'mode',
-    type: 'string',
-    field: 'mode',
-    coerce: validate.enum<RunMode>('--mode', VALID_MODES),
-    placeholder: '{build|plan|fast}',
+    key: "mode",
+    type: "string",
+    field: "mode",
+    coerce: validate.enum<RunMode>("--mode", VALID_MODES),
+    placeholder: "{build|plan|fast}",
     help: 'Execution mode — defaults to "build" if omitted',
   },
   {
-    key: 'thinking-level',
-    type: 'string',
-    field: 'thinkingLevel',
-    coerce: validate.enum<ThinkingLevel>('--thinking-level', VALID_THINKING_LEVELS),
-    placeholder: '<level>',
-    help: 'Thinking level: off, low, medium, high, xhigh, max',
+    key: "thinking-level",
+    type: "string",
+    field: "thinkingLevel",
+    coerce: validate.enum<ThinkingLevel>("--thinking-level", VALID_THINKING_LEVELS),
+    placeholder: "<level>",
+    help: "Thinking level: off, low, medium, high, xhigh, max",
   },
   {
-    key: 'settings',
-    type: 'string',
-    field: 'settings',
+    key: "settings",
+    type: "string",
+    field: "settings",
     coerce: validate.string,
-    placeholder: '<path>',
-    help: 'Path to settings.json file (default: global settings)',
+    placeholder: "<path>",
+    help: "Path to settings.json file (default: global settings)",
   },
   {
-    key: 'help',
-    short: 'h',
-    type: 'boolean',
-    help: 'Show this help and exit',
+    key: "help",
+    short: "h",
+    type: "boolean",
+    help: "Show this help and exit",
   },
 ];
 
 /** `parseArgs` option config derived from {@link FLAGS}. */
 export function buildParseArgsOptions() {
-  const options: Record<string, { type: 'string' | 'boolean'; short?: string; default?: boolean }> = {};
+  const options: Record<string, { type: "string" | "boolean"; short?: string; default?: boolean }> = {};
   for (const flag of FLAGS) {
-    options[flag.key] = flag.type === 'boolean' ? { type: 'boolean', default: false } : { type: 'string' };
+    options[flag.key] = flag.type === "boolean" ? { type: "boolean", default: false } : { type: "string" };
     if (flag.short) options[flag.key]!.short = flag.short;
   }
   return options;
@@ -217,22 +217,22 @@ export function buildParseArgsOptions() {
 export function renderFlagUsage(): string {
   const left = (flag: FlagSpec): string => {
     const long = `--${flag.key}`;
-    const short = flag.short ? `, -${flag.short}` : '';
-    const value = flag.placeholder ? ` ${flag.placeholder}` : '';
+    const short = flag.short ? `, -${flag.short}` : "";
+    const value = flag.placeholder ? ` ${flag.placeholder}` : "";
     return `  ${long}${short}${value}`;
   };
 
-  const rows = FLAGS.map(flag => ({ flag, label: left(flag) }));
-  const width = Math.max(...rows.map(r => r.label.length)) + 2;
+  const rows = FLAGS.map((flag) => ({ flag, label: left(flag) }));
+  const width = Math.max(...rows.map((r) => r.label.length)) + 2;
 
   return rows
     .map(({ flag, label }) => {
       const lines = Array.isArray(flag.help) ? flag.help : [flag.help];
       const first = `${label.padEnd(width)}${lines[0]}`;
-      const rest = lines.slice(1).map(line => `${' '.repeat(width)}${line}`);
-      return [first, ...rest].join('\n');
+      const rest = lines.slice(1).map((line) => `${" ".repeat(width)}${line}`);
+      return [first, ...rest].join("\n");
     })
-    .join('\n');
+    .join("\n");
 }
 
 /** Validate each value with its flag's coercion, then emit `--key value` pairs in table order. */
@@ -240,12 +240,12 @@ export function mastraArgv(values: Record<string, string | undefined>): string[]
   const out: string[] = [];
   for (const flag of FLAGS) {
     const raw = values[flag.key];
-    if (raw === undefined || flag.type !== 'string' || !flag.coerce) continue;
+    if (raw === undefined || flag.type !== "string" || !flag.coerce) continue;
     flag.coerce(raw);
     out.push(`--${flag.key}`, raw);
   }
   for (const key of Object.keys(values)) {
-    if (!FLAGS.some(f => f.key === key)) throw new Error(`unknown Mastra Code flag --${key}`);
+    if (!FLAGS.some((f) => f.key === key)) throw new Error(`unknown Mastra Code flag --${key}`);
   }
   return out;
 }

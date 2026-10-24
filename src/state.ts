@@ -102,7 +102,8 @@ export interface StageRun {
 }
 
 // The two v2.5.1 columns default to 0 cached tokens and a complete count; session_id to NULL.
-export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete" | "session_id" | "verdict"> & Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id">>;
+export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete" | "session_id" | "verdict"> &
+  Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id">>;
 
 // Absolute, rooted at FACTORY_HOME (~/.factory by default, /data in Docker) —
 // see paths.ts. A relative path here broke on any machine where the process
@@ -254,7 +255,9 @@ export class FactoryState {
       CREATE INDEX IF NOT EXISTS bus_deliveries_status_next ON bus_deliveries(status, next_at);
     `);
     // Forward-only and idempotent: safe to run on boot from several replicas.
-    const have = new Set((this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name));
+    const have = new Set(
+      (this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name),
+    );
     for (const [col, ddl] of [
       ["tokens_cached", "INTEGER NOT NULL DEFAULT 0"],
       ["usage_complete", "INTEGER NOT NULL DEFAULT 1"],
@@ -308,13 +311,7 @@ export class FactoryState {
     `);
   }
 
-  upsertRun(input: {
-    issue: number;
-    repo: string;
-    title: string;
-    stage: Stage;
-    status: RunStatus;
-  }): Run {
+  upsertRun(input: { issue: number; repo: string; title: string; stage: Stage; status: RunStatus }): Run {
     const now = new Date().toISOString();
     this.db
       .query(
@@ -388,7 +385,10 @@ export class FactoryState {
   }
 
   listRuns(repo?: string): Run[] {
-    if (repo) return this.db.query("SELECT * FROM runs WHERE repo = $repo ORDER BY updated_at DESC").all({ $repo: repo }) as Run[];
+    if (repo)
+      return this.db
+        .query("SELECT * FROM runs WHERE repo = $repo ORDER BY updated_at DESC")
+        .all({ $repo: repo }) as Run[];
     return this.db.query("SELECT * FROM runs ORDER BY updated_at DESC").all() as Run[];
   }
 
@@ -399,7 +399,9 @@ export class FactoryState {
   appendEvent(runId: number, stage: Stage, kind: string, text: string): void {
     let budget = this.budgets.get(runId);
     if (!budget) {
-      const row = this.db.query("SELECT COALESCE(SUM(LENGTH(CAST(text AS BLOB)) + LENGTH(kind)), 0) AS n FROM events WHERE run_id = $id").get({ $id: runId }) as { n: number };
+      const row = this.db
+        .query("SELECT COALESCE(SUM(LENGTH(CAST(text AS BLOB)) + LENGTH(kind)), 0) AS n FROM events WHERE run_id = $id")
+        .get({ $id: runId }) as { n: number };
       budget = new EventBudget(row.n, this.eventByteLimit);
       this.budgets.set(runId, budget);
     }
@@ -453,16 +455,26 @@ export class FactoryState {
   // The verify row was recorded before its verdict.json was read; stamp the newest one.
   setVerifyVerdict(repo: string, issue: number, verdict: string): void {
     this.db
-      .query("UPDATE stage_runs SET verdict = $verdict WHERE id = (SELECT MAX(id) FROM stage_runs WHERE repo = $repo AND issue = $issue AND stage = 'verify')")
+      .query(
+        "UPDATE stage_runs SET verdict = $verdict WHERE id = (SELECT MAX(id) FROM stage_runs WHERE repo = $repo AND issue = $issue AND stage = 'verify')",
+      )
       .run({ $repo: repo, $issue: issue, $verdict: verdict });
   }
 
   // The newest resumable session for an issue, for `factory takeover`, or of
   // one stage, for a rebuild that picks up where the last build left off.
-  lastSession(repo: string, issue: number, stage?: Stage): Pick<StageRun, "stage" | "agent"> & { session_id: string } | undefined {
+  lastSession(
+    repo: string,
+    issue: number,
+    stage?: Stage,
+  ): (Pick<StageRun, "stage" | "agent"> & { session_id: string }) | undefined {
     return (this.db
-      .query("SELECT stage, agent, session_id FROM stage_runs WHERE repo = $repo AND issue = $issue AND session_id IS NOT NULL AND ($stage IS NULL OR stage = $stage) ORDER BY id DESC LIMIT 1")
-      .get({ $repo: repo, $issue: issue, $stage: stage ?? null }) ?? undefined) as (Pick<StageRun, "stage" | "agent"> & { session_id: string }) | undefined;
+      .query(
+        "SELECT stage, agent, session_id FROM stage_runs WHERE repo = $repo AND issue = $issue AND session_id IS NOT NULL AND ($stage IS NULL OR stage = $stage) ORDER BY id DESC LIMIT 1",
+      )
+      .get({ $repo: repo, $issue: issue, $stage: stage ?? null }) ?? undefined) as
+      | (Pick<StageRun, "stage" | "agent"> & { session_id: string })
+      | undefined;
   }
 
   // Keyset pagination on id, like listEvents: pass the last id seen.
@@ -471,7 +483,9 @@ export class FactoryState {
     const after = opts?.after ?? 0;
     if (opts?.issue !== undefined) {
       return this.db
-        .query("SELECT * FROM stage_runs WHERE repo = $repo AND issue = $issue AND id > $after ORDER BY id ASC LIMIT $limit")
+        .query(
+          "SELECT * FROM stage_runs WHERE repo = $repo AND issue = $issue AND id > $after ORDER BY id ASC LIMIT $limit",
+        )
         .all({ $repo: repo, $issue: opts.issue, $after: after, $limit: limit }) as StageRun[];
     }
     return this.db
@@ -490,7 +504,9 @@ export class FactoryState {
         `SELECT COALESCE(SUM(cost_usd), 0) AS cost, SUM(CASE WHEN cost_usd IS NULL THEN 1 ELSE 0 END) AS unreported
          FROM stage_runs WHERE repo = $repo AND started_at >= $since ${issueClause}`,
       )
-      .get(issue !== undefined ? { $repo: repo, $since: sinceIso, $issue: issue } : { $repo: repo, $since: sinceIso }) as { cost: number; unreported: number };
+      .get(
+        issue !== undefined ? { $repo: repo, $since: sinceIso, $issue: issue } : { $repo: repo, $since: sinceIso },
+      ) as { cost: number; unreported: number };
     return { costUsd: row.cost, unreportedRuns: row.unreported };
   }
 
@@ -499,12 +515,18 @@ export class FactoryState {
   // runs immediately or (the dashboard's merge route) waits for the poll loop.
   queueRetro(repo: string, issue: number, outcome: RetroTrigger): number {
     this.db
-      .query("INSERT INTO retros (repo, issue, outcome, status, created_at) VALUES ($repo, $issue, $outcome, 'queued', $now)")
+      .query(
+        "INSERT INTO retros (repo, issue, outcome, status, created_at) VALUES ($repo, $issue, $outcome, 'queued', $now)",
+      )
       .run({ $repo: repo, $issue: issue, $outcome: outcome, $now: new Date().toISOString() });
     return (this.db.query("SELECT last_insert_rowid() AS id").get() as { id: number }).id;
   }
 
-  completeRetro(id: number, proposal?: { lesson?: string; skill_name?: string; skill_edit?: string }, status: "done" | "failed" = "done"): void {
+  completeRetro(
+    id: number,
+    proposal?: { lesson?: string; skill_name?: string; skill_edit?: string },
+    status: "done" | "failed" = "done",
+  ): void {
     this.db
       .query(
         `UPDATE retros SET status = $status, lesson = $lesson, skill_name = $skill_name, skill_edit = $skill_edit, completed_at = $now WHERE id = $id`,
@@ -529,7 +551,9 @@ export class FactoryState {
   // Every retro for a repo regardless of status, newest first. `factory learn`
   // (plan v2.10.0 item 4) will filter this to done rows with a lesson.
   listRetros(repo: string, limit = 50): RetroRow[] {
-    return this.db.query("SELECT * FROM retros WHERE repo = $repo ORDER BY id DESC LIMIT $limit").all({ $repo: repo, $limit: limit }) as RetroRow[];
+    return this.db
+      .query("SELECT * FROM retros WHERE repo = $repo ORDER BY id DESC LIMIT $limit")
+      .all({ $repo: repo, $limit: limit }) as RetroRow[];
   }
 
   // Done rows with a proposal that `factory learn` (plan v2.10.0 item 4)
@@ -564,14 +588,18 @@ export class FactoryState {
 
   setToggle(key: string, value: boolean): void {
     this.db
-      .query("INSERT INTO toggles (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .query(
+        "INSERT INTO toggles (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
       .run({ $key: key, $value: value ? "1" : "0" });
   }
 
   // One row per GitHub delivery id; false when GitHub redelivered one already seen.
   recordDelivery(d: { id: string; event: string; action: string; repo: string }, at = new Date()): boolean {
     const r = this.db
-      .query("INSERT OR IGNORE INTO webhook_deliveries (delivery_id, event, action, repo, received_at) VALUES ($id, $event, $action, $repo, $at)")
+      .query(
+        "INSERT OR IGNORE INTO webhook_deliveries (delivery_id, event, action, repo, received_at) VALUES ($id, $event, $action, $repo, $at)",
+      )
       .run({ $id: d.id, $event: d.event, $action: d.action, $repo: d.repo, $at: at.toISOString() });
     return r.changes > 0;
   }
@@ -588,27 +616,42 @@ export class FactoryState {
       .query(
         "INSERT OR IGNORE INTO bus_events (id, direction, type, source, subject, time, data, handled_at) VALUES ($id, $direction, $type, $source, $subject, $time, $data, $handled)",
       )
-      .run({ $id: e.id, $direction: e.direction, $type: e.type, $source: e.source, $subject: e.subject, $time: e.time, $data: e.data, $handled: e.handled_at });
+      .run({
+        $id: e.id,
+        $direction: e.direction,
+        $type: e.type,
+        $source: e.source,
+        $subject: e.subject,
+        $time: e.time,
+        $data: e.data,
+        $handled: e.handled_at,
+      });
     return r.changes > 0;
   }
 
   busEvent(id: string): BusEventRow | undefined {
-    return (this.db.query("SELECT * FROM bus_events WHERE id = $id").get({ $id: id }) as BusEventRow | null) ?? undefined;
+    return (
+      (this.db.query("SELECT * FROM bus_events WHERE id = $id").get({ $id: id }) as BusEventRow | null) ?? undefined
+    );
   }
 
   // Newest last; `after` is a seq for tailing.
   busEvents(limit = 50, after = 0): BusEventRow[] {
-    return (
-      this.db.query("SELECT * FROM (SELECT * FROM bus_events WHERE seq > $after ORDER BY seq DESC LIMIT $limit) ORDER BY seq ASC").all({
+    return this.db
+      .query(
+        "SELECT * FROM (SELECT * FROM bus_events WHERE seq > $after ORDER BY seq DESC LIMIT $limit) ORDER BY seq ASC",
+      )
+      .all({
         $after: after,
         $limit: limit,
-      }) as BusEventRow[]
-    );
+      }) as BusEventRow[];
   }
 
   // Inbound events the watcher has not handed to subscribers yet, oldest first.
   unhandledInbound(): BusEventRow[] {
-    return this.db.query("SELECT * FROM bus_events WHERE direction = 'in' AND handled_at IS NULL ORDER BY seq ASC").all() as BusEventRow[];
+    return this.db
+      .query("SELECT * FROM bus_events WHERE direction = 'in' AND handled_at IS NULL ORDER BY seq ASC")
+      .all() as BusEventRow[];
   }
 
   markBusHandled(id: string, at = new Date()): void {
@@ -624,7 +667,9 @@ export class FactoryState {
   // Replay: put every delivery of one event back to pending, due now.
   requeueBusDeliveries(eventId: string, at = new Date()): number {
     return this.db
-      .query("UPDATE bus_deliveries SET status = 'pending', attempts = 0, next_at = $at, delivered_at = NULL, last_error = NULL WHERE event_id = $e")
+      .query(
+        "UPDATE bus_deliveries SET status = 'pending', attempts = 0, next_at = $at, delivered_at = NULL, last_error = NULL WHERE event_id = $e",
+      )
       .run({ $e: eventId, $at: at.toISOString() }).changes;
   }
 
@@ -635,12 +680,20 @@ export class FactoryState {
   }
 
   busDeliveries(eventId: string): BusDeliveryRow[] {
-    return this.db.query("SELECT * FROM bus_deliveries WHERE event_id = $e ORDER BY id ASC").all({ $e: eventId }) as BusDeliveryRow[];
+    return this.db
+      .query("SELECT * FROM bus_deliveries WHERE event_id = $e ORDER BY id ASC")
+      .all({ $e: eventId }) as BusDeliveryRow[];
   }
 
-  markBusDelivery(id: number, d: { status: "pending" | "delivered" | "dead"; attempts: number; nextAt: Date; error?: string }, at = new Date()): void {
+  markBusDelivery(
+    id: number,
+    d: { status: "pending" | "delivered" | "dead"; attempts: number; nextAt: Date; error?: string },
+    at = new Date(),
+  ): void {
     this.db
-      .query("UPDATE bus_deliveries SET status = $status, attempts = $attempts, next_at = $next, last_error = $err, delivered_at = $delivered WHERE id = $id")
+      .query(
+        "UPDATE bus_deliveries SET status = $status, attempts = $attempts, next_at = $next, last_error = $err, delivered_at = $delivered WHERE id = $id",
+      )
       .run({
         $id: id,
         $status: d.status,
@@ -653,13 +706,17 @@ export class FactoryState {
 
   // A free-form value in the same key table as the toggles (a cron trigger's last-checked minute).
   getSetting(key: string): string | undefined {
-    const row = this.db.query("SELECT value FROM toggles WHERE key = $key").get({ $key: key }) as { value: string } | undefined;
+    const row = this.db.query("SELECT value FROM toggles WHERE key = $key").get({ $key: key }) as
+      | { value: string }
+      | undefined;
     return row?.value;
   }
 
   setSetting(key: string, value: string): void {
     this.db
-      .query("INSERT INTO toggles (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .query(
+        "INSERT INTO toggles (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
       .run({ $key: key, $value: value });
   }
 

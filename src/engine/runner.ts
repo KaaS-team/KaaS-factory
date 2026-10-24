@@ -11,7 +11,17 @@ import { latestDataFor, parseDataMarkers } from "../derive";
 import type { GhIssue } from "../github";
 import { LABEL } from "../labels";
 import { McpError } from "../mcp";
-import { checkSpendCap, finish, moveLabel, OperatorTakeover, postComment, stopStep, type Outcome, type RunCtx, type WatchDeps } from "./common";
+import {
+  checkSpendCap,
+  finish,
+  moveLabel,
+  OperatorTakeover,
+  postComment,
+  stopStep,
+  type Outcome,
+  type RunCtx,
+  type WatchDeps,
+} from "./common";
 import { RuntimeMissing, STEP_TYPES } from "./steps";
 import { emitEvent } from "./bus";
 
@@ -37,11 +47,17 @@ export async function runWorkflow(
   try {
     outcome = await walk(deps, config, workflow, issue, at, worktree, ctx);
   } catch (e) {
-    emitEvent(deps.bus, "factory.step.failed", { ...base, step: at.step, error: e instanceof Error ? e.message : String(e) }, subject);
+    emitEvent(
+      deps.bus,
+      "factory.step.failed",
+      { ...base, step: at.step, error: e instanceof Error ? e.message : String(e) },
+      subject,
+    );
     throw e;
   }
   if (PARKED.has(outcome)) emitEvent(deps.bus, "factory.issue.parked", { ...base, step: at.step, outcome }, subject);
-  if (!NOT_A_RUN.has(outcome)) emitEvent(deps.bus, "factory.run.completed", { ...base, step: at.step, outcome }, subject);
+  if (!NOT_A_RUN.has(outcome))
+    emitEvent(deps.bus, "factory.run.completed", { ...base, step: at.step, outcome }, subject);
   return outcome;
 }
 
@@ -73,14 +89,27 @@ async function walk(
       const overBudget = await checkSpendCap(deps, config, issueNumber);
       if (overBudget) {
         // The amounts are operator detail: the inbox and the hidden marker carry them, the visible text does not.
-        await postComment(deps, config, issueNumber, "Parked: a spend cap is reached. An operator can raise it and `/factory retry`.", { stage: "budget", json: { reason: overBudget } });
+        await postComment(
+          deps,
+          config,
+          issueNumber,
+          "Parked: a spend cap is reached. An operator can raise it and `/factory retry`.",
+          { stage: "budget", json: { reason: overBudget } },
+        );
         return await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: overBudget });
       }
       at.step = step.id;
       emitEvent(deps.bus, "factory.step.started", { ...base, step: step.id, uses: step.uses }, subject);
       const result = await STEP_TYPES[step.uses]!.run({ deps, config, issue, worktree, ctx, step, workflow });
-      if (result.kind === "stop" && result.outcome === "failed") emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, outcome: result.outcome }, subject);
-      else emitEvent(deps.bus, "factory.step.completed", { ...base, step: step.id, result: result.kind === "stop" ? result.outcome : result.kind }, subject);
+      if (result.kind === "stop" && result.outcome === "failed")
+        emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, outcome: result.outcome }, subject);
+      else
+        emitEvent(
+          deps.bus,
+          "factory.step.completed",
+          { ...base, step: step.id, result: result.kind === "stop" ? result.outcome : result.kind },
+          subject,
+        );
       if (result.kind === "stop") return result.outcome;
       if (result.kind === "reject") {
         const back: Step = workflow.steps[step.reject!]!;
@@ -91,7 +120,9 @@ async function walk(
       if (result.facts !== undefined) facts[step.id] = result.facts;
       const edge = pickEdge(step.next, {
         ...facts,
-        toggles: { autoApproveLowRisk: deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk) },
+        toggles: {
+          autoApproveLowRisk: deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk),
+        },
         config,
       });
       if ("park" in edge) {
@@ -104,14 +135,27 @@ async function walk(
       step = to;
     }
   } catch (e) {
-    if (e instanceof McpError || e instanceof RuntimeMissing) emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, error: e.message }, subject);
+    if (e instanceof McpError || e instanceof RuntimeMissing)
+      emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, error: e.message }, subject);
     if (e instanceof McpError) {
       // A server the step names is not in the base branch's .factory/mcp.json: nothing ran, so a retry after the fix is free.
-      await postComment(deps, config, issueNumber, `Stopped before ${step.id}: ${e.message}. Add it to .factory/mcp.json or drop it from the step, then \`/factory retry\`.`, { stage: "mcp", json: { step: step.id, problem: e.message } });
+      await postComment(
+        deps,
+        config,
+        issueNumber,
+        `Stopped before ${step.id}: ${e.message}. Add it to .factory/mcp.json or drop it from the step, then \`/factory retry\`.`,
+        { stage: "mcp", json: { step: step.id, problem: e.message } },
+      );
       return await stopStep(deps, config, issueNumber, step.label, { status: "failed", reason: e.message });
     }
     if (e instanceof RuntimeMissing) {
-      await postComment(deps, config, issueNumber, `Stopped before ${step.id}: ${e.message}. Add it to FACTORY_HOME/machine.json runtimes or drop it from the step, then \`/factory retry\`.`, { stage: "runtime", json: { step: step.id, problem: e.message } });
+      await postComment(
+        deps,
+        config,
+        issueNumber,
+        `Stopped before ${step.id}: ${e.message}. Add it to FACTORY_HOME/machine.json runtimes or drop it from the step, then \`/factory retry\`.`,
+        { stage: "runtime", json: { step: step.id, problem: e.message } },
+      );
       return await stopStep(deps, config, issueNumber, step.label, { status: "failed", reason: e.message });
     }
     if (!(e instanceof OperatorTakeover)) throw e;

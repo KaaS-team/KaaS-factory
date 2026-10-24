@@ -48,7 +48,9 @@ export function analytics(runs: readonly Run[], stageRuns: readonly StageRun[], 
   const finished = runs.filter((r) => FINISHED.has(r.status));
   const shipped = runs.filter((r) => r.status === "shipped").length;
   const spendSince = (days: number) =>
-    stageRuns.filter((r) => now.getTime() - Date.parse(r.finished_at) <= days * DAY_MS).reduce((n, r) => n + (r.cost_usd ?? 0), 0);
+    stageRuns
+      .filter((r) => now.getTime() - Date.parse(r.finished_at) <= days * DAY_MS)
+      .reduce((n, r) => n + (r.cost_usd ?? 0), 0);
   return {
     runs: runs.length,
     shipped,

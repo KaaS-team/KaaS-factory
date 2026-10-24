@@ -58,7 +58,8 @@ describe("every template skill conforms to the agentskills.io spec", () => {
         expect(lineCount).toBeLessThan(90);
       });
 
-      test("description is 300 characters or fewer and a plain YAML scalar", () => expect(descriptionProblem(text)).toBeUndefined());
+      test("description is 300 characters or fewer and a plain YAML scalar", () =>
+        expect(descriptionProblem(text)).toBeUndefined());
 
       test("every references/ file is named in the body, so the skill can reach it", () => {
         let refs: string[] = [];
@@ -92,7 +93,8 @@ function descriptionProblem(text: string): string | undefined {
   if (!description) return "no description";
   if (description.length > 300) return `description is ${description.length} characters`;
   if (/[<>]/.test(description)) return "description has < or >";
-  if (/: | #|:$|^[-?:,[\]{}#&*!|>'"%@`]/.test(description)) return "description is not a plain YAML scalar (a colon-space, a comment, or a leading indicator)";
+  if (/: | #|:$|^[-?:,[\]{}#&*!|>'"%@`]/.test(description))
+    return "description is not a plain YAML scalar (a colon-space, a comment, or a leading indicator)";
   return undefined;
 }
 
@@ -125,7 +127,9 @@ describe("skills-ref validate (the authority make check calls)", () => {
     const which = Bun.spawn(["which", "uvx"], { stdout: "pipe", stderr: "pipe" });
     const hasUvx = (await which.exited) === 0;
     if (!hasUvx) {
-      console.warn("skills.test.ts: uvx not on PATH, skipping the live skills-ref run (make check still fails without uvx)");
+      console.warn(
+        "skills.test.ts: uvx not on PATH, skipping the live skills-ref run (make check still fails without uvx)",
+      );
       return;
     }
     for (const dir of skillDirs) {
@@ -155,11 +159,15 @@ describe("skills-ref validate (the authority make check calls)", () => {
 describe("every stage a revise reruns reads revise.md", () => {
   // A revise lands on a park edge's `revise:` or a step's own `revise:`; that step's skill must read it.
   const wf = defaultWorkflow();
-  const targets = Object.values(wf.steps).flatMap((s) => [...s.next.flatMap((e) => ("park" in e ? [e.revise] : [])), ...(s.revise ? [s.revise] : [])]);
+  const targets = Object.values(wf.steps).flatMap((s) => [
+    ...s.next.flatMap((e) => ("park" in e ? [e.revise] : [])),
+    ...(s.revise ? [s.revise] : []),
+  ]);
   const stages = [...new Set(targets.map((id) => wf.steps[id]!.uses))].sort();
   test("feature-to-pr reruns plan and build on a revise", () => expect(stages).toEqual(["build", "plan"]));
   for (const stage of stages)
-    test(`factory-${stage}`, () => expect(readFileSync(join(SKILLS_DIR, `factory-${stage}`, "SKILL.md"), "utf8")).toContain("revise.md"));
+    test(`factory-${stage}`, () =>
+      expect(readFileSync(join(SKILLS_DIR, `factory-${stage}`, "SKILL.md"), "utf8")).toContain("revise.md"));
 });
 
 // Subagents never see --append-system-prompt, so each template agent carries the
@@ -174,7 +182,8 @@ describe("every template agent carries STAGE_GUIDANCE verbatim", () => {
 // Verify must drop what the reviewer is told to leave out. splitbill-demo #87: verify kept a
 // finding it called "not new", rejected on it, then rejected the build's fix for it.
 test("factory-verify drops a finding the diff did not introduce, as the reviewer is told to", () => {
-  const read = (p: string) => readFileSync(join(import.meta.dir, "..", "template", ".claude", p), "utf8").replace(/\s+/g, " ");
+  const read = (p: string) =>
+    readFileSync(join(import.meta.dir, "..", "template", ".claude", p), "utf8").replace(/\s+/g, " ");
   expect(read("agents/factory-reviewer.md")).toContain("an issue the diff did not introduce");
   expect(read("skills/factory-verify/SKILL.md")).toContain("one the diff did not introduce");
 });
@@ -185,8 +194,12 @@ test("factory-verify drops a finding the diff did not introduce, as the reviewer
 describe("every inline shell command in the template passes the stage shell rules", () => {
   const root = join(import.meta.dir, "..", "template", ".claude");
   const HOOK = join(root, "hooks", "guard-paths.sh");
-  const COMMAND = /^(git|bun|make|npm|npx|pnpm|bash|cat|ls|grep|find|echo|head|tail|cd|\.factory\/(?:gates|mutate)\.sh)\b/;
-  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"]).stdout.toString().trim().split("\n");
+  const COMMAND =
+    /^(git|bun|make|npm|npx|pnpm|bash|cat|ls|grep|find|echo|head|tail|cd|\.factory\/(?:gates|mutate)\.sh)\b/;
+  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"])
+    .stdout.toString()
+    .trim()
+    .split("\n");
   const commands = new Map<string, string>();
   for (const file of files)
     for (const [, span] of readFileSync(file, "utf8").matchAll(/`([^`\n]+)`/g))
@@ -216,7 +229,8 @@ describe("every inline command in verify's prove reference is on the verify allo
     .filter((span) => /^(git|bun|make|npm|bash) |^\.factory\/\S+\.sh/.test(span));
   test("found the commands to check", () => expect(commands.length).toBeGreaterThan(3));
   // The executor creates .factory/runs/issue-N/ untracked, so a bare "prints nothing" never holds.
-  test("the clean-restore check allows the untracked run dir", () => expect(body).toContain("must list nothing outside `.factory/`"));
+  test("the clean-restore check allows the untracked run dir", () =>
+    expect(body).toContain("must list nothing outside `.factory/`"));
   for (const command of commands) test(command, () => expect(allowed.some((r) => r.test(command))).toBe(true));
 });
 
@@ -224,12 +238,16 @@ describe("every inline command in verify's prove reference is on the verify allo
 // style of their own instructions. The template ships to other machines, so it names none of ours.
 describe("template prose and paths", () => {
   const root = join(import.meta.dir, "..");
-  const files = Bun.spawnSync(["find", join(root, "template"), join(root, "template-ci"), "-type", "f"]).stdout.toString().trim().split("\n");
+  const files = Bun.spawnSync(["find", join(root, "template"), join(root, "template-ci"), "-type", "f"])
+    .stdout.toString()
+    .trim()
+    .split("\n");
   test("found the template files", () => expect(files.length).toBeGreaterThan(20));
   for (const file of files) {
     const rel = file.slice(root.length + 1);
     const text = readFileSync(file, "utf8");
-    if (/\.claude\/(skills|agents)\//.test(rel)) test(`${rel} has no em dash`, () => expect(text).not.toContain("\u2014"));
+    if (/\.claude\/(skills|agents)\//.test(rel))
+      test(`${rel} has no em dash`, () => expect(text).not.toContain("\u2014"));
     test(`${rel} names no machine path`, () => expect(text).not.toMatch(/\/Users\/|~\/\.claude|\$HOME\/\.claude/));
   }
 });
@@ -238,8 +256,17 @@ describe("template prose and paths", () => {
 // the template ships, so it never claims a check that is not there.
 describe("every [enforced:] tag names a shipped hook", () => {
   const root = join(import.meta.dir, "..", "template", ".claude");
-  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"]).stdout.toString().trim().split("\n");
-  const tags = files.flatMap((file) => [...readFileSync(file, "utf8").matchAll(/\[enforced: ([^\]]+)\]/g)].map((m) => ({ file: file.slice(root.length + 1), hook: m[1]! })));
+  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"])
+    .stdout.toString()
+    .trim()
+    .split("\n");
+  const tags = files.flatMap((file) =>
+    [...readFileSync(file, "utf8").matchAll(/\[enforced: ([^\]]+)\]/g)].map((m) => ({
+      file: file.slice(root.length + 1),
+      hook: m[1]!,
+    })),
+  );
   test("found the tags", () => expect(tags.length).toBeGreaterThan(3));
-  for (const { file, hook } of tags) test(`${file}: ${hook}`, () => expect(statSync(join(root, "hooks", hook)).isFile()).toBe(true));
+  for (const { file, hook } of tags)
+    test(`${file}: ${hook}`, () => expect(statSync(join(root, "hooks", hook)).isFile()).toBe(true));
 });

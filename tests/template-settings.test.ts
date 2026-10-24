@@ -10,8 +10,10 @@ const ROOT = join(import.meta.dir, "..");
 const CLAUDE_DIR = join(ROOT, "template", ".claude");
 const settings = JSON.parse(readFileSync(join(CLAUDE_DIR, "settings.json"), "utf8"));
 type Hook = { matcher?: string; hooks: Array<{ command: string }> };
-const registered: Array<{ event: string; matcher: string; command: string }> = Object.entries(settings.hooks as Record<string, Hook[]>).flatMap(
-  ([event, groups]) => groups.flatMap((g) => g.hooks.map((h) => ({ event, matcher: g.matcher ?? "", command: h.command }))),
+const registered: Array<{ event: string; matcher: string; command: string }> = Object.entries(
+  settings.hooks as Record<string, Hook[]>,
+).flatMap(([event, groups]) =>
+  groups.flatMap((g) => g.hooks.map((h) => ({ event, matcher: g.matcher ?? "", command: h.command }))),
 );
 const hookFiles = readdirSync(join(CLAUDE_DIR, "hooks"));
 
@@ -36,10 +38,12 @@ test("guard-paths.sh is registered for every tool it guards", () => {
 
 test("settings name their schema, and each stop hook is on its event", () => {
   expect(settings.$schema).toBe("https://json.schemastore.org/claude-code-settings.json");
-  expect(registered.filter((r) => r.event.endsWith("Stop")).map((r) => `${r.event} ${r.command}`).sort()).toEqual([
-    "Stop .claude/hooks/stop-artifact.sh",
-    "Stop .claude/hooks/stop-verifier-evidence.sh",
-  ]);
+  expect(
+    registered
+      .filter((r) => r.event.endsWith("Stop"))
+      .map((r) => `${r.event} ${r.command}`)
+      .sort(),
+  ).toEqual(["Stop .claude/hooks/stop-artifact.sh", "Stop .claude/hooks/stop-verifier-evidence.sh"]);
 });
 
 test("post-edit-check.sh runs after every file edit, with time for its 60s check", () => {
@@ -50,13 +54,20 @@ test("post-edit-check.sh runs after every file edit, with time for its 60s check
 });
 
 test("every hook file has a test that runs it", () => {
-  const tests = readdirSync(join(ROOT, "tests")).filter((f) => f.endsWith(".test.ts")).map((f) => readFileSync(join(ROOT, "tests", f), "utf8"));
+  const tests = readdirSync(join(ROOT, "tests"))
+    .filter((f) => f.endsWith(".test.ts"))
+    .map((f) => readFileSync(join(ROOT, "tests", f), "utf8"));
   for (const file of hookFiles) expect(tests.some((t) => t.includes(`"hooks", "${file}"`))).toBe(true);
 });
 
 // The template ships to other people's repos: a path into this machine breaks there.
 test("nothing in template/ or template-ci/ points at one machine's home", () => {
-  const files = Bun.spawnSync(["find", join(ROOT, "template"), join(ROOT, "template-ci"), "-type", "f"]).stdout.toString().trim().split("\n");
-  const hits = files.filter((f) => /\/Users\/|\/home\/[a-z]|~\/\.claude|\$HOME\/\.claude/.test(readFileSync(f, "utf8"))).map((f) => f.slice(ROOT.length + 1));
+  const files = Bun.spawnSync(["find", join(ROOT, "template"), join(ROOT, "template-ci"), "-type", "f"])
+    .stdout.toString()
+    .trim()
+    .split("\n");
+  const hits = files
+    .filter((f) => /\/Users\/|\/home\/[a-z]|~\/\.claude|\$HOME\/\.claude/.test(readFileSync(f, "utf8")))
+    .map((f) => f.slice(ROOT.length + 1));
   expect(hits).toEqual([]);
 });

@@ -25,7 +25,9 @@ steps:
 `;
 const withOn = (on: string) => BASE.replace("steps:", `on:\n${on}\nsteps:`);
 
-function nightly(on = `  cron:\n    - schedule: "0 2 * * *"\n      title: Nightly dependency check\n      body: Bump what is safe.`) {
+function nightly(
+  on = `  cron:\n    - schedule: "0 2 * * *"\n      title: Nightly dependency check\n      body: Bump what is safe.`,
+) {
   const r = parseWorkflowText(withOn(on));
   if (!r.ok) throw new Error(r.problems.join("\n"));
   return r.workflow;
@@ -145,12 +147,23 @@ describe("fireCron under a fake clock", () => {
   });
 });
 
-const wikiEvent = (id = "ev-1"): CloudEvent => ({ specversion: "1.0", id, source: "wiki", type: "wiki.page.updated", subject: "pages/setup", time: "2026-10-11T00:00:00Z", data: { page: "setup" } });
+const wikiEvent = (id = "ev-1"): CloudEvent => ({
+  specversion: "1.0",
+  id,
+  source: "wiki",
+  type: "wiki.page.updated",
+  subject: "pages/setup",
+  time: "2026-10-11T00:00:00Z",
+  data: { page: "setup" },
+});
 
 describe("workflow on: event", () => {
   test("takes one type or a list, each from the catalogue", () => {
     expect(nightly(`  event: wiki.page.updated`).triggers.event).toEqual(["wiki.page.updated"]);
-    expect(nightly(`  event: [tasks.task.ready, wiki.page.updated]`).triggers.event).toEqual(["tasks.task.ready", "wiki.page.updated"]);
+    expect(nightly(`  event: [tasks.task.ready, wiki.page.updated]`).triggers.event).toEqual([
+      "tasks.task.ready",
+      "wiki.page.updated",
+    ]);
     expect(defaultWorkflow().triggers.event).toEqual([]);
   });
 
@@ -192,7 +205,11 @@ describe("workflow on: event", () => {
 
   test("an inbound event never starts a run by itself: the poll picks nothing up", async () => {
     const gh = new FakeGitHub([]);
-    const deps = { github: gh, state: new FactoryState(":memory:"), workflow: nightly(`  event: tasks.task.ready`) } as never;
+    const deps = {
+      github: gh,
+      state: new FactoryState(":memory:"),
+      workflow: nightly(`  event: tasks.task.ready`),
+    } as never;
     expect(await handleEvent(deps, mergeConfig({ repo: REPO }), { ...wikiEvent(), type: "tasks.task.ready" })).toBe(1);
     expect((await pollOnce(deps, mergeConfig({ repo: REPO }))).processed).toEqual([]);
   });
@@ -201,7 +218,12 @@ describe("workflow on: event", () => {
     const gh = new FakeGitHub([]);
     const routed = parseWorkflowText(withOn(`  event: wiki.page.updated`).replace("name: nightly", "name: docs-sync"));
     if (!routed.ok) throw new Error(routed.problems.join("\n"));
-    const deps = { github: gh, state: new FactoryState(":memory:"), workflow: defaultWorkflow(), routeWorkflows: { docs: routed.workflow } } as never;
+    const deps = {
+      github: gh,
+      state: new FactoryState(":memory:"),
+      workflow: defaultWorkflow(),
+      routeWorkflows: { docs: routed.workflow },
+    } as never;
     expect(await handleEvent(deps, mergeConfig({ repo: REPO }), wikiEvent())).toBe(1);
     const [issue] = [...gh.issues.values()];
     expect(issue!.comments.map((c) => c.body).join("\n")).toContain('"name":"docs-sync"');

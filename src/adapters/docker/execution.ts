@@ -18,7 +18,12 @@ export interface DockerSpec {
   readonly runtime?: string;
 }
 
-export function containerArgs(spec: DockerSpec, cmd: string, cwd: string, user = `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`): string[] {
+export function containerArgs(
+  spec: DockerSpec,
+  cmd: string,
+  cwd: string,
+  user = `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
+): string[] {
   return [
     "docker",
     "run",
@@ -56,8 +61,17 @@ export function containerArgs(spec: DockerSpec, cmd: string, cwd: string, user =
 export class DockerExecution implements ExecutionPort {
   constructor(private readonly spec: DockerSpec) {}
   async run(cmd: string, cwd: string): Promise<ExecResult> {
-    const proc = Bun.spawn(containerArgs(this.spec, cmd, cwd), { cwd, env: process.env, stdout: "pipe", stderr: "pipe" });
-    const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+    const proc = Bun.spawn(containerArgs(this.spec, cmd, cwd), {
+      cwd,
+      env: process.env,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
     return { stdout, stderr, code };
   }
 }

@@ -18,7 +18,13 @@ export interface Held {
 }
 
 // undefined when another worker holds the lease: nothing ran.
-export async function withLease<T>(port: LeasePort, key: string, holder: string, work: (held: Held) => Promise<T>, opts: LeaseOpts = {}): Promise<T | undefined> {
+export async function withLease<T>(
+  port: LeasePort,
+  key: string,
+  holder: string,
+  work: (held: Held) => Promise<T>,
+  opts: LeaseOpts = {},
+): Promise<T | undefined> {
   const ttl = opts.ttlMs ?? LEASE_TTL_MS;
   const now = opts.now ?? Date.now;
   if (!(await port.acquire(key, holder, ttl, now()))) return undefined;

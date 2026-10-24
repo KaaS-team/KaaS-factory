@@ -9,7 +9,14 @@ import { dirname, join } from "node:path";
 import { JSON_FILENAMES, runDir } from "../artifacts";
 import type { RouteConfig } from "../config";
 import { buildContextPack } from "../context";
-import { aggregateStageEvents, OPERATOR_TAKEOVER, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
+import {
+  aggregateStageEvents,
+  OPERATOR_TAKEOVER,
+  type Executor,
+  type StageEvent,
+  type StageRunOptions,
+  type StageRunResult,
+} from "../executor";
 import { plain } from "../display";
 import { streamPath, takeoverMarker } from "../paths";
 import { McpError } from "../mcp";
@@ -29,7 +36,10 @@ const STDERR_KEEP_BYTES = 64 * 1024;
 export const MAX_ARG_BYTES = 120 * 1024;
 // What the stop-artifact hook checks: only the stages whose file watch.ts requires and
 // validates (pr and retro owe none), and a stopped verify owes nothing but its outcome.
-export function stopArtifactSpec(stage: StageRunOptions["stage"], types: readonly string[]): Record<string, unknown> | undefined {
+export function stopArtifactSpec(
+  stage: StageRunOptions["stage"],
+  types: readonly string[],
+): Record<string, unknown> | undefined {
   if (stage !== "triage" && stage !== "plan" && stage !== "build" && stage !== "verify") return undefined;
   return { file: JSON_FILENAMES[stage], schema: stageSchema(stage, types), stoppedOwesOnlyOutcome: stage === "verify" };
 }
@@ -51,7 +61,10 @@ export function renderEvent(e: StageEvent, cwd?: string): string | undefined {
   if (e.kind === "startup_error") return `startup error: ${plain(e.text ?? "")}`;
   // One "denied" line per refused call, so scripts/e2e-score.ts can count them.
   if (e.kind === "result")
-    return [`result ${e.text ?? ""}${e.costUsd === undefined ? "" : ` $${e.costUsd.toFixed(3)}`}`.trim(), ...(e.denials ?? []).map((d) => `denied ${plain(d)}`)].join("\n");
+    return [
+      `result ${e.text ?? ""}${e.costUsd === undefined ? "" : ` $${e.costUsd.toFixed(3)}`}`.trim(),
+      ...(e.denials ?? []).map((d) => `denied ${plain(d)}`),
+    ].join("\n");
   return undefined;
 }
 
@@ -84,7 +97,11 @@ export function resolveRoute(
   return resolveAgentByName(agents, name, stage);
 }
 
-export function resolveAgent(agents: Record<string, AgentConfig>, stages: StageAgents, stage: keyof StageAgents & string): ResolvedAgent {
+export function resolveAgent(
+  agents: Record<string, AgentConfig>,
+  stages: StageAgents,
+  stage: keyof StageAgents & string,
+): ResolvedAgent {
   return resolveRoute(agents, stages, undefined, stage, undefined);
 }
 
@@ -100,7 +117,10 @@ function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, s
 }
 
 // Placeholders in a config command. Anything else is passed through verbatim.
-export function renderCommand(command: readonly string[], values: { prompt: string; promptFile: string; model: string }): { argv: string[]; usesStdin: boolean } {
+export function renderCommand(
+  command: readonly string[],
+  values: { prompt: string; promptFile: string; model: string },
+): { argv: string[]; usesStdin: boolean } {
   let usesStdin = true;
   const argv = command.map((part) =>
     part.replace(/\{\{(prompt|promptFile|model)\}\}/g, (_m, key: "prompt" | "promptFile" | "model") => {
@@ -120,7 +140,10 @@ export class CommandExecutor implements Executor {
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
-    const agent = opts.prompt !== undefined && opts.agent ? resolveAgentByName(this.agents, opts.agent, opts.stage) : resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
+    const agent =
+      opts.prompt !== undefined && opts.agent
+        ? resolveAgentByName(this.agents, opts.agent, opts.stage)
+        : resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
     const scratch = mkdtempSync(join(tmpdir(), `factory-scratch-${opts.issue}-`));
     try {
       return await this.spawnStage(opts, agent, scratch);
@@ -136,7 +159,11 @@ export class CommandExecutor implements Executor {
 
     // A read-only stage on a preset that cannot write files returns them instead.
     // A minion (opts.prompt) owes no stage file, so it never gets one written for it.
-    const readOnly = opts.prompt === undefined && !stagePolicy(opts.stage).write && agent.preset?.returnsArtifact === true && !agent.config.command;
+    const readOnly =
+      opts.prompt === undefined &&
+      !stagePolicy(opts.stage).write &&
+      agent.preset?.returnsArtifact === true &&
+      !agent.config.command;
     let argv: readonly string[];
     let stdin: string | undefined;
     const types = typesFor(this.routes);
@@ -146,12 +173,18 @@ export class CommandExecutor implements Executor {
     // A step that asked for MCP servers must get them, so an agent that cannot load them is an error, not a quiet run without.
     let mcpConfig: string | undefined;
     if (opts.mcp && Object.keys(opts.mcp).length > 0) {
-      if (!agent.preset?.mcp || agent.config.command) throw new McpError(`${agent.name}: this step names MCP servers (${Object.keys(opts.mcp).join(", ")}), and only the claude preset can load them`);
+      if (!agent.preset?.mcp || agent.config.command)
+        throw new McpError(
+          `${agent.name}: this step names MCP servers (${Object.keys(opts.mcp).join(", ")}), and only the claude preset can load them`,
+        );
       mcpConfig = join(scratch, "mcp.json");
       writeFileSync(mcpConfig, JSON.stringify({ mcpServers: opts.mcp }));
     }
-    const skills = opts.type ? this.routes[opts.type]?.skills ?? [] : [];
-    const contextPack = opts.prompt !== undefined ? "" : await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
+    const skills = opts.type ? (this.routes[opts.type]?.skills ?? []) : [];
+    const contextPack =
+      opts.prompt !== undefined
+        ? ""
+        : await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
     if (agent.preset?.ownsPrompt) {
       ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig }));
     } else {
@@ -176,13 +209,19 @@ export class CommandExecutor implements Executor {
 
     // Linux caps one argument at 128 KiB; past that spawn fails with E2BIG and no hint.
     const big = argv.find((a) => Buffer.byteLength(a) > MAX_ARG_BYTES);
-    if (big !== undefined) throw new Error(`${agent.name}: the prompt is passed as an argument and is ${Buffer.byteLength(big)} bytes, over the ${MAX_ARG_BYTES} byte limit; configure a stdin agent or shorten the issue`);
+    if (big !== undefined)
+      throw new Error(
+        `${agent.name}: the prompt is passed as an argument and is ${Buffer.byteLength(big)} bytes, over the ${MAX_ARG_BYTES} byte limit; configure a stdin agent or shorten the issue`,
+      );
 
     if (opts.transcriptFile) mkdirSync(dirname(opts.transcriptFile), { recursive: true });
     append(opts.transcriptFile, `\n=== ${opts.stage} #${opts.issue} ${new Date().toISOString()} (${agent.name}) ===\n`);
     const streamFile = opts.transcriptFile ? streamPath(opts.transcriptFile) : undefined;
     let streamed = 0;
-    append(streamFile, `${JSON.stringify({ type: "factory_stage", stage: opts.stage, issue: opts.issue, at: new Date().toISOString(), agent: agent.name })}\n`);
+    append(
+      streamFile,
+      `${JSON.stringify({ type: "factory_stage", stage: opts.stage, issue: opts.issue, at: new Date().toISOString(), agent: agent.name })}\n`,
+    );
     const marker = opts.liveFile ? takeoverMarker(opts.liveFile) : undefined;
     if (marker) rmSync(marker, { force: true });
 
@@ -206,7 +245,17 @@ export class CommandExecutor implements Executor {
     const writeLive = () => {
       if (!opts.liveFile) return;
       mkdirSync(dirname(opts.liveFile), { recursive: true });
-      writeFileSync(opts.liveFile, JSON.stringify({ pid: proc.pid, issue: opts.issue, stage: opts.stage, agent: agent.name, sessionId, transcriptFile: opts.transcriptFile }));
+      writeFileSync(
+        opts.liveFile,
+        JSON.stringify({
+          pid: proc.pid,
+          issue: opts.issue,
+          stage: opts.stage,
+          agent: agent.name,
+          sessionId,
+          transcriptFile: opts.transcriptFile,
+        }),
+      );
     };
     writeLive();
     let cancelRead: (() => void) | undefined;
@@ -250,7 +299,11 @@ export class CommandExecutor implements Executor {
     const handle = (line: string) => {
       this.recorder?.line(opts.stage, line);
       // The live window's copy, raw so it keeps diffs and command output; `factory view` strips escapes.
-      if (Buffer.byteLength(line) <= MAX_EVENT_LINE_BYTES && (streamed += Buffer.byteLength(line)) <= MAX_RECORDED_OUTPUT_BYTES) append(streamFile, `${line}\n`);
+      if (
+        Buffer.byteLength(line) <= MAX_EVENT_LINE_BYTES &&
+        (streamed += Buffer.byteLength(line)) <= MAX_RECORDED_OUTPUT_BYTES
+      )
+        append(streamFile, `${line}\n`);
       if (!agent.preset || !parseLine) {
         // No parser means no events: the window shows the raw output instead, under the same cap.
         recorded += Buffer.byteLength(line);
@@ -270,7 +323,10 @@ export class CommandExecutor implements Executor {
         recorded += Buffer.byteLength(e.text ?? "");
         if (recorded > MAX_RECORDED_OUTPUT_BYTES) {
           if (events.at(-1)?.kind !== "truncated") {
-            events.push({ kind: "truncated", text: `recording stopped after ${MAX_RECORDED_OUTPUT_BYTES} output bytes; the agent keeps running` });
+            events.push({
+              kind: "truncated",
+              text: `recording stopped after ${MAX_RECORDED_OUTPUT_BYTES} output bytes; the agent keeps running`,
+            });
             append(opts.transcriptFile, `${events.at(-1)!.text}\n`);
           }
         } else {
@@ -325,10 +381,18 @@ export class CommandExecutor implements Executor {
       rmSync(marker, { force: true });
     }
     append(opts.transcriptFile, `=== ${opts.stage} exit ${exitCode}${killedReason ? ` (${killedReason})` : ""} ===\n`);
-    append(streamFile, `${JSON.stringify({ type: "factory_exit", stage: opts.stage, code: exitCode, ...(killedReason ? { reason: killedReason } : {}) })}\n`);
+    append(
+      streamFile,
+      `${JSON.stringify({ type: "factory_exit", stage: opts.stage, code: exitCode, ...(killedReason ? { reason: killedReason } : {}) })}\n`,
+    );
     const stderrTail = stderr.trim().slice(-4000) || undefined;
     const base0 = aggregateStageEvents(events, exitCode, stderrTail);
-    const base = { ...base0, agent: agent.name, model: agent.config.model ?? null, usageComplete: usageComplete && base0.usageComplete !== false };
+    const base = {
+      ...base0,
+      agent: agent.name,
+      model: agent.config.model ?? null,
+      usageComplete: usageComplete && base0.usageComplete !== false,
+    };
     if (readOnly && exitCode === 0 && !killedReason) {
       const problem = await writeReply(opts.cwd, opts.issue, opts.stage, base.finalMessage);
       // No file is left behind, so the runner reports "no valid <stage>.json".

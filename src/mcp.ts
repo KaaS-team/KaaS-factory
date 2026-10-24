@@ -28,7 +28,8 @@ export function parseMcpRegistry(text: string | undefined): Registry {
     return { problem: `${MCP_REGISTRY} is not JSON: ${(e as Error).message}` };
   }
   const servers = (raw as { mcpServers?: unknown } | null)?.mcpServers;
-  if (typeof servers !== "object" || servers === null || Array.isArray(servers)) return { problem: `${MCP_REGISTRY}: needs an "mcpServers" object` };
+  if (typeof servers !== "object" || servers === null || Array.isArray(servers))
+    return { problem: `${MCP_REGISTRY}: needs an "mcpServers" object` };
   return { servers: servers as McpServers };
 }
 
@@ -42,7 +43,9 @@ export function mcpProblems(registry: Registry, names: readonly string[]): strin
   if (names.length === 0) return [];
   const { servers, problem } = registry;
   if (problem) return [`${problem}, but a step names ${names.join(", ")}`];
-  return names.filter((n) => !Object.hasOwn(servers!, n)).map((n) => `"${n}" is not in ${MCP_REGISTRY} (has: ${Object.keys(servers!).join(", ") || "none"})`);
+  return names
+    .filter((n) => !Object.hasOwn(servers!, n))
+    .map((n) => `"${n}" is not in ${MCP_REGISTRY} (has: ${Object.keys(servers!).join(", ") || "none"})`);
 }
 
 // The subset of the registry one step asked for.

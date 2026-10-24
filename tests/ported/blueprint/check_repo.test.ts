@@ -18,7 +18,9 @@ function check(markdown: string, files: [string, string][] = []): string[] {
 }
 
 test("a missing reference-style link is reported", () => {
-  expect(check("Read the [guide][details].\n\n[details]: missing.md\n").some((e) => e.includes("missing.md"))).toBe(true);
+  expect(check("Read the [guide][details].\n\n[details]: missing.md\n").some((e) => e.includes("missing.md"))).toBe(
+    true,
+  );
 });
 
 test("a missing reference definition is reported", () => {

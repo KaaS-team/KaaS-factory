@@ -30,7 +30,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 export function parseMinion(raw: unknown): { ok: true; minion: Minion } | { ok: false; problems: string[] } {
   if (!isObj(raw)) return { ok: false, problems: ["a minion must be a mapping"] };
   const problems: string[] = [];
-  for (const k of Object.keys(raw)) if (!KEYS.has(k)) problems.push(`${k}: unknown key (allowed: ${[...KEYS].join(", ")})`);
+  for (const k of Object.keys(raw))
+    if (!KEYS.has(k)) problems.push(`${k}: unknown key (allowed: ${[...KEYS].join(", ")})`);
   const str = (k: string, required: boolean): string | undefined => {
     const v = raw[k];
     if (v === undefined) {
@@ -46,32 +47,42 @@ export function parseMinion(raw: unknown): { ok: true; minion: Minion } | { ok: 
   const prompt = str("prompt", true) ?? "";
   const agent = str("agent", false);
   const skill = str("skill", false);
-  if (skill !== undefined && !MINION_NAME.test(skill)) problems.push(`skill: "${skill}" must be a skill directory name under .claude/skills`);
+  if (skill !== undefined && !MINION_NAME.test(skill))
+    problems.push(`skill: "${skill}" must be a skill directory name under .claude/skills`);
   const emit = str("emit", false);
   // A minion speaks for another app (wiki, decisions, ...), never for the factory itself.
   if (emit !== undefined && !isExternalEventType(emit)) {
-    problems.push(isEventType(emit) ? `emit: "${emit}" is a factory event; a minion may emit only another app's type` : `emit: "${emit}" is not an event type (see docs/events.md)`);
+    problems.push(
+      isEventType(emit)
+        ? `emit: "${emit}" is a factory event; a minion may emit only another app's type`
+        : `emit: "${emit}" is not an event type (see docs/events.md)`,
+    );
   }
   let mcp: string[] = [];
   if (raw.mcp !== undefined) {
-    if (!Array.isArray(raw.mcp) || !raw.mcp.every((m) => typeof m === "string" && m)) problems.push("mcp: a list of server names in .factory/mcp.json");
+    if (!Array.isArray(raw.mcp) || !raw.mcp.every((m) => typeof m === "string" && m))
+      problems.push("mcp: a list of server names in .factory/mcp.json");
     else mcp = raw.mcp as string[];
   }
   let budgetUsd: number | undefined;
   if (raw.budgetUsd !== undefined) {
-    if (typeof raw.budgetUsd !== "number" || !Number.isFinite(raw.budgetUsd) || raw.budgetUsd <= 0) problems.push("budgetUsd: must be a positive number");
+    if (typeof raw.budgetUsd !== "number" || !Number.isFinite(raw.budgetUsd) || raw.budgetUsd <= 0)
+      problems.push("budgetUsd: must be a positive number");
     else budgetUsd = raw.budgetUsd;
   }
-  if (raw.runtime !== undefined && raw.runtime !== "local") problems.push(`runtime: only "local" is supported, got ${JSON.stringify(raw.runtime)}`);
+  if (raw.runtime !== undefined && raw.runtime !== "local")
+    problems.push(`runtime: only "local" is supported, got ${JSON.stringify(raw.runtime)}`);
 
   let on: Minion["on"] | undefined;
   if (!isObj(raw.on)) problems.push("on: required, a mapping with event or cron");
   else {
-    for (const k of Object.keys(raw.on)) if (!ON_KEYS.has(k)) problems.push(`on.${k}: unknown key (allowed: ${[...ON_KEYS].join(", ")})`);
+    for (const k of Object.keys(raw.on))
+      if (!ON_KEYS.has(k)) problems.push(`on.${k}: unknown key (allowed: ${[...ON_KEYS].join(", ")})`);
     const { event, cron, tz } = raw.on;
     if ((event === undefined) === (cron === undefined)) problems.push("on: exactly one of event or cron");
     else if (event !== undefined) {
-      if (typeof event !== "string" || !isEventType(event)) problems.push(`on.event: "${String(event)}" is not an event type (see docs/events.md)`);
+      if (typeof event !== "string" || !isEventType(event))
+        problems.push(`on.event: "${String(event)}" is not an event type (see docs/events.md)`);
       else if (event === emit) problems.push(`on.event: "${event}" is also what it emits, so it would wake itself`);
       else on = { event };
       if (tz !== undefined) problems.push("on.tz: only with cron");
@@ -83,7 +94,9 @@ export function parseMinion(raw: unknown): { ok: true; minion: Minion } | { ok: 
         if (typeof cron !== "string") throw new CronError("five cron fields, as a string");
         on = { cron: parseCron(cron), tz: zone };
       } catch (e) {
-        problems.push(`on.${e instanceof CronError && /zone|tz/.test(e.message) ? "tz" : "cron"}: ${e instanceof Error ? e.message : String(e)}`);
+        problems.push(
+          `on.${e instanceof CronError && /zone|tz/.test(e.message) ? "tz" : "cron"}: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
   }

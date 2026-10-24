@@ -11,7 +11,13 @@ export type ParkState = "awaiting-approval";
 
 export type Edge =
   | { readonly if?: Expr; readonly ifSrc?: string; readonly to: string }
-  | { readonly if?: Expr; readonly ifSrc?: string; readonly park: ParkState; readonly approve: string; readonly revise: string };
+  | {
+      readonly if?: Expr;
+      readonly ifSrc?: string;
+      readonly park: ParkState;
+      readonly approve: string;
+      readonly revise: string;
+    };
 
 export interface Step {
   readonly id: string;
@@ -71,10 +77,15 @@ export type WorkflowResult = { ok: true; workflow: Workflow } | { ok: false; pro
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 
-export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepKind>>, exprRoots: readonly string[] = []): WorkflowResult {
+export function parseWorkflow(
+  raw: unknown,
+  kinds: Readonly<Record<string, StepKind>>,
+  exprRoots: readonly string[] = [],
+): WorkflowResult {
   const problems: string[] = [];
   if (!isObj(raw)) return { ok: false, problems: ["a workflow is a mapping with name and steps"] };
-  for (const k of Object.keys(raw)) if (!TOP_KEYS.has(k)) problems.push(`${k}: unknown key (allowed: ${[...TOP_KEYS].join(", ")})`);
+  for (const k of Object.keys(raw))
+    if (!TOP_KEYS.has(k)) problems.push(`${k}: unknown key (allowed: ${[...TOP_KEYS].join(", ")})`);
   const name = typeof raw.name === "string" && raw.name.trim() ? raw.name : (problems.push("name: required"), "");
 
   const limitsRaw = raw.limits === undefined ? {} : raw.limits;
@@ -83,7 +94,8 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
   else {
     for (const [k, v] of Object.entries(limitsRaw)) {
       if (k !== "questions" && k !== "rejects") problems.push(`limits.${k}: unknown key (allowed: questions, rejects)`);
-      else if (!Number.isInteger(v) || (v as number) < 0) problems.push(`limits.${k}: must be a whole number, 0 or more`);
+      else if (!Number.isInteger(v) || (v as number) < 0)
+        problems.push(`limits.${k}: must be a whole number, 0 or more`);
       else limits[k] = v as number;
     }
   }
@@ -108,7 +120,8 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
     }
     try {
       const expr = parseExpr(src);
-      for (const r of rootsOf(expr)) if (!roots.has(r)) problems.push(`${where}.if: "${r}" is not a step or one of ${[...exprRoots].join(", ")}`);
+      for (const r of rootsOf(expr))
+        if (!roots.has(r)) problems.push(`${where}.if: "${r}" is not a step or one of ${[...exprRoots].join(", ")}`);
       return { if: expr, ifSrc: src };
     } catch (e) {
       problems.push(`${where}.if: ${e instanceof ExprError ? e.message : String(e)}`);
@@ -123,11 +136,16 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
       problems.push(`${where}: must be a mapping`);
       continue;
     }
-    for (const k of Object.keys(s)) if (!STEP_KEYS.has(k)) problems.push(`${where}.${k}: unknown key (allowed: ${[...STEP_KEYS].join(", ")})`);
+    for (const k of Object.keys(s))
+      if (!STEP_KEYS.has(k)) problems.push(`${where}.${k}: unknown key (allowed: ${[...STEP_KEYS].join(", ")})`);
     const uses = typeof s.uses === "string" ? s.uses : "";
     const kind = kinds[uses];
-    if (!kind) problems.push(`${where}.uses: ${uses ? `"${uses}" is not a step type` : "required"} (known: ${Object.keys(kinds).join(", ")})`);
-    const label = typeof s.label === "string" && s.label.trim() ? s.label : (problems.push(`${where}.label: required`), "");
+    if (!kind)
+      problems.push(
+        `${where}.uses: ${uses ? `"${uses}" is not a step type` : "required"} (known: ${Object.keys(kinds).join(", ")})`,
+      );
+    const label =
+      typeof s.label === "string" && s.label.trim() ? s.label : (problems.push(`${where}.label: required`), "");
     if (label && labels.has(label)) problems.push(`${where}.label: "${label}" is already ${labels.get(label)}'s label`);
     else if (label) labels.set(label, id);
 
@@ -140,33 +158,50 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
         problems.push(`${ew}: must be a mapping`);
         continue;
       }
-      for (const k of Object.keys(e)) if (!EDGE_KEYS.has(k)) problems.push(`${ew}.${k}: unknown key (allowed: ${[...EDGE_KEYS].join(", ")})`);
+      for (const k of Object.keys(e))
+        if (!EDGE_KEYS.has(k)) problems.push(`${ew}.${k}: unknown key (allowed: ${[...EDGE_KEYS].join(", ")})`);
       const cond = parseIf(ew, e.if);
       if (typeof e.to === "string" && e.park === undefined) edges.push({ ...cond, to: e.to });
       else if (typeof e.park === "string" && e.to === undefined) {
-        if (!PARKS.includes(e.park as ParkState)) problems.push(`${ew}.park: "${e.park}" is not one of ${PARKS.join(", ")}`);
-        if (typeof e.approve !== "string") problems.push(`${ew}.approve: required with park (the step /factory approve resumes)`);
-        if (typeof e.revise !== "string") problems.push(`${ew}.revise: required with park (the step /factory revise resumes)`);
-        edges.push({ ...cond, park: e.park as ParkState, approve: String(e.approve ?? ""), revise: String(e.revise ?? "") });
+        if (!PARKS.includes(e.park as ParkState))
+          problems.push(`${ew}.park: "${e.park}" is not one of ${PARKS.join(", ")}`);
+        if (typeof e.approve !== "string")
+          problems.push(`${ew}.approve: required with park (the step /factory approve resumes)`);
+        if (typeof e.revise !== "string")
+          problems.push(`${ew}.revise: required with park (the step /factory revise resumes)`);
+        edges.push({
+          ...cond,
+          park: e.park as ParkState,
+          approve: String(e.approve ?? ""),
+          revise: String(e.revise ?? ""),
+        });
       } else problems.push(`${ew}: needs exactly one of to or park`);
     }
     edges.forEach((e, i) => {
-      if (!e.if && i < edges.length - 1) problems.push(`${where}.next[${i}]: has no if:, so the edges after it never run`);
+      if (!e.if && i < edges.length - 1)
+        problems.push(`${where}.next[${i}]: has no if:, so the edges after it never run`);
     });
-    if (edges.length > 0 && edges.at(-1)!.if) problems.push(`${where}.next: the last edge needs no if:, so some edge always applies`);
-    if (kind?.terminal && edges.length > 0) problems.push(`${where}.next: a ${uses} step ends the workflow, so it has no next`);
-    if (kind && !kind.terminal && edges.length === 0) problems.push(`${where}.next: required (only a terminal step type ends the workflow)`);
-    if (kind?.rejects && typeof s.reject !== "string") problems.push(`${where}.reject: required, a ${uses} step can reject`);
+    if (edges.length > 0 && edges.at(-1)!.if)
+      problems.push(`${where}.next: the last edge needs no if:, so some edge always applies`);
+    if (kind?.terminal && edges.length > 0)
+      problems.push(`${where}.next: a ${uses} step ends the workflow, so it has no next`);
+    if (kind && !kind.terminal && edges.length === 0)
+      problems.push(`${where}.next: required (only a terminal step type ends the workflow)`);
+    if (kind?.rejects && typeof s.reject !== "string")
+      problems.push(`${where}.reject: required, a ${uses} step can reject`);
     if (s.reject !== undefined && !kind?.rejects) problems.push(`${where}.reject: a ${uses} step never rejects`);
-    if (kind?.command && (typeof s.run !== "string" || !s.run.trim())) problems.push(`${where}.run: required, the command a ${uses} step runs`);
+    if (kind?.command && (typeof s.run !== "string" || !s.run.trim()))
+      problems.push(`${where}.run: required, the command a ${uses} step runs`);
     if (s.run !== undefined && kind && !kind.command) problems.push(`${where}.run: a ${uses} step takes no command`);
     if (s.runtime !== undefined) {
-      if (typeof s.runtime !== "string" || !/^[\w-]{1,64}$/.test(s.runtime)) problems.push(`${where}.runtime: a runtime name (local, lwpr, or one in machine.json)`);
+      if (typeof s.runtime !== "string" || !/^[\w-]{1,64}$/.test(s.runtime))
+        problems.push(`${where}.runtime: a runtime name (local, lwpr, or one in machine.json)`);
       else if (kind && !kind.command) problems.push(`${where}.runtime: a ${uses} step runs no command`);
     }
     const mcp = s.mcp;
     if (mcp !== undefined) {
-      if (!Array.isArray(mcp) || !mcp.every((n) => typeof n === "string" && /^[\w-]{1,64}$/.test(n))) problems.push(`${where}.mcp: a list of server names from .factory/mcp.json`);
+      if (!Array.isArray(mcp) || !mcp.every((n) => typeof n === "string" && /^[\w-]{1,64}$/.test(n)))
+        problems.push(`${where}.mcp: a list of server names from .factory/mcp.json`);
       else if (kind && !kind.agent) problems.push(`${where}.mcp: a ${uses} step runs no agent`);
     }
 
@@ -184,11 +219,13 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
   }
 
   for (const step of Object.values(steps)) {
-    for (const [what, target] of targets(step)) if (!steps[target]) problems.push(`steps.${step.id}.${what}: no step "${target}"`);
+    for (const [what, target] of targets(step))
+      if (!steps[target]) problems.push(`steps.${step.id}.${what}: no step "${target}"`);
   }
   if (problems.length === 0) {
     const cycle = forwardCycle(steps);
-    if (cycle) problems.push(`steps: ${cycle.join(" -> ")} loops through next:; only reject, revise and approve may point back`);
+    if (cycle)
+      problems.push(`steps: ${cycle.join(" -> ")} loops through next:; only reject, revise and approve may point back`);
     const reached = reachable(steps, ids[0]!);
     for (const id of ids) if (!reached.has(id)) problems.push(`steps.${id}: no edge reaches it from ${ids[0]}`);
   }
@@ -202,7 +239,8 @@ function parseOn(on: unknown, problems: string[]): CronTrigger[] {
     problems.push("on: must be a mapping");
     return [];
   }
-  for (const k of Object.keys(on)) if (!ON_KEYS.has(k)) problems.push(`on.${k}: unknown key (allowed: ${[...ON_KEYS].join(", ")})`);
+  for (const k of Object.keys(on))
+    if (!ON_KEYS.has(k)) problems.push(`on.${k}: unknown key (allowed: ${[...ON_KEYS].join(", ")})`);
   if (on.cron === undefined) return [];
   if (!Array.isArray(on.cron)) {
     problems.push("on.cron: a list of {schedule, title}");
@@ -212,17 +250,26 @@ function parseOn(on: unknown, problems: string[]): CronTrigger[] {
   on.cron.forEach((c, i) => {
     const where = `on.cron[${i}]`;
     if (!isObj(c)) return void problems.push(`${where}: must be a mapping`);
-    for (const k of Object.keys(c)) if (!CRON_KEYS.has(k)) problems.push(`${where}.${k}: unknown key (allowed: ${[...CRON_KEYS].join(", ")})`);
+    for (const k of Object.keys(c))
+      if (!CRON_KEYS.has(k)) problems.push(`${where}.${k}: unknown key (allowed: ${[...CRON_KEYS].join(", ")})`);
     const tz = c.tz === undefined ? "UTC" : c.tz;
-    if (typeof c.title !== "string" || !c.title.trim()) problems.push(`${where}.title: required, the title of the issue it files`);
+    if (typeof c.title !== "string" || !c.title.trim())
+      problems.push(`${where}.title: required, the title of the issue it files`);
     if (c.body !== undefined && typeof c.body !== "string") problems.push(`${where}.body: must be a string`);
     try {
       if (typeof tz !== "string") throw new CronError("tz must be a string");
       wallClock(new Date(0), tz);
       if (typeof c.schedule !== "string") throw new CronError("required, five cron fields");
-      out.push({ cron: parseCron(c.schedule), tz, title: String(c.title ?? ""), body: typeof c.body === "string" ? c.body : "" });
+      out.push({
+        cron: parseCron(c.schedule),
+        tz,
+        title: String(c.title ?? ""),
+        body: typeof c.body === "string" ? c.body : "",
+      });
     } catch (e) {
-      problems.push(`${where}.${e instanceof CronError && /zone|tz/.test(e.message) ? "tz" : "schedule"}: ${e instanceof Error ? e.message : String(e)}`);
+      problems.push(
+        `${where}.${e instanceof CronError && /zone|tz/.test(e.message) ? "tz" : "schedule"}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   });
   return out;
@@ -236,7 +283,8 @@ function parseOnEvent(on: unknown, problems: string[]): string[] {
     problems.push("on.event: an event type, or a list of them");
     return [];
   }
-  for (const t of list) if (!isEventType(t)) problems.push(`on.event: "${t}" is not an event type (see docs/events.md)`);
+  for (const t of list)
+    if (!isEventType(t)) problems.push(`on.event: "${t}" is not an event type (see docs/events.md)`);
   return [...new Set(list as string[])];
 }
 
@@ -279,7 +327,8 @@ function forwardCycle(steps: Readonly<Record<string, Step>>): string[] | undefin
 function reachable(steps: Readonly<Record<string, Step>>, start: string): Set<string> {
   const seen = new Set<string>([start]);
   const queue = [start];
-  while (queue.length) for (const [, t] of targets(steps[queue.shift()!]!)) if (!seen.has(t)) seen.add(t), queue.push(t);
+  while (queue.length)
+    for (const [, t] of targets(steps[queue.shift()!]!)) if (!seen.has(t)) seen.add(t), queue.push(t);
   return seen;
 }
 

@@ -5,10 +5,22 @@ import { revisionPrompt } from "../../../src/revision";
 
 test("revision prompt keeps feedback literal and includes saved files", () => {
   const got = revisionPrompt(
-    { previousRun: "run_old", feedback: "Keep {{task.spec}} literal", previousSummary: "Original plan", priorFeedback: ["Keep compatibility"], artifacts: { old: "plan.md" } },
+    {
+      previousRun: "run_old",
+      feedback: "Keep {{task.spec}} literal",
+      previousSummary: "Original plan",
+      priorFeedback: ["Keep compatibility"],
+      artifacts: { old: "plan.md" },
+    },
     { old: "/private/inputs/old" },
   );
-  for (const want of ["run_old", "Keep {{task.spec}} literal", "Keep compatibility", "plan.md", "/private/inputs/old"]) {
+  for (const want of [
+    "run_old",
+    "Keep {{task.spec}} literal",
+    "Keep compatibility",
+    "plan.md",
+    "/private/inputs/old",
+  ]) {
     expect(got).toContain(want);
   }
 });

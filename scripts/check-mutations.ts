@@ -28,7 +28,11 @@ function copyRepo(): string {
 
 async function runTest(dir: string, test: string): Promise<{ code: number; out: string }> {
   const proc = Bun.spawn(["bun", "test", test], { cwd: dir, stdout: "pipe", stderr: "pipe" });
-  const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
   return { code, out: out + err };
 }
 

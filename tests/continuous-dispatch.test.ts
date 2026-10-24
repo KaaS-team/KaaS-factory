@@ -44,11 +44,28 @@ class SlowTriageExecutor {
     writeFileSync(join(dir, "triage-comment.md"), "<!-- factory:triage v1 -->\ntriage");
     writeFileSync(
       join(dir, "triage.json"),
-      JSON.stringify({ disposition: "needs-info", type: "bug", risk: "low", done_when: "x", files_expected: ["src/a.ts"], gate_level: "make check", confidence: 0.9 }),
+      JSON.stringify({
+        disposition: "needs-info",
+        type: "bug",
+        risk: "low",
+        done_when: "x",
+        files_expected: ["src/a.ts"],
+        gate_level: "make check",
+        confidence: 0.9,
+      }),
     );
     writeFileSync(join(dir, "question-comment.md"), "<!-- factory:question v1 -->\nWhich one?");
     this.active.delete(n);
-    return { events: [], toolCalls: 0, tokensIn: 0, tokensOut: 0, costUsd: 0.01, costReported: true, exitCode: 0, permissionDenials: [] };
+    return {
+      events: [],
+      toolCalls: 0,
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: 0.01,
+      costReported: true,
+      exitCode: 0,
+      permissionDenials: [],
+    };
   }
 }
 
@@ -58,7 +75,16 @@ function setup(delayMsFor: (issue: number) => number) {
   const github = new FakeGitHub([baseIssue(1, ["factory:ready"])]);
   const executor = new SlowTriageExecutor(delayMsFor);
   const config = mergeConfig({ repo: "acme/repo", concurrency: 1 });
-  const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+  const deps = {
+    github,
+    git: new FakeGit(),
+    state: new FactoryState(":memory:"),
+    executor,
+    gateRunner: new FakeGateRunner(),
+    holdoutRunner: new FakeHoldoutRunner(),
+    cloneDir,
+    workspacesDir,
+  };
   return { deps, config, github, executor, workspacesDir, cloneDir };
 }
 

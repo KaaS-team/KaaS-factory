@@ -36,7 +36,11 @@ export class HttpSandboxExecution implements ExecutionPort {
 
   async run(cmd: string, cwd: string): Promise<ExecResult> {
     const tar = Bun.spawn(archiveArgs(this.spec), { cwd, stdout: "pipe", stderr: "pipe" });
-    const [archive, tarErr, tarCode] = await Promise.all([new Response(tar.stdout).arrayBuffer(), new Response(tar.stderr).text(), tar.exited]);
+    const [archive, tarErr, tarCode] = await Promise.all([
+      new Response(tar.stdout).arrayBuffer(),
+      new Response(tar.stderr).text(),
+      tar.exited,
+    ]);
     if (tarCode !== 0) return fail(`packing the worktree failed:\n${tarErr}`);
     const token = this.spec.tokenEnv ? this.env[this.spec.tokenEnv] : undefined;
     if (this.spec.tokenEnv && !token) return fail(`sandbox ${this.spec.url}: env var ${this.spec.tokenEnv} is not set`);
@@ -54,7 +58,8 @@ export class HttpSandboxExecution implements ExecutionPort {
     if (!res.ok) return fail(`sandbox ${this.spec.url} answered ${res.status}: ${text.slice(0, 500)}`);
     try {
       const r = JSON.parse(text) as Partial<ExecResult>;
-      if (typeof r.stdout === "string" && typeof r.stderr === "string" && Number.isInteger(r.code)) return { stdout: r.stdout, stderr: r.stderr, code: r.code! };
+      if (typeof r.stdout === "string" && typeof r.stderr === "string" && Number.isInteger(r.code))
+        return { stdout: r.stdout, stderr: r.stderr, code: r.code! };
     } catch {
       // falls through to the shape error
     }

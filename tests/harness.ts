@@ -10,7 +10,16 @@ import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
 import { runDir } from "../src/artifacts";
-import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus, type RepoRole } from "../src/github";
+import {
+  GitHub,
+  type CreatePrOptions,
+  type GhComment,
+  type GhIssue,
+  type GhPr,
+  type MergeReadiness,
+  type PrStatus,
+  type RepoRole,
+} from "../src/github";
 import { Git } from "../src/git";
 import type { ChangedFile } from "../src/merge-policy";
 import type { GateRunner } from "../src/gates";
@@ -77,7 +86,10 @@ export class FakeGitHub extends GitHub {
   // Who applied a label, and each login's role; by default a maintainer applied everything.
   labelers = new Map<number, string | undefined>();
   // "human" writes every scripted comment; "maintainer" applies every label.
-  roles = new Map<string, RepoRole>([["maintainer", "admin"], ["human", "admin"]]);
+  roles = new Map<string, RepoRole>([
+    ["maintainer", "admin"],
+    ["human", "admin"],
+  ]);
   override async labeledBy(_repo: string, number: number): Promise<string | undefined> {
     return this.labelers.has(number) ? this.labelers.get(number) : "maintainer";
   }
@@ -132,13 +144,15 @@ export class FakeGitHub extends GitHub {
   // A human comment on the issue, from any association (default: the owner).
   say(issue: number, body: string, authorAssociation = "OWNER"): void {
     const i = this.issues.get(issue)!;
-    i.comments = [...i.comments, { id: this.nextCommentId++, author: "human", authorAssociation, body, createdAt: nextIso() }];
+    i.comments = [
+      ...i.comments,
+      { id: this.nextCommentId++, author: "human", authorAssociation, body, createdAt: nextIso() },
+    ];
   }
 
   sayOnPr(body: string, authorAssociation = "OWNER"): void {
     this.prComments = [...this.prComments, { id: 0, author: "human", authorAssociation, body, createdAt: nextIso() }];
   }
-
 
   override async editComment(_repo: string, commentId: number, body: string): Promise<void> {
     assertCustomerSafe(body);
@@ -373,7 +387,13 @@ export class FakeHoldoutRunner implements HoldoutRunner {
 }
 
 export function baseIssue(number: number, labels: string[]): GhIssue {
-  return { number, title: `Issue ${number}`, body: "do the thing", labels: labels.map((name) => ({ name })), comments: [] };
+  return {
+    number,
+    title: `Issue ${number}`,
+    body: "do the thing",
+    labels: labels.map((name) => ({ name })),
+    comments: [],
+  };
 }
 
 export function fixtureFor(stage: StageName, issue: number) {
@@ -391,10 +411,19 @@ export function fixtureFor(stage: StageName, issue: number) {
 // where the clear just happened. A queue per stage:issue key lets a resumed
 // stage (needs-info, reject-and-rebuild) return different output each round.
 export class MultiStageExecutor {
-  private readonly queue = new Map<string, Array<{ executor: ReplayExecutor; files?: Record<string, string>; result?: Partial<StageRunResult> }>>();
+  private readonly queue = new Map<
+    string,
+    Array<{ executor: ReplayExecutor; files?: Record<string, string>; result?: Partial<StageRunResult> }>
+  >();
 
   // `result` overrides fields of the replayed result (a kill, a denial, a non-zero exit).
-  push(stage: StageName, issue: number, executor: ReplayExecutor, files?: Record<string, string>, result?: Partial<StageRunResult>): void {
+  push(
+    stage: StageName,
+    issue: number,
+    executor: ReplayExecutor,
+    files?: Record<string, string>,
+    result?: Partial<StageRunResult>,
+  ): void {
     const key = `${stage}:${issue}`;
     const arr = this.queue.get(key) ?? [];
     arr.push({ executor, files, result });
@@ -406,7 +435,14 @@ export class MultiStageExecutor {
   // The MCP servers each run was handed, by stage.
   readonly mcp: Array<[StageName, StageRunOptions["mcp"]]> = [];
 
-  async runStage(opts: { stage: StageName; issue: number; cwd: string; maxBudgetUsd: number; resume?: StageRunOptions["resume"]; mcp?: StageRunOptions["mcp"] }) {
+  async runStage(opts: {
+    stage: StageName;
+    issue: number;
+    cwd: string;
+    maxBudgetUsd: number;
+    resume?: StageRunOptions["resume"];
+    mcp?: StageRunOptions["mcp"];
+  }) {
     this.resumed.push(opts.resume);
     this.mcp.push([opts.stage, opts.mcp]);
     const key = `${opts.stage}:${opts.issue}`;
@@ -421,7 +457,6 @@ export class MultiStageExecutor {
     return { ...(await next.executor.runStage(opts)), ...next.result };
   }
 }
-
 
 // One shared lease table, held to tests/ports/lease.contract.ts.
 export class FakeLeases implements LeasePort {

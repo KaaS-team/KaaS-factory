@@ -13,7 +13,10 @@ export interface Rechecker {
 export const isChecked = (f: string | Finding): f is Finding => typeof f !== "string" && f.severity !== "could";
 
 // Findings that survive: could-level and string findings are never re-checked.
-export function keepSupported(all: readonly (string | Finding)[], supported: readonly number[]): { kept: (string | Finding)[]; dropped: Finding[] } {
+export function keepSupported(
+  all: readonly (string | Finding)[],
+  supported: readonly number[],
+): { kept: (string | Finding)[]; dropped: Finding[] } {
   const checked = all.filter(isChecked);
   const keep = new Set(supported.filter((i) => Number.isInteger(i) && i >= 0 && i < checked.length));
   const dropped = checked.filter((_, i) => !keep.has(i));

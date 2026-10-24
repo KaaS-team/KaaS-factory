@@ -21,7 +21,8 @@ export function cloneDirFor(repoSlug: string, env: NodeJS.ProcessEnv = process.e
 
 async function run(runner: CommandRunner, args: string[], cwd?: string): Promise<string> {
   const result = await runner.run(args, cwd ? { cwd } : undefined);
-  if (result.code !== 0) throw new Error(`git ${args.join(" ")} (cwd=${cwd ?? "."}) failed: ${result.stderr || result.stdout}`);
+  if (result.code !== 0)
+    throw new Error(`git ${args.join(" ")} (cwd=${cwd ?? "."}) failed: ${result.stderr || result.stdout}`);
   return result.stdout.trim();
 }
 

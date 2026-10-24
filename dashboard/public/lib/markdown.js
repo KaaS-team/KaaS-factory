@@ -8,7 +8,8 @@ const ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
 const QUOTE = /^\s*>\s?(.*)$/;
 const TABLE_SEP = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
-const INLINE = /`([^`]+)`|\*\*(.+?)\*\*|__(.+?)__|(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s)<>]+)/g;
+const INLINE =
+  /`([^`]+)`|\*\*(.+?)\*\*|__(.+?)__|(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s)<>]+)/g;
 
 const node = (t, a, ...c) => ({ t, a: a || {}, c });
 const safeHref = (href) => (/^https?:\/\//i.test(href) ? href : null);
@@ -22,7 +23,8 @@ export function inline(text) {
     if (code != null) out.push(node("code", null, code));
     else if (strong != null || strong2 != null) out.push(node("strong", null, ...inline(strong ?? strong2)));
     else if (em != null) out.push(node("em", null, ...inline(em)));
-    else if (label != null) out.push(safeHref(href) ? node("a", { href, target: "_blank", rel: "noreferrer" }, ...inline(label)) : whole);
+    else if (label != null)
+      out.push(safeHref(href) ? node("a", { href, target: "_blank", rel: "noreferrer" }, ...inline(label)) : whole);
     else out.push(node("a", { href: bare, target: "_blank", rel: "noreferrer" }, bare));
     at = m.index + whole.length;
   }
@@ -36,7 +38,12 @@ function paragraph(lines) {
 }
 
 function cells(row) {
-  return row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  return row
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((c) => c.trim());
 }
 
 function listItem(text) {
@@ -61,13 +68,25 @@ function list(rows) {
 }
 
 export function parseMarkdown(source) {
-  const lines = String(source ?? "").replace(/<!--[\s\S]*?-->/g, "").replace(/\r/g, "").split("\n");
+  const lines = String(source ?? "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\r/g, "")
+    .split("\n");
   const blocks = [];
   let i = 0;
-  const startsBlock = (l, next) => FENCE.test(l) || HEADING.test(l) || ITEM.test(l) || RULE.test(l) || QUOTE.test(l) || (l.includes("|") && next != null && TABLE_SEP.test(next));
+  const startsBlock = (l, next) =>
+    FENCE.test(l) ||
+    HEADING.test(l) ||
+    ITEM.test(l) ||
+    RULE.test(l) ||
+    QUOTE.test(l) ||
+    (l.includes("|") && next != null && TABLE_SEP.test(next));
   while (i < lines.length) {
     const l = lines[i];
-    if (!l.trim()) { i++; continue; }
+    if (!l.trim()) {
+      i++;
+      continue;
+    }
     if (FENCE.test(l)) {
       const fence = FENCE.exec(l)[1];
       const body = [];
@@ -82,7 +101,11 @@ export function parseMarkdown(source) {
       i++;
       continue;
     }
-    if (RULE.test(l)) { blocks.push(node("hr")); i++; continue; }
+    if (RULE.test(l)) {
+      blocks.push(node("hr"));
+      i++;
+      continue;
+    }
     if (QUOTE.test(l)) {
       const body = [];
       while (i < lines.length && QUOTE.test(lines[i])) body.push(QUOTE.exec(lines[i++])[1]);
@@ -105,13 +128,27 @@ export function parseMarkdown(source) {
       const header = cells(l);
       const body = [];
       for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) body.push(cells(lines[i]));
-      blocks.push(node("div", { class: "table-wrap" }, node("table", null,
-        node("thead", null, node("tr", null, ...header.map((c) => node("th", null, ...inline(c))))),
-        node("tbody", null, ...body.map((r) => node("tr", null, ...header.map((_, k) => node("td", null, ...inline(r[k] ?? "")))))))));
+      blocks.push(
+        node(
+          "div",
+          { class: "table-wrap" },
+          node(
+            "table",
+            null,
+            node("thead", null, node("tr", null, ...header.map((c) => node("th", null, ...inline(c))))),
+            node(
+              "tbody",
+              null,
+              ...body.map((r) => node("tr", null, ...header.map((_, k) => node("td", null, ...inline(r[k] ?? ""))))),
+            ),
+          ),
+        ),
+      );
       continue;
     }
     const para = [];
-    while (i < lines.length && lines[i].trim() && (!para.length || !startsBlock(lines[i], lines[i + 1]))) para.push(lines[i++]);
+    while (i < lines.length && lines[i].trim() && (!para.length || !startsBlock(lines[i], lines[i + 1])))
+      para.push(lines[i++]);
     blocks.push(paragraph(para));
   }
   return blocks;

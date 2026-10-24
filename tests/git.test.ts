@@ -164,7 +164,8 @@ describe("Git.diffStat", () => {
   test("lists both sides of a rename, each file's mode, binaries, and only the given head's diff", async () => {
     const root = tmpRoot();
     const clone = (await bareOriginWithClones(root, ["clone-a"])).clones[0]!;
-    const commit = (m: string) => run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", m], clone);
+    const commit = (m: string) =>
+      run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", m], clone);
     await run(["git", "checkout", "-b", "factory/issue-6"], clone);
     mkdirSync(join(clone, "moved"));
     await run(["git", "mv", "README.md", "moved/README.md"], clone);
@@ -184,7 +185,7 @@ describe("Git.diffStat", () => {
     expect(byPath["README.md"]!.mode).toBe("000000");
     expect(byPath["moved/README.md"]!.mode).toBe("100644");
     expect(byPath["run.sh"]!.mode).toBe("100755");
-    expect(byPath["link"]!.mode).toBe("120000");
+    expect(byPath.link!.mode).toBe("120000");
     expect(byPath["logo.bin"]!.binary).toBe(true);
     expect(byPath["run.sh"]!.binary).toBeUndefined();
   });
@@ -281,7 +282,9 @@ describe("issueOfPr", () => {
   });
   test("any other PR resolves to the one issue it closes, or to none", () => {
     expect(issueOfPr({ headRefName: "fix-thing", closingIssuesReferences: [{ number: 7 }] })).toBe(7);
-    expect(issueOfPr({ headRefName: "fix-thing", closingIssuesReferences: [{ number: 7 }, { number: 8 }] })).toBeUndefined();
+    expect(
+      issueOfPr({ headRefName: "fix-thing", closingIssuesReferences: [{ number: 7 }, { number: 8 }] }),
+    ).toBeUndefined();
     expect(issueOfPr({ headRefName: "factory/issue-42-extra" })).toBeUndefined();
   });
 });

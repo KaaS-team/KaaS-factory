@@ -14,12 +14,21 @@ function repo(): string {
   roots.push(dir);
   Bun.spawnSync(["git", "init", "-q"], { cwd: dir });
   mkdirSync(join(dir, ".claude/skills/factory-plan"), { recursive: true });
-  writeFileSync(join(dir, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPLAN-BODY `touch bad` $(echo bad) \"quotes\"\nline\n");
+  writeFileSync(
+    join(dir, ".claude/skills/factory-plan/SKILL.md"),
+    '---\nname: factory-plan\n---\nPLAN-BODY `touch bad` $(echo bad) "quotes"\nline\n',
+  );
   return dir;
 }
 
 const run = (cwd: string, command: string[], extra: Record<string, unknown> = {}) =>
-  new CommandExecutor({ a: { command } }, { default: "a" }).runStage({ stage: "plan", issue: 7, cwd, maxBudgetUsd: 1, ...extra });
+  new CommandExecutor({ a: { command } }, { default: "a" }).runStage({
+    stage: "plan",
+    issue: 7,
+    cwd,
+    maxBudgetUsd: 1,
+    ...extra,
+  });
 
 test("prompts remain literal arguments, including shell syntax", async () => {
   const cwd = repo();

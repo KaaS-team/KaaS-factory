@@ -8,7 +8,11 @@ const cfg = (agents: object, stages: object = {}) => configProblems({ repo: "a/b
 
 test("prompts remain literal arguments, including shell syntax", async () => {
   const prompt = '`touch bad` $(echo bad) "quotes"\nline';
-  const { argv, usesStdin } = renderCommand([process.execPath, "-e", "console.log(process.argv[1])", "{{prompt}}"], { prompt, promptFile: "", model: "" });
+  const { argv, usesStdin } = renderCommand([process.execPath, "-e", "console.log(process.argv[1])", "{{prompt}}"], {
+    prompt,
+    promptFile: "",
+    model: "",
+  });
   expect(usesStdin).toBe(false);
   const proc = Bun.spawn(argv, { stdout: "pipe" });
   expect((await new Response(proc.stdout).text()).trim()).toBe(prompt);

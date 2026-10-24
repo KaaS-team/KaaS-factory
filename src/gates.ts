@@ -18,7 +18,14 @@ const LINE_RE = /FACTORY_GATES:\s*status=(\w+)\s+passed=(\d+)\s+failed=(\d+)\s+s
 export function parseGateLine(output: string): GateResult | undefined {
   const match = output.match(LINE_RE);
   if (!match) return undefined;
-  const [, status, passed, failed, skipped, failedGates] = match as unknown as [string, string, string, string, string, string];
+  const [, status, passed, failed, skipped, failedGates] = match as unknown as [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
   return {
     status: status.toUpperCase() as GateResult["status"],
     passed: Number(passed),
