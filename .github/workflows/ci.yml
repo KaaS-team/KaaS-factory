@@ -5,9 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# A newer push to the same ref cancels the run it supersedes, so minutes go to the latest tree only.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +37,7 @@ jobs:
   # Every check must bite: each mutation in tests/mutations.json turns its test red.
   check-mutations:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -47,6 +54,7 @@ jobs:
   # keeps it honest (Rule 0: an unwired check did not ship).
   docker-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: docker/build-push-action@v6
