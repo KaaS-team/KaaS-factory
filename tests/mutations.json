@@ -364,5 +364,7 @@
   {"name": "acceptance: the kit holdout folder is hidden", "file": "src/acceptance.ts", "find": "if (typeof dir === \"string\" && dir.trim()) paths.push(", "replace": "if (false) paths.push(", "test": "tests/acceptance-table.test.ts"},
   {"name": "acceptance: stages are handed the hidden paths", "file": "src/agents/executor.ts", "find": "FACTORY_HIDDEN_PATHS: (opts.hiddenPaths ?? []).join(\"\\n\"),", "replace": "", "test": "tests/acceptance-table.test.ts"},
   {"name": "guard: a command naming a hidden path is refused", "file": "template/.claude/hooks/guard-paths.sh", "find": "hits = names_hidden(command) if isinstance(command, str) else []", "replace": "hits = []", "test": "tests/guard-hook.test.ts"},
-  {"name": "guard: a read of a hidden file is refused", "file": "template/.claude/hooks/guard-paths.sh", "find": "if fnmatch.fnmatch(rel, g) or rel == hidden_root(g) or rel.startswith(hidden_root(g) + \"/\"):", "replace": "if False:", "test": "tests/guard-hook.test.ts"}
+  {"name": "guard: a read of a hidden file is refused", "file": "template/.claude/hooks/guard-paths.sh", "find": "if fnmatch.fnmatch(rel, g) or rel == hidden_root(g) or rel.startswith(hidden_root(g) + \"/\"):", "replace": "if False:", "test": "tests/guard-hook.test.ts"},
+  {"name": "scan: an open finding is filed again", "file": "src/scan.ts", "find": "if (openMarkers.has(finding.id)) {", "replace": "if (false) {", "test": "tests/scan.test.ts"},
+  {"name": "scan: a broken Lighthouse report passes", "file": "src/scan.ts", "find": "!Array.isArray(parsed.misses))\n    return", "replace": "false)\n    return", "test": "tests/scan.test.ts"}
 ]

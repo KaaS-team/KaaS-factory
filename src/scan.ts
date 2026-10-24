@@ -34,7 +34,7 @@ export interface ScanFinding {
   readonly id: string; // "audit:<package>"
   readonly title: string;
   readonly body: string;
-  readonly labelType: "security" | "dependency";
+  readonly labelType: "security" | "dependency" | "bug";
 }
 
 function marker(id: string): string {
@@ -168,7 +168,7 @@ export interface ScanDeps {
 export interface ScanResult {
   readonly filed: string[]; // issue titles filed this run
   readonly skipped: string[]; // findings already open, deduped by marker
-  readonly source?: "osv-scanner" | "bun audit";
+  readonly source?: "osv-scanner" | "bun audit" | "lighthouse";
   // Set instead of filing when no scanner could read this repo (plan v2.6.2
   // item 6: a repo scan cannot read must not fail, or silently parse a
   // scanner's error output as zero findings).
@@ -207,7 +207,12 @@ export async function scan(deps: ScanDeps, repo: string, cloneDir: string): Prom
   if ("skippedReason" in found) return { filed: [], skipped: [], skippedReason: found.skippedReason };
   const { findings, source } = found;
 
-  const open = await deps.github.listOpenIssues(repo);
+  return { ...(await fileFindings(deps.github, repo, findings)), source };
+}
+
+// One issue per finding id, never a second while one is open: the marker in the body is the key.
+async function fileFindings(github: ScmPort, repo: string, findings: ScanFinding[]) {
+  const open = await github.listOpenIssues(repo);
   const openMarkers = new Set(
     open.flatMap((i) => [...i.body.matchAll(/<!-- factory:scan id=([^\s]+) -->/g)].map((m) => m[1])),
   );
@@ -219,8 +224,54 @@ export async function scan(deps: ScanDeps, repo: string, cloneDir: string): Prom
       skipped.push(finding.title);
       continue;
     }
-    await deps.github.createIssue(repo, finding.title, finding.body, [finding.labelType, LABEL.monitor]);
+    await github.createIssue(repo, finding.title, finding.body, [finding.labelType, LABEL.monitor]);
     filed.push(finding.title);
   }
-  return { filed, skipped, source };
+  return { filed, skipped };
+}
+
+// The report a target repo's Lighthouse run writes (LIGHTHOUSE_REPORT=path): every category under its bar.
+interface LighthouseMiss {
+  readonly path?: string;
+  readonly mode?: string; // "mobile" | "desktop"
+  readonly category?: string;
+  readonly score?: number;
+  readonly bar?: number;
+  readonly audits?: string[]; // the failing weighted audits, as the run printed them
+}
+
+// One finding per PAGE, whatever its modes and categories, so a slow page is one issue and the fix lands once.
+export function parseLighthouseFindings(json: string): ScanFinding[] {
+  const parsed = parseJson(json) as { misses?: LighthouseMiss[] } | undefined;
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray(parsed.misses)) return [];
+  const byPath = new Map<string, LighthouseMiss[]>();
+  for (const m of parsed.misses) if (m.path) byPath.set(m.path, [...(byPath.get(m.path) ?? []), m]);
+  return [...byPath].map(([path, misses]) => {
+    const id = `lighthouse:${path}`;
+    const worst = [...misses].sort((a, b) => (a.score ?? 0) - (b.score ?? 0))[0]!;
+    return {
+      id,
+      title: `Lighthouse below the bar on ${path} (${worst.mode} ${worst.category} ${worst.score}, bar ${worst.bar})`,
+      body: [
+        marker(id),
+        `**Page:** ${path}`,
+        "",
+        ...misses.flatMap((m) => [
+          `- **${m.mode} ${m.category}:** ${m.score}, bar ${m.bar}`,
+          ...(m.audits ?? []).map((a) => `  - ${a}`),
+        ]),
+        "",
+        "Filed by `factory scan --lighthouse` from the nightly run.",
+      ].join("\n"),
+      labelType: "bug" as const,
+    };
+  });
+}
+
+export async function scanLighthouse(github: ScmPort, repo: string, reportJson: string): Promise<ScanResult> {
+  const parsed = parseJson(reportJson) as { misses?: unknown } | undefined;
+  // A report that is not one is an error, never "every page passed".
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray(parsed.misses))
+    return { filed: [], skipped: [], skippedReason: "the Lighthouse report has no `misses` array" };
+  return { ...(await fileFindings(github, repo, parseLighthouseFindings(reportJson))), source: "lighthouse" };
 }

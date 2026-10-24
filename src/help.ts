@@ -64,8 +64,8 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   },
   {
     name: "scan",
-    usage: "scan --repo-dir <path>",
-    does: "file issues from `osv-scanner` (any lockfile), else `bun audit` on a Bun project",
+    usage: "scan --repo-dir <path> [--lighthouse <report.json>]",
+    does: "file issues from `osv-scanner` (any lockfile), else `bun audit` on a Bun project; with --lighthouse, one per page below its bar",
   },
   {
     name: "reset",

@@ -9,7 +9,15 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { OSV_ARGV, parseAuditFindings, parseOsvFindings, scan, type ScanDeps } from "../src/scan";
+import {
+  OSV_ARGV,
+  parseAuditFindings,
+  parseLighthouseFindings,
+  parseOsvFindings,
+  scan,
+  scanLighthouse,
+  type ScanDeps,
+} from "../src/scan";
 import { GitHub, type CommandResult, type CommandRunner, type GhIssue } from "../src/github";
 import { LABEL } from "../src/labels";
 
@@ -181,5 +189,53 @@ describe("parseOsvFindings", () => {
   test("no results, and unparseable output, are no findings", () => {
     expect(parseOsvFindings('{"results":[]}')).toEqual([]);
     expect(parseOsvFindings("not json")).toEqual([]);
+  });
+});
+
+// The shape a target's lighthouse.mjs writes with LIGHTHOUSE_REPORT set: one row per category under its bar.
+const LIGHTHOUSE = JSON.stringify({
+  misses: [
+    { path: "/pricing", mode: "mobile", category: "Performance", score: 91, bar: 95, audits: ["lcp: LCP (3.1 s)"] },
+    { path: "/pricing", mode: "desktop", category: "Accessibility", score: 96, bar: 100, audits: [] },
+    { path: "/blog", mode: "mobile", category: "SEO", score: 92, bar: 100 },
+  ],
+});
+
+describe("scanLighthouse()", () => {
+  test("files one bug per page, naming its worst miss, under factory:monitor", async () => {
+    const github = new FakeGitHub([]);
+    const result = await scanLighthouse(github, "acme/site", LIGHTHOUSE);
+    expect(result.source).toBe("lighthouse");
+    expect(github.created.map((c) => c.title)).toEqual([
+      "Lighthouse below the bar on /pricing (mobile Performance 91, bar 95)",
+      "Lighthouse below the bar on /blog (mobile SEO 92, bar 100)",
+    ]);
+    expect(github.created[0]!.labels).toEqual(["bug", LABEL.monitor]);
+    expect(github.created[0]!.body).toContain("<!-- factory:scan id=lighthouse:/pricing -->");
+    expect(github.created[0]!.body).toContain("desktop Accessibility:** 96, bar 100");
+    expect(github.created[0]!.body).toContain("lcp: LCP (3.1 s)");
+  });
+
+  test("a page already open is never filed again, so a nightly miss stays one issue", async () => {
+    const github = new FakeGitHub([issue(9, "<!-- factory:scan id=lighthouse:/pricing -->")]);
+    const result = await scanLighthouse(github, "acme/site", LIGHTHOUSE);
+    expect(result.skipped).toHaveLength(1);
+    expect(github.created.map((c) => c.title)).toEqual([expect.stringContaining("/blog")]);
+  });
+
+  test("a clean run files nothing", async () => {
+    const github = new FakeGitHub([]);
+    expect((await scanLighthouse(github, "acme/site", '{"misses":[]}')).filed).toEqual([]);
+    expect(github.created).toEqual([]);
+  });
+
+  test("a report with no misses array is a skip with a reason, never a pass", async () => {
+    const github = new FakeGitHub([]);
+    const result = await scanLighthouse(github, "acme/site", "lighthouse crashed");
+    expect(result.skippedReason).toContain("misses");
+    // JSON of the wrong shape (a run that wrote its error object) is a skip too
+    expect((await scanLighthouse(github, "acme/site", '{"error":"NO_FCP"}')).skippedReason).toContain("misses");
+    expect(parseLighthouseFindings("{}")).toEqual([]);
+    expect(github.created).toEqual([]);
   });
 });

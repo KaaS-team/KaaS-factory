@@ -17,7 +17,7 @@ import { ShellGateRunner } from "./gates";
 import { ShellHoldoutRunner } from "./holdout";
 import { ShellSetupRunner } from "./setup";
 import { DiffAnchorRechecker } from "./recheck";
-import { scan } from "./scan";
+import { scan, scanLighthouse } from "./scan";
 import { streamLogs } from "./logs";
 import { plain } from "./display";
 import { act, buildInbox, inboxPositionals, learningPrItems, parkReasons, type InboxAction } from "./inbox";
@@ -332,7 +332,10 @@ async function cmdScan(): Promise<void> {
       return { stdout, stderr, code };
     },
   };
-  const result = await scan({ github: makeScm(config), runner }, config.repo, cloneDir);
+  const report = flag("lighthouse");
+  const result = report
+    ? await scanLighthouse(makeScm(config), config.repo, await Bun.file(report).text())
+    : await scan({ github: makeScm(config), runner }, config.repo, cloneDir);
   if (result.skippedReason) {
     console.log(`factory scan: skipped — ${result.skippedReason}`);
     return;

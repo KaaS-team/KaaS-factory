@@ -362,6 +362,7 @@ dependency bump), clone it to see the loop run against something real before wir
 | `factory park --repo-dir <path> --issue <N> --reason <text>` | park an issue as `needs-human` from outside the loop |
 | `factory dashboard [--repo <owner/name> \| --repo-dir <path>] [--port <n>]` | serve the board on :4100; with `--repo-dir` (or under `factory up`) it also shows the repo's workflows, runtimes and issue leases |
 | `factory scan --repo-dir <path>` | file issues from `osv-scanner` findings, one per package, for any lockfile it reads; without osv-scanner, a Bun project falls back to `bun audit` |
+| `factory scan --repo-dir <path> --lighthouse <report.json>` | file one `bug` per page whose Lighthouse score is under its bar, from the report the target's nightly run writes; a page with an open issue is never filed again |
 | `factory rebaseline --repo-dir <path> [--dry-run]` | move the baseline tag to the current base, keeping merged setup changes across reset |
 | `factory reset --repo-dir <path> [--dry-run]` | **destructive**: force-pushes the base branch to the baseline tag |
 
