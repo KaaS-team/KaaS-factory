@@ -2,7 +2,7 @@
 // label helpers, running one agent stage, retro, and the spend caps. Moved
 // verbatim from watch.ts when the pipeline became a workflow (v3.1).
 
-import { holdoutEnabled, type FactoryConfig } from "../config";
+import type { FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
 import { costFor } from "../pricing";
@@ -14,7 +14,7 @@ import {
   type StageRunResult,
 } from "../executor";
 import { renderRunSummary } from "../run-summary";
-import { renderAcceptanceTable, type AcceptanceVerdict } from "../acceptance";
+import { hiddenPaths, renderAcceptanceTable, type AcceptanceVerdict } from "../acceptance";
 import type { IssueView } from "../tmux";
 import {
   clearStageArtifacts,
@@ -156,8 +156,9 @@ export async function ensureWorktreeReady(
   await deps.git.ensureWorktree(deps.cloneDir, worktree, issueNumber);
   // Every resume path funnels through here, so this is the one place that has
   // to hide holdout paths for triage, plan, build, verify and pr alike.
-  if (holdoutEnabled(config.holdout)) await deps.git.excludeFromSparseCheckout(worktree, config.holdout.paths);
-  const result = await ensureSetup(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.setup);
+  const setupRunner = deps.setupRunner ?? new ShellSetupRunner();
+  await deps.git.excludeFromSparseCheckout(worktree, await hiddenPaths(setupRunner, config, worktree));
+  const result = await ensureSetup(setupRunner, worktree, config.setup);
   if (result.ok) return true;
   await moveLabel(deps, config, issueNumber, fromLabel, LABEL.needsHuman);
   await postComment(
@@ -345,6 +346,7 @@ export async function runStage(
     stage,
     issue: issueNumber,
     cwd: worktree,
+    hiddenPaths: await hiddenPaths(deps.setupRunner ?? new ShellSetupRunner(), config, worktree),
     maxBudgetUsd: config.maxBudgetUsd[stage],
     timeoutMinutes: config.stageTimeoutMinutes,
     maxToolCalls: config.maxToolCalls,

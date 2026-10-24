@@ -238,6 +238,7 @@ export class CommandExecutor implements Executor {
         FACTORY_ISSUE: String(opts.issue),
         FACTORY_STAGE: opts.stage,
         FACTORY_SCRATCH_DIR: scratch,
+        FACTORY_HIDDEN_PATHS: (opts.hiddenPaths ?? []).join("\n"),
         ...portEnv(opts.cwd),
       },
     });

@@ -32,6 +32,8 @@ export interface StageRunOptions {
   readonly stage: StageName;
   readonly issue: number;
   readonly cwd: string;
+  // Paths the stage's agent must not read (src/acceptance.ts hiddenPaths); guard-paths.sh refuses them.
+  readonly hiddenPaths?: readonly string[];
   readonly maxBudgetUsd: number;
   readonly timeoutMinutes?: number;
   readonly maxToolCalls?: number;

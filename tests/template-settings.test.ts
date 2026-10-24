@@ -33,7 +33,15 @@ test("every hook file is registered, and every registration is an executable hoo
 test("guard-paths.sh is registered for every tool it guards", () => {
   const guard = registered.find((r) => r.command.endsWith("guard-paths.sh"))!;
   expect(guard.event).toBe("PreToolUse");
-  expect(guard.matcher.split("|").sort()).toEqual(["Agent", "Bash", "Edit", "MultiEdit", "NotebookEdit", "Write"]);
+  expect(guard.matcher.split("|").sort()).toEqual([
+    "Agent",
+    "Bash",
+    "Edit",
+    "MultiEdit",
+    "NotebookEdit",
+    "Read",
+    "Write",
+  ]);
 });
 
 test("settings name their schema, and each stop hook is on its event", () => {

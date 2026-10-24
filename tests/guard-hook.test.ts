@@ -426,3 +426,39 @@ describe("guard-paths.sh shell shapes inside a stage", () => {
     expect(code).toBe(0);
   });
 });
+
+// The runner hides the holdouts a change is graded by (src/acceptance.ts hiddenPaths) and names them in
+// FACTORY_HIDDEN_PATHS; sparse checkout keeps them off disk, this keeps git show and the full clone out.
+describe("guard-paths.sh hidden paths", () => {
+  const stage = { FACTORY_STAGE: "build", FACTORY_HIDDEN_PATHS: "holdout/**\n.factory/holdout/**" };
+  const bash = (command: string) => ({ tool_name: "Bash", tool_input: { command } });
+
+  test("in a stage, a command naming a hidden path is refused", async () => {
+    for (const cmd of [
+      "git show origin/main:holdout/pricing/AC-1.sh",
+      "cat .factory/holdout/a.test.ts",
+      "ls holdout",
+    ]) {
+      const { code, stderr } = await runHook(bash(cmd), stage);
+      expect(code).toBe(2);
+      expect(stderr).toContain("graded by");
+    }
+  });
+
+  test("a path that only shares the word passes, and outside a stage nothing is hidden", async () => {
+    expect((await runHook(bash("cat src/holdout_utils.ts"), stage)).code).toBe(0);
+    expect(
+      (await runHook(bash("git show origin/main:holdout/a.sh"), { FACTORY_HIDDEN_PATHS: "holdout/**" })).code,
+    ).toBe(0);
+  });
+
+  test("Read and Write of a hidden file are refused in a stage; other reads pass", async () => {
+    const read = (p: string) => ({ tool_name: "Read", tool_input: { file_path: `${projectDir}/${p}` } });
+    expect((await runHook(read("holdout/pricing/AC-1.sh"), stage)).code).toBe(2);
+    expect(
+      (await runHook({ tool_name: "Write", tool_input: { file_path: `${projectDir}/holdout/x.sh` } }, stage)).code,
+    ).toBe(2);
+    expect((await runHook(read("src/a.ts"), stage)).code).toBe(0);
+    expect((await runHook(read("holdout/pricing/AC-1.sh"))).code).toBe(0);
+  });
+});

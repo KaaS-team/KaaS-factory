@@ -1,12 +1,15 @@
 // The PR body's "Acceptance" table, one row per spec criterion, rendered from the kit's
 // scripts/lwp/check-acceptance.py --json. The script owns the verdict; this only runs it and shows what it
 // said, so a reviewer reads each promise beside its proof. A repo without the script gets no table.
+// A verdict that is not proven rejects verify, as a failing holdout does.
 
 import { existsSync } from "node:fs";
+import { holdoutEnabled, type FactoryConfig } from "./config";
 import { shq } from "./core/frame";
 import type { ExecutionPort } from "./ports/execution";
 
 export const ACCEPTANCE_SCRIPT = "scripts/lwp/check-acceptance.py";
+const REPO_JSON = [".agents/repo.json", ".claude/repo.json"];
 
 export interface AcceptanceRow {
   readonly spec: string;
@@ -73,4 +76,34 @@ export function renderAcceptanceTable(v: AcceptanceVerdict): string {
       : `All ${v.acs.length} criteria proven.`,
   );
   return lines.join("\n");
+}
+
+export function acceptanceProven(v: AcceptanceVerdict): boolean {
+  return v.acs.length > 0 && !v.errors.length && v.acs.every((r) => r.ok);
+}
+
+// The paths no stage's agent may see: config.holdout.paths, plus the kit's acceptance holdout folder when
+// the base branch vendors check-acceptance.py. Read from origin/<base>, never the worktree, so a branch
+// that edits repo.json cannot unhide its own holdouts. One list feeds the sparse checkout, the build's
+// protected paths and the guard hook (FACTORY_HIDDEN_PATHS).
+export async function hiddenPaths(exec: ExecutionPort, config: FactoryConfig, worktree: string): Promise<string[]> {
+  const paths = holdoutEnabled(config.holdout) ? [...config.holdout.paths] : [];
+  const ref = shq(`origin/${config.base}`);
+  const script = await exec.run(`git cat-file -e ${ref}:${ACCEPTANCE_SCRIPT}`, worktree);
+  if (script.code !== 0) return paths;
+  for (const name of REPO_JSON) {
+    const shown = await exec.run(`git show ${ref}:${name}`, worktree);
+    if (shown.code !== 0) continue;
+    let dir: unknown;
+    try {
+      const acceptance = (JSON.parse(shown.stdout) as { acceptance?: { holdout?: unknown } }).acceptance;
+      if (!acceptance) return paths;
+      dir = acceptance.holdout ?? "holdout";
+    } catch {
+      return paths;
+    }
+    if (typeof dir === "string" && dir.trim()) paths.push(`${dir.replace(/^\/+|\/+$/g, "")}/**`);
+    return paths;
+  }
+  return paths;
 }

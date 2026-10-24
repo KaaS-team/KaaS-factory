@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Bash|Agent. Refuses writes to
+# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Read|Bash|Agent. Refuses writes to
 # protected paths (.factory/config.json's protectedPaths, plus .claude/** and
 # .factory/** always), merges and force-pushes, and inside a factory stage the
 # shell shapes the stage's permission mode refuses, naming the fix, and a
-# backgrounded subagent. Writes to
+# backgrounded subagent, and any read of a path the runner hides (FACTORY_HIDDEN_PATHS). Writes to
 # `.factory/runs/**` always pass: that is where a stage hands back its output.
 # Exit 2 + stderr blocks.
 set -euo pipefail
@@ -199,10 +199,27 @@ def merges_or_force_pushes(command):
                     return True
     return False
 
+# The holdouts a stage is graded by: sparse checkout keeps them out of the worktree, but
+# `git show origin/main:holdout/x` or a Read into the full clone would still reach them.
+HIDDEN = [g for g in os.environ.get("FACTORY_HIDDEN_PATHS", "").split("\n") if g.strip()] if os.environ.get("FACTORY_STAGE") else []
+
+
+def hidden_root(glob):
+    return re.sub(r"(/\*\*?)+$", "", glob.strip().lstrip("/"))
+
+
+def names_hidden(command):
+    return [g for g in HIDDEN if re.search(r"(?<![\w.-])" + re.escape(hidden_root(g)) + r"(?![\w-])", command)]
+
+
 if tool_name == "Bash":
     command = tool_input.get("command", "")
     if not isinstance(command, str):
         block("guard-paths: blocked, the Bash command is not a string (fails closed)")
+    hits = names_hidden(command) if isinstance(command, str) else []
+    if hits:
+        block(f"guard-paths: blocked, {hidden_root(hits[0])} holds the tests this change is graded by; no stage reads them. "
+              "Build from the spec's acceptance criteria instead.")
     if merges_or_force_pushes(command):
         block(f"guard-paths: blocked — a stage never merges or force-pushes: {command}")
     if os.environ.get("FACTORY_STAGE"):
@@ -220,7 +237,9 @@ if tool_name == "Agent":
               "and wait for its answer: a stage must not end its turn before the result is in.")
     sys.exit(0)
 
-if tool_name not in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+if tool_name not in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Read"):
+    sys.exit(0)
+if tool_name == "Read" and not HIDDEN:
     sys.exit(0)
 
 path = tool_input.get("file_path") or tool_input.get("notebook_path") or tool_input.get("path") or ""
@@ -248,6 +267,12 @@ inside = [r for r in roots if path.startswith(r + "/")]
 root = max(inside, key=len) if inside else roots[0]
 
 rel = path[len(root) + 1 :] if path.startswith(root + "/") else path
+
+for g in HIDDEN:
+    if fnmatch.fnmatch(rel, g) or rel == hidden_root(g) or rel.startswith(hidden_root(g) + "/"):
+        block(f'guard-paths: blocked, "{rel}" holds the tests this change is graded by; no stage reads or edits them.')
+if tool_name == "Read":
+    sys.exit(0)
 
 if rel.startswith(".factory/runs/"):
     sys.exit(0)

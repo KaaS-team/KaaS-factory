@@ -7,7 +7,13 @@
 import { readFileSync } from "node:fs";
 import { holdoutEnabled, testGate, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
-import { runAcceptance, type AcceptanceVerdict } from "../acceptance";
+import {
+  acceptanceProven,
+  hiddenPaths,
+  renderAcceptanceTable,
+  runAcceptance,
+  type AcceptanceVerdict,
+} from "../acceptance";
 import {
   stepStop,
   validateVerdict,
@@ -227,9 +233,10 @@ const build: StepType = {
     // `.factory/**` is already unconditionally protected below (ALWAYS_PROTECTED_PATHS),
     // covering the default holdout location; this adds any holdout path a
     // repo configured outside it.
-    const protectedPaths = holdoutEnabled(config.holdout)
-      ? [...config.protectedPaths, ...config.holdout.paths]
-      : config.protectedPaths;
+    const protectedPaths = [
+      ...config.protectedPaths,
+      ...(await hiddenPaths(deps.setupRunner ?? new ShellSetupRunner(), config, worktree)),
+    ];
     const hits = touchesProtectedPath(changed, protectedPaths);
     if (hits.length) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
@@ -333,6 +340,20 @@ const verify: StepType = {
     const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
     if (acceptance)
       await Bun.write(`${worktree}/${runDir(issueNumber)}/acceptance.json`, `${JSON.stringify(acceptance, null, 2)}\n`);
+    // Like a failing holdout, an unproven criterion is the build's to fix, not the verifier's to judge.
+    if (acceptance && !acceptanceProven(acceptance)) {
+      const table = renderAcceptanceTable(acceptance);
+      ctx.rejectRound += 1;
+      ctx.failure = failureTail(table);
+      await postComment(deps, config, issueNumber, table, { stage: "verify", json: { acceptance } });
+      if (ctx.rejectRound > maxRejects) {
+        await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
+        await runRetro(deps, config, issue, "gave-up");
+        finish(deps, config, issueNumber, "needs-human", `acceptance not proven ${ctx.rejectRound} times`);
+        return stop("needs-human");
+      }
+      return { kind: "reject" };
+    }
     const result = await runStage(deps, config, issue, "verify", worktree, { mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "verify");
     const checked = art.json === undefined ? undefined : validateVerdict(art.json);
