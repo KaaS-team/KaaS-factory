@@ -14,6 +14,7 @@ import {
   type StageRunResult,
 } from "../executor";
 import { renderRunSummary } from "../run-summary";
+import { renderAcceptanceTable, type AcceptanceVerdict } from "../acceptance";
 import type { IssueView } from "../tmux";
 import {
   clearStageArtifacts,
@@ -634,7 +635,8 @@ export async function checkSpendCap(
   }
   return undefined;
 }
-// The PR body, plus the "Factory run" summary unless config.prRunSummary is off.
+// The PR body, then the Acceptance table when the repo has check-acceptance.py, then the "Factory run"
+// summary unless config.prRunSummary is off.
 export function prBody(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -642,7 +644,10 @@ export function prBody(
   body: string,
   ctx: RunCtx,
   proof?: ProofStatus,
+  acceptance?: AcceptanceVerdict,
 ): string {
+  // The acceptance table carries no model or spend, so prRunSummary does not hide it.
+  if (acceptance) body = `${body}\n\n${renderAcceptanceTable(acceptance)}`;
   if (!config.prRunSummary) return body;
   const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
   const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;

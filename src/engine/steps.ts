@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import { holdoutEnabled, testGate, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
+import { runAcceptance, type AcceptanceVerdict } from "../acceptance";
 import {
   stepStop,
   validateVerdict,
@@ -329,6 +330,9 @@ const verify: StepType = {
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
     }
+    const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
+    if (acceptance)
+      await Bun.write(`${worktree}/${runDir(issueNumber)}/acceptance.json`, `${JSON.stringify(acceptance, null, 2)}\n`);
     const result = await runStage(deps, config, issue, "verify", worktree, { mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "verify");
     const checked = art.json === undefined ? undefined : validateVerdict(art.json);
@@ -378,6 +382,14 @@ const verify: StepType = {
   },
 };
 
+function readAcceptance(worktree: string, issueNumber: number): AcceptanceVerdict | undefined {
+  try {
+    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/acceptance.json`, "utf8")) as AcceptanceVerdict;
+  } catch {
+    return undefined; // the repo has no check-acceptance.py
+  }
+}
+
 function readProofStatus(worktree: string, issueNumber: number): ProofStatus | undefined {
   try {
     return (JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/proof.json`, "utf8")) as ProofResult).status;
@@ -412,6 +424,7 @@ const pr: StepType = {
           art.comment ?? `Closes #${issueNumber}`,
           ctx,
           readProofStatus(worktree, issueNumber),
+          readAcceptance(worktree, issueNumber),
         ),
         draft: true,
       }));

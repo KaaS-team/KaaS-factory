@@ -1,7 +1,7 @@
 // Structural: the cockpit's colour is kaas.team's, and asserted, not eyeballed. Every pair the
 // page renders reaches its WCAG level, every colour token is in a pair, no other file in
 // dashboard/public holds a colour literal, and every var(--x) the page uses is defined.
-// Where a kaas.team checkout sits beside a parent directory, tokens.css and the font must match it.
+// Where a kaas.team checkout sits beside a parent directory, tokens.css's declarations and the font must match it.
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -12,7 +12,22 @@ const tokens = loadTokens();
 const PUBLIC = join(import.meta.dir, "..", "dashboard", "public");
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? walk(join(dir, f)) : [join(dir, f)]));
-const rootBlock = (css: string) => /^:root\{[\s\S]*?\}$/m.exec(css)?.[0] ?? "";
+const rootBlock = (css: string) => /^:root\s*\{[^}]*\}/m.exec(css)?.[0] ?? "";
+// The declarations in order, whatever the formatter did to the layout: kaas.team runs Prettier, we do not.
+const declarations = (block: string) =>
+  block
+    .replace(/^:root\s*\{|\}$/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split(";")
+    .map((d) =>
+      d
+        .replace(/\s+/g, " ")
+        .replace(/\s*([:,])\s*/g, "$1")
+        .replace(/(^|[^\d.])\.(\d)/g, (_, pre, digit) => `${pre}0.${digit}`)
+        .replace(/"/g, "'")
+        .trim(),
+    )
+    .filter(Boolean);
 
 // KAAS_TEAM_DIR, else kaas.team (or kaaslabs/kaas.team) beside this repo or any parent of it.
 function kaasTeam(): string | null {
@@ -50,9 +65,10 @@ describe("design tokens", () => {
       expect(rootBlock(readFileSync(TOKENS_CSS, "utf8"))).toContain(t);
   });
 
-  test.skipIf(!kaas)("tokens.css :root block equals kaas.team base.css, line for line", () => {
-    const theirs = rootBlock(readFileSync(join(kaas!, "src/styles/base.css"), "utf8"));
-    expect(rootBlock(readFileSync(TOKENS_CSS, "utf8")).split("\n")).toEqual(theirs.split("\n"));
+  test.skipIf(!kaas)("tokens.css :root block declares what kaas.team base.css declares, in order", () => {
+    const theirs = declarations(rootBlock(readFileSync(join(kaas!, "src/styles/base.css"), "utf8")));
+    expect(theirs.length).toBeGreaterThan(10);
+    expect(declarations(rootBlock(readFileSync(TOKENS_CSS, "utf8")))).toEqual(theirs);
   });
 
   test.skipIf(!kaas)("Geist is byte-identical to kaas.team's", () => {
