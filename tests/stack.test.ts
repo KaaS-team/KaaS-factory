@@ -85,7 +85,8 @@ describe("factory init", () => {
       expect(config.repo).toBe("acme/widgets");
       const gate = Bun.spawnSync(["bash", ".factory/gates.sh"], { cwd: dir, stdout: "pipe" });
       expect(gate.stdout.toString()).toContain("FACTORY_GATES: status=GREEN");
-    });
+      // init and the gate each spawn a process (npm for no-tests); on a loaded CI runner that took ~10s
+    }, 30_000);
   }
 
   test("a filled-in config is left alone unless --force", () => {
