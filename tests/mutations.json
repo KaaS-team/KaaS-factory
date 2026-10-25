@@ -420,5 +420,10 @@
   {"name": "jira: an edit after a restart refills the id map", "file": "src/adapters/trackers/jira.ts", "find": "if (!this.comments.vendorId(id)) await this.listOpenIssues();", "replace": "", "test": "tests/trackers-jira.test.ts"},
   {"name": "jira: browse permission alone is not a member", "file": "src/adapters/trackers/jira.ts", "find": "if (has(\"EDIT_ISSUES\")) return \"write\";", "replace": "if (has(\"BROWSE_PROJECTS\")) return \"write\";", "test": "tests/trackers-jira.test.ts"},
   {"name": "jira: an unknown account is a stranger, not an error", "file": "src/adapters/trackers/jira.ts", "find": "(err.status === 400 || err.status === 404)", "replace": "false", "test": "tests/trackers-jira.test.ts"},
-  {"name": "jira: an applied label is listed after it is removed", "file": "src/adapters/trackers/jira.ts", "find": "for (const l of add) this.ensured.add(l);", "replace": "", "test": "tests/trackers-jira.test.ts"}
+  {"name": "jira: an applied label is listed after it is removed", "file": "src/adapters/trackers/jira.ts", "find": "for (const l of add) this.ensured.add(l);", "replace": "", "test": "tests/trackers-jira.test.ts"},
+  {"name": "clickup: label triggers fail closed without labelTrust", "file": "src/adapters/trackers/clickup.ts", "find": "if (this.spec.labelTrust !== \"creator\") return undefined;", "replace": "", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "clickup: closing skips a status named for dropped work", "file": "src/adapters/trackers/clickup.ts", "find": " && !DROPPED.test(x.status)", "replace": "", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "clickup: a guest is not a member", "file": "src/adapters/trackers/clickup.ts", "find": "4: \"guest\" }", "replace": "4: \"member\" }", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "clickup: a cancelled status is not planned", "file": "src/adapters/trackers/clickup.ts", "find": "DROPPED.test(raw.status.status) ?", "replace": "false ?", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "clickup: an unsafe task id is refused", "file": "src/adapters/trackers/clickup.ts", "find": "!/^[0-9a-z]+$/.test(id) || !Number.isSafeInteger(n)", "replace": "!/^[0-9a-z]+$/.test(id)", "test": "tests/trackers-clickup.test.ts"}
 ]
