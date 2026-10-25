@@ -11,6 +11,7 @@ import { DockerExecution, type DockerSpec } from "./adapters/docker/execution";
 import { HttpSandboxExecution, type HttpSandboxSpec } from "./adapters/http-sandbox/execution";
 import { LocalExecution } from "./adapters/local/execution";
 import { LwprExecution, type LwprSpec } from "./adapters/lwpr/execution";
+import { MicrosandboxExecution, type MicrosandboxSpec, SECRET } from "./adapters/microsandbox/execution";
 import { PoolExecution, type PoolSpec, SqliteUsageStore } from "./adapters/pool/execution";
 import { SshExecution, type SshSpec } from "./adapters/ssh/execution";
 import { CMD, WrapExecution, type WrapSpec } from "./adapters/wrap/execution";
@@ -25,6 +26,7 @@ export type RuntimeSpec =
   | WrapSpec
   | HttpSandboxSpec
   | Agent37Spec
+  | MicrosandboxSpec
   | PoolSpec;
 
 export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = {
@@ -49,6 +51,10 @@ const SHAPES: Readonly<
   agent37: {
     required: ["instance", "tokenEnv"],
     fields: { instance: "string", tokenEnv: "string", url: "string", root: "string", exclude: "strings" },
+  },
+  microsandbox: {
+    required: ["image"],
+    fields: { image: "string", allow: "strings", secrets: "strings", memory: "string", cpus: "posInt" },
   },
   pool: { required: ["members"], fields: { members: "members", reserveMin: "posInt", fallback: "string" } },
 };
@@ -80,7 +86,21 @@ function kindProblems(at: string, s: Record<string, unknown>, all: Record<string
     !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(s.url)
   )
     return [`${at}.url: https (plain http only to localhost), since the worktree is sent to it`];
+  if (s.kind === "microsandbox" && Array.isArray(s.secrets)) return secretProblems(at, s.secrets, s.allow);
   return [];
+}
+
+// A secret's hosts must be reachable, or the key is injected nowhere and the run fails late.
+function secretProblems(at: string, secrets: unknown[], allow: unknown): string[] {
+  const reachable = new Set(Array.isArray(allow) ? allow : []);
+  return secrets.flatMap((s) => {
+    const m = SECRET.exec(String(s));
+    if (!m) return [`${at}.secrets: "${s}" is not ENV@host[,host]`];
+    return (m[2] ?? "")
+      .split(",")
+      .filter((h) => !reachable.has(h))
+      .map((h) => `${at}.secrets: "${s}" sends to ${h}, which is not in allow`);
+  });
 }
 
 // A pool's fallback is "none", a built-in, or a runtime in the same file that is not itself a pool.
@@ -152,6 +172,8 @@ export function executionFor(spec: Exclude<RuntimeSpec, PoolSpec>): ExecutionPor
       return new HttpSandboxExecution(spec);
     case "agent37":
       return new Agent37Execution(spec);
+    case "microsandbox":
+      return new MicrosandboxExecution(spec);
   }
 }
 

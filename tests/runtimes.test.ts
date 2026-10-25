@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { containerArgs } from "../src/adapters/docker/execution";
 import { lwprArgs } from "../src/adapters/lwpr/execution";
+import { MicrosandboxExecution, sandboxArgs } from "../src/adapters/microsandbox/execution";
 import { Agent37Execution, CHUNK } from "../src/adapters/agent37/execution";
 import { archiveArgs, HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { sshArgs } from "../src/adapters/ssh/execution";
@@ -261,7 +262,7 @@ describe("names", () => {
       "runtimes.a b: a name is letters, digits, _ and -",
       "runtimes.d.image: required for docker",
       "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude)",
-      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, pool",
+      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, microsandbox, pool",
     ]);
   });
   test("a bad machine.json runtime stops boot", () => {
@@ -363,4 +364,71 @@ describe("agent37", () => {
       "runtimes.c.url: https (plain http only to localhost), since the worktree is sent to it",
     ]);
   });
+});
+
+describe("microsandbox", () => {
+  const spec = {
+    kind: "microsandbox",
+    image: "node:22-slim",
+    allow: ["httpbin.org", "postman-echo.com"],
+    secrets: ["PROBE@httpbin.org"],
+  } as const;
+
+  test("denies egress by default, allows each host on 443, mounts the worktree at its own path", () => {
+    expect(sandboxArgs(spec, "make check", "/w", "n1")).toEqual(
+      "msb run -q --no-tty --no-stdin --name n1 --no-net --net-rule allow@dns --net-rule allow@httpbin.org:tcp:443 --net-rule allow@postman-echo.com:tcp:443 --secret PROBE@httpbin.org --secret-violation-action block-and-log -m 4G -c 2 -v /w:/w -w /w node:22-slim -- bash -c"
+        .split(" ")
+        .concat("make check"),
+    );
+    expect(sandboxArgs({ kind: "microsandbox", image: "i" }, "x", "/w", "n")).not.toContain("allow@dns");
+    expect(sandboxArgs(spec, "x", "/var/w", "n", "/private/var/w")).toContain("/private/var/w:/var/w");
+  });
+
+  test("an unset secret fails the step before a VM starts", async () => {
+    const r = await new MicrosandboxExecution(spec, {}).run("true", tmpdir());
+    expect(r).toEqual({ stdout: "", stderr: "", code: 1, runtimeFailed: "microsandbox: env var PROBE is not set" });
+  });
+
+  test("machine.json: image is required, each secret is ENV@hosts and its hosts are allowed", () => {
+    expect(runtimeProblems({ m: spec })).toEqual([]);
+    expect(
+      runtimeProblems({
+        a: { kind: "microsandbox" },
+        b: { kind: "microsandbox", image: "i", secrets: ["KEY=value@x.com"] },
+        c: { kind: "microsandbox", image: "i", allow: ["a.com"], secrets: ["K@a.com,b.com"] },
+      }),
+    ).toEqual([
+      "runtimes.a.image: required for microsandbox",
+      'runtimes.b.secrets: "KEY=value@x.com" is not ENV@host[,host]',
+      'runtimes.c.secrets: "K@a.com,b.com" sends to b.com, which is not in allow',
+    ]);
+  });
+
+  // A real microVM and two public echo servers, so it runs only where msb is installed.
+  test.skipIf(!Bun.which("msb"))(
+    "live: an unlisted host is refused, and the key reaches only its own host",
+    async () => {
+      const probe = "fake-probe-value-3k9";
+      const js = `const h={"X-P":process.env.PROBE};
+for(const u of["https://httpbin.org/headers","https://postman-echo.com/headers","https://example.com"])
+await fetch(u,{headers:h}).then(async r=>console.log(r.status,JSON.stringify(await r.text())),e=>console.log("err"));`;
+      const d = mkdtempSync(join(tmpdir(), "factory-msb-"));
+      writeFileSync(join(d, "probe.mjs"), js);
+      const r = await new MicrosandboxExecution(spec, { ...process.env, PROBE: probe }).run(
+        'echo "guest=$PROBE"; node probe.mjs; touch made; exit 4',
+        d,
+      );
+      const [guest, own, other, unlisted] = r.stdout.trim().split("\n");
+      expect(r.stderr).toBe("");
+      expect(r.code).toBe(4);
+      expect(guest).toBe("guest=$MSB_PROBE");
+      expect(own).toStartWith("200 ");
+      expect(own).toContain(probe);
+      expect(other).toStartWith("403 ");
+      expect(other).not.toContain(probe);
+      expect(unlisted).toContain("network_policy_denied");
+      expect(readdirSync(d)).toContain("made");
+    },
+    120_000,
+  );
 });

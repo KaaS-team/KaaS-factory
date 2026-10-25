@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Stand-in msb for the contract suite: honours -w and runs what follows `--` here, with no VM.
+set -u
+[[ $1 == rm ]] && exit 0
+[[ $1 == run ]] || exit 2
+shift
+wd=.
+while [[ $# -gt 0 && $1 != -- ]]; do
+  case $1 in
+    -w) wd=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+shift
+cd "$wd" && exec "$@"

@@ -13,6 +13,7 @@ import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { LocalExecution } from "../src/adapters/local/execution";
 import { LwprExecution } from "../src/adapters/lwpr/execution";
+import { MicrosandboxExecution } from "../src/adapters/microsandbox/execution";
 import { PoolExecution, SqliteUsageStore } from "../src/adapters/pool/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";
 import { WrapExecution } from "../src/adapters/wrap/execution";
@@ -146,6 +147,9 @@ const REGISTRY: Record<string, () => void> = {
     ),
   "http-sandbox": httpSandbox(),
   agent37: agent37(),
+  microsandbox: onFakePath(() =>
+    executionContract("microsandbox", () => new MicrosandboxExecution({ kind: "microsandbox", image: "img" })),
+  ),
   pool: sandboxPool(),
   ssh: onFakePath(() =>
     executionContract(

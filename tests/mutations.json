@@ -368,5 +368,7 @@
   {"name": "scan: an open finding is filed again", "file": "src/scan.ts", "find": "if (openMarkers.has(finding.id)) {", "replace": "if (false) {", "test": "tests/scan.test.ts"},
   {"name": "scan: a broken Lighthouse report passes", "file": "src/scan.ts", "find": "!Array.isArray(parsed.misses))\n    return", "replace": "false)\n    return", "test": "tests/scan.test.ts"},
   {"name": "agent37: whole archive in one exec", "file": "src/adapters/agent37/execution.ts", "find": "i += CHUNK)", "replace": "i += b64.length)", "test": "tests/runtimes.test.ts"},
-  {"name": "agent37: pool refuses an agent37 member", "file": "src/runtimes.ts", "find": "new Set<unknown>([\"http\", \"agent37\"])", "replace": "new Set<unknown>([\"http\"])", "test": "tests/runtimes.test.ts"}
+  {"name": "agent37: pool refuses an agent37 member", "file": "src/runtimes.ts", "find": "new Set<unknown>([\"http\", \"agent37\"])", "replace": "new Set<unknown>([\"http\"])", "test": "tests/runtimes.test.ts"},
+  {"name": "microsandbox: open egress", "file": "src/adapters/microsandbox/execution.ts", "find": "\"--no-net\",", "replace": "", "test": "tests/runtimes.test.ts"},
+  {"name": "microsandbox: secret sent to an unlisted host", "file": "src/runtimes.ts", "find": ".filter((h) => !reachable.has(h))", "replace": ".filter(() => false)", "test": "tests/runtimes.test.ts"}
 ]

@@ -29,7 +29,8 @@ and tokens belong to the machine, not the repo, so you define every other runtim
     "box": { "kind": "ssh", "host": "ci1", "dir": "/srv/factory", "exclude": ["node_modules", "dist"] },
     "fc": { "kind": "wrap", "argv": ["firecracker-ctr", "run", "--rm", "--mount", "type=bind,src={cwd},dst={cwd}", "docker.io/library/node:22", "job", "bash", "-c", "{cmd}"] },
     "e2b": { "kind": "http", "url": "https://sandbox.example.com/exec", "tokenEnv": "SANDBOX_TOKEN" },
-    "a37": { "kind": "agent37", "instance": "ab12cd34ef", "tokenEnv": "AGENT37_API_KEY" }
+    "a37": { "kind": "agent37", "instance": "ab12cd34ef", "tokenEnv": "AGENT37_API_KEY" },
+    "vm": { "kind": "microsandbox", "image": "node:22-slim", "allow": ["registry.npmjs.org", "api.anthropic.com"], "secrets": ["ANTHROPIC_API_KEY@api.anthropic.com"] }
   }
 }
 ```
@@ -42,6 +43,7 @@ and tokens belong to the machine, not the repo, so you define every other runtim
 | `wrap` | Any launcher: a Firecracker microVM, podman, bubblewrap, nsjail. `{cmd}` must be exactly one element of `argv`, and the bash command goes there. `{cwd}` is the worktree path wherever it appears. | `argv` (required) |
 | `http` | A hosted sandbox (e2b, Daytona, Modal or your own) behind the protocol below. | `url` (required; https, or http to loopback only), `tokenEnv`, `exclude` |
 | `agent37` | An agent37.com instance, through its exec API (see below). | `instance`, `tokenEnv` (both required), `root` (default `/tmp/factory`), `exclude`, `url` (the exec host) |
+| `microsandbox` | A microVM on this machine through `msb` (see below): no network except `allow`, and keys the guest cannot read. | `image` (required), `allow` (hosts, port 443), `secrets` (`ENV@host[,host]`, each host in `allow`), `memory` (default `4G`), `cpus` (default 2) |
 
 `factory doctor` lists the runtimes the repo uses and flags any that are missing.
 
@@ -107,6 +109,17 @@ file API answers only on templates that run an agent. The tar.gz goes in base64 
 is unpacked into a fresh directory under `root`, `bash -c cmd` runs there, and the directory is
 removed after. One exec waits at most 15 minutes, so a longer step needs another runtime. A 1 MB
 worktree took 12.5 seconds end to end on the default 2 vCPU instance.
+
+## microsandbox
+
+Install `msb` (`brew install superradcompany/tap/microsandbox` on macOS; Linux needs KVM). Each run
+boots a fresh microVM from `image` with the worktree mounted at its own path, so its writes land
+here. Egress is denied, DNS and port 443 open only for the hosts in `allow`, and with nothing in
+`allow` there is no network at all. A secret `ENV@host` is read from this process's env when the VM
+starts; inside, `$ENV` is the placeholder `$MSB_ENV`, and msb's proxy swaps in the real value only on
+a request to that secret's hosts. The same request to any other host is refused, so a command that
+prints the variable or posts it elsewhere leaks nothing. The live test in `tests/runtimes.test.ts`
+proves all three against public echo servers; it runs only where `msb` is installed.
 
 ## Many workers, one repo
 

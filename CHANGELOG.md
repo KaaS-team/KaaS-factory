@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A `microsandbox` runtime: a gate or `check` step runs in a fresh microVM through `msb`, with egress
+  denied except to the hosts in `allow`, and each key in `secrets` held outside the VM and sent only to
+  its own hosts. `machine.json` fails to load when a secret's host is not in `allow`.
 - An `agent37` runtime: a gate or `check` step runs on an agent37.com instance named in
   `machine.json`, with the key read from the env var `tokenEnv`. Exec bodies are capped at 128 KB, so
   the worktree goes over in base64 chunks, is unpacked in a fresh directory and removed after. It can
