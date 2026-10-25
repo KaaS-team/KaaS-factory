@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `machine.json` `agentRuntime` names a `microsandbox` runtime that every agent stage on the machine
+  runs in, with only plain `FACTORY_*` values in its env and its keys held by msb.
+- Fix: `FACTORY_SLOTS` overrode all of `machine.json`, so setting it dropped the machine's
+  `runtimes`. It now overrides only `slots`.
 - A `microsandbox` runtime: a gate or `check` step runs in a fresh microVM through `msb`, with egress
   denied except to the hosts in `allow`, and each key in `secrets` held outside the VM and sent only to
   its own hosts. `machine.json` fails to load when a secret's host is not in `allow`.

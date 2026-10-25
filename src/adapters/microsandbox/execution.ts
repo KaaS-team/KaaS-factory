@@ -21,8 +21,8 @@ export interface MicrosandboxSpec {
 
 export const SECRET = /^([A-Za-z_]\w*)@([\w.-]+(?:,[\w.-]+)*)$/;
 
-// `host` is cwd with symlinks resolved, which msb requires of a mount source (macOS /var is one).
-export function sandboxArgs(spec: MicrosandboxSpec, cmd: string, cwd: string, name: string, host = cwd): string[] {
+// The VM and its egress, before the mounts and the command.
+function vmArgs(spec: MicrosandboxSpec, name: string): string[] {
   const allow = spec.allow ?? [];
   return [
     "msb",
@@ -42,16 +42,47 @@ export function sandboxArgs(spec: MicrosandboxSpec, cmd: string, cwd: string, na
     spec.memory ?? "4G",
     "-c",
     String(spec.cpus ?? 2),
-    "-v",
-    `${host}:${cwd}`,
+  ];
+}
+
+// `host` is cwd with symlinks resolved, which msb requires of a mount source (macOS /var is one).
+export function sandboxArgs(spec: MicrosandboxSpec, cmd: string, cwd: string, name: string, host = cwd): string[] {
+  return [...vmArgs(spec, name), "-v", `${host}:${cwd}`, "-w", cwd, spec.image, "--", "bash", "-c", cmd];
+}
+
+export interface AgentInVm {
+  readonly argv: readonly string[];
+  readonly cwd: string;
+  // Folders besides cwd the agent reads or writes, such as the stage's scratch dir.
+  readonly mounts: readonly string[];
+  // What the guest sees. Only plain values: anything secret goes in spec.secrets.
+  readonly env: Readonly<Record<string, string>>;
+  // msb 0.7 does not forward piped stdin, so the prompt is read from this file in the guest.
+  readonly stdinFile?: string;
+  readonly name: string;
+}
+
+export function agentArgs(
+  spec: MicrosandboxSpec,
+  run: AgentInVm,
+  real: (p: string) => string = realpathSync,
+): string[] {
+  const command = run.stdinFile ? ["bash", "-c", 'exec "$@" < "$0"', run.stdinFile, ...run.argv] : [...run.argv];
+  return [
+    ...vmArgs(spec, run.name),
+    ...[run.cwd, ...run.mounts].flatMap((d) => ["-v", `${real(d)}:${d}`]),
+    ...Object.entries(run.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
     "-w",
-    cwd,
+    run.cwd,
     spec.image,
     "--",
-    "bash",
-    "-c",
-    cmd,
+    ...command,
   ];
+}
+
+// Killing the msb client can leave the VM running; remove it by name.
+export function removeVm(name: string): void {
+  Bun.spawn(["msb", "rm", "-f", "-q", name], { stdout: "ignore", stderr: "ignore" });
 }
 
 export class MicrosandboxExecution implements ExecutionPort {
@@ -70,8 +101,7 @@ export class MicrosandboxExecution implements ExecutionPort {
       stdout: "pipe",
       stderr: "pipe",
     });
-    // Killing msb alone can leave the VM running; remove it by name.
-    const stop = () => Bun.spawn(["msb", "rm", "-f", "-q", name], { stdout: "ignore", stderr: "ignore" });
+    const stop = () => removeVm(name);
     signal?.addEventListener("abort", stop, { once: true });
     try {
       const [stdout, stderr, code] = await Promise.all([

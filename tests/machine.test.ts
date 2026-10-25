@@ -5,10 +5,10 @@
 // what two real `factory watch` processes sharing FACTORY_HOME would be.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { effectiveSlots, loadMachineConfig, MachineLeases, suggestSlots } from "../src/machine";
+import { agentVm, effectiveSlots, loadMachineConfig, MachineLeases, suggestSlots } from "../src/machine";
 
 function tmpDb(): string {
   const dir = mkdtempSync(join(tmpdir(), "factory-machine-"));
@@ -113,6 +113,35 @@ describe("loadMachineConfig", () => {
     Bun.write(`${dir}/machine.json`, JSON.stringify({ slots: 0 }));
     expect(() => loadMachineConfig({ FACTORY_HOME: dir })).toThrow(/positive integer/);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("agentRuntime", () => {
+  const vm = { kind: "microsandbox", image: "node:22-slim", allow: ["api.anthropic.com"] } as const;
+  const home = (machine: object) => {
+    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    writeFileSync(`${dir}/machine.json`, JSON.stringify(machine));
+    return dir;
+  };
+
+  test("names the microsandbox runtime every agent runs in, and FACTORY_SLOTS keeps it", () => {
+    const dir = home({ slots: 2, runtimes: { vm }, agentRuntime: "vm" });
+    expect(agentVm(loadMachineConfig({ FACTORY_HOME: dir }))).toEqual(vm);
+    const withSlots = loadMachineConfig({ FACTORY_HOME: dir, FACTORY_SLOTS: "5" });
+    expect(withSlots.slots).toBe(5);
+    expect(agentVm(withSlots)).toEqual(vm);
+    expect(agentVm({ slots: 1 })).toBeUndefined();
+  });
+
+  test("anything but a microsandbox runtime in the same file refuses to start", () => {
+    for (const bad of [
+      { slots: 1, agentRuntime: "vm" },
+      { slots: 1, runtimes: { vm: { kind: "docker", image: "i" } }, agentRuntime: "vm" },
+      { slots: 1, runtimes: { vm }, agentRuntime: "local" },
+    ])
+      expect(() => loadMachineConfig({ FACTORY_HOME: home(bad) })).toThrow(
+        /"agentRuntime" must name a microsandbox runtime/,
+      );
   });
 });
 

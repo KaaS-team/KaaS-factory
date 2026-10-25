@@ -5,7 +5,8 @@
 import { describe, expect, test } from "bun:test";
 import { containerArgs } from "../src/adapters/docker/execution";
 import { lwprArgs } from "../src/adapters/lwpr/execution";
-import { MicrosandboxExecution, sandboxArgs } from "../src/adapters/microsandbox/execution";
+import { agentArgs, MicrosandboxExecution, sandboxArgs } from "../src/adapters/microsandbox/execution";
+import { CommandExecutor } from "../src/agents/executor";
 import { Agent37Execution, CHUNK } from "../src/adapters/agent37/execution";
 import { archiveArgs, HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { sshArgs } from "../src/adapters/ssh/execution";
@@ -17,7 +18,7 @@ import { framed, shq, unframe } from "../src/core/frame";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { loadMachineConfig } from "../src/machine";
 import { BUILTIN_RUNTIMES, runtimeProblems, runtimeRefs, runtimesFrom, unknownRuntimes } from "../src/runtimes";
-import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -403,6 +404,85 @@ describe("microsandbox", () => {
       'runtimes.c.secrets: "K@a.com,b.com" sends to b.com, which is not in allow',
     ]);
   });
+
+  test("an agent in the VM gets its folders, plain env and the prompt file, never the host env", () => {
+    const argv = agentArgs(
+      spec,
+      {
+        argv: ["claude", "-p"],
+        cwd: "/w",
+        mounts: ["/s"],
+        env: { FACTORY_ISSUE: "7" },
+        stdinFile: "/s/stdin",
+        name: "n",
+      },
+      (d) => `/real${d}`,
+    );
+    expect(argv.slice(argv.indexOf("4G") + 3)).toEqual(
+      "-v /real/w:/w -v /real/s:/s -e FACTORY_ISSUE=7 -w /w node:22-slim -- bash -c"
+        .split(" ")
+        .concat('exec "$@" < "$0"', "/s/stdin", "claude", "-p"),
+    );
+  });
+
+  test("with agentRuntime set, the executor starts the agent through msb with the prompt as a file", async () => {
+    const d = mkdtempSync(join(tmpdir(), "factory-msb-agent-"));
+    mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });
+    writeFileSync(join(d, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
+    const saved = process.env.PATH;
+    process.env.PATH = `${join(import.meta.dir, "fixtures", "runtimes")}:${saved}`;
+    try {
+      const agent = 'echo "${MSB_STAND_IN:-host} $(wc -c)" > "$FACTORY_ARTIFACT_DIR/ran"';
+      await new CommandExecutor(
+        { x: { command: ["sh", "-c", agent] } },
+        { default: "x" },
+        {},
+        undefined,
+        spec,
+      ).runStage({ stage: "plan", issue: 7, cwd: d, maxBudgetUsd: 1 });
+    } finally {
+      process.env.PATH = saved;
+    }
+    const [via, bytes] = readFileSync(join(d, ".factory/runs/issue-7/ran"), "utf8").trim().split(/\s+/);
+    expect(via).toBe("1");
+    expect(Number(bytes)).toBeGreaterThan(10);
+  });
+
+  test.skipIf(!Bun.which("msb"))(
+    "live: an agent stage runs in the VM, reads its prompt, and holds only a placeholder for the key",
+    async () => {
+      const d = mkdtempSync(join(tmpdir(), "factory-msb-agent-"));
+      mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });
+      writeFileSync(join(d, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
+      const probe = "fake-probe-value-7m1";
+      const out = '"$FACTORY_ARTIFACT_DIR"';
+      const agent = [
+        `wc -c < /dev/stdin > ${out}/prompt-bytes`,
+        `uname -s > ${out}/kernel`,
+        `echo "probe=$PROBE host=\${FACTORY_TEST_HOST_ONLY:-unset}" > ${out}/env`,
+        `node -e 'fetch("https://httpbin.org/headers",{headers:{"X-P":process.env.PROBE}}).then(r=>r.text()).then(t=>process.stdout.write(t))' > ${out}/sent`,
+      ].join("; ");
+      Object.assign(process.env, { PROBE: probe, FACTORY_TEST_HOST_ONLY: "leaked" });
+      try {
+        await new CommandExecutor(
+          { x: { command: ["sh", "-c", agent] } },
+          { default: "x" },
+          {},
+          undefined,
+          spec,
+        ).runStage({ stage: "plan", issue: 7, cwd: d, maxBudgetUsd: 1 });
+      } finally {
+        delete process.env.PROBE;
+        delete process.env.FACTORY_TEST_HOST_ONLY;
+      }
+      const read = (f: string) => readFileSync(join(d, ".factory/runs/issue-7", f), "utf8").trim();
+      expect(Number(read("prompt-bytes"))).toBeGreaterThan(10);
+      expect(read("kernel")).toBe("Linux");
+      expect(read("env")).toBe("probe=$MSB_PROBE host=unset");
+      expect(read("sent")).toContain(probe);
+    },
+    120_000,
+  );
 
   // A real microVM and two public echo servers, so it runs only where msb is installed.
   test.skipIf(!Bun.which("msb"))(

@@ -370,5 +370,7 @@
   {"name": "agent37: whole archive in one exec", "file": "src/adapters/agent37/execution.ts", "find": "i += CHUNK)", "replace": "i += b64.length)", "test": "tests/runtimes.test.ts"},
   {"name": "agent37: pool refuses an agent37 member", "file": "src/runtimes.ts", "find": "new Set<unknown>([\"http\", \"agent37\"])", "replace": "new Set<unknown>([\"http\"])", "test": "tests/runtimes.test.ts"},
   {"name": "microsandbox: open egress", "file": "src/adapters/microsandbox/execution.ts", "find": "\"--no-net\",", "replace": "", "test": "tests/runtimes.test.ts"},
-  {"name": "microsandbox: secret sent to an unlisted host", "file": "src/runtimes.ts", "find": ".filter((h) => !reachable.has(h))", "replace": ".filter(() => false)", "test": "tests/runtimes.test.ts"}
+  {"name": "microsandbox: secret sent to an unlisted host", "file": "src/runtimes.ts", "find": ".filter((h) => !reachable.has(h))", "replace": ".filter(() => false)", "test": "tests/runtimes.test.ts"},
+  {"name": "microsandbox: agent runs on the host", "file": "src/agents/executor.ts", "find": "this.vm && vmName\n        ? agentArgs", "replace": "false && vmName\n        ? agentArgs", "test": "tests/runtimes.test.ts"},
+  {"name": "machine: FACTORY_SLOTS drops agentRuntime", "file": "src/machine.ts", "find": "if (!existsSync(path)) return { slots: fromEnv ?? DEFAULT_SLOTS };", "replace": "if (fromEnv || !existsSync(path)) return { slots: fromEnv ?? DEFAULT_SLOTS };", "test": "tests/machine.test.ts"}
 ]

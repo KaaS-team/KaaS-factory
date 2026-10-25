@@ -12,4 +12,5 @@ while [[ $# -gt 0 && $1 != -- ]]; do
   esac
 done
 shift
+export MSB_STAND_IN=1 # lets a test see the command went through msb
 cd "$wd" && exec "$@"

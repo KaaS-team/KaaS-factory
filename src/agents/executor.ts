@@ -30,6 +30,7 @@ import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 import { portEnv } from "../port";
+import { agentArgs, type MicrosandboxSpec, removeVm } from "../adapters/microsandbox/execution";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -137,6 +138,8 @@ export class CommandExecutor implements Executor {
     private readonly stages: StageAgents,
     private readonly routes: Readonly<Record<string, RouteConfig>> = {},
     private readonly recorder?: FixtureRecorder,
+    // machine.json `agentRuntime`: every agent this executor starts runs in this microVM.
+    private readonly vm?: MicrosandboxSpec,
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
@@ -225,23 +228,38 @@ export class CommandExecutor implements Executor {
     const marker = opts.liveFile ? takeoverMarker(opts.liveFile) : undefined;
     if (marker) rmSync(marker, { force: true });
 
-    const proc = Bun.spawn([...argv], {
-      cwd: opts.cwd,
-      stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
-      stdout: "pipe",
-      stderr: "pipe",
-      detached: true, // its own process group, so a kill reaches the agent's children too
-      env: {
-        ...sanitizeEnv(process.env, agent.preset?.envKeys),
-        ...agent.preset?.env,
-        FACTORY_ARTIFACT_DIR: artifactDir,
-        FACTORY_ISSUE: String(opts.issue),
-        FACTORY_STAGE: opts.stage,
-        FACTORY_SCRATCH_DIR: scratch,
-        FACTORY_HIDDEN_PATHS: (opts.hiddenPaths ?? []).join("\n"),
-        ...portEnv(opts.cwd),
+    const stageEnv: Record<string, string> = {
+      ...agent.preset?.env,
+      FACTORY_ARTIFACT_DIR: artifactDir,
+      FACTORY_ISSUE: String(opts.issue),
+      FACTORY_STAGE: opts.stage,
+      FACTORY_SCRATCH_DIR: scratch,
+      FACTORY_HIDDEN_PATHS: (opts.hiddenPaths ?? []).join("\n"),
+      ...portEnv(opts.cwd),
+    };
+    // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
+    const vmName = this.vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
+    if (this.vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
+    const proc = Bun.spawn(
+      this.vm && vmName
+        ? agentArgs(this.vm, {
+            argv,
+            cwd: opts.cwd,
+            mounts: [scratch],
+            env: stageEnv,
+            stdinFile: stdin === undefined ? undefined : join(scratch, "stdin"),
+            name: vmName,
+          })
+        : [...argv],
+      {
+        cwd: opts.cwd,
+        stdin: stdin === undefined || this.vm ? "ignore" : new Blob([stdin]),
+        stdout: "pipe",
+        stderr: "pipe",
+        detached: true, // its own process group, so a kill reaches the agent's children too
+        env: { ...sanitizeEnv(process.env, agent.preset?.envKeys), ...stageEnv },
       },
-    });
+    );
     let sessionId: string | undefined;
     const writeLive = () => {
       if (!opts.liveFile) return;
@@ -267,6 +285,7 @@ export class CommandExecutor implements Executor {
       } catch {
         proc.kill();
       }
+      if (vmName) removeVm(vmName);
       // A descendant that left the group (setsid) can still hold the pipe open:
       // give the reader a moment to drain, then stop waiting for it.
       setTimeout(() => cancelRead?.(), 2000).unref();

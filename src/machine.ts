@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { cpus, freemem } from "node:os";
 import { dirname } from "node:path";
 import { factoryHome } from "./paths";
+import type { MicrosandboxSpec } from "./adapters/microsandbox/execution";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
 
 export interface MachineConfig {
@@ -18,6 +19,8 @@ export interface MachineConfig {
   readonly dailyUsd?: number;
   // Named places a gate or check command can run; see src/runtimes.ts.
   readonly runtimes?: Readonly<Record<string, RuntimeSpec>>;
+  // A microsandbox runtime in `runtimes` that every agent stage on this machine runs in.
+  readonly agentRuntime?: string;
 }
 
 const DEFAULT_SLOTS = 2;
@@ -36,17 +39,16 @@ function positiveInt(value: unknown, where: string): number {
   return value as number;
 }
 
-// FACTORY_SLOTS wins over machine.json; naming neither runs with
+// FACTORY_SLOTS wins over machine.json's slots and nothing else, so it never
+// drops the file's runtimes or agentRuntime; naming neither runs with
 // DEFAULT_SLOTS. A value that is present but not a positive integer refuses
 // to start rather than silently running unbounded (NaN turns every cap off).
 export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): MachineConfig {
-  if (env.FACTORY_SLOTS !== undefined) {
-    return { slots: positiveInt(Number(env.FACTORY_SLOTS), "FACTORY_SLOTS") };
-  }
+  const fromEnv = env.FACTORY_SLOTS === undefined ? undefined : positiveInt(Number(env.FACTORY_SLOTS), "FACTORY_SLOTS");
   const path = machineConfigPath(env);
-  if (!existsSync(path)) return { slots: DEFAULT_SLOTS };
+  if (!existsSync(path)) return { slots: fromEnv ?? DEFAULT_SLOTS };
   const raw = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
-  const slots = positiveInt(raw.slots, `${path}: "slots"`);
+  const slots = fromEnv ?? positiveInt(raw.slots, `${path}: "slots"`);
   if (raw.dailyUsd !== undefined && !(typeof raw.dailyUsd === "number" && raw.dailyUsd > 0)) {
     throw new Error(`${path}: "dailyUsd" must be a positive number, got ${JSON.stringify(raw.dailyUsd)}`);
   }
@@ -54,11 +56,25 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     const problems = runtimeProblems(raw.runtimes, `${path}: runtimes`);
     if (problems.length) throw new Error(problems.join("\n"));
   }
+  if (raw.agentRuntime !== undefined) {
+    const named = (raw.runtimes as Record<string, RuntimeSpec> | undefined)?.[raw.agentRuntime as string];
+    if (named?.kind !== "microsandbox")
+      throw new Error(
+        `${path}: "agentRuntime" must name a microsandbox runtime in "runtimes", got ${JSON.stringify(raw.agentRuntime)}`,
+      );
+  }
   return {
     slots,
     dailyUsd: raw.dailyUsd as number | undefined,
+    ...(raw.agentRuntime ? { agentRuntime: raw.agentRuntime as string } : {}),
     ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}),
   };
+}
+
+// The VM every agent stage runs in, when machine.json names one.
+export function agentVm(m: MachineConfig): MicrosandboxSpec | undefined {
+  const spec = m.agentRuntime ? m.runtimes?.[m.agentRuntime] : undefined;
+  return spec?.kind === "microsandbox" ? spec : undefined;
 }
 
 // Advice only (`factory doctor` prints it, nothing enforces it): roughly one

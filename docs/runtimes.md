@@ -121,6 +121,17 @@ a request to that secret's hosts. The same request to any other host is refused,
 prints the variable or posts it elsewhere leaks nothing. The live test in `tests/runtimes.test.ts`
 proves all three against public echo servers; it runs only where `msb` is installed.
 
+### Agents in the VM
+
+`"agentRuntime": "<name>"` in `machine.json` names a `microsandbox` runtime, and every agent stage on
+this machine then starts inside it: the worktree and the stage's scratch folder are mounted, the guest
+gets only the `FACTORY_*` values and the preset's own settings, and nothing else from this machine's
+env. The image must hold the agent CLI. Give its key as a secret, for example
+`"secrets": ["ANTHROPIC_API_KEY@api.anthropic.com"]` with `api.anthropic.com` in `allow`, so the agent
+holds a placeholder it cannot leak. msb 0.7 does not pass piped stdin through, so a prompt sent on
+stdin is written to the scratch folder and fed to the agent from there. `FACTORY_SLOTS` overrides
+only the slot count and keeps the rest of `machine.json`.
+
 ## Many workers, one repo
 
 Several factories can drive one repo at once: laptops, a VM, GitHub Actions jobs, or a daemon on

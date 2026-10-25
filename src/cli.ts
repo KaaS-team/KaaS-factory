@@ -23,7 +23,7 @@ import { plain } from "./display";
 import { act, buildInbox, inboxPositionals, learningPrItems, parkReasons, type InboxAction } from "./inbox";
 import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
-import { loadMachineConfig, MachineLeases, MachineSpend } from "./machine";
+import { agentVm, loadMachineConfig, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard } from "../dashboard/server";
 import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
@@ -149,7 +149,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     state,
     bus: new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}` }),
     minions: loaded.minions,
-    executor: new CommandExecutor(config.agents, config.stages, config.routes),
+    executor: new CommandExecutor(config.agents, config.stages, config.routes, undefined, agentVm(machineConfig)),
     gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
     holdoutRunner: new ShellHoldoutRunner(),
     rechecker: new DiffAnchorRechecker(),
