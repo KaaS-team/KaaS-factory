@@ -44,6 +44,16 @@ describe("Asana specifics", () => {
     ]);
   });
 
+  test("a tag renamed to a name its old name contained still names no one", async () => {
+    const t = make();
+    const n = await t.createIssue(repo, "x", "", []);
+    await t.ensureLabel(repo, "not factory:ready", "ededed", "");
+    const tag = server.store.tags.find((x) => x.name === "not factory:ready")!;
+    server.store.addTag(server.store.tasks.at(-1)!, tag.gid, "1200000000000003");
+    tag.name = "factory:ready";
+    expect(await t.labeledBy(repo, n, "factory:ready")).toBeUndefined();
+  });
+
   test("a guest's comment is not trusted, and a deactivated member is no one", async () => {
     const t = make();
     server.store.members.set("1200000000000003", { is_admin: false, is_guest: true, is_active: true });

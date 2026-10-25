@@ -11,12 +11,13 @@ interface Item {
   state_id: string;
   label_ids: string[];
   created_by_id: string;
+  created_at: string;
   comments: { id: string; comment_html: string; created_at: string; actor_id: string }[];
   activities: { actor_id: string; field: string; verb: string; old_value: string | null; new_value: string | null; old_identifier: string | null; new_identifier: string | null; created_at: string }[];
 }
 interface Project {
   states: { id: string; group: string }[];
-  labels: { id: string; name: string }[];
+  labels: { id: string; name: string; updated_at: string }[];
   items: Item[];
   members: { member_id: string; role: number }[];
 }
@@ -58,7 +59,7 @@ export class PlaneStore {
     if (kind === "labels" && method === "GET") return page(p.labels);
     if (kind === "labels" && method === "POST") {
       if (p.labels.some((l) => l.name === body.name)) return Response.json({ error: "Label already exists" }, { status: 409 });
-      const l = { id: randomUUID(), name: body.name as string };
+      const l = { id: randomUUID(), name: body.name as string, updated_at: this.now() };
       p.labels.push(l);
       return Response.json(l, { status: 201 });
     }
@@ -74,6 +75,7 @@ export class PlaneStore {
         state_id: p.states.find((s) => s.group === "backlog")!.id,
         label_ids: [...(body.label_ids ?? [])],
         created_by_id: this.me,
+        created_at: this.now(),
         comments: [],
         activities: [],
       };

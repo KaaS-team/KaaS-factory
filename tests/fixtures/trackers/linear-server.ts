@@ -18,6 +18,7 @@ interface Issue {
   description: string;
   stateId: string;
   creator: string;
+  createdAt: string;
   labelIds: string[];
   comments: { id: string; body: string; createdAt: string; user: string }[];
   history: { createdAt: string; actor: string; addedLabelIds: string[] }[];
@@ -54,6 +55,7 @@ export class LinearStore {
       description: i.description,
       state: { type: state.type },
       creator: { id: i.creator },
+      createdAt: i.createdAt,
       labels: { nodes: i.labelIds.map((id) => this.labels.find((l) => l.id === id)!).map((l) => ({ id: l.id, name: l.name, updatedAt: l.updatedAt })) },
       comments: { nodes: i.comments.map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt, user: { id: c.user } })) },
     };
@@ -126,6 +128,7 @@ export class LinearStore {
           description: strip(v.input.description ?? ""),
           stateId: team.states.find((s) => s.type === "backlog")!.id,
           creator: this.viewer,
+          createdAt: this.now(),
           labelIds: [...(v.input.labelIds ?? [])],
           comments: [],
           history: [],

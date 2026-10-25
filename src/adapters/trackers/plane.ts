@@ -21,6 +21,7 @@ interface WorkItem {
   state_id: string;
   label_ids: string[];
   created_by_id: string;
+  created_at: string;
 }
 interface Page<T> {
   data: T[];
@@ -270,12 +271,15 @@ export class PlaneTracker implements TrackerPort {
   async currentLogin(): Promise<string> {
     return (await this.client.request<{ id: string }>("GET", "/api/v2/users/me/")).id;
   }
-  // Matched by label id, and the activity must still name the label: a label renamed after it was added
-  // would carry the adder's trust to a new name, so it names no one. A label set at creation names the creator.
+  // Matched by label id, and the activity must still name the label: a rename after the add would carry
+  // the adder's trust to a new name. A label set at creation names the creator, unless edited since.
   async labeledBy(_repo: string, n: number, label: string): Promise<string | undefined> {
     const w = await this.item(n);
-    const id = (await this.labelMap()).get(label);
-    if (!id || !w.label_ids.includes(id)) return undefined;
+    const found = (await this.all<{ id: string; name: string; updated_at: string }>(`${this.base}/labels/`)).find(
+      (l) => l.name === label,
+    );
+    if (!found || !w.label_ids.includes(found.id)) return undefined;
+    const id = found.id;
     const rows = await this.all<{
       actor_id: string;
       field: string;
@@ -287,7 +291,7 @@ export class PlaneTracker implements TrackerPort {
       .filter((r) => r.field === "labels" && r.new_identifier === id)
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
     const last = adds.at(-1);
-    if (!last) return w.created_by_id;
+    if (!last) return found.updated_at > w.created_at ? undefined : w.created_by_id;
     return last.new_value === label ? last.actor_id : undefined;
   }
   // Read fresh on every call: a role is what lets a comment drive the factory, so a demotion counts at once.

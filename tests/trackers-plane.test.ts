@@ -55,6 +55,17 @@ describe("Plane specifics", () => {
     expect(await t.labeledBy(repo, n, "factory:ready")).toBeUndefined();
   });
 
+  test("a label set at creation and renamed since names no one", async () => {
+    const t = make();
+    const n = await t.createIssue(repo, "x", "", ["harmless"]);
+    expect(await t.labeledBy(repo, n, "harmless")).toBe(server.store.me);
+    Object.assign(project().labels.find((l) => l.name === "harmless")!, {
+      name: "factory:ready",
+      updated_at: server.store.now(),
+    });
+    expect(await t.labeledBy(repo, n, "factory:ready")).toBeUndefined();
+  });
+
   test("a guest's comment is not trusted, and a cancelled item is closed as not planned", async () => {
     const t = make();
     project().members.push({ member_id: "gus", role: 5 });

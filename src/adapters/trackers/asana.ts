@@ -32,6 +32,8 @@ interface Story {
 }
 
 const TASK_FIELDS = "name,notes,completed,tags.name,created_by.gid,projects.gid";
+// An added_to_tag story's text, which records the tag's name when it was added.
+const TAG_STORY = /^added (?:this task )?to (.+)$/;
 const STORY_FIELDS = "resource_subtype,text,created_at,created_by.gid,tag.gid";
 
 // Asana gids are decimal strings; one past a safe integer would round, and an edit would hit the wrong one.
@@ -234,7 +236,7 @@ export class AsanaTracker implements TrackerPort {
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
     const last = adds.at(-1);
     if (!last) return t.created_by?.gid;
-    return last.text.includes(label) ? last.created_by?.gid : undefined;
+    return TAG_STORY.exec(last.text)?.[1] === label ? last.created_by?.gid : undefined;
   }
   // Read fresh on every call: a role is what lets a comment drive the factory, so a demotion counts at once.
   async roleOf(_repo: string, login: string): Promise<RepoRole> {

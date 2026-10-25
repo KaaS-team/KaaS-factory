@@ -21,6 +21,7 @@ interface LinearIssue extends Node {
   description: string | null;
   state: { type: string };
   creator: Node | null;
+  createdAt: string;
   labels: { nodes: Label[] };
   comments: { nodes: (Node & { body: string; createdAt: string; user: Node | null })[] };
 }
@@ -29,7 +30,7 @@ interface Page<T> {
   pageInfo: { hasNextPage: boolean; endCursor: string | null };
 }
 
-const ISSUE = `id number title description state { type } creator { id } labels { nodes { id name updatedAt } }
+const ISSUE = `id number title description state { type } creator { id } createdAt labels { nodes { id name updatedAt } }
   comments(first: 250) { nodes { id body createdAt user { id } } }`;
 
 // Named operations, one per need: the fixture answers by name, and a reader sees every call Linear gets.
@@ -258,8 +259,8 @@ export class LinearTracker implements TrackerPort {
   async currentLogin(): Promise<string> {
     return (await this.gql<{ viewer: Node }>(Q.viewer)).viewer.id;
   }
-  // Linear's history has no entry for labels set when the issue was made, so those name the creator. It
-  // keeps label ids, not names, so a label edited after it was added (a rename) names no one.
+  // History keeps label ids, not names, so a label edited (renamed) after it was added names no one. A
+  // label set at creation has no entry and names the creator, unless the label was edited since.
   async labeledBy(_repo: string, n: number, label: string): Promise<string | undefined> {
     const raw = await this.raw(n);
     const found =
@@ -277,6 +278,7 @@ export class LinearTracker implements TrackerPort {
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const last = adds.at(-1);
     if (last) return found.updatedAt > last.createdAt ? undefined : last.actor?.id;
+    if (found.updatedAt > raw.createdAt) return undefined;
     return raw.labels.nodes.some((l) => l.id === id) ? d.issue.creator?.id : undefined;
   }
   async roleOf(_repo: string, login: string): Promise<RepoRole> {

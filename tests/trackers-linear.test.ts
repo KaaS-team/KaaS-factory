@@ -46,6 +46,18 @@ describe("Linear specifics", () => {
     expect(await t.roleOf(repo, "alice")).toBe("read");
   });
 
+  test("a label set at creation and renamed since names no one", async () => {
+    const t = make();
+    await t.ensureLabel(repo, "harmless", "ededed", "");
+    const n = await t.createIssue(repo, "x", "", ["harmless"]);
+    expect(await t.labeledBy(repo, n, "harmless")).toBe(server.store.viewer);
+    Object.assign(server.store.labels.find((l) => l.name === "harmless")!, {
+      name: "factory:ready",
+      updatedAt: server.store.now(),
+    });
+    expect(await t.labeledBy(repo, n, "factory:ready")).toBeUndefined();
+  });
+
   test("a guest's comment is not trusted, and a canceled issue is closed as not planned", async () => {
     const t = make();
     server.store.users.set("gus", { id: "gus", admin: false, guest: true, active: true });

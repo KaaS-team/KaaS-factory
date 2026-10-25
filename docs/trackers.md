@@ -28,7 +28,9 @@ as no one.
 
 - **Who added a label** comes from the tracker's history: Linear's issue history, Plane's activity log,
   Jira's changelog and Asana's stories. A label set when the issue was made has no history entry, so it
-  names the issue's creator. A label renamed after it was added names no one.
+  names the issue's creator. A label renamed after it was added names no one, and in Linear and Plane
+  so does a label set at creation and edited since. Asana tags carry no edit time, so a tag set when
+  the task was made and renamed later still names the task's creator.
 - **ClickUp** has no public activity history, so label triggers are off unless `labelTrust: "creator"`,
   which credits any tag to the task's creator. `factory doctor` says which applies.
 - **Scope.** Every read and write is limited to the configured team, project or List. ClickUp and Asana
