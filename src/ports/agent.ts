@@ -2,6 +2,7 @@
 // behind a preset, or the replay executor the tests use.
 
 import type { AgentCommands } from "../config";
+import type { IssueScope } from "../core/model-tier";
 
 export type StageName = "triage" | "plan" | "build" | "verify" | "pr" | "retro";
 
@@ -56,6 +57,8 @@ export interface StageRunOptions {
   // A minion's whole prompt (src/engine/minion.ts), in place of the stage skill and the
   // context pack; with it, `agent` names the agent directly instead of the stage routing.
   readonly prompt?: string;
+  // The issue's risk and size once triage or plan has judged them; picks the agent's model tier.
+  readonly scope?: IssueScope;
 }
 
 // The killedReason a `factory takeover` stop gets. watch.ts parks on it

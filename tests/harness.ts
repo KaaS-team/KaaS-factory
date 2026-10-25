@@ -434,6 +434,8 @@ export class MultiStageExecutor {
   readonly resumed: Array<StageRunOptions["resume"]> = [];
   // The MCP servers each run was handed, by stage.
   readonly mcp: Array<[StageName, StageRunOptions["mcp"]]> = [];
+  // The issue scope each run was handed, by stage: what picks the agent's model tier.
+  readonly scopes: Array<[StageName, StageRunOptions["scope"]]> = [];
 
   async runStage(opts: {
     stage: StageName;
@@ -442,8 +444,10 @@ export class MultiStageExecutor {
     maxBudgetUsd: number;
     resume?: StageRunOptions["resume"];
     mcp?: StageRunOptions["mcp"];
+    scope?: StageRunOptions["scope"];
   }) {
     this.resumed.push(opts.resume);
+    this.scopes.push([opts.stage, opts.scope]);
     this.mcp.push([opts.stage, opts.mcp]);
     const key = `${opts.stage}:${opts.issue}`;
     const arr = this.queue.get(key);

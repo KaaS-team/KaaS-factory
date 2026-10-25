@@ -27,7 +27,8 @@ import {
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isHumanComment, parseChatOps } from "../chatops";
 import { mcpServersFor } from "../mcp";
-import { deriveIssueState } from "../derive";
+import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
+import { type IssueScope, scopeFrom } from "../core/model-tier";
 import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
 import type { ProofGit, ProofStatus } from "../proof";
@@ -309,6 +310,14 @@ export function priceResult(result: StageRunResult): {
   return { cached, costUsd, usageComplete };
 }
 
+// What the thread's triage and plan said about the issue's size and risk; triage has nothing to read yet.
+export function scopeOf(issue: GhIssue, stage: string): { scope?: IssueScope } {
+  if (stage === "triage") return {};
+  const markers = parseDataMarkers(issue.comments);
+  const scope = scopeFrom(latestDataFor(markers, "plan"), latestDataFor(markers, "triage"));
+  return scope ? { scope } : {};
+}
+
 export async function runStage(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -352,6 +361,7 @@ export async function runStage(
     maxToolCalls: config.maxToolCalls,
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
+    ...scopeOf(issue, stage),
     ...files,
     ...rest,
     ...(mcp ? { mcp } : {}),

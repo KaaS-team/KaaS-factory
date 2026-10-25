@@ -10,6 +10,8 @@ export interface AgentConfig {
   // With no placeholder the prompt goes to stdin.
   readonly command?: readonly string[];
   readonly model?: string;
+  // Cheaper or stronger models by issue scope (src/core/model-tier.ts); unset tiers use `model`.
+  readonly models?: { readonly small?: string; readonly large?: string };
   // Pass the reply schema to the CLI (Codex --output-schema). Off until a live run confirms the CLI accepts it.
   readonly outputSchema?: boolean;
 }

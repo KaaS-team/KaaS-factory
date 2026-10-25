@@ -3,6 +3,7 @@
 // through the preset's line parser, and kill the whole process group on a
 // timeout or a runaway tool-call count.
 
+import { tierFor } from "../core/model-tier";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -118,6 +119,13 @@ function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, s
   return { name, config, preset };
 }
 
+// The agent with `model` swapped for its tier's, so every preset and {{model}} see one model.
+function withTier(agent: ResolvedAgent, scope: StageRunOptions["scope"]): ResolvedAgent {
+  const tier = tierFor(scope);
+  const model = tier && agent.config.models?.[tier];
+  return model ? { ...agent, config: { ...agent.config, model } } : agent;
+}
+
 // Placeholders in a config command. Anything else is passed through verbatim.
 export function renderCommand(
   command: readonly string[],
@@ -149,7 +157,7 @@ export class CommandExecutor implements Executor {
     const agent =
       opts.prompt !== undefined && opts.agent
         ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
+        : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts.scope);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)

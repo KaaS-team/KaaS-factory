@@ -246,6 +246,17 @@ describe("approval paths", () => {
     done(c);
   });
 
+  test("4b. each stage after triage is handed the thread's risk and file count", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ risk: "medium" }));
+    c.push("plan", plan("medium"));
+    await c.step();
+    expect(c.executor.scopes[0]).toEqual(["triage", undefined]);
+    expect(c.executor.scopes[1]![0]).toBe("plan");
+    expect(c.executor.scopes[1]![1]?.risk).toBe("medium");
+    done(c);
+  });
+
   test("4c. a repo with no gates parks before the build agent runs, saying how to add one", async () => {
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);

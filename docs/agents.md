@@ -31,6 +31,14 @@ The table is generated from the presets (`bun scripts/gen-agents-doc.ts`); a tes
 }
 ```
 
+### The cheapest model that is enough
+
+An agent can name a model per tier: `"models": { "small": "<cheap model>", "large": "<strong model>" }`.
+After triage, each stage reads the issue's risk and file count from the plan (or the triage, before
+there is a plan). Low risk with at most 3 files runs on `small`; high risk or 11 files and more runs
+on `large`; anything else, and triage itself, runs on `model`. A tier left out falls back to `model`.
+The thresholds are `SMALL_MAX_FILES` and `LARGE_MIN_FILES` in `src/core/model-tier.ts`.
+
 Install the skills into each agent's own directory with `factory install <repo> --agents claude,gemini`.
 Skills stay in `.claude/skills`; the other directories are symlinks to it. A context pointer
 (`AGENTS.md`, or `GEMINI.md` for Gemini) is written only when the file is absent.
