@@ -9,7 +9,7 @@
 // parseDataMarkers recovers those; deriveIssueState turns them, plus the
 // issue's current labels, into "where is this issue and what happened".
 
-import { isHumanComment, parseChatOps } from "./chatops";
+import { isHumanComment, isTrusted, parseChatOps } from "./chatops";
 import type { GhComment, GhIssue } from "./github";
 import { LABEL } from "./labels";
 import type { Workflow } from "./core/workflow";
@@ -35,6 +35,19 @@ export function parseDataMarkers(comments: readonly GhComment[]): DataMarker[] {
     }
   }
   return out;
+}
+
+export const PARK_WINDOW = "park-window";
+
+// The on-the-loop window counts only from the runner's own notice for the step that parked,
+// so an outsider's forged plan or marker can neither start nor move it.
+export function parkWindowStart(comments: readonly GhComment[], step: string, notBefore: string): number | undefined {
+  const notice = [...comments]
+    .reverse()
+    .find((c) => isTrusted(c) && parseDataMarkers([c]).some((m) => m.stage === PARK_WINDOW));
+  if (!notice || Date.parse(notice.createdAt) < Date.parse(notBefore)) return undefined;
+  const data = latestDataFor(parseDataMarkers([notice]), PARK_WINDOW) as { step?: unknown } | undefined;
+  return data?.step === step ? Date.parse(notice.createdAt) : undefined;
 }
 
 export function latestDataFor(markers: readonly DataMarker[], stage: string): unknown {

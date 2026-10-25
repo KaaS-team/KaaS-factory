@@ -487,5 +487,9 @@
   {"name": "on the loop: the park posts when it will go on", "file": "src/engine/runner.ts", "find": "        if (edge.after) {", "replace": "        if (false && edge.after) {", "test": "tests/workflow.test.ts"},
   {"name": "on the loop: a lapsed approval says so on the thread", "file": "src/watch.ts", "find": "  if (lapsed)\n", "replace": "  if (false)\n", "test": "tests/workflow.test.ts"},
   {"name": "on the loop: park edges of one step share a window", "file": "src/core/workflow.ts", "find": "(\"park\" in e ? [e.after ?? 0] : []))).size > 1)", "replace": "(\"park\" in e ? [e.after ?? 0] : []))).size > 9)", "test": "tests/workflow.test.ts"},
-  {"name": "on the loop: an unreadable window is a load error", "file": "src/core/workflow.ts", "find": "        if (e.after !== undefined && after === undefined)", "replace": "        if (false)", "test": "tests/workflow.test.ts"}
+  {"name": "on the loop: an unreadable window is a load error", "file": "src/core/workflow.ts", "find": "        if (e.after !== undefined && after === undefined)", "replace": "        if (false)", "test": "tests/workflow.test.ts"},
+  {"name": "on the loop: an outsider's plan comment is read as the plan", "file": "src/watch.ts", "find": "find((c) => isTrusted(c) && c.body.includes(\"<!-- factory:plan v1\"))", "replace": "find((c) => c.body.includes(\"<!-- factory:plan v1\"))", "test": "tests/workflow.test.ts"},
+  {"name": "on the loop: an outsider's copy of the park notice opens the window", "file": "src/derive.ts", "find": ".find((c) => isTrusted(c) && parseDataMarkers([c])", "replace": ".find((c) => parseDataMarkers([c])", "test": "tests/workflow.test.ts"},
+  {"name": "on the loop: a notice for another step opens the window", "file": "src/derive.ts", "find": "return data?.step === step ? Date", "replace": "return data ? Date", "test": "tests/workflow.test.ts"},
+  {"name": "on the loop: a park notice older than the plan opens the window", "file": "src/derive.ts", "find": "if (!notice || Date.parse(notice.createdAt) < Date.parse(notBefore)) return undefined;", "replace": "if (!notice) return undefined;", "test": "tests/workflow.test.ts"}
 ]

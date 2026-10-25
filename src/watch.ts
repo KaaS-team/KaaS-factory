@@ -16,7 +16,7 @@ import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
-import { deriveIssueState, parseDataMarkers } from "./derive";
+import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
@@ -230,7 +230,7 @@ function findQuestionComment(issue: GhIssue): GhComment | undefined {
 }
 
 function findPlanComment(issue: GhIssue): GhComment | undefined {
-  return [...issue.comments].reverse().find((c) => c.body.includes("<!-- factory:plan v1"));
+  return [...issue.comments].reverse().find((c) => isTrusted(c) && c.body.includes("<!-- factory:plan v1"));
 }
 
 function ctxFrom(deps: WatchDeps, issue: GhIssue): RunCtx {
@@ -278,12 +278,11 @@ export async function resumeAwaitingApproval(
   if (!plan) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, plan.createdAt);
   // The step that parked here names where approve and revise go.
-  const edge = parkEdgeOf(workflowOf(deps, issue), deriveIssueState(issue, workflowOf(deps, issue)).resumeStage);
+  const parked = deriveIssueState(issue, workflowOf(deps, issue)).resumeStage;
+  const edge = parkEdgeOf(workflowOf(deps, issue), parked);
   // Human on the loop: silence through the window approves; any trusted comment holds it for a person.
-  const lapsed =
-    !reply &&
-    edge?.after !== undefined &&
-    (deps.now?.() ?? new Date()).getTime() - Date.parse(plan.createdAt) >= edge.after;
+  const start = edge?.after === undefined ? undefined : parkWindowStart(issue.comments, parked, plan.createdAt);
+  const lapsed = !reply && start !== undefined && (deps.now?.() ?? new Date()).getTime() - start >= edge!.after!;
   if (!lapsed && (!reply || !(await commandIsTrusted(deps, config, reply)))) return "waiting";
   const command = reply ? parseChatOps(reply.body) : ({ type: "approve" } as const);
   const worktree = worktreeFor(deps, issue.number);

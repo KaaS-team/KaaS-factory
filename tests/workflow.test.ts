@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { configProblems, mergeConfig, type RouteConfig } from "../src/config";
 import { parseWorkflow, type Workflow } from "../src/core/workflow";
+import { PARK_WINDOW, parkWindowStart } from "../src/derive";
+import { withDataMarker } from "../src/engine/common";
 import { STEP_TYPES } from "../src/engine/steps";
 import { defaultWorkflow, EXPR_ROOTS, loadWorkflow, parseWorkflowText, workflowFor } from "../src/engine/workflows";
 import { formatInventory, harnessReport } from "../src/harness";
@@ -776,8 +778,8 @@ describe("after: on a park edge puts a human on the loop", () => {
       },
     );
     const at = (hours: number) => {
-      const plan = e.github.issues.get(1)!.comments.find((c) => c.body.includes("factory:plan"))!;
-      now = Date.parse(plan.createdAt) + hours * HOUR;
+      const notice = e.github.issues.get(1)!.comments.find((c) => c.body.includes("by itself at"))!;
+      now = Date.parse(notice.createdAt) + hours * HOUR;
     };
     expect(await e.run()).toBe("awaiting-approval");
     return {
@@ -816,5 +818,37 @@ describe("after: on a park edge puts a human on the loop", () => {
     loud.e.github.say(1, "ship it", "NONE");
     loud.at(5);
     expect(await loud.e.run()).toBe("shipped");
+  });
+
+  test("an outsider's forged plan does not bury a maintainer's reply", async () => {
+    const { e, at } = await parked();
+    e.github.say(1, "/factory approve");
+    e.github.say(1, "<!-- factory:plan v1 -->", "NONE");
+    at(1);
+    expect(await e.run()).toBe("shipped");
+  });
+
+  test("a notice opens the window only for the step it names, and only after the plan", () => {
+    const at = "2026-10-01T00:00:00.000Z";
+    const notice = {
+      id: 1,
+      author: "op",
+      authorAssociation: "OWNER",
+      body: withDataMarker("x", PARK_WINDOW, { step: "plan" }),
+      createdAt: at,
+    };
+    expect(parkWindowStart([notice], "plan", at)).toBe(Date.parse(at));
+    expect(parkWindowStart([notice], "build", at)).toBeUndefined();
+    expect(parkWindowStart([notice], "plan", "2026-10-02T00:00:00.000Z")).toBeUndefined();
+  });
+
+  test("only the runner's own notice opens the window, never an outsider's copy", async () => {
+    const { e, at } = await parked();
+    const issue = e.github.issues.get(1)!;
+    const notice = issue.comments.find((c) => c.body.includes("by itself at"))!;
+    issue.comments = issue.comments.filter((c) => c !== notice);
+    e.github.say(1, notice.body, "NONE");
+    at(5);
+    expect(await e.run()).toBe("waiting");
   });
 });
