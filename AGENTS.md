@@ -9,7 +9,8 @@ A GitHub-native loop for coding agents: triage, plan, build, verify, PR. `src/` 
 - `make check`: typecheck, `bun test`, then `skills-ref validate` on every template skill. It needs
   `uvx` and fails without it. This is the gate.
 - `make check-mutations`: applies each entry in `tests/mutations.json` to a copy of the repo, and its
-  test must go red. A new check lands with its mutation in the same change. It is a separate CI job.
+  test must go red. A new check lands with its mutation in the same change. It runs in `mutations.yml`, off the push verdict: on a pull request, a push that changes a
+  test or a check, and nightly.
 - `make agent-matrix` spends tokens on real agents, so it is never part of the gate.
 
 ## Things that change together

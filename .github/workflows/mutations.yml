@@ -1,0 +1,31 @@
+name: mutations
+
+# Every check must bite: each mutation in tests/mutations.json turns its test red. It takes ten minutes, so it
+# runs on its own, off the push verdict in ci.yml: on a pull request, on a push that changes a test or a check,
+# and nightly for whatever slipped past the path filter.
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths: ["tests/**", "src/**", "scripts/check-mutations.ts", ".github/workflows/mutations.yml"]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-mutations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - name: Install dependencies
+        run: make install
+      - name: make check-mutations
+        run: make check-mutations
