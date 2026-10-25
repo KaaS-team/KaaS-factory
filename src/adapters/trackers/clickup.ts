@@ -23,6 +23,7 @@ interface RawTask {
   status: { status: string; type: string };
   tags: { name: string }[];
   creator: { id: number };
+  list: { id: string };
 }
 
 // ClickUp has no resolution field, so a closed status whose name says the work was dropped is not planned.
@@ -39,6 +40,7 @@ export function taskNumber(id: string): number {
 
 export class ClickUpTracker implements TrackerPort {
   private readonly client: VendorClient;
+  private readonly seen = new Set<number>();
   private listCache?: Promise<{ space: string; statuses: { status: string; type: string }[] }>;
 
   constructor(
@@ -71,10 +73,22 @@ export class ClickUpTracker implements TrackerPort {
     return s.status;
   }
 
-  private task(n: number): Promise<RawTask> {
-    return this.client.request<RawTask>("GET", `/api/v2/task/${n.toString(36)}`, {
+  // Task ids are global to the workspace, so a number from issue text could name a task in another List.
+  private async task(n: number): Promise<RawTask> {
+    const raw = await this.client.request<RawTask>("GET", `/api/v2/task/${n.toString(36)}`, {
       query: { include_markdown_description: "true" },
     });
+    if (raw.list?.id !== this.spec.list) throw new Error(`clickup: task ${n} is not in list ${this.spec.list}`);
+    return raw;
+  }
+
+  private async scoped(n: number): Promise<string> {
+    return (await this.task(n)).id;
+  }
+
+  private saw(id: number): number {
+    this.seen.add(id);
+    return id;
   }
 
   private async toIssue(raw: RawTask): Promise<GhIssue> {
@@ -85,7 +99,7 @@ export class ClickUpTracker implements TrackerPort {
     for (const c of rows) {
       const author = String(c.user.id);
       comments.push({
-        id: commentNumber(c.id),
+        id: this.saw(commentNumber(c.id)),
         author,
         authorAssociation: association(await this.roleOf("", author)),
         body: decodeBody(c.comment_text),
@@ -150,23 +164,31 @@ export class ClickUpTracker implements TrackerPort {
     return this.open();
   }
   async commentIssue(_repo: string, n: number, body: string): Promise<number> {
-    const c = await this.client.request<{ id: string | number }>("POST", `/api/v2/task/${n.toString(36)}/comment`, {
-      body: { comment_text: encodeBody(body), notify_all: false },
-    });
-    return commentNumber(String(c.id));
+    const c = await this.client.request<{ id: string | number }>(
+      "POST",
+      `/api/v2/task/${await this.scoped(n)}/comment`,
+      {
+        body: { comment_text: encodeBody(body), notify_all: false },
+      },
+    );
+    return this.saw(commentNumber(String(c.id)));
   }
+  // Only a comment seen on a task in this List, for the same reason as task().
   async editComment(_repo: string, id: number, body: string): Promise<void> {
+    if (!this.seen.has(id)) await this.listOpenIssues();
+    if (!this.seen.has(id)) throw new Error(`clickup: no comment ${id} on an open task in list ${this.spec.list}`);
     await this.client.request("PUT", `/api/v2/comment/${id}`, { body: { comment_text: encodeBody(body) } });
   }
   async addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
+    const id = await this.scoped(n);
     await this.ensureTags(labels);
-    for (const l of labels)
-      await this.client.request("POST", `/api/v2/task/${n.toString(36)}/tag/${encodeURIComponent(l)}`);
+    for (const l of labels) await this.client.request("POST", `/api/v2/task/${id}/tag/${encodeURIComponent(l)}`);
   }
   async removeLabels(_repo: string, n: number, labels: string[]): Promise<void> {
-    const on = new Set((await this.task(n)).tags.map((t) => t.name));
+    const t = await this.task(n);
+    const on = new Set(t.tags.map((x) => x.name));
     for (const l of labels.filter((x) => on.has(x)))
-      await this.client.request("DELETE", `/api/v2/task/${n.toString(36)}/tag/${encodeURIComponent(l)}`);
+      await this.client.request("DELETE", `/api/v2/task/${t.id}/tag/${encodeURIComponent(l)}`);
   }
   // ClickUp tags one at a time, so the new state goes on first: a task may show both for a moment, never neither.
   async setStateLabel(repo: string, n: number, current: string[], next: string): Promise<void> {
@@ -178,12 +200,14 @@ export class ClickUpTracker implements TrackerPort {
     );
   }
   async closeIssue(_repo: string, n: number): Promise<void> {
-    await this.client.request("PUT", `/api/v2/task/${n.toString(36)}`, {
+    await this.client.request("PUT", `/api/v2/task/${await this.scoped(n)}`, {
       body: { status: await this.status("closed", "done") },
     });
   }
   async reopenIssue(_repo: string, n: number): Promise<void> {
-    await this.client.request("PUT", `/api/v2/task/${n.toString(36)}`, { body: { status: await this.status("open") } });
+    await this.client.request("PUT", `/api/v2/task/${await this.scoped(n)}`, {
+      body: { status: await this.status("open") },
+    });
   }
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     await this.ensureTags(labels);

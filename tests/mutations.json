@@ -425,5 +425,16 @@
   {"name": "clickup: closing skips a status named for dropped work", "file": "src/adapters/trackers/clickup.ts", "find": " && !DROPPED.test(x.status)", "replace": "", "test": "tests/trackers-clickup.test.ts"},
   {"name": "clickup: a guest is not a member", "file": "src/adapters/trackers/clickup.ts", "find": "4: \"guest\" }", "replace": "4: \"member\" }", "test": "tests/trackers-clickup.test.ts"},
   {"name": "clickup: a cancelled status is not planned", "file": "src/adapters/trackers/clickup.ts", "find": "DROPPED.test(raw.status.status) ?", "replace": "false ?", "test": "tests/trackers-clickup.test.ts"},
-  {"name": "clickup: an unsafe task id is refused", "file": "src/adapters/trackers/clickup.ts", "find": "!/^[0-9a-z]+$/.test(id) || !Number.isSafeInteger(n)", "replace": "!/^[0-9a-z]+$/.test(id)", "test": "tests/trackers-clickup.test.ts"}
+  {"name": "clickup: an unsafe task id is refused", "file": "src/adapters/trackers/clickup.ts", "find": "!/^[0-9a-z]+$/.test(id) || !Number.isSafeInteger(n)", "replace": "!/^[0-9a-z]+$/.test(id)", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "clickup: a task outside the configured List is refused", "file": "src/adapters/trackers/clickup.ts", "find": "if (raw.list?.id !== this.spec.list) throw", "replace": "if (false) throw", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "clickup: a write checks the task's List first", "file": "src/adapters/trackers/clickup.ts", "find": "return (await this.task(n)).id;", "replace": "return n.toString(36);", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "clickup: only a comment seen in the List is edited", "file": "src/adapters/trackers/clickup.ts", "find": "if (!this.seen.has(id)) throw", "replace": "if (false) throw", "test": "tests/trackers-clickup.test.ts"},
+  {"name": "asana: a task outside the configured project is refused", "file": "src/adapters/trackers/asana.ts", "find": "if (!raw.projects?.some((p) => p.gid === this.spec.project))", "replace": "if (false)", "test": "tests/trackers-asana.test.ts"},
+  {"name": "asana: a write checks the task's project first", "file": "src/adapters/trackers/asana.ts", "find": "return (await this.task(n)).gid;", "replace": "return String(n);", "test": "tests/trackers-asana.test.ts"},
+  {"name": "asana: only a comment seen in the project is edited", "file": "src/adapters/trackers/asana.ts", "find": "if (!this.seen.has(id)) throw", "replace": "if (false) throw", "test": "tests/trackers-asana.test.ts"},
+  {"name": "asana: labeledBy matches the tag by gid", "file": "src/adapters/trackers/asana.ts", "find": " && s.tag?.gid === tag.gid", "replace": "", "test": "tests/trackers-asana.test.ts"},
+  {"name": "asana: a tag set at creation names the creator", "file": "src/adapters/trackers/asana.ts", "find": ": t.created_by?.gid;", "replace": ": undefined;", "test": "tests/trackers-asana.test.ts"},
+  {"name": "asana: a deactivated member is no one", "file": "src/adapters/trackers/asana.ts", "find": "if (!m?.is_active) return \"none\";", "replace": "if (!m) return \"none\";", "test": "tests/trackers-asana.test.ts"},
+  {"name": "asana: a guest is not a member", "file": "src/adapters/trackers/asana.ts", "find": "m.is_guest ? \"guest\" : \"member\"", "replace": "\"member\"", "test": "tests/trackers-asana.test.ts"},
+  {"name": "asana: an unsafe gid is refused", "file": "src/adapters/trackers/asana.ts", "find": "!/^\\d+$/.test(gid) || !Number.isSafeInteger(n)", "replace": "!/^\\d+$/.test(gid)", "test": "tests/trackers-asana.test.ts"}
 ]

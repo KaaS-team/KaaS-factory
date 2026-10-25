@@ -41,7 +41,7 @@ export class ClickUpStore {
 
   private view(t: Task) {
     const status = STATUSES.find((s) => s.status === t.status)!;
-    return { id: t.id, name: t.name, markdown_description: t.markdown_description, status, tags: t.tags.map((name) => ({ name })), creator: { id: t.creator } };
+    return { id: t.id, name: t.name, markdown_description: t.markdown_description, status, tags: t.tags.map((name) => ({ name })), creator: { id: t.creator }, list: { id: t.list } };
   }
 
   handle(method: string, path: string, body: Record<string, any>, q: URLSearchParams): Response {

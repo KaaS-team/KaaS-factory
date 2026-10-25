@@ -65,6 +65,17 @@ describe("ClickUp specifics", () => {
     expect((await after.getIssue(repo, n)).comments[0]!.body).toBe("<!-- factory:status v1 -->\nshipped");
   });
 
+  test("a task or comment in another List is refused, though the token can reach it", async () => {
+    const other = make();
+    const n = await other.createIssue(repo, "elsewhere", "", []);
+    const id = await other.commentIssue(repo, n, "status");
+    const t = make();
+    await expect(t.getIssue(repo, n)).rejects.toThrow("is not in list");
+    await expect(t.commentIssue(repo, n, "x")).rejects.toThrow("is not in list");
+    await expect(t.closeIssue(repo, n)).rejects.toThrow("is not in list");
+    await expect(t.editComment(repo, id, "x")).rejects.toThrow("no comment");
+  });
+
   test("a task id too long for a safe integer is refused rather than rounded", () => {
     expect(taskNumber("86a1b2c3")).toBe(Number.parseInt("86a1b2c3", 36));
     expect(() => taskNumber("zzzzzzzzzzzz")).toThrow("not a base-36 number");

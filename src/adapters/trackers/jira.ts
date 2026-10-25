@@ -214,7 +214,7 @@ export class JiraTracker implements TrackerPort {
     return [...new Set([...used, ...this.ensured])];
   }
   // Jira has no label objects to create, color or describe: any string is a label.
-  async ensureLabel(_repo: string, name: string): Promise<void> {
+  async ensureLabel(_repo: string, name: string, _color?: string, _description?: string): Promise<void> {
     this.ensured.add(name);
   }
   async currentLogin(): Promise<string> {
