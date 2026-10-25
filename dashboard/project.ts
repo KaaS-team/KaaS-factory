@@ -60,7 +60,7 @@ function target(spec: RuntimeSpec): string {
     case "http":
       return spec.url;
     case "pool":
-      return `pool of ${spec.members.map((m) => m.runtime).join(", ")}, then this machine`;
+      return `pool of ${spec.members.map((m) => m.runtime).join(", ")}, then ${spec.fallback ?? "local"}`;
   }
 }
 

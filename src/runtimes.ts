@@ -10,7 +10,7 @@ import { DockerExecution, type DockerSpec } from "./adapters/docker/execution";
 import { HttpSandboxExecution, type HttpSandboxSpec } from "./adapters/http-sandbox/execution";
 import { LocalExecution } from "./adapters/local/execution";
 import { LwprExecution, type LwprSpec } from "./adapters/lwpr/execution";
-import { FileUsageStore, PoolExecution, type PoolSpec } from "./adapters/pool/execution";
+import { PoolExecution, type PoolSpec, SqliteUsageStore } from "./adapters/pool/execution";
 import { SshExecution, type SshSpec } from "./adapters/ssh/execution";
 import { CMD, WrapExecution, type WrapSpec } from "./adapters/wrap/execution";
 import { factoryHome } from "./paths";
@@ -44,7 +44,7 @@ const SHAPES: Readonly<
   lwpr: { required: [], fields: { app: "string", timeoutMin: "posInt", setup: "boolean" } },
   wrap: { required: ["argv"], fields: { argv: "strings" } },
   http: { required: ["url"], fields: { url: "string", tokenEnv: "string", exclude: "strings" } },
-  pool: { required: ["members"], fields: { members: "members", reserveMin: "posInt" } },
+  pool: { required: ["members"], fields: { members: "members", reserveMin: "posInt", fallback: "string" } },
 };
 
 // What a field's shape cannot say. `all` is the whole runtimes object, for a pool's members.
@@ -57,6 +57,7 @@ function kindProblems(at: string, s: Record<string, unknown>, all: Record<string
         .filter((n) => (all[n as string] as { kind?: unknown } | undefined)?.kind !== "http")
         .map((n) => `${at}.members: "${n}" is not an http runtime in this file (only those stop at the allowance)`),
       ...names.filter((n, i) => names.indexOf(n) !== i).map((n) => `${at}.members: "${n}" twice`),
+      ...fallbackProblems(at, s.fallback, all),
     ];
   }
   if (s.kind === "wrap" && Array.isArray(s.argv) && s.argv.filter((a) => a === CMD).length !== 1)
@@ -68,6 +69,14 @@ function kindProblems(at: string, s: Record<string, unknown>, all: Record<string
   )
     return [`${at}.url: https (plain http only to localhost), since the worktree is sent to it`];
   return [];
+}
+
+// A pool's fallback is "none", a built-in, or a runtime in the same file that is not itself a pool.
+function fallbackProblems(at: string, fallback: unknown, all: Record<string, unknown>): string[] {
+  if (typeof fallback !== "string" || fallback === "none" || Object.hasOwn(BUILTIN_RUNTIMES, fallback)) return [];
+  const kind = (all[fallback] as { kind?: unknown } | undefined)?.kind;
+  if (kind === undefined) return [`${at}.fallback: no runtime "${fallback}" (or "none")`];
+  return kind === "pool" ? [`${at}.fallback: "${fallback}" is a pool`] : [];
 }
 
 function fieldOk(v: unknown, f: Field): boolean {
@@ -141,14 +150,19 @@ export function runtimesFrom(
   const ports: Record<string, ExecutionPort> = {};
   const all = Object.entries({ ...BUILTIN_RUNTIMES, ...machine });
   for (const [name, spec] of all) if (spec.kind !== "pool") ports[name] = executionFor(spec);
-  const store = new FileUsageStore(poolUsagePath(env));
+  let store: SqliteUsageStore | undefined;
   for (const [name, spec] of all)
-    if (spec.kind === "pool") ports[name] = new PoolExecution(spec, ports, ports.local!, store);
+    if (spec.kind === "pool") {
+      store ??= new SqliteUsageStore(poolDbPath(env));
+      const fallback = spec.fallback === "none" ? undefined : ports[spec.fallback ?? "local"];
+      ports[name] = new PoolExecution(spec, ports, fallback, store);
+    }
   return ports;
 }
 
-export function poolUsagePath(env: NodeJS.ProcessEnv = process.env): string {
-  return `${factoryHome(env)}/pool-usage.json`;
+// Pool usage shares machine.db with slot leases and spend.
+export function poolDbPath(env: NodeJS.ProcessEnv = process.env): string {
+  return `${factoryHome(env)}/machine.db`;
 }
 
 // The runtime names a repo's config and workflow ask for, each with where it was asked.

@@ -1,22 +1,21 @@
 // Routing for a `pool` runtime: members in the order the operator listed
 // them, each with a monthly allowance in minutes copied from that provider's
-// free tier. A run goes to the first member that still has `reserveMin`
-// minutes left this month; the adapter cuts a run off when it reaches the
-// minutes that were left, so no member runs past its allowance. With none
-// left the run goes to the fallback.
+// free tier. Before a run, a member's minutes are reserved: everything it has
+// left after what it used and what other runs hold, but only if that is at
+// least `reserveMin`. The adapter cuts the run off at the minutes it holds, so
+// two runs at once can never take a member past its allowance together.
 
 export interface PoolMember {
   readonly runtime: string;
   readonly minutes: number;
 }
 
-export interface MemberUsage {
-  readonly minutes: number;
+// One member's month: minutes used by finished runs, minutes held by running ones.
+export interface MemberMonth {
+  readonly used: number;
+  readonly held: number;
   readonly lastFailure?: string;
 }
-
-// month ("2026-10", UTC) -> member runtime name -> usage.
-export type PoolUsage = Readonly<Record<string, Readonly<Record<string, MemberUsage>>>>;
 
 export const DEFAULT_RESERVE_MIN = 10;
 
@@ -24,34 +23,14 @@ export function monthKey(at: Date): string {
   return at.toISOString().slice(0, 7);
 }
 
-export function minutesLeft(member: PoolMember, usage: PoolUsage, month: string): number {
-  return Math.max(0, member.minutes - (usage[month]?.[member.runtime]?.minutes ?? 0));
+export function minutesLeft(member: PoolMember, month: MemberMonth | undefined): number {
+  return Math.max(0, member.minutes - (month?.used ?? 0) - (month?.held ?? 0));
 }
 
-// The members a run may try this month, in order.
-export function eligible(
-  members: readonly PoolMember[],
-  usage: PoolUsage,
-  month: string,
-  reserveMin = DEFAULT_RESERVE_MIN,
-): PoolMember[] {
-  return members.filter((m) => minutesLeft(m, usage, month) >= reserveMin);
-}
-
-// `usage` with `minutes` more on one member, and its last failure when the run failed as a runtime.
-export function withRun(
-  usage: PoolUsage,
-  month: string,
-  runtime: string,
-  minutes: number,
-  failure?: string,
-): PoolUsage {
-  const prev = usage[month]?.[runtime];
-  const next: MemberUsage = {
-    minutes: (prev?.minutes ?? 0) + minutes,
-    ...(failure ? { lastFailure: failure } : prev?.lastFailure ? { lastFailure: prev.lastFailure } : {}),
-  };
-  return { ...usage, [month]: { ...usage[month], [runtime]: next } };
+// The minutes a new run may hold on `member`, or 0 when it may not run there.
+export function grant(member: PoolMember, month: MemberMonth | undefined, reserveMin = DEFAULT_RESERVE_MIN): number {
+  const left = minutesLeft(member, month);
+  return left >= reserveMin ? left : 0;
 }
 
 export interface MemberRow {
@@ -62,15 +41,17 @@ export interface MemberRow {
   readonly lastFailure?: string;
 }
 
+const tenth = (n: number) => Math.round(n * 10) / 10;
+
 // What `factory pool` prints for one pool.
-export function poolReport(members: readonly PoolMember[], usage: PoolUsage, month: string): MemberRow[] {
+export function poolReport(members: readonly PoolMember[], months: Readonly<Record<string, MemberMonth>>): MemberRow[] {
   return members.map((m) => {
-    const u = usage[month]?.[m.runtime];
+    const u = months[m.runtime];
     return {
       runtime: m.runtime,
       allowance: m.minutes,
-      used: Math.round((u?.minutes ?? 0) * 10) / 10,
-      left: Math.round(minutesLeft(m, usage, month) * 10) / 10,
+      used: tenth(u?.used ?? 0),
+      left: tenth(minutesLeft(m, u)),
       ...(u?.lastFailure ? { lastFailure: u.lastFailure } : {}),
     };
   });

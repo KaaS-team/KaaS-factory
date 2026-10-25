@@ -12,8 +12,7 @@ import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { LocalExecution } from "../src/adapters/local/execution";
 import { LwprExecution } from "../src/adapters/lwpr/execution";
-import { PoolExecution } from "../src/adapters/pool/execution";
-import type { PoolUsage } from "../src/core/sandbox-pool";
+import { PoolExecution, SqliteUsageStore } from "../src/adapters/pool/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";
 import { WrapExecution } from "../src/adapters/wrap/execution";
 import { startSandbox } from "./fixtures/http-sandbox";
@@ -85,7 +84,6 @@ function sandboxPool(): () => void {
       beforeAll(() => (sandbox = startSandbox("s3cret")));
       afterAll(() => sandbox.stop());
       executionContract("pool", () => {
-        let usage: PoolUsage = {};
         const member = new HttpSandboxExecution(
           { kind: "http", url: sandbox.url, tokenEnv: "SANDBOX_TOKEN" },
           { SANDBOX_TOKEN: "s3cret" },
@@ -94,7 +92,7 @@ function sandboxPool(): () => void {
           { kind: "pool", members: [{ runtime: "sb", minutes: 60 }] },
           { sb: member },
           { run: async () => ({ stdout: "", stderr: "ran on the fallback", code: 99 }) },
-          { read: () => usage, write: (u) => (usage = u) },
+          new SqliteUsageStore(":memory:"),
         );
       });
     });

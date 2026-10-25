@@ -58,13 +58,19 @@ free tier gives. You copy that figure from the provider's pricing page; the fact
 }
 ```
 
-A step on `free` runs on the first member with at least `reserveMin` minutes left this month
-(default 10, months in UTC). The run is cut off when it reaches the minutes that member had left,
-so no member runs past its allowance. A member that fails as a runtime (unreachable, refused, no
-answer) is charged the minutes it took, keeps the error as its last failure, and the step moves to
-the next member. A command that fails on a member is the step's answer. With every member spent,
-the step runs on `local`. Usage is in `FACTORY_HOME/pool-usage.json`, shared by every watcher on
-the machine. Only `http` members can be cut off mid-run, so a pool takes no other kind.
+Before a step runs on `free`, the first member with at least `reserveMin` minutes left this month
+(default 10, months in UTC) holds everything it has left, in one SQLite transaction in
+`FACTORY_HOME/machine.db`. Every watcher on the machine shares that file, so two runs at once hold
+minutes apart and together stay inside the allowance. The run is cut off when it reaches the minutes
+it holds, and it settles what it used when it ends; a watcher that dies is charged everything it
+held. A member that fails as a runtime (unreachable, refused, no answer, an exception) is charged
+the minutes it took, keeps the error as its last failure, and the step moves to the next member. A
+command that fails on a member is the step's answer.
+
+With every member spent or failed, the step runs on `fallback`: `local` unless the pool names
+another runtime. Its stderr starts with a `pool:` line saying why. A pool you chose for isolation
+should say `"fallback": "none"`, so the step fails as a runtime instead of running on this machine.
+Only `http` members can be cut off mid-run, so a pool takes no other kind.
 
 `factory pool` prints each member's minutes used and left this month and its last failure;
 `--json` prints the same as `{ok, data}`.

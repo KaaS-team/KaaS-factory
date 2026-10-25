@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fix: a `pool` member's minutes are held in `FACTORY_HOME/machine.db` before a run starts, in one
+  transaction, and the run is cut off at what it holds. Two runs at once could each see the same
+  minutes left and together run past the allowance. A pool can name its `fallback` (default `local`)
+  or `"none"`, which fails the step instead of running it on this machine.
 - A `pool` runtime: hosted sandboxes on free tiers in order, each with its monthly minutes from
   `machine.json`. A spent member is skipped, a run is cut off at the minutes a member has left, a
   member that fails as a runtime hands the run to the next one, and `local` runs it when all are

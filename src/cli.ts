@@ -49,8 +49,8 @@ import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
 import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
-import { poolUsagePath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
-import { FileUsageStore } from "./adapters/pool/execution";
+import { poolDbPath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { SqliteUsageStore } from "./adapters/pool/execution";
 import { monthKey, poolReport } from "./core/sandbox-pool";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
@@ -985,10 +985,13 @@ async function cmdPool(): Promise<void> {
   }
   const runtimes = loadMachineConfig().runtimes ?? {};
   const month = monthKey(new Date());
-  const usage = new FileUsageStore(poolUsagePath()).read();
-  const pools = Object.entries(runtimes).flatMap(([name, spec]) =>
-    spec.kind === "pool" ? [{ name, members: poolReport(spec.members, usage, month) }] : [],
-  );
+  const specs = Object.entries(runtimes).flatMap(([name, spec]) => (spec.kind === "pool" ? [{ name, spec }] : []));
+  const usage = specs.length ? new SqliteUsageStore(poolDbPath()).month(month) : {};
+  const pools = specs.map(({ name, spec }) => ({
+    name,
+    fallback: spec.fallback ?? "local",
+    members: poolReport(spec.members, usage),
+  }));
   if (has("json")) {
     console.log(successJson({ month, pools }));
     return;
@@ -998,7 +1001,7 @@ async function cmdPool(): Promise<void> {
     return;
   }
   for (const p of pools) {
-    console.log(`${p.name} (${month}, then local)`);
+    console.log(`${p.name} (${month}, then ${p.fallback})`);
     for (const m of p.members)
       console.log(
         `  ${m.runtime}  used ${m.used} of ${m.allowance} min, ${m.left} left${m.lastFailure ? `  last failure: ${plain(m.lastFailure)}` : ""}`,
