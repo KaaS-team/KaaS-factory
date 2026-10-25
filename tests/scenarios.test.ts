@@ -826,6 +826,13 @@ describe("in-review and claim paths", () => {
     done(c);
   });
 
+  test("20a. recovery leaves an in-flight issue that needs a capability this machine lacks", async () => {
+    const c = setup([LABEL.building, "needs:gpu"]);
+    expect(await recoverInFlight(c.deps, c.config)).toEqual([]);
+    expect(labels(c.github, 1)).toEqual([LABEL.building, "needs:gpu"]);
+    done(c);
+  });
+
   test("20b. with leases, recovery leaves an issue a live worker holds and reclaims one whose worker died", async () => {
     const c = setup([LABEL.building]);
     c.github.issues.get(1)!.comments = [

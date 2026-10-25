@@ -24,6 +24,8 @@ export interface MachineConfig {
   readonly agentRuntime?: string;
   // A LiteLLM gateway every agent stage calls through, on a key capped at the stage's budget.
   readonly llmGateway?: { readonly url: string };
+  // What this machine has (gpu, macos, docker): an issue labelled `needs:<cap>` waits for one that has it.
+  readonly capabilities?: readonly string[];
 }
 
 const DEFAULT_SLOTS = 2;
@@ -67,13 +69,30 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
       );
   }
   if (raw.llmGateway !== undefined) gatewayProblem(raw, path);
+  if (
+    raw.capabilities !== undefined &&
+    !(Array.isArray(raw.capabilities) && raw.capabilities.every((c) => typeof c === "string" && CAPABILITY.test(c)))
+  )
+    throw new Error(
+      `${path}: "capabilities" must be a list of lowercase names, got ${JSON.stringify(raw.capabilities)}`,
+    );
   return {
     slots,
     ...(raw.llmGateway ? { llmGateway: raw.llmGateway as { url: string } } : {}),
     dailyUsd: raw.dailyUsd as number | undefined,
     ...(raw.agentRuntime ? { agentRuntime: raw.agentRuntime as string } : {}),
     ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}),
+    ...(raw.capabilities ? { capabilities: raw.capabilities as string[] } : {}),
   };
+}
+
+const CAPABILITY = /^[a-z0-9][a-z0-9-]{0,31}$/;
+export const NEEDS_PREFIX = "needs:";
+
+// An issue this machine lacks a `needs:` capability for is left for another machine to claim.
+export function canServe(capabilities: readonly string[] | undefined, labels: readonly { name: string }[]): boolean {
+  const has = new Set(capabilities ?? []);
+  return labels.every((l) => !l.name.startsWith(NEEDS_PREFIX) || has.has(l.name.slice(NEEDS_PREFIX.length)));
 }
 
 // Plain http only to this machine: anywhere else the minted keys would cross the network in the clear.

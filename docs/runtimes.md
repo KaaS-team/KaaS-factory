@@ -185,6 +185,10 @@ each of them. Two things are shared through GitHub, so it is safe:
 
   `spend.perIssueUsd` and `spend.dailyUsd` read the sum of every worker's comments. They take the
   larger of that sum and the local SQLite cache, so a GitHub write that failed can't lift a cap.
+- **Capabilities.** `"capabilities": ["gpu", "macos"]` in `machine.json` says what a machine has.
+  An issue labelled `needs:gpu` is skipped by every worker whose machine does not list `gpu`, at
+  pickup and when a restart recovers in-flight issues, so it waits for one that does. A machine with
+  no `capabilities` takes only issues with no `needs:` label.
 
 ## In the background
 

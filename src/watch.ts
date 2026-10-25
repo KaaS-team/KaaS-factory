@@ -21,7 +21,7 @@ import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
 import { issueType, LABEL, PARKED_LABELS } from "./labels";
-import { effectiveSlots } from "./machine";
+import { canServe, effectiveSlots } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
   ensureWorktreeReady,
@@ -608,6 +608,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     .flat()
     .filter((issue) => {
       if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
+      if (!canServe(deps.machine?.config.capabilities, issue.labels)) return false;
       const released = inFlight ? releasedAt.get(inFlight)?.get(issue.number) : undefined;
       if (released !== undefined && released > listedAt) return false;
       seen.add(issue.number);
@@ -670,7 +671,9 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
     ),
   );
   const lists = await Promise.all([...running].map((l) => deps.github.listIssuesByLabel(config.repo, l)));
-  const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()];
+  const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()].filter((i) =>
+    canServe(deps.machine?.config.capabilities, i.labels),
+  );
   await runPool(issues, dispatchConcurrency(deps, config), async (issue) => {
     const derived = deriveIssueState(issue, workflowOf(deps, issue));
     const worktree = worktreeFor(deps, issue.number);
