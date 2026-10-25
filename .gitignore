@@ -1,1 +1,2 @@
-*.ran
+node_modules/
+.factory/runs/
