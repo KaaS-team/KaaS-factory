@@ -105,23 +105,25 @@ export async function agentChecks(
     detail: `agent "${name}" runs each stage it is assigned`,
     fixable: false,
   });
-  if (preset?.noVersionFlag && binary && (await deps.which(binary))) {
+  // A preset that wraps `command` pins a protocol, not the binary, so there is no version to compare.
+  const pinned = preset?.wrapsCommand ? undefined : preset;
+  if (pinned?.noVersionFlag && binary && (await deps.which(binary))) {
     out.push({
-      name: `${binary} is version ${preset.version}`,
+      name: `${binary} is version ${pinned.version}`,
       ok: true,
-      detail: `${binary} has no --version flag, so the pin (${preset.version}) is not checked here; the Dockerfile and CI install it`,
+      detail: `${binary} has no --version flag, so the pin (${pinned.version}) is not checked here; the Dockerfile and CI install it`,
       fixable: false,
     });
-  } else if (preset && deps.versionOf && binary && (await deps.which(binary))) {
+  } else if (pinned && deps.versionOf && binary && (await deps.which(binary))) {
     const found = await deps.versionOf(binary);
     out.push({
-      name: `${binary} is version ${preset.version}`,
-      ok: found?.includes(preset.version) ?? false,
+      name: `${binary} is version ${pinned.version}`,
+      ok: found?.includes(pinned.version) ?? false,
       warn: true,
       detail:
         found === undefined
           ? `could not read \`${binary} --version\``
-          : `found "${found.split("\n")[0]!.trim()}", pinned ${preset.version} (Dockerfile and CI install the pin)`,
+          : `found "${found.split("\n")[0]!.trim()}", pinned ${pinned.version} (Dockerfile and CI install the pin)`,
       fixable: false,
     });
   }

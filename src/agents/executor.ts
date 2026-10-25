@@ -185,13 +185,14 @@ export class CommandExecutor implements Executor {
     const artifactDir = join(opts.cwd, runDir(opts.issue));
     mkdirSync(artifactDir, { recursive: true });
 
+    const ownCommand = agent.config.command !== undefined && !agent.preset?.wrapsCommand;
     // A read-only stage on a preset that cannot write files returns them instead.
     // A minion (opts.prompt) owes no stage file, so it never gets one written for it.
     const readOnly =
       opts.prompt === undefined &&
       !stagePolicy(opts.stage).write &&
       agent.preset?.returnsArtifact === true &&
-      !agent.config.command;
+      !ownCommand;
     let argv: readonly string[];
     let stdin: string | undefined;
     const types = typesFor(this.routes);
@@ -201,7 +202,7 @@ export class CommandExecutor implements Executor {
     // A step that asked for MCP servers must get them, so an agent that cannot load them is an error, not a quiet run without.
     let mcpConfig: string | undefined;
     if (opts.mcp && Object.keys(opts.mcp).length > 0) {
-      if (!agent.preset?.mcp || agent.config.command)
+      if (!agent.preset?.mcp || ownCommand)
         throw new McpError(
           `${agent.name}: this step names MCP servers (${Object.keys(opts.mcp).join(", ")}), and only the claude preset can load them`,
         );
@@ -217,7 +218,7 @@ export class CommandExecutor implements Executor {
       ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig }));
     } else {
       const prompt = opts.prompt ?? (await renderPrompt(opts, readOnly, types, contextPack));
-      if (agent.config.command) {
+      if (ownCommand && agent.config.command) {
         const promptFile = join(scratch, "prompt.md");
         writeFileSync(promptFile, prompt);
         const rendered = renderCommand(agent.config.command, { prompt, promptFile, model: agent.config.model ?? "" });

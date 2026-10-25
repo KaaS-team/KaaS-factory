@@ -372,6 +372,16 @@ describe("runDoctor agent versions", () => {
     expect(unreadable.find((c) => c.name === "gemini is version 0.61.0")!.detail).toContain("could not read");
   });
 
+  test("an acp agent is looked up by its own binary, with no pin to compare", async () => {
+    const acp = { goose: { preset: "acp", command: ["goose", "acp"] } };
+    const checks = await runDoctor(
+      { ...deps({ which: new Set(["gh", "goose", "python3", "jq"]) }), versionOf: async () => "goose 1.9.0" },
+      { ...ctx, agents: acp, stages: { default: "goose" } },
+    );
+    expect(checks.find((c) => c.name === "goose on PATH")!.ok).toBe(true);
+    expect(checks.some((c) => c.name.startsWith("goose is version"))).toBe(false);
+  });
+
   test("every preset that is not verified live warns with the participant path", async () => {
     const { PRESETS } = await import("../src/agents/presets");
     for (const preset of Object.values(PRESETS)) {

@@ -318,9 +318,9 @@ The factory knows no agent by name. Each one is config, and `stages` says which 
 }
 ```
 
-Presets: `"preset": "claude"`, `"preset": "codex"`, `"preset": "gemini"`, `"preset": "opencode"`, `"preset": "cursor"`, `"preset": "pi"`, `"preset": "mastracode"` (the
+Presets: `"preset": "claude"`, `"preset": "codex"`, `"preset": "gemini"`, `"preset": "opencode"`, `"preset": "cursor"`, `"preset": "pi"`, `"preset": "mastracode"`, `"preset": "acp"` (the
 compatibility matrix, safety layers per agent and the bring-your-own walkthrough are in [docs/agents.md](docs/agents.md)).
-A preset agent sees only its own provider API keys. Setting both `preset` and `command` keeps the preset's event parser but runs your command. A `command` agent gets the stage skill plus an artifact contract on stdin, or
+A preset agent sees only its own provider API keys. Setting both `preset` and `command` keeps the preset's event parser but runs your command, except for `acp`, whose `command` is the ACP server it drives. A `command` agent gets the stage skill plus an artifact contract on stdin, or
 where `{{prompt}}` / `{{promptFile}}` appears, and writes its results as files under
 `$FACTORY_ARTIFACT_DIR`. It runs with no event parser: tokens show as "not reported" and the tool-call cap
 cannot be enforced, so the timeout is the backstop and `factory doctor` says so. A shell as the executable may not take `{{prompt}}` as an argument. The guard hook and

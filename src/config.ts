@@ -612,6 +612,8 @@ function agentProblems(agents: unknown, stages: unknown, routes?: unknown): stri
       if (typeof a.preset === "string" && !PRESETS[a.preset])
         problems.push(`${where}preset: unknown "${a.preset}" (built in: ${Object.keys(PRESETS).join(", ")})`);
       if (a.preset === undefined && a.command === undefined) problems.push(`${where}needs a "preset" or a "command"`);
+      if (typeof a.preset === "string" && PRESETS[a.preset]?.wrapsCommand && a.command === undefined)
+        problems.push(`${where}command: preset "${a.preset}" needs the agent's argv in "command"`);
       if (Array.isArray(a.command)) {
         if (a.command.length === 0) problems.push(`${where}command: must not be empty`);
         else if (!String(a.command[0]).trim()) problems.push(`${where}command: the executable must not be empty`);

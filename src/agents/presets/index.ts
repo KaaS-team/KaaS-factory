@@ -1,4 +1,5 @@
 import type { AgentPreset } from "../types";
+import { acpPreset } from "./acp";
 import { claudePreset } from "./claude";
 import { codexPreset } from "./codex";
 import { cursorPreset } from "./cursor";
@@ -15,4 +16,5 @@ export const PRESETS: Record<string, AgentPreset> = {
   cursor: cursorPreset,
   pi: piPreset,
   mastracode: mastracodePreset,
+  acp: acpPreset,
 };

@@ -15,7 +15,7 @@ set -euo pipefail
 
 usage() {
   echo "usage: install.sh <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]" >&2
-  echo "  --agents links the skills into each agent's own dir: claude,codex,gemini,opencode,cursor,pi,mastracode" >&2
+  echo "  --agents links the skills into each agent's own dir: claude,codex,gemini,opencode,cursor,pi,mastracode,acp" >&2
 }
 
 # Skills stay in .claude/skills; each agent gets a symlink from its own dir. The map is
@@ -29,6 +29,7 @@ agent_dirs() {
     cursor) echo ".cursor/skills AGENTS.md" ;;
     pi) echo ".pi/skills AGENTS.md" ;;
     mastracode) echo ".mastracode/skills AGENTS.md" ;;
+    acp) echo ".agents/skills AGENTS.md" ;;
     *) return 1 ;;
   esac
 }

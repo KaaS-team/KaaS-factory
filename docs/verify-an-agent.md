@@ -36,6 +36,7 @@ Set the key the agent reads, then run step 3 with that name. `factory doctor` na
 | `cursor` | Cursor's own installer (no versioned download) | `CURSOR_API_KEY` or `cursor-agent login` |
 | `pi` | `npm i -g @mariozechner/pi-coding-agent@0.73.1` | the provider's key |
 | `mastracode` | `npm i -g mastracode@0.42.0` | the provider's key |
+| `acp` | any ACP server, such as `codex-acp`, set as the agent's `command` | that agent's key |
 
 The repo ships a synthetic fixture for each of these, written from the CLI's own docs. Your recording
 replaces it. If the real events do not match the parser, the replay test fails: that is the bug to report.
@@ -76,3 +77,9 @@ Prompt on stdin. Skills are read from `.pi/skills`. Unconfirmed: the read-only `
 Prompt on stdin, argv built by the ported flag table (`src/agents/presets/mastracode-flags.ts`).
 It has no `--version` flag (it would read it as a prompt), so `factory doctor` cannot check its pin.
 Unconfirmed: that `--mode plan` keeps a headless run read-only.
+
+### acp
+
+The bridge (`src/agents/acp-bridge.ts`) takes the prompt on stdin and drives the server in `command`.
+Read-only stages refuse every permission request that is not a read, search or think. Unconfirmed: that
+your agent asks before it edits, and whether it reports `usage` (tokens may show as "Not reported").
