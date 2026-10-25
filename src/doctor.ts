@@ -407,7 +407,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
 }
 
 export async function fixDoctor(
-  github: ScmPort,
+  github: Pick<ScmPort, "ensureLabel">,
   repo: string,
   routes?: Readonly<Record<string, RouteConfig>>,
   workflow?: Workflow,

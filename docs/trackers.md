@@ -19,6 +19,16 @@ one of five trackers the runner speaks natively. PRs always go to GitHub. Set `t
 `url` must be https (plain http only to localhost). `factory doctor` checks the token and the
 team, project or List, and names what is missing without printing the token.
 
+## Labels
+
+The factory needs 18 labels and no more: 8 states (one at a time), 3 parked (`needs-info`,
+`needs-human`, `failed`), 2 provenance (`monitor`, `ledger`) and 5 types (`bug`, `feature`, `docs`,
+`security`, `dependency`). `src/labels.ts` is the list, and `tests/labels.test.ts` fails on a label
+nothing uses. `factory doctor --fix` creates the set, plus each `config.routes` type and workflow step
+label, in whichever tracker is configured. A `needs:<cap>` label (`needs:gpu`) holds an issue for a
+machine with that capability; it is created the first time someone applies it. To reuse a label the team
+already has, map it in config: `"labels": { "bug": "Bug" }`.
+
 ## What the factory trusts
 
 A label or a `/factory` comment drives the factory only when its author has a trusted role (admin, or

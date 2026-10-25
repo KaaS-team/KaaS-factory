@@ -3,6 +3,8 @@
 // Each test uses its own repo, so one store can serve the whole suite.
 
 import { describe, expect, test } from "bun:test";
+import { fixDoctor } from "../../src/doctor";
+import { labelsFor } from "../../src/labels";
 import type { TrackerPort } from "../../src/ports/scm";
 
 let seq = 0;
@@ -93,6 +95,17 @@ export function trackerContract(name: string, make: () => TrackerPort): void {
       await t.ensureLabel(repo, "factory:ready", "0e8a16", "ready");
       await t.ensureLabel(repo, "factory:ready", "0e8a16", "ready");
       expect((await t.listLabels(repo)).filter((l) => l === "factory:ready")).toHaveLength(1);
+    });
+
+    test("doctor --fix creates the whole label set once, a repo-added type included", async () => {
+      const t = make();
+      const repo = fresh();
+      const routes = { content: {} };
+      await fixDoctor(t, repo, routes);
+      await fixDoctor(t, repo, routes);
+      const have = await t.listLabels(repo);
+      const want = labelsFor(routes).map((l) => l.name);
+      expect(want.filter((l) => have.filter((h) => h === l).length !== 1)).toEqual([]);
     });
 
     test("roleOf trusts the factory's own login and no one it does not know", async () => {

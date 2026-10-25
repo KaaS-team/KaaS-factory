@@ -168,7 +168,9 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
       issue.number,
       "This issue's `factory/issue-" +
         issue.number +
-        "` branch already exists, so the claim was not renewed — either another run is already in flight, or a previous run parked here. Use `/factory retry` on the parked labels, not a fresh `factory:ready`.",
+        "` branch already exists, so the claim was not renewed — either another run is already in flight, or a previous run parked here. Use `/factory retry` on the parked labels, not a fresh `" +
+        LABEL.ready +
+        "`.",
     );
     await deps.github.removeLabels(config.repo, issue.number, [LABEL.ready]);
     return "lost-claim";
