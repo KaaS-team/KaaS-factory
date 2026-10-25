@@ -14,6 +14,7 @@ import {
   type ReceiptInput,
   renderReceipt,
   type RunSeal,
+  clearRunFiles,
   sealRunFiles,
   signStatement,
   type Statement,
@@ -385,5 +386,26 @@ describe("writeRunReceipt", () => {
     await w.write(await w.seal());
     expect(readFileSync(target, "utf8")).toBe("untouched");
     expect(lstatSync(w.file("receipt.dsse.json")).isSymbolicLink()).toBe(false);
+  });
+
+  test("a symlinked run dir is refused by the seal and the write, and clearRunFiles makes it real", async () => {
+    const w = worktree();
+    const seal = await w.seal();
+    const elsewhere = mkdtempSync(join(tmpdir(), "factory-receipt-elsewhere-"));
+    for (const name of ["acceptance.json", "proof.json"])
+      writeFileSync(join(elsewhere, name), readFileSync(w.file(name)));
+    rmSync(join(w.repo, w.runDir), { recursive: true });
+    symlinkSync(elsewhere, join(w.repo, w.runDir));
+    await expect(w.seal()).rejects.toThrow(`receipt: ${w.runDir} is not a plain directory`);
+    await expect(w.write(seal)).rejects.toThrow(`receipt: ${w.runDir} is not a plain directory`);
+    clearRunFiles(w.repo, w.runDir);
+    expect(lstatSync(join(w.repo, w.runDir)).isDirectory()).toBe(true);
+    expect(readFileSync(join(elsewhere, "proof.json"), "utf8")).toContain("bites");
+  });
+
+  test("clearRunFiles removes what an earlier stage left, so the seal records it absent", async () => {
+    const w = worktree();
+    clearRunFiles(w.repo, w.runDir);
+    expect((await w.seal()).files).toEqual({ "acceptance.json": null, "holdout.json": null, "proof.json": null });
   });
 });

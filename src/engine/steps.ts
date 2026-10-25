@@ -29,7 +29,15 @@ import { isChecked } from "../recheck";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
 import { runProof, type ProofResult, type ProofStatus } from "../proof";
 import { touchesProtectedPath } from "../boundary";
-import { missingReceipt, readSeal, renderReceipt, sealKey, sealRunFiles, writeRunReceipt } from "../receipt";
+import {
+  clearRunFiles,
+  missingReceipt,
+  readSeal,
+  renderReceipt,
+  sealKey,
+  sealRunFiles,
+  writeRunReceipt,
+} from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
@@ -296,6 +304,7 @@ const verify: StepType = {
     // flowing straight into verify in the same tick is the common case,
     // and gate.json (written by the build, which never saw these paths)
     // cannot possibly already cover them.
+    clearRunFiles(worktree, runDir(issueNumber));
     if (holdoutEnabled(config.holdout)) {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
       // A pass leaves no comment, so the run page reads the result from here.

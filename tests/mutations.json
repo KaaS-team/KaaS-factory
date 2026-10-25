@@ -398,5 +398,8 @@
   {"name": "receipt: a symlink at the receipt name is replaced", "file": "src/receipt.ts", "find": "  rmSync(out, { force: true });\n", "replace": "", "test": "tests/receipt.test.ts"},
   {"name": "receipt: a required holdout that never ran is not proven", "file": "src/receipt.ts", "find": ": !holdout.required;", "replace": ": true;", "test": "tests/receipt.test.ts"},
   {"name": "kaas-verify: a required holdout that never ran is not proven", "file": "verify/src/main.rs", "find": "        !holdout_required\n", "replace": "        true\n", "test": "tests/receipt.test.ts"},
-  {"name": "verify seals the run files for the receipt", "file": "src/engine/steps.ts", "find": "deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : \"\");", "replace": "void seal;", "test": "tests/executor.test.ts"}
+  {"name": "verify seals the run files for the receipt", "file": "src/engine/steps.ts", "find": "deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : \"\");", "replace": "void seal;", "test": "tests/executor.test.ts"},
+  {"name": "verify clears run files an earlier stage left", "file": "src/engine/steps.ts", "find": "    clearRunFiles(worktree, runDir(issueNumber));\n", "replace": "", "test": "tests/executor.test.ts"},
+  {"name": "receipt: a symlinked run dir is refused", "file": "src/receipt.ts", "find": "if (!st.isDirectory()) throw new Error(`receipt: ${runDir} is not a plain directory`);", "replace": "", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: clearRunFiles removes the run files", "file": "src/receipt.ts", "find": "for (const name of [...RUN_FILES, RECEIPT_FILE]) rmSync(", "replace": "for (const name of []) rmSync(", "test": "tests/receipt.test.ts"}
 ]

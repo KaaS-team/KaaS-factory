@@ -22,10 +22,11 @@ kit's own rule. `proven` needs at least one criterion, none failed, no acceptanc
 that passed when config enables one. A mutation proof that did not bite, or a holdout the repo never set
 up, is listed under "Not proven" without failing the verdict.
 
-The pr agent runs in the same worktree after verify, so verify seals the run: the head commit and the
+Verify first deletes any run file an earlier stage left, so the build agent cannot plant one. The pr
+agent runs in the same worktree after verify, so verify seals the run: the head commit and the
 sha256 of each run file go into runner state, outside the worktree. The receipt is built only when the
-files and the head still match that seal; otherwise the PR says "No receipt" and why. A run file that
-is a symlink is refused.
+files and the head still match that seal; otherwise the PR says "No receipt" and why. A run file or run
+dir that is a symlink is refused.
 
 The vocabulary is `verify/context.jsonld`, which maps every key to
 [PROV-O](https://www.w3.org/TR/prov-o/) or the `kaas:` namespace; `tests/receipt.test.ts` fails when a

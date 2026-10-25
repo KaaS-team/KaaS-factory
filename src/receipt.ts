@@ -5,7 +5,7 @@
 // Why this shape: docs/decisions/signed-acceptance-receipts.md.
 
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AcceptanceRow, AcceptanceVerdict } from "./acceptance";
 import { shq } from "./core/frame";
@@ -332,6 +332,40 @@ function readRunFile(dir: string, name: string): string | undefined {
   return readFileSync(join(dir, name), "utf8");
 }
 
+// The run dir under the worktree, refused when any part of the path is a symlink or not a directory: a
+// symlinked parent would aim the sealed files and the receipt write outside the worktree.
+function realRunDir(worktree: string, runDir: string): string {
+  let at = worktree;
+  for (const part of runDir.split("/").filter(Boolean)) {
+    at = join(at, part);
+    let st: ReturnType<typeof lstatSync>;
+    try {
+      st = lstatSync(at);
+    } catch {
+      break; // missing: nothing to read, and the write fails on its own
+    }
+    if (!st.isDirectory()) throw new Error(`receipt: ${runDir} is not a plain directory`);
+  }
+  return join(worktree, runDir);
+}
+
+// Called as verify starts, so the seal only ever covers files verify wrote itself: a build agent could
+// otherwise leave a proof.json or acceptance.json that verify never overwrites. A symlinked or non-directory
+// part of the run dir is replaced with a real directory.
+export function clearRunFiles(worktree: string, runDir: string): void {
+  let at = worktree;
+  for (const part of runDir.split("/").filter(Boolean)) {
+    at = join(at, part);
+    try {
+      if (!lstatSync(at).isDirectory()) rmSync(at, { force: true });
+    } catch {
+      // missing; mkdir below makes it
+    }
+    mkdirSync(at, { recursive: true });
+  }
+  for (const name of [...RUN_FILES, RECEIPT_FILE]) rmSync(join(at, name), { force: true, recursive: true });
+}
+
 function readRunFiles(dir: string): Record<string, string> {
   const files: Record<string, string> = {};
   for (const name of RUN_FILES) {
@@ -349,7 +383,7 @@ async function revParse(exec: ExecutionPort, cwd: string, ref: string): Promise<
 }
 
 export async function sealRunFiles(exec: ExecutionPort, worktree: string, runDir: string): Promise<RunSeal> {
-  const files = readRunFiles(join(worktree, runDir));
+  const files = readRunFiles(realRunDir(worktree, runDir));
   return {
     head: await revParse(exec, worktree, "HEAD").catch(() => null),
     files: Object.fromEntries(RUN_FILES.map((n) => [n, files[n] === undefined ? null : sha256(files[n]!)])),
@@ -383,8 +417,8 @@ export interface RunReceiptOptions {
 // Builds the run's receipt from the files verify sealed, signs it when a key is set, and writes it beside
 // them so `kaas-verify --artifacts <run dir>` re-hashes the same bytes. Any drift from the seal refuses.
 export async function writeRunReceipt(exec: ExecutionPort, o: RunReceiptOptions): Promise<Envelope> {
-  const dir = join(o.worktree, o.runDir);
   if (!o.seal) throw new Error("receipt: verify did not seal this run's files");
+  const dir = realRunDir(o.worktree, o.runDir);
   const files = readRunFiles(dir);
   for (const name of RUN_FILES) {
     const now = files[name] === undefined ? null : sha256(files[name]!);
