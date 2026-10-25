@@ -1,1 +1,1 @@
-{"gates":[{"name":"test","cmd":"sh -c","required":true,"role":"test"}],"protectedPaths":["secret/**"]}
+{"gates":[{"name":"test","cmd":"bash","required":true,"role":"test"}],"protectedPaths":["secret/**"]}
