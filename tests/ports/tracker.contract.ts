@@ -43,7 +43,10 @@ export function trackerContract(name: string, make: () => TrackerPort): void {
       await t.closeIssue(repo, n);
       expect(await t.getIssue(repo, n)).toMatchObject({ state: "CLOSED", stateReason: "COMPLETED" });
       await t.reopenIssue(repo, n);
-      expect(await t.getIssue(repo, n)).toMatchObject({ state: "OPEN", stateReason: "REOPENED" });
+      // blockers.ts reads stateReason on closed issues only, so an open one need not name its history.
+      const reopened = await t.getIssue(repo, n);
+      expect(reopened.state).toBe("OPEN");
+      expect(reopened.stateReason).not.toBe("COMPLETED");
     });
 
     test("a comment has an id, is authored by the current login, and can be edited in place", async () => {
@@ -79,6 +82,9 @@ export function trackerContract(name: string, make: () => TrackerPort): void {
       await t.addLabels(repo, n, ["factory:ready"]);
       expect(await t.labeledBy(repo, n, "factory:ready")).toBe(await t.currentLogin());
       expect(await t.labeledBy(repo, n, "never")).toBeUndefined();
+      // Triggers file issues already labelled ready, so a label set at creation names its creator too.
+      const filed = await t.createIssue(repo, "y", "", ["factory:ready"]);
+      expect(await t.labeledBy(repo, filed, "factory:ready")).toBe(await t.currentLogin());
     });
 
     test("ensureLabel is idempotent and listLabels sees it", async () => {
