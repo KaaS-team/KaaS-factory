@@ -277,21 +277,33 @@ export async function resumeAwaitingApproval(
   const plan = findPlanComment(issue);
   if (!plan) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, plan.createdAt);
-  if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
-  const command = parseChatOps(reply.body);
+  // The step that parked here names where approve and revise go.
+  const edge = parkEdgeOf(workflowOf(deps, issue), deriveIssueState(issue, workflowOf(deps, issue)).resumeStage);
+  // Human on the loop: silence through the window approves; any trusted comment holds it for a person.
+  const lapsed =
+    !reply &&
+    edge?.after !== undefined &&
+    (deps.now?.() ?? new Date()).getTime() - Date.parse(plan.createdAt) >= edge.after;
+  if (!lapsed && (!reply || !(await commandIsTrusted(deps, config, reply)))) return "waiting";
+  const command = reply ? parseChatOps(reply.body) : ({ type: "approve" } as const);
   const worktree = worktreeFor(deps, issue.number);
 
   if (command.type === "cancel") return cancelRun(issue, deps, config);
-  // The step that parked here names where approve and revise go.
-  const edge = parkEdgeOf(workflowOf(deps, issue), deriveIssueState(issue, workflowOf(deps, issue)).resumeStage);
   if (!edge) return "waiting";
   const resumeAt = async (stepId: string): Promise<Outcome> => {
     if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval)))
       return "needs-human";
-    if (command.type === "revise") await writeRevision(worktree, issue, reply, command.text);
+    if (command.type === "revise" && reply) await writeRevision(worktree, issue, reply, command.text);
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, issue, stepId));
     return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
   };
+  if (lapsed)
+    await postComment(
+      deps,
+      config,
+      issue.number,
+      `No maintainer commented within the window, so the factory approved the plan.`,
+    );
   if (command.type === "approve") return resumeAt(edge.approve);
   if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
   // A plain reply that is not a command: nothing to do yet.

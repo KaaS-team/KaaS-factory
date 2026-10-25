@@ -44,6 +44,21 @@ triggers and the types routed to it.
 An edge is `{ to: <step> }` or `{ park: awaiting-approval, approve: <step>, revise: <step> }`,
 with an optional `if:`. The first edge whose `if:` holds wins; the last has no `if:`.
 
+### Human in the loop or on the loop
+
+A park edge waits for a person: `/factory approve` goes on, `/factory revise` sends it back. Add
+`after: 4h` (`30m`, `4h`, `2d`) and the person is on the loop instead. The park comment says when
+the issue goes on, and if no maintainer comments within that window of the plan, the factory approves
+it and says so on the thread. Any trusted comment, even "wait", holds it for a person; an outsider's
+comment does not. Every park edge of one step takes the same `after:`.
+
+```yaml
+      - park: awaiting-approval
+        approve: build
+        revise: plan
+        after: 4h
+```
+
 `limits.questions` caps needs-info rounds and `limits.rejects` caps rejections (both default 2).
 
 ## `on:` schedules and events

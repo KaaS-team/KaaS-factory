@@ -157,6 +157,38 @@ describe("parseWorkflow names every problem", () => {
       '"secrets" is not a step',
     ],
     [
+      "a window that is not one",
+      minimal({
+        a: {
+          uses: "plan",
+          label: "a",
+          next: [{ park: "awaiting-approval", approve: "p", revise: "a", after: "4 hours" }],
+        },
+        p: { uses: "pr", label: "p" },
+      }),
+      'steps.a.next[0].after: "4 hours" is not a window',
+    ],
+    [
+      "a window on a to edge",
+      minimal({ a: { uses: "plan", label: "a", next: [{ to: "p", after: "4h" }] }, p: { uses: "pr", label: "p" } }),
+      "steps.a.next[0].after: only a park edge has a window",
+    ],
+    [
+      "two park edges, two windows",
+      minimal({
+        a: {
+          uses: "plan",
+          label: "a",
+          next: [
+            { if: "a.x", park: "awaiting-approval", approve: "p", revise: "a" },
+            { park: "awaiting-approval", approve: "p", revise: "a", after: "4h" },
+          ],
+        },
+        p: { uses: "pr", label: "p" },
+      }),
+      "every park edge of a step needs the same after:",
+    ],
+    [
       "forward cycle",
       minimal({ a: { uses: "build", label: "a", next: "b" }, b: { uses: "build", label: "b", next: "a" } }),
       "loops through next:",
@@ -709,5 +741,80 @@ describe("factory harness", () => {
     );
     expect(json.exitCode).toBe(4);
     expect(JSON.parse(json.stdout.toString()).ok).toBe(false);
+  });
+});
+
+describe("after: on a park edge puts a human on the loop", () => {
+  const HOUR = 3_600_000;
+  const onTheLoop = () => {
+    const r = parseWorkflowText(
+      readFileSync(join(BUNDLED, "feature-to-pr.yml"), "utf8").replace(
+        "revise: plan\n",
+        "revise: plan\n        after: 4h\n",
+      ),
+    );
+    if (!r.ok) throw new Error(r.problems.join("; "));
+    return r.workflow;
+  };
+  const parked = async () => {
+    let now = 0;
+    const e = engine(
+      onTheLoop(),
+      0,
+      {},
+      {},
+      { now: () => new Date(now) },
+      {
+        outputs: {
+          plan: [
+            {
+              ...PLAN,
+              "plan.json": JSON.stringify({ risk: "high", revision: 1, files: ["a"], autoApproveEligible: false }),
+            },
+          ],
+        },
+      },
+    );
+    const at = (hours: number) => {
+      const plan = e.github.issues.get(1)!.comments.find((c) => c.body.includes("factory:plan"))!;
+      now = Date.parse(plan.createdAt) + hours * HOUR;
+    };
+    expect(await e.run()).toBe("awaiting-approval");
+    return {
+      e,
+      at,
+      bodies: () =>
+        e.github.issues
+          .get(1)!
+          .comments.map((c) => c.body)
+          .join("\n"),
+    };
+  };
+
+  test("the window parses to milliseconds", () => {
+    const park = onTheLoop().steps.plan!.next.at(-1)!;
+    expect("park" in park && park.after).toBe(4 * HOUR);
+  });
+
+  test("silence through the window approves, and the thread says when and that it did", async () => {
+    const { e, at, bodies } = await parked();
+    expect(bodies()).toContain("goes on to build by itself at");
+    at(3);
+    expect(await e.run()).toBe("waiting");
+    at(4);
+    expect(await e.run()).toBe("shipped");
+    expect(bodies()).toContain("No maintainer commented within the window");
+  });
+
+  test("any trusted comment holds it for a person; an outsider's does not", async () => {
+    const held = await parked();
+    held.e.github.say(1, "Wait, I want to read this first.");
+    held.at(5);
+    expect(await held.e.run()).toBe("waiting");
+
+    const loud = await parked();
+    loud.e.github.say(1, "ship it", "NONE");
+    loud.at(5);
+    expect(await loud.e.run()).toBe("shipped");
   });
 });
