@@ -30,7 +30,7 @@ import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 import { portEnv } from "../port";
-import { agentArgs, type MicrosandboxSpec, removeVm } from "../adapters/microsandbox/execution";
+import { agentArgs, guestGit, type MicrosandboxSpec, removeVm } from "../adapters/microsandbox/execution";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -240,13 +240,14 @@ export class CommandExecutor implements Executor {
     // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
     const vmName = this.vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
     if (this.vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
+    const guestEnv = this.vm ? { ...stageEnv, ...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? []) } : stageEnv;
     const proc = Bun.spawn(
       this.vm && vmName
         ? agentArgs(this.vm, {
             argv,
             cwd: opts.cwd,
             mounts: [scratch],
-            env: stageEnv,
+            env: guestEnv,
             stdinFile: stdin === undefined ? undefined : join(scratch, "stdin"),
             name: vmName,
           })

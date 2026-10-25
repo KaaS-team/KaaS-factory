@@ -4,7 +4,9 @@
 // real value only on a request to that secret's own hosts, so a command that
 // prints or posts the variable elsewhere leaks nothing.
 
-import { realpathSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, realpathSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { sparseCheckoutPatterns } from "../../git";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface MicrosandboxSpec {
@@ -78,6 +80,54 @@ export function agentArgs(
     "--",
     ...command,
   ];
+}
+
+function git(args: string[], cwd: string, stdin?: string): { ok: boolean; out: string; err: string } {
+  const r = Bun.spawnSync(["git", ...args], { cwd, stdin: stdin === undefined ? "ignore" : Buffer.from(stdin) });
+  return { ok: r.exitCode === 0, out: r.stdout.toString().trim(), err: r.stderr.toString().trim() };
+}
+
+// The worktree's .git points into the host clone, which the VM does not mount. Mounting it would
+// hand any agent `git show origin/main:holdout/x`, so the guest gets its own mirror with the
+// hidden paths' blobs repacked out and a remote that leads nowhere: no push, no lazy fetch.
+export function guestGit(cwd: string, scratch: string, hidden: readonly string[]): Record<string, string> {
+  if (!git(["rev-parse", "--is-inside-work-tree"], cwd).ok) return {};
+  const must = (args: string[], dir: string, stdin?: string) => {
+    const r = git(args, dir, stdin);
+    if (!r.ok) throw new Error(`microsandbox: git ${args.slice(0, 2).join(" ")} failed for the guest repo: ${r.err}`);
+    return r.out;
+  };
+  const common = must(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd);
+  const own = must(["rev-parse", "--absolute-git-dir"], cwd);
+  const dir = join(scratch, "git");
+  must(["clone", "-q", "--mirror", "--no-local", common, dir], scratch);
+  must(["config", "--unset", "remote.origin.mirror"], dir);
+  must(["config", "remote.origin.url", "/factory/withheld"], dir);
+  must(["config", "remote.origin.promisor", "true"], dir);
+  if (hidden.length) {
+    const spec = must(["hash-object", "-w", "--stdin"], dir, `${sparseCheckoutPatterns(hidden).join("\n")}\n`);
+    const drop = join(scratch, "withheld");
+    mkdirSync(drop);
+    must(
+      [
+        "repack",
+        "-a",
+        "-d",
+        "-q",
+        "--no-write-bitmap-index",
+        `--filter=sparse:oid=${spec}`,
+        `--filter-to=${drop}/pack`,
+      ],
+      dir,
+    );
+    rmSync(drop, { recursive: true, force: true });
+  }
+  must(["config", "core.bare", "false"], dir);
+  const branch = git(["symbolic-ref", "-q", "HEAD"], cwd);
+  if (branch.ok) must(["symbolic-ref", "HEAD", branch.out], dir);
+  else must(["update-ref", "--no-deref", "HEAD", must(["rev-parse", "HEAD"], cwd)], dir);
+  if (existsSync(join(own, "index"))) copyFileSync(join(own, "index"), join(dir, "index"));
+  return { GIT_DIR: dir, GIT_WORK_TREE: cwd };
 }
 
 // Killing the msb client can leave the VM running; remove it by name.

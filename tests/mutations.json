@@ -372,5 +372,8 @@
   {"name": "microsandbox: open egress", "file": "src/adapters/microsandbox/execution.ts", "find": "\"--no-net\",", "replace": "", "test": "tests/runtimes.test.ts"},
   {"name": "microsandbox: secret sent to an unlisted host", "file": "src/runtimes.ts", "find": ".filter((h) => !reachable.has(h))", "replace": ".filter(() => false)", "test": "tests/runtimes.test.ts"},
   {"name": "microsandbox: agent runs on the host", "file": "src/agents/executor.ts", "find": "this.vm && vmName\n        ? agentArgs", "replace": "false && vmName\n        ? agentArgs", "test": "tests/runtimes.test.ts"},
+  {"name": "microsandbox: guest repo keeps the holdout blobs", "file": "src/adapters/microsandbox/execution.ts", "find": "if (hidden.length) {", "replace": "if (false) {", "test": "tests/runtimes.test.ts"},
+  {"name": "microsandbox: guest remote reaches the host clone", "file": "src/adapters/microsandbox/execution.ts", "find": "\"remote.origin.url\", \"/factory/withheld\"", "replace": "\"remote.origin.url\", common", "test": "tests/runtimes.test.ts"},
+  {"name": "microsandbox: agent sees no git", "file": "src/agents/executor.ts", "find": "...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? [])", "replace": "", "test": "tests/runtimes.test.ts"},
   {"name": "machine: FACTORY_SLOTS drops agentRuntime", "file": "src/machine.ts", "find": "if (!existsSync(path)) return { slots: fromEnv ?? DEFAULT_SLOTS };", "replace": "if (fromEnv || !existsSync(path)) return { slots: fromEnv ?? DEFAULT_SLOTS };", "test": "tests/machine.test.ts"}
 ]

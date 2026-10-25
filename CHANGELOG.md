@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- An agent stage in the `agentRuntime` VM gets a working git: a mirror of the stage repo with the
+  holdouts' blobs left out and no reachable remote, so no agent can read a holdout or push.
 - `machine.json` `agentRuntime` names a `microsandbox` runtime that every agent stage on the machine
   runs in, with only plain `FACTORY_*` values in its env and its keys held by msb.
 - Fix: `FACTORY_SLOTS` overrode all of `machine.json`, so setting it dropped the machine's

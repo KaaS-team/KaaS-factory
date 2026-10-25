@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { containerArgs } from "../src/adapters/docker/execution";
 import { lwprArgs } from "../src/adapters/lwpr/execution";
-import { agentArgs, MicrosandboxExecution, sandboxArgs } from "../src/adapters/microsandbox/execution";
+import { agentArgs, guestGit, MicrosandboxExecution, sandboxArgs } from "../src/adapters/microsandbox/execution";
 import { CommandExecutor } from "../src/agents/executor";
 import { Agent37Execution, CHUNK } from "../src/adapters/agent37/execution";
 import { archiveArgs, HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
@@ -447,6 +447,62 @@ describe("microsandbox", () => {
     expect(via).toBe("1");
     expect(Number(bytes)).toBeGreaterThan(10);
   });
+
+  // A repo with a committed holdout and a sparse worktree that hides it, as the runner makes one.
+  function holdoutWorktree(): string {
+    const d = mkdtempSync(join(tmpdir(), "factory-msb-git-"));
+    const sh = (c: string) => expect(Bun.spawnSync(["bash", "-c", c], { cwd: d }).exitCode).toBe(0);
+    sh(
+      "git init -q -b main main && cd main && echo a > a && mkdir holdout && echo secret-7m1 > holdout/t && git add . && " +
+        "git -c user.email=t@t -c user.name=t commit -qm i && git worktree add -q -b work ../wt && cd ../wt && " +
+        "git sparse-checkout init --no-cone && git sparse-checkout set '/*' '!/holdout/' && echo b >> a",
+    );
+    return join(d, "wt");
+  }
+
+  test("the guest repo works, withholds every hidden path's blobs, and cannot push", () => {
+    const wt = holdoutWorktree();
+    const env = {
+      ...process.env,
+      ...guestGit(wt, mkdtempSync(join(tmpdir(), "factory-msb-scratch-")), ["holdout/**"]),
+    };
+    const git = (...a: string[]) => Bun.spawnSync(["git", ...a], { cwd: wt, env });
+    expect(git("status", "--short").stdout.toString()).toBe(" M a\n");
+    expect(git("log", "--format=%s", "-1").stdout.toString()).toBe("i\n");
+    expect(git("show", "main:a").stdout.toString()).toBe("a\n");
+    const leak = git("show", "main:holdout/t");
+    expect(leak.exitCode).not.toBe(0);
+    expect(leak.stdout.toString()).not.toContain("secret-7m1");
+    expect(git("ls-remote", "origin").exitCode).not.toBe(0);
+    expect(git("push", "origin", "HEAD").exitCode).not.toBe(0);
+  });
+
+  test("outside a git worktree the guest gets no repo", () => {
+    expect(guestGit(mkdtempSync(join(tmpdir(), "factory-msb-plain-")), "/s", ["holdout/**"])).toEqual({});
+  });
+
+  test.skipIf(!Bun.which("msb"))(
+    "live: an agent in the VM has a working git that cannot read the holdouts",
+    async () => {
+      const wt = holdoutWorktree();
+      mkdirSync(join(wt, ".claude/skills/factory-build"), { recursive: true });
+      writeFileSync(join(wt, ".claude/skills/factory-build/SKILL.md"), "---\nname: factory-build\n---\nBuild it.\n");
+      const out = '"$FACTORY_ARTIFACT_DIR"';
+      const agent = [
+        `git status --short --untracked-files=no > ${out}/status`,
+        `git show main:holdout/t > ${out}/leak 2>/dev/null; echo $? > ${out}/leak-code`,
+      ].join("; ");
+      await new CommandExecutor({ x: { command: ["bash", "-c", agent] } }, { default: "x" }, {}, undefined, {
+        kind: "microsandbox",
+        image: "buildpack-deps:bookworm-scm",
+      }).runStage({ stage: "build", issue: 7, cwd: wt, maxBudgetUsd: 1, hiddenPaths: ["holdout/**"] });
+      const read = (f: string) => readFileSync(join(wt, ".factory/runs/issue-7", f), "utf8").trim();
+      expect(read("status")).toBe("M a");
+      expect(read("leak")).toBe("");
+      expect(read("leak-code")).not.toBe("0");
+    },
+    300_000,
+  );
 
   test.skipIf(!Bun.which("msb"))(
     "live: an agent stage runs in the VM, reads its prompt, and holds only a placeholder for the key",

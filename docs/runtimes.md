@@ -126,11 +126,17 @@ proves all three against public echo servers; it runs only where `msb` is instal
 `"agentRuntime": "<name>"` in `machine.json` names a `microsandbox` runtime, and every agent stage on
 this machine then starts inside it: the worktree and the stage's scratch folder are mounted, the guest
 gets only the `FACTORY_*` values and the preset's own settings, and nothing else from this machine's
-env. The image must hold the agent CLI. Give its key as a secret, for example
+env. The image must hold the agent CLI and git. Give its key as a secret, for example
 `"secrets": ["ANTHROPIC_API_KEY@api.anthropic.com"]` with `api.anthropic.com` in `allow`, so the agent
 holds a placeholder it cannot leak. msb 0.7 does not pass piped stdin through, so a prompt sent on
 stdin is written to the scratch folder and fed to the agent from there. `FACTORY_SLOTS` overrides
 only the slot count and keeps the rest of `machine.json`.
+
+The guest's git is a mirror of the stage repo made for that run, with the blobs of every hidden
+path (the holdouts) repacked out, so `git show origin/main:holdout/x` fails inside the VM whatever
+agent runs. Its remote leads nowhere, so a push or a fetch fails too, and commits made in the guest
+stay there: the runner commits the worktree itself. A protected path changed by any means stops the
+run before the push, since the runner diffs the branch, not the agent's tool calls.
 
 ## Many workers, one repo
 
