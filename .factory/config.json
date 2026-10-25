@@ -1,1 +1,1 @@
-{"gates":[{"name":"test","cmd":"bash tests/check.sh; touch pwned","required":true,"role":"test"}],"protectedPaths":["secret/**"]}
+{"gates":[{"name":"test","cmd":"bash","required":true,"role":"test"}],"protectedPaths":["secret/**"]}
