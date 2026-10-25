@@ -675,7 +675,13 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
-      handler: () => json(analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [])),
+      handler: () =>
+        json(
+          analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [], new Date(), (agent) => {
+            const a = project?.config.agents[agent];
+            return a?.models?.large ?? a?.model;
+          }),
+        ),
     },
     {
       method: "GET",

@@ -1,6 +1,7 @@
 // What the Analytics view shows, computed from stage_runs and runs. The
 // server sends numbers; the page only draws them.
 
+import { costFor } from "../src/pricing";
 import type { Run, StageRun } from "../src/state";
 
 export interface Bucket {
@@ -23,6 +24,17 @@ export interface Analytics {
   readonly byStage: readonly Bucket[];
   readonly byAgent: readonly Bucket[];
   readonly byModel: readonly Bucket[];
+  readonly savings: Savings;
+}
+
+// What model routing saved: each run's cost against the same tokens at its agent's strongest
+// model, at list price. A run with no full count, no price or no baseline is counted, not guessed.
+export interface Savings {
+  readonly runs: number;
+  readonly unpriced: number;
+  readonly actualUsd: number;
+  readonly baselineUsd: number;
+  readonly savedUsd: number;
 }
 
 const FINISHED = new Set(["shipped", "failed", "rejected", "cancelled", "needs-human"]);
@@ -44,7 +56,29 @@ function bucketBy(rows: readonly StageRun[], key: (r: StageRun) => string): Buck
     .sort((a, b) => a.key.localeCompare(b.key));
 }
 
-export function analytics(runs: readonly Run[], stageRuns: readonly StageRun[], now = new Date()): Analytics {
+export function savings(rows: readonly StageRun[], baselineFor: (agent: string) => string | undefined): Savings {
+  let actualUsd = 0;
+  let baselineUsd = 0;
+  let runs = 0;
+  for (const r of rows) {
+    const usage = { tokensIn: r.tokens_in, tokensOut: r.tokens_out, tokensCached: r.tokens_cached };
+    // cost_usd is NULL whenever the count was not full, so this one check covers both.
+    if (r.cost_usd === null) continue;
+    const base = costFor(baselineFor(r.agent), usage);
+    if (base === undefined) continue;
+    runs++;
+    actualUsd += r.cost_usd;
+    baselineUsd += base;
+  }
+  return { runs, unpriced: rows.length - runs, actualUsd, baselineUsd, savedUsd: baselineUsd - actualUsd };
+}
+
+export function analytics(
+  runs: readonly Run[],
+  stageRuns: readonly StageRun[],
+  now = new Date(),
+  baselineFor: (agent: string) => string | undefined = () => undefined,
+): Analytics {
   const finished = runs.filter((r) => FINISHED.has(r.status));
   const shipped = runs.filter((r) => r.status === "shipped").length;
   const spendSince = (days: number) =>
@@ -63,5 +97,6 @@ export function analytics(runs: readonly Run[], stageRuns: readonly StageRun[], 
     // entry) is still counted, under "unknown" — never dropped silently
     // (plan v2.7.0 item 7: spend per model, visible even when incomplete).
     byModel: bucketBy(stageRuns, (r) => r.model ?? "unknown"),
+    savings: savings(stageRuns, baselineFor),
   };
 }

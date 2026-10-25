@@ -41,6 +41,10 @@ The thresholds are `SMALL_MAX_FILES` and `LARGE_MIN_FILES` in `src/core/model-ti
 Each verify reject moves the rebuild one tier up (`small`, then `model`, then `large`), so a cheap
 model that failed is not asked again. Only markers on trusted comments (owner, member, collaborator)
 are read, so an outside commenter cannot pick the model.
+The dashboard's Analytics view shows what this saved: each attempt's cost against the same tokens at
+the agent's `models.large` (or `model`), at list price from `src/pricing.ts`. Attempts it cannot price
+are counted, not guessed. Claude Haiku 5.5 is priced at its card for prompts over 100K tokens, since
+a stage reports the sum of its turns.
 
 Install the skills into each agent's own directory with `factory install <repo> --agents claude,gemini`.
 Skills stay in `.claude/skills`; the other directories are symlinks to it. A context pointer

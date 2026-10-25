@@ -1025,6 +1025,9 @@ function analyticsView() {
                 [String(a.runs), "Runs started"],
                 [money(a.spend7dUsd), "Spent in 7 days"],
                 [money(a.spend30dUsd), "Spent in 30 days"],
+                ...(a.savings.runs
+                  ? [[money(a.savings.savedUsd), `Saved by model routing, ${a.savings.runs} priced attempts`]]
+                  : []),
               ].map(([v, l]) =>
                 h("div", { class: "kpi" }, h("span", { class: "value" }, v), h("span", { class: "label" }, l)),
               ),

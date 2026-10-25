@@ -387,6 +387,20 @@ describe("analytics and stages", () => {
     expect(a.byAgent.reduce((n, b) => n + b.failures, 0)).toBe(110);
   });
 
+  test("savings price each attempt's tokens at its agent's large model, and count what they cannot price", async () => {
+    const agents = { claude: { preset: "claude", model: "claude-haiku-5-5", models: { large: "claude-opus-5-5" } } };
+    const p = project();
+    const { dashboard, state } = await make("", [], { ...p, config: { ...p.config, agents } as FactoryConfig });
+    const million = { tokens_in: 1_000_000, tokens_out: 0, tokens_cached: 0 };
+    state.recordStageRun({ ...stage(0, "claude"), ...million, cost_usd: 0.5 });
+    state.recordStageRun({ ...stage(1, "codex"), ...million, cost_usd: 0.5 });
+    state.recordStageRun({ ...stage(2, "claude"), ...million, cost_usd: null, usage_complete: 0 });
+    const a = (await (await dashboard.handle(call("GET /api/analytics"), "127.0.0.1")).json()) as {
+      savings: { runs: number; unpriced: number; actualUsd: number; baselineUsd: number; savedUsd: number };
+    };
+    expect(a.savings).toEqual({ runs: 1, unpriced: 2, actualUsd: 0.5, baselineUsd: 4, savedUsd: 3.5 });
+  });
+
   test("run stages come back for a known run and 404 for an unknown one", async () => {
     const { dashboard, state } = await make("");
     state.upsertRun({ issue: 1, repo: "acme/widgets", title: "t", stage: "build", status: "running" });

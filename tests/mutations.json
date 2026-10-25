@@ -473,5 +473,10 @@
   {"name": "model tier: the climb stops at large", "file": "src/core/model-tier.ts", "find": "Math.min(LADDER.length - 1, base + rejects)", "replace": "base + rejects", "test": "tests/model-tier.test.ts"},
   {"name": "model tier: the executor passes the rejects", "file": "src/agents/executor.ts", "find": "tierFor(opts.scope, opts.rejects)", "replace": "tierFor(opts.scope)", "test": "tests/model-tier.test.ts"},
   {"name": "model tier: the rebuild is told of the reject", "file": "src/engine/steps.ts", "find": "...(sc.ctx.rejectRound ? { rejects: sc.ctx.rejectRound } : {}),", "replace": "", "test": "tests/scenarios.test.ts"},
-  {"name": "model tier: only trusted markers set the scope", "file": "src/engine/common.ts", "find": "parseDataMarkers(issue.comments.filter(isTrusted));\n  const scope", "replace": "parseDataMarkers(issue.comments);\n  const scope", "test": "tests/model-tier.test.ts"}
+  {"name": "model tier: only trusted markers set the scope", "file": "src/engine/common.ts", "find": "parseDataMarkers(issue.comments.filter(isTrusted));\n  const scope", "replace": "parseDataMarkers(issue.comments);\n  const scope", "test": "tests/model-tier.test.ts"},
+  {"name": "savings: saved is baseline minus actual", "file": "dashboard/analytics.ts", "find": "savedUsd: baselineUsd - actualUsd", "replace": "savedUsd: baselineUsd", "test": "tests/dashboard-routes.test.ts"},
+  {"name": "savings: the baseline is the agent's large model", "file": "dashboard/server.ts", "find": "return a?.models?.large ?? a?.model;", "replace": "return a?.model;", "test": "tests/dashboard-routes.test.ts"},
+  {"name": "pricing: haiku 5.5 at the over-100K card", "file": "src/pricing.ts", "find": "    input: 0.5,\n    output: 2.5,", "replace": "    input: 0.1,\n    output: 0.5,", "test": "tests/pricing.test.ts"},
+  {"name": "pricing: sonnet 5.5 cache read is 0.2", "file": "src/pricing.ts", "find": "\"claude-sonnet-5-5\": { input: 2, output: 10, cacheRead: 0.2,", "replace": "\"claude-sonnet-5-5\": { input: 2, output: 10, cacheRead: 0.1,", "test": "tests/pricing.test.ts"},
+  {"name": "savings: an unpriced attempt is not counted", "file": "dashboard/analytics.ts", "find": "    if (r.cost_usd === null) continue;\n", "replace": "", "test": "tests/dashboard-routes.test.ts"}
 ]

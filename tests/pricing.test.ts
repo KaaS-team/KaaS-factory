@@ -4,7 +4,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PRICES, UNPRICED } from "../src/pricing";
+import { costFor, PRICES, UNPRICED } from "../src/pricing";
 
 const root = join(import.meta.dir, "..");
 const MODEL = /"model":\s*"([^"]+)"|--model[ =]([A-Za-z0-9._-]+)/g;
@@ -28,4 +28,12 @@ test("a model is never both priced and unpriced, and every row is dated and sour
     expect(p.source, m).toMatch(/^https:\/\//);
     expect(p.asOf, m).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   }
+});
+
+test("Haiku 5.5 prices at its over-100K card, the ceiling, since a stage's usage is a sum of turns", () => {
+  expect(costFor("claude-haiku-5-5", { tokensIn: 1_000_000, tokensOut: 1_000_000 })).toBeCloseTo(3, 9);
+  expect(costFor("claude-sonnet-5-5", { tokensIn: 1_000_000, tokensOut: 0, tokensCached: 1_000_000 })).toBeCloseTo(
+    0.2,
+    9,
+  );
 });
