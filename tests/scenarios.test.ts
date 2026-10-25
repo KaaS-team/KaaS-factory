@@ -565,6 +565,11 @@ describe("failure paths", () => {
     });
     // Only the rebuild resumes: triage, plan, the first build and every verify start fresh.
     expect(c.executor.resumed.filter(Boolean)).toHaveLength(1);
+    // The rebuild is told of the reject, so it runs a tier up; the first build is not.
+    expect(c.executor.rejects.filter(([s]) => s === "build")).toEqual([
+      ["build", undefined],
+      ["build", 1],
+    ]);
     done(c);
   });
 

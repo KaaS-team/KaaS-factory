@@ -436,6 +436,8 @@ export class MultiStageExecutor {
   readonly mcp: Array<[StageName, StageRunOptions["mcp"]]> = [];
   // The issue scope each run was handed, by stage: what picks the agent's model tier.
   readonly scopes: Array<[StageName, StageRunOptions["scope"]]> = [];
+  // The verify rejects each run was told of, by stage: what climbs the build a tier.
+  readonly rejects: Array<[StageName, StageRunOptions["rejects"]]> = [];
 
   async runStage(opts: {
     stage: StageName;
@@ -445,8 +447,10 @@ export class MultiStageExecutor {
     resume?: StageRunOptions["resume"];
     mcp?: StageRunOptions["mcp"];
     scope?: StageRunOptions["scope"];
+    rejects?: StageRunOptions["rejects"];
   }) {
     this.resumed.push(opts.resume);
+    this.rejects.push([opts.stage, opts.rejects]);
     this.scopes.push([opts.stage, opts.scope]);
     this.mcp.push([opts.stage, opts.mcp]);
     const key = `${opts.stage}:${opts.issue}`;

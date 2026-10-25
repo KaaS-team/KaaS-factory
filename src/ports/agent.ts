@@ -59,6 +59,8 @@ export interface StageRunOptions {
   readonly prompt?: string;
   // The issue's risk and size once triage or plan has judged them; picks the agent's model tier.
   readonly scope?: IssueScope;
+  // Verify rejects so far on this issue; each one moves the build a model tier up.
+  readonly rejects?: number;
 }
 
 // The killedReason a `factory takeover` stop gets. watch.ts parks on it

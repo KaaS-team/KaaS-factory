@@ -193,7 +193,11 @@ const build: StepType = {
         }),
       );
     }
-    const result = await runStage(deps, config, issue, "build", worktree, { ...rebuildFrom(sc), mcp: step.mcp });
+    const result = await runStage(deps, config, issue, "build", worktree, {
+      ...rebuildFrom(sc),
+      ...(sc.ctx.rejectRound ? { rejects: sc.ctx.rejectRound } : {}),
+      mcp: step.mcp,
+    });
     const art = await readStageArtifacts(worktree, issueNumber, "build");
     const built = stageJson<BuildArtifact>("build", art.json);
     const problem = built.problem;

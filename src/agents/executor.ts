@@ -120,8 +120,8 @@ function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, s
 }
 
 // The agent with `model` swapped for its tier's, so every preset and {{model}} see one model.
-function withTier(agent: ResolvedAgent, scope: StageRunOptions["scope"]): ResolvedAgent {
-  const tier = tierFor(scope);
+function withTier(agent: ResolvedAgent, opts: Pick<StageRunOptions, "scope" | "rejects">): ResolvedAgent {
+  const tier = tierFor(opts.scope, opts.rejects);
   const model = tier && agent.config.models?.[tier];
   return model ? { ...agent, config: { ...agent.config, model } } : agent;
 }
@@ -157,7 +157,7 @@ export class CommandExecutor implements Executor {
     const agent =
       opts.prompt !== undefined && opts.agent
         ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts.scope);
+        : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)

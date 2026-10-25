@@ -11,11 +11,19 @@ export interface IssueScope {
 export const SMALL_MAX_FILES = 3;
 export const LARGE_MIN_FILES = 11;
 
-export function tierFor(scope: IssueScope | undefined): Tier | undefined {
-  if (!scope) return undefined;
-  if (scope.risk === "high" || scope.files >= LARGE_MIN_FILES) return "large";
-  if (scope.risk === "low" && scope.files <= SMALL_MAX_FILES) return "small";
-  return undefined;
+// Each verify reject climbs one rung (small, the agent's `model`, large), so a cheap model that
+// failed is not asked again for the same answer. Without a scope the climb starts at `model`.
+const LADDER: readonly (Tier | undefined)[] = ["small", undefined, "large"];
+
+export function tierFor(scope: IssueScope | undefined, rejects = 0): Tier | undefined {
+  const base = !scope
+    ? 1
+    : scope.risk === "high" || scope.files >= LARGE_MIN_FILES
+      ? 2
+      : scope.risk === "low" && scope.files <= SMALL_MAX_FILES
+        ? 0
+        : 1;
+  return LADDER[Math.min(LADDER.length - 1, base + rejects)];
 }
 
 // The plan's risk and files win over the triage's guess, since the plan has read the code.

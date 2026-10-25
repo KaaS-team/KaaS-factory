@@ -25,7 +25,7 @@ import {
   type VerdictArtifact,
 } from "../artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
-import { isHumanComment, parseChatOps } from "../chatops";
+import { isHumanComment, isTrusted, parseChatOps } from "../chatops";
 import { mcpServersFor } from "../mcp";
 import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
 import { type IssueScope, scopeFrom } from "../core/model-tier";
@@ -311,9 +311,10 @@ export function priceResult(result: StageRunResult): {
 }
 
 // What the thread's triage and plan said about the issue's size and risk; triage has nothing to read yet.
+// Only trusted comments count, so an outside commenter cannot pick the model by pasting a marker.
 export function scopeOf(issue: GhIssue, stage: string): { scope?: IssueScope } {
   if (stage === "triage") return {};
-  const markers = parseDataMarkers(issue.comments);
+  const markers = parseDataMarkers(issue.comments.filter(isTrusted));
   const scope = scopeFrom(latestDataFor(markers, "plan"), latestDataFor(markers, "triage"));
   return scope ? { scope } : {};
 }
@@ -324,7 +325,7 @@ export async function runStage(
   issue: GhIssue,
   stage: StageName,
   worktree: string,
-  extra: Pick<StageRunOptions, "resume"> & { readonly mcp?: readonly string[] } = {},
+  extra: Pick<StageRunOptions, "resume" | "rejects"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
   // Read from the clone of the base branch, never the worktree: an earlier step's agent can write

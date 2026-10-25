@@ -22,6 +22,14 @@ describe("model tier", () => {
     expect(tierFor(undefined)).toBeUndefined();
   });
 
+  test("each reject climbs one tier and stops at large", () => {
+    expect(tierFor({ risk: "low", files: 1 }, 1)).toBeUndefined();
+    expect(tierFor({ risk: "low", files: 1 }, 2)).toBe("large");
+    expect(tierFor({ risk: "medium", files: 5 }, 1)).toBe("large");
+    expect(tierFor({ risk: "high", files: 1 }, 3)).toBe("large");
+    expect(tierFor(undefined, 1)).toBe("large");
+  });
+
   test("the plan's judgement wins over the triage's, and malformed data picks no tier", () => {
     expect(scopeFrom({ risk: "high", files: files(1) }, { risk: "low", files_expected: [] })).toEqual({
       risk: "high",
@@ -44,6 +52,9 @@ describe("model tier", () => {
     ];
     expect(scopeOf(issue, "build")).toEqual({ scope: { risk: "low", files: 1 } });
     expect(scopeOf(issue, "triage")).toEqual({});
+    // A marker pasted by an outside commenter is not read, so it cannot pick a cheaper model.
+    issue.comments = issue.comments.map((c) => ({ ...c, authorAssociation: "NONE" }));
+    expect(scopeOf(issue, "build")).toEqual({});
   });
 
   test("the executor runs the tier's model, and the agent's own model when no tier fits", async () => {
@@ -62,6 +73,15 @@ describe("model tier", () => {
     expect((await run({ risk: "high", files: 1 })).model).toBe("strong");
     expect((await run({ risk: "medium", files: 5 })).model).toBe("mid");
     expect((await run()).model).toBe("mid");
+    const again = await new CommandExecutor(agents, { default: "x" }).runStage({
+      stage: "build",
+      issue: 1,
+      cwd,
+      maxBudgetUsd: 1,
+      scope: { risk: "low", files: 1 },
+      rejects: 2,
+    });
+    expect(again.model).toBe("strong");
   });
 
   test("config accepts models.small and models.large and nothing else", () => {

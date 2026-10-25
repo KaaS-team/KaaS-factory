@@ -38,6 +38,9 @@ After triage, each stage reads the issue's risk and file count from the plan (or
 there is a plan). Low risk with at most 3 files runs on `small`; high risk or 11 files and more runs
 on `large`; anything else, and triage itself, runs on `model`. A tier left out falls back to `model`.
 The thresholds are `SMALL_MAX_FILES` and `LARGE_MIN_FILES` in `src/core/model-tier.ts`.
+Each verify reject moves the rebuild one tier up (`small`, then `model`, then `large`), so a cheap
+model that failed is not asked again. Only markers on trusted comments (owner, member, collaborator)
+are read, so an outside commenter cannot pick the model.
 
 Install the skills into each agent's own directory with `factory install <repo> --agents claude,gemini`.
 Skills stay in `.claude/skills`; the other directories are symlinks to it. A context pointer
