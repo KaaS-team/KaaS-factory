@@ -3,7 +3,7 @@
 
 import type { CommandRunner, ScmPort } from "./github";
 import { labelsFor } from "./labels";
-import { gateCount, type RouteConfig, type RuntimeConfig } from "./config";
+import { gateCount, type RouteConfig, type RuntimeConfig, type TrackerConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
 import { suggestSlots } from "./machine";
@@ -25,7 +25,7 @@ export interface DoctorCheck {
 export interface DoctorDeps {
   readonly github: ScmPort;
   // Where issues live (config.tracker) and its own auth. Absent: GitHub, whose auth is gh's.
-  readonly tracker?: { readonly kind: "github" | "http"; authStatus(): Promise<{ ok: boolean; detail: string }> };
+  readonly tracker?: { readonly kind: TrackerConfig["kind"]; authStatus(): Promise<{ ok: boolean; detail: string }> };
   readonly git: CommandRunner;
   readonly which: (bin: string) => Promise<boolean>;
   // `<bin> --version` output, or undefined when it cannot be read.

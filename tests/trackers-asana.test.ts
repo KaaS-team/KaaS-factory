@@ -26,7 +26,7 @@ trackerContract("Asana", make);
 describe("Asana specifics", () => {
   const repo = "acme/shop";
 
-  test("labeledBy names the human who tagged the task, even after the tag is renamed", async () => {
+  test("labeledBy names the human who tagged the task, and no one once the tag is renamed", async () => {
     const t = make();
     server.store.members.set("1200000000000002", { is_admin: false, is_guest: false, is_active: true });
     server.store.members.set("1200000000000003", { is_admin: false, is_guest: true, is_active: true });
@@ -34,8 +34,9 @@ describe("Asana specifics", () => {
     await t.ensureLabel(repo, "harmless", "ededed", "");
     const tag = server.store.tags.find((x) => x.name === "harmless")!;
     server.store.addTag(server.store.tasks.at(-1)!, tag.gid, "1200000000000003");
+    expect(await t.labeledBy(repo, n, "harmless")).toBe("1200000000000003");
     tag.name = "factory:ready";
-    expect(await t.labeledBy(repo, n, "factory:ready")).toBe("1200000000000003");
+    expect(await t.labeledBy(repo, n, "factory:ready")).toBeUndefined();
     expect(await t.labeledBy(repo, n, "bug")).toBe(server.store.me);
     expect([await t.roleOf(repo, "1200000000000002"), await t.roleOf(repo, "1200000000000003")]).toEqual([
       "write",

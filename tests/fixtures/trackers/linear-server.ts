@@ -28,7 +28,7 @@ const strip = (s: string) => s.replace(/<!--[\s\S]*?-->/g, "");
 export class LinearStore {
   readonly users = new Map<string, User>([["factory-bot", { id: "factory-bot", admin: true, guest: false, active: true }]]);
   readonly teams = new Map<string, { id: string; key: string; states: { id: string; type: string; position: number }[] }>();
-  readonly labels: { id: string; name: string; team: string | null }[] = [];
+  readonly labels: { id: string; name: string; team: string | null; updatedAt: string }[] = [];
   readonly issues: Issue[] = [];
   private tick = Date.parse("2026-01-01T00:00:00Z");
   viewer = "factory-bot";
@@ -54,7 +54,7 @@ export class LinearStore {
       description: i.description,
       state: { type: state.type },
       creator: { id: i.creator },
-      labels: { nodes: i.labelIds.map((id) => this.labels.find((l) => l.id === id)!).map((l) => ({ id: l.id, name: l.name })) },
+      labels: { nodes: i.labelIds.map((id) => this.labels.find((l) => l.id === id)!).map((l) => ({ id: l.id, name: l.name, updatedAt: l.updatedAt })) },
       comments: { nodes: i.comments.map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt, user: { id: c.user } })) },
     };
   }
@@ -90,7 +90,7 @@ export class LinearStore {
         return { issues: { nodes: rows.map((i) => this.view(i)), pageInfo: { hasNextPage: false, endCursor: null } } };
       }
       case "Labels":
-        return { issueLabels: { nodes: this.labels.map((l) => ({ id: l.id, name: l.name, team: l.team ? { id: l.team } : null })), pageInfo: { hasNextPage: false, endCursor: null } } };
+        return { issueLabels: { nodes: this.labels.map((l) => ({ id: l.id, name: l.name, updatedAt: l.updatedAt, team: l.team ? { id: l.team } : null })), pageInfo: { hasNextPage: false, endCursor: null } } };
       case "History": {
         const i = this.find(v.id);
         if (!i) throw new Error("Entity not found");
@@ -141,7 +141,7 @@ export class LinearStore {
         return { issueUpdate: { success: true } };
       }
       case "LabelCreate": {
-        const l = { id: randomUUID(), name: v.input.name, team: v.input.teamId ?? null };
+        const l = { id: randomUUID(), name: v.input.name, team: v.input.teamId ?? null, updatedAt: this.now() };
         this.labels.push(l);
         return { issueLabelCreate: { issueLabel: { id: l.id, name: l.name } } };
       }

@@ -1,6 +1,6 @@
 // TrackerPort over Linear's GraphQL API, for one team. Issue numbers are the team's (ENG-42 is 42),
 // logins are Linear user ids, and labeledBy reads the issue history. Modeled on Linear's public
-// schema; tests/trackers/linear.test.ts runs the contract against a fixture of it.
+// schema; tests/trackers-linear.test.ts runs the contract against a fixture of it.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
 import { association, decodeBody, encodeBody, IdMap, VendorClient, VendorHttpError, workspaceRole } from "./kit";
@@ -21,7 +21,7 @@ interface LinearIssue extends Node {
   description: string | null;
   state: { type: string };
   creator: Node | null;
-  labels: { nodes: (Node & { name: string })[] };
+  labels: { nodes: Label[] };
   comments: { nodes: (Node & { body: string; createdAt: string; user: Node | null })[] };
 }
 interface Page<T> {
@@ -29,7 +29,7 @@ interface Page<T> {
   pageInfo: { hasNextPage: boolean; endCursor: string | null };
 }
 
-const ISSUE = `id number title description state { type } creator { id } labels { nodes { id name } }
+const ISSUE = `id number title description state { type } creator { id } labels { nodes { id name updatedAt } }
   comments(first: 250) { nodes { id body createdAt user { id } } }`;
 
 // Named operations, one per need: the fixture answers by name, and a reader sees every call Linear gets.
@@ -41,7 +41,7 @@ const Q = {
   issues: `query Issues($filter: IssueFilter, $after: String) { issues(filter: $filter, first: 100, after: $after) {
     nodes { ${ISSUE} } pageInfo { hasNextPage endCursor } } }`,
   labels: `query Labels($after: String) { issueLabels(first: 250, after: $after) {
-    nodes { id name team { id } } pageInfo { hasNextPage endCursor } } }`,
+    nodes { id name updatedAt team { id } } pageInfo { hasNextPage endCursor } } }`,
   history: `query History($id: String!) { issue(id: $id) { creator { id }
     history(first: 250) { nodes { createdAt actor { id } addedLabelIds } } } }`,
   user: "query User($id: String!) { user(id: $id) { id admin guest active } }",
@@ -58,11 +58,16 @@ const Q = {
 
 const CLOSED = new Set(["completed", "canceled"]);
 
+interface Label {
+  id: string;
+  name: string;
+  updatedAt: string;
+}
+
 export class LinearTracker implements TrackerPort {
   private readonly client: VendorClient;
   private readonly comments = new IdMap();
   private teamCache?: Promise<{ id: string; done: string; open: string }>;
-  private readonly roles = new Map<string, RepoRole>();
 
   constructor(
     private readonly spec: LinearSpec,
@@ -146,12 +151,12 @@ export class LinearTracker implements TrackerPort {
     return out;
   }
 
-  private async allLabels(): Promise<{ id: string; name: string }[]> {
+  private async allLabels(): Promise<Label[]> {
     const team = await this.team();
-    const out: { id: string; name: string }[] = [];
+    const out: Label[] = [];
     let after: string | null = null;
     do {
-      const d: { issueLabels: Page<{ id: string; name: string; team: Node | null }> } = await this.gql(Q.labels, {
+      const d: { issueLabels: Page<Label & { team: Node | null }> } = await this.gql(Q.labels, {
         after,
       });
       out.push(...d.issueLabels.nodes.filter((l) => !l.team || l.team.id === team.id));
@@ -253,12 +258,14 @@ export class LinearTracker implements TrackerPort {
   async currentLogin(): Promise<string> {
     return (await this.gql<{ viewer: Node }>(Q.viewer)).viewer.id;
   }
-  // Linear's history has no entry for labels set when the issue was made, so those name the creator.
+  // Linear's history has no entry for labels set when the issue was made, so those name the creator. It
+  // keeps label ids, not names, so a label edited after it was added (a rename) names no one.
   async labeledBy(_repo: string, n: number, label: string): Promise<string | undefined> {
     const raw = await this.raw(n);
-    const id =
-      raw.labels.nodes.find((l) => l.name === label)?.id ?? (await this.allLabels()).find((l) => l.name === label)?.id;
-    if (!id) return undefined;
+    const found =
+      raw.labels.nodes.find((l) => l.name === label) ?? (await this.allLabels()).find((l) => l.name === label);
+    if (!found) return undefined;
+    const id = found.id;
     const d = await this.gql<{
       issue: {
         creator: Node | null;
@@ -268,24 +275,20 @@ export class LinearTracker implements TrackerPort {
     const adds = d.issue.history.nodes
       .filter((h) => h.addedLabelIds?.includes(id))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    if (adds.length > 0) return adds.at(-1)!.actor?.id;
+    const last = adds.at(-1);
+    if (last) return found.updatedAt > last.createdAt ? undefined : last.actor?.id;
     return raw.labels.nodes.some((l) => l.id === id) ? d.issue.creator?.id : undefined;
   }
   async roleOf(_repo: string, login: string): Promise<RepoRole> {
-    const known = this.roles.get(login);
-    if (known) return known;
     let user: { admin: boolean; guest: boolean; active: boolean } | null;
     try {
       user = (await this.gql<{ user: typeof user }>(Q.user, { id: login })).user;
     } catch (err) {
-      // Linear answers an unknown id with a GraphQL error: not a member, and not cached, since a rate
-      // limit comes back the same way. Any transport failure throws.
+      // Linear answers an unknown id with a GraphQL error: not a member. Any transport failure throws.
       if (err instanceof VendorHttpError && err.status === 200) return "none";
       throw err;
     }
-    const role = user?.active ? workspaceRole(user.admin ? "admin" : user.guest ? "guest" : "member") : "none";
-    this.roles.set(login, role);
-    return role;
+    return user?.active ? workspaceRole(user.admin ? "admin" : user.guest ? "guest" : "member") : "none";
   }
   async authStatus(): Promise<{ ok: boolean; detail: string }> {
     try {

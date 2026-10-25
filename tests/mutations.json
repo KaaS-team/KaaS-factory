@@ -436,5 +436,12 @@
   {"name": "asana: a tag set at creation names the creator", "file": "src/adapters/trackers/asana.ts", "find": ": t.created_by?.gid;", "replace": ": undefined;", "test": "tests/trackers-asana.test.ts"},
   {"name": "asana: a deactivated member is no one", "file": "src/adapters/trackers/asana.ts", "find": "if (!m?.is_active) return \"none\";", "replace": "if (!m) return \"none\";", "test": "tests/trackers-asana.test.ts"},
   {"name": "asana: a guest is not a member", "file": "src/adapters/trackers/asana.ts", "find": "m.is_guest ? \"guest\" : \"member\"", "replace": "\"member\"", "test": "tests/trackers-asana.test.ts"},
-  {"name": "asana: an unsafe gid is refused", "file": "src/adapters/trackers/asana.ts", "find": "!/^\\d+$/.test(gid) || !Number.isSafeInteger(n)", "replace": "!/^\\d+$/.test(gid)", "test": "tests/trackers-asana.test.ts"}
+  {"name": "asana: an unsafe gid is refused", "file": "src/adapters/trackers/asana.ts", "find": "!/^\\d+$/.test(gid) || !Number.isSafeInteger(n)", "replace": "!/^\\d+$/.test(gid)", "test": "tests/trackers-asana.test.ts"},
+  {"name": "plane: a label renamed after it was added names no one", "file": "src/adapters/trackers/plane.ts", "find": "return last.new_value === label ? last.actor_id : undefined;", "replace": "return last.actor_id;", "test": "tests/trackers-plane.test.ts"},
+  {"name": "asana: a tag renamed after it was added names no one", "file": "src/adapters/trackers/asana.ts", "find": "return last.text.includes(label) ? last.created_by?.gid : undefined;", "replace": "return last.created_by?.gid;", "test": "tests/trackers-asana.test.ts"},
+  {"name": "config: an unknown tracker kind is refused", "file": "src/config.ts", "find": "if (!Object.hasOwn(TRACKER_KEYS, String(t.kind)))", "replace": "if (t.kind === undefined)", "test": "tests/config.test.ts"},
+  {"name": "config: a native tracker's required key is checked", "file": "src/config.ts", "find": "if (required && t[k] === undefined)", "replace": "if (false)", "test": "tests/config.test.ts"},
+  {"name": "config: clickup labelTrust is one of two values", "file": "src/config.ts", "find": "t.labelTrust !== \"none\" && t.labelTrust !== \"creator\"", "replace": "false", "test": "tests/config.test.ts"},
+  {"name": "scm: makeTracker builds each native kind", "file": "src/scm.ts", "find": "return new AsanaTracker(tracker, env);", "replace": "return github;", "test": "tests/config.test.ts"},
+  {"name": "linear: a label edited after it was added names no one", "file": "src/adapters/trackers/linear.ts", "find": "return found.updatedAt > last.createdAt ? undefined : last.actor?.id;", "replace": "return last.actor?.id;", "test": "tests/trackers-linear.test.ts"}
 ]

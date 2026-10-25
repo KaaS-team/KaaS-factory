@@ -223,8 +223,8 @@ export class AsanaTracker implements TrackerPort {
   async currentLogin(): Promise<string> {
     return (await this.one<{ gid: string }>("GET", "/users/me")).gid;
   }
-  // Matched by tag gid, so a renamed tag still names who added it. A tag set when the task was made has
-  // no story, so it names the task's creator.
+  // Matched by tag gid, and the story must still name the label: a tag renamed after it was added would
+  // carry the adder's trust to a new name, so it names no one. A tag set at creation names the creator.
   async labeledBy(_repo: string, n: number, label: string): Promise<string | undefined> {
     const t = await this.task(n);
     const tag = t.tags.find((x) => x.name === label);
@@ -232,7 +232,9 @@ export class AsanaTracker implements TrackerPort {
     const adds = (await this.stories(t.gid))
       .filter((s) => s.resource_subtype === "added_to_tag" && s.tag?.gid === tag.gid)
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
-    return adds.length > 0 ? adds.at(-1)!.created_by?.gid : t.created_by?.gid;
+    const last = adds.at(-1);
+    if (!last) return t.created_by?.gid;
+    return last.text.includes(label) ? last.created_by?.gid : undefined;
   }
   // Read fresh on every call: a role is what lets a comment drive the factory, so a demotion counts at once.
   async roleOf(_repo: string, login: string): Promise<RepoRole> {

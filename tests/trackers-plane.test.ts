@@ -43,15 +43,16 @@ describe("Plane specifics", () => {
     ]);
   });
 
-  test("a label a guest added and someone renamed to factory:ready still names the guest", async () => {
+  test("a label renamed to factory:ready after it was added names no one", async () => {
     const t = make();
     const n = await t.createIssue(repo, "x", "", []);
     await t.ensureLabel(repo, "harmless", "ededed", "");
     const p = project();
     const label = p.labels.find((l) => l.name === "harmless")!;
     server.store.applyLabel(p.items.at(-1)!, label.id, "gus");
+    expect(await t.labeledBy(repo, n, "harmless")).toBe("gus");
     label.name = "factory:ready";
-    expect(await t.labeledBy(repo, n, "factory:ready")).toBe("gus");
+    expect(await t.labeledBy(repo, n, "factory:ready")).toBeUndefined();
   });
 
   test("a guest's comment is not trusted, and a cancelled item is closed as not planned", async () => {

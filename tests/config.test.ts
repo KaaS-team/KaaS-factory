@@ -3,7 +3,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { configProblems, DEFAULT_CONFIG, gateCount, holdoutEnabled, loadConfig, testGate } from "../src/config";
+import {
+  configProblems,
+  DEFAULT_CONFIG,
+  gateCount,
+  holdoutEnabled,
+  loadConfig,
+  TRACKER_KINDS,
+  type TrackerConfig,
+  testGate,
+} from "../src/config";
+import { makeTracker } from "../src/scm";
 import { hasNoGates } from "../src/gates";
 import { isFilledIn } from "../src/init";
 
@@ -147,8 +157,11 @@ describe("config validation at boot", () => {
     expect(
       configProblems({ repo: "a/b", tracker: { kind: "http", url: "http://127.0.0.1:9000", tokenEnv: "T" } }),
     ).toEqual([]);
-    expect(configProblems({ repo: "a/b", tracker: { kind: "jira" } })).toEqual([
-      'tracker.kind: expected "github" or "http", got "jira"',
+    expect(configProblems({ repo: "a/b", tracker: { kind: "trello" } })).toEqual([
+      'tracker.kind: expected one of "github", "http", "linear", "plane", "jira", "clickup", "asana", got "trello"',
+    ]);
+    expect(configProblems({ repo: "a/b", tracker: { kind: "toString" } })).toEqual([
+      expect.stringContaining("tracker.kind: expected one of"),
     ]);
     expect(configProblems({ repo: "a/b", tracker: { kind: "github", url: "https://x" } })).toEqual([
       expect.stringContaining("tracker.url: unknown key"),
@@ -166,6 +179,44 @@ describe("config validation at boot", () => {
       "tracker.url: required",
       "tracker.tokenEnv: required (the name of the env var holding the token)",
     ]);
+  });
+
+  test("each native tracker kind validates its own keys, and makeTracker builds every kind", () => {
+    const ok: TrackerConfig[] = [
+      { kind: "linear", team: "ENG", tokenEnv: "LINEAR_API_KEY" },
+      { kind: "plane", workspace: "acme", project: "p1", tokenEnv: "PLANE_API_KEY", url: "https://plane.acme.dev" },
+      { kind: "jira", url: "https://acme.atlassian.net", project: "SHOP", tokenEnv: "JIRA_TOKEN", issueType: "Bug" },
+      { kind: "clickup", workspace: "9001", list: "901", tokenEnv: "CLICKUP_API_TOKEN", labelTrust: "creator" },
+      { kind: "asana", workspace: "1200", project: "1201", tokenEnv: "ASANA_TOKEN" },
+    ];
+    for (const tracker of ok) expect(configProblems({ repo: "a/b", tracker })).toEqual([]);
+    expect(new Set([...ok.map((t) => t.kind), "github", "http"])).toEqual(new Set(TRACKER_KINDS));
+    for (const tracker of [...ok, { kind: "github" } as const])
+      expect(makeTracker(tracker, {}).constructor.name.toLowerCase()).toContain(
+        tracker.kind === "github" ? "github" : tracker.kind,
+      );
+    expect(configProblems({ repo: "a/b", tracker: { kind: "jira", project: "SHOP" } })).toEqual([
+      "tracker.url: required",
+      "tracker.tokenEnv: required (the name of the env var holding the token)",
+    ]);
+    expect(
+      configProblems({
+        repo: "a/b",
+        tracker: { kind: "linear", team: "ENG", tokenEnv: "K", url: "http://linear.example" },
+      }),
+    ).toEqual(['tracker.url: https (plain http only to localhost), got "http://linear.example"']);
+    expect(
+      configProblems({
+        repo: "a/b",
+        tracker: { kind: "clickup", workspace: "1", list: "2", tokenEnv: "K", labelTrust: "all" },
+      }),
+    ).toEqual(['tracker.labelTrust: expected "none" or "creator", got "all"']);
+    expect(
+      configProblems({
+        repo: "a/b",
+        tracker: { kind: "asana", workspace: "1", project: "2", tokenEnv: "K", team: "x" },
+      }),
+    ).toEqual([expect.stringContaining("tracker.team: unknown key")]);
   });
 
   test("labels maps factory labels to a team's names, one to one", () => {
