@@ -49,7 +49,9 @@ import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
 import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
-import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { poolUsagePath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { FileUsageStore } from "./adapters/pool/execution";
+import { monthKey, poolReport } from "./core/sandbox-pool";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
 import { repoFromRemoteUrl } from "./config";
@@ -975,6 +977,35 @@ async function cmdEvents(): Promise<void> {
   console.log(`factory events: ${id} queued to ${queued} sink(s), ${delivered} delivered now`);
 }
 
+// `factory pool`: each pool in machine.json, its members' minutes used and left this month, and the last failure.
+async function cmdPool(): Promise<void> {
+  if (has("help")) {
+    console.log("usage: factory pool [--json]");
+    return;
+  }
+  const runtimes = loadMachineConfig().runtimes ?? {};
+  const month = monthKey(new Date());
+  const usage = new FileUsageStore(poolUsagePath()).read();
+  const pools = Object.entries(runtimes).flatMap(([name, spec]) =>
+    spec.kind === "pool" ? [{ name, members: poolReport(spec.members, usage, month) }] : [],
+  );
+  if (has("json")) {
+    console.log(successJson({ month, pools }));
+    return;
+  }
+  if (!pools.length) {
+    console.log("factory pool: no pool runtime in FACTORY_HOME/machine.json");
+    return;
+  }
+  for (const p of pools) {
+    console.log(`${p.name} (${month}, then local)`);
+    for (const m of p.members)
+      console.log(
+        `  ${m.runtime}  used ${m.used} of ${m.allowance} min, ${m.left} left${m.lastFailure ? `  last failure: ${plain(m.lastFailure)}` : ""}`,
+      );
+  }
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "up":
@@ -1023,6 +1054,8 @@ async function main(): Promise<void> {
       return cmdMinion();
     case "events":
       return cmdEvents();
+    case "pool":
+      return cmdPool();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

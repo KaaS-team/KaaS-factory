@@ -59,6 +59,8 @@ function target(spec: RuntimeSpec): string {
       return spec.argv.join(" ");
     case "http":
       return spec.url;
+    case "pool":
+      return `pool of ${spec.members.map((m) => m.runtime).join(", ")}, then this machine`;
   }
 }
 

@@ -29,7 +29,12 @@ describe("frame", () => {
     expect(unframe(p.stdout.toString(), p.exitCode)).toEqual({ stdout: "out\nx", stderr: "err\n", code: 4 });
   });
   test("no frame means the runtime failed before the command: its output is the error", () => {
-    expect(unframe("box unreachable\n", 255)).toEqual({ stdout: "", stderr: "box unreachable\n", code: 255 });
+    expect(unframe("box unreachable\n", 255)).toEqual({
+      stdout: "",
+      stderr: "box unreachable\n",
+      code: 255,
+      runtimeFailed: "box unreachable",
+    });
     expect(unframe("", 0).code).toBe(1);
   });
 });
@@ -170,13 +175,23 @@ describe("http sandbox", () => {
         { kind: "http", url: sandbox.url, tokenEnv: "T" },
         { T: "wrong-token-value" },
       ).run("true", dir());
-      expect(wrong).toEqual({ stdout: "", stderr: `sandbox ${sandbox.url} answered 401: unauthorized`, code: 1 });
+      expect(wrong).toEqual({
+        stdout: "",
+        stderr: `sandbox ${sandbox.url} answered 401: unauthorized`,
+        code: 1,
+        runtimeFailed: `sandbox ${sandbox.url} answered 401: unauthorized`,
+      });
       expect(sandbox.requests.at(-1)?.auth).toBe("Bearer wrong-token-value");
       const unset = await new HttpSandboxExecution({ kind: "http", url: sandbox.url, tokenEnv: "T" }, {}).run(
         "true",
         dir(),
       );
-      expect(unset).toEqual({ stdout: "", stderr: `sandbox ${sandbox.url}: env var T is not set`, code: 1 });
+      expect(unset).toEqual({
+        stdout: "",
+        stderr: `sandbox ${sandbox.url}: env var T is not set`,
+        code: 1,
+        runtimeFailed: `sandbox ${sandbox.url}: env var T is not set`,
+      });
       expect(sandbox.requests.length).toBe(1);
     } finally {
       sandbox.stop();
@@ -197,6 +212,7 @@ describe("http sandbox", () => {
         stdout: "",
         stderr: `sandbox http://127.0.0.1:${odd.port}/ answered without {stdout, stderr, code}: {"out":"?"}`,
         code: 1,
+        runtimeFailed: `sandbox http://127.0.0.1:${odd.port}/ answered without {stdout, stderr, code}: {"out":"?"}`,
       });
     } finally {
       odd.stop(true);
@@ -243,7 +259,7 @@ describe("names", () => {
       "runtimes.a b: a name is letters, digits, _ and -",
       "runtimes.d.image: required for docker",
       "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude)",
-      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http",
+      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, pool",
     ]);
   });
   test("a bad machine.json runtime stops boot", () => {

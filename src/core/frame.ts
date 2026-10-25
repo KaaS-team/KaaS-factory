@@ -26,6 +26,7 @@ export interface Unframed {
   readonly stdout: string;
   readonly stderr: string;
   readonly code: number;
+  readonly runtimeFailed?: string;
 }
 
 // The last frame in `output`. No frame means the command never ran (the
@@ -34,7 +35,13 @@ export function unframe(output: string, runtimeCode: number): Unframed {
   const lines = output.split("\n");
   const at = lines.lastIndexOf(START);
   const end = lines[at + 3]?.match(new RegExp(`^${END} (\\d+)$`));
-  if (at < 0 || !end) return { stdout: "", stderr: output, code: runtimeCode === 0 ? 1 : runtimeCode };
+  if (at < 0 || !end)
+    return {
+      stdout: "",
+      stderr: output,
+      code: runtimeCode === 0 ? 1 : runtimeCode,
+      runtimeFailed: output.trim().split("\n")[0] || `exit ${runtimeCode} with no output`,
+    };
   const decode = (b64: string) => Buffer.from(b64, "base64").toString("utf8");
   return { stdout: decode(lines[at + 1]!), stderr: decode(lines[at + 2]!), code: Number(end[1]) };
 }

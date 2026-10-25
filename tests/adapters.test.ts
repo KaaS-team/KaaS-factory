@@ -12,6 +12,8 @@ import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { LocalExecution } from "../src/adapters/local/execution";
 import { LwprExecution } from "../src/adapters/lwpr/execution";
+import { PoolExecution } from "../src/adapters/pool/execution";
+import type { PoolUsage } from "../src/core/sandbox-pool";
 import { SshExecution } from "../src/adapters/ssh/execution";
 import { WrapExecution } from "../src/adapters/wrap/execution";
 import { startSandbox } from "./fixtures/http-sandbox";
@@ -75,6 +77,29 @@ function httpSandbox(): () => void {
     });
 }
 
+// A pool of one sandbox member, usage in memory: the contract runs on the member.
+function sandboxPool(): () => void {
+  return () =>
+    describe("a pool over the reference sandbox server", () => {
+      let sandbox: ReturnType<typeof startSandbox>;
+      beforeAll(() => (sandbox = startSandbox("s3cret")));
+      afterAll(() => sandbox.stop());
+      executionContract("pool", () => {
+        let usage: PoolUsage = {};
+        const member = new HttpSandboxExecution(
+          { kind: "http", url: sandbox.url, tokenEnv: "SANDBOX_TOKEN" },
+          { SANDBOX_TOKEN: "s3cret" },
+        );
+        return new PoolExecution(
+          { kind: "pool", members: [{ runtime: "sb", minutes: 60 }] },
+          { sb: member },
+          { run: async () => ({ stdout: "", stderr: "ran on the fallback", code: 99 }) },
+          { read: () => usage, write: (u) => (usage = u) },
+        );
+      });
+    });
+}
+
 const REGISTRY: Record<string, () => void> = {
   "git-lease": () => leaseContract("git-lease", gitLeases),
   "github-store": () =>
@@ -96,6 +121,7 @@ const REGISTRY: Record<string, () => void> = {
       () => new WrapExecution({ kind: "wrap", argv: ["env", "FACTORY_WRAPPED=1", "bash", "-c", "{cmd}"] }),
     ),
   "http-sandbox": httpSandbox(),
+  pool: sandboxPool(),
   ssh: onFakePath(() =>
     executionContract(
       "ssh",

@@ -6,9 +6,13 @@ export interface ExecResult {
   readonly stdout: string;
   readonly stderr: string;
   readonly code: number;
+  // Set when the runtime failed before or around the command (unreachable,
+  // refused, cut off), so a caller can tell that from the command failing.
+  readonly runtimeFailed?: string;
 }
 
 export interface ExecutionPort {
   // `cmd` is a bash command line, run with `cwd` as its working directory.
-  run(cmd: string, cwd: string): Promise<ExecResult>;
+  // An adapter that honours `signal` stops the command when it aborts.
+  run(cmd: string, cwd: string, signal?: AbortSignal): Promise<ExecResult>;
 }

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A `pool` runtime: hosted sandboxes on free tiers in order, each with its monthly minutes from
+  `machine.json`. A spent member is skipped, a run is cut off at the minutes a member has left, a
+  member that fails as a runtime hands the run to the next one, and `local` runs it when all are
+  spent. `factory pool` shows each member's minutes used and left and its last failure. An
+  `ExecResult` now says `runtimeFailed` when the runtime, not the command, failed.
 - The cockpit follows the kaas.team design: its tokens are a line-for-line copy of kaas.team's
   `:root` block, set in Geist, in one light theme, laid out like kaas-tasks: a sidebar with a Repos
   section that filters every view, and the view in an inset panel under a breadcrumb. The Line is the

@@ -113,6 +113,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "tail: recent events in and out, with each sink's delivery status; replay: send one event to its sinks again",
   },
   {
+    name: "pool",
+    usage: "pool [--json]",
+    does: "each pool runtime in machine.json: every member's free minutes used and left this month, and its last failure",
+  },
+  {
     name: "install",
     usage: "install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]",
     does: "install or update the template in a repo; --agents links skills into each agent dir",
@@ -127,6 +132,7 @@ export const OPTIONS: [string, string][] = [
     "run, tick, watch --once, doctor and harness: print {ok,data} on stdout, and errors as {ok:false,error} on stderr",
   ],
   ["--tmux", "watch and up: show each issue's live transcript in a tmux window (config tmux.enabled does the same)"],
+  ["-h, --help", "print this help; after a command, that command's usage"],
   ["--port <n>", "dashboard port (default FACTORY_DASHBOARD_PORT or 4100)"],
 ];
 

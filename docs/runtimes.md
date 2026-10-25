@@ -43,6 +43,32 @@ and tokens belong to the machine, not the repo, so you define every other runtim
 
 `factory doctor` lists the runtimes the repo uses and flags any that are missing.
 
+## A pool of free tiers
+
+A `pool` names `http` runtimes from the same file, in order, each with the monthly minutes its
+free tier gives. You copy that figure from the provider's pricing page; the factory holds none.
+
+```json
+{
+  "runtimes": {
+    "e2b": { "kind": "http", "url": "https://e2b-shim.example.com/exec", "tokenEnv": "E2B_SHIM_TOKEN" },
+    "daytona": { "kind": "http", "url": "https://daytona-shim.example.com/exec", "tokenEnv": "DAYTONA_SHIM_TOKEN" },
+    "free": { "kind": "pool", "members": [{ "runtime": "e2b", "minutes": 60 }, { "runtime": "daytona", "minutes": 30 }] }
+  }
+}
+```
+
+A step on `free` runs on the first member with at least `reserveMin` minutes left this month
+(default 10, months in UTC). The run is cut off when it reaches the minutes that member had left,
+so no member runs past its allowance. A member that fails as a runtime (unreachable, refused, no
+answer) is charged the minutes it took, keeps the error as its last failure, and the step moves to
+the next member. A command that fails on a member is the step's answer. With every member spent,
+the step runs on `local`. Usage is in `FACTORY_HOME/pool-usage.json`, shared by every watcher on
+the machine. Only `http` members can be cut off mid-run, so a pool takes no other kind.
+
+`factory pool` prints each member's minutes used and left this month and its last failure;
+`--json` prints the same as `{ok, data}`.
+
 ## The http protocol
 
 ```

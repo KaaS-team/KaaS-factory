@@ -25,7 +25,7 @@ export function archiveArgs(spec: HttpSandboxSpec): string[] {
 }
 
 function fail(stderr: string): ExecResult {
-  return { stdout: "", stderr, code: 1 };
+  return { stdout: "", stderr, code: 1, runtimeFailed: stderr.split("\n")[0]! };
 }
 
 export class HttpSandboxExecution implements ExecutionPort {
@@ -34,7 +34,7 @@ export class HttpSandboxExecution implements ExecutionPort {
     private readonly env: NodeJS.ProcessEnv = process.env,
   ) {}
 
-  async run(cmd: string, cwd: string): Promise<ExecResult> {
+  async run(cmd: string, cwd: string, signal?: AbortSignal): Promise<ExecResult> {
     const tar = Bun.spawn(archiveArgs(this.spec), { cwd, stdout: "pipe", stderr: "pipe" });
     const [archive, tarErr, tarCode] = await Promise.all([
       new Response(tar.stdout).arrayBuffer(),
@@ -50,11 +50,18 @@ export class HttpSandboxExecution implements ExecutionPort {
         method: "POST",
         headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ cmd, archive: Buffer.from(archive).toString("base64") }),
+        ...(signal ? { signal } : {}),
       });
     } catch (err) {
+      if (signal?.aborted) return fail(`sandbox ${this.spec.url}: cut off (${String(signal.reason)})`);
       return fail(`sandbox ${this.spec.url} unreachable: ${err instanceof Error ? err.message : String(err)}`);
     }
-    const text = await res.text();
+    let text: string;
+    try {
+      text = await res.text();
+    } catch {
+      return fail(`sandbox ${this.spec.url}: cut off (${String(signal?.reason)})`);
+    }
     if (!res.ok) return fail(`sandbox ${this.spec.url} answered ${res.status}: ${text.slice(0, 500)}`);
     try {
       const r = JSON.parse(text) as Partial<ExecResult>;
