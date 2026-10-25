@@ -17,7 +17,7 @@ Path-scoped rules load when a matching file is read: `.claude/rules/lwp-api.md` 
 
 - Test the structure: one test that walks every route, table or coupled pair beats review.
 - Verify by executing (curl it, run it, check the row), then revert the fix and watch the test fail.
-- Gate the blast radius: `scripts/lwp/check-affected.py --run` per phase, `--base origin/main` before a PR; the box runs everything on push.
+- Gate the blast radius: `scripts/lwp/check-affected.py --run` per phase, `--base origin/main` before a PR; CI runs everything on push.
 - Never write a claim the code does not do.
 - One resolver per concept; a number that appears twice is derived or pinned by a test.
 - Vet a dependency before adding it (`/eng-add-dependency`); no major-version drift across sibling apps.

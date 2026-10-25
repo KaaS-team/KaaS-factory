@@ -5,7 +5,7 @@ Usage:  check-affected.py            print the plan: which checks run, scoped ho
         check-affected.py --run      run the plan; on a pass, stamp the tree so the Stop hook accepts it
         check-affected.py --full     run the repo's whole `gate`
         check-affected.py --base REF diff against REF instead of the last verified tree
-        check-affected.py --files a,b  plan for these files, no diff (how a run reaches the box, which has no history)
+        check-affected.py --files a,b  plan for these files, no diff (a CI checkout with no history)
         check-affected.py --stage S  only checks whose `stage` is S or earlier (stop, push, nightly); default push
         check-affected.py --audit    fail when repo.json breaks repo.schema.json, a tracked file is claimed by no
                                      check, `full` or `ignore`, or a gate step is run by no check, `covers` or `fullOnly`
@@ -17,7 +17,6 @@ import json
 import os
 import re
 import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -46,7 +45,7 @@ FULL_AT = 60
 INERT_KIT = [
     "scripts/lwp/check-affected.py",
     "scripts/lwp/gate-stamp.py",
-    "scripts/lwp/push-remote.sh",
+    "scripts/lwp/push-remote.sh",  # retired; a sync deletes it, and the deletion is inert too
     "scripts/lwp/pre-push.sh",
     ".githooks/pre-push",
     "scripts/lwp/repo.schema.json",
@@ -155,7 +154,9 @@ def plan(
         files = [f for f in files if f not in kit]
         head += f"; {len(kit)} vendored kit file(s) left to lwp-claude-plugins' evals"
     # Right after a push the merge base is HEAD itself: an empty diff there proves nothing ran on this tree.
-    if not files and given is None and base_arg is None and not read_stamp(root):
+    # A kit-only diff below the push stage passes: that run writes no stamp, and CI runs the whole gate.
+    synced = bool(kit) and STAGES.index(stage) < STAGES.index("push")
+    if not files and not synced and given is None and base_arg is None and not read_stamp(root):
         return {"mode": "full", "why": f"{head}, and no run here has verified this tree", "steps": [("gate", gate)]}
     if not files:
         return {"mode": "scoped", "why": head, "steps": [], "files": files}
@@ -202,31 +203,6 @@ def plan(
     return {"mode": "scoped", "why": head, "steps": steps, "skipped": skipped, "later": later, "files": files}
 
 
-def routed(root: Path) -> bool:
-    """lwpr picks this machine or the box; inside its run (LWPR_LOCAL here, LWPR_JOB there) it already has."""
-    return (
-        (root / ".lwpr.toml").is_file()
-        and bool(shutil.which("lwpr"))
-        and not os.environ.get("LWPR_JOB")
-        and os.environ.get("LWPR_LOCAL") != "1"
-    )
-
-
-def offload(root: Path, cmd: str) -> str:
-    return f"lwpr run -- {shlex.quote(cmd)}" if routed(root) else cmd
-
-
-def through_lwpr(root: Path, p: dict) -> int:
-    """A scoped run goes where lwpr sends it, with the file list, since the box has no git history to diff."""
-    before = tree_id(root)
-    staged = [] if p["stage"] == "push" else ["--stage", p["stage"]]
-    inner = shlex.join(["python3", "scripts/lwp/check-affected.py", "--run", *staged, "--files", ",".join(p["files"])])
-    rc = subprocess.run(["lwpr", "run", "--", inner], cwd=str(root)).returncode
-    if rc == 0 and before and tree_id(root) == before and stamps(p):
-        write_stamp(root, p["mode"])
-    return rc
-
-
 def width(cfg: dict, n: int) -> int:
     """Checks at once: half the cores the machine has free now, since each test runner fans out
     itself, capped by the map's `jobs`. A loaded machine runs them one by one rather than choke."""
@@ -255,10 +231,6 @@ def stamps(p: dict) -> bool:
 
 def execute(root: Path, cfg: dict, p: dict) -> int:
     steps = p["steps"]
-    if p["mode"] == "scoped" and steps and routed(root):
-        return through_lwpr(root, p)
-    if p["mode"] == "full":
-        steps = [(n, offload(root, c)) for n, c in steps]
     logs = Path(tempfile.mkdtemp(prefix="affected-"))
     alone = {c["name"] for c in (cfg.get("impact") or {}).get("checks", []) if c.get("alone")}
     first = [s for s in steps if s[0] in alone or p["mode"] == "full"]
