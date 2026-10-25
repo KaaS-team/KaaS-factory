@@ -96,11 +96,19 @@ fn check_predicate(p: &Value, artifacts_dir: Option<&str>) -> Result<(), Tampere
     for e in errors {
         not_proven.push(format!("acceptance error: {}", e.as_str().unwrap_or("")));
     }
+    let holdout_required = get(p, "holdout.required")?.as_bool().unwrap_or(true);
     let holdout_ran = get(p, "holdout.ran")?.as_bool().unwrap_or(false);
     let holdout_failed = get(p, "holdout.ok")?.as_bool() == Some(false);
-    if holdout_ran && holdout_failed {
+    if !holdout_ran {
+        not_proven.push("holdout tests did not run".into());
+    } else if holdout_failed {
         not_proven.push("holdout tests failed".into());
     }
+    let holdout_held = if holdout_ran {
+        !holdout_failed
+    } else {
+        !holdout_required
+    };
     let mutation = text(p, "mutationProof.status")?;
     if mutation != "bites" {
         not_proven.push(format!("mutation proof: {mutation}"));
@@ -119,7 +127,7 @@ fn check_predicate(p: &Value, artifacts_dir: Option<&str>) -> Result<(), Tampere
             format!("{failed} criteria are not proven"),
         );
     }
-    let proven = !criteria.is_empty() && failed == 0 && errors.is_empty() && !holdout_failed;
+    let proven = !criteria.is_empty() && failed == 0 && errors.is_empty() && holdout_held;
     if get(p, "verdict.proven")?.as_bool() != Some(proven) {
         return tampered("verdict.proven", format!("the rows give proven={proven}"));
     }

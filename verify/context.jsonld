@@ -36,6 +36,10 @@
       "@id": "kaas:proven",
       "@type": "xsd:boolean"
     },
+    "required": {
+      "@id": "kaas:holdoutRequired",
+      "@type": "xsd:boolean"
+    },
     "ran": {
       "@id": "kaas:ran",
       "@type": "xsd:boolean"

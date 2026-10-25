@@ -390,5 +390,13 @@
   {"name": "kaas-verify: artifacts are re-hashed", "file": "verify/src/main.rs", "find": "if Some(hex(&Sha256::digest(&body)).as_str()) != digest.as_str() {", "replace": "if false {", "test": "tests/receipt.test.ts"},
   {"name": "kaas-verify: the subject is the head", "file": "verify/src/main.rs", "find": ".and_then(Value::as_str)\n        != Some(head)", "replace": ".and_then(Value::as_str)\n        == Some(\"never\")", "test": "tests/receipt.test.ts"},
   {"name": "receipt: a failed holdout is not proven", "file": "src/receipt.ts", "find": "&& holdout.ok !== false", "replace": "", "test": "tests/receipt.test.ts"},
-  {"name": "receipt: the PR body carries the receipt", "file": "src/engine/common.ts", "find": "if (receipt) body = `${body}\\n\\n${receipt}`;", "replace": "", "test": "tests/executor.test.ts"}
+  {"name": "receipt: the PR body carries the receipt", "file": "src/engine/common.ts", "find": "if (receipt) body = `${body}\\n\\n${receipt}`;", "replace": "", "test": "tests/executor.test.ts"},
+  {"name": "receipt: a run file changed after verify is refused", "file": "src/receipt.ts", "find": "if (now !== o.seal.files[name]) throw", "replace": "if (false) throw", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: a head that moved after verify is refused", "file": "src/receipt.ts", "find": "if (headSha !== o.seal.head) throw", "replace": "if (false) throw", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: no seal, nothing signed", "file": "src/receipt.ts", "find": "if (!o.seal) throw new Error", "replace": "if (false) throw new Error", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: a symlinked run file is refused", "file": "src/receipt.ts", "find": "if (!st.isFile()) throw", "replace": "if (false) throw", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: a symlink at the receipt name is replaced", "file": "src/receipt.ts", "find": "  rmSync(out, { force: true });\n", "replace": "", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: a required holdout that never ran is not proven", "file": "src/receipt.ts", "find": ": !holdout.required;", "replace": ": true;", "test": "tests/receipt.test.ts"},
+  {"name": "kaas-verify: a required holdout that never ran is not proven", "file": "verify/src/main.rs", "find": "        !holdout_required\n", "replace": "        true\n", "test": "tests/receipt.test.ts"},
+  {"name": "verify seals the run files for the receipt", "file": "src/engine/steps.ts", "find": "deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : \"\");", "replace": "void seal;", "test": "tests/executor.test.ts"}
 ]

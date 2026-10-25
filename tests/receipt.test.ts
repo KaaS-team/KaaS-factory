@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AcceptanceVerdict } from "../src/acceptance";
@@ -12,6 +13,8 @@ import {
   missingReceipt,
   type ReceiptInput,
   renderReceipt,
+  type RunSeal,
+  sealRunFiles,
   signStatement,
   type Statement,
   unsignedEnvelope,
@@ -24,7 +27,12 @@ import type { StageRun } from "../src/state";
 
 const ROOT = join(import.meta.dir, "..");
 // Shared across the mutation copies so each one rebuilds only the crate, never its dependencies.
-const TARGET = process.env.CARGO_TARGET_DIR ?? join(tmpdir(), "kaas-verify-target");
+// One target per checkout: make check-mutations builds mutated copies, and a shared target dir hands
+// this checkout the last copy's binary while cargo still calls its own build fresh.
+const TARGET = join(
+  process.env.CARGO_TARGET_DIR ?? join(tmpdir(), "kaas-verify-target"),
+  createHash("sha256").update(ROOT).digest("hex").slice(0, 12),
+);
 const BIN = join(TARGET, "release", "kaas-verify");
 
 beforeAll(() => {
@@ -84,6 +92,7 @@ function input(over: Partial<ReceiptInput> = {}): ReceiptInput {
     at: "2026-10-25T00:00:00.000Z",
     acceptance,
     holdout: { ok: true },
+    holdoutRequired: true,
     proof: { status: "bites", tests: ["tests/price.test.ts"] },
     runs: [run("build", "claude-haiku-5-5", 0.12), run("verify", "claude-sonnet-5-5", null)],
     files: { "acceptance.json": JSON.stringify(acceptance) },
@@ -137,6 +146,19 @@ describe("receipt statement", () => {
     const { predicate: p } = buildStatement(input({ holdout: { ok: false } }));
     expect(p.verdict.proven).toBe(false);
     expect(p.verdict.notProven).toEqual(["holdout tests failed"]);
+  });
+
+  test("a holdout config requires that did not run is not proven", () => {
+    const { predicate: p } = buildStatement(input({ holdout: undefined }));
+    expect(p.holdout).toEqual({ required: true, ran: false, ok: null });
+    expect(p.verdict.proven).toBe(false);
+    expect(p.verdict.notProven).toEqual(["holdout tests did not run"]);
+  });
+
+  test("a repo with no holdout is listed as such without failing the verdict", () => {
+    const { predicate: p } = buildStatement(input({ holdout: undefined, holdoutRequired: false }));
+    expect(p.verdict.proven).toBe(true);
+    expect(p.verdict.notProven).toEqual(["holdout tests did not run"]);
   });
 
   test("prRunSummary off leaves no model or spend in the receipt", () => {
@@ -255,6 +277,11 @@ describe("kaas-verify, the independent checker", () => {
       "verdict.proven: the rows give proven=false",
     ],
     [
+      "proven claimed over a required holdout that never ran",
+      (s) => Object.assign(s.predicate.holdout, { ran: false, ok: null }),
+      "verdict.proven: the rows give proven=false",
+    ],
+    [
       "a not-proven line dropped",
       (s) => Object.assign(s.predicate.mutationProof, { status: "survives" }),
       'verdict.notProven: the rows give ["mutation proof: survives"]',
@@ -286,7 +313,8 @@ describe("kaas-verify, the independent checker", () => {
 });
 
 describe("writeRunReceipt", () => {
-  test("signs from the run dir's own files and the worktree's commits", async () => {
+  // A worktree with a base and a head commit, and verify's two run files written.
+  function worktree() {
     const repo = mkdtempSync(join(tmpdir(), "factory-receipt-repo-"));
     const git = (cmd: string) =>
       Bun.spawnSync(["sh", "-c", cmd], { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
@@ -301,20 +329,61 @@ describe("writeRunReceipt", () => {
       join(repo, runDir, "proof.json"),
       JSON.stringify({ status: "bites", tests: ["t"], reverted: [], cmd: "", tail: "" }),
     );
-    const env = await writeRunReceipt(new ShellSetupRunner(), {
-      worktree: repo,
-      runDir,
-      repo: "acme/shop",
-      issue: 42,
-      base: "main",
-      runs: [],
-      operatorDetail: true,
-      env: { FACTORY_RECEIPT_KEY: key.privateKeyPem },
-    });
-    const head = git("git rev-parse HEAD").stdout.toString().trim();
+    const write = async (seal: RunSeal | undefined) =>
+      writeRunReceipt(new ShellSetupRunner(), {
+        worktree: repo,
+        runDir,
+        repo: "acme/shop",
+        issue: 42,
+        base: "main",
+        runs: [],
+        operatorDetail: true,
+        holdoutRequired: false,
+        seal,
+        env: { FACTORY_RECEIPT_KEY: key.privateKeyPem },
+      });
+    const seal = () => sealRunFiles(new ShellSetupRunner(), repo, runDir);
+    return { repo, runDir, git, write, seal, file: (name: string) => join(repo, runDir, name) };
+  }
+
+  test("signs what verify sealed, from the run dir's own files and the worktree's commits", async () => {
+    const w = worktree();
+    const env = await w.write(await w.seal());
+    const head = w.git("git rev-parse HEAD").stdout.toString().trim();
     expect(decodeStatement(env).predicate.run.head.sha).toBe(head);
-    expect(JSON.parse(readFileSync(join(repo, runDir, "receipt.dsse.json"), "utf8"))).toEqual(env);
-    const r = kaasVerify(env, "--pubkey", join(dir, "key.pub"), "--artifacts", join(repo, runDir));
+    expect(JSON.parse(readFileSync(w.file("receipt.dsse.json"), "utf8"))).toEqual(env);
+    const r = kaasVerify(env, "--pubkey", join(dir, "key.pub"), "--artifacts", join(w.repo, w.runDir));
     expect(r.code).toBe(0);
+  });
+
+  test("refuses when there is no seal, a run file changed, one appeared, or the head moved", async () => {
+    const w = worktree();
+    await expect(w.write(undefined)).rejects.toThrow("receipt: verify did not seal this run's files");
+    let seal = await w.seal();
+    writeFileSync(w.file("acceptance.json"), JSON.stringify({ ...acceptance, errors: [] }, null, 1));
+    await expect(w.write(seal)).rejects.toThrow("receipt: acceptance.json changed after verify");
+    seal = await w.seal();
+    writeFileSync(w.file("holdout.json"), JSON.stringify({ ok: true }));
+    await expect(w.write(seal)).rejects.toThrow("receipt: holdout.json changed after verify");
+    seal = await w.seal();
+    w.git("git -c user.email=t@t -c user.name=t commit -q --allow-empty -m later");
+    await expect(w.write(seal)).rejects.toThrow("receipt: the head moved after verify");
+  });
+
+  test("a symlinked run file is refused, and a symlink at the receipt's name is replaced, not written through", async () => {
+    const w = worktree();
+    const outside = join(w.repo, "outside.json");
+    writeFileSync(outside, JSON.stringify(acceptance));
+    rmSync(w.file("acceptance.json"));
+    symlinkSync(outside, w.file("acceptance.json"));
+    await expect(w.seal()).rejects.toThrow("receipt: acceptance.json is not a regular file");
+    rmSync(w.file("acceptance.json"));
+    writeFileSync(w.file("acceptance.json"), JSON.stringify(acceptance));
+    const target = join(w.repo, "target.txt");
+    writeFileSync(target, "untouched");
+    symlinkSync(target, w.file("receipt.dsse.json"));
+    await w.write(await w.seal());
+    expect(readFileSync(target, "utf8")).toBe("untouched");
+    expect(lstatSync(w.file("receipt.dsse.json")).isSymbolicLink()).toBe(false);
   });
 });

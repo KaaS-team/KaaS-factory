@@ -5,7 +5,7 @@
 // Why this shape: docs/decisions/signed-acceptance-receipts.md.
 
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AcceptanceRow, AcceptanceVerdict } from "./acceptance";
 import { shq } from "./core/frame";
@@ -52,7 +52,7 @@ export interface AcceptancePredicate {
     readonly at: string;
   };
   readonly criteria: readonly ReceiptCriterion[];
-  readonly holdout: { readonly ran: boolean; readonly ok: boolean | null };
+  readonly holdout: { readonly required: boolean; readonly ran: boolean; readonly ok: boolean | null };
   readonly mutationProof: { readonly status: string; readonly tests: number };
   readonly steps: readonly ReceiptStep[];
   readonly artifacts: Readonly<Record<string, string>>;
@@ -87,6 +87,8 @@ export interface ReceiptInput {
   readonly at: string;
   readonly acceptance?: AcceptanceVerdict;
   readonly holdout?: { readonly ok: boolean };
+  // Config enables a holdout, so a run without its result is not proven.
+  readonly holdoutRequired: boolean;
   readonly proof?: Pick<ProofResult, "status" | "tests">;
   readonly runs: readonly StageRun[];
   // Raw bytes of each run-dir file the predicate stands on, hashed so the receipt pins them.
@@ -121,17 +123,20 @@ export function notProven(
   if (!p.criteria) out.push("no acceptance criteria were found for this change");
   for (const c of input.criteria) if (!c.ok) out.push(`${c.id}: ${c.proof}`);
   for (const e of p.errors) out.push(`acceptance error: ${e}`);
-  if (input.holdout.ran && input.holdout.ok === false) out.push("holdout tests failed");
+  if (!input.holdout.ran) out.push("holdout tests did not run");
+  else if (input.holdout.ok === false) out.push("holdout tests failed");
   if (input.mutationProof.status !== "bites") out.push(`mutation proof: ${input.mutationProof.status}`);
   return out;
 }
 
-// Proven is the acceptance gate's own bar plus the holdout; a missing mutation proof is listed, not failed.
+// Proven is the acceptance gate's own bar plus the holdout, when config requires one; a missing mutation
+// proof, or a holdout the repo never set up, is listed under "Not proven" without failing it.
 export function isProven(
   v: Pick<AcceptancePredicate["verdict"], "criteria" | "failed" | "errors">,
   holdout: AcceptancePredicate["holdout"],
 ): boolean {
-  return v.criteria > 0 && v.failed === 0 && v.errors.length === 0 && holdout.ok !== false;
+  const holdoutHeld = holdout.ran ? holdout.ok !== false : !holdout.required;
+  return v.criteria > 0 && v.failed === 0 && v.errors.length === 0 && holdoutHeld;
 }
 
 export function buildStatement(input: ReceiptInput): Statement {
@@ -149,7 +154,7 @@ export function buildStatement(input: ReceiptInput): Statement {
       ok: criterionOk(proof),
     };
   });
-  const holdout = { ran: input.holdout !== undefined, ok: input.holdout?.ok ?? null };
+  const holdout = { required: input.holdoutRequired, ran: input.holdout !== undefined, ok: input.holdout?.ok ?? null };
   const mutationProof = { status: input.proof?.status ?? "unavailable", tests: input.proof?.tests.length ?? 0 };
   const steps = input.runs.map((r) => ({
     stage: r.stage,
@@ -252,7 +257,7 @@ export function receiptKey(env: Readonly<Record<string, string | undefined>> = p
   const raw = env[RECEIPT_KEY_ENV]?.trim();
   if (!raw) return undefined;
   if (raw.startsWith("-----BEGIN")) return raw;
-  if (!existsSync(raw)) throw new Error(`${RECEIPT_KEY_ENV} names ${raw}, which does not exist`);
+  if (!existsSync(raw)) throw new Error(`${RECEIPT_KEY_ENV} names a file that does not exist`);
   return readFileSync(raw, "utf8");
 }
 
@@ -305,6 +310,61 @@ export function envelopeFromBody(body: string): Envelope | undefined {
 
 const RUN_FILES = ["acceptance.json", "holdout.json", "proof.json"] as const;
 
+// What verify left, fixed before any later agent stage can touch the worktree: the commit it checked and
+// the sha256 of each run file (null when absent). Kept in runner state, never in the worktree.
+export interface RunSeal {
+  readonly head: string | null;
+  readonly files: Readonly<Record<string, string | null>>;
+}
+
+export const sealKey = (repo: string, issue: number): string => `receipt-seal:${repo}#${issue}`;
+
+// A run file's bytes, or undefined when absent. A symlink or directory is refused, so an agent cannot
+// point the receipt at a file outside the run dir.
+function readRunFile(dir: string, name: string): string | undefined {
+  let st: ReturnType<typeof lstatSync>;
+  try {
+    st = lstatSync(join(dir, name));
+  } catch {
+    return undefined;
+  }
+  if (!st.isFile()) throw new Error(`receipt: ${name} is not a regular file`);
+  return readFileSync(join(dir, name), "utf8");
+}
+
+function readRunFiles(dir: string): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (const name of RUN_FILES) {
+    const body = readRunFile(dir, name);
+    if (body !== undefined) files[name] = body;
+  }
+  return files;
+}
+
+// Errors name the ref only: git's stderr can carry host paths, and this text reaches the PR.
+async function revParse(exec: ExecutionPort, cwd: string, ref: string): Promise<string> {
+  const out = await exec.run(`git rev-parse ${shq(ref)}`, cwd);
+  if (out.code !== 0) throw new Error(`receipt: git rev-parse ${ref} failed`);
+  return out.stdout.trim();
+}
+
+export async function sealRunFiles(exec: ExecutionPort, worktree: string, runDir: string): Promise<RunSeal> {
+  const files = readRunFiles(join(worktree, runDir));
+  return {
+    head: await revParse(exec, worktree, "HEAD").catch(() => null),
+    files: Object.fromEntries(RUN_FILES.map((n) => [n, files[n] === undefined ? null : sha256(files[n]!)])),
+  };
+}
+
+export function readSeal(raw: string | undefined): RunSeal | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as RunSeal;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface RunReceiptOptions {
   readonly worktree: string;
   readonly runDir: string;
@@ -313,34 +373,43 @@ export interface RunReceiptOptions {
   readonly base: string;
   readonly runs: readonly StageRun[];
   readonly operatorDetail: boolean;
+  readonly holdoutRequired: boolean;
+  // From sealRunFiles at the end of verify; without one, nothing is signed.
+  readonly seal: RunSeal | undefined;
   readonly at?: string;
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
-// Builds the run's receipt from the files verify left in the run dir, signs it when a key is set,
-// and writes it beside them so `kaas-verify --artifacts <run dir>` re-hashes the same bytes.
+// Builds the run's receipt from the files verify sealed, signs it when a key is set, and writes it beside
+// them so `kaas-verify --artifacts <run dir>` re-hashes the same bytes. Any drift from the seal refuses.
 export async function writeRunReceipt(exec: ExecutionPort, o: RunReceiptOptions): Promise<Envelope> {
   const dir = join(o.worktree, o.runDir);
-  const files: Record<string, string> = {};
+  if (!o.seal) throw new Error("receipt: verify did not seal this run's files");
+  const files = readRunFiles(dir);
   for (const name of RUN_FILES) {
-    const path = join(dir, name);
-    if (existsSync(path)) files[name] = readFileSync(path, "utf8");
+    const now = files[name] === undefined ? null : sha256(files[name]!);
+    if (now !== o.seal.files[name]) throw new Error(`receipt: ${name} changed after verify`);
   }
-  const parse = <T>(name: string): T | undefined => (files[name] ? (JSON.parse(files[name]!) as T) : undefined);
-  const rev = async (ref: string) => {
-    const out = await exec.run(`git rev-parse ${shq(ref)}`, o.worktree);
-    if (out.code !== 0) throw new Error(`receipt: git rev-parse ${ref} failed: ${out.stderr.trim()}`);
-    return out.stdout.trim();
+  const headSha = await revParse(exec, o.worktree, "HEAD");
+  if (headSha !== o.seal.head) throw new Error("receipt: the head moved after verify");
+  const parse = <T>(name: string): T | undefined => {
+    if (files[name] === undefined) return undefined;
+    try {
+      return JSON.parse(files[name]!) as T;
+    } catch {
+      throw new Error(`receipt: ${name} is not valid JSON`);
+    }
   };
   const statement = buildStatement({
     repo: o.repo,
     issue: o.issue,
     baseRef: o.base,
-    baseSha: await rev(`origin/${o.base}`),
-    headSha: await rev("HEAD"),
+    baseSha: await revParse(exec, o.worktree, `origin/${o.base}`),
+    headSha,
     at: o.at ?? new Date().toISOString(),
     acceptance: parse<AcceptanceVerdict>("acceptance.json"),
     holdout: parse<{ ok: boolean }>("holdout.json"),
+    holdoutRequired: o.holdoutRequired,
     proof: parse<ProofResult>("proof.json"),
     runs: o.runs,
     files,
@@ -348,6 +417,9 @@ export async function writeRunReceipt(exec: ExecutionPort, o: RunReceiptOptions)
   });
   const key = receiptKey(o.env);
   const envelope = key ? signStatement(statement, key) : unsignedEnvelope(statement);
-  writeFileSync(join(dir, RECEIPT_FILE), `${JSON.stringify(envelope, null, 2)}\n`);
+  const out = join(dir, RECEIPT_FILE);
+  // Removed first, so a symlink an agent left at this name is replaced, never written through.
+  rmSync(out, { force: true });
+  writeFileSync(out, `${JSON.stringify(envelope, null, 2)}\n`, { flag: "wx" });
   return envelope;
 }

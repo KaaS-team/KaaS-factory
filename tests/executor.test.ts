@@ -201,7 +201,7 @@ describe("full happy-path pipeline (triage -> plan -> build -> verify -> pr)", (
     expect(github.createdPrs[0]!.draft).toBe(true);
     expect(github.createdPrs[0]!.body).toContain("Closes #1");
     // The fake worktree has no git, so the receipt cannot be built, and the body says so rather than go quiet.
-    expect(github.createdPrs[0]!.body).toContain("## Receipt\n\nNo receipt: receipt: git rev-parse origin/main failed");
+    expect(github.createdPrs[0]!.body).toContain("## Receipt\n\nNo receipt: receipt: git rev-parse HEAD failed");
     expect(git.pushed).toEqual([1]);
 
     const run = state.getRun("acme/widgets", 1)!;
