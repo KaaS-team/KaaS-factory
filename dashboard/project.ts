@@ -63,6 +63,8 @@ function target(spec: RuntimeSpec): string {
       return `agent37 instance ${spec.instance}`;
     case "microsandbox":
       return `microsandbox ${spec.image}`;
+    case "codespaces":
+      return `codespace ${spec.codespace}`;
     case "pool":
       return `pool of ${spec.members.map((m) => m.runtime).join(", ")}, then ${spec.fallback ?? "local"}`;
   }

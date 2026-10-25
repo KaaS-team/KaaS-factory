@@ -263,7 +263,7 @@ describe("names", () => {
       "runtimes.a b: a name is letters, digits, _ and -",
       "runtimes.d.image: required for docker",
       "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude)",
-      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, microsandbox, pool",
+      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, microsandbox, codespaces, pool",
     ]);
   });
   test("a bad machine.json runtime stops boot", () => {

@@ -7,6 +7,7 @@
 // free tier's monthly minutes (src/core/sandbox-pool.ts).
 
 import { Agent37Execution, type Agent37Spec } from "./adapters/agent37/execution";
+import { CodespacesExecution, type CodespacesSpec } from "./adapters/codespaces/execution";
 import { DockerExecution, type DockerSpec } from "./adapters/docker/execution";
 import { HttpSandboxExecution, type HttpSandboxSpec } from "./adapters/http-sandbox/execution";
 import { LocalExecution } from "./adapters/local/execution";
@@ -27,6 +28,7 @@ export type RuntimeSpec =
   | HttpSandboxSpec
   | Agent37Spec
   | MicrosandboxSpec
+  | CodespacesSpec
   | PoolSpec;
 
 export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = {
@@ -55,6 +57,10 @@ const SHAPES: Readonly<
   microsandbox: {
     required: ["image"],
     fields: { image: "string", allow: "strings", secrets: "strings", memory: "string", cpus: "posInt" },
+  },
+  codespaces: {
+    required: ["codespace"],
+    fields: { codespace: "string", tokenEnv: "string", root: "string", exclude: "strings" },
   },
   pool: { required: ["members"], fields: { members: "members", reserveMin: "posInt", fallback: "string" } },
 };
@@ -174,6 +180,8 @@ export function executionFor(spec: Exclude<RuntimeSpec, PoolSpec>): ExecutionPor
       return new Agent37Execution(spec);
     case "microsandbox":
       return new MicrosandboxExecution(spec);
+    case "codespaces":
+      return new CodespacesExecution(spec);
   }
 }
 

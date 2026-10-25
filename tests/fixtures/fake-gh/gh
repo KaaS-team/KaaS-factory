@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Stands in for `gh codespace ssh --codespace NAME -- SCRIPT`: runs SCRIPT here, as ssh would there.
+# It logs the codespace and the GH_TOKEN it saw, so a test can see the token arrived by env.
+[ "$1 $2 $3 $5" = "codespace ssh --codespace --" ] || { echo "fake gh: unexpected argv: $*" >&2; exit 2; }
+[ -n "$FAKE_GH_LOG" ] && echo "$4 token=${GH_TOKEN:-none}" >>"$FAKE_GH_LOG"
+[ -n "$FAKE_GH_DOWN" ] && { echo "error connecting to codespace: not found" >&2; exit 1; }
+exec bash -c "$6"

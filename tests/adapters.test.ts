@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll } from "bun:test";
 import { Agent37Execution } from "../src/adapters/agent37/execution";
+import { CodespacesExecution } from "../src/adapters/codespaces/execution";
 import { DockerExecution } from "../src/adapters/docker/execution";
 import { GitLeases } from "../src/adapters/git-lease/lease";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
@@ -169,6 +170,16 @@ const REGISTRY: Record<string, () => void> = {
   microsandbox: onFakePath(() =>
     executionContract("microsandbox", () => new MicrosandboxExecution({ kind: "microsandbox", image: "img" })),
   ),
+  // A fake gh that runs the remote script here, so the archive and the cleanup are what is under test.
+  codespaces: () =>
+    executionContract(
+      "codespaces",
+      () =>
+        new CodespacesExecution(
+          { kind: "codespaces", codespace: "cs", root: mkdtempSync(join(tmpdir(), "factory-cs-")) },
+          { ...process.env, PATH: `${join(import.meta.dir, "fixtures/fake-gh")}:${process.env.PATH}` },
+        ),
+    ),
   pool: sandboxPool(),
   ssh: onFakePath(() =>
     executionContract(
