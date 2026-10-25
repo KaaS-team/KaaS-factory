@@ -3,6 +3,7 @@
 set -u
 [[ $1 == rm ]] && exit 0
 [[ $1 == run ]] || exit 2
+[[ -n ${MSB_ARGV_FILE:-} ]] && printf '%s\n' "$@" > "$MSB_ARGV_FILE" # lets a test read the argv
 shift
 wd=.
 while [[ $# -gt 0 && $1 != -- ]]; do

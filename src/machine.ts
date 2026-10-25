@@ -13,6 +13,7 @@ import { dirname } from "node:path";
 import { factoryHome } from "./paths";
 import type { MicrosandboxSpec } from "./adapters/microsandbox/execution";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
+import { GATEWAY_KEY_ENV, type LlmGateway } from "./agents/gateway";
 
 export interface MachineConfig {
   readonly slots: number;
@@ -21,6 +22,8 @@ export interface MachineConfig {
   readonly runtimes?: Readonly<Record<string, RuntimeSpec>>;
   // A microsandbox runtime in `runtimes` that every agent stage on this machine runs in.
   readonly agentRuntime?: string;
+  // A LiteLLM gateway every agent stage calls through, on a key capped at the stage's budget.
+  readonly llmGateway?: { readonly url: string };
 }
 
 const DEFAULT_SLOTS = 2;
@@ -63,12 +66,39 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
         `${path}: "agentRuntime" must name a microsandbox runtime in "runtimes", got ${JSON.stringify(raw.agentRuntime)}`,
       );
   }
+  if (raw.llmGateway !== undefined) gatewayProblem(raw, path);
   return {
     slots,
+    ...(raw.llmGateway ? { llmGateway: raw.llmGateway as { url: string } } : {}),
     dailyUsd: raw.dailyUsd as number | undefined,
     ...(raw.agentRuntime ? { agentRuntime: raw.agentRuntime as string } : {}),
     ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}),
   };
+}
+
+// Plain http only to this machine: anywhere else the minted keys would cross the network in the clear.
+function gatewayProblem(raw: Record<string, unknown>, path: string): void {
+  const url = (raw.llmGateway as { url?: unknown } | null)?.url;
+  let parsed: URL | undefined;
+  try {
+    parsed = typeof url === "string" ? new URL(url) : undefined;
+  } catch {}
+  const local = parsed?.hostname === "127.0.0.1" || parsed?.hostname === "localhost";
+  if (!parsed || !(parsed.protocol === "https:" || (parsed.protocol === "http:" && local)))
+    throw new Error(`${path}: "llmGateway.url" must be an https URL, got ${JSON.stringify(url)}`);
+  const vm = raw.agentRuntime
+    ? (raw.runtimes as Record<string, MicrosandboxSpec>)[raw.agentRuntime as string]
+    : undefined;
+  if (vm && !(vm.allow ?? []).includes(parsed.hostname))
+    throw new Error(`${path}: the agentRuntime's "allow" must list the llmGateway host ${parsed.hostname}`);
+}
+
+// The gateway with its master key, which only this process holds. Named without a key, it refuses to start.
+export function machineGateway(m: MachineConfig, env: NodeJS.ProcessEnv = process.env): LlmGateway | undefined {
+  if (!m.llmGateway) return undefined;
+  const masterKey = env[GATEWAY_KEY_ENV];
+  if (!masterKey) throw new Error(`machine.json names an llmGateway, and ${GATEWAY_KEY_ENV} is not set`);
+  return { url: m.llmGateway.url, masterKey };
 }
 
 // The VM every agent stage runs in, when machine.json names one.

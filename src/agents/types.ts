@@ -52,6 +52,8 @@ export interface AgentPreset {
   readonly envKeys: readonly string[];
   // Set on every stage run of this agent, after the parent env is sanitized.
   readonly env?: Readonly<Record<string, string>>;
+  // The env vars that point this CLI at an LLM gateway: its base URL (plus `path`) and its key.
+  readonly gateway?: { readonly baseUrl: string; readonly key: string; readonly path?: string };
   // What keeps a read-only stage read-only for this agent (shown in docs/agents.md).
   readonly readOnlyBy: string;
   // Project directory `install --agents` links the skills into, and the context file it points at.

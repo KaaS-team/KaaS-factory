@@ -54,6 +54,7 @@ export const codexPreset: AgentPreset = {
   verified: false,
   version: "0.156.1",
   envKeys: ["OPENAI_API_KEY"],
+  gateway: { baseUrl: "OPENAI_BASE_URL", key: "OPENAI_API_KEY", path: "/v1" },
   readOnlyBy: "`-s read-only`",
   skillsDir: ".codex/skills",
   contextFile: "AGENTS.md",

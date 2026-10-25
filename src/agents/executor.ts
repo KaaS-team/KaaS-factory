@@ -20,7 +20,8 @@ import {
 import { plain } from "../display";
 import { streamPath, takeoverMarker } from "../paths";
 import { McpError } from "../mcp";
-import { sanitizeEnv } from "./env";
+import { PROVIDER_KEYS, sanitizeEnv } from "./env";
+import { gatewayHost, type LlmGateway, mintStageKey, revokeKey } from "./gateway";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
 import { structuredCommand } from "./structured";
@@ -30,7 +31,7 @@ import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 import { portEnv } from "../port";
-import { agentArgs, guestGit, type MicrosandboxSpec, removeVm } from "../adapters/microsandbox/execution";
+import { agentArgs, guestGit, type MicrosandboxSpec, removeVm, SECRET } from "../adapters/microsandbox/execution";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -140,6 +141,8 @@ export class CommandExecutor implements Executor {
     private readonly recorder?: FixtureRecorder,
     // machine.json `agentRuntime`: every agent this executor starts runs in this microVM.
     private readonly vm?: MicrosandboxSpec,
+    // machine.json `llmGateway`: every stage run gets its own key, capped at its maxBudgetUsd.
+    private readonly gateway?: LlmGateway,
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
@@ -147,16 +150,38 @@ export class CommandExecutor implements Executor {
       opts.prompt !== undefined && opts.agent
         ? resolveAgentByName(this.agents, opts.agent, opts.stage)
         : resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
+    if (this.gateway && !agent.preset?.gateway) {
+      const able = Object.values(PRESETS)
+        .filter((p) => p.gateway)
+        .map((p) => p.name);
+      throw new Error(
+        `${agent.name}: machine.json names an llmGateway, and only these presets can call through one: ${able.join(", ")}`,
+      );
+    }
+    const key =
+      this.gateway &&
+      (await mintStageKey(this.gateway, {
+        maxBudgetUsd: opts.maxBudgetUsd,
+        timeoutMinutes: opts.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES,
+        issue: opts.issue,
+        stage: opts.stage,
+      }));
     const scratch = mkdtempSync(join(tmpdir(), `factory-scratch-${opts.issue}-`));
     try {
-      return await this.spawnStage(opts, agent, scratch);
+      return await this.spawnStage(opts, agent, scratch, key);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
       if (opts.liveFile) rmSync(opts.liveFile, { force: true });
+      if (this.gateway && key) await revokeKey(this.gateway, key);
     }
   }
 
-  private async spawnStage(opts: StageRunOptions, agent: ResolvedAgent, scratch: string): Promise<StageRunResult> {
+  private async spawnStage(
+    opts: StageRunOptions,
+    agent: ResolvedAgent,
+    scratch: string,
+    key?: string,
+  ): Promise<StageRunResult> {
     const artifactDir = join(opts.cwd, runDir(opts.issue));
     mkdirSync(artifactDir, { recursive: true });
 
@@ -237,19 +262,29 @@ export class CommandExecutor implements Executor {
       FACTORY_HIDDEN_PATHS: (opts.hiddenPaths ?? []).join("\n"),
       ...portEnv(opts.cwd),
     };
+    // Through a gateway the agent holds only its stage key: no provider key is passed on, in a VM or not.
+    const via = key && this.gateway ? agent.preset?.gateway : undefined;
+    const gatewayUrl = via ? { [via.baseUrl]: `${this.gateway!.url.replace(/\/$/, "")}${via.path ?? ""}` } : {};
+    const vm =
+      via && this.vm
+        ? { ...this.vm, secrets: this.vm.secrets?.filter((s) => !PROVIDER_KEYS.some((k) => k === SECRET.exec(s)?.[1])) }
+        : this.vm;
     // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
-    const vmName = this.vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
-    if (this.vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
-    const guestEnv = this.vm ? { ...stageEnv, ...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? []) } : stageEnv;
+    const vmName = vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
+    if (vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
+    const guestEnv = vm
+      ? { ...stageEnv, ...gatewayUrl, ...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? []) }
+      : stageEnv;
     const proc = Bun.spawn(
-      this.vm && vmName
-        ? agentArgs(this.vm, {
+      vm && vmName
+        ? agentArgs(vm, {
             argv,
             cwd: opts.cwd,
             mounts: [scratch],
             env: guestEnv,
             stdinFile: stdin === undefined ? undefined : join(scratch, "stdin"),
             name: vmName,
+            ...(via ? { secrets: [`${via.key}@${gatewayHost(this.gateway!)}`] } : {}),
           })
         : [...argv],
       {
@@ -258,7 +293,12 @@ export class CommandExecutor implements Executor {
         stdout: "pipe",
         stderr: "pipe",
         detached: true, // its own process group, so a kill reaches the agent's children too
-        env: { ...sanitizeEnv(process.env, agent.preset?.envKeys), ...stageEnv },
+        env: {
+          ...sanitizeEnv(process.env, via ? [] : agent.preset?.envKeys),
+          ...stageEnv,
+          ...gatewayUrl,
+          ...(via && key ? { [via.key]: key } : {}),
+        },
       },
     );
     let sessionId: string | undefined;

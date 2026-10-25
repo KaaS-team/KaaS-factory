@@ -138,6 +138,20 @@ agent runs. Its remote leads nowhere, so a push or a fetch fails too, and commit
 stay there: the runner commits the worktree itself. A protected path changed by any means stops the
 run before the push, since the runner diffs the branch, not the agent's tool calls.
 
+### A budget the agent cannot exceed
+
+`"llmGateway": { "url": "https://<host>" }` in `machine.json` sends every agent stage's model calls
+through a [LiteLLM](https://docs.litellm.ai) proxy. Before a stage starts, the runner mints a key on
+the gateway with `max_budget` set to that stage's `maxBudgetUsd` and a lifetime of the stage timeout
+plus five minutes, and revokes it when the stage ends. The gateway refuses a call once the key's spend
+reaches its cap, so the cap holds whatever the CLI reports about its own cost. The master key is read
+from `FACTORY_LLM_GATEWAY_KEY`, which no agent sees, and the factory refuses to start when the URL is
+set and the key is not. The agent gets the gateway as its base URL and the stage key as its only
+provider key: `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` for `claude`, `OPENAI_BASE_URL` and
+`OPENAI_API_KEY` for `codex`. A stage on any other agent is refused. In the `agentRuntime` VM the stage
+key is an msb secret toward the gateway host, which must be in `allow`, and the runtime's own provider
+secrets are dropped. A failed mint fails the stage before the agent starts.
+
 ## Many workers, one repo
 
 Several factories can drive one repo at once: laptops, a VM, GitHub Actions jobs, or a daemon on

@@ -24,7 +24,7 @@ export interface MicrosandboxSpec {
 export const SECRET = /^([A-Za-z_]\w*)@([\w.-]+(?:,[\w.-]+)*)$/;
 
 // The VM and its egress, before the mounts and the command.
-function vmArgs(spec: MicrosandboxSpec, name: string): string[] {
+function vmArgs(spec: MicrosandboxSpec, name: string, extraSecrets: readonly string[] = []): string[] {
   const allow = spec.allow ?? [];
   return [
     "msb",
@@ -37,7 +37,7 @@ function vmArgs(spec: MicrosandboxSpec, name: string): string[] {
     "--no-net",
     ...(allow.length ? ["--net-rule", "allow@dns"] : []),
     ...allow.flatMap((h) => ["--net-rule", `allow@${h}:tcp:443`]),
-    ...(spec.secrets ?? []).flatMap((s) => ["--secret", s]),
+    ...[...(spec.secrets ?? []), ...extraSecrets].flatMap((s) => ["--secret", s]),
     "--secret-violation-action",
     "block-and-log",
     "-m",
@@ -62,6 +62,8 @@ export interface AgentInVm {
   // msb 0.7 does not forward piped stdin, so the prompt is read from this file in the guest.
   readonly stdinFile?: string;
   readonly name: string;
+  // Per-run keys in spec.secrets' form, such as a stage's gateway key.
+  readonly secrets?: readonly string[];
 }
 
 export function agentArgs(
@@ -71,7 +73,7 @@ export function agentArgs(
 ): string[] {
   const command = run.stdinFile ? ["bash", "-c", 'exec "$@" < "$0"', run.stdinFile, ...run.argv] : [...run.argv];
   return [
-    ...vmArgs(spec, run.name),
+    ...vmArgs(spec, run.name, run.secrets),
     ...[run.cwd, ...run.mounts].flatMap((d) => ["-v", `${real(d)}:${d}`]),
     ...Object.entries(run.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
     "-w",

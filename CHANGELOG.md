@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `machine.json` `llmGateway` runs every agent stage on its own LiteLLM key, capped at the stage's
+  `maxBudgetUsd` and revoked when the stage ends; the agent holds no provider key and never the
+  master key (`FACTORY_LLM_GATEWAY_KEY`). Only the `claude` and `codex` presets can use it.
 - An agent stage in the `agentRuntime` VM gets a working git: a mirror of the stage repo with the
   holdouts' blobs left out and no reachable remote, so no agent can read a holdout or push.
 - `machine.json` `agentRuntime` names a `microsandbox` runtime that every agent stage on the machine

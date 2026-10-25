@@ -177,6 +177,7 @@ export const claudePreset: AgentPreset = {
   verified: true,
   version: "2.1.286",
   envKeys: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+  gateway: { baseUrl: "ANTHROPIC_BASE_URL", key: "ANTHROPIC_AUTH_TOKEN" },
   // A headless stage has no one to resume a background task for, and no reason to phone home.
   env: { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
   readOnlyBy: "the stage allow-list under `dontAsk`",
