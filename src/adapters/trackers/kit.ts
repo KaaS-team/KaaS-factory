@@ -1,7 +1,6 @@
-// What every native tracker adapter (Linear, Plane, Jira, ClickUp, Asana) shares: one HTTP client that
-// reads its token from an env var on each call, a codec that keeps the runner's <!-- factory --> markers
-// through trackers that strip HTML comments, and the numeric ids the TrackerPort speaks.
-// Why this shape: docs/decisions/native-trackers.md.
+// What every native tracker adapter shares: an HTTP client that reads its token from an env var per
+// call, a codec that keeps the runner's <!-- factory --> markers through trackers that strip HTML
+// comments, and the numeric ids the TrackerPort speaks. Why: docs/decisions/native-trackers.md.
 
 import { createHash } from "node:crypto";
 import type { RepoRole } from "../../ports/scm";

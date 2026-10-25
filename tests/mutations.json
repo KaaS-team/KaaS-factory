@@ -413,5 +413,12 @@
   {"name": "plane: a guest is not a member", "file": "src/adapters/trackers/plane.ts", "find": "5: \"guest\" }", "replace": "5: \"member\" }", "test": "tests/trackers-plane.test.ts"},
   {"name": "plane: an edit after a restart refills the id map", "file": "src/adapters/trackers/plane.ts", "find": "if (!this.comments.vendorId(id)) await this.listOpenIssues();", "replace": "", "test": "tests/trackers-plane.test.ts"},
   {"name": "plane: human HTML reads back as plain lines", "file": "src/adapters/trackers/plane.ts", "find": ".replace(/<\\/(p|div|li|h\\d)>/gi, \"\\n\")", "replace": "", "test": "tests/trackers-plane.test.ts"},
-  {"name": "adapters: a native tracker without its contract run is caught", "file": "tests/trackers-plane.test.ts", "find": "trackerContract(\"Plane\", make);", "replace": "", "test": "tests/adapters.test.ts"}
+  {"name": "adapters: a native tracker without its contract run is caught", "file": "tests/trackers-plane.test.ts", "find": "trackerContract(\"Plane\", make);", "replace": "", "test": "tests/adapters.test.ts"},
+  {"name": "plane: a renamed label is matched by id, not name", "file": "src/adapters/trackers/plane.ts", "find": "r.new_identifier === id", "replace": "r.new_identifier === label", "test": "tests/trackers-plane.test.ts"},
+  {"name": "jira: a Won't Do resolution is not planned", "file": "src/adapters/trackers/jira.ts", "find": "NOT_DONE.has(", "replace": "false && NOT_DONE.has(", "test": "tests/trackers-jira.test.ts"},
+  {"name": "jira: a label set at creation names the creator", "file": "src/adapters/trackers/jira.ts", "find": "? raw.fields.creator.accountId : undefined", "replace": "? undefined : undefined", "test": "tests/trackers-jira.test.ts"},
+  {"name": "jira: an edit after a restart refills the id map", "file": "src/adapters/trackers/jira.ts", "find": "if (!this.comments.vendorId(id)) await this.listOpenIssues();", "replace": "", "test": "tests/trackers-jira.test.ts"},
+  {"name": "jira: browse permission alone is not a member", "file": "src/adapters/trackers/jira.ts", "find": "if (has(\"EDIT_ISSUES\")) return \"write\";", "replace": "if (has(\"BROWSE_PROJECTS\")) return \"write\";", "test": "tests/trackers-jira.test.ts"},
+  {"name": "jira: an unknown account is a stranger, not an error", "file": "src/adapters/trackers/jira.ts", "find": "(err.status === 400 || err.status === 404)", "replace": "false", "test": "tests/trackers-jira.test.ts"},
+  {"name": "jira: an applied label is listed after it is removed", "file": "src/adapters/trackers/jira.ts", "find": "for (const l of add) this.ensured.add(l);", "replace": "", "test": "tests/trackers-jira.test.ts"}
 ]

@@ -270,19 +270,20 @@ export class PlaneTracker implements TrackerPort {
   async currentLogin(): Promise<string> {
     return (await this.client.request<{ id: string }>("GET", "/api/v2/users/me/")).id;
   }
-  // A label set when the item was made may have no activity row, so it names the item's creator.
+  // Matched by label id, so a label renamed after a guest added it still names the guest. A label set
+  // when the item was made has no activity row, so it names the item's creator.
   async labeledBy(_repo: string, n: number, label: string): Promise<string | undefined> {
     const w = await this.item(n);
-    const rows = await this.all<{ actor_id: string; new_value: string | null; verb: string; created_at: string }>(
+    const id = (await this.labelMap()).get(label);
+    if (!id || !w.label_ids.includes(id)) return undefined;
+    const rows = await this.all<{ actor_id: string; field: string; new_identifier: string | null; created_at: string }>(
       `${this.base}/work-items/${w.id}/activities/`,
       { field: "labels" },
     );
     const adds = rows
-      .filter((r) => r.new_value === label && r.verb !== "deleted")
+      .filter((r) => r.field === "labels" && r.new_identifier === id)
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
-    if (adds.length > 0) return adds.at(-1)!.actor_id;
-    const id = (await this.labelMap()).get(label);
-    return id && w.label_ids.includes(id) ? w.created_by_id : undefined;
+    return adds.length > 0 ? adds.at(-1)!.actor_id : w.created_by_id;
   }
   // Read fresh on every call: a role is what lets a comment drive the factory, so a demotion counts at once.
   async roleOf(_repo: string, login: string): Promise<RepoRole> {

@@ -12,7 +12,7 @@ interface Item {
   label_ids: string[];
   created_by_id: string;
   comments: { id: string; comment_html: string; created_at: string; actor_id: string }[];
-  activities: { actor_id: string; field: string; verb: string; old_value: string | null; new_value: string | null; created_at: string }[];
+  activities: { actor_id: string; field: string; verb: string; old_value: string | null; new_value: string | null; old_identifier: string | null; new_identifier: string | null; created_at: string }[];
 }
 interface Project {
   states: { id: string; group: string }[];
@@ -43,7 +43,7 @@ export class PlaneStore {
     const p = [...this.projects.values()].find((x) => x.items.includes(item))!;
     if (!item.label_ids.includes(labelId)) item.label_ids.push(labelId);
     const name = p.labels.find((l) => l.id === labelId)!.name;
-    item.activities.push({ actor_id: actor, field: "labels", verb: "updated", old_value: null, new_value: name, created_at: this.now() });
+    item.activities.push({ actor_id: actor, field: "labels", verb: "updated", old_value: null, new_value: name, old_identifier: null, new_identifier: labelId, created_at: this.now() });
   }
 
   handle(method: string, parts: string[], body: Record<string, any>, query: URLSearchParams): Response {
@@ -90,7 +90,7 @@ export class PlaneStore {
         for (const l of next.filter((x) => !w.label_ids.includes(x))) this.applyLabel(w, l, this.me);
         for (const l of w.label_ids.filter((x) => !next.includes(x))) {
           const name = p.labels.find((x) => x.id === l)!.name;
-          w.activities.push({ actor_id: this.me, field: "labels", verb: "updated", old_value: name, new_value: "", created_at: this.now() });
+          w.activities.push({ actor_id: this.me, field: "labels", verb: "updated", old_value: name, new_value: "", old_identifier: l, new_identifier: null, created_at: this.now() });
         }
         w.label_ids = [...next];
       }
