@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 import { factoryHome } from "./paths";
 import type { MicrosandboxSpec } from "./adapters/microsandbox/execution";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
-import { GATEWAY_KEY_ENV, type LlmGateway } from "./agents/gateway";
+import { GATEWAY_KEY_ENV, isProviderHost, type LlmGateway } from "./agents/gateway";
 
 export interface MachineConfig {
   readonly slots: number;
@@ -91,6 +91,11 @@ function gatewayProblem(raw: Record<string, unknown>, path: string): void {
     : undefined;
   if (vm && !(vm.allow ?? []).includes(parsed.hostname))
     throw new Error(`${path}: the agentRuntime's "allow" must list the llmGateway host ${parsed.hostname}`);
+  const around = vm?.allow?.find(isProviderHost);
+  if (around)
+    throw new Error(
+      `${path}: with an llmGateway the agentRuntime may not allow ${around}, a model API it could call around it`,
+    );
 }
 
 // The gateway with its master key, which only this process holds. Named without a key, it refuses to start.

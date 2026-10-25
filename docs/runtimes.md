@@ -148,9 +148,15 @@ reaches its cap, so the cap holds whatever the CLI reports about its own cost. T
 from `FACTORY_LLM_GATEWAY_KEY`, which no agent sees, and the factory refuses to start when the URL is
 set and the key is not. The agent gets the gateway as its base URL and the stage key as its only
 provider key: `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` for `claude`, `OPENAI_BASE_URL` and
-`OPENAI_API_KEY` for `codex`. A stage on any other agent is refused. In the `agentRuntime` VM the stage
-key is an msb secret toward the gateway host, which must be in `allow`, and the runtime's own provider
-secrets are dropped. A failed mint fails the stage before the agent starts.
+`OPENAI_API_KEY` for `codex`, and every other provider credential in the env (OAuth tokens, Bedrock,
+Vertex, `AWS_*`, `AZURE_*`) is removed. A stage on any other agent is refused. A failed mint fails the
+stage before the agent starts.
+
+On this machine's own shell the cap is only as strong as the agent's manners: a CLI can still read its
+login files (`~/.claude`, `~/.codex/auth.json`) and call a provider directly. In the `agentRuntime` VM it
+is a hard limit: the stage key is an msb secret toward the gateway host, which must be in `allow`, the
+runtime's own provider secrets are dropped, and `machine.json` fails to load when `allow` names a known
+model API (`api.anthropic.com`, `api.openai.com`, `openrouter.ai` and the rest of `PROVIDER_DOMAINS`).
 
 ## Many workers, one repo
 

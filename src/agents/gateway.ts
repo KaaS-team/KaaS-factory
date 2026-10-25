@@ -10,6 +10,28 @@ export interface LlmGateway {
 // The env var the master key is read from. FACTORY_* is stripped from every agent's env.
 export const GATEWAY_KEY_ENV = "FACTORY_LLM_GATEWAY_KEY";
 
+// Model APIs an agent could call around the gateway, matched by domain suffix. A known list, not a
+// proof: the VM's own deny-by-default egress is what keeps an unlisted provider out.
+export const PROVIDER_DOMAINS = [
+  "anthropic.com",
+  "openai.com",
+  "chatgpt.com",
+  "openrouter.ai",
+  "googleapis.com",
+  "mistral.ai",
+  "groq.com",
+  "x.ai",
+  "deepseek.com",
+  "cursor.sh",
+  "cursor.com",
+  "amazonaws.com",
+  "azure.com",
+] as const;
+
+export function isProviderHost(host: string): boolean {
+  return PROVIDER_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
 export function gatewayHost(gateway: { url: string }): string {
   return new URL(gateway.url).hostname;
 }

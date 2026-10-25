@@ -20,7 +20,7 @@ import {
 import { plain } from "../display";
 import { streamPath, takeoverMarker } from "../paths";
 import { McpError } from "../mcp";
-import { PROVIDER_KEYS, sanitizeEnv } from "./env";
+import { gatewaySanitizedEnv, PROVIDER_KEYS, sanitizeEnv } from "./env";
 import { gatewayHost, type LlmGateway, mintStageKey, revokeKey } from "./gateway";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
@@ -294,7 +294,7 @@ export class CommandExecutor implements Executor {
         stderr: "pipe",
         detached: true, // its own process group, so a kill reaches the agent's children too
         env: {
-          ...sanitizeEnv(process.env, via ? [] : agent.preset?.envKeys),
+          ...(via ? gatewaySanitizedEnv(process.env) : sanitizeEnv(process.env, agent.preset?.envKeys)),
           ...stageEnv,
           ...gatewayUrl,
           ...(via && key ? { [via.key]: key } : {}),

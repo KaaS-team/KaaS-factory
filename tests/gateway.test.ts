@@ -72,6 +72,8 @@ describe("llmGateway", () => {
     const saved = { ...process.env };
     process.env.PATH = `${bin}:${saved.PATH}`;
     process.env.ANTHROPIC_API_KEY = "fake-host-anthropic-7m1";
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "fake-host-oauth-7m1";
+    process.env.AWS_SECRET_ACCESS_KEY = "fake-host-aws-7m1";
     try {
       await new CommandExecutor(
         { c: { preset: "claude" } },
@@ -87,7 +89,7 @@ describe("llmGateway", () => {
     const env = readFileSync(join(d, ".factory/runs/issue-8/env"), "utf8");
     expect(env).toContain(`ANTHROPIC_AUTH_TOKEN=${STAGE_KEY}\n`);
     expect(env).toContain(`ANTHROPIC_BASE_URL=${gateway.url}\n`);
-    expect(env).not.toContain("fake-host-anthropic-7m1");
+    expect(env).not.toMatch(/fake-host-(anthropic|oauth|aws)-7m1/);
   });
 
   test("a failed mint stops the stage before the agent starts", async () => {
@@ -186,6 +188,17 @@ describe("machine.json llmGateway", () => {
         home({ slots: 1, runtimes, agentRuntime: "vm", llmGateway: { url: "https://llm.example.com" } }),
       ),
     ).toThrow("must list the llmGateway host llm.example.com");
+  });
+
+  test("refuses an agentRuntime that could call a model API around it", () => {
+    const runtimes = {
+      vm: { kind: "microsandbox", image: "node:22-slim", allow: ["llm.example.com", "api.anthropic.com"] },
+    };
+    expect(() =>
+      loadMachineConfig(
+        home({ slots: 1, runtimes, agentRuntime: "vm", llmGateway: { url: "https://llm.example.com" } }),
+      ),
+    ).toThrow("may not allow api.anthropic.com");
   });
 
   test("refuses to start without the master key, and holds it once set", () => {

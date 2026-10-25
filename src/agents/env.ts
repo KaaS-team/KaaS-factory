@@ -44,6 +44,28 @@ export const PROVIDER_KEYS = [
   "DEEPSEEK_API_KEY",
 ] as const;
 
+// Other ways a CLI reaches a model on its own credentials. Through a gateway none of them may remain.
+const GATEWAY_STRIPPED = [
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_FOUNDRY",
+  "ANTHROPIC_BEDROCK_BASE_URL",
+  "ANTHROPIC_VERTEX_BASE_URL",
+  "ANTHROPIC_VERTEX_PROJECT_ID",
+  "CODEX_API_KEY",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+];
+const GATEWAY_STRIPPED_PREFIXES = ["AWS_", "AZURE_"];
+
+// The env of an agent that calls through a gateway: no provider key or credential of any kind.
+export function gatewaySanitizedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out = sanitizeEnv(env, []);
+  for (const key of Object.keys(out))
+    if (GATEWAY_STRIPPED.includes(key) || GATEWAY_STRIPPED_PREFIXES.some((p) => key.startsWith(p))) delete out[key];
+  return out;
+}
+
 export function sanitizeEnv(env: NodeJS.ProcessEnv, keep?: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
