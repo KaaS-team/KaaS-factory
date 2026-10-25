@@ -407,5 +407,11 @@
   {"name": "tracker kit: markers are moved out of the visible text", "file": "src/adapters/trackers/kit.ts", "find": "if (!body.includes(\"<!--\")) return body;", "replace": "return body;", "test": "tests/trackers-kit.test.ts"},
   {"name": "linear: a label set at creation names the creator", "file": "src/adapters/trackers/linear.ts", "find": "? d.issue.creator?.id : undefined", "replace": "? undefined : undefined", "test": "tests/trackers-linear.test.ts"},
   {"name": "linear: a guest is not a member", "file": "src/adapters/trackers/linear.ts", "find": "user.guest ? \"guest\" : \"member\"", "replace": "\"member\"", "test": "tests/trackers-linear.test.ts"},
-  {"name": "linear: an edit after a restart refills the id map", "file": "src/adapters/trackers/linear.ts", "find": "if (!this.comments.vendorId(id)) await this.listOpenIssues();", "replace": "", "test": "tests/trackers-linear.test.ts"}
+  {"name": "linear: an edit after a restart refills the id map", "file": "src/adapters/trackers/linear.ts", "find": "if (!this.comments.vendorId(id)) await this.listOpenIssues();", "replace": "", "test": "tests/trackers-linear.test.ts"},
+  {"name": "plane: a cancelled item is not planned", "file": "src/adapters/trackers/plane.ts", "find": "group === \"cancelled\" ? \"NOT_PLANNED\"", "replace": "false ? \"NOT_PLANNED\"", "test": "tests/trackers-plane.test.ts"},
+  {"name": "plane: a label set at creation names the creator", "file": "src/adapters/trackers/plane.ts", "find": "? w.created_by_id : undefined", "replace": "? undefined : undefined", "test": "tests/trackers-plane.test.ts"},
+  {"name": "plane: a guest is not a member", "file": "src/adapters/trackers/plane.ts", "find": "5: \"guest\" }", "replace": "5: \"member\" }", "test": "tests/trackers-plane.test.ts"},
+  {"name": "plane: an edit after a restart refills the id map", "file": "src/adapters/trackers/plane.ts", "find": "if (!this.comments.vendorId(id)) await this.listOpenIssues();", "replace": "", "test": "tests/trackers-plane.test.ts"},
+  {"name": "plane: human HTML reads back as plain lines", "file": "src/adapters/trackers/plane.ts", "find": ".replace(/<\\/(p|div|li|h\\d)>/gi, \"\\n\")", "replace": "", "test": "tests/trackers-plane.test.ts"},
+  {"name": "adapters: a native tracker without its contract run is caught", "file": "tests/trackers-plane.test.ts", "find": "trackerContract(\"Plane\", make);", "replace": "", "test": "tests/adapters.test.ts"}
 ]
