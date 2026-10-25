@@ -1,0 +1,3 @@
+GEM
+  specs:
+    rubocop (1.60.0)

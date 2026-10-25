@@ -1,0 +1,7 @@
+{"type": "session", "version": 3, "id": "u1", "timestamp": "2026-09-24T00:00:00Z", "cwd": "/work"}
+{"type": "agent_start"}
+{"type": "turn_start"}
+{"type": "tool_execution_start", "toolCallId": "c1", "toolName": "read", "args": {"path": "README.md"}}
+{"type": "tool_execution_end", "toolCallId": "c1", "toolName": "read", "result": "...", "isError": false}
+{"type": "message_end", "message": {"role": "assistant", "content": [{"type": "text", "text": "{\"outcome\":\"ok\"}"}], "usage": {"input": 800, "output": 90, "cacheRead": 400, "cacheWrite": 0, "totalTokens": 1290, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}}}}
+{"type": "agent_end", "messages": []}

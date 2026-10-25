@@ -1,0 +1,194 @@
+{
+ "results": [
+  {
+   "source": {
+    "path": "/repo/bun.lock",
+    "type": "lockfile"
+   },
+   "packages": [
+    {
+     "package": {
+      "name": "hono",
+      "version": "3.12.12",
+      "ecosystem": "npm"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GHSA-2234-fmw7-43wr"
+       ],
+       "aliases": [
+        "CVE-2024-48913",
+        "GHSA-2234-fmw7-43wr"
+       ],
+       "max_severity": "5.9"
+      },
+      {
+       "ids": [
+        "GHSA-26pp-8wgv-hjvm"
+       ],
+       "aliases": [
+        "CVE-2026-56762",
+        "GHSA-26pp-8wgv-hjvm"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "GHSA-2gcr-mfcq-wcc3"
+       ],
+       "aliases": [
+        "CVE-2026-47676",
+        "GHSA-2gcr-mfcq-wcc3"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "GHSA-3hrh-pfw6-9m5x"
+       ],
+       "aliases": [
+        "CVE-2026-47675",
+        "GHSA-3hrh-pfw6-9m5x"
+       ],
+       "max_severity": "4.3"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "id": "GHSA-2234-fmw7-43wr",
+       "summary": "Hono allows bypass of CSRF Middleware by a request without Content-Type header.",
+       "aliases": [
+        "CVE-2024-48913"
+       ],
+       "database_specific": {
+        "severity": "MODERATE"
+       }
+      },
+      {
+       "id": "GHSA-26pp-8wgv-hjvm",
+       "summary": "Hono missing validation of cookie name on write path in setCookie()",
+       "aliases": [
+        "CVE-2026-56762"
+       ],
+       "database_specific": {
+        "severity": "MODERATE"
+       }
+      },
+      {
+       "id": "GHSA-2gcr-mfcq-wcc3",
+       "summary": "Hono: app.mount() strips mount prefix using undecoded path, causing incorrect routing for percent-encoded paths",
+       "aliases": [
+        "CVE-2026-47676"
+       ],
+       "database_specific": {
+        "severity": "MODERATE"
+       }
+      },
+      {
+       "id": "GHSA-3hrh-pfw6-9m5x",
+       "summary": "Hono: Cookie helper does not sanitize sameSite and priority, allowing Set-Cookie injection",
+       "aliases": [
+        "CVE-2026-47675"
+       ],
+       "database_specific": {
+        "severity": "MODERATE"
+       }
+      }
+     ]
+    },
+    {
+     "package": {
+      "name": "nanoid",
+      "version": "3.3.7",
+      "ecosystem": "npm"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GHSA-28wg-ghj8-5hjv"
+       ],
+       "aliases": [
+        "CVE-2026-67214",
+        "GHSA-28wg-ghj8-5hjv"
+       ],
+       "max_severity": "8.2"
+      },
+      {
+       "ids": [
+        "GHSA-2v37-7h3g-55p8"
+       ],
+       "aliases": [
+        "CVE-2026-67213",
+        "GHSA-2v37-7h3g-55p8"
+       ],
+       "max_severity": "8.2"
+      },
+      {
+       "ids": [
+        "GHSA-mwcw-c2x4-8c55"
+       ],
+       "aliases": [
+        "CVE-2024-55565",
+        "GHSA-mwcw-c2x4-8c55"
+       ],
+       "max_severity": "4.3"
+      },
+      {
+       "ids": [
+        "GHSA-xwg4-73v4-xw9w"
+       ],
+       "aliases": [
+        "CVE-2026-73086",
+        "GHSA-xwg4-73v4-xw9w"
+       ],
+       "max_severity": "7.4"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "id": "GHSA-28wg-ghj8-5hjv",
+       "summary": "nanoid: non-secure generators can loop indefinitely with negative size",
+       "aliases": [
+        "CVE-2026-67214"
+       ],
+       "database_specific": {
+        "severity": "HIGH"
+       }
+      },
+      {
+       "id": "GHSA-2v37-7h3g-55p8",
+       "summary": "nanoid: custom generators can loop indefinitely when size is zero",
+       "aliases": [
+        "CVE-2026-67213"
+       ],
+       "database_specific": {
+        "severity": "HIGH"
+       }
+      },
+      {
+       "id": "GHSA-mwcw-c2x4-8c55",
+       "summary": "Predictable results in nanoid generation when given non-integer values",
+       "aliases": [
+        "CVE-2024-55565"
+       ],
+       "database_specific": {
+        "severity": "MODERATE"
+       }
+      },
+      {
+       "id": "GHSA-xwg4-73v4-xw9w",
+       "summary": "nanoid: Integer Overflow or Wraparound",
+       "aliases": [
+        "CVE-2026-73086"
+       ],
+       "database_specific": {
+        "severity": "HIGH"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

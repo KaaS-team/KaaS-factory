@@ -1,0 +1,9 @@
+node_modules/
+.factory-state/
+workspaces/
+*.log
+.DS_Store
+artifacts/
+.worktrees/
+.factory-home/
+.factory-wt.env

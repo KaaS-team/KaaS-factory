@@ -1,0 +1,10 @@
+{
+  "repo": "acme/mono",
+  "base": "main",
+  "gates": [{ "name": "root", "cmd": "test -f README.md", "required": true }],
+  "packages": [
+    { "path": "packages/api", "gates": [{ "name": "test", "cmd": "test -f api.txt && echo ran > ../../api.ran", "required": true, "role": "test" }] },
+    { "path": "packages/web", "gates": [{ "name": "test", "cmd": "echo ran > ../../web.ran; test ! -f broken", "required": true, "role": "test" }] },
+    { "path": "shared", "always": true, "gates": [{ "name": "lint", "cmd": "echo ran > ../shared.ran", "required": false, "role": "lint" }] }
+  ]
+}

@@ -1,0 +1,66 @@
+2026.01.23-916f423
+Usage: agent [options] [command] [prompt...]
+
+Start the Cursor Agent
+
+Arguments:
+  prompt                       Initial prompt for the agent
+
+Options:
+  -v, --version                Output the version number
+  --api-key <key>              API key for authentication (can also use
+                               CURSOR_API_KEY env var)
+  -H, --header <header>        Add custom header to agent requests (format:
+                               'Name: Value', can be used multiple times)
+  -p, --print                  Print responses to console (for scripts or
+                               non-interactive use). Has access to all tools,
+                               including write and bash. (default: false)
+  --output-format <format>     Output format (only works with --print): text |
+                               json | stream-json (default: "text")
+  --stream-partial-output      Stream partial output as individual text deltas
+                               (only works with --print and stream-json format)
+                               (default: false)
+  -c, --cloud                  Start in cloud mode (open composer picker on
+                               launch) (default: false)
+  --mode <mode>                Start in the given execution mode. plan:
+                               read-only/planning (analyze, propose plans, no
+                               edits). ask: Q&A style for explanations and
+                               questions (read-only). (choices: "plan", "ask")
+  --plan                       Start in plan mode (shorthand for --mode=plan).
+                               Ignored if --cloud is passed. (default: false)
+  --resume [chatId]            Resume a chat session. (default: false)
+  --continue                   Resume the last chat session (default: false)
+  --model <model>              Model to use (e.g., gpt-5, sonnet-4,
+                               sonnet-4-thinking)
+  --list-models                List available models and exit (default: false)
+  -f, --force                  Force allow commands unless explicitly denied
+                               (default: false)
+  --sandbox <mode>             Explicitly enable or disable sandbox mode
+                               (overrides config) (choices: "enabled",
+                               "disabled")
+  --approve-mcps               Automatically approve all MCP servers (only works
+                               with --print/headless mode) (default: false)
+  --browser                    Enable browser automation support (default:
+                               false)
+  --workspace <path>           Workspace directory to use (defaults to current
+                               working directory)
+  -h, --help                   Display help for command
+
+Commands:
+  install-shell-integration    Install shell integration to ~/.zshrc
+  uninstall-shell-integration  Remove shell integration from ~/.zshrc
+  login                        Authenticate with Cursor. Set NO_OPEN_BROWSER to
+                               disable browser opening.
+  logout                       Sign out and clear stored authentication
+  mcp                          Manage MCP servers
+  status|whoami                View authentication status
+  models                       List available models for this account
+  about                        Display version, system, and account information
+  update|upgrade               Update Cursor Agent to the latest version
+  create-chat                  Create a new empty chat and return its ID
+  generate-rule|rule           Generate a new Cursor rule with interactive
+                               prompts
+  agent [prompt...]            Start the Cursor Agent
+  ls                           Resume a chat session
+  resume                       Resume the latest chat session
+  help [command]               Display help for command

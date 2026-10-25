@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Stand-in ssh: drops options and the host, then runs the joined remote line through bash, as sshd would.
+set -u
+while [[ $1 == -o ]]; do shift 2; done
+shift
+exec bash -c "$*"

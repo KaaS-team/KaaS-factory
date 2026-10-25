@@ -1,0 +1,4 @@
+{"type": "thread.started", "thread_id": "t1"}
+{"type": "item.completed", "item": {"type": "command_execution", "command": "ls"}}
+{"type": "item.completed", "item": {"type": "agent_message", "text": "{\"outcome\":\"ok\"}"}}
+{"type": "turn.completed", "usage": {"input_tokens": 1200, "cached_input_tokens": 400, "output_tokens": 90}}

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Stand-in docker for the contract suite: honours -w and runs the trailing `bash -c <cmd>` here.
+set -u
+[[ $1 == run ]] || exit 2
+shift
+wd=.
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -w) wd=$2; shift 2 ;;
+    --rm|--read-only|--cap-drop=ALL) shift ;;
+    --*|-e|-v) shift 2 ;;
+    *) shift; break ;; # the image
+  esac
+done
+cd "$wd" && exec "$@"

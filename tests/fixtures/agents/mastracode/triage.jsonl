@@ -1,0 +1,9 @@
+{"type": "agent_start"}
+{"type": "message_start", "message": {"id": "m1", "role": "assistant"}}
+{"type": "tool_start", "toolName": "view"}
+{"type": "tool_end", "toolName": "view", "isError": false, "result": "..."}
+{"type": "message_update", "id": "m1", "event": {"type": "text-delta", "delta": "{\"outcome\":"}}
+{"type": "message_update", "id": "m1", "event": {"type": "text-delta", "delta": "\"ok\"}"}}
+{"type": "message_end", "id": "m1"}
+{"type": "usage_update", "usage": {"promptTokens": 1200, "completionTokens": 90, "totalTokens": 1290}}
+{"type": "agent_end"}

@@ -1,0 +1,8 @@
+{
+  "name": "b",
+  "scripts": {
+    "test": "echo tests ok",
+    "typecheck": "echo types ok",
+    "lint": "echo lint ok"
+  }
+}

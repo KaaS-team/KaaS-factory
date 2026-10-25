@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Workflow Library</title>
+<link rel="stylesheet" href="worksheet.css">
+<style>
+  .wf { display: grid; gap: 12px; padding: 20px 22px; background: var(--panel); box-shadow: 0 0 0 1px var(--line); border-radius: 10px; break-inside: avoid; }
+  .wf h3 { margin: 0; font-size: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+  .wf dl { display: grid; grid-template-columns: 9.5em 1fr; gap: 4px 12px; margin: 0; font-size: 14.5px; }
+  .wf dt { font-weight: 600; color: var(--ink-2); }
+  .wf dd { margin: 0; min-width: 0; }
+  .flow { font: 500 12.5px var(--mono); color: var(--ink); background: var(--surface); border: 1px solid var(--line); padding: 6px 10px; border-radius: 6px; overflow-wrap: anywhere; }
+  @media (max-width: 520px) { .wf dl { grid-template-columns: 1fr; } .wf dt { margin-top: 4px; } }
+  @media print { .wf { padding: 3mm; } .wf dl { font-size: 9.5pt; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="index.html">Worksheets</a> / Workflow library</span>
+    <span class="actions"><button type="button" class="primary" data-print>Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Reference for the workflow worksheet</span>
+    <h1>Every ticket type runs <mark>its own workflow</mark></h1>
+    <p class="lede">The loop is the same for every ticket: triage, plan, build, verify, review, deliver. What changes per type is the trigger, who triages, the risk tier, which steps are plain scripts, where the human sits, when it stops, and what you measure. These are starting defaults drawn from how Anthropic, Stripe, Spotify, Uber, Google SRE, CISA and GitHub run them. Copy one into a Workflow card and change it to fit your team.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">A</span>Four rules every workflow below follows</h2>
+    <ol>
+      <li><b>Scripts where you can, agents where you must.</b> Stripe's Minions mix fixed steps (lint, push, run CI) with agent steps (write the fix). Anything with one right answer is a script.</li>
+      <li><b>The change sets the risk tier.</b> Paths, size and data touched decide who approves, never who or what wrote it. An agent's approval never counts as a human approval.</li>
+      <li><b>Every loop has a cap.</b> Stripe allows two CI rounds per run. Anthropic caps agent review at three rounds after one PR went through fifty overnight. When the cap is hit, the issue escalates to a human with the reason.</li>
+      <li><b>Fix a repeated finding at the source.</b> The third time a reviewer says the same thing, it becomes a rule, a skill, a lint or a test.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="n">B</span>Triage is different for each type</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Type</th><th>Triage decides</th><th>Who triages</th><th>Time box</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Small bug</td><td>Can we write a failing test from the report?</td><td>Agent, owner confirms</td><td>Same day</td></tr>
+        <tr><td class="k">Support report</td><td>Is it new, a duplicate, or not a bug? What is missing?</td><td>Agent asks, support answers</td><td>1 business day</td></tr>
+        <tr><td class="k">Dependency update</td><td>Patch, minor or major? Does CI pass?</td><td>A script</td><td>Weekly batch</td></tr>
+        <tr><td class="k">Security finding</td><td>Exploited in the wild? Reachable in our code? Exposed to the internet?</td><td>Security owner, agent gathers evidence</td><td>Hours for exploited, days otherwise</td></tr>
+        <tr><td class="k">Incident</td><td>Severity, and who is incident commander</td><td>On-call engineer, never an agent</td><td>Minutes</td></tr>
+        <tr><td class="k">Flaky test</td><td>Flaky or a real regression?</td><td>A script, agent investigates</td><td>Quarantine now, fix in a week</td></tr>
+        <tr><td class="k">Feature or epic</td><td>Is the problem shaped? Is the appetite set?</td><td>Product and tech lead</td><td>Planning cycle</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="page-break">
+    <h2><span class="n">C</span>The workflows</h2>
+
+    <div class="wf"><h3>Small bug <span class="pill pass">Low to medium</span></h3><dl>
+      <dt>Trigger</dt><dd>Issue with steps to reproduce, labelled ready.</dd>
+      <dt>Path</dt><dd><span class="flow">triage → failing test → fix → gates → verify (revert, test fails) → PR</span></dd>
+      <dt>Scripts</dt><dd>Gates, the revert proof, the PR template.</dd>
+      <dt>Agent</dt><dd>Reproduces, writes the failing test, makes the smallest fix.</dd>
+      <dt>Human</dt><dd>Reviews the PR. Low tier when only covered, non-sensitive files changed.</dd>
+      <dt>Stops when</dt><dd>No failing test after one try: ask the reporter. Two rejected builds: escalate to a human.</dd>
+      <dt>Watch</dt><dd>Reopen rate; time from ready to PR.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Unclear bug or support report <span class="pill wait">Needs info</span></h3><dl>
+      <dt>Trigger</dt><dd>Support inbox, a customer message, a vague issue.</dd>
+      <dt>Path</dt><dd><span class="flow">dedupe → ask for what is missing (max 2 rounds) → reproduce → becomes a Small bug, or closes with a reason</span></dd>
+      <dt>Agent</dt><dd>Searches past issues and logs, drafts the question, attaches what it found.</dd>
+      <dt>Human</dt><dd>Support or the owner answers. Only trusted accounts can steer the agent.</dd>
+      <dt>Stops when</dt><dd>Two question rounds with no answer: close as cannot reproduce.</dd>
+      <dt>Watch</dt><dd>Share of reports that reach a reproduction.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Dependency update (Dependabot, Renovate) <span class="pill pass">Low</span> for patch and minor</h3><dl>
+      <dt>Trigger</dt><dd>Weekly schedule. Security updates skip the schedule.</dd>
+      <dt>Path</dt><dd><span class="flow">group patch + minor into one PR → wait until the release is 3 to 7 days old → CI → auto-merge</span></dd>
+      <dt>Scripts</dt><dd>All of the happy path. No agent at all when CI is green.</dd>
+      <dt>Agent</dt><dd>Only when CI breaks or for a major: reads the changelog, fixes breaking calls, summarises risk in the PR.</dd>
+      <dt>Human</dt><dd>Every major version, one PR each. Auto-merge only in repos with real test coverage.</dd>
+      <dt>Stops when</dt><dd>Fix needs more than the files that call the package: park, it is a migration.</dd>
+      <dt>Watch</dt><dd>Open update PRs; days behind latest.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Security finding in a dependency (CVE alert) <span class="pill fail">High</span></h3><dl>
+      <dt>Trigger</dt><dd>Dependabot or scanner alert.</dd>
+      <dt>Path</dt><dd><span class="flow">enrich (CISA KEV, EPSS, reachable?, exposed?) → decide with SSVC (Track, Track*, Attend, Act) → patch or mitigate → regression test → PR</span></dd>
+      <dt>Scripts</dt><dd>KEV and EPSS lookup, the SLA clock, the upgrade itself.</dd>
+      <dt>Agent</dt><dd>Proves whether our code reaches the vulnerable function and writes that up as evidence.</dd>
+      <dt>Human</dt><dd>Security owner decides the outcome. Never auto-merged.</dd>
+      <dt>Stops when</dt><dd>SLA tier: exploited in the wild within days (the KEV catalog sets a due date for US federal teams), the rest in weeks.</dd>
+      <dt>Watch</dt><dd>Time to remediate by tier; alerts past SLA.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Security bug in your own code <span class="pill fail">High</span></h3><dl>
+      <dt>Trigger</dt><dd>Private report, bug bounty, pen test. Never a public issue.</dd>
+      <dt>Path</dt><dd><span class="flow">private advisory → reproduce in an isolated worktree, no network → fix + regression test → hunt the same bug class elsewhere → two reviewers → coordinated release</span></dd>
+      <dt>Agent</dt><dd>Writes the exploit as a failing test, then searches for variants of the same pattern.</dd>
+      <dt>Human</dt><dd>Two human approvals, one from the security owner. A human decides when to disclose.</dd>
+      <dt>Watch</dt><dd>Variants found per report: the real payoff of the agent here.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Incident <span class="pill fail">Humans lead</span></h3><dl>
+      <dt>Trigger</dt><dd>Alert or customer impact. Declare early, downgrade freely.</dd>
+      <dt>Path</dt><dd><span class="flow">declare + severity → incident commander → mitigate (roll back, flag off) → resolve → blameless postmortem → action items become issues</span></dd>
+      <dt>Agent</dt><dd>Scribe and investigator: keeps the timeline, diffs what shipped since the last good deploy, searches logs and traces, drafts the status update and the postmortem.</dd>
+      <dt>Human</dt><dd>The commander decides every action on production. Mitigate first, fix later.</dd>
+      <dt>After</dt><dd>Each action item runs as a Small bug or Feature. The incident becomes an eval case for your reviewer.</dd>
+      <dt>Watch</dt><dd>Time to mitigate; action items closed.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Flaky test <span class="pill wait">Medium</span></h3><dl>
+      <dt>Trigger</dt><dd>A test that fails then passes on retry. Google found most pass-to-fail changes after submit involved a flaky test.</dd>
+      <dt>Path</dt><dd><span class="flow">detect → quarantine with an owner and an expiry (30 days) → agent finds the cause → fix → back in the gate</span></dd>
+      <dt>Human</dt><dd>Approves any change that deletes or weakens a test.</dd>
+      <dt>Watch</dt><dd>Quarantined tests past expiry; flake rate.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Feature from product <span class="pill wait">Medium</span></h3><dl>
+      <dt>Trigger</dt><dd>A shaped pitch: problem, appetite (how much time it is worth), rough solution, rabbit holes, no-gos.</dd>
+      <dt>Path</dt><dd><span class="flow">spec (requirements → design → tasks) → human approves the spec → each task runs build-verify-PR → feature flag → staged release</span></dd>
+      <dt>Agent</dt><dd>Drafts the spec from the pitch and the code, lists open questions, writes tasks with acceptance criteria.</dd>
+      <dt>Human</dt><dd>Approves the spec before any code. Product checks it behind the flag.</dd>
+      <dt>Watch</dt><dd>Spec rework rounds; scope added after approval.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Epic into tasks <span class="pill wait">Medium</span></h3><dl>
+      <dt>Rule</dt><dd>Cut vertical slices, each shippable on its own behind a flag and small enough to review in about fifteen minutes.</dd>
+      <dt>Path</dt><dd><span class="flow">epic → slices → dependency order → tasks that touch different files run in parallel → one PR per task</span></dd>
+      <dt>Human</dt><dd>Approves the slice list and the order. Each PR follows its own tier.</dd>
+      <dt>Watch</dt><dd>PR size; tasks blocked on another task.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Refactor or migration across many repos <span class="pill wait">Medium</span></h3><dl>
+      <dt>Path</dt><dd><span class="flow">codemod for the common case → agent for the long tail → one PR per repo → existing CI verifies</span></dd>
+      <dt>Evidence</dt><dd>Spotify's Honk opened hundreds of migration PRs. It did well on standard frameworks and struggled on unusual ones, so standardise first.</dd>
+      <dt>Watch</dt><dd>Merged versus opened; review time per PR.</dd>
+    </dl></div>
+
+    <div class="wf"><h3>Docs or copy <span class="pill pass">Low</span></h3><dl>
+      <dt>Path</dt><dd><span class="flow">triage → build → link and prose checks → PR → merge on green</span></dd>
+      <dt>Human</dt><dd>None for low tier once checks pass. Pricing and legal copy are high tier.</dd>
+    </dl></div>
+  </section>
+
+  <section>
+    <h2><span class="n">D</span>Sources</h2>
+    <ul>
+      <li><a href="https://claude.dev/blog/solving-code-review-at-anthropic/">Anthropic: how the Claude Code team does code review</a></li>
+      <li><a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents">Stripe: Minions</a> and <a href="https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents-part-2">part 2</a></li>
+      <li><a href="https://engineering.atspotify.com/2025/11/spotifys-background-coding-agent-part-1">Spotify: Honk, part 1</a></li>
+      <li><a href="https://sre.google/sre-book/managing-incidents/">Google SRE: Managing incidents</a> and <a href="https://sre.google/sre-book/postmortem-culture/">Postmortem culture</a></li>
+      <li><a href="https://www.cisa.gov/ssvc">CISA: SSVC</a>, <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog">KEV catalog</a>, <a href="https://www.first.org/epss/">FIRST: EPSS</a></li>
+      <li><a href="https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions">GitHub: automating Dependabot with Actions</a></li>
+      <li><a href="https://basecamp.com/shapeup">Shape Up</a> and <a href="https://www.martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html">Fowler: spec-driven development tools</a></li>
+    </ul>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Free to use with your team.</footer>
+</main>
+<script src="worksheet.js"></script>
+</body>
+</html>

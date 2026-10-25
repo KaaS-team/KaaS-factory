@@ -1,0 +1,7 @@
+.git
+.claude
+.factory-state
+node_modules
+tests
+*.md
+.DS_Store

@@ -1,0 +1,8 @@
+# worktrunk hooks: each worktree runs its own factory, so a live loop here never touches another
+# one. State, workspaces and machine caps live in .factory-home/, the dashboard gets its own port,
+# and the settings go in .factory-wt.env, not .env, because `bun test` would load .env.
+# Run it with: bun --env-file=.factory-wt.env bin/factory up --repo-dir <target clone>
+
+[pre-start]
+deps = "bun install --frozen-lockfile > /dev/null"
+env = "mkdir -p .factory-home && printf '{\"slots\": 1, \"dailyUsd\": 10}\\n' > .factory-home/machine.json && printf 'FACTORY_HOME=%s/.factory-home\\nFACTORY_DASHBOARD_PORT={{ branch | hash_port }}\\n' \"$PWD\" > .factory-wt.env"

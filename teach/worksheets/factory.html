@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Factory Worksheet</title>
+<link rel="stylesheet" href="worksheet.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="index.html">Worksheets</a> / Your Software Factory</span>
+    <span class="actions"><span class="saved" data-saved>Saves in this browser as you type</span><button type="button" data-clear>Clear</button><button type="button" data-copy>Copy Markdown</button><button type="button" data-download>Download .md</button><button type="button" class="primary" data-print>Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Step 3: your Software Factory</span>
+    <h1>Run your blueprint on a <mark>real issue</mark>, end to end</h1>
+    <p class="lede">Your factory runs the workflow from step 1 with the blueprint from step 2, in isolation, with caps, and stops at a pull request a human reviews and merges. Parts 4 to 6 become your demo.</p>
+    <div class="row who"><label>Your name<div class="f" data-k="name"></div></label></div>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>Where each run happens, and what it can reach</h2>
+    <div class="row">
+      <label>Runs in<div class="f" data-ph="git worktree, container, VM, hosted sandbox"></div></label>
+      <label>Files it may write<div class="f" data-ph="src/, tests/; never .github/, migrations/"></div></label>
+      <label>Commands it may run<div class="f" data-ph="allow-list per stage"></div></label>
+      <label>Network<div class="f" data-ph="none, package registry only, allow-list"></div></label>
+      <label>Secrets it gets<div class="f" data-ph="scoped token, expiry"></div></label>
+      <label>Caps per run<div class="f" data-ph="minutes, dollars, tool calls"></div></label>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Break one real plan into tasks you can verify one at a time</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Task</th><th>Files</th><th>Check that proves it</th><th>Depends on</th><th>Can run in parallel?</th></tr></thead>
+      <tbody>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f" data-ph="only if files do not overlap"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Doer, Tester and the stop rules</h2>
+    <p class="hint">The Tester runs in a fresh context and must say why it failed in a form the Doer can act on. Every loop ends: it finishes, it escalates to a human, or it stops.</p>
+    <div class="row">
+      <label>What the Tester runs<div class="f" data-ph="gates.sh, revert proof, holdout tests, reviewer agent"></div></label>
+      <label>What it sends back on failure<div class="f" data-ph="failing command, output tail, which criterion"></div></label>
+      <label>Max rounds before escalating to a human<div class="f" data-ph="Stripe: 2 CI rounds. Anthropic: 3 review rounds."></div></label>
+      <label>Who gets a parked issue, and how they hear<div class="f"></div></label>
+    </div>
+  </section>
+
+  <section class="page-break">
+    <h2><span class="n">4</span>Measure it: before and after</h2>
+    <p class="hint">Warp reports autonomy (merged PRs that needed no human push) and cost per PR. Anthropic watches human approvals per PR, wait time, and revert rate as the guardrail. Take the before numbers from your workflow worksheet.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Metric</th><th>Before</th><th>With the factory</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Time from ready to PR</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Review wait</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Review rounds to merge</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Share merged with no human code push</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Cost per PR</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Reverts or reopened issues</td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
+    <label class="stack">Circuit breaker: when this number gets worse, approvals tighten automatically<div class="f" data-ph="e.g. two reverts in a week moves every medium change to two reviewers"></div></label>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Demo card, three minutes</h2>
+    <div class="row">
+      <label>The issue, in one line<div class="f"></div></label>
+      <label>Its ticket type and tier<div class="f"></div></label>
+    </div>
+    <label class="stack">What happened, stage by stage<div class="f tall" data-ph="triage said..., plan said..., the gate caught..., the PR carried..."></div></label>
+    <label class="stack">One thing the factory refused or caught<div class="f"></div></label>
+    <label class="stack">The PR link, and the evidence a reviewer sees first<div class="f"></div></label>
+    <label class="stack">Next ticket type you will add, and its first gate<div class="f"></div></label>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>Read before the next session</h2>
+    <div class="read"><ul>
+      <li><span class="t">15 min</span> <a href="https://engineering.atspotify.com/2025/12/feedback-loops-background-coding-agents-part-3">Spotify: feedback loops for background agents, part 3</a>.</li>
+      <li><span class="t">10 min</span> <a href="https://docs.warp.dev/factories/measure-and-improve/">Warp: measure and improve a factory</a>. Scorers, benchmarks, cost per PR.</li>
+      <li><span class="t">15 min</span> <a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic: building effective agents</a>. Workflows versus agents.</li>
+      <li><span class="t">listen</span> <a href="https://www.latent.space/p/software-factories">Latent Space: software factories</a>, with Warp's Zach Lloyd.</li>
+    </ul></div>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Free to use with your team.</footer>
+</main>
+<script src="worksheet.js"></script>
+</body>
+</html>

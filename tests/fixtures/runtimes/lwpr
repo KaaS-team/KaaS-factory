@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Stand-in lwpr: like the real one, it copies the worktree to another directory,
+# merges both streams into one log wrapped in its own [lwpr] lines, and mirrors the exit code.
+set -u
+[[ $1 == run ]] || exit 2
+while [[ $1 != -- ]]; do shift; done
+shift
+work=$(mktemp -d)
+cp -R . "$work/"
+echo "[lwpr] job 1 app=fake"
+(cd "$work" && "$@") 2>&1
+code=$?
+echo "[lwpr] job 1 done"
+echo "lwpr: packed $(pwd)" >&2
+rm -rf "$work"
+exit $code

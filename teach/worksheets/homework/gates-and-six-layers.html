@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gates and Six Layers</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="homework.css">
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js" integrity="sha384-1NLkwxMO2sOqcq7rQkFBhIAUJtbt8ziLxhVKVgKfFGMEU8pF+GEq5LVogviveup6" crossorigin="anonymous" defer></script>
+<script src="scene.js" defer></script>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs">Software factory homework</span>
+    <span class="actions"><a href="../team-audit.html">Blank template</a><button type="button" class="primary" onclick="print()">Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Gates and the six layers</span>
+    <h1>Build the gates and <mark>six layers</mark> an agent needs before it runs alone</h1>
+    <p class="lede">A blueprint tells an agent how to work, but it cannot stop the agent. Six layers can. Build them, then give each task type a gate that can say no.</p>
+  </header>
+
+  <section>
+    <h2>You will learn what each layer stops, and which ones our repos lack</h2>
+    <ul>
+      <li>The six layers of a software factory, and the question each one answers.</li>
+      <li>What kaas.team, lwp-academy and englishmaa have in each layer today, and what to add.</li>
+      <li>The gate each task type needs, drawn as the path a change takes through it.</li>
+    </ul>
+    <div class="legend" aria-label="How to read the drawings">
+      <span><i class="human"></i>A human owns the step</span>
+      <span><i class="tool"></i>The runner or agent does it</span>
+      <span><i class="gate"></i>A check that can say no</span>
+      <span><i class="gap"></i>A check we still have to build</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Six layers answer six questions before an agent touches a repo</h2>
+    <p>A <b>layer</b> answers one question about unattended work. Today a person answers all six in their head. A factory answers each one in a file or a script.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "groups": [{ "label": "Boundary: what may it touch?", "nodes": ["exec", "ctx", "skills", "verify"] }],
+  "nodes": [
+    { "id": "issue", "at": [0, 0], "label": "An issue", "shape": "ellipse", "tone": "accent" },
+    { "id": "exec", "at": [1, 0], "label": "Execution", "who": "where does it run?" },
+    { "id": "ctx", "at": [2, 0], "label": "Context", "who": "what must it know?" },
+    { "id": "skills", "at": [2, 1], "label": "Skills", "who": "what repeats?" },
+    { "id": "verify", "at": [1, 1], "label": "Verification", "tone": "pass", "who": "what proof exists?" },
+    { "id": "deliver", "at": [0, 1], "label": "Delivery", "who": "who ships it?" },
+    { "id": "human", "at": [0, 2.1], "label": "Merge", "shape": "ellipse", "tone": "accent", "who": "a human" },
+    { "id": "paths", "at": [3, 0.5], "label": "Protected paths", "shape": "doc", "tone": "fail", "who": "deny, diff check" }
+  ],
+  "edges": [
+    { "from": "issue", "to": "exec" },
+    { "from": "exec", "to": "ctx" },
+    { "from": "ctx", "to": "skills" },
+    { "from": "skills", "to": "verify" },
+    { "from": "verify", "to": "skills", "label": "red", "tone": "fail", "bend": 60 },
+    { "from": "verify", "to": "deliver", "label": "proof" },
+    { "from": "deliver", "to": "human" },
+    { "from": "paths", "to": "skills", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>An issue passes through four layers inside the boundary, then delivery hands it to a human.</figcaption>
+      <ol class="narr">
+        <li><b>Boundary</b> asks what the agent may touch: protected paths, deny rules, an env scrub and a diff check. It wraps every other layer.</li>
+        <li><b>Execution</b> asks where it runs: one git worktree per issue, on a laptop, in Docker or in Actions.</li>
+        <li><b>Context</b> asks what it must know: the issue, the handoff, AGENTS.md and the rules on the path it touches.</li>
+        <li><b>Skills</b> asks what know-how repeats: one skill per stage, from triage to PR.</li>
+        <li><b>Verification</b> asks what proof exists: gates, a test that bites, hidden tests and a reviewer. Red goes back.</li>
+        <li><b>Delivery</b> asks who ships it: a PR from the template, and a human merges.</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Boundary stops an edit before it lands, then checks the diff again</h2>
+    <p>The <b>Boundary</b> layer decides what an agent may touch. A hook can miss an edit made through the shell, so check the diff again before every push.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "edit", "at": [0, 0], "label": "Try an edit", "who": "build stage" },
+    { "id": "prot", "at": [1, 0], "label": "Protected path?", "shape": "diamond", "tone": "pass" },
+    { "id": "lands", "at": [2, 0], "label": "Edit lands", "who": "in the worktree" },
+    { "id": "diff", "at": [3, 0], "label": "Protected in diff?", "shape": "diamond", "tone": "pass" },
+    { "id": "env", "at": [0, 1], "label": "Read .env or push", "who": "Bash, gh, git" },
+    { "id": "refused", "at": [1, 1], "label": "Refused", "tone": "fail", "who": "fails closed" },
+    { "id": "pushed", "at": [2, 1], "label": "Pushed", "shape": "ellipse", "tone": "pass" },
+    { "id": "parked", "at": [3, 1], "label": "Run parked", "tone": "wait", "who": "src/boundary.ts" },
+    { "id": "param", "at": [3, 2.1], "label": "A human takes it", "tone": "accent", "who": "billing, secrets" }
+  ],
+  "edges": [
+    { "from": "edit", "to": "prot", "label": "hook" },
+    { "from": "prot", "to": "refused", "label": "yes", "tone": "fail" },
+    { "from": "prot", "to": "lands", "label": "no" },
+    { "from": "env", "to": "refused", "label": "denied", "tone": "fail" },
+    { "from": "lands", "to": "diff", "label": "push" },
+    { "from": "diff", "to": "pushed", "label": "no", "tone": "pass" },
+    { "from": "diff", "to": "parked", "label": "yes", "tone": "fail" },
+    { "from": "parked", "to": "param" }
+  ]
+}
+      </script>
+      <figcaption>Two checks in a row: a hook on the edit, then a diff before the push catches what the hook missed.</figcaption>
+      <ol class="narr">
+        <li><b>The agent tries an edit,</b> say to a server file or .env.</li>
+        <li><b>A hook checks the path</b> on every edit, and refuses by default.</li>
+        <li><b>Settings deny the risky tools:</b> reading .env and pushing.</li>
+        <li><b>A diff check runs before push.</b> A protected path in the diff parks the run.</li>
+        <li><b>A human takes protected work:</b> billing, prices, secrets and deploy config.</li>
+      </ol>
+    </figure>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>kaas.team</th><th>lwp-academy</th><th>englishmaa</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Today</td><td>nothing in the repo</td><td>nothing in the repo</td><td>protectedPaths in repo.json</td></tr>
+        <tr><td class="k">Add</td><td>protect scripts/lighthouse.mjs, the Plunk client, Coolify config</td><td>protect server.mjs boot keys, Stripe webhook, auth tables, migrations</td><td>deny .env reads; protect mobile/revenuecat.json and release.env</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Execution gives every issue its own worktree, budget and clock</h2>
+    <p>The <b>Execution</b> layer decides where an agent runs. Give every issue its own worktree, budget and clock, never the main checkout.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "label", "at": [0, 0.5], "label": "Label the issue", "tone": "accent", "who": "factory:ready" },
+    { "id": "a", "at": [1, 0], "label": "Worker A", "who": "src/pool.ts" },
+    { "id": "b", "at": [1, 1], "label": "Worker B", "who": "src/pool.ts" },
+    { "id": "cas", "at": [2, 0.5], "label": "Claim wins?", "shape": "diamond", "tone": "pass" },
+    { "id": "wt", "at": [3, 0.5], "label": "Worktree", "shape": "store", "who": "branch per issue" },
+    { "id": "skip", "at": [2, 1.6], "label": "Next issue", "shape": "ellipse", "faint": true },
+    { "id": "cap", "at": [3, 1.6], "label": "Cap the stage", "tone": "pass", "who": "config.json" },
+    { "id": "stop", "at": [3, 2.7], "label": "Stage stopped", "tone": "fail", "who": "budget, time, tools" }
+  ],
+  "edges": [
+    { "from": "label", "to": "a" },
+    { "from": "label", "to": "b" },
+    { "from": "a", "to": "cas" },
+    { "from": "b", "to": "cas" },
+    { "from": "cas", "to": "wt", "label": "wins" },
+    { "from": "cas", "to": "skip", "label": "loses" },
+    { "from": "wt", "to": "cap" },
+    { "from": "cap", "to": "stop", "label": "over", "tone": "fail" }
+  ]
+}
+      </script>
+      <figcaption>Two workers race for one issue; the loser moves on, and the winner runs inside its caps.</figcaption>
+      <ol class="narr">
+        <li><b>A human labels the issue</b> ready.</li>
+        <li><b>One worker claims it,</b> so two never build the same issue.</li>
+        <li><b>A worktree</b> gives it its own branch, never main.</li>
+        <li><b>Caps on budget, time and tool calls</b> stop a stage that runs too long.</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Context reaches the agent from the issue and the repo, never from a laptop</h2>
+    <p>The <b>Context</b> layer decides what an agent knows: the issue, the last stage's handoff, the repo rules, and any rule for the path it touches. Nothing on a laptop counts.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "issue", "at": [0, 0], "label": "The issue", "shape": "doc", "who": "issue.json" },
+    { "id": "hand", "at": [0, 1], "label": "The handoff", "shape": "doc", "who": "src/rehydrate.ts" },
+    { "id": "agents", "at": [0, 2], "label": "Repo rules", "shape": "doc", "who": "AGENTS.md" },
+    { "id": "rules", "at": [0, 3], "label": "Path rules", "shape": "doc", "who": ".claude/rules" },
+    { "id": "match", "at": [1, 3], "label": "Path open?", "shape": "diamond" },
+    { "id": "stage", "at": [2, 1.5], "label": "What the stage knows", "tone": "accent" },
+    { "id": "laptop", "at": [3, 1.5], "label": "A laptop", "shape": "store", "tone": "fail", "dashed": true }
+  ],
+  "edges": [
+    { "from": "issue", "to": "stage" },
+    { "from": "hand", "to": "stage" },
+    { "from": "agents", "to": "stage" },
+    { "from": "rules", "to": "match" },
+    { "from": "match", "to": "stage", "label": "yes" },
+    { "from": "laptop", "to": "stage", "label": "never", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Four files flow into a stage; the laptop, with its plugins and home folder, never does.</figcaption>
+      <ol class="narr">
+        <li><b>The issue</b> says what was asked, and by whom.</li>
+        <li><b>The handoff</b> says what the last stage decided.</li>
+        <li><b>AGENTS.md</b> holds the commands, the gate and what changes together.</li>
+        <li><b>Path rules</b> load only when a matching file is open: database rules load only for a migration.</li>
+        <li><b>A laptop</b> is invisible to the agent, so nothing it holds counts.</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What to add</b> An AGENTS.md in kaas.team and lwp-academy, and a one-line CLAUDE.md in all three.</div>
+  </section>
+
+  <section>
+    <h2>Skills give each stage one job and one shape of output</h2>
+    <p>The <b>Skills</b> layer holds the know-how each stage repeats: one skill per stage, and a hook that rejects output in the wrong shape.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "triage", "at": [0, 0], "label": "Real and in scope?", "shape": "diamond", "tone": "accent" },
+    { "id": "plan", "at": [1, 0], "label": "Plan", "who": "factory-plan" },
+    { "id": "build", "at": [2, 0], "label": "Build", "who": "factory-build" },
+    { "id": "verify", "at": [3, 0], "label": "Proved?", "shape": "diamond", "tone": "pass" },
+    { "id": "close", "at": [0, 1.1], "label": "Close it", "shape": "ellipse", "faint": true, "who": "with a note" },
+    { "id": "hook", "at": [1.5, 1.1], "label": "Artifact shape", "shape": "doc", "tone": "pass", "who": "stop-artifact.sh" },
+    { "id": "pr", "at": [3, 1.1], "label": "Open PR", "shape": "ellipse", "who": "factory-pr" }
+  ],
+  "edges": [
+    { "from": "triage", "to": "plan", "label": "yes" },
+    { "from": "triage", "to": "close", "label": "no" },
+    { "from": "plan", "to": "build" },
+    { "from": "build", "to": "verify" },
+    { "from": "verify", "to": "build", "label": "no", "tone": "fail", "bend": -70 },
+    { "from": "verify", "to": "pr", "label": "yes", "tone": "pass" },
+    { "from": "hook", "to": "plan", "tone": "pass", "dashed": true },
+    { "from": "hook", "to": "build", "tone": "pass", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>One skill per stage, and a stop hook that refuses any stage whose artifact has the wrong shape.</figcaption>
+      <ol class="narr">
+        <li><b>factory-triage</b> asks whether the issue is real, clear and in scope. If not, it closes with a note.</li>
+        <li><b>factory-plan</b> names the files, the test and the risk. <b>factory-build</b> works in the worktree.</li>
+        <li><b>factory-verify</b> reverts and proves. Without proof the work goes back to build.</li>
+        <li><b>factory-pr</b> opens the PR from the template.</li>
+        <li><b>A stop hook</b> checks each stage's output has the right shape.</li>
+      </ol>
+    </figure>
+    <p class="hint">Skills you adopt from <a href="the-blueprint.html">the blueprint</a> sit beside these.</p>
+  </section>
+
+  <section>
+    <h2>Verification trusts the gate's own line, never the agent's claim</h2>
+    <p>The <b>Verification</b> layer decides what proof exists before a human looks. Trust the gate's own output, never the agent's summary, and make the new test fail without the fix.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "gate", "at": [0, 0], "label": "Run the gate", "tone": "pass", "who": ".factory/gates.sh" },
+    { "id": "line", "at": [1, 0], "label": "FACTORY_GATES", "shape": "doc", "who": "one line" },
+    { "id": "status", "at": [2, 0], "label": "Status pass?", "shape": "diamond", "tone": "pass" },
+    { "id": "revert", "at": [3, 0], "label": "Revert the fix", "who": "factory-verify" },
+    { "id": "back", "at": [1, 1], "label": "Back to build", "tone": "fail" },
+    { "id": "bites", "at": [3, 1], "label": "Test fails?", "shape": "diamond", "tone": "pass" },
+    { "id": "hidden", "at": [3, 2.1], "label": "Hidden tests", "tone": "pass", "who": "src/holdout.ts" },
+    { "id": "review", "at": [2, 2.1], "label": "Review the diff", "tone": "pass", "who": "factory-reviewer" },
+    { "id": "ready", "at": [1, 2.1], "label": "Ready", "shape": "ellipse", "tone": "pass", "who": "for a PR" }
+  ],
+  "edges": [
+    { "from": "gate", "to": "line", "label": "prints" },
+    { "from": "line", "to": "status", "label": "parsed" },
+    { "from": "status", "to": "revert", "label": "yes" },
+    { "from": "status", "to": "back", "label": "no", "tone": "fail" },
+    { "from": "revert", "to": "bites" },
+    { "from": "bites", "to": "back", "label": "no bite", "tone": "fail", "via": [[3, 1.72], [1, 1.72]] },
+    { "from": "bites", "to": "hidden", "label": "yes" },
+    { "from": "hidden", "to": "review" },
+    { "from": "review", "to": "ready" }
+  ]
+}
+      </script>
+      <figcaption>Four proofs in a row, and two ways back to build: a red gate line, or a test that does not bite.</figcaption>
+      <ol class="narr">
+        <li><b>The gate</b> wraps make check and prints one result line.</li>
+        <li><b>The runner reads that line,</b> never the agent's summary.</li>
+        <li><b>Revert the fix and rerun.</b> The new test must fail, or the work goes back.</li>
+        <li><b>Hidden tests</b> the agent never saw run last.</li>
+        <li><b>A reviewer agent</b> reads the diff against the plan.</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Delivery ends at a PR and a human merge, because main deploys</h2>
+    <p>The <b>Delivery</b> layer decides how work reaches production. Our apps deploy from main, so the factory stops at a PR and a human merges.</p>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "lanes": [{ "label": "Factory", "rows": [0, 0] }, { "label": "GitHub", "rows": [1, 1] }, { "label": "human", "rows": [2, 2] }, { "label": "Coolify", "rows": [3, 3] }],
+  "nodes": [
+    { "id": "pr", "at": [0, 0], "label": "Open the PR", "who": "factory-pr" },
+    { "id": "ci", "at": [1, 1], "label": "CI green?", "shape": "diamond", "tone": "pass" },
+    { "id": "red", "at": [2, 1], "label": "PR stays open", "tone": "fail", "who": "red" },
+    { "id": "read", "at": [1, 2], "label": "Read and merge", "tone": "accent", "who": "the only merge" },
+    { "id": "deploy", "at": [2, 3], "label": "Deploy", "shape": "ellipse", "who": "push to main" }
+  ],
+  "edges": [
+    { "from": "pr", "to": "ci", "label": "ci.yml" },
+    { "from": "ci", "to": "red", "label": "no", "tone": "fail" },
+    { "from": "ci", "to": "read", "label": "yes" },
+    { "from": "read", "to": "deploy" }
+  ]
+}
+      </script>
+      <figcaption>Each owner has its own lane, and the only crossing into production goes through a human.</figcaption>
+      <ol class="narr">
+        <li><b>Open the PR</b> with the gate result and the proof.</li>
+        <li><b>CI runs the gate again.</b> Red keeps the PR open.</li>
+        <li><b>A human reads and merges.</b> It is the only way in.</li>
+        <li><b>Main deploys</b> on push.</li>
+      </ol>
+    </figure>
+    <div class="cost"><b>What to add</b> CI in kaas.team and lwp-academy, as the check every merge waits for.</div>
+  </section>
+
+  <section>
+    <h2>Each task type gets a gate that matches what can go wrong with it</h2>
+    <p>A <b>gate</b> is a command that can refuse a change. One gate for everything is too weak for a security bug and too slow for a copy edit, so each task type gets its own.</p>
+
+    <h3>Dependabot PR: merge-ready means green and in the patch range</h3>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "bump", "at": [0, 0], "label": "Weekly bump", "shape": "ellipse", "who": "Dependabot" },
+    { "id": "check", "at": [1, 0], "label": "make check", "tone": "pass", "who": "ci.yml" },
+    { "id": "green", "at": [2, 0], "label": "Green?", "shape": "diamond", "tone": "pass" },
+    { "id": "patch", "at": [3, 0], "label": "Patch range?", "shape": "diamond" },
+    { "id": "open", "at": [1, 1], "label": "Stays open", "tone": "fail", "who": "red" },
+    { "id": "major", "at": [2, 1], "label": "Plan the major", "shape": "doc", "tone": "accent", "who": "a human" },
+    { "id": "ready", "at": [3, 1], "label": "Label it ready", "tone": "fail", "dashed": true, "who": "a rule we add" },
+    { "id": "merge", "at": [3, 2.1], "label": "Merge", "shape": "ellipse", "tone": "accent", "who": "a human, morning" }
+  ],
+  "edges": [
+    { "from": "bump", "to": "check" },
+    { "from": "check", "to": "green" },
+    { "from": "green", "to": "patch", "label": "yes" },
+    { "from": "green", "to": "open", "label": "no", "tone": "fail" },
+    { "from": "patch", "to": "ready", "label": "yes" },
+    { "from": "patch", "to": "major", "label": "no" },
+    { "from": "ready", "to": "merge" }
+  ]
+}
+      </script>
+      <figcaption>A green patch bump is flagged for the morning; a major version waits for a plan.</figcaption>
+      <ol class="narr">
+        <li><b>Dependabot opens a bump</b> weekly, minor and patch grouped.</li>
+        <li><b>CI runs make check.</b></li>
+        <li><b>A green patch bump</b> is labelled ready for the morning.</li>
+        <li><b>A human merges.</b> A major version waits for a plan.</li>
+      </ol>
+    </figure>
+
+    <h3>Vulnerability alert: no dismissal without a reason and a date</h3>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "lock", "at": [0, 0], "label": "Lockfile", "shape": "store", "who": "every repo" },
+    { "id": "scan", "at": [1, 0], "label": "Scan it", "who": "osv-scanner" },
+    { "id": "issue", "at": [2, 0], "label": "Issue per package", "who": "factory scan" },
+    { "id": "draft", "at": [3, 0], "label": "Draft the call", "who": "risk auditor skill" },
+    { "id": "decide", "at": [3, 1], "label": "Fix or dismiss?", "shape": "diamond", "tone": "accent" },
+    { "id": "fix", "at": [2, 1], "label": "Upgrade", "tone": "pass" },
+    { "id": "why", "at": [3, 2.1], "label": "Reason and date", "shape": "doc", "tone": "fail", "dashed": true, "who": "required" },
+    { "id": "audit", "at": [0, 1], "label": "Audit in make check", "tone": "fail", "dashed": true, "who": "audit step" },
+    { "id": "high", "at": [0, 2.1], "label": "High and reachable?", "shape": "diamond", "tone": "pass" },
+    { "id": "refuse", "at": [1, 2.1], "label": "Push refused", "tone": "fail" }
+  ],
+  "edges": [
+    { "from": "lock", "to": "scan" },
+    { "from": "scan", "to": "issue" },
+    { "from": "issue", "to": "draft" },
+    { "from": "draft", "to": "decide" },
+    { "from": "decide", "to": "fix", "label": "fix" },
+    { "from": "decide", "to": "why", "label": "dismiss" },
+    { "from": "lock", "to": "audit", "label": "push" },
+    { "from": "audit", "to": "high" },
+    { "from": "high", "to": "refuse", "label": "yes", "tone": "fail" }
+  ]
+}
+      </script>
+      <figcaption>Two paths from one lockfile: a scan that files issues for a human call, and an audit that refuses the push.</figcaption>
+      <ol class="narr">
+        <li><b>A scan</b> files one issue per vulnerable package.</li>
+        <li><b>An agent drafts the call:</b> fix, upgrade, or dismiss with a reason.</li>
+        <li><b>A human decides</b> and records why, and when to look again. No reason, no dismissal.</li>
+        <li><b>An audit in make check</b> refuses a push with a high advisory in a package your code reaches.</li>
+      </ol>
+    </figure>
+
+    <h3>Security bug: the test must fail on the old code</h3>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "nodes": [
+    { "id": "bug", "at": [0, 0], "label": "Security bug", "shape": "ellipse", "tone": "fail" },
+    { "id": "approve", "at": [1, 0], "label": "Approve the plan", "tone": "accent", "who": "a human" },
+    { "id": "fix", "at": [2, 0], "label": "Fix and test", "who": "CSP lists 2 paths" },
+    { "id": "revert", "at": [3, 0], "label": "Revert the fix", "who": "verify" },
+    { "id": "fails", "at": [3, 1], "label": "Test fails?", "shape": "diamond", "tone": "pass" },
+    { "id": "weak", "at": [2, 1], "label": "Test does not bite", "tone": "fail" },
+    { "id": "restore", "at": [3, 2.1], "label": "Restore the fix", "tone": "pass" },
+    { "id": "secret", "at": [2, 2.1], "label": "Secret scan", "tone": "fail", "dashed": true, "who": "every push" },
+    { "id": "pr", "at": [1, 2.1], "label": "Open PR", "shape": "ellipse" }
+  ],
+  "edges": [
+    { "from": "bug", "to": "approve" },
+    { "from": "approve", "to": "fix" },
+    { "from": "fix", "to": "revert" },
+    { "from": "revert", "to": "fails" },
+    { "from": "fails", "to": "weak", "label": "no", "tone": "fail" },
+    { "from": "weak", "to": "fix", "label": "redo", "tone": "fail" },
+    { "from": "fails", "to": "restore", "label": "yes" },
+    { "from": "restore", "to": "secret", "tone": "fail", "dashed": true },
+    { "from": "secret", "to": "pr", "tone": "fail", "dashed": true }
+  ]
+}
+      </script>
+      <figcaption>Approval comes first, and the fix ships only after its test fails on the old code.</figcaption>
+      <ol class="narr">
+        <li><b>A human approves the plan.</b> Security work never skips it.</li>
+        <li><b>Fix it and write a test,</b> such as one that reads the header.</li>
+        <li><b>Revert the fix and rerun.</b> The test must fail; if it passes, rewrite it.</li>
+        <li><b>A secret scan</b> runs on every push.</li>
+      </ol>
+    </figure>
+
+    <h3>Lighthouse: the same bar in all three repos</h3>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "lanes": [{ "label": "kaas.team", "rows": [0, 0] }, { "label": "lwp-academy", "rows": [1, 1] }, { "label": "englishmaa", "rows": [2, 2] }, { "label": "proof", "rows": [3, 3] }],
+  "nodes": [
+    { "id": "k1", "at": [0, 0], "label": "Lighthouse", "tone": "pass", "who": "make check" },
+    { "id": "k2", "at": [1, 0], "label": "Meets bar?", "shape": "diamond", "tone": "pass" },
+    { "id": "k3", "at": [2, 0], "label": "Push", "shape": "ellipse", "tone": "pass" },
+    { "id": "a1", "at": [0, 1], "label": "Lighthouse", "tone": "pass", "who": "make check" },
+    { "id": "a2", "at": [1, 1], "label": "Meets bar?", "shape": "diamond", "tone": "pass" },
+    { "id": "a3", "at": [2, 1], "label": "Push", "shape": "ellipse", "tone": "pass" },
+    { "id": "e1", "at": [0, 2], "label": "Add the script", "tone": "fail", "dashed": true, "who": "lighthouse.mjs" },
+    { "id": "e2", "at": [1, 2], "label": "Meets bar?", "shape": "diamond", "tone": "fail", "dashed": true },
+    { "id": "e3", "at": [2, 2], "label": "Push", "shape": "ellipse", "faint": true },
+    { "id": "m1", "at": [0, 3], "label": "Add a 2 MB image", "tone": "wait", "who": "mutation" },
+    { "id": "m2", "at": [1, 3], "label": "Gate must fail", "tone": "pass", "who": "mobile 95" }
+  ],
+  "edges": [
+    { "from": "k1", "to": "k2" }, { "from": "k2", "to": "k3", "label": "yes" },
+    { "from": "a1", "to": "a2" }, { "from": "a2", "to": "a3", "label": "yes" },
+    { "from": "e1", "to": "e2", "tone": "fail", "dashed": true }, { "from": "e2", "to": "e3", "tone": "fail", "dashed": true },
+    { "from": "m1", "to": "m2" },
+    { "from": "m2", "to": "e2", "label": "bites", "tone": "pass" }
+  ]
+}
+      </script>
+      <figcaption>The same bar in three lanes; englishmaa's lane is still dashed, and a mutation proves the gate bites.</figcaption>
+      <ol class="narr">
+        <li><b>Two repos</b> already need 100, with mobile Performance at least 95.</li>
+        <li><b>The third</b> copies the script into its make check.</li>
+        <li><b>A mutation proves it bites:</b> slow a page on purpose and watch the gate fail.</li>
+      </ol>
+    </figure>
+
+    <h3>UI task: a preview before production, and a human says yes</h3>
+    <figure class="scene">
+      <script type="application/json" class="scene">
+{
+  "lanes": [{ "label": "Today", "rows": [0, 0] }, { "label": "With the gate", "rows": [1, 2] }],
+  "nodes": [
+    { "id": "t1", "at": [0, 0], "label": "Change the page" },
+    { "id": "t2", "at": [1, 0], "label": "Gate passes", "tone": "pass", "who": "build, browser" },
+    { "id": "t3", "at": [2, 0], "label": "Judge it live", "tone": "fail", "who": "on production" },
+    { "id": "g1", "at": [0, 1], "label": "Change the page" },
+    { "id": "g2", "at": [1, 1], "label": "Gate passes", "tone": "pass", "who": "build, browser" },
+    { "id": "g3", "at": [2, 1], "label": "Shots on the PR", "tone": "fail", "dashed": true, "who": "desktop, phone" },
+    { "id": "g4", "at": [2, 2], "label": "Copy right?", "shape": "diamond", "tone": "accent" },
+    { "id": "g5", "at": [1, 2], "label": "Merge", "shape": "ellipse", "tone": "pass" }
+  ],
+  "edges": [
+    { "from": "t1", "to": "t2" }, { "from": "t2", "to": "t3", "label": "deploy", "tone": "fail" },
+    { "from": "g1", "to": "g2" }, { "from": "g2", "to": "g3" },
+    { "from": "g3", "to": "g4", "label": "human" },
+    { "from": "g4", "to": "g5", "label": "yes", "tone": "pass" },
+    { "from": "g4", "to": "g1", "label": "no", "tone": "fail", "via": [[2, 2.75], [0, 2.75]] }
+  ]
+}
+      </script>
+      <figcaption>Today the taste check happens on production. With the gate, it happens on the PR, before merge.</figcaption>
+      <ol class="narr">
+        <li><b>The page changes</b> and the build, browser and Lighthouse gates pass.</li>
+        <li><b>Screenshots go on the PR,</b> desktop and phone, before and after.</li>
+        <li><b>A human judges the copy</b> on the PR, before it ships.</li>
+      </ol>
+    </figure>
+  </section>
+
+  <section>
+    <h2>A gate counts only when a mutation proves it can fail</h2>
+    <p>A <b>mutation</b> breaks the code on purpose to prove a check catches it. Land every gate with its mutation, in the same change.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Gate</th><th>The mutation</th><th>Expected result</th></tr></thead>
+      <tbody>
+        <tr><td class="k">englishmaa Lighthouse</td><td>add a 2 MB image to the home page</td><td>make check fails on mobile Performance</td></tr>
+        <tr><td class="k">Secret scan</td><td>commit a fake key in a test fixture</td><td>the push is refused</td></tr>
+        <tr><td class="k">Dependency audit</td><td>pin vite back to 8.3.0</td><td>make check fails on the high advisory</td></tr>
+        <tr><td class="k">CSP header test</td><td>put the whole googletagmanager.com host back</td><td>the header test fails</td></tr>
+        <tr><td class="k">CRON_SECRET boot</td><td>unset the key</td><td>server.mjs refuses to boot</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Key terms</h2>
+    <dl class="terms">
+      <dt>Layer</dt><dd>One part of the factory that answers one question about unattended work.</dd>
+      <dt>Boundary</dt><dd>What a stage may touch: protected paths, deny rules and the diff check.</dd>
+      <dt>Gate</dt><dd>A command that can refuse a change, read by the runner from one line.</dd>
+      <dt>Test that bites</dt><dd>A test that fails when the fix is reverted.</dd>
+      <dt>Mutation</dt><dd>A deliberate break that proves a check can fail.</dd>
+    </dl>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>.</footer>
+</main>
+</body>
+</html>

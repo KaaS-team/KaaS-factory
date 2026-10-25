@@ -1,0 +1,3 @@
+#!/bin/sh
+# Written by lwp-claude-plugins scripts/sync-vendored.py; the gate is scripts/lwp/pre-push.sh.
+exec scripts/lwp/pre-push.sh "$@"

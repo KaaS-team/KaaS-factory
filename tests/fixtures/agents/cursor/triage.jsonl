@@ -1,0 +1,6 @@
+{"type": "system", "subtype": "init", "model": "sonnet-4"}
+{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "prompt"}]}}
+{"type": "tool_call", "subtype": "started", "call_id": "c1", "tool_call": {"readToolCall": {"args": {"path": "README.md"}}}}
+{"type": "tool_call", "subtype": "completed", "call_id": "c1", "tool_call": {"readToolCall": {"result": {}}}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "{\"outcome\":\"ok\"}"}]}}
+{"type": "result", "subtype": "success", "is_error": false, "duration_ms": 5000, "result": "{\"outcome\":\"ok\"}"}

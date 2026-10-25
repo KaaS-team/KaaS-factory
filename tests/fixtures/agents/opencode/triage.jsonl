@@ -1,0 +1,4 @@
+{"type": "step_start", "sessionID": "s1", "part": {"type": "step-start"}}
+{"type": "tool_use", "sessionID": "s1", "part": {"type": "tool", "tool": "read", "state": {"status": "completed"}}}
+{"type": "text", "sessionID": "s1", "part": {"type": "text", "text": "{\"outcome\":\"ok\"}"}}
+{"type": "step_finish", "sessionID": "s1", "part": {"type": "step-finish", "cost": 0, "tokens": {"input": 800, "output": 90, "reasoning": 0, "cache": {"read": 400, "write": 0}}}}

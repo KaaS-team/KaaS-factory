@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Stand-in rsync: the last two arguments are <src>/ and <host>:<dir>/; copies src into dir here.
+set -u
+src=${@: -2:1}
+dest=${@: -1}
+dest=${dest#*:}
+mkdir -p "$dest" && cp -R "$src". "$dest"

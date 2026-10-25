@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Workflow Cards</title>
+<link rel="stylesheet" href="worksheet.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="index.html">Worksheets</a> / Workflow cards</span>
+    <span class="actions"><span class="saved" data-saved>Saves in this browser as you type</span><button type="button" data-clear>Clear</button><button type="button" data-copy>Copy Markdown</button><button type="button" data-download>Download .md</button><button type="button" class="primary" data-print>Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">Step 1: one card per ticket type</span>
+    <h1>Write the workflow for <mark>one ticket type</mark> on one page</h1>
+    <p class="lede">Fill one card for each of the three types you chose in the workflow worksheet. Start from the matching entry in the Workflow library and change what is different on your team. A card is done when a new engineer could run the workflow from it alone. In step 3 each card becomes a workflow file your factory runs.</p>
+    <div class="row who"><label>Your name<div class="f" data-k="name"></div></label></div>
+  </header>
+
+  <div id="cards"></div>
+
+  <template id="card">
+    <section class="card-sheet">
+      <h2><span class="n">Card {n}</span>One ticket type, end to end</h2>
+      <div class="row"><label>Ticket type<div class="f" data-k="type" data-ph="e.g. dependency update"></div></label></div>
+      <div class="row">
+        <label>Trigger: where it comes from<div class="f" data-k="trigger" data-ph="label, alert, schedule, webhook, message"></div></label>
+        <label>Ready means the ticket carries<div class="f" data-k="ready" data-ph="repro steps, affected version, expected result"></div></label>
+      </div>
+      <div class="row">
+        <label>Triage decides<div class="f" data-k="triage" data-ph="the question that routes it"></div></label>
+        <label>Risk tier, and what raises it<div class="f" data-k="tier" data-ph="low, medium or high; paths that bump it"></div></label>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>Step</th><th>Script or agent</th><th>Tool or skill</th><th>Output it leaves</th><th>Check that ends it</th></tr></thead>
+        <tbody>
+          <tr><td class="f" data-k="s1"></td><td class="f" data-k="s1t"></td><td class="f" data-k="s1u"></td><td class="f" data-k="s1o"></td><td class="f" data-k="s1c"></td></tr>
+          <tr><td class="f" data-k="s2"></td><td class="f" data-k="s2t"></td><td class="f" data-k="s2u"></td><td class="f" data-k="s2o"></td><td class="f" data-k="s2c"></td></tr>
+          <tr><td class="f" data-k="s3"></td><td class="f" data-k="s3t"></td><td class="f" data-k="s3u"></td><td class="f" data-k="s3o"></td><td class="f" data-k="s3c"></td></tr>
+          <tr><td class="f" data-k="s4"></td><td class="f" data-k="s4t"></td><td class="f" data-k="s4u"></td><td class="f" data-k="s4o"></td><td class="f" data-k="s4c"></td></tr>
+          <tr><td class="f" data-k="s5"></td><td class="f" data-k="s5t"></td><td class="f" data-k="s5u"></td><td class="f" data-k="s5o"></td><td class="f" data-k="s5c"></td></tr>
+          <tr><td class="f" data-k="s6"></td><td class="f" data-k="s6t"></td><td class="f" data-k="s6u"></td><td class="f" data-k="s6o"></td><td class="f" data-k="s6c"></td></tr>
+        </tbody>
+      </table></div>
+      <div class="row">
+        <label>Human in the loop: where, who, and what they see<div class="f tall" data-k="human" data-ph="approves the plan; sees acceptance criteria and risk"></div></label>
+        <label>Stop rules<div class="f tall" data-k="stop" data-ph="max rounds, max minutes, max spend, who gets it after"></div></label>
+      </div>
+      <div class="row">
+        <label>Done means the PR carries<div class="f" data-k="done" data-ph="failing-then-passing test, gate output, screenshots"></div></label>
+        <label>The failure that would hurt most, and the gate that catches it<div class="f" data-k="risk"></div></label>
+        <label>Metric you will watch<div class="f" data-k="metric" data-ph="e.g. time from ready to PR"></div></label>
+      </div>
+    </section>
+  </template>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Free to use with your team.</footer>
+</main>
+<script>
+  // Three cards from one template; field keys are prefixed per card so each saves on its own.
+  (function () {
+    const tpl = document.getElementById("card");
+    const host = document.getElementById("cards");
+    for (let n = 1; n <= 3; n++) {
+      const node = tpl.content.cloneNode(true);
+      const sheet = node.querySelector(".card-sheet");
+      if (n > 1) sheet.classList.add("page-break");
+      sheet.querySelector(".n").textContent = "Card " + n;
+      node.querySelectorAll(".f").forEach((el) => { el.dataset.k = "c" + n + "-" + el.dataset.k; });
+      host.appendChild(node);
+    }
+  })();
+</script>
+<script src="worksheet.js"></script>
+</body>
+</html>

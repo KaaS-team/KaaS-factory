@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI-Native SDLC Team Audit</title>
+<link rel="stylesheet" href="worksheet.css">
+</head>
+<body>
+<main>
+  <div class="bar">
+    <span class="crumbs"><a href="index.html">Worksheets</a> / Team audit</span>
+    <span class="actions"><span class="saved" data-saved>Saves in this browser as you type</span><button type="button" data-clear>Clear</button><button type="button" data-copy>Copy Markdown</button><button type="button" data-download>Download .md</button><button type="button" class="primary" data-print>Save as PDF</button></span>
+  </div>
+
+  <header class="sheet">
+    <p class="brand"><a href="https://kaas.team" target="_blank" rel="noopener"><svg class="bm" viewBox="0 0 32 32" aria-hidden="true"><rect class="mb" width="32" height="32" rx="8"/><rect x="8.5" y="7" width="5" height="2" rx=".7"/><rect x="8.5" y="10" width="5" height="2" rx=".7"/><rect x="8.5" y="13" width="5" height="2" rx=".7"/><rect x="8.5" y="16" width="5" height="2" rx=".7"/><rect x="8.5" y="19" width="5" height="2" rx=".7"/><rect x="8.5" y="22" width="5" height="2" rx=".7"/><path d="M23 7.5 15.5 15.5 23 23.5"/></svg>KaaS.team</a><span class="x">and</span><a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a></p>
+    <span class="when">For tech leads and engineering leaders, one team, one hour</span>
+    <h1>Where does your team's delivery <mark>choke once agents write the code</mark>?</h1>
+    <p class="lede">When agents make code cheap, the bottleneck moves to review, verification and release. DORA's 2025 report found AI amplifies the system it lands in: strong teams get faster, weak ones get less stable. Score each row 0 to 3 with the team in the room, then pick the three lowest rows that block the most work.</p>
+    <div class="row who"><label>Team<div class="f" data-k="name"></div></label><label>Date<div class="f" data-k="date"></div></label></div>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>Baseline numbers, last 30 days</h2>
+    <div class="row">
+      <label>PRs merged per week<div class="f"></div></label>
+      <label>Median wait for first review<div class="f"></div></label>
+      <label>Median lead time, ready to production<div class="f"></div></label>
+      <label>Reverts and hotfixes<div class="f"></div></label>
+      <label>Share of PRs written mostly by an agent<div class="f"></div></label>
+      <label>Agent spend per PR<div class="f" data-ph="or unknown"></div></label>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Score the eleven layers</h2>
+    <p class="hint">0 none, 1 ad hoc, 2 written down, 3 enforced by a check.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Layer</th><th>3 looks like</th><th>Score</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Intake</td><td>A ticket has a ready checklist an agent can check</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Triage</td><td>Each ticket type has its own route and risk tier</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Planning</td><td>Features carry a spec that gets human approval before any code</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Context</td><td>Short <code>AGENTS.md</code>, path-scoped rules, skills in the repo</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Isolation</td><td>Agents run in a worktree or sandbox with limits</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Verification</td><td>Gates and holdout tests the agent cannot skip</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Review</td><td>Risk tiers decide approvals; AI review on every PR; round cap</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Delivery</td><td>Merge queue, feature flags, staged release, fast rollback</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Learning</td><td>Incidents and reverts become evals; repeated comments become rules</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Measurement</td><td>Wait time, rounds, autonomy and cost per PR on a dashboard</td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="k">Governance</td><td>Written AI policy, spend caps, audit trail per run</td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="page-break">
+    <h2><span class="n">3</span>The three rows to fix first</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Row</th><th>What it blocks today</th><th>First change</th><th>Owner</th><th>Check that proves it</th></tr></thead>
+      <tbody>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+        <tr><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td><td class="f"></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>30, 60, 90 days</h2>
+    <div class="row">
+      <label>Day 30: one ticket type automated<div class="f tall" data-ph="usually dependency updates or small bugs"></div></label>
+      <label>Day 60: risk tiers and AI review live<div class="f tall"></div></label>
+      <label>Day 90: the guardrail number<div class="f tall" data-ph="revert rate no worse while PRs per week rise"></div></label>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Questions to ask in the room</h2>
+    <ul>
+      <li>Which PRs would you merge without reading the diff if the evidence were attached? What evidence?</li>
+      <li>Which paths always need human review, whoever wrote the change?</li>
+      <li>What did the last three incidents have in common, and would a gate have caught one?</li>
+      <li>Who owns a change an agent wrote, and who answers for it when it breaks?</li>
+    </ul>
+  </section>
+
+  <footer>Made by <a href="https://kaas.team" target="_blank" rel="noopener">KaaS.team</a> and <a href="https://learnwithparam.com" target="_blank" rel="noopener">learnwithparam</a>. Free to use with your team.</footer>
+</main>
+<script src="worksheet.js"></script>
+</body>
+</html>

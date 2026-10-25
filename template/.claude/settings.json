@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(gh *)",
+      "Bash(git push*)",
+      "Bash(git merge *)",
+      "Bash(git reset --hard *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.ssh/**)",
+      "Read(./.env*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Read|Bash|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-paths.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/stop-artifact.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/stop-verifier-evidence.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-edit-check.sh",
+            "timeout": 90
+          }
+        ]
+      }
+    ]
+  }
+}
