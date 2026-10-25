@@ -2,7 +2,7 @@
 // bin/factory imports this file. Thin dispatcher; the logic lives in the other src/ modules so it
 // stays testable without a child process.
 
-import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
 import type { ScmPort } from "./github";
@@ -41,6 +41,7 @@ import { LABEL } from "./labels";
 import { ensureRepoClone } from "./repo";
 import { daemonPlatform, installDaemon, uninstallDaemon } from "./daemon";
 import { helpText } from "./help";
+import { decodeStatement, type Envelope, generateReceiptKey, keyId, RECEIPT_KEY_ENV, verifyEnvelope } from "./receipt";
 import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
@@ -984,6 +985,41 @@ async function cmdEvents(): Promise<void> {
   console.log(`factory events: ${id} queued to ${queued} sink(s), ${delivered} delivered now`);
 }
 
+// `factory receipt`: the key that signs acceptance receipts, and a quick check of one. The independent check
+// is verify/ (kaas-verify), which a reviewer runs with no factory code; see docs/receipts.md.
+async function cmdReceipt(): Promise<void> {
+  const sub = args[1];
+  if (sub === "keygen") {
+    const out = flag("out");
+    if (!out) throw new Error("usage: factory receipt keygen --out <key.pem>");
+    if (existsSync(out)) throw new Error(`${out} exists; a new key would orphan every receipt it signed`);
+    const { privateKeyPem, publicKeyPem } = generateReceiptKey();
+    writeFileSync(out, privateKeyPem, { mode: 0o600 });
+    writeFileSync(`${out}.pub`, publicKeyPem);
+    if (has("json")) console.log(successJson({ key: out, pub: `${out}.pub`, keyid: keyId(publicKeyPem) }));
+    else
+      console.log(
+        `factory receipt: wrote ${out} (keep it secret) and ${out}.pub (commit it as .factory/receipt.pub)\nset ${RECEIPT_KEY_ENV}=${out} on the runner`,
+      );
+    return;
+  }
+  if (sub === "verify" && args[2]) {
+    const pub = flag("pubkey");
+    if (!pub) throw new Error("usage: factory receipt verify <receipt.dsse.json> --pubkey <key.pub>");
+    const envelope = JSON.parse(readFileSync(args[2], "utf8")) as Envelope;
+    const ok = verifyEnvelope(envelope, readFileSync(pub, "utf8"));
+    const { verdict } = decodeStatement(envelope).predicate;
+    if (has("json")) console.log(successJson({ signed: ok, ...verdict }));
+    else console.log(`${ok ? "signed" : "NOT SIGNED by this key"}; ${verdict.proven ? "proven" : "not proven"}`);
+    if (!ok) process.exit(EXIT.error);
+    return;
+  }
+  console.log(
+    "usage: factory receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <key.pub>) [--json]",
+  );
+  if (!has("help")) process.exit(EXIT.error);
+}
+
 // `factory pool`: each pool in machine.json, its members' minutes used and left this month, and the last failure.
 async function cmdPool(): Promise<void> {
   if (has("help")) {
@@ -1066,6 +1102,8 @@ async function main(): Promise<void> {
       return cmdEvents();
     case "pool":
       return cmdPool();
+    case "receipt":
+      return cmdReceipt();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

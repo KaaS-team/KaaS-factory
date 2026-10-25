@@ -1,0 +1,16 @@
+[package]
+name = "kaas-verify"
+version = "5.0.0"
+edition = "2021"
+license = "MIT"
+description = "Offline checker for software-factory acceptance receipts; shares no code with the engine."
+publish = false
+
+[dependencies]
+base64 = "=0.22.1"
+ed25519-dalek = "=2.2.0"
+serde_json = "=1.0.140"
+sha2 = "=0.10.9"
+
+[profile.release]
+strip = true

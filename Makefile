@@ -3,7 +3,7 @@
 install:
 	bun install
 
-# make check = lint + typecheck + test + skills validation. Hard-fails if uvx is
+# make check = lint (biome, and rustfmt plus clippy on verify/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
 # check did not ship (see the lwp-eng plugin's engineering.md, Rule 0).
 check: lint typecheck test skills-check
@@ -13,6 +13,9 @@ check: lint typecheck test skills-check
 # (`!` in tests, comma and forEach shorthand, literal `${}` in test strings).
 lint:
 	bun x biome ci .
+	@command -v cargo >/dev/null 2>&1 || { echo "make check: cargo is required for verify/ (kaas-verify), not skipping it" >&2; exit 1; }
+	cargo fmt --manifest-path verify/Cargo.toml --check
+	cargo clippy --quiet --locked --manifest-path verify/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-verify-target} -- -D warnings
 
 typecheck:
 	bun x tsc --noEmit

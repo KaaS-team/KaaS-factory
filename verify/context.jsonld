@@ -1,0 +1,99 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "prov": "http://www.w3.org/ns/prov#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "kaas": "https://kaas.team/attestations/acceptance/v1#",
+    "run": {
+      "@id": "kaas:run"
+    },
+    "base": {
+      "@id": "prov:used"
+    },
+    "head": {
+      "@id": "prov:generated"
+    },
+    "criteria": {
+      "@id": "kaas:criterion",
+      "@container": "@list"
+    },
+    "id": "@id",
+    "spec": {
+      "@id": "prov:wasDerivedFrom",
+      "@type": "@id"
+    },
+    "text": "kaas:promise",
+    "holdout": {
+      "@id": "kaas:holdoutTest",
+      "@container": "@set"
+    },
+    "new": {
+      "@id": "kaas:newInThisChange",
+      "@type": "xsd:boolean"
+    },
+    "proof": "kaas:proof",
+    "ok": {
+      "@id": "kaas:proven",
+      "@type": "xsd:boolean"
+    },
+    "ran": {
+      "@id": "kaas:ran",
+      "@type": "xsd:boolean"
+    },
+    "mutationProof": "kaas:mutationProof",
+    "status": "kaas:status",
+    "tests": {
+      "@id": "kaas:testCount",
+      "@type": "xsd:integer"
+    },
+    "steps": {
+      "@id": "prov:qualifiedAssociation",
+      "@container": "@list"
+    },
+    "stage": "prov:hadRole",
+    "agent": {
+      "@id": "prov:agent"
+    },
+    "model": "kaas:model",
+    "exitCode": {
+      "@id": "kaas:exitCode",
+      "@type": "xsd:integer"
+    },
+    "costUsd": {
+      "@id": "kaas:costUsd",
+      "@type": "xsd:decimal"
+    },
+    "artifacts": {
+      "@id": "kaas:sha256",
+      "@container": "@index"
+    },
+    "verdict": "kaas:verdict",
+    "proven": {
+      "@id": "kaas:proven",
+      "@type": "xsd:boolean"
+    },
+    "failed": {
+      "@id": "kaas:failedCount",
+      "@type": "xsd:integer"
+    },
+    "errors": {
+      "@id": "kaas:error",
+      "@container": "@list"
+    },
+    "notProven": {
+      "@id": "kaas:notProven",
+      "@container": "@list"
+    },
+    "repo": "kaas:repo",
+    "issue": {
+      "@id": "kaas:issue",
+      "@type": "xsd:integer"
+    },
+    "ref": "kaas:ref",
+    "sha": "kaas:gitCommit",
+    "at": {
+      "@id": "prov:endedAtTime",
+      "@type": "xsd:dateTime"
+    }
+  }
+}

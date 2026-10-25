@@ -8,3 +8,4 @@ artifacts/
 .factory-home/
 .factory-wt.env
 reports/
+verify/target/

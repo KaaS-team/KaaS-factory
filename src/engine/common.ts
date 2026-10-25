@@ -637,8 +637,8 @@ export async function checkSpendCap(
   }
   return undefined;
 }
-// The PR body, then the Acceptance table when the repo has check-acceptance.py, then the "Factory run"
-// summary unless config.prRunSummary is off.
+// The PR body, then the Acceptance table when the repo has check-acceptance.py, then the signed Receipt,
+// then the "Factory run" summary unless config.prRunSummary is off.
 export function prBody(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -647,9 +647,12 @@ export function prBody(
   ctx: RunCtx,
   proof?: ProofStatus,
   acceptance?: AcceptanceVerdict,
+  receipt?: string,
 ): string {
-  // The acceptance table carries no model or spend, so prRunSummary does not hide it.
+  // The acceptance table carries no model or spend, so prRunSummary does not hide it; the receipt
+  // drops both itself when prRunSummary is off.
   if (acceptance) body = `${body}\n\n${renderAcceptanceTable(acceptance)}`;
+  if (receipt) body = `${body}\n\n${receipt}`;
   if (!config.prRunSummary) return body;
   const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
   const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;

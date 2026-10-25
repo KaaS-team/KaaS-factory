@@ -29,6 +29,7 @@ import { isChecked } from "../recheck";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
 import { runProof, type ProofResult, type ProofStatus } from "../proof";
 import { touchesProtectedPath } from "../boundary";
+import { missingReceipt, renderReceipt, writeRunReceipt } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
@@ -430,6 +431,15 @@ const pr: StepType = {
     // A revise from in-review re-enters here with the PR already open;
     // the push in build already updated its branch.
     const head = deps.git.branchName(issueNumber);
+    const receipt = await writeRunReceipt(deps.setupRunner ?? new ShellSetupRunner(), {
+      worktree,
+      runDir: runDir(issueNumber),
+      repo: config.repo,
+      issue: issueNumber,
+      base: config.base,
+      runs: deps.state.listStageRuns(config.repo, { issue: issueNumber }),
+      operatorDetail: config.prRunSummary,
+    }).then(renderReceipt, (err: Error) => missingReceipt(err.message));
     const existing = await deps.github.findPrByHead(config.repo, head);
     const prUrl =
       existing?.url ??
@@ -446,6 +456,7 @@ const pr: StepType = {
           ctx,
           readProofStatus(worktree, issueNumber),
           readAcceptance(worktree, issueNumber),
+          receipt,
         ),
         draft: true,
       }));

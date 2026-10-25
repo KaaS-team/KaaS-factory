@@ -383,5 +383,12 @@
   {"name": "gateway: https only", "file": "src/machine.ts", "find": "(parsed.protocol === \"http:\" && local)", "replace": "parsed.protocol === \"http:\"", "test": "tests/gateway.test.ts"},
   {"name": "gateway: other provider auth stripped", "file": "src/agents/env.ts", "find": "GATEWAY_STRIPPED_PREFIXES.some((p) => key.startsWith(p))", "replace": "false", "test": "tests/gateway.test.ts"},
   {"name": "gateway: provider hosts refused in the VM", "file": "src/machine.ts", "find": "const around = vm?.allow?.find(isProviderHost);", "replace": "const around = undefined;", "test": "tests/gateway.test.ts"},
-  {"name": "gateway: host match ignores case and trailing dot", "file": "src/agents/gateway.ts", "find": "const h = host.toLowerCase().replace(/\\.$/, \"\");", "replace": "const h = host;", "test": "tests/gateway.test.ts"}
+  {"name": "gateway: host match ignores case and trailing dot", "file": "src/agents/gateway.ts", "find": "const h = host.toLowerCase().replace(/\\.$/, \"\");", "replace": "const h = host;", "test": "tests/gateway.test.ts"},
+  {"name": "kaas-verify: the ok flag is re-derived", "file": "verify/src/main.rs", "find": "if c.get(\"ok\").and_then(Value::as_bool) != Some(ok) {", "replace": "if false {", "test": "tests/receipt.test.ts"},
+  {"name": "kaas-verify: the signature is checked", "file": "verify/src/main.rs", "find": "match key.verify(&message, &sig) {", "replace": "match Ok::<(), ed25519_dalek::SignatureError>(()) {", "test": "tests/receipt.test.ts"},
+  {"name": "kaas-verify: the not-proven list is re-derived", "file": "verify/src/main.rs", "find": "if listed != not_proven", "replace": "if false && listed != not_proven", "test": "tests/receipt.test.ts"},
+  {"name": "kaas-verify: artifacts are re-hashed", "file": "verify/src/main.rs", "find": "if Some(hex(&Sha256::digest(&body)).as_str()) != digest.as_str() {", "replace": "if false {", "test": "tests/receipt.test.ts"},
+  {"name": "kaas-verify: the subject is the head", "file": "verify/src/main.rs", "find": ".and_then(Value::as_str)\n        != Some(head)", "replace": ".and_then(Value::as_str)\n        == Some(\"never\")", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: a failed holdout is not proven", "file": "src/receipt.ts", "find": "&& holdout.ok !== false", "replace": "", "test": "tests/receipt.test.ts"},
+  {"name": "receipt: the PR body carries the receipt", "file": "src/engine/common.ts", "find": "if (receipt) body = `${body}\\n\\n${receipt}`;", "replace": "", "test": "tests/executor.test.ts"}
 ]
