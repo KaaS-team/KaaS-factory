@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- An `agent37` runtime: a gate or `check` step runs on an agent37.com instance named in
+  `machine.json`, with the key read from the env var `tokenEnv`. Exec bodies are capped at 128 KB, so
+  the worktree goes over in base64 chunks, is unpacked in a fresh directory and removed after. It can
+  be a `pool` member next to `http`.
 - Fix: a `pool` member's minutes are held in `FACTORY_HOME/machine.db` before a run starts, in one
   transaction, and the run is cut off at what it holds. Two runs at once could each see the same
   minutes left and together run past the allowance. A pool can name its `fallback` (default `local`)

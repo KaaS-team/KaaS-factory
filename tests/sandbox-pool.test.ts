@@ -205,7 +205,7 @@ describe("sandbox pool", () => {
         two: { kind: "pool", members: one, fallback: "free" },
       }),
     ).toEqual([
-      'runtimes.free.members: "lwpr" is not an http runtime in this file (only those stop at the allowance)',
+      'runtimes.free.members: "lwpr" is not an http or agent37 runtime in this file (only those stop at the allowance)',
       'runtimes.free.members: "e2b" twice',
       'runtimes.free.fallback: no runtime "nowhere" (or "none")',
       'runtimes.two.fallback: "free" is a pool',

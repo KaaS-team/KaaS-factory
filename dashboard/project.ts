@@ -59,6 +59,8 @@ function target(spec: RuntimeSpec): string {
       return spec.argv.join(" ");
     case "http":
       return spec.url;
+    case "agent37":
+      return `agent37 instance ${spec.instance}`;
     case "pool":
       return `pool of ${spec.members.map((m) => m.runtime).join(", ")}, then ${spec.fallback ?? "local"}`;
   }

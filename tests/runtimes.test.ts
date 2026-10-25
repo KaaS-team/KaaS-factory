@@ -5,16 +5,18 @@
 import { describe, expect, test } from "bun:test";
 import { containerArgs } from "../src/adapters/docker/execution";
 import { lwprArgs } from "../src/adapters/lwpr/execution";
+import { Agent37Execution, CHUNK } from "../src/adapters/agent37/execution";
 import { archiveArgs, HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { sshArgs } from "../src/adapters/ssh/execution";
 import { wrapArgs } from "../src/adapters/wrap/execution";
+import { startAgent37 } from "./fixtures/agent37";
 import { startSandbox } from "./fixtures/http-sandbox";
 import { configProblems } from "../src/config";
 import { framed, shq, unframe } from "../src/core/frame";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { loadMachineConfig } from "../src/machine";
 import { BUILTIN_RUNTIMES, runtimeProblems, runtimeRefs, runtimesFrom, unknownRuntimes } from "../src/runtimes";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -259,7 +261,7 @@ describe("names", () => {
       "runtimes.a b: a name is letters, digits, _ and -",
       "runtimes.d.image: required for docker",
       "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude)",
-      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, pool",
+      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, pool",
     ]);
   });
   test("a bad machine.json runtime stops boot", () => {
@@ -296,5 +298,69 @@ describe("names", () => {
     expect(ok.ok && ok.workflow.steps.a!.runtime).toBe("lwpr");
     const bad = flow("build");
     expect(!bad.ok && bad.problems.join()).toContain("steps.a.runtime: a build step runs no command");
+  });
+});
+
+describe("agent37", () => {
+  const dir = () => {
+    const d = mkdtempSync(join(tmpdir(), "factory-a37-"));
+    for (const sub of [".git", "node_modules", "dist"]) {
+      Bun.spawnSync(["mkdir", "-p", join(d, sub)]);
+      writeFileSync(join(d, sub, "f"), sub);
+    }
+    return d;
+  };
+  const spec = (url: string, root: string) => ({ kind: "agent37", instance: "i1", tokenEnv: "K", url, root }) as const;
+
+  test("sends the worktree in chunks under the body cap, runs there, answers its exit code, cleans up", async () => {
+    const box = startAgent37("k", "i1");
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-root-"));
+    try {
+      const d = dir();
+      // Random bytes do not compress, so the archive needs several chunks.
+      writeFileSync(join(d, "big.bin"), crypto.getRandomValues(new Uint8Array(3 * CHUNK)));
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run(
+        "ls -A | sort | tr '\\n' ' '; printf \"it's\" >&2; exit 3",
+        d,
+      );
+      expect(r).toEqual({ stdout: "big.bin dist ", stderr: "it's", code: 3 });
+      expect(box.commands.filter((c) => c.startsWith("printf %s ")).length).toBeGreaterThan(3);
+      expect(readdirSync(root)).toEqual([]);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("the key goes in the header only; unset, wrong or unreachable fails the step, never throws", async () => {
+    const box = startAgent37("right", "i1");
+    try {
+      const unset = await new Agent37Execution(spec(box.url, "/tmp/x"), {}).run("true", dir());
+      expect(unset.runtimeFailed).toBe("agent37 i1: env var K is not set");
+      expect(box.keys.length).toBe(0);
+      const wrong = await new Agent37Execution(spec(box.url, "/tmp/x"), { K: "wrong-key-value" }).run("true", dir());
+      expect(wrong).toMatchObject({ code: 1, runtimeFailed: "agent37 i1 answered 401: unauthorized" });
+      expect(wrong.stderr).not.toContain("wrong-key-value");
+      expect(box.keys.at(-1)).toBe("wrong-key-value");
+      const down = await new Agent37Execution(spec("http://127.0.0.1:1", "/tmp/x"), { K: "k" }).run("true", dir());
+      expect(down.code).toBe(1);
+      expect(down.runtimeFailed).toStartWith("agent37 i1 unreachable:");
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("machine.json: instance and tokenEnv are required, the url is https or loopback", () => {
+    expect(runtimeProblems({ a: { kind: "agent37", instance: "i1", tokenEnv: "AGENT37_API_KEY" } })).toEqual([]);
+    const a37 = { kind: "agent37", instance: "i1", tokenEnv: "K" };
+    expect(runtimeProblems({ a37, free: { kind: "pool", members: [{ runtime: "a37", minutes: 60 }] } })).toEqual([]);
+    expect(
+      runtimeProblems({
+        b: { kind: "agent37", instance: "i1" },
+        c: { kind: "agent37", instance: "i1", tokenEnv: "K", url: "http://sandbox.agent37.app" },
+      }),
+    ).toEqual([
+      "runtimes.b.tokenEnv: required for agent37",
+      "runtimes.c.url: https (plain http only to localhost), since the worktree is sent to it",
+    ]);
   });
 });

@@ -28,7 +28,8 @@ and tokens belong to the machine, not the repo, so you define every other runtim
     "gvisor": { "kind": "docker", "image": "node:22", "runtime": "runsc" },
     "box": { "kind": "ssh", "host": "ci1", "dir": "/srv/factory", "exclude": ["node_modules", "dist"] },
     "fc": { "kind": "wrap", "argv": ["firecracker-ctr", "run", "--rm", "--mount", "type=bind,src={cwd},dst={cwd}", "docker.io/library/node:22", "job", "bash", "-c", "{cmd}"] },
-    "e2b": { "kind": "http", "url": "https://sandbox.example.com/exec", "tokenEnv": "SANDBOX_TOKEN" }
+    "e2b": { "kind": "http", "url": "https://sandbox.example.com/exec", "tokenEnv": "SANDBOX_TOKEN" },
+    "a37": { "kind": "agent37", "instance": "ab12cd34ef", "tokenEnv": "AGENT37_API_KEY" }
   }
 }
 ```
@@ -40,12 +41,13 @@ and tokens belong to the machine, not the repo, so you define every other runtim
 | `lwpr` | `lwpr run` packs the worktree and runs the command on the lwpr box. | `app`, `timeoutMin`, `setup` |
 | `wrap` | Any launcher: a Firecracker microVM, podman, bubblewrap, nsjail. `{cmd}` must be exactly one element of `argv`, and the bash command goes there. `{cwd}` is the worktree path wherever it appears. | `argv` (required) |
 | `http` | A hosted sandbox (e2b, Daytona, Modal or your own) behind the protocol below. | `url` (required; https, or http to loopback only), `tokenEnv`, `exclude` |
+| `agent37` | An agent37.com instance, through its exec API (see below). | `instance`, `tokenEnv` (both required), `root` (default `/tmp/factory`), `exclude`, `url` (the exec host) |
 
 `factory doctor` lists the runtimes the repo uses and flags any that are missing.
 
 ## A pool of free tiers
 
-A `pool` names `http` runtimes from the same file, in order, each with the monthly minutes its
+A `pool` names `http` and `agent37` runtimes from the same file, in order, each with the monthly minutes its
 free tier gives. You copy that figure from the provider's pricing page; the factory holds none.
 
 ```json
@@ -70,7 +72,7 @@ command that fails on a member is the step's answer.
 With every member spent or failed, the step runs on `fallback`: `local` unless the pool names
 another runtime. Its stderr starts with a `pool:` line saying why. A pool you chose for isolation
 should say `"fallback": "none"`, so the step fails as a runtime instead of running on this machine.
-Only `http` members can be cut off mid-run, so a pool takes no other kind.
+Only `http` and `agent37` members can be cut off mid-run, so a pool takes no other kind.
 
 `factory pool` prints each member's minutes used and left this month and its last failure;
 `--json` prints the same as `{ok, data}`.
@@ -95,6 +97,16 @@ the step with an error but never crashes the loop:
 The token is read by name when the step runs, so it never appears in `machine.json`, an argv or a
 log. `tests/fixtures/http-sandbox.ts` is a reference server for the protocol. A shim in front of a
 hosted sandbox does the same work inside the sandbox.
+
+## agent37
+
+Create the instance once (`POST https://api.agent37.com/v1/instances` with `"auto_sleep": true`, so
+an idle one bills only its disk) and put its id in `instance`. Each run sends the worktree, without
+`.git` and `exclude`, over the exec API itself: an exec body is capped at 128 KB, and the instance's
+file API answers only on templates that run an agent. The tar.gz goes in base64 chunks of 96 KB,
+is unpacked into a fresh directory under `root`, `bash -c cmd` runs there, and the directory is
+removed after. One exec waits at most 15 minutes, so a longer step needs another runtime. A 1 MB
+worktree took 12.5 seconds end to end on the default 2 vCPU instance.
 
 ## Many workers, one repo
 

@@ -3,9 +3,10 @@
 // FACTORY_HOME/machine.json `runtimes` names any others, because hosts and
 // images belong to the machine, not the repo. The repo's `runtime.gates` and
 // `runtime.check`, and a check step's own `runtime:`, pick one by name.
-// A `pool` names `http` runtimes from the same file, in order, each with its
+// A `pool` names `http` and `agent37` runtimes from the same file, in order, each with its
 // free tier's monthly minutes (src/core/sandbox-pool.ts).
 
+import { Agent37Execution, type Agent37Spec } from "./adapters/agent37/execution";
 import { DockerExecution, type DockerSpec } from "./adapters/docker/execution";
 import { HttpSandboxExecution, type HttpSandboxSpec } from "./adapters/http-sandbox/execution";
 import { LocalExecution } from "./adapters/local/execution";
@@ -23,6 +24,7 @@ export type RuntimeSpec =
   | LwprSpec
   | WrapSpec
   | HttpSandboxSpec
+  | Agent37Spec
   | PoolSpec;
 
 export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = {
@@ -44,8 +46,15 @@ const SHAPES: Readonly<
   lwpr: { required: [], fields: { app: "string", timeoutMin: "posInt", setup: "boolean" } },
   wrap: { required: ["argv"], fields: { argv: "strings" } },
   http: { required: ["url"], fields: { url: "string", tokenEnv: "string", exclude: "strings" } },
+  agent37: {
+    required: ["instance", "tokenEnv"],
+    fields: { instance: "string", tokenEnv: "string", url: "string", root: "string", exclude: "strings" },
+  },
   pool: { required: ["members"], fields: { members: "members", reserveMin: "posInt", fallback: "string" } },
 };
+
+// Kinds a pool can cut off at the minutes it holds: one fetch each, aborted by its signal.
+const POOLABLE = new Set<unknown>(["http", "agent37"]);
 
 // What a field's shape cannot say. `all` is the whole runtimes object, for a pool's members.
 function kindProblems(at: string, s: Record<string, unknown>, all: Record<string, unknown>): string[] {
@@ -54,8 +63,11 @@ function kindProblems(at: string, s: Record<string, unknown>, all: Record<string
     return [
       ...(s.members.length ? [] : [`${at}.members: at least one`]),
       ...names
-        .filter((n) => (all[n as string] as { kind?: unknown } | undefined)?.kind !== "http")
-        .map((n) => `${at}.members: "${n}" is not an http runtime in this file (only those stop at the allowance)`),
+        .filter((n) => !POOLABLE.has((all[n as string] as { kind?: unknown } | undefined)?.kind))
+        .map(
+          (n) =>
+            `${at}.members: "${n}" is not an http or agent37 runtime in this file (only those stop at the allowance)`,
+        ),
       ...names.filter((n, i) => names.indexOf(n) !== i).map((n) => `${at}.members: "${n}" twice`),
       ...fallbackProblems(at, s.fallback, all),
     ];
@@ -63,7 +75,7 @@ function kindProblems(at: string, s: Record<string, unknown>, all: Record<string
   if (s.kind === "wrap" && Array.isArray(s.argv) && s.argv.filter((a) => a === CMD).length !== 1)
     return [`${at}.argv: needs "${CMD}" as exactly one element, where the bash command goes`];
   if (
-    s.kind === "http" &&
+    (s.kind === "http" || s.kind === "agent37") &&
     typeof s.url === "string" &&
     !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(s.url)
   )
@@ -138,6 +150,8 @@ export function executionFor(spec: Exclude<RuntimeSpec, PoolSpec>): ExecutionPor
       return new WrapExecution(spec);
     case "http":
       return new HttpSandboxExecution(spec);
+    case "agent37":
+      return new Agent37Execution(spec);
   }
 }
 

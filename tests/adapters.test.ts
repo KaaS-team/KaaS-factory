@@ -6,6 +6,7 @@ import { mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll } from "bun:test";
+import { Agent37Execution } from "../src/adapters/agent37/execution";
 import { DockerExecution } from "../src/adapters/docker/execution";
 import { GitLeases } from "../src/adapters/git-lease/lease";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
@@ -15,6 +16,7 @@ import { LwprExecution } from "../src/adapters/lwpr/execution";
 import { PoolExecution, SqliteUsageStore } from "../src/adapters/pool/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";
 import { WrapExecution } from "../src/adapters/wrap/execution";
+import { startAgent37 } from "./fixtures/agent37";
 import { startSandbox } from "./fixtures/http-sandbox";
 import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 import { executionContract } from "./ports/execution.contract";
@@ -76,6 +78,30 @@ function httpSandbox(): () => void {
     });
 }
 
+// The agent37 runtime against a stand-in for its exec API, on loopback.
+function agent37(): () => void {
+  return () =>
+    describe("against a stand-in for the agent37 exec API", () => {
+      let box: ReturnType<typeof startAgent37>;
+      beforeAll(() => (box = startAgent37("s3cret", "i1")));
+      afterAll(() => box.stop());
+      executionContract(
+        "agent37",
+        () =>
+          new Agent37Execution(
+            {
+              kind: "agent37",
+              instance: "i1",
+              tokenEnv: "AGENT37_API_KEY",
+              url: box.url,
+              root: mkdtempSync(join(tmpdir(), "factory-a37-")),
+            },
+            { AGENT37_API_KEY: "s3cret" },
+          ),
+      );
+    });
+}
+
 // A pool of one sandbox member, usage in memory: the contract runs on the member.
 function sandboxPool(): () => void {
   return () =>
@@ -119,6 +145,7 @@ const REGISTRY: Record<string, () => void> = {
       () => new WrapExecution({ kind: "wrap", argv: ["env", "FACTORY_WRAPPED=1", "bash", "-c", "{cmd}"] }),
     ),
   "http-sandbox": httpSandbox(),
+  agent37: agent37(),
   pool: sandboxPool(),
   ssh: onFakePath(() =>
     executionContract(
