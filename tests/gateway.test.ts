@@ -192,13 +192,13 @@ describe("machine.json llmGateway", () => {
 
   test("refuses an agentRuntime that could call a model API around it", () => {
     const runtimes = {
-      vm: { kind: "microsandbox", image: "node:22-slim", allow: ["llm.example.com", "api.anthropic.com"] },
+      vm: { kind: "microsandbox", image: "node:22-slim", allow: ["llm.example.com", "API.Anthropic.com."] },
     };
     expect(() =>
       loadMachineConfig(
         home({ slots: 1, runtimes, agentRuntime: "vm", llmGateway: { url: "https://llm.example.com" } }),
       ),
-    ).toThrow("may not allow api.anthropic.com");
+    ).toThrow("may not allow API.Anthropic.com.");
   });
 
   test("refuses to start without the master key, and holds it once set", () => {

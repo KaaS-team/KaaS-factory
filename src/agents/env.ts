@@ -50,19 +50,34 @@ const GATEWAY_STRIPPED = [
   "CLAUDE_CODE_USE_BEDROCK",
   "CLAUDE_CODE_USE_VERTEX",
   "CLAUDE_CODE_USE_FOUNDRY",
-  "ANTHROPIC_BEDROCK_BASE_URL",
-  "ANTHROPIC_VERTEX_BASE_URL",
-  "ANTHROPIC_VERTEX_PROJECT_ID",
   "CODEX_API_KEY",
   "GOOGLE_APPLICATION_CREDENTIALS",
+  "GOOGLE_CLOUD_PROJECT",
+  "HF_TOKEN",
+  "COPILOT_GITHUB_TOKEN",
 ];
-const GATEWAY_STRIPPED_PREFIXES = ["AWS_", "AZURE_"];
+const GATEWAY_STRIPPED_PREFIXES = [
+  "AWS_",
+  "AZURE_",
+  "CLOUDSDK_",
+  "ANTHROPIC_BEDROCK_",
+  "ANTHROPIC_VERTEX_",
+  "ANTHROPIC_FOUNDRY_",
+];
+
+// One predicate for both places a gateway run drops credentials: the env and the VM's secrets.
+export function isProviderCredential(key: string): boolean {
+  return (
+    (PROVIDER_KEYS as readonly string[]).includes(key) ||
+    GATEWAY_STRIPPED.includes(key) ||
+    GATEWAY_STRIPPED_PREFIXES.some((p) => key.startsWith(p))
+  );
+}
 
 // The env of an agent that calls through a gateway: no provider key or credential of any kind.
 export function gatewaySanitizedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   const out = sanitizeEnv(env, []);
-  for (const key of Object.keys(out))
-    if (GATEWAY_STRIPPED.includes(key) || GATEWAY_STRIPPED_PREFIXES.some((p) => key.startsWith(p))) delete out[key];
+  for (const key of Object.keys(out)) if (isProviderCredential(key)) delete out[key];
   return out;
 }
 

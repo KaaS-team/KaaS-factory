@@ -28,8 +28,10 @@ export const PROVIDER_DOMAINS = [
   "azure.com",
 ] as const;
 
+// Case and a trailing dot name the same host to DNS, so they must not slip past the match.
 export function isProviderHost(host: string): boolean {
-  return PROVIDER_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
+  const h = host.toLowerCase().replace(/\.$/, "");
+  return PROVIDER_DOMAINS.some((d) => h === d || h.endsWith(`.${d}`));
 }
 
 export function gatewayHost(gateway: { url: string }): string {

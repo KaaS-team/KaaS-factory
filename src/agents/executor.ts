@@ -20,7 +20,7 @@ import {
 import { plain } from "../display";
 import { streamPath, takeoverMarker } from "../paths";
 import { McpError } from "../mcp";
-import { gatewaySanitizedEnv, PROVIDER_KEYS, sanitizeEnv } from "./env";
+import { gatewaySanitizedEnv, isProviderCredential, sanitizeEnv } from "./env";
 import { gatewayHost, type LlmGateway, mintStageKey, revokeKey } from "./gateway";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
@@ -267,7 +267,7 @@ export class CommandExecutor implements Executor {
     const gatewayUrl = via ? { [via.baseUrl]: `${this.gateway!.url.replace(/\/$/, "")}${via.path ?? ""}` } : {};
     const vm =
       via && this.vm
-        ? { ...this.vm, secrets: this.vm.secrets?.filter((s) => !PROVIDER_KEYS.some((k) => k === SECRET.exec(s)?.[1])) }
+        ? { ...this.vm, secrets: this.vm.secrets?.filter((s) => !isProviderCredential(SECRET.exec(s)?.[1] ?? "")) }
         : this.vm;
     // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
     const vmName = vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
