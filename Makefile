@@ -1,4 +1,4 @@
-.PHONY: agent-matrix demo install check check-mutations lint typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix demo install check check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
@@ -19,8 +19,16 @@ typecheck:
 
 # Run with no git identity, like a fresh CI runner or container, so a code path
 # that needs the developer's own identity fails here and not only on GitHub.
+# A flaky test is named @quarantine: test skips it and writes reports/junit.xml for the CTRF step in ci.yml;
+# quarantine, a ci.yml job that never blocks a push, runs only those (bun fails a filter that matches none).
+GIT_ENV = GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true
 test:
-	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true bun test
+	@mkdir -p reports
+	$(GIT_ENV) bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml
+
+quarantine:
+	@f=$$(grep -rl @quarantine tests --include='*.test.ts'); if [ -z "$$f" ]; then echo "quarantine: no @quarantine tests"; \
+	else $(GIT_ENV) bun test -t @quarantine $$f; fi
 
 # Each entry in tests/mutations.json breaks one thing; its test must go red.
 # Proves the checks bite. Its own CI job, since it copies the repo per mutation.

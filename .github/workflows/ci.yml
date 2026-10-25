@@ -15,6 +15,10 @@ jobs:
   push:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # actions: read lets the report step fetch the last runs' reports
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +38,35 @@ jobs:
       # An empty HOME, so a check that passes only with one machine's ~/.claude or caches fails here.
       - name: make check
         run: HOME="$(mktemp -d)" make check
+
+      # Flags a flaky test from the last runs' reports; name it @quarantine and it moves to the job below.
+      - uses: ctrf-io/github-test-reporter@93ff46b55aefe633bde6d13e61a7f533303233e6 # v1.3.2
+        if: always()
+        with:
+          report-path: reports/junit.xml
+          integrations-config: '{"junit-to-ctrf": {"enabled": true, "action": "convert", "options": {"output": "reports/ctrf.json"}}}'
+          summary-report: true
+          flaky-rate-report: true
+          fail-rate-report: true
+          upload-artifact: true
+          fetch-previous-results: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # only the quarantined tests; it never blocks a push
+  quarantine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - name: Install tmux (tests/tmux.test.ts drives a real one)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux
+      - run: make install
+      - run: make quarantine
 
   # The Dockerfile ships the VM run mode (plan "Run anywhere"). An image that
   # only builds when someone remembers to try it by hand rots the first time
