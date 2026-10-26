@@ -58,7 +58,7 @@ import sys
 from html import unescape
 from pathlib import Path
 
-# Beside the script when a repo vendors it into scripts/lwp/; one level up inside the plugin.
+# Beside the script when a repo vendors it into scripts/kaas/; one level up inside the plugin.
 _HERE = Path(__file__).resolve().parent
 RULES_DOC = next(
     (d / "house-rules.md" for d in (_HERE, _HERE.parent) if (d / "house-rules.md").is_file()),

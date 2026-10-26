@@ -10,7 +10,7 @@ paths:
 - A comment says why, never what the next line does. No narration ("Step 1", "Now we", "This function").
 - Two or three lines at most. Longer reasoning goes in `docs/decisions/`, and the comment links it.
 - No commented-out code and no ownerless TODO.
-- `scripts/lwp/check-quality.py` enforces the first two (and 400 lines per file) where the repo has a
+- `scripts/kaas/check-quality.py` enforces the first two (and 400 lines per file) where the repo has a
   `quality-baseline.json`; the post-edit hook feeds its findings back on every edit.
 
 Bad:

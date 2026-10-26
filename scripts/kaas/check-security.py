@@ -2,12 +2,12 @@
 """Security checks on what a change adds: secrets, insecure patterns, vulnerable or day-old packages, unsafe SQL.
 
 Usage: check-security.py gitleaks              secrets in commits and edits not yet on the base branch
-       check-security.py semgrep [FILE...]     scripts/lwp/semgrep.yml on the files; findings the base already had pass
+       check-security.py semgrep [FILE...]     scripts/kaas/semgrep.yml on the files; findings the base already had pass
        check-security.py osv-scanner [LOCK...] OSV advisories on the lockfiles, and a package version that
                                                lockfile adds which was published under 3 days ago fails
        check-security.py squawk [SQL...]       Squawk on migration SQL files
 A TOOL may be a comma list. With no files a tool takes the files changed since the merge base with origin/main
-(LWP_SECURITY_BASE overrides). Exceptions, each with a reason: .gitleaksignore, `nosemgrep: rule-id` on the line,
+(KAAS_SECURITY_BASE overrides). Exceptions, each with a reason: .gitleaksignore, `nosemgrep: rule-id` on the line,
 osv-scanner.toml [[IgnoredVulns]], .agents/security-sources.txt (`npm:name # reason` for a package a lockfile takes
 from git, a tarball or another registry), `-- squawk-ignore` in the SQL.
 Why: docs/decisions/scripts.md#check-securitypy
@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 ROOT = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip())
-RULES = ROOT / "scripts/lwp/semgrep.yml"
+RULES = ROOT / "scripts/kaas/semgrep.yml"
 SOURCES = ROOT / ".agents/security-sources.txt"
 MIN_AGE = timedelta(days=3)
 LOCKS = ("package-lock.json", "bun.lock", "uv.lock", "Cargo.lock")
@@ -41,10 +41,10 @@ def git(*args: str) -> str:
 
 def base() -> str:
     """No fallback to HEAD: a diff against HEAD itself is empty, so every check would pass having read nothing."""
-    ref = os.environ.get("LWP_SECURITY_BASE", "origin/main")
+    ref = os.environ.get("KAAS_SECURITY_BASE", "origin/main")
     found = git("merge-base", "HEAD", ref).strip()
     if not found:
-        sys.exit(f"security  FAIL  no merge base with {ref}; fetch it, or set LWP_SECURITY_BASE to the base ref")
+        sys.exit(f"security  FAIL  no merge base with {ref}; fetch it, or set KAAS_SECURITY_BASE to the base ref")
     return found
 
 
@@ -55,12 +55,12 @@ def changed(since: str) -> list[str]:
 
 
 def need(tool: str) -> bool:
-    """A missing scanner fails. A CI job whose runner lacks the tools opts out with LWP_SECURITY_ALLOW_SKIP=1 in the
+    """A missing scanner fails. A CI job whose runner lacks the tools opts out with KAAS_SECURITY_ALLOW_SKIP=1 in the
     workflow, since a scoped CI run reaches the stop-stage checks; the pre-push stop stage still runs them."""
     if shutil.which(tool):
         return True
-    if os.environ.get("LWP_SECURITY_ALLOW_SKIP") == "1":
-        print(f"security  SKIP  {tool} is not installed, so this scan did NOT run (LWP_SECURITY_ALLOW_SKIP=1)")
+    if os.environ.get("KAAS_SECURITY_ALLOW_SKIP") == "1":
+        print(f"security  SKIP  {tool} is not installed, so this scan did NOT run (KAAS_SECURITY_ALLOW_SKIP=1)")
         return False
     sys.exit(f"security  FAIL  {tool} is not installed: {INSTALL}")
 
@@ -218,7 +218,7 @@ def published(pkg: tuple[str, str, str]) -> datetime | None:
         "pypi": f"https://pypi.org/pypi/{name}/{ver}/json",
         "crates": f"https://crates.io/api/v1/crates/{name}/{ver}",
     }[eco]
-    req = urllib.request.Request(url, headers={"User-Agent": "lwp-check-security (learnwithparam.com)"})
+    req = urllib.request.Request(url, headers={"User-Agent": "kaas-check-security"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = json.load(resp)
     stamp = {

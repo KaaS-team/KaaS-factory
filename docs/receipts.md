@@ -11,7 +11,7 @@ written to `.factory/runs/issue-<n>/receipt.dsse.json`, beside the files it pins
 |---|---|
 | `subject[0]` | the head commit the PR ships |
 | `run.base`, `run.head` | `git rev-parse origin/<base>` and `HEAD` in the run's worktree |
-| `criteria[]` | each row of `scripts/lwp/check-acceptance.py --json`, with `proof` and `ok` derived from it |
+| `criteria[]` | each row of `scripts/kaas/check-acceptance.py --json`, with `proof` and `ok` derived from it |
 | `holdout`, `mutationProof` | `holdout.json` and `proof.json` from verify |
 | `steps[]` | each stage run; `model` and `costUsd` are null when `prRunSummary` is off |
 | `artifacts` | the sha256 of each run-dir file above |

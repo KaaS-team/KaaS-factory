@@ -1,5 +1,5 @@
 {
-  "$comment": "Read by the lwp-eng plugin hooks (Param-Harrison/lwp-claude-plugins). Biome is the one formatter; biome.json says which files it owns.",
+  "$comment": "Read by the kaas-eng plugin hooks (Param-Harrison/lwp-claude-plugins). Biome is the one formatter; biome.json says which files it owns.",
   "name": "factory",
   "gate": "make check",
   "test": "make test",
@@ -12,12 +12,12 @@
     ".mjs": "bun x biome format --write"
   },
   "stageGates": {
-    "stop": "make check && python3 scripts/lwp/check-security.py gitleaks,semgrep,osv-scanner",
-    "push": "make check && python3 scripts/lwp/check-security.py gitleaks,semgrep,osv-scanner"
+    "stop": "make check && python3 scripts/kaas/check-security.py gitleaks,semgrep,osv-scanner",
+    "push": "make check && python3 scripts/kaas/check-security.py gitleaks,semgrep,osv-scanner"
   },
   "$stageGates": "push matches stop so the scanners run before every push, not the gate alone; CI runs the same scan.",
   "kitExtras": [
-    "scripts/lwp/check-security.py",
-    "scripts/lwp/semgrep.yml"
+    "scripts/kaas/check-security.py",
+    "scripts/kaas/semgrep.yml"
   ]
 }

@@ -8,7 +8,7 @@
     "name": { "type": "string" },
     "gate": { "type": "string" },
     "prePush": {
-      "description": "A command scripts/lwp/pre-push.sh runs on this machine after the gate passes or is queued on the box, for a push step that needs what the box lacks (secrets, a docker engine).",
+      "description": "A command scripts/kaas/pre-push.sh runs on this machine after the gate passes or is queued on the box, for a push step that needs what the box lacks (secrets, a docker engine).",
       "type": "string"
     },
     "stageGates": {

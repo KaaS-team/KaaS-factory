@@ -1,5 +1,5 @@
 // The PR body's "Acceptance" table, one row per spec criterion, rendered from the kit's
-// scripts/lwp/check-acceptance.py --json. The script owns the verdict; this only runs it and shows what it
+// scripts/kaas/check-acceptance.py --json. The script owns the verdict; this only runs it and shows what it
 // said, so a reviewer reads each promise beside its proof. A repo without the script gets no table.
 // A verdict that is not proven rejects verify, as a failing holdout does.
 
@@ -8,7 +8,7 @@ import { holdoutEnabled, type FactoryConfig } from "./config";
 import { shq } from "./core/frame";
 import type { ExecutionPort } from "./ports/execution";
 
-export const ACCEPTANCE_SCRIPT = "scripts/lwp/check-acceptance.py";
+export const ACCEPTANCE_SCRIPT = "scripts/kaas/check-acceptance.py";
 const REPO_JSON = [".agents/repo.json", ".claude/repo.json"];
 
 export interface AcceptanceRow {

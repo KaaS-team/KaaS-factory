@@ -26,7 +26,7 @@ _spec = importlib.util.spec_from_file_location("check_repo", Path(__file__).reso
 _repo = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_repo)
 METRICS = {"comments", "lines", "names"}
-DEFAULT_EXCLUDE = ["*.d.ts", "*.min.js", "*generated*", "scripts/lwp/*", "*/vendor/*", "*/migrations/*"]
+DEFAULT_EXCLUDE = ["*.d.ts", "*.min.js", "*generated*", "scripts/kaas/*", "*/vendor/*", "*/migrations/*"]
 TEST = re.compile(r"(\.test\.|\.spec\.|(^|/)(tests?|e2e|__tests__)/|(^|/)test_[^/]*\.py$)")
 BANNED = re.compile(r"^(utils?|helpers?|misc|common)$|[a-z](Manager|Handler)$")
 DIRECTIVE = re.compile(

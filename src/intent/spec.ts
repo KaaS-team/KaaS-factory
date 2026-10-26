@@ -5,7 +5,7 @@
 import type { Executor, StageRunResult } from "../ports/agent";
 import { minionOutput } from "../engine/minion";
 
-// The kit's scripts/lwp/check-acceptance.py AC_LINE, so a criterion this finds is one that script holds.
+// The kit's scripts/kaas/check-acceptance.py AC_LINE, so a criterion this finds is one that script holds.
 export const AC_LINE = /^\s*(?:[-*]\s+)?(?:\*\*)?(AC-\d+)(?:\*\*)?\s*[:.]\s*(.+?)\s*$/gm;
 const SLUG = /^\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 

@@ -1,7 +1,7 @@
 # Engineering standard
 
 A repo's `AGENTS.md` wins where it disagrees, but must say so. The incident behind each rule is in
-https://github.com/Param-Harrison/lwp-claude-plugins/blob/main/docs/engineering-why.md; read it only
+the kit's `docs/engineering-why.md`; read it only
 when you need to argue a rule.
 
 **Rule 0.** A check lands wired into `make check`, the build or CI in the same change. An unwired
@@ -9,15 +9,15 @@ check, or a rule stated only in a doc, did not ship.
 
 ## Where the rest lives
 
-Path-scoped rules load when a matching file is read: `.claude/rules/lwp-api.md` (routes and services),
-`.claude/rules/lwp-db.md` (tables, queries, migrations), `.claude/rules/lwp-comments.md` and
-`.claude/rules/lwp-playwright.md`. `sync-vendored.py` copies them into each repo from lwp-claude-plugins.
+Path-scoped rules load when a matching file is read: `.claude/rules/kaas-api.md` (routes and services),
+`.claude/rules/kaas-db.md` (tables, queries, migrations), `.claude/rules/kaas-comments.md` and
+`.claude/rules/kaas-playwright.md`. `sync-vendored.py` copies them into each repo from the kit.
 
 ## Working rules
 
 - Test the structure: one test that walks every route, table or coupled pair beats review.
 - Verify by executing (curl it, run it, check the row), then revert the fix and watch the test fail.
-- Gate the blast radius: `scripts/lwp/check-affected.py --run` per phase, `--base origin/main` before a PR; paid CI never runs per commit: a PR gets what it reaches in 3 min, the rest runs nightly in 9.
+- Gate the blast radius: `scripts/kaas/check-affected.py --run` per phase, `--base origin/main` before a PR; paid CI never runs per commit: a PR gets what it reaches in 3 min, the rest runs nightly in 9.
 - Never write a claim the code does not do.
 - One resolver per concept; a number that appears twice is derived or pinned by a test.
 - Vet a dependency before adding it (`/eng-add-dependency`); no major-version drift across sibling apps.
@@ -35,6 +35,6 @@ File-touching work goes in its own worktree. Throwaway files go in the session s
 
 ## Tooling and done
 
-`/eng-audit-repo` scores a repo; `python3 scripts/lwp/check-prose.py <files>`
-checks prose (no em dashes, no filler). Done means: the gate passes with zero errors and zero warnings,
+`/eng-audit-repo` scores a repo. Done means: the gate passes with zero errors and zero warnings,
 the new check is wired, every claim in the diff is asserted, and you ran it.
+`python3 scripts/kaas/check-prose.py <files>` checks prose (no em dashes, no filler). <!-- kaas:private -->

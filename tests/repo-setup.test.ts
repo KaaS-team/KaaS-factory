@@ -14,7 +14,7 @@ const matchesAFile = (glob: string): boolean => {
   return false;
 };
 // lwp-* rules are vendored from the house standard and owned there.
-const OWN_RULES = readdirSync(join(ROOT, ".claude/rules")).filter((f) => f.endsWith(".md") && !f.startsWith("lwp-"));
+const OWN_RULES = readdirSync(join(ROOT, ".claude/rules")).filter((f) => f.endsWith(".md") && !f.startsWith("kaas-"));
 
 // Backticked repo paths: `src/x.ts`, `template/`, `install.sh`. Commands and globs are skipped.
 function pathsIn(text: string): string[] {

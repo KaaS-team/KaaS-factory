@@ -40,18 +40,19 @@ context_errors, ci_errors, hook_errors, glob_re = (
 
 STAMP = ".claude/.gate-ran"
 FULL_AT = 60
-# Vendored from lwp-claude-plugins, whose evals test them, and no check's verdict reads them, so a kit sync
+# Vendored from the kaas kit, whose evals test them, and no check's verdict reads them, so a kit sync
 # alone runs nothing. check-prose and check-quality stay mapped: a new rule can fail this repo's own files.
 INERT_KIT = [
-    "scripts/lwp/check-affected.py",
-    "scripts/lwp/gate-stamp.py",
-    "scripts/lwp/push-remote.sh",  # retired; a sync deletes it, and the deletion is inert too
-    "scripts/lwp/pre-push.sh",
+    "scripts/kaas/check-affected.py",
+    "scripts/kaas/gate-stamp.py",
+    "scripts/kaas/pre-push.sh",
     ".githooks/pre-push",
-    "scripts/lwp/repo.schema.json",
-    "scripts/lwp/check-repo.py",
-    ".claude/rules/lwp-*.md",
+    "scripts/kaas/repo.schema.json",
+    "scripts/kaas/check-repo.py",
+    ".claude/rules/kaas-*.md",
 ]
+# The kit's old home, which a re-sync deletes.
+INERT_KIT += ["scripts/lwp/**", ".claude/rules/lwp-*.md"]  # kaas:private
 
 
 def git(root: Path, *args: str, env: dict | None = None) -> subprocess.CompletedProcess:
@@ -152,7 +153,7 @@ def plan(
         head = f"{len(files)} file(s) changed since {base_why} ({base[:10]})"
     if kit := [f for f in files if matches(f, INERT_KIT)]:
         files = [f for f in files if f not in kit]
-        head += f"; {len(kit)} vendored kit file(s) left to lwp-claude-plugins' evals"
+        head += f"; {len(kit)} vendored kit file(s) left to the kit's evals"
     # Right after a push the merge base is HEAD itself: an empty diff there proves nothing ran on this tree.
     # A kit-only diff below the push stage passes: that run writes no stamp, and CI runs the whole gate.
     synced = bool(kit) and STAGES.index(stage) < STAGES.index("push")

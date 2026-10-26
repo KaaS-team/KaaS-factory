@@ -162,7 +162,7 @@ def context_errors(root: Path) -> list[str]:
 
 
 # sync-vendored.py writes this as every repo's .githooks/pre-push, so the push gate lives in the kit alone.
-HOOK_STUB = '#!/bin/sh\n# Written by lwp-claude-plugins scripts/sync-vendored.py; the gate is scripts/lwp/pre-push.sh.\nexec scripts/lwp/pre-push.sh "$@"\n'
+HOOK_STUB = '#!/bin/sh\n# Written by the kaas kit (scripts/sync-vendored.py); the gate is scripts/kaas/pre-push.sh.\nexec scripts/kaas/pre-push.sh "$@"\n'
 
 
 def hook_errors(root: Path) -> list[str]:
@@ -173,7 +173,7 @@ def hook_errors(root: Path) -> list[str]:
         []
         if hook.is_file() and hook.read_text() == HOOK_STUB
         else [
-            ".githooks/pre-push is not the kit's stub; run lwp-claude-plugins scripts/sync-vendored.py on this repo "
+            ".githooks/pre-push is not the kit's stub; run the kaas kit's scripts/sync-vendored.py on this repo "
             "and move any extra push step into repo.json prePush"
         ]
     )
@@ -192,10 +192,11 @@ RUNNERS = {"github": "ubuntu-", "ubicloud": "ubicloud-"}
 # (a pull request, by hand) at 3 minutes, scheduled at 9. 25 Oct 2026: shards on every push spent 464 minutes.
 PAID = ("ubicloud-", "self-hosted")
 CAP = {"run": 3, "schedule": 9}
-# Ubicloud bills only the owner's own companies, on its smallest machine; every other owner (aeosome, hyplabAI)
-# runs on GitHub. 25 Oct 2026 billed premium at 1.7x standard. Why: docs/decisions/scripts.md.
+# Ubicloud bills only the owners listed here, on its smallest machine; every other owner runs on GitHub. 25 Oct 2026 billed premium at 1.7x standard. Why: docs/decisions/scripts.md.
 UBICLOUD = "ubicloud-standard-2"
-UBICLOUD_OWNERS = {"param-harrison", "learnwithparam", "kaas-team"}
+# An empty set leaves the runner to each repo.
+UBICLOUD_OWNERS: set[str] = set()
+UBICLOUD_OWNERS |= {"param-harrison", "learnwithparam", "kaas-team"}  # kaas:private
 
 
 def owner(root: Path) -> str:
@@ -220,7 +221,7 @@ def spend_errors(flows: dict[str, str], own: str = "") -> list[str]:
             on = (re.search(r"(?m)^    runs-on:\s*(\S+)", b) or ["", ""])[1]
             if on.startswith("ubicloud-") and on != UBICLOUD:
                 errs.append(f"{name}: job {job} runs on {on}; Ubicloud jobs run on {UBICLOUD}, the cheapest machine")
-            if on.startswith("ubicloud-") and own and own not in UBICLOUD_OWNERS:
+            if on.startswith("ubicloud-") and own and UBICLOUD_OWNERS and own not in UBICLOUD_OWNERS:
                 errs.append(f"{name}: job {job} runs on Ubicloud, but {own} repos run on GitHub's runners")
         for job, b in paid:
             t = re.search(r"(?m)^    timeout-minutes:\s*(\d+)\s*$", b)
@@ -239,8 +240,10 @@ def ci_errors(root: Path, cfg: dict) -> list[str]:
         for stage, cron in sorted((cfg.get("schedule") or {}).items())
         if cron not in crons
     ]
+    # kaas:private-begin
     if (root / ".lwpr.toml").exists():
         errs.append(".lwpr.toml is left over: the build box runs apps only since 25 Oct 2026; delete it")
+    # kaas:private-end
     runner = (cfg.get("ci") or {}).get("runner")
     if not runner:
         return errs

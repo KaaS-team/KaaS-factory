@@ -5,7 +5,7 @@ install:
 
 # make check = lint (biome, and rustfmt plus clippy on verify/ and relay/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
-# check did not ship (see the lwp-eng plugin's engineering.md, Rule 0).
+# check did not ship (see the kaas-eng plugin's engineering.md, Rule 0).
 check: lint typecheck test skills-check
 	@echo "make check: ok"
 

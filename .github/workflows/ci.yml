@@ -70,7 +70,7 @@ jobs:
           uv tool install semgrep==1.182.0
           uv tool dir --bin >> "$GITHUB_PATH"
       - name: Security scan of what this change adds
-        run: LWP_SECURITY_BASE=origin/${{ github.base_ref || 'main' }} python3 scripts/lwp/check-security.py gitleaks,semgrep,osv-scanner
+        run: KAAS_SECURITY_BASE=origin/${{ github.base_ref || 'main' }} python3 scripts/kaas/check-security.py gitleaks,semgrep,osv-scanner
 
       # Flags a flaky test from the last runs' reports; name it @quarantine and it moves to the job below.
       - uses: ctrf-io/github-test-reporter@93ff46b55aefe633bde6d13e61a7f533303233e6 # v1.3.2

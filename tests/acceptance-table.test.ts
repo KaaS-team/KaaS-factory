@@ -55,7 +55,7 @@ function exec(stdout: string, code = 0): ExecutionPort & { cmds: string[] } {
 function withScript(): string {
   const d = mkdtempSync(join(tmpdir(), "acceptance-"));
   dirs.push(d);
-  mkdirSync(join(d, "scripts/lwp"), { recursive: true });
+  mkdirSync(join(d, "scripts/kaas"), { recursive: true });
   writeFileSync(join(d, ACCEPTANCE_SCRIPT), "");
   return d;
 }
@@ -171,7 +171,7 @@ describe("an unproven acceptance verdict rejects verify", () => {
     const workspacesDir = mkdtempSync(join(tmpdir(), "factory-accept-ws-"));
     const cloneDir = mkdtempSync(join(tmpdir(), "factory-accept-clone-"));
     dirs2.push(workspacesDir, cloneDir);
-    mkdirSync(join(workspacesDir, `issue-${n}`, "scripts/lwp"), { recursive: true });
+    mkdirSync(join(workspacesDir, `issue-${n}`, "scripts/kaas"), { recursive: true });
     writeFileSync(join(workspacesDir, `issue-${n}`, ACCEPTANCE_SCRIPT), "");
     const unproven = {
       ...fixture,

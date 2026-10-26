@@ -19,10 +19,10 @@ if [ "${SKIP_GATE:-}" = "1" ]; then
 fi
 
 # The audit takes a second and catches a stale install before any minutes are spent.
-python3 scripts/lwp/check-affected.py --audit || exit 1
-GATE="python3 scripts/lwp/check-affected.py --run --stage stop"
+python3 scripts/kaas/check-affected.py --audit || exit 1
+GATE="python3 scripts/kaas/check-affected.py --run --stage stop"
 # prePush runs here after the gate: it needs what CI lacks (local keys, a docker engine).
-HERE=$(python3 scripts/lwp/check-repo.py --key prePush) || exit 1
+HERE=$(python3 scripts/kaas/check-repo.py --key prePush) || exit 1
 
 # The stop stage runs here; CI runs the whole gate on the pushed commit and gives the verdict.
 echo "pre-push: running \`$GATE\`. SKIP_GATE=1 to bypass."

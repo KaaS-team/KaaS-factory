@@ -82,7 +82,7 @@ const OLD_NAME_KEPT = [
   "CHANGELOG.md",
   "goals.json",
   "tests/fixtures/",
-  "scripts/lwp/",
+  "scripts/kaas/",
   "node_modules/",
   ".git",
   ".git/",

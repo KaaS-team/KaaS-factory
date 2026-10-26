@@ -16,7 +16,7 @@ const sources = (dir = ROOT): string[] =>
   });
 
 test("no source file grows past its quality baseline", () => {
-  const run = Bun.spawnSync(["python3", "scripts/lwp/check-quality.py", ...sources()], { cwd: ROOT });
+  const run = Bun.spawnSync(["python3", "scripts/kaas/check-quality.py", ...sources()], { cwd: ROOT });
   expect(
     run.stdout
       .toString()
