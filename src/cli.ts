@@ -50,7 +50,7 @@ import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
 import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
-import { formatInventory, harnessReport } from "./harness";
+import { type CliContext, cmdHarness, cmdTeach } from "./harness-cli";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { poolDbPath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
@@ -870,34 +870,15 @@ async function cmdInit(): Promise<void> {
   );
 }
 
-// `factory harness validate|inventory`: the repo's workflows, checked as the watcher loads them, or listed.
-async function cmdHarness(): Promise<void> {
-  const sub = args[1];
-  if (sub !== "validate" && sub !== "inventory")
-    throw new UsageError("usage: factory harness (validate | inventory) --repo-dir <path> [--json]");
-  const dir = resolve(flag("repo-dir") ?? ".");
-  const report = await harnessReport(dir, await loadConfig(dir));
-  if (has("json")) {
-    console.log(
-      successJson(
-        {
-          problems: report.problems,
-          workflows: report.entries.map(({ workflow, ...e }) => ({
-            ...e,
-            steps: workflow ? Object.keys(workflow.steps) : [],
-          })),
-        },
-        sub === "inventory" || !report.problems.length,
-      ),
-    );
-  } else if (sub === "inventory") {
-    for (const line of formatInventory(report)) console.log(line);
-  } else {
-    for (const p of report.problems) console.log(`factory harness: ${p}`);
-    if (!report.problems.length) console.log(`factory harness: ${report.entries.length} workflows, all valid`);
-  }
-  if (sub === "validate" && report.problems.length) process.exit(EXIT.checksFailed);
-}
+// `factory harness` and `factory teach` live in src/harness-cli.ts.
+const harnessCtx = (): CliContext => ({
+  args,
+  flag,
+  has,
+  cloneDir: resolveCloneDir,
+  watchDeps: buildWatchDeps,
+  statePath: stateDbPath,
+});
 
 // `factory minion list|run <name> [--event <json-file>]`: the repo's minions, or one run now.
 async function cmdMinion(): Promise<void> {
@@ -1093,7 +1074,9 @@ async function main(): Promise<void> {
     case "daemon":
       return cmdDaemon();
     case "harness":
-      return cmdHarness();
+      return cmdHarness(harnessCtx());
+    case "teach":
+      return cmdTeach(harnessCtx());
     case "minion":
       return cmdMinion();
     case "events":

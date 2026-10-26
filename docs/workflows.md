@@ -35,7 +35,18 @@ so a marker someone pastes later cannot move an issue off a workflow that parks 
 
 `factory harness validate` loads every workflow file, the repo's and the runner's, and every one the
 config names, and exits 4 on a problem. `factory harness inventory` lists each one's steps, cron
-triggers and the types routed to it.
+triggers and the types routed to it. `factory harness scaffold <name>` writes a starting
+`.factory/workflows/<name>.md` (the five stages, a risky plan parks, build held to lint and unit
+gates) and never overwrites one the repo has. `factory harness eval [--since <days>]` scores each
+workflow from the event log: runs, outcomes, shipped rate, the steps that failed and the cost of its
+issues (default the last 30 days).
+
+`factory teach "<how we ship>"` runs one agent in a fresh clone. It reads the code, the CI in
+`.github/workflows/` and, when `.factory/mcp.json` names a `brain` server, the company brain. Its
+answer is a set of workflows, minions and skills. Each file is checked with the parser the watcher
+uses, and the set opens as one PR on a `factory/teach-*` branch. A file outside
+`.factory/workflows/`, `.factory/minions/` or `.claude/skills/`, or one that does not load, opens
+no PR.
 
 ## Step keys
 

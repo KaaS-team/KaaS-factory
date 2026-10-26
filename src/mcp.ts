@@ -33,7 +33,7 @@ export function parseMcpRegistry(text: string | undefined): Registry {
   return { servers: servers as McpServers };
 }
 
-function readRegistry(dir: string): Registry {
+export function readRegistry(dir: string): Registry {
   const path = join(dir, MCP_REGISTRY);
   return parseMcpRegistry(existsSync(path) ? readFileSync(path, "utf8") : undefined);
 }

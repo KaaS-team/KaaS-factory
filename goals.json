@@ -882,7 +882,12 @@
       "phase": "P5",
       "ask": "factory teach \"<how we ship>\" reads the repo, its CI and the company brain, writes workflows, minions and skills, validates them and opens a PR (agentic-ai-lightning-sessions factory/research/v4/PLAN.md v4.4; deferred in CHANGELOG v4.0.0)",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/teach.test.ts",
+        "name": "teach reads the repo, its CI and the brain, and opens one PR with checked workflows and skills",
+        "mutation": "teach: every proposed file is checked before a PR"
+      }
     },
     {
       "id": "minions-checkout",
@@ -934,7 +939,12 @@
       "phase": "P5",
       "ask": "`factory harness scaffold` and `eval`.",
       "source": "CHANGELOG v3.4.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/harness-scaffold.test.ts",
+        "name": "eval scores each workflow's recorded runs: shipped rate, failed steps and cost",
+        "mutation": "harness eval: failed steps count per workflow"
+      }
     },
     {
       "id": "language-images",
