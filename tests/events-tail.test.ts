@@ -10,7 +10,7 @@ describe("events tail", () => {
   test("tail --follow prints events recorded after it started, once each, until stopped", async () => {
     const state = new FactoryState(":memory:");
     const bus = new EventBus({ store: state, sinks: [], source: "factory/o/r", autoDeliver: false });
-    bus.emit("factory.issue.picked", { issue: 1 }, "issue/1");
+    bus.emit("factory.issue.ready", { issue: 1 }, "issue/1");
     const lines: string[] = [];
     const controller = new AbortController();
     const done = tailEvents(state, {
@@ -26,7 +26,7 @@ describe("events tail", () => {
     controller.abort();
     await done;
     expect(lines.map((l) => l.split("  ")[2])).toEqual([
-      "factory.issue.picked",
+      "factory.issue.ready",
       "factory.step.started",
       "factory.step.completed",
     ]);
@@ -38,7 +38,7 @@ describe("events tail", () => {
   test("tail without --follow prints the newest page and returns", async () => {
     const state = new FactoryState(":memory:");
     const bus = new EventBus({ store: state, sinks: [], source: "factory/o/r", autoDeliver: false });
-    for (let i = 0; i < 5; i++) bus.emit("factory.issue.picked", { issue: i }, `issue/${i}`);
+    for (let i = 0; i < 5; i++) bus.emit("factory.issue.ready", { issue: i }, `issue/${i}`);
     const lines: string[] = [];
     await tailEvents(state, { limit: 2, json: true, write: (l) => lines.push(l) });
     expect(lines.map((l) => (JSON.parse(l) as { subject: string }).subject)).toEqual(["issue/3", "issue/4"]);
