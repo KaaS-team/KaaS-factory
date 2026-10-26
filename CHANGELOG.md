@@ -1,7 +1,45 @@
 # Changelog
 
-## Unreleased
+## v5.0.0
 
+Any tracker, any agent, any sandbox, and a cockpit you can carry. Upgraders: nothing to change;
+GitHub stays the default tracker, `claude` the default agent and `local` the default runtime.
+
+- Trackers: `tracker.kind` takes `linear`, `plane`, `jira`, `clickup` and `asana`, each validated
+  from one key table and built by `makeTracker`. A shared kit reads the token from `tokenEnv` per
+  call and carries the runner's markers through trackers that drop HTML comments. `labeledBy` reads
+  each vendor's history; a label renamed after it was added names no one, and ClickUp label triggers
+  stay off unless `labelTrust: "creator"`. ClickUp and Asana check every task is in the configured
+  List or project first. `docs/trackers.md` shows the config per kind.
+- The label set is built from `LABEL`, a test fails on a key nothing uses, and the tracker contract
+  runs `doctor --fix` against every adapter and expects each label exactly once.
+- Agents: an `acp` preset drives any Agent Client Protocol server over stdio; read-only stages refuse
+  every permission that is not a read, search or think.
+- Routing: an agent's `models.small` runs a low-risk change of at most 3 files, `models.large` a
+  high-risk or 11+ file one, and `model` the rest. A rebuild after a verify reject climbs one tier.
+  Analytics shows what routing saved against each agent's large model. Haiku 5.5 is priced, and the
+  Sonnet 5.5 cache read is fixed. Scope is read only from trusted comments.
+- Machines: `machine.json` `capabilities` sends a `needs:<cap>` issue only to a machine that has it;
+  the git claim still keeps a task one machine took from every other.
+- Runtimes: a `codespaces` kind runs a step in a GitHub Codespace, with the token passed as
+  `GH_TOKEN`, never on argv.
+- Receipts: each run's acceptance verdict is signed as an in-toto Statement in a DSSE envelope
+  (Ed25519, `FACTORY_RECEIPT_KEY`). `kaas-verify` (`verify/`, Rust) re-derives every proof, count
+  and the "Not proven" list from the rows. Verify clears planted run files first and seals the head
+  and each file's sha256; the receipt refuses on drift or a symlinked run dir.
+- Workflows: `after: 4h` on a park edge puts a human on the loop. If no maintainer comments within
+  that window of the runner's own park notice, the factory approves and says so. An outsider's
+  comment neither holds nor moves the window.
+- Scheduled workflows: `dependency-update` (weekly), `security-audit` (daily, every plan parks) and
+  `flaky-tests` (weekly) ship in the library with their own `on: cron:`. A cron-filed issue runs the
+  workflow that filed it.
+- Cockpit: installs as an app (manifest, icon, service worker). The worker precaches only the public
+  shell and never answers for `/api`, so no run data is stored on a device.
+- Cockpit: the inbox opens with a weekly brief: runs started, shipped and failed in the last 7 days,
+  what waits on you and for how long, and the 7-day spend. `/api/analytics` gains `week`.
+- kaas-relay (`relay/`, std-only Rust): the dashboard publishes the inbox and the week to it when
+  `FACTORY_RELAY_URL` and `FACTORY_RELAY_TOKEN` are set; the cockpit follows it with a separate
+  read-only token, so a phone off the network still sees the inbox. Nothing travels back.
 - `machine.json` `llmGateway` runs every agent stage on its own LiteLLM key, capped at the stage's
   `maxBudgetUsd` and revoked when the stage ends; the agent holds no provider key and never the
   master key (`FACTORY_LLM_GATEWAY_KEY`). Only the `claude` and `codex` presets can use it.
@@ -36,6 +74,14 @@
   stage bars, repo cards and recent activity. The Line marks only the stage waiting on you in yellow.
   The theme switch, Inter, Inconsolata and `make tokens` are gone.
 - Fix: a `?repo=` value from the dashboard URL can no longer name a path outside `FACTORY_HOME`.
+
+Not in this release:
+
+- Approvals from the phone: the relay is read-only, so unblocking and approving stay on GitHub or the
+  dashboard.
+- A stale-PR nudge (the code host's PR record has no `updatedAt` yet) and a PNG touch icon for iOS.
+- The native tracker adapters are tested against fixtures modeled on each vendor's documented API,
+  not against live workspaces.
 
 ## v4.0.3
 
