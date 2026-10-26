@@ -17,7 +17,8 @@ import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
-import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
+import { decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
+import { landInQueue } from "./merge-queue";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
 import { issueType, LABEL, PARKED_LABELS } from "./labels";
@@ -344,12 +345,9 @@ export async function resumeParked(
 
 // `/factory revise <text>` on an in-review issue (audit finding #19): sends
 // the change back to build with the feedback as `revise.md`.
-// Non-blocking, one snapshot per poll (never waitForCi's sleep loop, which
-// would hold a worker slot for up to 20 minutes and undo v2.7.0's continuous
-// dispatch). A routine miss — no PR yet, PR not a fit, a transient GitHub
-// error — is not this issue's problem to raise: it just leaves the PR for a
-// human, exactly like a repo with policy "off" always does. runPool has no
-// per-item error isolation, so nothing here may throw uncaught.
+// Non-blocking, one snapshot per poll (never waitForCi's sleep loop, which holds a worker slot). A routine
+// miss leaves the PR for a human, as policy "off" does; a "merge" lands through src/merge-queue.ts.
+// runPool has no per-item error isolation, so nothing here may throw uncaught.
 async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome | undefined> {
   try {
     const issueNumber = issue.number;
@@ -380,8 +378,8 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     const marker = mergePolicyMarker(decision.headSha);
     if (!issue.comments.some((c) => c.body.includes(marker)))
       await postComment(deps, config, issueNumber, renderAuditComment(decision));
-    const merged = await attemptMerge(deps.github, config.repo, pr.number, decision);
-    if (merged) return await recordMerge(deps, config, issue, pr.number, "factory");
+    const landed = await landInQueue(deps, config, issue, pr.number, decision, worktree);
+    if (landed?.outcome === "merged") return await recordMerge(deps, config, issue, pr.number, "factory");
   } catch (err) {
     console.error(`merge-policy check failed for #${issue.number}:`, err);
   }

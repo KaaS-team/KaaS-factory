@@ -15,6 +15,11 @@ A `check` step can name its own with `runtime:` (see [workflows.md](workflows.md
 An unknown name stops `factory watch` at boot. A name that exists in config but not on the machine
 running the step fails that issue with a comment saying which name is missing.
 
+Verify's holdout tests take no runtime name. They run on this machine in a fresh clone of the
+build's committed head, never the agent's worktree, with the holdout paths copied in from the base
+branch only after checkout, and under this OS's network sandbox (`sandbox-exec` on macOS,
+`unshare --net` on Linux). A platform with neither fails the run rather than running with network.
+
 ## Defining one
 
 `local` (this machine) and `lwpr` (`lwpr run` as it is configured here) always exist. Hosts, images

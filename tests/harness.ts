@@ -299,6 +299,15 @@ export class FakeGit extends Git {
     return true;
   }
 
+  // No real repo: main never moves and a rebase leaves the PR head as it was.
+  override async fetchBase(): Promise<string> {
+    return "base";
+  }
+
+  override async rebaseOnto(_w: string, _onto: string, head: string): Promise<{ ok: true; head: string }> {
+    return { ok: true, head };
+  }
+
   changed: string[] = [];
 
   override async changedFiles(): Promise<string[]> {

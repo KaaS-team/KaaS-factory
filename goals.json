@@ -583,7 +583,12 @@
       "phase": "P6",
       "ask": "Verify runs in a fresh checkout with no network and holdouts copied in only then",
       "source": "spec 10 verify-clean-room",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/clean-room.test.ts",
+        "name": "verify runs in a clean room: an agent-left file is not seen and holdouts come from the base",
+        "mutation": "clean room: holdouts run in the clone, not the worktree"
+      }
     },
     {
       "id": "verify-changed-lines",
@@ -618,7 +623,12 @@
       "phase": "P6",
       "ask": "Parallel agents never break main: one PR at a time, rebased and re-gated",
       "source": "spec 10 merge-serial",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/merge-queue.test.ts",
+        "name": "a PR whose rebase onto the latest main breaks the gate is not merged",
+        "mutation": "merge queue: a red gate after the rebase is not merged"
+      }
     },
     {
       "id": "post-merge-revert",

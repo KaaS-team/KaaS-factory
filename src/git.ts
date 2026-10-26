@@ -43,7 +43,7 @@ export function sparseCheckoutPatterns(holdoutPaths: readonly string[]): string[
 
 export class GitCommandRunner implements CommandRunner {
   async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
-    if (args[0] === "commit" || args[0] === "commit-tree") {
+    if (args[0] === "commit" || args[0] === "commit-tree" || args[0] === "rebase") {
       const name = await spawnGit(["config", "user.name"], opts?.cwd);
       const email = await spawnGit(["config", "user.email"], opts?.cwd);
       if (name.stdout.trim() === "" || email.stdout.trim() === "")
@@ -175,6 +175,33 @@ export class Git {
   // Generic (non-issue) counterpart to push, for `factory learn`'s branch.
   async pushBranch(worktreeDir: string, branch: string): Promise<CommandResult> {
     return this.runner.run(["push", "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
+  }
+
+  // The merge queue's moves (src/merge-queue.ts): the base's tip after a fetch, a rebase of the PR
+  // head that aborts on conflict, and a push that refuses unless the branch is still at `expected`.
+  async fetchBase(worktreeDir: string, base: string): Promise<string> {
+    await this.runner.run(["fetch", "-q", "origin", base], { cwd: worktreeDir });
+    return (await this.runner.run(["rev-parse", `origin/${base}`], { cwd: worktreeDir })).stdout.trim();
+  }
+
+  async rebaseOnto(
+    worktreeDir: string,
+    onto: string,
+    head: string,
+  ): Promise<{ ok: true; head: string } | { ok: false; detail: string }> {
+    const reset = await this.runner.run(["reset", "-q", "--keep", head], { cwd: worktreeDir });
+    if (reset.code !== 0) return { ok: false, detail: reset.stderr.trim() || "the worktree is not at the PR head" };
+    const rebase = await this.runner.run(["rebase", "-q", onto], { cwd: worktreeDir });
+    if (rebase.code !== 0) {
+      await this.runner.run(["rebase", "--abort"], { cwd: worktreeDir });
+      return { ok: false, detail: (rebase.stdout + rebase.stderr).trim().slice(-500) };
+    }
+    return { ok: true, head: (await this.runner.run(["rev-parse", "HEAD"], { cwd: worktreeDir })).stdout.trim() };
+  }
+
+  async pushRebased(worktreeDir: string, branch: string, expected: string): Promise<CommandResult> {
+    const lease = `--force-with-lease=refs/heads/${branch}:${expected}`;
+    return this.runner.run(["push", lease, "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
   }
 
   // The tree of the working directory, not of HEAD: uncommitted edits count,
