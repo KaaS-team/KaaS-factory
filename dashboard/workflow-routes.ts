@@ -19,7 +19,11 @@ export interface WorkflowRouteDeps {
   readonly projectFor: (repo: string) => Promise<DashboardProject | undefined>;
   readonly stateFor: (repo: string, create?: boolean) => FactoryState | null;
   readonly workspacesFor: (repo: string) => string;
-  readonly access: { readonly repoOf: (req: Request) => string; readonly actorOf: (req: Request) => Actor | undefined };
+  readonly access: {
+    readonly repoOf: (req: Request) => string;
+    readonly actorOf: (req: Request) => Actor | undefined;
+    readonly visibleRepos: (req: Request, repos: readonly string[]) => string[];
+  };
   readonly integrations?: () => { repo: string; on: string[] };
 }
 
@@ -121,7 +125,10 @@ export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
           harnessReport(project.cloneDir, project.config),
           heldLeases(r, project),
         ]);
-        const integrations = deps.integrations?.() ?? { repo: "", on: [] };
+        const bound = deps.integrations?.() ?? { repo: "", on: [] };
+        // A member who may not read the default repo is told neither its name nor what acts on it.
+        const hidden = bound.repo && deps.access.visibleRepos(req, [bound.repo]).length === 0;
+        const integrations = hidden ? { repo: "", on: [] } : bound;
         return json({ available: true, ...(await settings(project, report, leases, Date.now())), integrations });
       },
     },

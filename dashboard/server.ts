@@ -154,6 +154,8 @@ export function createDashboard(
   const repoOf = access.repoOf;
   // A list with no ?repo= reads every served repo the caller may see; tenancy narrows it.
   const reposFor = (req: Request) => (repoOf(req) ? [repoOf(req)] : access.visibleRepos(req, inboxRepos()));
+  // A hosted member who may not read the default repo is never told its name.
+  const homeOf = (req: Request) => (repo ? (access.visibleRepos(req, [repo])[0] ?? "") : "");
   const runsOf = (req: Request) =>
     reposFor(req)
       .flatMap((r) => stateFor(r)?.listRuns(r) ?? [])
@@ -164,9 +166,8 @@ export function createDashboard(
       return st ? allStageRuns(st, r) : [];
     });
 
-  // The primary configured repo's workspaces dir is the injectable
-  // `workspaces` param (tests point it at a scratch dir); any other repo in a
-  // multi-repo inbox resolves its own workspaces dir under FACTORY_HOME.
+  // The default repo's workspaces dir is the `workspaces` param (tests point it at a scratch dir);
+  // any other served repo resolves its own under FACTORY_HOME.
   function workspacesFor(r: string): string {
     return r === repo ? workspaces : workspacesDir(process.env, r);
   }
@@ -207,8 +208,7 @@ export function createDashboard(
     return inboxWithRisk(await cachedIssuesFor(r)).find((i) => i.issue === number);
   }
 
-  // The routing table is the only place a route exists, so the route-walk test
-  // (tests/dashboard-routes.test.ts) sees every one of them.
+  // Every route lives in this table, so the route walk (tests/dashboard-routes.test.ts) sees each one.
   const remote = createRemote({ access, github, repo, served: inboxRepos, handle: (req) => readInProcess(req) });
   const routes: readonly Route[] = [
     healthRoute,
@@ -311,7 +311,7 @@ export function createDashboard(
       label: "GET /api/runs",
       role: "viewer",
       repo: "filter",
-      handler: (req) => json({ repo, runs: runsOf(req).map(plainRun) }),
+      handler: (req) => json({ repo: homeOf(req), runs: runsOf(req).map(plainRun) }),
     },
     {
       method: "GET",
@@ -515,7 +515,7 @@ export function createDashboard(
           }));
         });
         rows.sort((a, b) => b.run.started_at.localeCompare(a.run.started_at));
-        return json({ repo, repos, rows: rows.slice(0, 100) });
+        return json({ repo: homeOf(req), repos, rows: rows.slice(0, 100) });
       },
     },
     {
@@ -566,7 +566,7 @@ export function createDashboard(
         const items = perRepo
           .flat()
           .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
-        return json({ repos: access.visibleRepos(req, inboxRepos()), repo, items });
+        return json({ repos: access.visibleRepos(req, inboxRepos()), repo: homeOf(req), items });
       },
     },
     {
@@ -634,7 +634,7 @@ export function createDashboard(
           start(controller) {
             const encoder = new TextEncoder();
             const send = () => {
-              const payload = JSON.stringify({ repo, runs: runsOf(req) });
+              const payload = JSON.stringify({ repo: homeOf(req), runs: runsOf(req) });
               controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
             };
             send();

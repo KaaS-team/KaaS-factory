@@ -2,7 +2,7 @@
 // cover every served repo, and a write lands only in the repo it names. The walk drives every route,
 // so a handler that reads a repo its route never declared fails here instead of acting on a guess.
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -19,6 +19,7 @@ import type { GhIssue } from "../src/github";
 import { configMirrorDir, defaultStatePath } from "../src/paths";
 import { cloneDirFor } from "../src/repo";
 import { FactoryState } from "../src/state";
+import { SLACK_ENV } from "../src/integrations/slack";
 import { signatureOf, WEBHOOK_SECRET_ENV } from "../src/webhook";
 
 const A = "acme/a";
@@ -395,7 +396,7 @@ describe("each repo's own config", () => {
 });
 
 // A hosted plane: alice is a member, and GitHub says she can read A but not B.
-function hostedPlane() {
+function hostedPlane(primary = "") {
   const github = fakeGitHub();
   const store = new PlaneStore();
   store.setMember("alice", "owner", "test");
@@ -405,7 +406,17 @@ function hostedPlane() {
   const probes = { which: () => null, versionOf: async () => null };
   const st = new FactoryState(":memory:");
   const ws = join(home, "ws");
-  const dashboard = createDashboard(st, github as never, "", false, ws, undefined, probes as never, undefined, access);
+  const dashboard = createDashboard(
+    st,
+    github as never,
+    primary,
+    false,
+    ws,
+    undefined,
+    probes as never,
+    undefined,
+    access,
+  );
   const as = (req: Request) => {
     const h = new Headers(req.headers);
     h.set("cookie", "factory_session=alice-session");
@@ -415,16 +426,23 @@ function hostedPlane() {
 }
 
 describe("a hosted plane shows a member only the repos GitHub lets them read", () => {
+  afterEach(() => {
+    delete process.env[SLACK_ENV.secret];
+  });
   test("B is in no list, and every route that names B answers 404 for it", async () => {
-    const { dashboard, as } = hostedPlane();
+    // B is the plane's default and Slack is on, so a page about A must not name B either.
+    process.env[SLACK_ENV.secret] = "s";
+    cloneOf(A, "walk", {}, cloneDirFor(A, process.env));
+    const { dashboard, as } = hostedPlane(B);
     const scopes = dashboard.routeScopes as Record<string, "query" | "body" | "filter" | null>;
     let lists = 0;
+    const naming: string[] = [];
     for (const label of dashboard.routeLabels as string[]) {
       if (PUBLIC_ROUTES.includes(label) || label.startsWith("POST /webhook") || label.includes("/runner/")) continue;
       const scope = scopes[label];
       if (label.startsWith("GET ") && scope !== "query" && scope !== "body") {
         const all = await hit(dashboard, as(request(label)));
-        expect(all.text, label).not.toContain(B);
+        if (all.text.includes(B)) naming.push(label);
         lists++;
       }
       if (!scope) continue;
@@ -432,7 +450,11 @@ describe("a hosted plane shows a member only the repos GitHub lets them read", (
       expect([named.status, named.text.includes("unknown repo")], label).toEqual([404, true]);
       const readable = await hit(dashboard, as(request(label, A)));
       expect(readable.text, label).not.toContain("unknown repo");
+      if (readable.text.includes(B)) naming.push(`${label} ?repo=A`);
     }
+    expect(naming).toEqual([]);
+    // A has a project, so its Settings page is what the walk read, integrations block included.
+    expect(JSON.parse((await hit(dashboard, as(request("GET /api/settings", A)))).text).available).toBe(true);
     expect(lists).toBeGreaterThan(10);
     const inbox = (await (await dashboard.handle(as(request("GET /api/inbox")), "127.0.0.1")).json()) as {
       repos: string[];

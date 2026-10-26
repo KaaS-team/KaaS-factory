@@ -12,6 +12,8 @@ Fixes from an independent check of the multi-repo release.
 - Runner jobs and messages from before v6.1.0 keep their rows: they move to the default repo
   instead of being dropped.
 - `FACTORY_REPO` is read in one place, `defaultRepo()` in `src/paths.ts`.
+- A hosted member who may not read the plane's default repo is never told its name: the runs,
+  Line, inbox and Settings answers leave it out.
 - Kept on purpose: the hosted plane still sets `FACTORY_REPO`, because the integrations carry no
   repo field yet and act on that default.
 
