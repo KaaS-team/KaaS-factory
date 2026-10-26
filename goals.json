@@ -552,14 +552,24 @@
       "phase": "P4",
       "ask": "make sure that it can be run on local or server too",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/local-or-server.test.ts",
+        "name": "the image copies every file the CLI and dashboard load, and runs from that copy alone",
+        "mutation": "server: the image copies the dashboard"
+      }
     },
     {
       "id": "lean-resources",
       "phase": "P4",
       "ask": "very lean on resources to run these",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/lean-resources.test.ts",
+        "name": "the CLI and the dashboard start under 100 MB, and the default sandbox is one CPU and 1 GB",
+        "mutation": "lean: the default sandbox asks for 1 GB"
+      }
     },
     {
       "id": "workflow-md",
