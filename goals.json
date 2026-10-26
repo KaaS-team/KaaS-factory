@@ -518,7 +518,12 @@
       "phase": "P5",
       "ask": "Agent stages are read-only; only the runner's executor writes to the tracker or GitHub",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/safe-outputs.test.ts",
+        "name": "no agent stage is allowed a command that writes to GitHub, the tracker or the network",
+        "mutation": "safe outputs: outward allow rules are dropped"
+      }
     },
     {
       "id": "durable-resume",
