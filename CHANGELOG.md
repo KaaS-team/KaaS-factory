@@ -14,6 +14,9 @@ that holds `.factory/config.json`. See [docs/control-plane.md](docs/control-plan
   `FACTORY_GITHUB_APP_OWNERS`, and each owner's calls run on its own installation token and rate
   limit; App-installed repos join the board by themselves, and each person sees only the repos they
   can read.
+- A stage no longer loads the plugins a target repo enables in its own `.claude/settings.json` or
+  `settings.local.json`, so a repo's guards cannot block the factory's own writes.
+- Every Markdown file is checked for prose rules on each gate (`tests/release.test.ts`).
 
 ## v6.0.0
 
