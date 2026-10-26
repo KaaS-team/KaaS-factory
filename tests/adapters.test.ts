@@ -2,11 +2,12 @@
 // so a new runtime or SCM can't land without proving it behaves like the rest.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll } from "bun:test";
 import { Agent37Execution } from "../src/adapters/agent37/execution";
+import { CodespacesExecution } from "../src/adapters/codespaces/execution";
 import { DockerExecution } from "../src/adapters/docker/execution";
 import { GitLeases } from "../src/adapters/git-lease/lease";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
@@ -125,7 +126,43 @@ function sandboxPool(): () => void {
     });
 }
 
+// Each native tracker runs the contract in its own file, beside the fixture server it needs.
+function nativeTrackers(): void {
+  test("every native tracker runs trackerContract against itself", () => {
+    const vendors = readdirSync(join(import.meta.dir, "..", "src", "adapters", "trackers"))
+      .filter((f) => f.endsWith(".ts") && f !== "kit.ts")
+      .map((f) => f.slice(0, -3));
+    expect(vendors.length).toBeGreaterThan(0);
+    for (const v of vendors) {
+      const file = join(import.meta.dir, `trackers-${v}.test.ts`);
+      const text = existsSync(file) ? readFileSync(file, "utf8") : "";
+      expect({ v, runs: /\btrackerContract\(/.test(text) && text.includes(`adapters/trackers/${v}"`) }).toEqual({
+        v,
+        runs: true,
+      });
+    }
+  });
+
+  // An outsider who pastes a valid footer must not hide text from the humans reading the issue.
+  test("every native tracker decodes a footer only on content its own user wrote", () => {
+    const dir = join(import.meta.dir, "..", "src", "adapters", "trackers");
+    for (const f of readdirSync(dir).filter((x) => x.endsWith(".ts") && x !== "kit.ts")) {
+      const calls = [...readFileSync(join(dir, f), "utf8").matchAll(/\b(?:decodeBody|fromHtml)\(([^;]*?)\),?\n/g)]
+        .map((m) => m[1]!)
+        .filter((args) => !args.startsWith("\n") && !args.includes(": string"));
+      expect({
+        f,
+        calls: calls.length > 0 && calls.every((a) => /=== self, this\.seal, "(comment|description)"\s*$/.test(a)),
+      }).toEqual({
+        f,
+        calls: true,
+      });
+    }
+  });
+}
+
 const REGISTRY: Record<string, () => void> = {
+  trackers: nativeTrackers,
   "git-lease": () => leaseContract("git-lease", gitLeases),
   "github-store": () =>
     spendContract("github-store", () => {
@@ -150,6 +187,16 @@ const REGISTRY: Record<string, () => void> = {
   microsandbox: onFakePath(() =>
     executionContract("microsandbox", () => new MicrosandboxExecution({ kind: "microsandbox", image: "img" })),
   ),
+  // A fake gh that runs the remote script here, so the archive and the cleanup are what is under test.
+  codespaces: () =>
+    executionContract(
+      "codespaces",
+      () =>
+        new CodespacesExecution(
+          { kind: "codespaces", codespace: "cs", root: mkdtempSync(join(tmpdir(), "factory-cs-")) },
+          { ...process.env, PATH: `${join(import.meta.dir, "fixtures/fake-gh")}:${process.env.PATH}` },
+        ),
+    ),
   pool: sandboxPool(),
   ssh: onFakePath(() =>
     executionContract(

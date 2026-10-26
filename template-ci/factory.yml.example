@@ -42,8 +42,8 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v4.0.3 # pinned software-factory release; bump deliberately
-  FACTORY_RUNNER_REPO: learnwithparam/software-factory
+  FACTORY_RUNNER_REF: v5.0.0 # pinned software-factory release; bump deliberately
+  FACTORY_RUNNER_REPO: KaaS-team/software-factory
   CLAUDE_CODE_VERSION: "2.1.286" # pinned claude, same version the Dockerfile installs
   # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE
   # FACTORY_AGENTS (space separated, default "claude"); add a repo secret for each one's key
@@ -144,6 +144,8 @@ jobs:
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          # The PEM from `factory receipt keygen`; without it each PR's receipt says Unsigned.
+          FACTORY_RECEIPT_KEY: ${{ secrets.FACTORY_RECEIPT_KEY }}
           # A comment on a PR arrives as an issue event whose number is the PR's.
           ISSUE: ${{ github.event.issue.pull_request == null && github.event.issue.number || '' }}
           PR: ${{ github.event.pull_request.number || (github.event.issue.pull_request != null && github.event.issue.number) || '' }}

@@ -7,7 +7,7 @@ import type { FactoryConfig } from "../config";
 import { OPERATOR_TAKEOVER } from "../executor";
 import { evalExpr } from "../core/expr";
 import type { Edge, Step, Workflow } from "../core/workflow";
-import { latestDataFor, parseDataMarkers } from "../derive";
+import { latestDataFor, PARK_WINDOW, parseDataMarkers } from "../derive";
 import type { GhIssue } from "../github";
 import { LABEL } from "../labels";
 import { McpError } from "../mcp";
@@ -127,6 +127,16 @@ async function walk(
       });
       if ("park" in edge) {
         await moveLabel(deps, config, issueNumber, step.label, LABEL.awaitingApproval);
+        if (edge.after) {
+          const at = new Date((deps.now?.() ?? new Date()).getTime() + edge.after).toISOString();
+          await postComment(
+            deps,
+            config,
+            issueNumber,
+            `This goes on to ${edge.approve} by itself at ${at} unless a maintainer comments first. \`/factory approve\` goes now; any other comment holds it for a person.`,
+            { stage: PARK_WINDOW, json: { step: step.id } },
+          );
+        }
         finish(deps, config, issueNumber, "awaiting-approval");
         return "awaiting-approval";
       }

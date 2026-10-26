@@ -228,4 +228,23 @@ describe("workflow on: event", () => {
     const [issue] = [...gh.issues.values()];
     expect(issue!.comments.map((c) => c.body).join("\n")).toContain('"name":"docs-sync"');
   });
+  test("an issue a routed workflow's schedule files records that workflow, so pickup runs it", async () => {
+    const gh = new FakeGitHub([]);
+    const routed = parseWorkflowText(
+      withOn(`  cron:\n    - schedule: "0 2 * * *"\n      title: Deps`).replace("name: nightly", "name: deps"),
+    );
+    if (!routed.ok) throw new Error(routed.problems.join("\n"));
+    const state = new FactoryState(":memory:");
+    state.setToggle("auto_start", false);
+    const deps = {
+      github: gh,
+      state,
+      workflow: defaultWorkflow(),
+      routeWorkflows: { deps: routed.workflow },
+      now: () => new Date("2026-10-09T02:00:00Z"),
+    } as never;
+    await pollOnce(deps, mergeConfig({ repo: REPO }));
+    const [issue] = [...gh.issues.values()];
+    expect(issue!.comments.map((c) => c.body).join("\n")).toContain('"name":"deps"');
+  });
 });

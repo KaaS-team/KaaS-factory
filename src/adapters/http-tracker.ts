@@ -1,5 +1,5 @@
 // TrackerPort over Tracker API v1 (docs/tracker-api.md): issues, comments and
-// labels on any tracker that speaks it (kaas Tasks, a Linear or Jira bridge).
+// labels on any tracker that speaks it (kaas Tasks, or a bridge to a tracker with no native adapter).
 // The bearer token is read from the env var named by tracker.tokenEnv on each
 // call, so it is never in config, an argv or a log.
 

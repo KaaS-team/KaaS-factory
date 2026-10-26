@@ -263,7 +263,7 @@ describe("names", () => {
       "runtimes.a b: a name is letters, digits, _ and -",
       "runtimes.d.image: required for docker",
       "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude)",
-      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, microsandbox, pool",
+      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, microsandbox, codespaces, pool",
     ]);
   });
   test("a bad machine.json runtime stops boot", () => {
@@ -446,6 +446,37 @@ describe("microsandbox", () => {
     const [via, bytes] = readFileSync(join(d, ".factory/runs/issue-7/ran"), "utf8").trim().split(/\s+/);
     expect(via).toBe("1");
     expect(Number(bytes)).toBeGreaterThan(10);
+  });
+
+  test("with agentRuntime set in a git worktree, the executor hands the guest its own GIT_DIR", async () => {
+    const d = mkdtempSync(join(tmpdir(), "factory-msb-gitdir-"));
+    mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });
+    writeFileSync(join(d, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
+    Bun.spawnSync(
+      ["sh", "-c", "git init -q -b main && git add . && git -c user.email=t@t -c user.name=t commit -qm i"],
+      {
+        cwd: d,
+      },
+    );
+    const argvFile = join(d, "msb-argv");
+    const saved = { PATH: process.env.PATH, MSB_ARGV_FILE: process.env.MSB_ARGV_FILE };
+    process.env.PATH = `${join(import.meta.dir, "fixtures", "runtimes")}:${saved.PATH}`;
+    process.env.MSB_ARGV_FILE = argvFile;
+    try {
+      await new CommandExecutor({ x: { command: ["true"] } }, { default: "x" }, {}, undefined, spec).runStage({
+        stage: "plan",
+        issue: 8,
+        cwd: d,
+        maxBudgetUsd: 1,
+      });
+    } finally {
+      process.env.PATH = saved.PATH;
+      if (saved.MSB_ARGV_FILE === undefined) delete process.env.MSB_ARGV_FILE;
+      else process.env.MSB_ARGV_FILE = saved.MSB_ARGV_FILE;
+    }
+    const argv = readFileSync(argvFile, "utf8").split("\n");
+    expect(argv.some((a) => a.startsWith("GIT_DIR=") && a.endsWith("/git"))).toBe(true);
+    expect(argv).toContain(`GIT_WORK_TREE=${d}`);
   });
 
   // A repo with a committed holdout and a sparse worktree that hides it, as the runner makes one.

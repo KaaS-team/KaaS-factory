@@ -14,7 +14,7 @@ import { mergeConfig } from "../src/config";
 import type { StageRunOptions, StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { pollOnce } from "../src/watch";
-import { MachineLeases, MachineSpend } from "../src/machine";
+import { canServe, loadMachineConfig, MachineLeases, MachineSpend } from "../src/machine";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } from "./harness";
 
 // Every stage run this executor serves takes `delayMs` and always ends the
@@ -120,5 +120,36 @@ describe("pollOnce respects a machine-wide lease across two independent WatchDep
     spendB.close();
     for (const dir of [a.workspacesDir, a.cloneDir, b.workspacesDir, b.cloneDir, dbDir])
       rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("capability routing", () => {
+  test("an issue labelled needs:<cap> goes only to a machine that has it", async () => {
+    const dbDir = mkdtempSync(join(tmpdir(), "factory-machine-"));
+    const leases = new MachineLeases(join(dbDir, "machine.db"));
+    const spend = new MachineSpend(join(dbDir, "machine.db"));
+    const shared = { active: 0, max: 0 };
+    const plain = makeDeps("acme/repo", [1, 2], new SlowTriageExecutor(0, shared), leases, 2, spend);
+    plain.deps.github.issues.get(2)!.labels.push({ name: "needs:gpu" });
+    const first = await pollOnce(plain.deps, plain.config);
+    expect(first.processed).toEqual([1]);
+    const gpu = makeDeps("acme/repo", [2], new SlowTriageExecutor(0, shared), leases, 2, spend);
+    gpu.deps.github.issues.get(2)!.labels.push({ name: "needs:gpu" });
+    const withGpu = { ...gpu.deps, machine: { ...gpu.deps.machine, config: { slots: 2, capabilities: ["gpu"] } } };
+    expect((await pollOnce(withGpu, gpu.config)).processed).toEqual([2]);
+    leases.close();
+    spend.close();
+    rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  test("machine.json capabilities are lowercase names", () => {
+    expect(canServe(["gpu", "macos"], [{ name: "needs:gpu" }, { name: "bug" }])).toBe(true);
+    expect(canServe(undefined, [{ name: "needs:gpu" }])).toBe(false);
+    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    writeFileSync(join(dir, "machine.json"), JSON.stringify({ slots: 1, capabilities: ["gpu"] }));
+    expect(loadMachineConfig({ FACTORY_HOME: dir }).capabilities).toEqual(["gpu"]);
+    writeFileSync(join(dir, "machine.json"), JSON.stringify({ slots: 1, capabilities: ["GPU box"] }));
+    expect(() => loadMachineConfig({ FACTORY_HOME: dir })).toThrow(/"capabilities" must be a list of lowercase names/);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

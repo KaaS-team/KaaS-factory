@@ -1,0 +1,39 @@
+# Daily security audit: the plan names each advisory and its fix, and every plan parks for a person,
+# since a security change is never auto-approved. Turn it on with routes.<type>.workflow: "security-audit".
+name: security-audit
+on:
+  cron:
+    - schedule: "0 5 * * *"
+      title: Daily security audit
+      body: |
+        Run the package manager's audit and read the advisories for every direct dependency. Plan one
+        fix per advisory that reaches this code, with the advisory id and the version that fixes it.
+        If no advisory reaches this code, triage refuses with "no reachable advisory".
+limits:
+  questions: 1
+  rejects: 2
+steps:
+  triage:
+    uses: triage
+    label: factory:triaging
+    next: plan
+  plan:
+    uses: plan
+    label: factory:planning
+    next:
+      - park: awaiting-approval
+        approve: build
+        revise: plan
+  build:
+    uses: build
+    label: factory:building
+    next: verify
+  verify:
+    uses: verify
+    label: factory:verifying
+    next: pr
+    reject: build
+  pr:
+    uses: pr
+    label: factory:in-review
+    revise: build

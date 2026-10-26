@@ -1,0 +1,4 @@
+{"kind":"tool_use","toolName":"read","toolTarget":"README.md"}
+{"kind":"text","text":"{\"outcome\":\"ready\"}"}
+{"kind":"usage","tokensIn":1200,"tokensOut":80,"tokensCached":0,"total":true}
+{"kind":"result","finalText":"{\"outcome\":\"ready\"}","denials":[]}

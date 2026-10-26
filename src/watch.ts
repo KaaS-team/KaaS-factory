@@ -16,12 +16,12 @@ import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
-import { deriveIssueState, parseDataMarkers } from "./derive";
+import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
 import { issueType, LABEL, PARKED_LABELS } from "./labels";
-import { effectiveSlots } from "./machine";
+import { canServe, effectiveSlots } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
   ensureWorktreeReady,
@@ -73,6 +73,15 @@ function recordedWorkflow(issue: GhIssue): string | undefined {
 }
 
 const WORKFLOW_MARKER = "workflow";
+
+// An issue a route's trigger filed runs that workflow, not the repo's, so pickup reads it back (recordedWorkflow).
+async function recordTriggered(deps: WatchDeps, config: FactoryConfig, n: number, workflow: Workflow, via: string) {
+  if (workflow.name === workflowOf(deps).name) return;
+  const body = withDataMarker(`Running workflow \`${workflow.name}\` (\`${via}\`).`, WORKFLOW_MARKER, {
+    name: workflow.name,
+  });
+  await deps.github.commentIssue(config.repo, n, body);
+}
 
 // The repo's workflow and every one a route names: what cron fires and recovery scans.
 function allWorkflows(deps: WatchDeps): Workflow[] {
@@ -168,7 +177,9 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
       issue.number,
       "This issue's `factory/issue-" +
         issue.number +
-        "` branch already exists, so the claim was not renewed — either another run is already in flight, or a previous run parked here. Use `/factory retry` on the parked labels, not a fresh `factory:ready`.",
+        "` branch already exists, so the claim was not renewed — either another run is already in flight, or a previous run parked here. Use `/factory retry` on the parked labels, not a fresh `" +
+        LABEL.ready +
+        "`.",
     );
     await deps.github.removeLabels(config.repo, issue.number, [LABEL.ready]);
     return "lost-claim";
@@ -228,7 +239,7 @@ function findQuestionComment(issue: GhIssue): GhComment | undefined {
 }
 
 function findPlanComment(issue: GhIssue): GhComment | undefined {
-  return [...issue.comments].reverse().find((c) => c.body.includes("<!-- factory:plan v1"));
+  return [...issue.comments].reverse().find((c) => isTrusted(c) && c.body.includes("<!-- factory:plan v1"));
 }
 
 function ctxFrom(deps: WatchDeps, issue: GhIssue): RunCtx {
@@ -275,21 +286,32 @@ export async function resumeAwaitingApproval(
   const plan = findPlanComment(issue);
   if (!plan) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, plan.createdAt);
-  if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
-  const command = parseChatOps(reply.body);
+  // The step that parked here names where approve and revise go.
+  const parked = deriveIssueState(issue, workflowOf(deps, issue)).resumeStage;
+  const edge = parkEdgeOf(workflowOf(deps, issue), parked);
+  // Human on the loop: silence through the window approves; any trusted comment holds it for a person.
+  const start = edge?.after === undefined ? undefined : parkWindowStart(issue.comments, parked, plan.createdAt);
+  const lapsed = !reply && start !== undefined && (deps.now?.() ?? new Date()).getTime() - start >= edge!.after!;
+  if (!lapsed && (!reply || !(await commandIsTrusted(deps, config, reply)))) return "waiting";
+  const command = reply ? parseChatOps(reply.body) : ({ type: "approve" } as const);
   const worktree = worktreeFor(deps, issue.number);
 
   if (command.type === "cancel") return cancelRun(issue, deps, config);
-  // The step that parked here names where approve and revise go.
-  const edge = parkEdgeOf(workflowOf(deps, issue), deriveIssueState(issue, workflowOf(deps, issue)).resumeStage);
   if (!edge) return "waiting";
   const resumeAt = async (stepId: string): Promise<Outcome> => {
     if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval)))
       return "needs-human";
-    if (command.type === "revise") await writeRevision(worktree, issue, reply, command.text);
+    if (command.type === "revise" && reply) await writeRevision(worktree, issue, reply, command.text);
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, issue, stepId));
     return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
   };
+  if (lapsed)
+    await postComment(
+      deps,
+      config,
+      issue.number,
+      `No maintainer commented within the window, so the factory approved the plan.`,
+    );
   if (command.type === "approve") return resumeAt(edge.approve);
   if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
   // A plain reply that is not a command: nothing to do yet.
@@ -579,9 +601,10 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const intakeGated = autoStart && !stopIf && !budgetPaused;
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {
-    await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch((err) =>
-      console.error("factory watch: cron trigger failed", err),
+    const filed = await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch(
+      (err) => (console.error("factory watch: cron trigger failed", err), [] as number[]),
     );
+    for (const n of filed) await recordTriggered(deps, config, n, workflow, "on: cron:");
   }
   // A minion runs for minutes: started here, never awaited by the poll.
   for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date()))
@@ -608,6 +631,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     .flat()
     .filter((issue) => {
       if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
+      if (!canServe(deps.machine?.config.capabilities, issue.labels)) return false;
       const released = inFlight ? releasedAt.get(inFlight)?.get(issue.number) : undefined;
       if (released !== undefined && released > listedAt) return false;
       seen.add(issue.number);
@@ -670,7 +694,9 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
     ),
   );
   const lists = await Promise.all([...running].map((l) => deps.github.listIssuesByLabel(config.repo, l)));
-  const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()];
+  const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()].filter((i) =>
+    canServe(deps.machine?.config.capabilities, i.labels),
+  );
   await runPool(issues, dispatchConcurrency(deps, config), async (issue) => {
     const derived = deriveIssueState(issue, workflowOf(deps, issue));
     const worktree = worktreeFor(deps, issue.number);
@@ -760,16 +786,7 @@ export async function handleEvent(deps: WatchDeps, config: FactoryConfig, event:
       const n = await fireEvent(deps.github, config.repo, workflow, event);
       if (n === undefined) continue;
       filed++;
-      // Not the repo's workflow: record it on the issue so pickup runs this one (recordedWorkflow).
-      if (workflow.name !== workflowOf(deps).name) {
-        await deps.github.commentIssue(
-          config.repo,
-          n,
-          withDataMarker(`Running workflow \`${workflow.name}\` (\`on: event: ${event.type}\`).`, WORKFLOW_MARKER, {
-            name: workflow.name,
-          }),
-        );
-      }
+      await recordTriggered(deps, config, n, workflow, `on: event: ${event.type}`);
     } catch (err) {
       console.error(`factory watch: event trigger ${workflow.name} on ${event.type} failed`, err);
     }

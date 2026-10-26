@@ -28,6 +28,7 @@ import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
+import { startRelay } from "./relay";
 import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
 import { harnessReport } from "../src/harness";
 import {
@@ -98,6 +99,8 @@ const ASSET_TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
   js: "text/javascript; charset=utf-8",
   woff2: "font/woff2",
+  svg: "image/svg+xml",
+  webmanifest: "application/manifest+json",
 };
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
@@ -363,7 +366,8 @@ export function createDashboard(
     {
       // Static files of the page itself: no data, so public like the shell.
       method: "GET",
-      pattern: /^\/(styles\.css|tokens\.css|app\.js|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
+      pattern:
+        /^\/(styles\.css|tokens\.css|app\.js|sw\.js|manifest\.webmanifest|icon\.svg|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
       label: "GET /assets",
       handler: (_req, _url, m) => {
         try {
@@ -675,7 +679,13 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
-      handler: () => json(analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [])),
+      handler: () =>
+        json(
+          analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [], new Date(), (agent) => {
+            const a = project?.config.agents[agent];
+            return a?.models?.large ?? a?.model;
+          }),
+        ),
     },
     {
       method: "GET",
@@ -909,4 +919,5 @@ if (import.meta.main) {
     fetch: (req: Request): Promise<Response> => dashboard.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${PORT} (repo=${REPO || "unset"})`);
+  startRelay(dashboard.handle);
 }

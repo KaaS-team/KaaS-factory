@@ -1,0 +1,11 @@
+{
+  "name": "KaaS Factory cockpit",
+  "short_name": "Factory",
+  "description": "What the software factory is doing, and what it needs from you.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f7",
+  "theme_color": "#171717",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

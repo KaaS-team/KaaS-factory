@@ -25,9 +25,10 @@ import {
   type VerdictArtifact,
 } from "../artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
-import { isHumanComment, parseChatOps } from "../chatops";
+import { isHumanComment, isTrusted, parseChatOps } from "../chatops";
 import { mcpServersFor } from "../mcp";
-import { deriveIssueState } from "../derive";
+import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
+import { type IssueScope, scopeFrom } from "../core/model-tier";
 import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
 import type { ProofGit, ProofStatus } from "../proof";
@@ -309,13 +310,22 @@ export function priceResult(result: StageRunResult): {
   return { cached, costUsd, usageComplete };
 }
 
+// What the thread's triage and plan said about the issue's size and risk; triage has nothing to read yet.
+// Only trusted comments count, so an outside commenter cannot pick the model by pasting a marker.
+export function scopeOf(issue: GhIssue, stage: string): { scope?: IssueScope } {
+  if (stage === "triage") return {};
+  const markers = parseDataMarkers(issue.comments.filter(isTrusted));
+  const scope = scopeFrom(latestDataFor(markers, "plan"), latestDataFor(markers, "triage"));
+  return scope ? { scope } : {};
+}
+
 export async function runStage(
   deps: WatchDeps,
   config: FactoryConfig,
   issue: GhIssue,
   stage: StageName,
   worktree: string,
-  extra: Pick<StageRunOptions, "resume"> & { readonly mcp?: readonly string[] } = {},
+  extra: Pick<StageRunOptions, "resume" | "rejects"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
   // Read from the clone of the base branch, never the worktree: an earlier step's agent can write
@@ -352,6 +362,7 @@ export async function runStage(
     maxToolCalls: config.maxToolCalls,
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
+    ...scopeOf(issue, stage),
     ...files,
     ...rest,
     ...(mcp ? { mcp } : {}),
@@ -637,8 +648,8 @@ export async function checkSpendCap(
   }
   return undefined;
 }
-// The PR body, then the Acceptance table when the repo has check-acceptance.py, then the "Factory run"
-// summary unless config.prRunSummary is off.
+// The PR body, then the Acceptance table when the repo has check-acceptance.py, then the signed Receipt,
+// then the "Factory run" summary unless config.prRunSummary is off.
 export function prBody(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -647,9 +658,12 @@ export function prBody(
   ctx: RunCtx,
   proof?: ProofStatus,
   acceptance?: AcceptanceVerdict,
+  receipt?: string,
 ): string {
-  // The acceptance table carries no model or spend, so prRunSummary does not hide it.
+  // The acceptance table carries no model or spend, so prRunSummary does not hide it; the receipt
+  // drops both itself when prRunSummary is off.
   if (acceptance) body = `${body}\n\n${renderAcceptanceTable(acceptance)}`;
+  if (receipt) body = `${body}\n\n${receipt}`;
   if (!config.prRunSummary) return body;
   const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
   const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;

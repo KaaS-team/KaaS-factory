@@ -44,6 +44,7 @@ and tokens belong to the machine, not the repo, so you define every other runtim
 | `http` | A hosted sandbox (e2b, Daytona, Modal or your own) behind the protocol below. | `url` (required; https, or http to loopback only), `tokenEnv`, `exclude` |
 | `agent37` | An agent37.com instance, through its exec API (see below). | `instance`, `tokenEnv` (both required), `root` (default `/tmp/factory`), `exclude`, `url` (the exec host) |
 | `microsandbox` | A microVM on this machine through `msb` (see below): no network except `allow`, and keys the guest cannot read. | `image` (required), `allow` (hosts, port 443), `secrets` (`ENV@host[,host]`, each host in `allow`), `memory` (default `4G`), `cpus` (default 2) |
+| `codespaces` | A GitHub Codespace, through `gh codespace ssh` (see below). | `codespace` (required), `tokenEnv`, `root` (default `/tmp/factory`), `exclude` (default `node_modules`) |
 
 `factory doctor` lists the runtimes the repo uses and flags any that are missing.
 
@@ -110,6 +111,17 @@ is unpacked into a fresh directory under `root`, `bash -c cmd` runs there, and t
 removed after. One exec waits at most 15 minutes, so a longer step needs another runtime. A 1 MB
 worktree took 12.5 seconds end to end on the default 2 vCPU instance.
 
+## codespaces
+
+Create the codespace once (`gh codespace create`) and put its name in `codespace`; a stopped one
+starts when the step connects. Each run packs the worktree, without `.git` and `exclude`, as a tar.gz
+on the stdin of `gh codespace ssh`, unpacks it into a fresh directory under `root`, runs `bash -c cmd`
+there and removes the directory. GitHub's REST API has no exec call, so gh and its ssh are the way
+in. gh signs in as usual, or with the token in the env var `tokenEnv` names, passed to gh as
+`GH_TOKEN` and never on its argv. A step that never reached the codespace fails as the runtime's
+fault, not the command's. `tests/runtimes-codespaces.test.ts` runs it against a fake `gh`, not a live
+codespace.
+
 ## microsandbox
 
 Install `msb` (`brew install superradcompany/tap/microsandbox` on macOS; Linux needs KVM). Each run
@@ -173,6 +185,10 @@ each of them. Two things are shared through GitHub, so it is safe:
 
   `spend.perIssueUsd` and `spend.dailyUsd` read the sum of every worker's comments. They take the
   larger of that sum and the local SQLite cache, so a GitHub write that failed can't lift a cap.
+- **Capabilities.** `"capabilities": ["gpu", "macos"]` in `machine.json` says what a machine has.
+  An issue labelled `needs:gpu` is skipped by every worker whose machine does not list `gpu`, at
+  pickup and when a restart recovers in-flight issues, so it waits for one that does. A machine with
+  no `capabilities` takes only issues with no `needs:` label.
 
 ## In the background
 

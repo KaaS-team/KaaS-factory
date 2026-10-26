@@ -1,6 +1,6 @@
 // Argv and event-shape pins for the presets added in v2.6, plus the per-provider env allow-list.
 import { describe, expect, test } from "bun:test";
-import { PROVIDER_KEYS, sanitizeEnv } from "../src/agents/env";
+import { PROVIDER_KEYS, sanitizeEnv, tokenEnvNames } from "../src/agents/env";
 import { PRESETS } from "../src/agents/presets";
 import type { StageName } from "../src/executor";
 import { CommandExecutor } from "../src/agents/executor";
@@ -210,6 +210,50 @@ describe("the executor applies the env allow-list", () => {
     }
     expect(readFileSync(join(cwd, ".factory/runs/issue-7/keys.txt"), "utf8")).toBe("openai|none");
     rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("no stage sees a key the config names as a tracker or runtime tokenEnv", async () => {
+    const config = { tracker: { kind: "linear", tokenEnv: "LINEAR_API_KEY" } };
+    const machine = { runtimes: { box: { kind: "pool", members: [{ kind: "http", tokenEnv: "SANDBOX_TOKEN" }] } } };
+    const names = tokenEnvNames(config, machine);
+    expect(names.sort()).toEqual(["LINEAR_API_KEY", "SANDBOX_TOKEN"]);
+    expect(
+      tokenEnvNames({ events: { inboundSecretEnv: "HOOK_SECRET" }, x: { apiKeyEnv: "K", tokenEnvs: "no" } }).sort(),
+    ).toEqual(["HOOK_SECRET", "K"]);
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), "factory-tokenenv-")));
+    Bun.spawnSync(["git", "init", "-q"], { cwd });
+    mkdirSync(join(cwd, ".claude/skills/factory-plan"), { recursive: true });
+    writeFileSync(join(cwd, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
+    const probe =
+      'printf "%s|%s|%s" "${LINEAR_API_KEY:-none}" "${SANDBOX_TOKEN:-none}" "${KEEP_ME:-none}" > "$FACTORY_ARTIFACT_DIR/keys.txt"';
+    const before = { l: process.env.LINEAR_API_KEY, s: process.env.SANDBOX_TOKEN, k: process.env.KEEP_ME };
+    Object.assign(process.env, { LINEAR_API_KEY: "lin", SANDBOX_TOKEN: "box", KEEP_ME: "kept" });
+    try {
+      await new CommandExecutor(
+        { p: { command: ["sh", "-c", probe] } },
+        { default: "p" },
+        {},
+        undefined,
+        undefined,
+        undefined,
+        names,
+      ).runStage({ stage: "plan", issue: 8, cwd, maxBudgetUsd: 1 });
+    } finally {
+      for (const [k, v] of [
+        ["LINEAR_API_KEY", before.l],
+        ["SANDBOX_TOKEN", before.s],
+        ["KEEP_ME", before.k],
+      ] as const)
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    }
+    expect(readFileSync(join(cwd, ".factory/runs/issue-8/keys.txt"), "utf8")).toBe("none|none|kept");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("the CLI hands the executor every tokenEnv in the repo and machine config", () => {
+    const cli = readFileSync(join(import.meta.dir, "../src/cli.ts"), "utf8");
+    expect(cli).toContain("tokenEnvNames(config, machineConfig),\n    ),\n    gateRunner");
   });
 });
 

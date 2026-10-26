@@ -24,6 +24,11 @@ import type {
   TrackerPort,
 } from "./ports/scm";
 import { HttpTracker } from "./adapters/http-tracker";
+import { AsanaTracker } from "./adapters/trackers/asana";
+import { ClickUpTracker } from "./adapters/trackers/clickup";
+import { JiraTracker } from "./adapters/trackers/jira";
+import { LinearTracker } from "./adapters/trackers/linear";
+import { PlaneTracker } from "./adapters/trackers/plane";
 
 export const PR_LINK_MARKER = "<!-- factory:pr-link v1 -->";
 
@@ -241,7 +246,22 @@ export function makeTracker(
   env: NodeJS.ProcessEnv = process.env,
   github: GitHub = new GitHub(),
 ): TrackerPort {
-  return tracker.kind === "http" ? new HttpTracker(tracker, env) : github;
+  switch (tracker.kind) {
+    case "github":
+      return github;
+    case "http":
+      return new HttpTracker(tracker, env);
+    case "linear":
+      return new LinearTracker(tracker, env);
+    case "plane":
+      return new PlaneTracker(tracker, env);
+    case "jira":
+      return new JiraTracker(tracker, env);
+    case "clickup":
+      return new ClickUpTracker(tracker, env);
+    case "asana":
+      return new AsanaTracker(tracker, env);
+  }
 }
 
 export function makeScm(

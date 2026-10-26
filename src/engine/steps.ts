@@ -29,6 +29,15 @@ import { isChecked } from "../recheck";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
 import { runProof, type ProofResult, type ProofStatus } from "../proof";
 import { touchesProtectedPath } from "../boundary";
+import {
+  clearRunFiles,
+  missingReceipt,
+  readSeal,
+  renderReceipt,
+  sealKey,
+  sealRunFiles,
+  writeRunReceipt,
+} from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
@@ -184,7 +193,11 @@ const build: StepType = {
         }),
       );
     }
-    const result = await runStage(deps, config, issue, "build", worktree, { ...rebuildFrom(sc), mcp: step.mcp });
+    const result = await runStage(deps, config, issue, "build", worktree, {
+      ...rebuildFrom(sc),
+      ...(sc.ctx.rejectRound ? { rejects: sc.ctx.rejectRound } : {}),
+      mcp: step.mcp,
+    });
     const art = await readStageArtifacts(worktree, issueNumber, "build");
     const built = stageJson<BuildArtifact>("build", art.json);
     const problem = built.problem;
@@ -295,6 +308,7 @@ const verify: StepType = {
     // flowing straight into verify in the same tick is the common case,
     // and gate.json (written by the build, which never saw these paths)
     // cannot possibly already cover them.
+    clearRunFiles(worktree, runDir(issueNumber));
     if (holdoutEnabled(config.holdout)) {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
       // A pass leaves no comment, so the run page reads the result from here.
@@ -340,6 +354,12 @@ const verify: StepType = {
     const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
     if (acceptance)
       await Bun.write(`${worktree}/${runDir(issueNumber)}/acceptance.json`, `${JSON.stringify(acceptance, null, 2)}\n`);
+    // The pr agent runs in this worktree next, so the receipt signs what verify sealed here, not what it finds later.
+    // A run file that is not a regular file leaves no seal, and the PR then says "No receipt".
+    const seal = await sealRunFiles(deps.setupRunner ?? new ShellSetupRunner(), worktree, runDir(issueNumber)).catch(
+      () => undefined,
+    );
+    deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : "");
     // Like a failing holdout, an unproven criterion is the build's to fix, not the verifier's to judge.
     if (acceptance && !acceptanceProven(acceptance)) {
       const table = renderAcceptanceTable(acceptance);
@@ -430,6 +450,17 @@ const pr: StepType = {
     // A revise from in-review re-enters here with the PR already open;
     // the push in build already updated its branch.
     const head = deps.git.branchName(issueNumber);
+    const receipt = await writeRunReceipt(deps.setupRunner ?? new ShellSetupRunner(), {
+      worktree,
+      runDir: runDir(issueNumber),
+      repo: config.repo,
+      issue: issueNumber,
+      base: config.base,
+      runs: deps.state.listStageRuns(config.repo, { issue: issueNumber }),
+      operatorDetail: config.prRunSummary,
+      holdoutRequired: holdoutEnabled(config.holdout),
+      seal: readSeal(deps.state.getSetting(sealKey(config.repo, issueNumber))),
+    }).then(renderReceipt, (err: Error) => missingReceipt(err.message));
     const existing = await deps.github.findPrByHead(config.repo, head);
     const prUrl =
       existing?.url ??
@@ -446,6 +477,7 @@ const pr: StepType = {
           ctx,
           readProofStatus(worktree, issueNumber),
           readAcceptance(worktree, issueNumber),
+          receipt,
         ),
         draft: true,
       }));

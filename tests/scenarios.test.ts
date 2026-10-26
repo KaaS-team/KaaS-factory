@@ -246,6 +246,17 @@ describe("approval paths", () => {
     done(c);
   });
 
+  test("4b. each stage after triage is handed the thread's risk and file count", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ risk: "medium" }));
+    c.push("plan", plan("medium"));
+    await c.step();
+    expect(c.executor.scopes[0]).toEqual(["triage", undefined]);
+    expect(c.executor.scopes[1]![0]).toBe("plan");
+    expect(c.executor.scopes[1]![1]?.risk).toBe("medium");
+    done(c);
+  });
+
   test("4c. a repo with no gates parks before the build agent runs, saying how to add one", async () => {
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);
@@ -554,6 +565,11 @@ describe("failure paths", () => {
     });
     // Only the rebuild resumes: triage, plan, the first build and every verify start fresh.
     expect(c.executor.resumed.filter(Boolean)).toHaveLength(1);
+    // The rebuild is told of the reject, so it runs a tier up; the first build is not.
+    expect(c.executor.rejects.filter(([s]) => s === "build")).toEqual([
+      ["build", undefined],
+      ["build", 1],
+    ]);
     done(c);
   });
 
@@ -823,6 +839,13 @@ describe("in-review and claim paths", () => {
     build_to_pr(c);
     expect(await recoverInFlight(c.deps, c.config)).toEqual([1]);
     expect(labels(c.github, 1)).toEqual([LABEL.inReview]);
+    done(c);
+  });
+
+  test("20a. recovery leaves an in-flight issue that needs a capability this machine lacks", async () => {
+    const c = setup([LABEL.building, "needs:gpu"]);
+    expect(await recoverInFlight(c.deps, c.config)).toEqual([]);
+    expect(labels(c.github, 1)).toEqual([LABEL.building, "needs:gpu"]);
     done(c);
   });
 

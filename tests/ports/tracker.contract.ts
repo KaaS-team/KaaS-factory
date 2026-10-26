@@ -3,6 +3,8 @@
 // Each test uses its own repo, so one store can serve the whole suite.
 
 import { describe, expect, test } from "bun:test";
+import { fixDoctor } from "../../src/doctor";
+import { labelsFor } from "../../src/labels";
 import type { TrackerPort } from "../../src/ports/scm";
 
 let seq = 0;
@@ -43,7 +45,10 @@ export function trackerContract(name: string, make: () => TrackerPort): void {
       await t.closeIssue(repo, n);
       expect(await t.getIssue(repo, n)).toMatchObject({ state: "CLOSED", stateReason: "COMPLETED" });
       await t.reopenIssue(repo, n);
-      expect(await t.getIssue(repo, n)).toMatchObject({ state: "OPEN", stateReason: "REOPENED" });
+      // blockers.ts reads stateReason on closed issues only, so an open one need not name its history.
+      const reopened = await t.getIssue(repo, n);
+      expect(reopened.state).toBe("OPEN");
+      expect(reopened.stateReason).not.toBe("COMPLETED");
     });
 
     test("a comment has an id, is authored by the current login, and can be edited in place", async () => {
@@ -79,6 +84,9 @@ export function trackerContract(name: string, make: () => TrackerPort): void {
       await t.addLabels(repo, n, ["factory:ready"]);
       expect(await t.labeledBy(repo, n, "factory:ready")).toBe(await t.currentLogin());
       expect(await t.labeledBy(repo, n, "never")).toBeUndefined();
+      // Triggers file issues already labelled ready, so a label set at creation names its creator too.
+      const filed = await t.createIssue(repo, "y", "", ["factory:ready"]);
+      expect(await t.labeledBy(repo, filed, "factory:ready")).toBe(await t.currentLogin());
     });
 
     test("ensureLabel is idempotent and listLabels sees it", async () => {
@@ -87,6 +95,17 @@ export function trackerContract(name: string, make: () => TrackerPort): void {
       await t.ensureLabel(repo, "factory:ready", "0e8a16", "ready");
       await t.ensureLabel(repo, "factory:ready", "0e8a16", "ready");
       expect((await t.listLabels(repo)).filter((l) => l === "factory:ready")).toHaveLength(1);
+    });
+
+    test("doctor --fix creates the whole label set once, a repo-added type included", async () => {
+      const t = make();
+      const repo = fresh();
+      const routes = { content: {} };
+      await fixDoctor(t, repo, routes);
+      await fixDoctor(t, repo, routes);
+      const have = await t.listLabels(repo);
+      const want = labelsFor(routes).map((l) => l.name);
+      expect(want.filter((l) => have.filter((h) => h === l).length !== 1)).toEqual([]);
     });
 
     test("roleOf trusts the factory's own login and no one it does not know", async () => {

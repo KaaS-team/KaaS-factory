@@ -6,11 +6,12 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { LABEL } from "../src/labels";
 
 const ROOT = join(import.meta.dir, "..");
 const SOURCE_DIRS = ["src", "bin", "dashboard"];
-const LABEL_LITERAL =
-  /"factory:(ready|triaging|planning|awaiting-approval|building|verifying|in-review|needs-info|needs-human|failed|monitor)"/g;
+// Built from LABEL, so a label added there is guarded the day it lands (a hand-typed list missed two).
+const LABEL_LITERAL = new RegExp(`["'](${Object.values(LABEL).join("|")})["']`, "g");
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -22,6 +23,8 @@ function walk(dir: string): string[] {
   }
   return out;
 }
+
+const SOURCES = SOURCE_DIRS.flatMap((d) => walk(join(ROOT, d))).filter((f) => !f.endsWith(join("src", "labels.ts")));
 
 describe("labels.ts is the only source of factory:* label strings", () => {
   for (const dir of SOURCE_DIRS) {
@@ -47,5 +50,17 @@ describe("labels.ts is the only source of factory:* label strings", () => {
     expect(LABELS.length).toBe(Object.values(LABEL).length + TYPE_LABELS.length);
     const names = new Set(LABELS.map((l) => l.name));
     expect(names.size).toBe(LABELS.length);
+  });
+
+  // The set stays minimal: a label nothing reads or writes is clutter in every tracker doctor --fix touches.
+  test("every LABEL key is used outside labels.ts", () => {
+    const text = SOURCES.map((f) => readFileSync(f, "utf8")).join("\n");
+    const unused = Object.keys(LABEL).filter((k) => !new RegExp(`\\bLABEL\\.${k}\\b`).test(text));
+    expect(unused).toEqual([]);
+  });
+
+  test("docs/trackers.md states the size of the label set", async () => {
+    const { LABELS } = await import("../src/labels");
+    expect(readFileSync(join(ROOT, "docs", "trackers.md"), "utf8")).toContain(`needs ${LABELS.length} labels`);
   });
 });

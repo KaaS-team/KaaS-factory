@@ -10,6 +10,8 @@ export interface AgentConfig {
   // With no placeholder the prompt goes to stdin.
   readonly command?: readonly string[];
   readonly model?: string;
+  // Cheaper or stronger models by issue scope (src/core/model-tier.ts); unset tiers use `model`.
+  readonly models?: { readonly small?: string; readonly large?: string };
   // Pass the reply schema to the CLI (Codex --output-schema). Off until a live run confirms the CLI accepts it.
   readonly outputSchema?: boolean;
 }
@@ -71,6 +73,8 @@ export interface AgentPreset {
   // True when a read-only stage cannot write its files: the agent returns them
   // as its final message and the runner writes them (see reply.ts).
   readonly returnsArtifact?: boolean;
+  // The agent's `command` is a server this preset drives (ACP), not a CLI the runner runs as is.
+  readonly wrapsCommand?: true;
   // Starts the MCP servers in ctx.mcpConfig. A step that names servers refuses any other agent.
   readonly mcp?: true;
   parseLine(line: string): StageEvent[];

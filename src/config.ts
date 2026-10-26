@@ -178,7 +178,49 @@ export type TrackerConfig =
   | { readonly kind: "github" }
   // tokenEnv names the env var holding the bearer token, so the token is never in config.
   // project defaults to config.repo.
-  | { readonly kind: "http"; readonly url: string; readonly tokenEnv: string; readonly project?: string };
+  | { readonly kind: "http"; readonly url: string; readonly tokenEnv: string; readonly project?: string }
+  // The native adapters (docs/trackers.md); url overrides the vendor's cloud endpoint.
+  | { readonly kind: "linear"; readonly team: string; readonly tokenEnv: string; readonly url?: string }
+  | {
+      readonly kind: "plane";
+      readonly workspace: string;
+      readonly project: string;
+      readonly tokenEnv: string;
+      readonly url?: string;
+    }
+  | {
+      readonly kind: "jira";
+      readonly url: string;
+      readonly project: string;
+      readonly tokenEnv: string;
+      readonly issueType?: string;
+    }
+  | {
+      readonly kind: "clickup";
+      readonly workspace: string;
+      readonly list: string;
+      readonly tokenEnv: string;
+      readonly url?: string;
+      readonly labelTrust?: "none" | "creator";
+    }
+  | {
+      readonly kind: "asana";
+      readonly workspace: string;
+      readonly project: string;
+      readonly tokenEnv: string;
+      readonly url?: string;
+    };
+
+// Each kind's keys beside kind and tokenEnv, true when required. trackerProblems reads only this.
+const TRACKER_KEYS: Record<Exclude<TrackerConfig["kind"], "github">, Record<string, boolean>> = {
+  http: { url: true, project: false },
+  linear: { team: true, url: false },
+  plane: { workspace: true, project: true, url: false },
+  jira: { url: true, project: true, issueType: false },
+  clickup: { workspace: true, list: true, url: false, labelTrust: false },
+  asana: { workspace: true, project: true, url: false },
+};
+export const TRACKER_KINDS = ["github", ...Object.keys(TRACKER_KEYS)] as TrackerConfig["kind"][];
 
 export interface RuntimeConfig {
   readonly gates?: string;
@@ -455,18 +497,29 @@ function trackerProblems(raw: unknown): string[] {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return ["tracker: expected an object"];
   const t = raw as Record<string, unknown>;
   const problems: string[] = [];
-  if (t.kind === "github") checkKeys(t, { kind: "string" }, "tracker.", problems);
-  else if (t.kind === "http") {
-    checkKeys(t, { kind: "string", url: "string", tokenEnv: "string", project: "string" }, "tracker.", problems);
-    if (typeof t.url !== "string") problems.push("tracker.url: required");
-    // The bearer token goes to this URL, so plain http only to loopback.
-    else if (!/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(t.url))
-      problems.push(`tracker.url: https (plain http only to localhost), got ${JSON.stringify(t.url)}`);
-    if (typeof t.tokenEnv !== "string")
-      problems.push("tracker.tokenEnv: required (the name of the env var holding the token)");
-    else if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(t.tokenEnv))
-      problems.push(`tracker.tokenEnv: expected an env var name, got ${JSON.stringify(t.tokenEnv)}`);
-  } else problems.push(`tracker.kind: expected "github" or "http", got ${JSON.stringify(t.kind)}`);
+  if (t.kind === "github") {
+    checkKeys(t, { kind: "string" }, "tracker.", problems);
+    return problems;
+  }
+  if (!Object.hasOwn(TRACKER_KEYS, String(t.kind)))
+    return [
+      `tracker.kind: expected one of ${TRACKER_KINDS.map((k) => JSON.stringify(k)).join(", ")}, got ${JSON.stringify(t.kind)}`,
+    ];
+  const keys = TRACKER_KEYS[t.kind as keyof typeof TRACKER_KEYS];
+  const allowed: Record<string, Kind> = { kind: "string", tokenEnv: "string" };
+  for (const k of Object.keys(keys)) allowed[k] = "string";
+  checkKeys(t, allowed, "tracker.", problems);
+  for (const [k, required] of Object.entries(keys))
+    if (required && t[k] === undefined) problems.push(`tracker.${k}: required`);
+  // The token goes to this URL, so plain http only to loopback.
+  if (typeof t.url === "string" && !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(t.url))
+    problems.push(`tracker.url: https (plain http only to localhost), got ${JSON.stringify(t.url)}`);
+  if (typeof t.tokenEnv !== "string")
+    problems.push("tracker.tokenEnv: required (the name of the env var holding the token)");
+  else if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(t.tokenEnv))
+    problems.push(`tracker.tokenEnv: expected an env var name, got ${JSON.stringify(t.tokenEnv)}`);
+  if (t.labelTrust !== undefined && t.labelTrust !== "none" && t.labelTrust !== "creator")
+    problems.push(`tracker.labelTrust: expected "none" or "creator", got ${JSON.stringify(t.labelTrust)}`);
   return problems;
 }
 
@@ -555,10 +608,24 @@ function agentProblems(agents: unknown, stages: unknown, routes?: unknown): stri
         continue;
       }
       const a = raw as Record<string, unknown>;
-      checkKeys(a, { preset: "string", command: "strings", model: "string", outputSchema: "boolean" }, where, problems);
+      checkKeys(
+        a,
+        { preset: "string", command: "strings", model: "string", models: "object", outputSchema: "boolean" },
+        where,
+        problems,
+      );
+      if (typeof a.models === "object" && a.models !== null)
+        checkKeys(
+          a.models as Record<string, unknown>,
+          { small: "string", large: "string" },
+          `${where}models.`,
+          problems,
+        );
       if (typeof a.preset === "string" && !PRESETS[a.preset])
         problems.push(`${where}preset: unknown "${a.preset}" (built in: ${Object.keys(PRESETS).join(", ")})`);
       if (a.preset === undefined && a.command === undefined) problems.push(`${where}needs a "preset" or a "command"`);
+      if (typeof a.preset === "string" && PRESETS[a.preset]?.wrapsCommand && a.command === undefined)
+        problems.push(`${where}command: preset "${a.preset}" needs the agent's argv in "command"`);
       if (Array.isArray(a.command)) {
         if (a.command.length === 0) problems.push(`${where}command: must not be empty`);
         else if (!String(a.command[0]).trim()) problems.push(`${where}command: the executable must not be empty`);

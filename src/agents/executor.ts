@@ -3,6 +3,7 @@
 // through the preset's line parser, and kill the whole process group on a
 // timeout or a runaway tool-call count.
 
+import { tierFor } from "../core/model-tier";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -118,6 +119,13 @@ function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, s
   return { name, config, preset };
 }
 
+// The agent with `model` swapped for its tier's, so every preset and {{model}} see one model.
+function withTier(agent: ResolvedAgent, opts: Pick<StageRunOptions, "scope" | "rejects">): ResolvedAgent {
+  const tier = tierFor(opts.scope, opts.rejects);
+  const model = tier && agent.config.models?.[tier];
+  return model ? { ...agent, config: { ...agent.config, model } } : agent;
+}
+
 // Placeholders in a config command. Anything else is passed through verbatim.
 export function renderCommand(
   command: readonly string[],
@@ -143,13 +151,15 @@ export class CommandExecutor implements Executor {
     private readonly vm?: MicrosandboxSpec,
     // machine.json `llmGateway`: every stage run gets its own key, capped at its maxBudgetUsd.
     private readonly gateway?: LlmGateway,
+    // The env vars the runner's own tracker and runtime keys live in (tokenEnvNames); no agent sees them.
+    private readonly secretEnv: readonly string[] = [],
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
     const agent =
       opts.prompt !== undefined && opts.agent
         ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
+        : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)
@@ -185,13 +195,14 @@ export class CommandExecutor implements Executor {
     const artifactDir = join(opts.cwd, runDir(opts.issue));
     mkdirSync(artifactDir, { recursive: true });
 
+    const ownCommand = agent.config.command !== undefined && !agent.preset?.wrapsCommand;
     // A read-only stage on a preset that cannot write files returns them instead.
     // A minion (opts.prompt) owes no stage file, so it never gets one written for it.
     const readOnly =
       opts.prompt === undefined &&
       !stagePolicy(opts.stage).write &&
       agent.preset?.returnsArtifact === true &&
-      !agent.config.command;
+      !ownCommand;
     let argv: readonly string[];
     let stdin: string | undefined;
     const types = typesFor(this.routes);
@@ -201,7 +212,7 @@ export class CommandExecutor implements Executor {
     // A step that asked for MCP servers must get them, so an agent that cannot load them is an error, not a quiet run without.
     let mcpConfig: string | undefined;
     if (opts.mcp && Object.keys(opts.mcp).length > 0) {
-      if (!agent.preset?.mcp || agent.config.command)
+      if (!agent.preset?.mcp || ownCommand)
         throw new McpError(
           `${agent.name}: this step names MCP servers (${Object.keys(opts.mcp).join(", ")}), and only the claude preset can load them`,
         );
@@ -217,7 +228,7 @@ export class CommandExecutor implements Executor {
       ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig }));
     } else {
       const prompt = opts.prompt ?? (await renderPrompt(opts, readOnly, types, contextPack));
-      if (agent.config.command) {
+      if (ownCommand && agent.config.command) {
         const promptFile = join(scratch, "prompt.md");
         writeFileSync(promptFile, prompt);
         const rendered = renderCommand(agent.config.command, { prompt, promptFile, model: agent.config.model ?? "" });
@@ -294,7 +305,9 @@ export class CommandExecutor implements Executor {
         stderr: "pipe",
         detached: true, // its own process group, so a kill reaches the agent's children too
         env: {
-          ...(via ? gatewaySanitizedEnv(process.env) : sanitizeEnv(process.env, agent.preset?.envKeys)),
+          ...(via
+            ? gatewaySanitizedEnv(process.env, this.secretEnv)
+            : sanitizeEnv(process.env, agent.preset?.envKeys, this.secretEnv)),
           ...stageEnv,
           ...gatewayUrl,
           ...(via && key ? { [via.key]: key } : {}),

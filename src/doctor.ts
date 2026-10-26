@@ -3,7 +3,7 @@
 
 import type { CommandRunner, ScmPort } from "./github";
 import { labelsFor } from "./labels";
-import { gateCount, type RouteConfig, type RuntimeConfig } from "./config";
+import { gateCount, type RouteConfig, type RuntimeConfig, type TrackerConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
 import { suggestSlots } from "./machine";
@@ -25,7 +25,7 @@ export interface DoctorCheck {
 export interface DoctorDeps {
   readonly github: ScmPort;
   // Where issues live (config.tracker) and its own auth. Absent: GitHub, whose auth is gh's.
-  readonly tracker?: { readonly kind: "github" | "http"; authStatus(): Promise<{ ok: boolean; detail: string }> };
+  readonly tracker?: { readonly kind: TrackerConfig["kind"]; authStatus(): Promise<{ ok: boolean; detail: string }> };
   readonly git: CommandRunner;
   readonly which: (bin: string) => Promise<boolean>;
   // `<bin> --version` output, or undefined when it cannot be read.
@@ -105,23 +105,25 @@ export async function agentChecks(
     detail: `agent "${name}" runs each stage it is assigned`,
     fixable: false,
   });
-  if (preset?.noVersionFlag && binary && (await deps.which(binary))) {
+  // A preset that wraps `command` pins a protocol, not the binary, so there is no version to compare.
+  const pinned = preset?.wrapsCommand ? undefined : preset;
+  if (pinned?.noVersionFlag && binary && (await deps.which(binary))) {
     out.push({
-      name: `${binary} is version ${preset.version}`,
+      name: `${binary} is version ${pinned.version}`,
       ok: true,
-      detail: `${binary} has no --version flag, so the pin (${preset.version}) is not checked here; the Dockerfile and CI install it`,
+      detail: `${binary} has no --version flag, so the pin (${pinned.version}) is not checked here; the Dockerfile and CI install it`,
       fixable: false,
     });
-  } else if (preset && deps.versionOf && binary && (await deps.which(binary))) {
+  } else if (pinned && deps.versionOf && binary && (await deps.which(binary))) {
     const found = await deps.versionOf(binary);
     out.push({
-      name: `${binary} is version ${preset.version}`,
-      ok: found?.includes(preset.version) ?? false,
+      name: `${binary} is version ${pinned.version}`,
+      ok: found?.includes(pinned.version) ?? false,
       warn: true,
       detail:
         found === undefined
           ? `could not read \`${binary} --version\``
-          : `found "${found.split("\n")[0]!.trim()}", pinned ${preset.version} (Dockerfile and CI install the pin)`,
+          : `found "${found.split("\n")[0]!.trim()}", pinned ${pinned.version} (Dockerfile and CI install the pin)`,
       fixable: false,
     });
   }
@@ -405,7 +407,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
 }
 
 export async function fixDoctor(
-  github: ScmPort,
+  github: Pick<ScmPort, "ensureLabel">,
   repo: string,
   routes?: Readonly<Record<string, RouteConfig>>,
   workflow?: Workflow,

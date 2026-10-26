@@ -1,7 +1,7 @@
 # Tracker API v1
 
 The contract the factory's `http` tracker adapter (`src/adapters/http-tracker.ts`) speaks. kaas Tasks
-implements it; a Linear or Jira bridge implements the same routes. The contract suite in
+implements it; so can any tracker without a native adapter (`docs/trackers.md`). The contract suite in
 `tests/tracker-contract.test.ts` runs against the fake and the adapter, so a route renamed on one side fails
 the gate.
 

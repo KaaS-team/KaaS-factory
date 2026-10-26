@@ -17,6 +17,8 @@ export type Edge =
       readonly park: ParkState;
       readonly approve: string;
       readonly revise: string;
+      // Human on the loop: with no trusted comment this many ms after the plan, the runner approves.
+      readonly after?: number;
     };
 
 export interface Step {
@@ -70,7 +72,14 @@ const STEP_KEYS = new Set(["uses", "label", "next", "reject", "revise", "run", "
 const TOP_KEYS = new Set(["name", "description", "on", "limits", "steps"]);
 const ON_KEYS = new Set(["cron", "event"]);
 const CRON_KEYS = new Set(["schedule", "tz", "title", "body"]);
-const EDGE_KEYS = new Set(["if", "to", "park", "approve", "revise"]);
+const EDGE_KEYS = new Set(["if", "to", "park", "approve", "revise", "after"]);
+const WINDOW_UNITS: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000 };
+
+// `30m`, `4h`, `2d`: a park edge's veto window, or undefined when it is not one.
+export function parseWindow(src: unknown): number | undefined {
+  const m = typeof src === "string" ? /^([1-9]\d*)([mhd])$/.exec(src) : null;
+  return m ? Number(m[1]) * WINDOW_UNITS[m[2]!]! : undefined;
+}
 const PARKS: readonly ParkState[] = ["awaiting-approval"];
 
 export type WorkflowResult = { ok: true; workflow: Workflow } | { ok: false; problems: string[] };
@@ -169,14 +178,22 @@ export function parseWorkflow(
           problems.push(`${ew}.approve: required with park (the step /factory approve resumes)`);
         if (typeof e.revise !== "string")
           problems.push(`${ew}.revise: required with park (the step /factory revise resumes)`);
+        const after = parseWindow(e.after);
+        if (e.after !== undefined && after === undefined)
+          problems.push(`${ew}.after: "${e.after}" is not a window like 30m, 4h or 2d`);
         edges.push({
           ...cond,
           park: e.park as ParkState,
           approve: String(e.approve ?? ""),
           revise: String(e.revise ?? ""),
+          ...(after ? { after } : {}),
         });
       } else problems.push(`${ew}: needs exactly one of to or park`);
+      if (e.after !== undefined && e.park === undefined) problems.push(`${ew}.after: only a park edge has a window`);
     }
+    // /factory approve finds a parked step's window by its step, not by the edge it took.
+    if (new Set(edges.flatMap((e) => ("park" in e ? [e.after ?? 0] : []))).size > 1)
+      problems.push(`${where}.next: every park edge of a step needs the same after:`);
     edges.forEach((e, i) => {
       if (!e.if && i < edges.length - 1)
         problems.push(`${where}.next[${i}]: has no if:, so the edges after it never run`);

@@ -1,0 +1,33 @@
+# Weekly dependency bump: the schedule files an issue, build bumps what is safe, and verify rejects a
+# bump the tests do not cover back to build. Turn it on with routes.<type>.workflow: "dependency-update";
+# every routed workflow's schedule fires, and the issue it files runs this workflow.
+name: dependency-update
+on:
+  cron:
+    - schedule: "0 6 * * 1"
+      title: Weekly dependency update
+      body: |
+        Bump each direct dependency to its newest release that keeps every gate green. Skip a major
+        version unless its changelog shows nothing this repo uses changed. List each bump with the
+        changelog line that makes it safe. If nothing is due, triage refuses with "nothing to bump".
+limits:
+  questions: 1
+  rejects: 2
+steps:
+  triage:
+    uses: triage
+    label: factory:triaging
+    next: build
+  build:
+    uses: build
+    label: factory:building
+    next: verify
+  verify:
+    uses: verify
+    label: factory:verifying
+    next: pr
+    reject: build
+  pr:
+    uses: pr
+    label: factory:in-review
+    revise: build
