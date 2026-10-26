@@ -525,7 +525,12 @@
       "phase": "P5",
       "ask": "A resume replays finished stages from the event log; approval is a wait-for-event token",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/durable-resume.test.ts",
+        "name": "an approved token resumes the run past the park without rerunning finished stages",
+        "mutation": "durable resume: finished stages replay from the event log"
+      }
     },
     {
       "id": "workflow-editor-pr",
@@ -880,7 +885,12 @@
       "phase": "P5",
       "ask": "A workflow is chosen from the type label an issue was filed with; a type triage assigns later does not switch it.",
       "source": "CHANGELOG v3.4.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/late-route.test.ts",
+        "name": "an issue filed with no type label runs the workflow its triaged type routes to",
+        "mutation": "late route: a triaged type switches the workflow once"
+      }
     },
     {
       "id": "library-workflows",
@@ -936,7 +946,12 @@
       "phase": "P5",
       "ask": "Cron dedupe through GitHub: two watchers could each still file one scheduled issue.",
       "source": "CHANGELOG v3.3.0 #6",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/cron-dedupe.test.ts",
+        "name": "two watchers sharing a lease store file one scheduled issue between them",
+        "mutation": "cron dedupe: a watcher claims the minute before filing"
+      }
     },
     {
       "id": "emit-chaining",
@@ -950,7 +965,12 @@
       "phase": "P5",
       "ask": "Cron dedupe through GitHub, so two watchers on one repo could each file the same scheduled issue (v3.3, with the GitHub store).",
       "source": "CHANGELOG v3.2.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/cron-dedupe.test.ts",
+        "name": "two watchers on clones of one remote file one scheduled issue (together: %p)",
+        "mutation": "cron dedupe v3.3: a held git lease ref is not taken"
+      }
     },
     {
       "id": "revision-role-check",
