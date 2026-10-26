@@ -1,15 +1,19 @@
-// Writes the public ledger (dashboard/ledger-public.ts) for every repo with a state DB, or the --repo
-// ones, and refuses to write when any field could leak operator detail.
-//   bun scripts/ledger-public.ts [--repo owner/name]... [--out shipped.json]
+// Writes the public ledger (dashboard/ledger-public.ts) for the --repo ones only, so a private repo's
+// titles are published only when named; refuses to write when any field could leak operator detail.
+//   bun scripts/ledger-public.ts --repo owner/name [--repo ...] [--out shipped.json]
 
 import { writeFileSync } from "node:fs";
 import { publicLeaks, publicLedger } from "../dashboard/ledger-public";
-import { defaultStatePath, discoverRepos } from "../src/paths";
+import { defaultStatePath } from "../src/paths";
 import { FactoryState } from "../src/state";
 
 const args = process.argv.slice(2);
 const values = (flag: string) => args.flatMap((a, i) => (a === flag && args[i + 1] ? [args[i + 1]!] : []));
-const repos = values("--repo").length ? values("--repo") : discoverRepos();
+const repos = values("--repo");
+if (!repos.length) {
+  console.error("ledger-public: name each repo to publish with --repo owner/name");
+  process.exit(2);
+}
 const states = repos.map((r) => new FactoryState(defaultStatePath(process.env, r)));
 const ledger = publicLedger(states);
 const leaks = publicLeaks(ledger);

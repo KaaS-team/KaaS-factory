@@ -23,9 +23,9 @@ export interface PublicLedger {
 export const ENTRY_KEYS: readonly (keyof ShippedEntry)[] = ["title", "repo", "mergedOn", "cycleHours", "dollars"];
 
 // Text a title may carry that is operator detail: model names, hosts and addresses, token counts and
-// stack frames. Issue titles are written by people, who do name the model they want swapped.
+// stack frames. No trailing \b on model names, so "claudex" or "opus5x" is caught too.
 export const FORBIDDEN_TEXT: readonly RegExp[] = [
-  /\b(claude|anthropic|openai|gpt|chatgpt|gemini|llama|mistral|mixtral|qwen|deepseek|nemotron|haiku|sonnet|opus|codex|grok|kimi|openrouter|ollama)\b[\w.:/-]*/gi,
+  /\b(claude|anthropic|openai|gpt|chatgpt|gemini|llama|mistral|mixtral|qwen|deepseek|nemotron|haiku|sonnet|opus|codex|grok|kimi|openrouter|ollama)[\w.:/-]*/gi,
   /\bo\d(-mini|-pro)?\b/gi,
   /\b[\w-]+(\.[\w-]+)*\.(local|internal|lan|localdomain)\b/gi,
   /\blocalhost(:\d+)?\b/gi,
@@ -35,8 +35,10 @@ export const FORBIDDEN_TEXT: readonly RegExp[] = [
   /\b\w*Error:\s.*$/g,
 ];
 
+// NFKC folds fullwidth and styled letters to ASCII; anything still outside printable ASCII (a Cyrillic
+// "о" in "оpus") is dropped, so a lookalike cannot carry a model name past FORBIDDEN_TEXT.
 export function scrubText(text: string): string {
-  let out = text;
+  let out = text.normalize("NFKC").replace(/[^\x20-\x7e]/g, "");
   for (const re of FORBIDDEN_TEXT) out = out.replace(re, "[redacted]");
   return out.replace(/\s+/g, " ").trim();
 }
@@ -47,9 +49,10 @@ export function publicLeaks(ledger: unknown): string[] {
   const out: string[] = [];
   const walk = (v: unknown, at: string) => {
     if (typeof v === "string") {
+      if (/[^\x20-\x7e]/.test(v)) out.push(`${at}: not printable ASCII`);
       for (const re of FORBIDDEN_TEXT) {
         re.lastIndex = 0;
-        if (re.test(v)) out.push(`${at}: ${JSON.stringify(v)}`);
+        if (re.test(v.normalize("NFKC"))) out.push(`${at}: ${JSON.stringify(v)}`);
       }
     } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${at}[${i}]`));
     else if (v && typeof v === "object")

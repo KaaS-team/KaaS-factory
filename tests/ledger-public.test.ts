@@ -119,10 +119,16 @@ test("publicLeaks fails a ledger that carries a forbidden field or a model-like 
     { ...ok, title: "Ran on runner.local" },
     { ...ok, title: "Spent 40k tokens" },
     { ...ok, title: "Error: boom at f (/a.ts:1:2)" },
+    { ...ok, title: "Bump claudex-5 and opus5x" },
+    { ...ok, title: "Swap \uff43\uff4c\uff41\uff55\uff44\uff45 in" },
+    { ...ok, title: "Swap \u043epus-5 in" },
   ])
     expect(publicLeaks(doc(bad)).length, JSON.stringify(bad)).toBeGreaterThan(0);
   expect(publicLeaks(doc(ok, { worker_name: "w1" })).length).toBeGreaterThan(0);
   expect(scrubText("Use opus-5 on db.internal")).toBe("Use [redacted] on [redacted]");
+  expect(scrubText("Use claude-opus-5-5x and opus5x")).toBe("Use [redacted] and [redacted]");
+  expect(scrubText("Use \uff43\uff4c\uff41\uff55\uff44\uff45-5 now")).toBe("Use [redacted] now");
+  expect(scrubText("Use \u043epus-5 now")).toBe("Use pus-5 now");
 });
 
 test("the export script writes the ledger from a state DB and leaves no operator detail in the file", async () => {
@@ -143,6 +149,10 @@ test("the export script writes the ledger from a state DB and leaves no operator
     const ledger = await Bun.file(out).json();
     expect(ledger.shipped).toHaveLength(1);
     expect(publicLeaks(ledger)).toEqual([]);
+    // With no --repo it publishes nothing: a repo's titles go public only when it is named.
+    const none = Bun.spawnSync(["bun", "scripts/ledger-public.ts"], { env: { ...process.env, FACTORY_HOME: home } });
+    expect(none.exitCode).toBe(2);
+    expect(none.stdout.toString()).toBe("");
   } finally {
     rmSync(home, { recursive: true, force: true });
   }

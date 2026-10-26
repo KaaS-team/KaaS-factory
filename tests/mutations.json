@@ -736,7 +736,9 @@
   {"name": "licensing: a sign-off must be the author's", "file": "scripts/dco.ts", "find": "return !trailers.includes(c.email.toLowerCase());", "replace": "return trailers.length === 0;", "test": "tests/licensing.test.ts"},
   {"name": "licensing: no runtime npm package", "file": "package.json", "find": "\"devDependencies\": {", "replace": "\"dependencies\": { \"left-pad\": \"1.3.0\" },\n  \"devDependencies\": {", "test": "tests/licensing.test.ts"},
   {"name": "public ledger: a model name in a title reaches the page", "file": "dashboard/ledger-public.ts", "find": "  for (const re of FORBIDDEN_TEXT) out = out.replace(re, \"[redacted]\");\n", "replace": "", "test": "tests/ledger-public.test.ts"},
-  {"name": "public ledger: the leak check misses a model-like string", "file": "dashboard/ledger-public.ts", "find": "        if (re.test(v)) out.push", "replace": "        if (false) out.push", "test": "tests/ledger-public.test.ts"},
+  {"name": "public ledger: the leak check misses a model-like string", "file": "dashboard/ledger-public.ts", "find": "        if (re.test(v.normalize(\"NFKC\"))) out.push", "replace": "        if (false) out.push", "test": "tests/ledger-public.test.ts"},
   {"name": "public ledger: a field outside the allow-list passes the leak check", "file": "dashboard/ledger-public.ts", "find": "      if (!(ENTRY_KEYS as string[]).includes(k)) out.push", "replace": "      if (false) out.push", "test": "tests/ledger-public.test.ts"},
-  {"name": "public ledger: a PR merged twice is listed twice", "file": "dashboard/ledger-public.ts", "find": " && !out.has(key))", "replace": ")", "test": "tests/ledger-public.test.ts"}
+  {"name": "public ledger: a PR merged twice is listed twice", "file": "dashboard/ledger-public.ts", "find": " && !out.has(key))", "replace": ")", "test": "tests/ledger-public.test.ts"},
+  {"name": "public ledger: a lookalike letter carries a model name past the scrub", "file": "dashboard/ledger-public.ts", "find": "text.normalize(\"NFKC\").replace(/[^\\x20-\\x7e]/g, \"\")", "replace": "text", "test": "tests/ledger-public.test.ts"},
+  {"name": "public ledger: the export publishes every repo when none is named", "file": "scripts/ledger-public.ts", "find": "  process.exit(2);\n", "replace": "", "test": "tests/ledger-public.test.ts"}
 ]
