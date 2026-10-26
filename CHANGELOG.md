@@ -1,5 +1,41 @@
 # Changelog
 
+## v6.0.0
+
+KaaS Factory becomes a product you steer from anywhere: a phone, the web, Slack or Linear, with
+runs on any machine or sandbox, workflows written in Markdown, a risk tier on every task and merge
+by itself once verification passes. Upgraders: vendor CLI presets moved to `contrib/agents`, and a
+repo with no `.claude` or `.agents` setup of its own now gets the default harness before each stage.
+See [docs/control-plane.md](docs/control-plane.md), [docs/workflows.md](docs/workflows.md),
+[docs/runtimes.md](docs/runtimes.md), [docs/integrations.md](docs/integrations.md) and
+[docs/self-host.md](docs/self-host.md).
+
+- Remote control: pair a phone, get web push when a task needs you, and send a message to a running
+  task. Phones and push are bound to current members, so removing someone ends both.
+- Fleet: `factory runtime`, `dispatch` and `routine`; machines, slots in use and runtime health on
+  the Settings page; agent steps in a docker `agentRuntime`; per-language images; `factory doctor`
+  probes every runtime the repo names; a deny-by-default egress proxy.
+- Workflows in Markdown: ten library workflows, an Events page with replay, minions in a fresh
+  clone, agent commands held to an allowlist of shapes, and every agent told why on a rebuild.
+- Default harness: a repo's own committed skills and agents win; anything a stage writes into
+  `.claude`, `.agents` or `.factory` is never taken for the repo's, `.agents/**` is protected like
+  the other two, and a planted link cannot send a default outside the worktree.
+- Verification, risk and auto-merge: one risk tier per task, a second review session at high risk,
+  and merge history kept in the state database.
+- Cockpit: the dashboard rebuilt for QA and product managers, split into one module per view.
+- Integrations: a catalogue with a contract test each, steering from Slack and Linear gated by role,
+  and progress sinks.
+- `ee/` (KaaS Factory Enterprise License): SSO through OIDC and SAML, SCIM, custom roles, audit-log
+  export, org mode and fleet spend policy, all behind plane extensions the core builds without.
+- Deploy: one image, `docker compose` self-host, `kaas-factory up`, a stage blob store (disk or S3)
+  and an idle memory budget.
+- Operator detail: a viewer's JSON never carries a model, a cost, token counts or a host, whichever
+  route returns it; one test walks every viewer route.
+
+Not in this release: CODEOWNERS on an operator's merge, the egress proxy wired into the runtimes,
+stages reading mid-run messages, the Ask/Build composer and preview images, and a notice when a
+refused agent command is dropped.
+
 ## v5.2.0
 
 The dashboard becomes a control plane: people sign in, each has a role, and every command from the

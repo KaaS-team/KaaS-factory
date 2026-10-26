@@ -1469,6 +1469,14 @@
         "name": "the core runs on open source only, with no runtime npm package",
         "mutation": "licensing: no runtime npm package"
       }
+    },
+    {
+      "id": "viewer-no-operator-detail",
+      "phase": "P7",
+      "ask": "Operator detail (model names, tokens, spend, hosts) never reaches a customer: no viewer route returns it",
+      "source": "engineering standard, review 26 Oct 2026",
+      "owner": "agent",
+      "proof": {"test": "tests/plane-access.test.ts", "name": "no route a viewer can read returns a model, a cost, tokens or a host", "mutation": "plane: a viewer's JSON never carries a model, cost, tokens or host"}
     }
   ]
 }
