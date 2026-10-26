@@ -7,8 +7,9 @@ import { join } from "node:path";
 import { readStageArtifacts, runDir } from "./artifacts";
 import { type Autonomy, webMode } from "./autonomy";
 import type { FactoryConfig, MergeConfig } from "./config";
-import { attemptMerge, type ChangedFile, type MergeDecision, renderAuditComment } from "./merge-policy";
+import { type ChangedFile, type MergeDecision, renderAuditComment } from "./merge-policy";
 import { DirLease, type Lease, serialMerge } from "./merge-queue";
+import { landPolicyMerge } from "./low-risk";
 import { changeFailureRate, revertBranch, tightenThresholds, watchAfterMerge } from "./post-merge";
 import { type PrFacts, mergeRecord, withMerge } from "./pr-facts";
 import { readVerifyFacts } from "./pr-facts-collect";
@@ -198,6 +199,6 @@ export async function settleMerge(
     const signed = auto && signedMergeRecord(config, run.issue, auto, decision);
     if (signed) await run.post(signed);
   }
-  if (!auto) return attemptMerge(deps.github, config.repo, run.pr, decision);
+  if (!auto) return landPolicyMerge(deps.github, config.repo, run.pr, decision);
   return autonomousMerge(deps, config, run, decision);
 }

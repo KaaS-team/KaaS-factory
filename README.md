@@ -298,6 +298,12 @@ Config example:
 
 `riskPolicy.autoApproveMaxRisk` (`low` or `medium`) is the highest plan risk that auto-approves.
 
+With `merge.policy` `auto`, the factory merges a PR with no human only when CI and every acceptance
+criterion are green and every changed file is inside the low-risk class: docs, tests and copy by
+default, or the globs in `merge.lowRiskPaths`, within `merge.maxFiles` and `merge.maxLines`. A
+migration, schema, auth, dependency, CI, infra or `.env` path is never in the class, whatever the
+config or a label on the PR says (`src/low-risk.ts`). Anything else waits for a human.
+
 Add `gates` (the commands `gates.sh` runs, each `{ "name": ..., "cmd": ... }`) and `agentCommands`
 (`read`, `build`, `verify`: Bash patterns each stage may run, for example `["make test", "make *"]` for
 build). A pattern is fixed words with at most a trailing `*` or `:*`; one that names a wrapper or

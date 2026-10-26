@@ -852,13 +852,25 @@
     {
       "id": "auto-merge-low-risk",
       "phase": "P6",
-      "ask": "No human merge for a low-risk change: every proof green and the diff inside the low-risk class",
+      "ask": "No human merge for a low-risk change: every proof green and the diff inside the low-risk class, the factory merges it.",
       "source": "spec 10 auto-merge-low-risk",
       "owner": "agent",
       "proof": {
-        "test": "tests/ported/machinist/merge-policy.test.ts",
-        "name": "a low-risk change with every proof green merges with no human, and one red signal stops it",
-        "mutation": "merge policy: a tier merges when every signal is green"
+        "test": "tests/auto-merge-low-risk.test.ts",
+        "name": "a forged label cannot widen the low-risk class",
+        "mutation": "low-risk: a file outside the class merges"
+      }
+    },
+    {
+      "id": "public-dashboard",
+      "phase": "P6",
+      "ask": "A public dashboard of what shipped and what it cost; no model name, host or token reaches it.",
+      "source": "spec 10 public-dashboard",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/ledger-public.test.ts",
+        "name": "no model name, host, token count, prompt or stack trace reaches the public ledger",
+        "mutation": "public ledger: a model name in a title reaches the page"
       }
     },
     {

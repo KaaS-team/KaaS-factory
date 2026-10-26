@@ -8,6 +8,8 @@ import type { MergeConfig } from "./config";
 import type { GitHub, MergeReadiness } from "./github";
 import { type CodeownersRule, codeownerRefusals } from "./profile-rules";
 import { factRefusals, type PrFacts } from "./pr-facts";
+import type { AcceptanceVerdict } from "./acceptance";
+import { acceptanceRefusals, lowRiskClassRefusals } from "./low-risk";
 
 export interface ChangedFile {
   readonly path: string;
@@ -39,7 +41,9 @@ export type MergeRefusalReason =
   | "policy-not-auto"
   | "codeowner-approval"
   | "autonomy-supervised"
-  | "signal-failed";
+  | "signal-failed"
+  | "outside-low-risk-class"
+  | "acceptance-red";
 
 export interface MergeRefusal {
   readonly reason: MergeRefusalReason;
@@ -105,7 +109,7 @@ export function checkReadiness(readiness: MergeReadiness, ci: CiResult, expected
 export function autoEligible(
   risk: Risk,
   changedFiles: readonly ChangedFile[],
-  merge: Pick<MergeConfig, "autoPaths" | "maxFiles" | "maxLines">,
+  merge: Pick<MergeConfig, "autoPaths" | "maxFiles" | "maxLines" | "lowRiskPaths">,
   protectedPaths: readonly string[],
   // "full" merges past the low-risk size class on its facts; protected paths, modes and binaries still hold.
   mode?: Autonomy,
@@ -120,9 +124,10 @@ export function autoEligible(
     refusals.push({ reason: "not-auto-eligible", detail: `protected path(s): ${protectedHits.join(", ")}` });
   }
   const sized = mode !== "full";
+  if (sized) refusals.push(...lowRiskClassRefusals(changedFiles, merge.lowRiskPaths));
   const globs = merge.autoPaths.map((pattern) => new Bun.Glob(pattern));
-  // Under a tier an empty autoPaths means no allow-list: the risk floor already rates the paths.
-  const listed = sized && (mode === undefined || globs.length > 0);
+  // An empty autoPaths adds no allow-list of its own: the low-risk class above already bounds the paths.
+  const listed = sized && globs.length > 0;
   const outside = listed ? paths.filter((path) => !globs.some((g) => g.match(path))) : [];
   if (outside.length > 0) {
     refusals.push({ reason: "not-auto-eligible", detail: `outside merge.autoPaths: ${outside.join(", ")}` });
@@ -170,6 +175,8 @@ export interface DecideMergeInput {
   // Set, the tier decides the merge from the PR facts instead of merge.policy alone.
   readonly autonomy?: Autonomy;
   readonly facts?: PrFacts;
+  // verify's acceptance.json; null when the repo has no acceptance script (src/low-risk.ts).
+  readonly acceptance?: AcceptanceVerdict | null;
 }
 
 // Authority is explicit only (herdr SKILL.md:18-23): "merge" is returned only
@@ -183,7 +190,12 @@ export function decideMerge(input: DecideMergeInput): MergeDecision {
   const eligibilityRefusals = autoEligible(input.risk, input.changedFiles, input.merge, input.protectedPaths, mode);
   const owners = input.codeowners;
   const ownerRefusals = owners ? codeownerRefusals(owners.rules, input.changedFiles, owners.approvedBy) : [];
-  const refusals = [...readinessRefusals, ...eligibilityRefusals, ...ownerRefusals];
+  const refusals = [
+    ...readinessRefusals,
+    ...eligibilityRefusals,
+    ...ownerRefusals,
+    ...acceptanceRefusals(input.acceptance),
+  ];
   if (mode !== undefined) {
     if (mode === "supervised")
       return { outcome: "refuse", headSha, refusals: [{ reason: "autonomy-supervised", detail: "a human merges" }] };

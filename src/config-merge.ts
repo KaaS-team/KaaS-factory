@@ -7,6 +7,9 @@ export interface MergeAutonomyFields {
   // The live URL the post-merge watch smokes, and the PR preview URL with `{pr}` (src/visual.ts).
   readonly smokeUrl?: string;
   readonly previewUrl?: string;
+  // The low-risk class a merge with no human must stay inside; absent is docs, tests and copy
+  // (src/low-risk.ts). It can never take in a migration, auth, dependency, CI or infra path.
+  readonly lowRiskPaths?: readonly string[];
 }
 
 export interface PackageOwnership {
@@ -24,6 +27,7 @@ export const MERGE_KEYS = {
   autonomy: "string",
   smokeUrl: "string",
   previewUrl: "string",
+  lowRiskPaths: "strings",
 } as const;
 
 export const PACKAGE_KEYS = {

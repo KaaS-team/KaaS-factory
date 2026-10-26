@@ -31,16 +31,16 @@ describe("scaleup and enterprise profile rules", () => {
   test("a merge waits for each touched file's code owner, enterprise forces a sandbox, and both cap teams", () => {
     const base = mkdtempSync(join(tmpdir(), "factory-codeowners-"));
     mkdirSync(join(base, ".github"));
-    writeFileSync(join(base, ".github/CODEOWNERS"), "*  @lead\n/docs/  @writer\n*.sql @dba @lead # schema\nvendor/\n");
-    const rules = parseCodeowners("*  @lead\n/docs/  @writer\n*.sql @dba @lead # schema\nvendor/\n");
+    writeFileSync(join(base, ".github/CODEOWNERS"), "*  @lead\n/docs/  @writer\n*.csv @dba @lead # data\nvendor/\n");
+    const rules = parseCodeowners("*  @lead\n/docs/  @writer\n*.csv @dba @lead # data\nvendor/\n");
     expect(ownersOf(rules, "docs/a/b.md")).toEqual(["@writer"]);
-    expect(ownersOf(rules, "db/x/1.sql")).toEqual(["@dba", "@lead"]);
+    expect(ownersOf(rules, "db/x/1.csv")).toEqual(["@dba", "@lead"]);
     expect(ownersOf(rules, "lib/vendor/x.js")).toEqual([]);
     expect(ownersOf(rules, "src/app.ts")).toEqual(["@lead"]);
 
     const changedFiles = [
       { path: "docs/guide.md", additions: 1, deletions: 0 },
-      { path: "db/1.sql", additions: 1, deletions: 0 },
+      { path: "db/1.csv", additions: 1, deletions: 0 },
     ];
     const decide = (profile: "team" | "scaleup", approvedBy: string[]) =>
       decideMerge({
@@ -48,14 +48,14 @@ describe("scaleup and enterprise profile rules", () => {
         ci,
         risk: "low",
         changedFiles,
-        merge: { policy: "auto", autoPaths: ["**"], maxFiles: 10, maxLines: 200 },
+        merge: { policy: "auto", autoPaths: ["**"], lowRiskPaths: ["**"], maxFiles: 10, maxLines: 200 },
         protectedPaths: [],
         expectedBaseRefName: "main",
         codeowners: codeownerCheck(profile, base, approvedBy),
       });
     expect(decide("team", []).outcome).toBe("merge");
     const held = decide("scaleup", ["writer"]);
-    expect(held.outcome === "refuse" && held.refusals[0]?.detail).toBe("no code owner approved db/1.sql (@dba @lead)");
+    expect(held.outcome === "refuse" && held.refusals[0]?.detail).toBe("no code owner approved db/1.csv (@dba @lead)");
     expect(decide("scaleup", ["writer", "lead"]).outcome).toBe("merge");
     expect(codeownerCheck("enterprise", base, undefined)?.approvedBy).toEqual([]);
     rmSync(base, { recursive: true, force: true });
@@ -124,11 +124,11 @@ describe("scaleup and enterprise profile rules", () => {
       readiness: r,
       ci: { ...ci, headSha: "new" },
       risk: "low",
-      changedFiles: [{ path: "db/1.sql", additions: 1, deletions: 0 }],
-      merge: { policy: "auto", autoPaths: ["**"], maxFiles: 10, maxLines: 200 },
+      changedFiles: [{ path: "db/1.csv", additions: 1, deletions: 0 }],
+      merge: { policy: "auto", autoPaths: ["**"], lowRiskPaths: ["**"], maxFiles: 10, maxLines: 200 },
       protectedPaths: [],
       expectedBaseRefName: "main",
-      codeowners: { rules: parseCodeowners("*.sql @dba\n"), approvedBy: r.approvedBy ?? [] },
+      codeowners: { rules: parseCodeowners("*.csv @dba\n"), approvedBy: r.approvedBy ?? [] },
     });
     expect(held.outcome === "refuse" && held.refusals.map((x) => x.reason)).toEqual(["codeowner-approval"]);
   });

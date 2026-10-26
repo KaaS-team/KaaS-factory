@@ -255,7 +255,7 @@ test("a low-risk change with every proof green merges with no human, and one red
     decideMerge(
       input({
         merge: mergeConfig({ autoPaths: [] }),
-        changedFiles: [file("lib/a.ts")],
+        changedFiles: [file("docs/a.md")],
         autonomy: "semi",
         facts: facts(),
         ...o,
@@ -270,4 +270,16 @@ test("a low-risk change with every proof green merges with no human, and one red
   expect(tier({ facts: facts({ risk: medium }) }).outcome).toBe("refuse");
   expect(tier({ facts: undefined }).outcome).toBe("refuse");
   expect(tier({ changedFiles: Array.from({ length: 11 }, (_, i) => file(`lib/f${i}.ts`)) }).outcome).toBe("refuse");
+});
+
+test("a code file is outside the low-risk class, and a red acceptance criterion blocks the merge", () => {
+  const code = decideMerge(input({ merge: mergeConfig({ autoPaths: ["**"] }), changedFiles: [file("lib/app.ts")] }));
+  expect(code.outcome === "refuse" && code.refusals.map((r) => r.reason)).toEqual(["outside-low-risk-class"]);
+  const red = {
+    base: "main",
+    acs: [{ spec: "s", ac: "AC1", text: "t", holdout: [], new: true, head: "fail" as const, ok: false }],
+    errors: [],
+  };
+  const held = decideMerge(input({ acceptance: red }));
+  expect(held.outcome === "refuse" && held.refusals.map((r) => r.reason)).toEqual(["acceptance-red"]);
 });

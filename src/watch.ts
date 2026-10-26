@@ -19,7 +19,8 @@ import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart } from "./derive";
-import { decideMerge, mergePolicyMarker } from "./merge-policy";
+import { decideMergeAt } from "./low-risk";
+import { mergePolicyMarker } from "./merge-policy";
 import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
@@ -44,7 +45,6 @@ import {
 import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { defaultWorkflow } from "./engine/workflows";
-
 import { cronStore, fireCron, fireEvent } from "./engine/triggers";
 import { recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
@@ -358,7 +358,7 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     const changedFiles = await deps.git.diffStat(worktree, config.base, readiness.headRefOid);
     const plan = await readStageArtifacts(worktree, issueNumber, "plan");
     const auto = await mergeContext(deps, config, worktree, issueNumber, changedFiles, pr.number);
-    const decision = decideMerge({
+    const decision = await decideMergeAt(worktree, issueNumber, {
       readiness,
       ci,
       changedFiles,

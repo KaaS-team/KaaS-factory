@@ -16,7 +16,7 @@ export const maxRisk = (...risks: readonly (Risk | undefined)[]): Risk =>
 
 // Paths whose change is high risk whatever the agent says: schema, CI and dependency changes
 // reach every user at once and are the hardest to roll back.
-const HIGH_RISK = [
+export const HIGH_RISK: readonly RegExp[] = [
   /(^|\/)migrations?\//,
   /\.sql$/,
   /(^|\/)schema\.(prisma|ts|rb)$/,
