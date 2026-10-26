@@ -19,8 +19,8 @@ export interface WorkflowRouteDeps {
   readonly projectFor: (repo: string) => Promise<DashboardProject | undefined>;
   readonly stateFor: (repo: string, create?: boolean) => FactoryState | null;
   readonly workspacesFor: (repo: string) => string;
-  readonly repoOf: (req: Request) => string;
-  readonly actorOf: (req: Request) => Actor | undefined;
+  readonly access: { readonly repoOf: (req: Request) => string; readonly actorOf: (req: Request) => Actor | undefined };
+  readonly integrations?: () => { repo: string; on: string[] };
 }
 
 const json = (data: unknown, status = 200) =>
@@ -81,7 +81,8 @@ export function minionsView(state: Pick<FactoryState, "busEvents"> | null, proje
 }
 
 export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
-  const { projectFor, repoOf } = deps;
+  const { projectFor } = deps;
+  const { repoOf, actorOf } = deps.access;
   const settings = settingsWithHealth();
   // Listing leases asks the remote, so the Settings page shares one answer per repo for 15 s.
   const leasesCache = new Map<string, { at: number; value: Awaited<ReturnType<DashboardProject["leases"]>> | Error }>();
@@ -120,7 +121,8 @@ export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
           harnessReport(project.cloneDir, project.config),
           heldLeases(r, project),
         ]);
-        return json({ available: true, ...(await settings(project, report, leases, Date.now())) });
+        const integrations = deps.integrations?.() ?? { repo: "", on: [] };
+        return json({ available: true, ...(await settings(project, report, leases, Date.now())), integrations });
       },
     },
     {
@@ -209,7 +211,7 @@ export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
             base: project.config.base,
             name: body.name,
             form: body.form,
-            by: senderName(deps.actorOf(req)),
+            by: senderName(actorOf(req)),
           },
         );
         return "problems" in out ? json({ error: out.problems.join("; "), problems: out.problems }, 422) : json(out);

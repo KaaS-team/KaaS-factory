@@ -8,7 +8,15 @@ import { DiskBlobStore } from "./adapters/blob-disk/blob";
 import { S3BlobStore } from "./adapters/blob-s3/blob";
 import { runDir } from "./artifacts";
 import { MAX_BLOB_BYTES, parseBlobKey, RUNS_PREFIX, shipConfig } from "./engine/blobs";
-import { configMirrorDir, defaultStatePath, servedRepos, streamPath, transcriptPath, workspacesDir } from "./paths";
+import {
+  configMirrorDir,
+  defaultRepo,
+  defaultStatePath,
+  servedRepos,
+  streamPath,
+  transcriptPath,
+  workspacesDir,
+} from "./paths";
 import { type BlobStore, validBlobKey } from "./ports/blob";
 import { FactoryState, type Run, type RunStatus, type Stage, type StageRun } from "./state";
 
@@ -48,7 +56,7 @@ export function localPathFor(key: string, env: NodeJS.ProcessEnv = process.env):
 // The repos this plane serves. Any runner holding the bucket key can write any key, so the mirror
 // reads only these prefixes and never plants another repo's files on the plane.
 export function mirroredRepos(env: NodeJS.ProcessEnv = process.env): string[] {
-  return servedRepos(env, env.FACTORY_REPO ?? "").filter(validBlobKey);
+  return servedRepos(env, defaultRepo(env)).filter(validBlobKey);
 }
 
 // Each column a runner's state.json may set, with its type: a field outside these, or of another

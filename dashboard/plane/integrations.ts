@@ -35,6 +35,8 @@ export interface IntegrationDeps {
 }
 
 const notFound = () => Response.json({ error: "not found" }, { status: 404 });
+// The surfaces carry no repo field yet (A1.7), so each acts on the plane's default and stops without one.
+const unbound = () => Response.json({ error: "this plane has no default repo for integrations" }, { status: 409 });
 const tooLarge = (req: Request) => Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES;
 // The receivers ack first and finish here, so a slow tracker never makes a vendor retry.
 const defer = (work: Promise<void>) =>
@@ -60,6 +62,7 @@ export function integrationRoutes(deps: IntegrationDeps) {
       handler: (req) => {
         const secret = key(LINEAR_AGENT_ENV.secret);
         if (!secret) return notFound();
+        if (!deps.repo) return unbound();
         if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
         const client = new LinearAgentClient(env.LINEAR_AGENT_URL, env);
         const sameBoard = deps.project?.config.tracker.kind === "linear";
@@ -82,6 +85,7 @@ export function integrationRoutes(deps: IntegrationDeps) {
       handler: (req) => {
         const secret = key(SLACK_ENV.secret);
         if (!secret) return notFound();
+        if (!deps.repo) return unbound();
         if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
         const client = new SlackClient(env.SLACK_API_URL, env);
         const actor = surfaceActors(env[SLACK_ENV.users], (login) => deps.store.roleOf(login));
@@ -102,6 +106,7 @@ export function integrationRoutes(deps: IntegrationDeps) {
       label: A2A_ROUTE,
       handler: (req) => {
         if (!key(A2A_ENV.token)) return notFound();
+        if (!deps.repo) return unbound();
         if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
         return a2aRpc({ token: key(A2A_ENV.token), repo: deps.repo, tracker: deps.tracker, links: links() }, req);
       },
@@ -113,6 +118,7 @@ export function integrationRoutes(deps: IntegrationDeps) {
       role: "viewer",
       handler: (_req, _url, m) => {
         if (!key(AGUI_ENV.on)) return notFound();
+        if (!deps.repo) return unbound();
         const events = deps.state.busEvents(500).flatMap((row) => {
           const { subject, ...rest } = row;
           const parsed = parseEvent({
@@ -129,5 +135,13 @@ export function integrationRoutes(deps: IntegrationDeps) {
       },
     },
   ];
-  return { routes, secrets };
+  // What the Settings page shows: which surfaces are on and the one repo they all act on.
+  const surfaces = [
+    ["Linear", LINEAR_AGENT_ENV.secret],
+    ["Slack", SLACK_ENV.secret],
+    ["A2A", A2A_ENV.token],
+    ["AG-UI", AGUI_ENV.on],
+  ] as const;
+  const bound = () => ({ repo: deps.repo, on: surfaces.flatMap(([name, k]) => (key(k) ? [name] : [])) });
+  return { routes, secrets, bound };
 }

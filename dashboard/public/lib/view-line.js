@@ -232,7 +232,9 @@ export function taskComposer() {
             h("label", { class: "visually-hidden", for: "task-repo" }, "Project"),
             h(
               "select",
-              { class: "field-control pick", id: "task-repo", name: "repo" },
+              { class: "field-control pick", id: "task-repo", name: "repo", required: true },
+              // With several projects nothing is preselected unless the list is filtered to one.
+              h("option", { value: "", disabled: true, selected: !repos.includes(state.repoFilter) }, "Pick a project"),
               repos.map((r) => h("option", { value: r, selected: r === state.repoFilter }, short(r))),
             ),
           ]

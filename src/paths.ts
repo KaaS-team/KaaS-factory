@@ -78,6 +78,11 @@ export function feedServedRepos(source: (() => readonly string[]) | null): void 
 
 // The one list of repos a dashboard serves and a plane mirrors: FACTORY_REPOS when set, else every
 // repo that has run here, plus the repo a dashboard was started for and any fed in above.
+// The plane's default repo: what a CLI-bound dashboard, its integrations and the App's owner fall back to.
+export function defaultRepo(env: NodeJS.ProcessEnv = process.env): string {
+  return env.FACTORY_REPO ?? "";
+}
+
 export function servedRepos(env: NodeJS.ProcessEnv = process.env, primary = ""): string[] {
   const listed = (env.FACTORY_REPOS ?? "")
     .split(",")

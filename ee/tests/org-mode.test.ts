@@ -43,7 +43,7 @@ describe("org mode", () => {
     p.store.setMember("carol", "operator", "test");
     const [alice, bob, carol] = [cookieFor(p, "alice"), cookieFor(p, "bob"), cookieFor(p, "carol")];
 
-    expect(await refused(call(p, "POST /api/tasks", alice, { title: "t" }))).toBe(false);
+    expect(await refused(call(p, "POST /api/tasks", alice, { repo: "acme/widgets", title: "t" }))).toBe(false);
     expect(await refused(call(p, "GET /api/issues/1/thread?repo=blue/app", alice))).toBe(true);
     expect(await refused(call(p, "GET /api/issues/1/thread?repo=loose/repo", alice))).toBe(true);
     // A list is narrowed to the caller's repos; naming a repo that is not theirs is refused.
@@ -56,7 +56,7 @@ describe("org mode", () => {
     );
     // bob may act on his own repo; it has nothing waiting, so the role check passes and the item is 404.
     expect((await call(p, "POST /api/inbox/1/act", bob, { repo: "blue/app", action: "dismiss" })).status).toBe(404);
-    expect(await refused(call(p, "POST /api/tasks", carol, { title: "t" }))).toBe(true);
+    expect(await refused(call(p, "POST /api/tasks", carol, { repo: "acme/widgets", title: "t" }))).toBe(true);
     expect(await refused(call(p, "GET /api/runs", carol))).toBe(false);
 
     expect(await refused(call(p, "GET /api/inbox?repo=blue/app", alice))).toBe(true);

@@ -49,10 +49,10 @@ describe("org mode targets", () => {
     expect(await status("POST /api/inbox/1/act?repo=blue/app", { ...act, repo: "acme/widgets" })).toBe(400);
     expect(await status("POST /api/inbox/1/act", { ...act, repo: ["blue/app"] })).toBe(400);
     expect(await status("POST /api/inbox/1/act?repo=blue/app", { ...act, repo: "blue/app" })).not.toBe(403);
-    // The plane resolves one repo per request, so ?repo= on a body route is the repo it acts on:
-    // bob's repo has nothing waiting, and the plane's own repo is one he cannot see: both 404.
+    // The plane resolves one repo per request, so ?repo= on a body route is the repo it acts on and
+    // bob's repo has nothing waiting (404). Naming none on a plane serving two is a 400, never its own repo.
     expect(await status("POST /api/inbox/1/act?repo=blue/app", act)).toBe(404);
-    expect(await status("POST /api/inbox/1/act", act)).toBe(404);
+    expect(await status("POST /api/inbox/1/act", act)).toBe(400);
     expect(await status("GET /api/runs?repo=blue/app")).toBe(200);
     expect(await status("GET /api/runs?repo=acme/widgets")).toBe(404);
     expect(await status("GET /api/analytics?repo=blue/app")).toBe(200);

@@ -55,6 +55,12 @@ function general(d) {
     isOperator()
       ? [h("dt", null, "Daily spend cap"), h("dd", null, d.dailyUsd == null ? "None set" : money(d.dailyUsd))]
       : null,
+    d.integrations?.on.length
+      ? [
+          h("dt", null, `${d.integrations.on.join(", ")} act on`),
+          h("dd", null, d.integrations.repo || "Nothing yet: this plane has no default project, so they are off"),
+        ]
+      : null,
   );
 }
 

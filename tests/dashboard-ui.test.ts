@@ -97,6 +97,7 @@ const { settingsView } = await import(`${lib}/view-settings.js`);
 const { workflowsView } = await import(`${lib}/view-workflows.js`);
 const { boardColumns } = await import(`${lib}/view-board.js`);
 const { createSendQueue } = await import(`${lib}/actions.js`);
+const { taskComposer } = await import(`${lib}/view-line.js`);
 Object.assign(shell, { render() {}, go() {}, async loadInbox() {}, async loadView() {}, startFollowing() {} });
 
 const css = readFileSync(join(import.meta.dir, "..", "dashboard", "public", "styles.css"), "utf8");
@@ -220,6 +221,18 @@ describe("cockpit for QA and PMs", () => {
     expect(state.toast).toBe("Answer sent for #7");
   });
 
+  test("with two projects the composer starts on no project and will not submit until one is picked", () => {
+    Object.assign(state, { repos: ["acme/shop", "acme/blog"], repo: "", repoFilter: "" });
+    const pick = (taskComposer() as El).all((e) => e.id === "task-repo")[0]!;
+    expect("required" in pick.attrs).toBe(true);
+    const options = pick.all((e) => e.tag === "option");
+    expect(options.filter((o) => "selected" in o.attrs).map((o) => o.attrs.value)).toEqual([""]);
+    state.repoFilter = "acme/blog";
+    const filtered = (taskComposer() as El).all((e) => e.tag === "option" && "selected" in e.attrs);
+    expect(filtered.map((o) => o.attrs.value)).toEqual(["acme/blog"]);
+    state.repoFilter = "";
+  });
+
   test("Settings is tabs, one panel per topic", async () => {
     state.data.settings = { available: true, slots: 2, dailyUsd: 5, runtimes: [], leases: [] };
     const tabs = (page: El) => page.all((e) => e.attrs.role === "tab").map((t) => t.textContent);
@@ -234,6 +247,8 @@ describe("cockpit for QA and PMs", () => {
     expect(phone.byText("button", "Phone")[0]!.attrs["aria-selected"]).toBe("true");
     expect(phone.byClass("settings-panel")[0]!.byText("button", "Save relay").length).toBe(1);
     state.settingsTab = "general";
+    state.data.settings = { available: true, slots: 2, integrations: { repo: "acme/shop", on: ["Slack", "A2A"] } };
+    expect((settingsView() as El).byClass("settings-panel")[0]!.textContent).toContain("Slack, A2A act onacme/shop");
   });
 
   test("a workflow reads as plain steps for a PM, and its automation switches are one click away", async () => {

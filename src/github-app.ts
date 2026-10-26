@@ -4,7 +4,7 @@
 
 import { createPrivateKey, type KeyObject, sign } from "node:crypto";
 import { type CommandResult, type CommandRunner, GhCommandRunner } from "./github";
-import { feedServedRepos, isRepoName } from "./paths";
+import { defaultRepo, feedServedRepos, isRepoName } from "./paths";
 import type { RateBudget } from "./ports/scm";
 
 export const APP_ENV = {
@@ -191,7 +191,7 @@ export function appFromEnv(env: Record<string, string | undefined> = process.env
   const key = env[APP_ENV.key] ?? "";
   if (!id && !key) return null;
   if (!id || !key) throw new Error(`${APP_ENV.id} and ${APP_ENV.key} are set together or not at all`);
-  const owners = (env[APP_ENV.owners] || (env.FACTORY_REPO ?? "").split("/")[0] || "").split(",").map((o) => o.trim());
+  const owners = (env[APP_ENV.owners] || defaultRepo(env).split("/")[0] || "").split(",").map((o) => o.trim());
   const named = owners.filter(Boolean);
   if (named.length === 0) throw new Error(`${APP_ENV.owners} (or FACTORY_REPO) names the accounts the App serves`);
   const tag = `${id}:${named.join(",")}`;

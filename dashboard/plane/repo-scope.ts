@@ -11,8 +11,6 @@ export type RepoSource = "query" | "body" | "filter";
 export interface RepoScope {
   // Every repo this plane serves, in the order lists show them.
   served(): string[];
-  // The repo a dashboard was started for; a request that names none acts on it.
-  primary: string;
 }
 
 const refuse = (error: string, status: number) =>
@@ -49,7 +47,8 @@ export async function resolveRepo(
   const served = scope.served();
   let repo = given;
   if (!repo && source === "filter") return "";
-  if (!repo) repo = scope.primary || (served.length === 1 ? served[0]! : "");
+  // The default repo is not a fallback here: with two served, a write that names none could land in either.
+  if (!repo) repo = served.length === 1 ? served[0]! : "";
   if (!repo) return refuse("pick a repo: this plane serves more than one", 400);
   if (!served.includes(repo) || visible([repo]).length === 0) return refuse("unknown repo", 404);
   return repo;

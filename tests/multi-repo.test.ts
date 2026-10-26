@@ -79,10 +79,18 @@ function fakeGitHub() {
   }) as typeof known;
 }
 
-function plane(shared = new FactoryState(":memory:")) {
+function plane(shared = new FactoryState(":memory:"), primary = "") {
   const github = fakeGitHub();
   const probes = { which: () => null, versionOf: async () => null };
-  const dashboard = createDashboard(shared, github as never, "", false, join(home, "ws"), undefined, probes as never);
+  const dashboard = createDashboard(
+    shared,
+    github as never,
+    primary,
+    false,
+    join(home, "ws"),
+    undefined,
+    probes as never,
+  );
   return { github, dashboard };
 }
 
@@ -138,6 +146,23 @@ describe("one plane, many repos", () => {
       else expect([none.status, none.text.includes("pick a repo")], label).toEqual([400, true]);
     }
   }, 120_000);
+
+  // The hosted plane keeps FACTORY_REPO for its integrations, and a toggle read with no repo answered
+  // from it while two repos were served. One served repo is the only default.
+  test("a default repo never stands in for a write that names none while two are served", async () => {
+    const { dashboard } = plane(undefined, A);
+    for (const label of ["GET /api/toggles", "POST /api/tasks"]) {
+      const none = await hit(dashboard, request(label, undefined, { title: "t" }));
+      expect([none.status, none.text.includes("pick a repo")], label).toEqual([400, true]);
+    }
+    process.env.FACTORY_REPOS = A;
+    try {
+      const one = await hit(plane(undefined, A).dashboard, request("GET /api/toggles"));
+      expect(one.status).toBe(200);
+    } finally {
+      process.env.FACTORY_REPOS = `${A},${B}`;
+    }
+  });
 
   test("a list covers every served repo, tagged, and a filter narrows it to one", async () => {
     const { dashboard } = plane();
@@ -477,5 +502,13 @@ describe("one repo resolver", () => {
   test("only src/paths.ts reads FACTORY_REPOS, and nothing reads FACTORY_BLOB_REPOS", () => {
     expect(readers(/FACTORY_REPOS\b/)).toEqual(["src/paths.ts"]);
     expect(readers(/FACTORY_BLOB_REPOS/)).toEqual([]);
+  });
+
+  test("FACTORY_REPO is read only by src/paths.ts and the CLI's own --repo default", () => {
+    expect(readers(/env\.FACTORY_REPO\b|env\[["']FACTORY_REPO["']\]/).sort()).toEqual([
+      "src/cli.ts",
+      "src/paths.ts",
+      "src/remote-cli.ts",
+    ]);
   });
 });

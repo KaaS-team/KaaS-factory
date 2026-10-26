@@ -4,10 +4,11 @@ import { describe, expect, test } from "bun:test";
 import { parseChatOps } from "../src/chatops";
 import type { CloudEvent } from "../src/core/event";
 import { A2A_ENV, taskState } from "../src/integrations/a2a";
+import { SLACK_ENV } from "../src/integrations/slack";
 import { AGUI_ENV, aguiEvents } from "../src/integrations/agui";
 import { LinkStore } from "../src/integrations/links";
 import type { BusEventRow } from "../src/state";
-import { A2A_CARD_ROUTE, A2A_ROUTE, integrationRoutes } from "../dashboard/plane/integrations";
+import { A2A_CARD_ROUTE, A2A_ROUTE, integrationRoutes, SLACK_ROUTE } from "../dashboard/plane/integrations";
 import { MemoryTracker } from "./fixtures/tracker-server";
 
 const REPO = "acme/shop";
@@ -39,13 +40,13 @@ const rows: BusEventRow[] = run.map((e) => ({
   handled_at: null,
 }));
 
-function plane(env: Record<string, string>) {
+function plane(env: Record<string, string>, repo = REPO) {
   const tracker = new MemoryTracker();
   const links = new LinkStore(":memory:");
-  const { routes } = integrationRoutes({
+  const { routes, bound } = integrationRoutes({
     state: { busEvents: () => rows },
     tracker,
-    repo: REPO,
+    repo,
     env,
     links: () => links,
     store: { roleOf: () => null },
@@ -55,7 +56,7 @@ function plane(env: Record<string, string>) {
     const url = new URL(req.url);
     return r.handler(req, url, url.pathname.match(r.pattern)!);
   };
-  return { tracker, call };
+  return { tracker, call, bound };
 }
 const rpc = (body: unknown, token = "a2a-tok") =>
   new Request("http://plane/a2a", {
@@ -77,6 +78,17 @@ describe("A2A and AG-UI", () => {
     expect((await p.call(A2A_CARD_ROUTE, new Request("http://plane/.well-known/agent-card.json"))).status).toBe(404);
     expect((await p.call(A2A_ROUTE, send("Fix the cart"))).status).toBe(404);
     expect((await p.call("GET /api/agui/:n", new Request("http://plane/api/agui/6"))).status).toBe(404);
+  });
+
+  test("on a plane with no default repo, a surface that is on refuses, and Settings is told which repo they use", async () => {
+    const env = { [A2A_ENV.token]: "a2a-tok", [AGUI_ENV.on]: "1", [SLACK_ENV.secret]: "s" };
+    const off = plane(env, "");
+    expect((await off.call(A2A_ROUTE, send("Fix the cart"))).status).toBe(409);
+    expect((await off.call("GET /api/agui/:n", new Request("http://plane/api/agui/6"))).status).toBe(409);
+    const slack = new Request("http://plane/integrations/slack", { method: "POST", body: "{}" });
+    expect((await off.call(SLACK_ROUTE, slack)).status).toBe(409);
+    expect(off.bound()).toEqual({ repo: "", on: ["Slack", "A2A", "AG-UI"] });
+    expect(plane(env).bound().repo).toBe(REPO);
   });
 
   test("an A2A client reads the card, starts a task, reads its state and approves its plan", async () => {

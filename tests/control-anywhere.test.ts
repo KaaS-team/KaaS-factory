@@ -28,6 +28,29 @@ const until = async (ok: () => boolean, ms = 3000) => {
 };
 
 describe("control from anywhere", () => {
+  test("the plane hands its default repo to the runner hub, so jobs queued before multi-repo survive", () => {
+    const store = new PlaneStore();
+    const legacy =
+      "CREATE TABLE plane_jobs (issue INTEGER PRIMARY KEY, state TEXT NOT NULL, runner TEXT, leased_at INTEGER)";
+    store.database.exec(legacy);
+    store.database.exec("INSERT INTO plane_jobs VALUES (7, 'queued', NULL, NULL)");
+    const access = createAccess({ token: "t", store, env: {} });
+    const github = new TrackerGitHub();
+    createDashboard(
+      new FactoryState(":memory:"),
+      github,
+      "acme/widgets",
+      false,
+      "/nonexistent",
+      undefined,
+      undefined,
+      undefined,
+      access,
+    );
+    const jobs = store.database.query("SELECT repo, issue FROM plane_jobs").all();
+    expect(jobs).toEqual([{ repo: "acme/widgets", issue: 7 }]);
+  });
+
   test("a guarded web plane is driven from MCP, a browser, a phone and a remote runner", async () => {
     // Facing the web with nothing guarding it, the plane refuses every off-box caller.
     const open = createAccess({ token: "", store: new PlaneStore(), env: {} });

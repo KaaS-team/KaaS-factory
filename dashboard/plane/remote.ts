@@ -36,6 +36,8 @@ export interface RemoteDeps {
   handle: (req: Request) => Promise<Response>;
   // Every repo the plane serves; a runner holds and a caller sees only repos from this list.
   served: () => string[];
+  // The plane's default repo: rows written before jobs carried a repo were all its.
+  repo?: string;
   env?: Record<string, string | undefined>;
   send?: typeof fetch;
   now?: () => number;
@@ -47,7 +49,7 @@ export function createRemote(deps: RemoteDeps) {
   const db = store.database;
   const roleOf = (login: string) => store.roleOf(login);
   const devices = new DeviceStore(db, now, roleOf);
-  const hub = new RunnerHub(db, now);
+  const hub = new RunnerHub(db, now, deps.repo);
   // The factory's key lives beside plane.db; an in-memory plane (tests) gets a fresh one.
   let key: Promise<E2EKey> | undefined;
   const e2eKey = () =>
