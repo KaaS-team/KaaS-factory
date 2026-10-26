@@ -348,8 +348,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
     };
   }
 
-  // The two `gh pr view` fields gate.py's Merge Readiness check needs
-  // (mergeable, reviewDecision) plus review-thread resolution, which only
+  // gate.py's Merge Readiness fields from `gh pr view`, plus review-thread resolution, which only
   // GraphQL exposes. state is lowercased for the same reason as prStatus.
   async mergeReadiness(repo: string, number: number): Promise<MergeReadiness> {
     const result = await this.exec([
@@ -359,7 +358,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--repo",
       repo,
       "--json",
-      "state,isDraft,baseRefName,headRefOid,mergeable,reviewDecision",
+      "state,isDraft,baseRefName,headRefOid,mergeable,reviewDecision,latestReviews",
     ]);
     const data = JSON.parse(result.stdout) as {
       state: string;
@@ -368,6 +367,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       headRefOid: string;
       mergeable: string;
       reviewDecision: string;
+      latestReviews?: { author?: { login?: string }; state?: string }[];
     };
     const [owner, name] = repo.split("/");
     if (!owner || !name) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
@@ -386,12 +386,12 @@ export class GitHub implements TrackerPort, CodeHostPort {
       reviewDecision: (data.reviewDecision ?? "") as MergeReadiness["reviewDecision"],
       hasUnresolvedReviewThreads,
       changesRequestedStale,
+      approvedBy: (data.latestReviews ?? []).filter((r) => r.state === "APPROVED").map((r) => r.author?.login ?? ""),
     };
   }
 
-  // One GraphQL call for both readiness facts that `gh pr view` can't expose:
-  // unresolved review threads, and whether every CHANGES_REQUESTED review is
-  // against a commit the head has since moved past.
+  // One GraphQL call for what `gh pr view` can't expose: unresolved review threads, and whether
+  // every CHANGES_REQUESTED review is against a commit the head has since moved past.
   private async reviewState(
     owner: string,
     name: string,

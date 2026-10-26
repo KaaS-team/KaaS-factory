@@ -23,7 +23,8 @@ interface Row {
   active: number;
 }
 
-const scimError = (status: number, detail: string) => json({ schemas: [ERROR], status: String(status), detail }, status, TYPE);
+const scimError = (status: number, detail: string) =>
+  json({ schemas: [ERROR], status: String(status), detail }, status, TYPE);
 
 export function scimRoutes(ctx: PlaneContext): Route[] {
   const db = ctx.store.database();
@@ -81,7 +82,13 @@ export function scimRoutes(ctx: PlaneContext): Route[] {
           : db.query("SELECT * FROM ee_scim_users ORDER BY user_name LIMIT 500").all()
       ) as Row[];
       return json(
-        { schemas: [LIST], totalResults: rows.length, itemsPerPage: rows.length, startIndex: 1, Resources: rows.map(view) },
+        {
+          schemas: [LIST],
+          totalResults: rows.length,
+          itemsPerPage: rows.length,
+          startIndex: 1,
+          Resources: rows.map(view),
+        },
         200,
         TYPE,
       );
@@ -96,7 +103,11 @@ export function scimRoutes(ctx: PlaneContext): Route[] {
       // An email can never be a GitHub login, so an IdP user cannot take over a GitHub member's row.
       if (!/^[^@\s]+@[^@\s]+$/.test(userName)) return scimError(400, "userName must be an email address");
       if (db.query("SELECT 1 FROM ee_scim_users WHERE user_name = ?").get(userName))
-        return json({ schemas: [ERROR], status: "409", scimType: "uniqueness", detail: "userName is taken" }, 409, TYPE);
+        return json(
+          { schemas: [ERROR], status: "409", scimType: "uniqueness", detail: "userName is taken" },
+          409,
+          TYPE,
+        );
       const r: Row = {
         id: randomUUID(),
         user_name: userName,

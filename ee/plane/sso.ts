@@ -10,7 +10,11 @@ import { authorizeUrl, discover, exchange, type OidcSettings, verifyIdToken } fr
 import { verifySamlResponse } from "./saml";
 import { SCIM_TOKEN_ENV, scimRoutes } from "./scim";
 
-export const OIDC_ENV = { issuer: "FACTORY_OIDC_ISSUER", id: "FACTORY_OIDC_CLIENT_ID", secret: "FACTORY_OIDC_CLIENT_SECRET" };
+export const OIDC_ENV = {
+  issuer: "FACTORY_OIDC_ISSUER",
+  id: "FACTORY_OIDC_CLIENT_ID",
+  secret: "FACTORY_OIDC_CLIENT_SECRET",
+};
 export const SAML_ENV = {
   cert: "FACTORY_SAML_IDP_CERT",
   sso: "FACTORY_SAML_IDP_SSO_URL",
@@ -26,13 +30,16 @@ function finish(ctx: PlaneContext, req: Request, login: string, route: string, c
   const who = ctx.member(login);
   ctx.store.record({ actor: login, role: who?.role ?? "none", route, issue: null, status: who ? 302 : 403 });
   const done = [["set-cookie", setCookie(req, clear, "", 0)]] as [string, string][];
-  if (!who) return withHeaders(json({ error: `${login} is not a member of this factory; ask an owner to add you` }, 403), done);
+  if (!who)
+    return withHeaders(json({ error: `${login} is not a member of this factory; ask an owner to add you` }, 403), done);
   return withHeaders(ctx.startSession(req, login), done);
 }
 
 function oidcRoutes(ctx: PlaneContext): Route[] {
   const settings = (): OidcSettings | null => {
-    const [issuer, clientId, clientSecret] = [OIDC_ENV.issuer, OIDC_ENV.id, OIDC_ENV.secret].map((k) => ctx.env[k] ?? "");
+    const [issuer, clientId, clientSecret] = [OIDC_ENV.issuer, OIDC_ENV.id, OIDC_ENV.secret].map(
+      (k) => ctx.env[k] ?? "",
+    );
     return issuer && clientId && clientSecret ? { issuer, clientId, clientSecret } : null;
   };
   const off = () => json({ error: "OIDC sign-in is not set up on this factory" }, 404);
@@ -68,7 +75,14 @@ function oidcRoutes(ctx: PlaneContext): Route[] {
         let login: string;
         try {
           const d = await discover(s, ctx.fetch);
-          const { idToken, jwks } = await exchange(d, s, ctx.fetch, url.searchParams.get("code") ?? "", redirect(req), verifier);
+          const { idToken, jwks } = await exchange(
+            d,
+            s,
+            ctx.fetch,
+            url.searchParams.get("code") ?? "",
+            redirect(req),
+            verifier,
+          );
           const claims = await verifyIdToken(idToken, jwks, { issuer: s.issuer, clientId: s.clientId, nonce });
           if (typeof claims.email !== "string" || claims.email_verified === false)
             throw new Error("the IdP did not vouch for an email address");

@@ -115,7 +115,8 @@ export const isNs = (el: XmlElement, ns: string, local: string) =>
 export const textOf = (el: XmlElement): string =>
   el.children.map((c) => (c.kind === "text" ? c.text : textOf(c))).join("");
 
-const escText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r/g, "&#xD;");
+const escText = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r/g, "&#xD;");
 const escAttr = (s: string) =>
   s
     .replace(/&/g, "&amp;")
@@ -134,7 +135,8 @@ export function canonicalize(el: XmlElement, skip?: XmlElement, inclusive: strin
     if (e === skip) return;
     const plain = e.attrs.filter(([n]) => n !== "xmlns" && !n.startsWith("xmlns:"));
     const used = new Set([prefixOf(e.name), ...plain.map(([n]) => prefixOf(n)).filter((p) => p !== "")]);
-    for (const p of inclusive) if (e.attrs.some(([n]) => n === (p === "#default" ? "xmlns" : `xmlns:${p}`))) used.add(p);
+    for (const p of inclusive)
+      if (e.attrs.some(([n]) => n === (p === "#default" ? "xmlns" : `xmlns:${p}`))) used.add(p);
     const next = new Map(rendered);
     const decls: [string, string][] = [];
     for (const p of [...used].filter((x) => x !== "xml").sort()) {

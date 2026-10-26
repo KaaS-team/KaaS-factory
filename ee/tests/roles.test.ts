@@ -26,7 +26,11 @@ describe("custom roles", () => {
     expect((await call(p, "POST /api/roles/assign", owner, { login: "rm", role: "release-manager" })).status).toBe(200);
     const rm = cookieFor(p, "rm");
 
-    expect(await (await call(p, "GET /api/me", rm)).json()).toMatchObject({ login: "rm", role: "viewer", custom: "release-manager" });
+    expect(await (await call(p, "GET /api/me", rm)).json()).toMatchObject({
+      login: "rm",
+      role: "viewer",
+      custom: "release-manager",
+    });
     expect((await call(p, "GET /api/runs", rm)).status).toBe(200);
     expect([401, 403]).not.toContain((await call(p, "POST /api/issues/1/merge", rm)).status);
     expect((await call(p, "POST /api/tasks", rm)).status).toBe(403);

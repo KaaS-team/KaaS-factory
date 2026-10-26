@@ -286,20 +286,20 @@ export function createAccess(opts: AccessOptions) {
   for (const e of exts) routes.push(...(e.routes?.(ctx) ?? []));
 
   // Extensions speak before the ladder: any refusal (tenancy, a denied route) wins over any grant.
-  function permitted(who: Actor, route: Route | undefined, req: Request): boolean {
-    const said = route ? exts.map((e) => e.allows?.(who, route, req)) : [];
+  async function permitted(who: Actor, route: Route | undefined, req: Request): Promise<boolean> {
+    const said = route ? await Promise.all(exts.map((e) => e.allows?.(who, route, req))) : [];
     if (said.includes(false)) return false;
     return said.includes(true) || atLeast(who.role, route?.role ?? "owner");
   }
 
   // Returns a refusal, or null when the caller may run the route.
-  function gate(req: Request, route: Route | undefined, isPublic: boolean, loopback: boolean, inProcess = false) {
+  async function gate(req: Request, route: Route | undefined, isPublic: boolean, loopback: boolean, inProcess = false) {
     if (isPublic) return null;
     const who = inProcess ? IN_PROCESS : actor(req, loopback);
     if (!who) return json({ error: "unauthorized" }, 401);
     seenActors.set(req, who);
     const need = route?.role ?? "owner";
-    if (permitted(who, route, req)) return null;
+    if (await permitted(who, route, req)) return null;
     if (req.method !== "GET" && route)
       store.record({ actor: who.login, role: who.role, route: route.label, issue: null, status: 403 });
     return json({ error: `needs the ${need} role` }, 403);

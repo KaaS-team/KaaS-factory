@@ -36,7 +36,12 @@ export function rolesExtension(): PlaneExtension {
         pattern: /^\/api\/roles$/,
         label: "GET /api/roles",
         role: "owner",
-        handler: () => json({ roles: (db.query("SELECT name FROM ee_roles ORDER BY name").all() as { name: string }[]).map((r) => get(r.name)) }),
+        handler: () =>
+          json({
+            roles: (db.query("SELECT name FROM ee_roles ORDER BY name").all() as { name: string }[]).map((r) =>
+              get(r.name),
+            ),
+          }),
       },
       {
         method: "POST",
@@ -50,7 +55,8 @@ export function rolesExtension(): PlaneExtension {
           if (!isRole(b.base)) return json({ error: "base must be viewer, approver, operator or owner" }, 400);
           const allow = b.allow ?? [];
           const deny = b.deny ?? [];
-          if (!labels(allow) || !labels(deny)) return json({ error: 'allow and deny are route labels like "POST /api/tasks"' }, 400);
+          if (!labels(allow) || !labels(deny))
+            return json({ error: 'allow and deny are route labels like "POST /api/tasks"' }, 400);
           db.query(
             `INSERT INTO ee_roles VALUES (?, ?, ?, ?)
              ON CONFLICT (name) DO UPDATE SET base = excluded.base, allow = excluded.allow, deny = excluded.deny`,

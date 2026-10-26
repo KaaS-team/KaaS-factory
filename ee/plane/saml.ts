@@ -56,10 +56,15 @@ function checkSignature(signed: XmlElement, root: XmlElement, cert: string): voi
     if (list) prefixes = (attr(list, "PrefixList") ?? "").split(/\s+/).filter(Boolean);
   }
   alg(child(ref, DS, "DigestMethod"), SHA256, "DigestMethod");
-  const digest = createHash("sha256").update(canonicalize(signed, sig, prefixes)).digest("base64");
+  const digest = createHash("sha256")
+    .update(canonicalize(signed, sig, prefixes))
+    .digest("base64");
   if (digest !== textOf(one(child(ref, DS, "DigestValue"), "DigestValue")).replace(/\s/g, ""))
     throw new Error("digest mismatch: the signed element was changed");
-  const value = Buffer.from(textOf(one(child(sig, DS, "SignatureValue"), "SignatureValue")).replace(/\s/g, ""), "base64");
+  const value = Buffer.from(
+    textOf(one(child(sig, DS, "SignatureValue"), "SignatureValue")).replace(/\s/g, ""),
+    "base64",
+  );
   const key = new X509Certificate(cert).publicKey;
   if (!verify("sha256", Buffer.from(canonicalize(info)), key, value)) throw new Error("bad signature");
 }
@@ -72,7 +77,10 @@ export function verifySamlResponse(xml: string, opts: SamlOptions): SamlIdentity
   if (!isNs(root, PROTOCOL, "Response")) throw new Error("not a SAML Response");
   const all = [...descendants(root)];
   if (all.some((e) => e.name.endsWith("EncryptedAssertion"))) throw new Error("encrypted assertions are not supported");
-  const assertion = one(all.filter((e) => isNs(e, SAML, "Assertion")), "Assertion");
+  const assertion = one(
+    all.filter((e) => isNs(e, SAML, "Assertion")),
+    "Assertion",
+  );
   if (assertion.parent !== root) throw new Error("the assertion must sit directly in the Response");
   // Either the assertion or the whole response may carry the signature.
   const signed = child(assertion, DS, "Signature").length ? assertion : root;
@@ -98,7 +106,9 @@ export function verifySamlResponse(xml: string, opts: SamlOptions): SamlIdentity
     const irt = attr(data, "InResponseTo") ?? attr(root, "InResponseTo");
     if (opts.inResponseTo && irt !== opts.inResponseTo) throw new Error("the response answers another request");
   }
-  const login = textOf(one(child(subject, SAML, "NameID"), "NameID")).trim().toLowerCase();
+  const login = textOf(one(child(subject, SAML, "NameID"), "NameID"))
+    .trim()
+    .toLowerCase();
   // An email can never be a GitHub login, so SSO and GitHub members cannot collide.
   if (!/^[^@\s]+@[^@\s]+$/.test(login)) throw new Error("the NameID must be an email address");
   return { login, assertionId: attr(assertion, "ID")!, notOnOrAfter: until };

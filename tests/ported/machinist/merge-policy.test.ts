@@ -223,3 +223,12 @@ test("checkReadiness is the readiness half alone: eligibility problems never app
   const refusals = checkReadiness(readiness(), ci(), "main");
   expect(refusals).toEqual([]);
 });
+
+// Not in gate.py: the scaleup and enterprise profiles hold a merge for code owners (src/profile-rules.ts).
+test("decideMerge refuses with codeowner-approval while a touched file's code owner has not approved", () => {
+  const codeowners = { rules: [{ pattern: /^docs\//, owners: ["@docs-lead"] }], approvedBy: ["someone"] };
+  const decision = decideMerge(input({ codeowners }));
+  expect(decision.outcome).toBe("refuse");
+  if (decision.outcome === "refuse") expect(decision.refusals.map((r) => r.reason)).toEqual(["codeowner-approval"]);
+  expect(decideMerge(input({ codeowners: { ...codeowners, approvedBy: ["Docs-Lead"] } })).outcome).toBe("merge");
+});

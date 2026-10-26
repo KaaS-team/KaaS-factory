@@ -18,6 +18,8 @@ import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, uns
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
+import { admitReady } from "./org-caps";
+import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
 import { issueType, LABEL, PARKED_LABELS } from "./labels";
@@ -344,12 +346,9 @@ export async function resumeParked(
 
 // `/factory revise <text>` on an in-review issue (audit finding #19): sends
 // the change back to build with the feedback as `revise.md`.
-// Non-blocking, one snapshot per poll (never waitForCi's sleep loop, which
-// would hold a worker slot for up to 20 minutes and undo v2.7.0's continuous
-// dispatch). A routine miss — no PR yet, PR not a fit, a transient GitHub
-// error — is not this issue's problem to raise: it just leaves the PR for a
-// human, exactly like a repo with policy "off" always does. runPool has no
-// per-item error isolation, so nothing here may throw uncaught.
+// One snapshot per poll, never waitForCi's sleep loop, which would hold a slot for 20 minutes. A
+// routine miss (no PR, a transient error) leaves the PR for a human, as policy "off" does; runPool
+// has no per-item error isolation, so nothing here may throw uncaught.
 async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome | undefined> {
   try {
     const issueNumber = issue.number;
@@ -375,6 +374,7 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
       merge: config.merge,
       protectedPaths: config.protectedPaths,
       expectedBaseRefName: config.base,
+      codeowners: codeownerCheck(config.profile, deps.cloneDir, readiness.approvedBy),
     });
 
     const marker = mergePolicyMarker(decision.headSha);
@@ -613,11 +613,11 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
   ]);
 
-  // The dependency gate (blockers.ts): demotes a ready issue that still has
-  // an open "Blocked by" to LABEL.blocked, and promotes a blocked issue back
-  // to ready the poll its last blocker clears. Both moves happen here, once
-  // per poll, before anything is dispatched.
-  const { clear: ready } = await resolveBlockers(deps.github, config.repo, readyRaw, blockedRaw);
+  // The dependency gate (blockers.ts), once per poll before any dispatch: a ready issue with an open
+  // "Blocked by" moves to LABEL.blocked, and back to ready the poll its last blocker clears.
+  const { clear } = await resolveBlockers(deps.github, config.repo, readyRaw, blockedRaw);
+  // Per-team and org caps hold back new pickups while work waits on people (src/org-caps.ts).
+  const ready = admitReady(clear, [...awaitingApproval, ...inReview], capsFor(config));
   const buckets = [ready, needsInfo, awaitingApproval, failed, needsHuman, inReview];
 
   const seen = new Set<number>();

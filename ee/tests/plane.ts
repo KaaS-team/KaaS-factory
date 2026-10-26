@@ -21,6 +21,9 @@ class QuietGitHub extends GitHub {
     return 1;
   }
   override async addLabels() {}
+  override async createIssue() {
+    return 7;
+  }
 }
 
 export const TOKEN = "break-glass-token";
@@ -48,7 +51,7 @@ export function plane(
 
 export const sessionOf = (res: Response) => {
   const c = res.headers.getSetCookie().find((x) => x.startsWith("factory_session="));
-  const id = c?.split(";")[0]!.split("=")[1];
+  const id = c?.split(";")[0]?.split("=")[1];
   return id ? `factory_session=${id}` : "";
 };
 

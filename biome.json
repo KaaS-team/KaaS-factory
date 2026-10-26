@@ -6,7 +6,17 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["src/**", "tests/**", "scripts/**", "dashboard/**", "bin/**", "ee/**", "!tests/fixtures", "!ee/tests/fixtures", "!**/*.json"]
+    "includes": [
+      "src/**",
+      "tests/**",
+      "scripts/**",
+      "dashboard/**",
+      "bin/**",
+      "ee/**",
+      "!tests/fixtures",
+      "!ee/tests/fixtures",
+      "!**/*.json"
+    ]
   },
   "formatter": {
     "indentStyle": "space",

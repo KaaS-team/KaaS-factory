@@ -12,10 +12,19 @@ test("an owner exports every audit row, oldest first, as JSON lines or CSV, and 
   p.store.setMember("eve", "operator", "test");
   // More rows than one page, so the export must keep reading past the first.
   for (let i = 1; i <= 450; i++)
-    p.store.record({ actor: i === 7 ? "=HYPERLINK(1)" : "boss", role: "owner", route: "POST /api/tasks", issue: i, status: 200 });
+    p.store.record({
+      actor: i === 7 ? "=HYPERLINK(1)" : "boss",
+      role: "owner",
+      route: "POST /api/tasks",
+      issue: i,
+      status: 200,
+    });
   const owner = cookieFor(p, "boss");
 
-  const lines = (await (await get(p, "", owner)).text()).trim().split("\n").map((l) => JSON.parse(l));
+  const lines = (await (await get(p, "", owner)).text())
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l));
   expect(lines.length).toBe(450);
   expect(lines.map((r) => r.issue)).toEqual(Array.from({ length: 450 }, (_, i) => i + 1));
 

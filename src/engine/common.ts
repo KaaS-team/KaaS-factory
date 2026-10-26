@@ -35,7 +35,7 @@ import type { ProofGit, ProofStatus } from "../proof";
 import type { GhIssue } from "../github";
 import { withLease, type Held, type LeaseOpts } from "./lease";
 import type { LeasePort } from "../ports/lease";
-import type { SpendEntry, SpendStore, SpendTotal } from "../ports/spend";
+import type { SpendEntry, SpendPolicy, SpendStore, SpendTotal } from "../ports/spend";
 import type { ExecutionPort } from "../ports/execution";
 import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
@@ -89,6 +89,8 @@ export interface WatchDeps {
   // also recorded here and caps read the larger of the two, so they hold
   // across every worker.
   readonly spend?: SpendStore;
+  // An org or fleet cap read with the repo's; absent means the repo and machine caps alone.
+  readonly spendPolicy?: SpendPolicy;
   // Runtimes by name for check steps (src/runtimes.ts builds them); absent means check steps run like setup.
   readonly runtimes?: Readonly<Record<string, ExecutionPort>>;
   // Absent means this process alone decides concurrency (config.concurrency,
@@ -593,7 +595,7 @@ export async function spendCapHit(deps: WatchDeps, config: FactoryConfig): Promi
   const machineDailyUsd = deps.machine?.config.dailyUsd;
   if (machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd)
     return `this machine's daily spend cap ($${machineDailyUsd}) is reached`;
-  return undefined;
+  return deps.spendPolicy?.breached(config.repo, startOfTodayUtc());
 }
 
 // The repo's spend today: every worker's, from the shared store when there is one.
@@ -640,13 +642,10 @@ export async function checkSpendCap(
     return `${config.repo} has spent $${repoToday.costUsd.toFixed(2)} today, at or over its dailyUsd cap of $${dailyUsd.toFixed(2)}`;
   }
   const machineDailyUsd = deps.machine?.config.dailyUsd;
-  if (machineDailyUsd !== undefined) {
-    const machineToday = deps.machine!.spend.todayUsd();
-    if (machineToday >= machineDailyUsd) {
-      return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
-    }
-  }
-  return undefined;
+  const machineToday = deps.machine?.spend.todayUsd() ?? 0;
+  if (machineDailyUsd !== undefined && machineToday >= machineDailyUsd)
+    return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
+  return deps.spendPolicy?.breached(config.repo, startOfTodayUtc());
 }
 // The PR body, then the Acceptance table when the repo has check-acceptance.py, then the signed Receipt,
 // then the "Factory run" summary unless config.prRunSummary is off.

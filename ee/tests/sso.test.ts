@@ -42,7 +42,8 @@ function idp(claims: (nonce: string) => Promise<string>) {
       });
     if (url === `${ISSUER}/token`) {
       const form = new URLSearchParams(String(init?.body));
-      if (form.get("code") !== "good" || !form.get("code_verifier")) return Response.json({ error: "x" }, { status: 400 });
+      if (form.get("code") !== "good" || !form.get("code_verifier"))
+        return Response.json({ error: "x" }, { status: 400 });
       return Response.json({ id_token: await claims(nonce) });
     }
     if (url === `${ISSUER}/jwks`) return Response.json({ keys: [jwk] });
@@ -75,12 +76,23 @@ async function oidcSignIn(p: ReturnType<typeof make>) {
   p.fake.setNonce(to.searchParams.get("nonce")!);
   const flow = start.headers.get("set-cookie")!.split(";")[0]!;
   return p.handle(
-    new Request(`${BASE}/auth/oidc/callback?code=good&state=${to.searchParams.get("state")}`, { headers: { cookie: flow } }),
+    new Request(`${BASE}/auth/oidc/callback?code=good&state=${to.searchParams.get("state")}`, {
+      headers: { cookie: flow },
+    }),
   );
 }
 
-const good = (over: Record<string, unknown> = {}) => (nonce: string) =>
-  jwt({ iss: ISSUER, aud: "plane", exp: Math.floor(Date.now() / 1000) + 300, email: "Bo@Acme.example", nonce, ...over });
+const good =
+  (over: Record<string, unknown> = {}) =>
+  (nonce: string) =>
+    jwt({
+      iss: ISSUER,
+      aud: "plane",
+      exp: Math.floor(Date.now() / 1000) + 300,
+      email: "Bo@Acme.example",
+      nonce,
+      ...over,
+    });
 
 const scim = (p: ReturnType<typeof make>, method: string, path: string, body?: unknown, token = "scim-token") =>
   p.handle(
@@ -161,11 +173,15 @@ describe("SSO", () => {
     expect(verifySamlResponse(RESPONSE, opts).login).toBe("alice@acme.example");
     const changed = RESPONSE.replace("Alice@Acme.example", "Mallory@Acme.example");
     expect(() => verifySamlResponse(changed, opts)).toThrow(/digest/);
-    const wrapped = RESPONSE.replace("<saml:Issuer>https://idp.example/metadata</saml:Issuer>\n  <samlp:Status>",
-      '<saml:Issuer>https://idp.example/metadata</saml:Issuer><saml:Assertion ID="_evil"><saml:Subject><saml:NameID>mallory@acme.example</saml:NameID></saml:Subject></saml:Assertion>\n  <samlp:Status>');
+    const wrapped = RESPONSE.replace(
+      "<saml:Issuer>https://idp.example/metadata</saml:Issuer>\n  <samlp:Status>",
+      '<saml:Issuer>https://idp.example/metadata</saml:Issuer><saml:Assertion ID="_evil"><saml:Subject><saml:NameID>mallory@acme.example</saml:NameID></saml:Subject></saml:Assertion>\n  <samlp:Status>',
+    );
     expect(wrapped).not.toBe(RESPONSE);
     expect(() => verifySamlResponse(wrapped, opts)).toThrow(/one Assertion/);
-    expect(() => verifySamlResponse(RESPONSE, { ...opts, audience: "https://other.example" })).toThrow(/another service/);
+    expect(() => verifySamlResponse(RESPONSE, { ...opts, audience: "https://other.example" })).toThrow(
+      /another service/,
+    );
     expect(() => verifySamlResponse(RESPONSE, { ...opts, now: new Date("2026-10-27T00:00:00Z") })).toThrow(/expired/);
     expect(() => verifySamlResponse(`<!DOCTYPE x [<!ENTITY a "b">]>${RESPONSE}`, opts)).toThrow(/DTD/);
   });

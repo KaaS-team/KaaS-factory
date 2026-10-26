@@ -812,7 +812,7 @@ export function createDashboard(
     }
     // Every non-public route needs a caller with its role, so an unknown path
     // is refused before it can 404 (no route probing).
-    const refused = access.gate(req, route, isPublic, loopback, inProcess);
+    const refused = await access.gate(req, route, isPublic, loopback, inProcess);
     if (refused) return refused;
 
     // CSRF: a mutating request must be same-origin JSON, never the

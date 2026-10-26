@@ -23,7 +23,8 @@ export interface PlaneExtension {
   // Turns a stored role the ladder does not know (a custom role) into an actor; null refuses.
   actor?(login: string, storedRole: string): Actor | null;
   // false refuses, true allows, undefined leaves it to the role ladder; any false beats any true.
-  allows?(who: Actor, route: Route, req: Request): boolean | undefined;
+  // It may be async, to read the target out of a request body.
+  allows?(who: Actor, route: Route, req: Request): boolean | undefined | Promise<boolean | undefined>;
 }
 
 const registered: PlaneExtension[] = [];

@@ -11,7 +11,7 @@ import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { tokenEnvNames } from "./agents/env";
 import { CommandExecutor } from "./agents/executor";
-import { DEFAULT_CONFIG, loadConfig, type FactoryConfig } from "./config";
+import { DEFAULT_CONFIG, loadConfig, repoFromRemoteUrl, type FactoryConfig } from "./config";
 import { EXIT, UsageError, failureJson, successJson } from "./cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "./watch";
 import { ShellGateRunner } from "./gates";
@@ -52,12 +52,12 @@ import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
 import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
+import { spendPolicy } from "./ports/spend";
 import { poolDbPath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { SqliteUsageStore } from "./adapters/pool/execution";
 import { monthKey, poolReport } from "./core/sandbox-pool";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
-import { repoFromRemoteUrl } from "./config";
 import { EventBus } from "./engine/bus";
 import { loadMinions, runMinion } from "./engine/minion";
 import { parseEvent } from "./core/event";
@@ -168,15 +168,15 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
     setupRunner: new ShellSetupRunner(),
-    // Real cross-process leases: every real CLI invocation (watch, run, tick)
-    // shares this machine's FACTORY_HOME/machine.db, so a second repo's
-    // watcher on the same machine is respected (plan v2.7.0 item 5).
+    // Real cross-process leases: every CLI invocation shares FACTORY_HOME/machine.db, so a second
+    // repo's watcher on the same machine is respected (plan v2.7.0 item 5).
     machine: { leases: new MachineLeases(), config: machineConfig, spend: new MachineSpend() },
     // Issue leases on the repo's own remote, so watchers on other machines,
     // CI jobs and cloud routines driving the same repo never run one issue twice.
     leases: { port: new GitLeases(cloneDir), holder, held: new Map() },
     // Spend on the issue and the ledger issue, so caps hold across all of them too.
     spend: new GitHubSpend(github, config.repo, holder),
+    spendPolicy: spendPolicy(),
   };
 }
 
