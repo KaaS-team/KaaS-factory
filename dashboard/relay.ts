@@ -45,8 +45,10 @@ export function relayPublisher(handle: Handle, target: RelayTarget, send: typeof
         analytics: analytics && { week: analytics.week, spend7dUsd: analytics.spend7dUsd },
       });
       if (body === last) return false;
+      // The relay closes every reply; Bun's pool still reuses that socket and the next send resets.
       const res = await send(`${target.url}/publish/${target.channel}`, {
         method: "POST",
+        keepalive: false,
         headers: { authorization: `Bearer ${target.token}`, "content-type": "application/json" },
         body,
       });

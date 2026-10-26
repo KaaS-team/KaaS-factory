@@ -52,13 +52,15 @@ beforeAll(async () => {
 
 afterAll(() => relay?.kill());
 
+// The relay closes every reply, and Bun's pool would reuse that socket (a reset on Linux CI).
+const get = (path: string, init: RequestInit = {}) => fetch(`${base}${path}`, { ...init, keepalive: false });
 const publish = (channel: string, body: string, token = PUBLISH) =>
-  fetch(`${base}/publish/${channel}`, { method: "POST", headers: { authorization: `Bearer ${token}` }, body });
+  get(`/publish/${channel}`, { method: "POST", headers: { authorization: `Bearer ${token}` }, body });
 
 // Reads server-sent events until `count` data lines arrive, then closes the stream.
 async function events(channel: string, count: number, query = `?token=${SUBSCRIBE}`) {
   const ac = new AbortController();
-  const res = await fetch(`${base}/subscribe/${channel}${query}`, { signal: ac.signal });
+  const res = await get(`/subscribe/${channel}${query}`, { signal: ac.signal });
   const reader = res.body!.getReader();
   const seen: string[] = [];
   let buf = "";
@@ -109,9 +111,9 @@ describe("kaas-relay", () => {
   test("each token opens only its own side", async () => {
     expect((await publish("inbox", "{}", SUBSCRIBE)).status).toBe(401);
     expect((await publish("inbox", "{}", "")).status).toBe(401);
-    expect((await fetch(`${base}/subscribe/inbox?token=${PUBLISH}`)).status).toBe(401);
-    expect((await fetch(`${base}/subscribe/inbox`)).status).toBe(401);
-    const header = await fetch(`${base}/subscribe/inbox`, { headers: { authorization: `Bearer ${SUBSCRIBE}` } });
+    expect((await get(`/subscribe/inbox?token=${PUBLISH}`)).status).toBe(401);
+    expect((await get(`/subscribe/inbox`)).status).toBe(401);
+    const header = await get(`/subscribe/inbox`, { headers: { authorization: `Bearer ${SUBSCRIBE}` } });
     expect(header.status).toBe(200);
     await header.body?.cancel();
   });
@@ -150,8 +152,8 @@ describe("kaas-relay", () => {
     expect((await publish("inbox", "x".repeat(64 * 1024 + 1))).status).toBe(413);
     expect((await publish("Inbox", "{}")).status).toBe(400);
     expect((await publish("x".repeat(65), "{}")).status).toBe(400);
-    expect((await fetch(`${base}/nope`)).status).toBe(404);
-    expect(await (await fetch(`${base}/healthz`)).text()).toBe("ok");
+    expect((await get(`/nope`)).status).toBe(404);
+    expect(await (await get(`/healthz`)).text()).toBe("ok");
   });
 });
 
@@ -206,6 +208,16 @@ describe("the dashboard publishes to it", () => {
       ask: "x".repeat(280),
     });
     expect(got.analytics).toEqual({ week: analytics.week, spend7dUsd: 0.5 });
+  });
+
+  test("each publish opens a fresh connection", async () => {
+    let init: RequestInit | undefined;
+    const send = (async (_url: string, i?: RequestInit) => {
+      init = i;
+      return new Response("{}", { status: 202 });
+    }) as typeof fetch;
+    expect(await relayPublisher(handle, { url: base, token: PUBLISH, channel: "e2e-fresh" }, send)()).toBe(true);
+    expect(init?.keepalive).toBe(false);
   });
 
   test("a refused publish is retried on the next tick", async () => {
