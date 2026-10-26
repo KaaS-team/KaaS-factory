@@ -14,8 +14,6 @@ import { LABEL } from "../src/labels";
 import { InboxError, act, inboxWithRisk, parkReasons, type InboxAction } from "../src/inbox";
 import { prItems } from "../src/stale-pr";
 import { plain } from "../src/display";
-import { agentCatalog } from "../src/agents/docs";
-import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
 import { DEFAULT_CONFIG, eventsInboundSecretEnv, type FactoryConfig } from "../src/config";
 import { defaultStatePath, factoryHome, servedRepos, streamPath, transcriptPath, workspacesDir } from "../src/paths";
@@ -25,9 +23,8 @@ import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
 import { HEALTH_ROUTE, healthRoute } from "./health";
-import { NO_PROJECT, settingsWithHealth, type DashboardProject } from "./project";
+import { agentsProbe, type DashboardProject, projectResolver } from "./project";
 import { workflowRoutes } from "./workflow-routes";
-import { harnessReport } from "../src/harness";
 import { artifacts } from "./artifacts";
 import { createAccess, type Route } from "./plane/access";
 import { type RepoScope, runIn } from "./plane/repo-scope";
@@ -137,51 +134,8 @@ export function createDashboard(
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
   const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
   const prsInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listPrs"]>>>>();
-  const settings = settingsWithHealth();
-  // Listing leases asks the remote, so the Settings page shares one answer for 15 s.
-  let leasesCache: { at: number; value: Awaited<ReturnType<DashboardProject["leases"]>> | Error } | null = null;
-  async function heldLeases(p: DashboardProject) {
-    if (leasesCache && Date.now() - leasesCache.at < 15_000) return leasesCache.value;
-    const value = await p.leases().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
-    leasesCache = { at: Date.now(), value };
-    return value;
-  }
-
-  // The Agents page shows each configured agent's installed version and doctor rows.
-  // Probing spawns `--version`, so it is cached for a minute and shared by concurrent requests.
-  let agentsCache: { at: number; rows: unknown[] } | null = null;
-  let agentsInflight: Promise<unknown[]> | null = null;
-  async function probedAgents(): Promise<unknown[]> {
-    if (agentsCache && Date.now() - agentsCache.at < 60_000) return agentsCache.rows;
-    agentsInflight ??= Promise.all(
-      agentCatalog(fleet.agents, fleet.stages).map(async (a) => {
-        const row = { ...a, name: plain(a.name), binary: plain(a.binary) };
-        if (!a.configured) return { ...row, installed: null, version: null, checks: [] };
-        const checks = await agentChecks(a.name, fleet.agents, probes);
-        const installed = await probes.which(a.binary);
-        const version = installed ? ((await probes.versionOf(a.binary)) ?? "").split("\n")[0]!.trim() || null : null;
-        return {
-          ...row,
-          installed,
-          version: version === null ? null : plain(version),
-          checks: checks.map((c) => ({
-            name: plain(c.name),
-            ok: c.ok,
-            warn: c.warn === true,
-            detail: plain(c.detail),
-          })),
-        };
-      }),
-    )
-      .then((rows) => {
-        agentsCache = { at: Date.now(), rows };
-        return rows;
-      })
-      .finally(() => {
-        agentsInflight = null;
-      });
-    return agentsInflight;
-  }
+  const projectFor = projectResolver(repo, project);
+  const agents = agentsProbe(probes);
 
   // Single-flight + 10s cache in front of `gh issue list` (plan: "cached gh
   // listing, single-flight, 10s") so a browser polling every few seconds,
@@ -624,24 +578,11 @@ export function createDashboard(
       pattern: /^\/api\/agents$/,
       label: "GET /api/agents",
       role: "viewer",
-      handler: async () => json({ agents: await probedAgents() }),
+      repo: "query",
+      handler: async (req) => json({ agents: await agents(repoOf(req), await projectFor(repoOf(req)), fleet) }),
     },
     // Workflows, Events, Minions and the workflow form: dashboard/workflow-routes.ts.
-    ...workflowRoutes({ state, github, workspacesDir: workspaces, project, actorOf: access.actorOf }),
-    {
-      method: "GET",
-      pattern: /^\/api\/settings$/,
-      label: "GET /api/settings",
-      role: "viewer",
-      handler: async () => {
-        if (!project) return json({ available: false, reason: NO_PROJECT });
-        const [report, leases] = await Promise.all([
-          harnessReport(project.cloneDir, project.config),
-          heldLeases(project),
-        ]);
-        return json({ available: true, ...(await settings(project, report, leases, Date.now())) });
-      },
-    },
+    ...workflowRoutes({ github, projectFor, stateFor, workspacesFor, repoOf, actorOf: access.actorOf }),
     {
       method: "GET",
       pattern: /^\/api\/inbox$/,

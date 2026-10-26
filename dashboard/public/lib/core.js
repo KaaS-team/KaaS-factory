@@ -164,6 +164,8 @@ export async function api(path, init) {
 }
 export const post = (path, body) =>
   api(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+// A POST about the repo in focus, for routes that read the repo from the body.
+export const repoPost = (path, body) => post(path, { ...body, repo: focusRepo() });
 
 /* ---- states shared by every view ---- */
 export const quiet = (title, hint, ...extra) =>

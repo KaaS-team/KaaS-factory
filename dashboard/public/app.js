@@ -2,7 +2,7 @@
 // the server goes in as a text node (see h() in lib/core.js); no markup is ever built from it.
 // This file is the shell: routing, loading and the render loop. Each view lives in lib/view-*.js.
 
-import { api, h, heading, plural, post, quiet, repoQuery, shell, short, state, stateOr } from "/lib/core.js";
+import { api, h, heading, plural, post, quiet, repoPost, repoQuery, shell, short, state, stateOr } from "/lib/core.js";
 import { renderNav } from "/lib/rail.js";
 import { readRelay } from "/lib/relay-follow.js";
 import { followRelay, startRemote } from "/lib/remote.js";
@@ -26,7 +26,7 @@ const VIEWS = {
   runs: runsView,
   task: runView,
   workflows: workflowsView,
-  ...extraViews({ h, heading, stateOr, quiet, post }),
+  ...extraViews({ h, heading, stateOr, quiet, post: repoPost }),
   analytics: analyticsView,
   agents: agentsView,
   settings: settingsView,
@@ -37,11 +37,12 @@ const LOADERS = {
   board: ["board", () => `/api/board${repoQuery()}`],
   runs: ["runs", "/api/runs"],
   task: ["line", "/api/line"],
-  workflows: ["workflows", "/api/workflows"],
-  ...EXTRA_LOADERS,
+  workflows: ["workflows", () => `/api/workflows${repoQuery()}`],
+  // Each page below reads the focused repo's config and DB, so it asks for that repo.
+  ...Object.fromEntries(Object.entries(EXTRA_LOADERS).map(([k, [key, path]]) => [k, [key, () => path + repoQuery()]])),
   analytics: ["analytics", "/api/analytics"],
-  agents: ["agents", "/api/agents"],
-  settings: ["settings", "/api/settings"],
+  agents: ["agents", () => `/api/agents${repoQuery()}`],
+  settings: ["settings", () => `/api/settings${repoQuery()}`],
 };
 
 let stopRelay = () => {};

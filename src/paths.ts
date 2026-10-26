@@ -33,6 +33,12 @@ export function workspacesDir(env: NodeJS.ProcessEnv = process.env, repo?: strin
   return repo ? `${repoHome(repo, env)}/workspaces` : `${factoryHome(env)}/workspaces`;
 }
 
+// The plane's copy of a repo's .factory/ config, written by the blob mirror (src/blobs.ts) when the
+// plane holds no clone of that repo; shaped like a clone so the clone readers work on it unchanged.
+export function configMirrorDir(repo: string, env: NodeJS.ProcessEnv = process.env): string {
+  return `${repoHome(repo, env)}/config`;
+}
+
 export function defaultStatePath(env: NodeJS.ProcessEnv = process.env, repo?: string): string {
   return repo ? `${repoHome(repo, env)}/factory.db` : `${factoryHome(env)}/factory.db`;
 }
