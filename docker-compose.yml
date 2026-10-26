@@ -1,0 +1,40 @@
+# Self-hosting: `docker compose up -d` runs the control plane and the relay from the one image, with
+# every SQLite file (runs, members, audit) on the factory-data volume. Values come from the shell or
+# an env file next to this one; docs/self-host.md lists them. factory.kaas.team runs this file on Coolify.
+services:
+  factory:
+    build: .
+    image: kaas-factory:local
+    command: ["up"]
+    restart: unless-stopped
+    environment:
+      FACTORY_HOME: /data
+      FACTORY_DASHBOARD_HOST: 0.0.0.0
+      FACTORY_DASHBOARD_PORT: "4100"
+      KAAS_RELAY_ADDR: 0.0.0.0:4200
+      # Without a token or GitHub sign-in the plane refuses every caller that is not on the box itself.
+      FACTORY_DASHBOARD_TOKEN: ${FACTORY_DASHBOARD_TOKEN:-}
+      FACTORY_GITHUB_CLIENT_ID: ${FACTORY_GITHUB_CLIENT_ID:-}
+      FACTORY_GITHUB_CLIENT_SECRET: ${FACTORY_GITHUB_CLIENT_SECRET:-}
+      FACTORY_REPO: ${FACTORY_REPO:-}
+      GH_TOKEN: ${GH_TOKEN:-}
+      KAAS_RELAY_PUBLISH_TOKEN: ${KAAS_RELAY_PUBLISH_TOKEN:-}
+      KAAS_RELAY_SUBSCRIBE_TOKEN: ${KAAS_RELAY_SUBSCRIBE_TOKEN:-}
+      FACTORY_BLOB_BUCKET: ${FACTORY_BLOB_BUCKET:-}
+      FACTORY_BLOB_ENDPOINT: ${FACTORY_BLOB_ENDPOINT:-}
+      FACTORY_BLOB_ACCESS_KEY_ID: ${FACTORY_BLOB_ACCESS_KEY_ID:-}
+      FACTORY_BLOB_SECRET_ACCESS_KEY: ${FACTORY_BLOB_SECRET_ACCESS_KEY:-}
+    ports:
+      - "127.0.0.1:4100:4100"
+      - "127.0.0.1:4200:4200"
+    volumes:
+      - factory-data:/data
+    # 127.0.0.1, not localhost: a resolver that tries ::1 first never reaches a plane bound to IPv4.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  factory-data:

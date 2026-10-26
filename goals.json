@@ -814,28 +814,44 @@
       "phase": "P10",
       "ask": "One image for plane, relay and verify; docker compose up to self-host; bunx kaas-factory up on a laptop",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/deploy.test.ts",
+        "name": "the image builds the relay and verify, carries both, and runs the stack by default",
+        "mutation": "deploy: the image carries kaas-verify"
+      }
     },
     {
       "id": "hosted-coolify",
       "phase": "P10",
       "ask": "Coolify on netcup at factory.kaas.team",
       "source": "user, 26 Oct 2026",
-      "owner": "param"
+      "owner": "param",
+      "proof": {
+        "probe": "scripts/probes/hosted-coolify.sh"
+      }
     },
     {
       "id": "idle-rss",
       "phase": "P10",
       "ask": "Idle RSS of plane plus relay under 150 MB, asserted in CI",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/deploy.test.ts",
+        "name": "idle RSS of plane plus relay stays under 150 MB",
+        "mutation": "deploy: idle RSS budget is 150 MB"
+      }
     },
     {
       "id": "live-auto-merge",
       "phase": "P10",
       "ask": "One task on splitbill-demo goes from a phone to an automatic merge",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "probe": "scripts/probes/live-auto-merge.sh"
+      }
     },
     {
       "id": "teach-command",
@@ -919,7 +935,12 @@
       "phase": "P10",
       "ask": "Transcripts and artifacts to a shared blob store; they stay on the machine that ran the stage.",
       "source": "CHANGELOG v3.3.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/blobs.test.ts",
+        "name": "a stage on a runner reaches the blob store and the plane mirrors it onto its run paths",
+        "mutation": "blobs: a stage ships its run"
+      }
     },
     {
       "id": "cron-dedupe",

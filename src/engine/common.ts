@@ -2,6 +2,8 @@
 // label helpers, running one agent stage, retro, and the spend caps. Moved
 // verbatim from watch.ts when the pipeline became a workflow (v3.1).
 
+import type { BlobStore } from "../ports/blob";
+import { shipStage } from "./blobs";
 import type { FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
@@ -91,11 +93,8 @@ export interface WatchDeps {
   readonly spend?: SpendStore;
   // Runtimes by name for check steps (src/runtimes.ts builds them); absent means check steps run like setup.
   readonly runtimes?: Readonly<Record<string, ExecutionPort>>;
-  // Absent means this process alone decides concurrency (config.concurrency,
-  // unchanged pre-v2.7.0 behaviour). Present means every dispatch first takes
-  // a machine-wide lease, so a second watcher (another repo, same
-  // FACTORY_HOME) sharing this machine's slots is respected too (plan
-  // v2.7.0 item 5).
+  // Absent: this process alone decides concurrency. Present: every dispatch first takes a machine-wide
+  // lease, so a second watcher on the same FACTORY_HOME shares this machine's slots (plan v2.7.0 item 5).
   readonly machine?: { readonly leases: MachineLeases; readonly config: MachineConfig; readonly spend: MachineSpend };
   // Where a stage streams its transcript and its pid/session (`factory takeover`). Absent: neither is written.
   readonly runFiles?: { transcript(issue: number): string; live(issue: number): string };
@@ -111,6 +110,8 @@ export interface WatchDeps {
   readonly bus?: EventBus;
   // The repo's .factory/minions, checked at boot (src/engine/minion.ts).
   readonly minions?: readonly Minion[];
+  // Where each stage's transcript and artifacts are copied for the plane; absent means they stay here.
+  readonly blobs?: BlobStore;
 }
 
 // Thrown by runStage when an operator stopped the agent to take it over;
@@ -333,11 +334,8 @@ export async function runStage(
   // before anything is recorded or spent.
   const { mcp: mcpNames, ...rest } = extra;
   const mcp = mcpNames?.length ? mcpServersFor(deps.cloneDir, mcpNames) : undefined;
-  // rehydrate before clearing: rehydrate only ever repopulates *earlier*
-  // stages' artifacts from the thread, never this stage's own output, so the
-  // order only matters for readability, not correctness — but clearing after
-  // guarantees this stage never starts with a stale copy of its own last
-  // attempt (audit finding #9).
+  // Clearing after rehydrate means this stage never starts with a stale copy of its own last attempt
+  // (audit finding #9); rehydrate only repopulates earlier stages' artifacts.
   await rehydrate(worktree, issue);
   await writeIssueSnapshot(worktree, issue);
   await clearStageArtifacts(worktree, issueNumber, stage);
@@ -409,6 +407,7 @@ export async function runStage(
     tokens_out: run.tokens_out + result.tokensOut,
     cost_usd: run.cost_usd + (costUsd ?? 0),
   });
+  await shipStage(deps.blobs, config.repo, issueNumber, worktree, files.transcriptFile);
   if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
   return result;
 }

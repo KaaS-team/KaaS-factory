@@ -4,8 +4,8 @@
 export const COMMANDS: { name: string; usage: string; does: string }[] = [
   {
     name: "up",
-    usage: "up (--repo-dir <path> | --repo <owner/name>) [--tmux]",
-    does: "watch + dashboard in one process (Docker/VM); --tmux: each in a tmux window, plus one per issue",
+    usage: "up [--repo-dir <path> | --repo <owner/name>] [--tmux]",
+    does: "no repo: control plane + relay (the image default); with a repo: watch + dashboard in one process; --tmux: each in a tmux window, plus one per issue",
   },
   {
     name: "watch",

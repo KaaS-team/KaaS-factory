@@ -27,6 +27,7 @@ import { runDoctor, fixDoctor } from "./doctor";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard, servingAccess as plane } from "../dashboard/server";
 import { startRelay } from "../dashboard/relay";
+import { blobStoreFromEnv } from "./blobs";
 import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
 import {
@@ -152,6 +153,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     state,
     bus: new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}` }),
     minions: loaded.minions,
+    blobs: blobStoreFromEnv(),
     executor: new CommandExecutor(
       config.agents,
       config.stages,
@@ -168,9 +170,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
     setupRunner: new ShellSetupRunner(),
-    // Real cross-process leases: every real CLI invocation (watch, run, tick)
-    // shares this machine's FACTORY_HOME/machine.db, so a second repo's
-    // watcher on the same machine is respected (plan v2.7.0 item 5).
+    // Every CLI invocation shares FACTORY_HOME/machine.db, so a second repo's watcher here is respected.
     machine: { leases: new MachineLeases(), config: machineConfig, spend: new MachineSpend() },
     // Issue leases on the repo's own remote, so watchers on other machines,
     // CI jobs and cloud routines driving the same repo never run one issue twice.
@@ -1059,7 +1059,7 @@ async function cmdPool(): Promise<void> {
 async function main(): Promise<void> {
   switch (command) {
     case "up":
-      return cmdUp();
+      return flag("repo") || flag("repo-dir") ? cmdUp() : (await import("./deploy/stack")).startStack(cmdDashboard);
     case "init":
       return cmdInit();
     case "watch":
