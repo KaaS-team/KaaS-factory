@@ -5,6 +5,7 @@ import { createDashboard } from "../dashboard/server";
 import { createAccess } from "../dashboard/plane/access";
 import { COMMANDS } from "../dashboard/plane/commands";
 import { PlaneStore, type Role } from "../dashboard/plane/store";
+import { CONTROL_LABEL, webMode } from "../src/autonomy";
 import { parseChatOps } from "../src/chatops";
 import { GitHub } from "../src/github";
 import { WAITING } from "../src/inbox";
@@ -162,5 +163,71 @@ describe("starting a task", () => {
     expect((await p.post("/api/tasks", cookie, { title: "x", type: "epic" })).status).toBe(400);
     expect((await p.post("/api/tasks", p.as("viewer"), { title: "x" })).status).toBe(403);
     expect(p.github.created).toHaveLength(0);
+  });
+});
+
+// The control issue lives in the tracker: the route writes the mode there, and the runner reads it back.
+class ModeGitHub extends TrackerGitHub {
+  control: GhIssue | undefined;
+  override async currentLogin() {
+    return "factory-bot";
+  }
+  override async listIssuesByLabel(_repo: string, label: string) {
+    return this.control && label === CONTROL_LABEL ? [this.control] : [];
+  }
+  override async createIssue(repo: string, title: string, body: string, labels: string[]) {
+    const n = await super.createIssue(repo, title, body, labels);
+    this.control = { number: n, title, body, labels: labels.map((name) => ({ name })), comments: [] };
+    return n;
+  }
+  override async commentIssue(repo: string, issue: number, body: string) {
+    this.control?.comments.push({ id: 1, author: "factory-bot", body, createdAt: "" } as never);
+    return super.commentIssue(repo, issue, body);
+  }
+}
+
+describe("set mode from the web", () => {
+  test("an owner sets a repo's autonomy as a signed tracker comment the runner reads back", async () => {
+    const github = new ModeGitHub();
+    const store = new PlaneStore();
+    const access = createAccess({ token: TOKEN, store, env: {} });
+    const d = createDashboard(
+      new FactoryState(":memory:"),
+      github,
+      "acme/widgets",
+      false,
+      "/nonexistent",
+      undefined,
+      undefined,
+      undefined,
+      access,
+    );
+    const session = (role: Role) => {
+      store.setMember(`${role}-person`, role, "test");
+      const id = crypto.randomUUID();
+      store.openSession(id, `${role}-person`, 60_000);
+      return `factory_session=${id}`;
+    };
+    const send = (cookie: string, mode: string) =>
+      d.handle(
+        new Request(`${BASE}/api/mode`, {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({ mode }),
+        }),
+        "127.0.0.1",
+      );
+    expect((await send(session("operator"), "full")).status).toBe(403);
+    expect((await send(session("owner"), "reckless")).status).toBe(400);
+    expect(github.posted).toHaveLength(0);
+    expect((await send(session("owner"), "full")).status).toBe(200);
+    expect(github.created[0]!.labels).toEqual([CONTROL_LABEL]);
+    expect(github.posted[0]!.body).toContain("Sent from the factory control plane by @owner-person");
+    expect(await webMode(github, "acme/widgets")).toBe("full");
+    const got = await d.handle(
+      new Request(`${BASE}/api/mode`, { headers: { cookie: session("viewer") } }),
+      "127.0.0.1",
+    );
+    expect(await got.json()).toEqual({ mode: "full" });
   });
 });

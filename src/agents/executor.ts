@@ -3,6 +3,7 @@
 // through the preset's line parser, and kill the whole process group on a
 // timeout or a runaway tool-call count.
 
+import { crossModel } from "../review-models";
 import { tierFor } from "../core/model-tier";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -156,10 +157,12 @@ export class CommandExecutor implements Executor {
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
+    const route = (s: StageRunOptions["stage"]) =>
+      withTier(resolveRoute(this.agents, this.stages, this.routes, s, opts.type), opts);
     const agent =
       opts.prompt !== undefined && opts.agent
         ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts);
+        : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)
@@ -224,8 +227,10 @@ export class CommandExecutor implements Executor {
       opts.prompt !== undefined
         ? ""
         : await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
+    const reply = agent.config.outputSchema && (spec || readOnly) ? join(scratch, "reply.schema.json") : undefined;
+    if (reply) writeFileSync(reply, JSON.stringify(replySchema(opts.stage, types)));
     if (agent.preset?.ownsPrompt) {
-      ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig }));
+      ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig, schemaFile: reply }));
     } else {
       const prompt = opts.prompt ?? (await renderPrompt(opts, readOnly, types, contextPack));
       if (ownCommand && agent.config.command) {
@@ -235,12 +240,7 @@ export class CommandExecutor implements Executor {
         argv = rendered.argv;
         stdin = rendered.usesStdin ? prompt : undefined;
       } else if (agent.preset) {
-        let schemaFile: string | undefined;
-        if (readOnly && agent.config.outputSchema) {
-          schemaFile = join(scratch, "reply.schema.json");
-          writeFileSync(schemaFile, JSON.stringify(replySchema(opts.stage, types)));
-        }
-        ({ argv, stdin } = agent.preset.command(opts, agent.config, prompt, { schemaFile }));
+        ({ argv, stdin } = agent.preset.command(opts, agent.config, prompt, { schemaFile: spec ? undefined : reply }));
       } else {
         throw new Error(`agent "${agent.name}" has neither a preset nor a command`);
       }

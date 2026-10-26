@@ -5,7 +5,7 @@
 // once it has parked or finished the issue itself, from `step.label`.
 
 import { readFileSync } from "node:fs";
-import { holdoutEnabled, testGate, type FactoryConfig } from "../config";
+import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
   acceptanceProven,
@@ -43,6 +43,7 @@ import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
 import type { Step, StepKind, Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
+import { flooredPlan, proofInputs, recordVerifyFacts } from "./verify-facts";
 import {
   failureTail,
   finish,
@@ -153,7 +154,7 @@ const plan: StepType = {
     const issueNumber = issue.number;
     const result = await runStage(deps, config, issue, "plan", worktree, { mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "plan");
-    const { json, problem } = stageJson<PlanArtifact>("plan", art.json);
+    const { json, problem } = flooredPlan(stageJson<PlanArtifact>("plan", art.json), config);
     // A plan stage that crashes (or writes nothing) used to fall through
     // to "not eligible" and park as awaiting-approval with no plan comment
     // to approve against — stuck forever (audit finding #10).
@@ -333,13 +334,10 @@ const verify: StepType = {
       }
     }
     if (deps.proofGit) {
-      const planJson = (await readStageArtifacts(worktree, issueNumber, "plan")).json as
-        | { proof?: "test" | "check" }
-        | undefined;
-      const testCmd = testGate(config.gates)?.cmd;
+      const { planProof, testCmd } = await proofInputs(deps.proofGit, worktree, config, issueNumber);
       let proof: ProofResult;
       try {
-        proof = await runProof(deps.proofGit, worktree, config.base, planJson?.proof, testCmd);
+        proof = await runProof(deps.proofGit, worktree, config.base, planProof, testCmd);
       } catch (err) {
         proof = {
           status: "skipped",
@@ -350,6 +348,8 @@ const verify: StepType = {
         };
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
+      // After proof.json, since the facts' fail-to-pass is this run's proof status.
+      await recordVerifyFacts(worktree, config, issueNumber, testCmd, proof);
     }
     const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
     if (acceptance)

@@ -321,3 +321,6 @@ pre.log { max-height: 22rem; overflow: auto; padding: 10px 12px; background: var
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.risk-badge { display: inline-block; padding: 1px 8px; border-radius: 9px; font-size: 12px; font-weight: 600; vertical-align: middle; border: 1px solid currentColor; }
+.risk-low { color: var(--ink); }
+.risk-medium, .risk-high { color: var(--surface); background: var(--ink); }

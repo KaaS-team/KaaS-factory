@@ -3,6 +3,8 @@
 // terminal, so the page and the tmux window never disagree.
 
 import { inline, renderMarkdown, toDom } from "/lib/markdown.js";
+// Re-exported so app.js takes the task badge with the other page pieces, in one import.
+export { riskBadge } from "/lib/risk-badge.js";
 
 const VERB = {
   Read: "Read",

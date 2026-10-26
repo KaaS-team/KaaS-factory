@@ -14,7 +14,7 @@ import { makeScm } from "../src/scm";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { buildBoard } from "./board";
 import { LABEL } from "../src/labels";
-import { InboxError, act, buildInbox, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
+import { InboxError, act, inboxWithRisk, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
 import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
@@ -31,7 +31,7 @@ import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
-import { commandRoutes, senderName } from "./plane/commands";
+import { planeRoutes, senderName } from "./plane/mode";
 import {
   readCapped,
   readDelivery,
@@ -287,7 +287,7 @@ export function createDashboard(
   const needRepo = (): Response | null => (repo ? null : json({ error: "FACTORY_REPO not set" }, { status: 500 }));
 
   async function inboxItem(r: string, number: number) {
-    return buildInbox(await cachedIssuesFor(r)).find((i) => i.issue === number);
+    return inboxWithRisk(await cachedIssuesFor(r)).find((i) => i.issue === number);
   }
 
   // Files a stage left in .factory/runs/issue-N/ of the issue's worktree. The
@@ -701,10 +701,10 @@ export function createDashboard(
         const perRepo = await Promise.all(
           repos.map(async (r) => [
             // Park reasons live in this dashboard's own DB, so only its repo has them.
-            ...buildInbox(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
+            ...inboxWithRisk(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
               (i) => ({ ...i, repo: r }),
             ),
-            ...learningPrItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
+            ...learningPrItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r, risk: null })),
           ]),
         );
         const items = perRepo
@@ -760,7 +760,7 @@ export function createDashboard(
       },
     },
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
-    ...commandRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
+    ...planeRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
     {
       method: "GET",
       pattern: /^\/api\/stream$/,

@@ -3,6 +3,7 @@
 // factory:ready pickup, a resume or a retry; `ctx` carries the round counts
 // deriveIssueState recovered, so a resumed run doesn't reset the caps.
 
+import { tierToggles } from "../autonomy";
 import type { FactoryConfig } from "../config";
 import { OPERATOR_TAKEOVER } from "../executor";
 import { evalExpr } from "../core/expr";
@@ -122,6 +123,14 @@ async function walk(
         ...facts,
         toggles: {
           autoApproveLowRisk: deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk),
+          ...(step.uses === "plan"
+            ? await tierToggles(
+                deps.github,
+                config.repo,
+                config.merge,
+                (facts.plan as { risk?: unknown } | undefined)?.risk,
+              )
+            : { tiered: false, tierApproves: false }),
         },
         config,
       });

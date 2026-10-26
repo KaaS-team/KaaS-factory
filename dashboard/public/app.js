@@ -6,7 +6,7 @@ import { createStatusLoader } from "/lib/status-loader.js";
 import { formatElapsed } from "/lib/run-metrics.js";
 import { ACTIVE, stationStates, WAITING } from "/lib/stations.js";
 import { markdownText, renderMarkdown } from "/lib/markdown.js";
-import { feedCard, proofPanel } from "/lib/run-page.js";
+import { feedCard, proofPanel, riskBadge } from "/lib/run-page.js";
 import { execSummary } from "/lib/exec-summary.js";
 import { followRelay, readRelay, saveRelay } from "/lib/relay-follow.js";
 
@@ -614,7 +614,7 @@ function conversation(item) {
     h(
       "div",
       { class: "panel-pad" },
-      h("h2", null, `#${item.issue} ${item.title}`),
+      h("h2", null, `#${item.issue} ${item.title} `, riskBadge(h, item.risk)),
       h(
         "span",
         { class: "muted" },

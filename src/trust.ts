@@ -29,7 +29,7 @@ export async function isWriter(github: Roles, repo: string, comment: Pick<GhComm
 // The runner's own login, so its marker comments stay even on a tracker that gives it no repo role.
 // A failed lookup keeps nobody by login; the writer check below still applies.
 const selfLogin = new WeakMap<object, Promise<string>>();
-const runnerLogin = (github: Scm) => {
+export const runnerLogin = (github: Scm) => {
   const hit = selfLogin.get(github) ?? github.currentLogin().catch(() => "");
   selfLogin.set(github, hit);
   return hit;

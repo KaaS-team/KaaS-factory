@@ -10,6 +10,7 @@
 import type { GhIssue } from "../src/github";
 import { plain } from "../src/display";
 import { LABEL, isParkedLabel, isStateLabel } from "../src/labels";
+import { type RateOptions, type RiskObject, riskOfIssue } from "../src/risk";
 
 export type BoardColumn = "intake" | "triage" | "plan" | "build" | "verify" | "pr" | "attention";
 
@@ -23,6 +24,8 @@ export interface BoardCard {
   // No factory:* label at all yet — a plain issue (hand-filed, or from
   // `factory scan`) that a human still needs to mark ready.
   readonly needsMarkReady: boolean;
+  // The task's one risk object (src/risk.ts); null until triage or the plan rated it.
+  readonly risk: RiskObject | null;
 }
 
 const STATE_TO_COLUMN: Readonly<Record<string, BoardColumn>> = {
@@ -47,7 +50,7 @@ export function columnFor(labelNames: readonly string[]): BoardColumn {
   return "intake";
 }
 
-export function buildBoard(issues: readonly GhIssue[]): BoardCard[] {
+export function buildBoard(issues: readonly GhIssue[], rate: RateOptions = { protectedPaths: [] }): BoardCard[] {
   return issues.map((issue) => {
     const names = issue.labels.map((l) => l.name);
     const stateLabel = names.find(isStateLabel) ?? null;
@@ -60,6 +63,7 @@ export function buildBoard(issues: readonly GhIssue[]): BoardCard[] {
       parkedLabel,
       typeLabels: names.filter((n) => !isStateLabel(n) && !isParkedLabel(n) && n !== LABEL.monitor),
       needsMarkReady: stateLabel === null && parkedLabel === null,
+      risk: riskOfIssue(issue, rate),
     };
   });
 }

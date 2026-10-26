@@ -8,6 +8,7 @@ import { parseDataMarkers } from "./derive";
 import { plain } from "./display";
 import type { GhComment, GhIssue, GhPr, GitHub } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
+import { riskIndex } from "./risk";
 import type { Run } from "./state";
 
 export type InboxKind =
@@ -91,6 +92,12 @@ export function parkReasons(runs: readonly Pick<Run, "issue" | "status" | "reaso
 }
 
 const PARKED_KINDS: ReadonlySet<InboxKind> = new Set(["parked", "failed", "budget"]);
+
+// Each item with its task's risk object, rated as the merge rates it, for the inbox badge.
+export function inboxWithRisk(issues: readonly GhIssue[], reasons?: ReadonlyMap<number, string>) {
+  const risk = riskIndex(issues, { protectedPaths: [] });
+  return buildInbox(issues, reasons).map((i) => ({ ...i, risk: risk.get(i.issue) ?? null }));
+}
 
 export function buildInbox(issues: readonly GhIssue[], reasons?: ReadonlyMap<number, string>): InboxItem[] {
   const items: InboxItem[] = [];
