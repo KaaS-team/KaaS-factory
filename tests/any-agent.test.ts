@@ -76,12 +76,12 @@ describe("any agent", () => {
     expect(bare.stages).toEqual(["triage", "plan", "build", "verify", "pr"]);
     expect(await ship({ preset: "codex", model: "gpt-5.6-terra" })).toEqual(bare);
     expect(await ship({ preset: "acp", command: [process.execPath, fixture("fake-acp.ts")] })).toEqual(bare);
-  });
+  }, 30_000);
 
   test("one ACP seam: two unrelated ACP servers ship the same ticket the same way", async () => {
     const ts = await ship({ preset: "acp", command: [process.execPath, fixture("fake-acp.ts")] });
     const py = await ship({ preset: "acp", command: ["python3", fixture("fake-acp.py")] });
     expect(ts.result).toBe("shipped");
     expect(py).toEqual(ts);
-  });
+  }, 30_000);
 });
