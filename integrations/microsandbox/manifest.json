@@ -1,0 +1,10 @@
+{
+  "name": "microsandbox",
+  "kind": "runtime",
+  "summary": "Runs in a microsandbox microVM.",
+  "env": [],
+  "enable": "`{\"kind\": \"microsandbox\", \"image\": \"...\"}` in machine.json",
+  "module": "src/adapters/microsandbox/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false
+}

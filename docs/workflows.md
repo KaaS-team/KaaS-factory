@@ -19,8 +19,20 @@ The runner ships these. Each one stops a bad output at a different rung:
 | `dependency-update` | triage, build, verify, pr | verify rejects a bump the tests do not cover; files itself weekly |
 | `security-audit` | triage, plan, build, verify, pr | every plan parks for a person; files itself daily |
 | `flaky-tests` | triage, build, verify, pr | verify rejects a fix that is not stable; files itself weekly |
+| `pr-review` | triage, review (plan), report | no PR: findings go on the issue, filed per `factory.pr.opened` event |
+| `test-authoring` | triage, plan, build, verify, pr | the unit gate on build; verify rejects a test that covers nothing |
+| `coverage-gap` | triage, build, verify, pr | the unit gate; files itself weekly |
+| `ci-fix` | triage, build, verify, pr | lint and unit gates on build, then verify |
+| `ci-cd-authoring` | triage, plan, build, verify, pr | every plan parks for a person; the lint gate |
+| `release-notes` | triage, build, pr | a person merges the notes; files itself weekly |
+| `harness-learn` | triage, plan, build, pr | every plan parks for a person; files itself weekly |
+| `ui-component` | triage, plan, build, verify, pr | a medium or high risk plan parks; lint and unit gates |
+| `spec-to-plan` | triage, plan, report | no PR: the plan comment is the output |
+| `backlog-triage` | triage, report | no PR: findings as comments; files itself daily |
 
-The last three carry their own `on: cron:` schedule. A schedule fires only for `config.workflow` and
+The rows from `pr-review` down are `.md` files. A `report` step closes the issue with no PR, and
+`gates:` holds a stage to the named gates. `dependency-update`, `security-audit`, `flaky-tests`,
+`coverage-gap`, `release-notes`, `harness-learn` and `backlog-triage` carry their own `on: cron:` schedule. A schedule fires only for `config.workflow` and
 the workflows a route names, so route a type to one to turn it on. The issue it files records that
 workflow, so pickup runs it and not `config.workflow`. Each one's body tells triage to refuse when
 there is nothing to do: the issue parks as `factory:needs-human` with no PR, and the schedule files no
@@ -35,7 +47,23 @@ so a marker someone pastes later cannot move an issue off a workflow that parks 
 
 `factory harness validate` loads every workflow file, the repo's and the runner's, and every one the
 config names, and exits 4 on a problem. `factory harness inventory` lists each one's steps, cron
-triggers and the types routed to it.
+triggers and the types routed to it. `factory harness scaffold <name>` writes a starting
+`.factory/workflows/<name>.md` (the five stages, a risky plan parks, build held to lint and unit
+gates) and never overwrites one the repo has. `factory harness eval [--since <days>]` scores each
+workflow from the event log: runs, outcomes, shipped rate, the steps that failed and the cost of its
+issues (default the last 30 days).
+
+`factory teach "<how we ship>"` runs one agent in a fresh clone. It reads the code, the CI in
+`.github/workflows/` and, when `.factory/mcp.json` names a `brain` server, the company brain. Its
+answer is a set of workflows, minions and skills. Each file is checked with the parser the watcher
+uses, and the set opens as one PR on a `factory/teach-*` branch. A file outside
+`.factory/workflows/`, `.factory/minions/` or `.claude/skills/`, or one that does not load, opens
+no PR.
+
+A repo needs no `.claude/` config to run. Before each stage the runner puts every factory skill and
+subagent the repo lacks where the agent reads skills, taken from the runner's `template/`, and lists
+them in the worktree's git exclude so no PR carries them. A skill or subagent the repo has under
+`.claude/` or `.agents/` wins over the default.
 
 ## Step keys
 
@@ -113,7 +141,7 @@ registry fails the issue before the step runs, and `factory doctor` reports it f
 
 ## `if:`
 
-`if:` reads a step's JSON by its id (`plan.risk`), `toggles.autoApproveLowRisk` and `config` (so `config.riskPolicy.autoApproveMaxRisk`). It
+`if:` reads a step's JSON by its id (`plan.risk`), `toggles.autoApproveLowRisk`, the plan step's tier toggles `toggles.tiered` and `toggles.tierApproves` (src/autonomy.ts), and `config` (so `config.riskPolicy.autoApproveMaxRisk`). It
 has `==`, `!=`, `&&`, `||`, `!`, parentheses, and string, number and boolean literals. A name it
 cannot resolve is a load error.
 

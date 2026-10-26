@@ -4,8 +4,8 @@
 export const COMMANDS: { name: string; usage: string; does: string }[] = [
   {
     name: "up",
-    usage: "up (--repo-dir <path> | --repo <owner/name>) [--tmux]",
-    does: "watch + dashboard in one process (Docker/VM); --tmux: each in a tmux window, plus one per issue",
+    usage: "up [--repo-dir <path> | --repo <owner/name>] [--tmux]",
+    does: "no repo: control plane + relay (the image default); with a repo: watch + dashboard in one process; --tmux: each in a tmux window, plus one per issue",
   },
   {
     name: "watch",
@@ -58,6 +58,21 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "render a stage's raw agent output in colour: tool calls, edit diffs, test results (the tmux issue window runs this)",
   },
   {
+    name: "mcp",
+    usage: "mcp (--repo <owner/name> | --repo-dir <path>) [--as <name>]",
+    does: "serve MCP on stdio, so an agent or IDE can list, read, start and approve tasks",
+  },
+  {
+    name: "runner",
+    usage: "runner register --url <plane> [--name <n>] (token on stdin) | runner start --repo-dir <path>",
+    does: "register this machine with a control plane once, then dial out for work with heartbeats",
+  },
+  {
+    name: "pair",
+    usage: "pair --url <plane> --login <member> (FACTORY_DASHBOARD_TOKEN set)",
+    does: "print a QR that pairs a phone to the plane as that member",
+  },
+  {
     name: "inbox",
     usage: "inbox [<N> <action> [--text <words>]] (--repo <owner/name> | --repo-dir <path>) [--json]",
     does: "list what waits for a human; with <N> <action>, post the same /factory comment a human would",
@@ -99,8 +114,13 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   },
   {
     name: "harness",
-    usage: "harness (validate | inventory) --repo-dir <path> [--json]",
-    does: "validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types",
+    usage: "harness (validate | inventory | scaffold <name> | eval [--since <days>]) --repo-dir <path> [--json]",
+    does: "validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types; scaffold: write a starting .factory/workflows/<name>.md; eval: runs, shipped rate, failed steps and cost per workflow from the event log",
+  },
+  {
+    name: "teach",
+    usage: 'teach "<how we ship>" (--repo-dir <path> | --repo <owner/name>) [--json]',
+    does: "one agent reads the repo, its CI and the brain MCP server, and opens a PR with the workflows, minions and skills it proposes, each checked first",
   },
   {
     name: "minion",
@@ -116,6 +136,21 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     name: "pool",
     usage: "pool [--json]",
     does: "each pool runtime in machine.json: every member's free minutes used and left this month, and its last failure",
+  },
+  {
+    name: "runtime",
+    usage: "runtime (list [--probe] | verify <name>) [--json]",
+    does: "list runtimes with their sandbox flags (--probe: does each answer); verify runs the shared conformance kit on one",
+  },
+  {
+    name: "dispatch",
+    usage: "dispatch (--repo-dir <path> | --repo <owner/name>) [--json]",
+    does: "the issues one tick would advance, written to $GITHUB_OUTPUT as a matrix for one `factory run` job each",
+  },
+  {
+    name: "routine",
+    usage: "routine (--repo <owner/name> | --repo-dir <path>) [--cron <expr>] [--json]",
+    does: "print a Claude Code cloud routine (name, cron, prompt) that runs `factory tick` on a schedule",
   },
   {
     name: "receipt",

@@ -27,12 +27,14 @@ export function relayStreamUrl(cfg) {
 }
 
 // Calls onPayload with each well-formed line; EventSource reconnects by itself after a drop.
-export function followRelay(cfg, onPayload, Source = globalThis.EventSource) {
+// A sealed line is opened with `open` (lib/remote.js); one this phone cannot open is skipped.
+export function followRelay(cfg, onPayload, Source = globalThis.EventSource, open) {
   if (!Source) return () => {};
   const es = new Source(relayStreamUrl(cfg));
-  es.onmessage = (e) => {
+  es.onmessage = async (e) => {
     try {
-      const p = JSON.parse(e.data);
+      let p = JSON.parse(e.data);
+      if (p?.sealed && open) p = JSON.parse(await open(p.sealed));
       if (Array.isArray(p?.items)) onPayload(p);
     } catch {}
   };

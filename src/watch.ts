@@ -10,18 +10,22 @@
 // comment thread alone, so a restarted watcher, a fresh CI job, or a runner
 // on a different machine can all resume any issue.
 
+import { mergeContext, settleMerge, tierInput } from "./merge-autonomy";
 import { resolveBlockers } from "./blockers";
+import { intakeGate } from "./dispatch";
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
-import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
-import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
+import { deriveIssueState, parkWindowStart } from "./derive";
+import { decideMerge, mergePolicyMarker } from "./merge-policy";
+import { admitReady } from "./org-caps";
+import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
 import { issueType, LABEL, PARKED_LABELS } from "./labels";
-import { canServe, effectiveSlots } from "./machine";
+import { canServe, effectiveSlots, machineBeat } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
   ensureWorktreeReady,
@@ -29,7 +33,6 @@ import {
   labelsOf,
   leased,
   postComment,
-  spendCapHit,
   runQueuedRetros,
   runRetro,
   worktreeFor,
@@ -39,10 +42,11 @@ import {
   withDataMarker,
 } from "./engine/common";
 import { parkEdgeOf, runWorkflow } from "./engine/runner";
-import { STEP_TYPES } from "./engine/steps";
+import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { defaultWorkflow } from "./engine/workflows";
 
-import { fireCron, fireEvent } from "./engine/triggers";
+import { cronStore, fireCron, fireEvent } from "./engine/triggers";
+import { recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
@@ -64,16 +68,6 @@ function workflowOf(deps: WatchDeps, issue?: GhIssue): Workflow {
   const chosen = issue ? recordedWorkflow(issue) : undefined;
   return (chosen && deps.routeWorkflows?.[chosen]) || deps.workflow || defaultWorkflow();
 }
-
-// The first choice a trusted comment recorded. Anyone can paste a marker into a comment, so an
-// outsider's is ignored, and a later one never switches an issue (say, off a workflow that parks
-// every plan) mid-run.
-function recordedWorkflow(issue: GhIssue): string | undefined {
-  const marker = parseDataMarkers(issue.comments.filter(isTrusted)).find((m) => m.stage === WORKFLOW_MARKER);
-  return (marker?.json as { name?: string } | undefined)?.name;
-}
-
-const WORKFLOW_MARKER = "workflow";
 
 // An issue a route's trigger filed runs that workflow, not the repo's, so pickup reads it back (recordedWorkflow).
 async function recordTriggered(deps: WatchDeps, config: FactoryConfig, n: number, workflow: Workflow, via: string) {
@@ -344,12 +338,9 @@ export async function resumeParked(
 
 // `/factory revise <text>` on an in-review issue (audit finding #19): sends
 // the change back to build with the feedback as `revise.md`.
-// Non-blocking, one snapshot per poll (never waitForCi's sleep loop, which
-// would hold a worker slot for up to 20 minutes and undo v2.7.0's continuous
-// dispatch). A routine miss — no PR yet, PR not a fit, a transient GitHub
-// error — is not this issue's problem to raise: it just leaves the PR for a
-// human, exactly like a repo with policy "off" always does. runPool has no
-// per-item error isolation, so nothing here may throw uncaught.
+// One snapshot per poll, never waitForCi's sleep loop, which would hold a slot for 20 minutes. A
+// routine miss (no PR, a transient error) leaves the PR for a human, as policy "off" does; runPool
+// has no per-item error isolation, so nothing here may throw uncaught.
 async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome | undefined> {
   try {
     const issueNumber = issue.number;
@@ -366,21 +357,21 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     // The PR head, not the worktree's: the policy judges the commit --match-head-commit merges.
     const changedFiles = await deps.git.diffStat(worktree, config.base, readiness.headRefOid);
     const plan = await readStageArtifacts(worktree, issueNumber, "plan");
-    const risk = (plan.json as Pick<PlanArtifact, "risk"> | undefined)?.risk ?? "high";
+    const auto = await mergeContext(deps, config, worktree, issueNumber, changedFiles, pr.number);
     const decision = decideMerge({
       readiness,
       ci,
-      risk,
       changedFiles,
-      merge: config.merge,
       protectedPaths: config.protectedPaths,
       expectedBaseRefName: config.base,
+      codeowners: codeownerCheck(config.profile, deps.cloneDir, readiness.approvedBy),
+      ...tierInput(auto, config, (plan.json as Pick<PlanArtifact, "risk"> | undefined)?.risk),
     });
 
-    const marker = mergePolicyMarker(decision.headSha);
-    if (!issue.comments.some((c) => c.body.includes(marker)))
-      await postComment(deps, config, issueNumber, renderAuditComment(decision));
-    const merged = await attemptMerge(deps.github, config.repo, pr.number, decision);
+    const fresh = !issue.comments.some((c) => c.body.includes(mergePolicyMarker(decision.headSha)));
+    const post = fresh ? (body: string) => postComment(deps, config, issueNumber, body) : undefined;
+    const run = { worktree, pr: pr.number, branch: head, issue: issueNumber, post };
+    const merged = await settleMerge(deps, config, auto, decision, run);
     if (merged) return await recordMerge(deps, config, issue, pr.number, "factory");
   } catch (err) {
     console.error(`merge-policy check failed for #${issue.number}:`, err);
@@ -478,7 +469,7 @@ export async function resumeInReview(
   }
   // A human command always wins over auto-merge, so this only runs once
   // there is nothing to revise or cancel.
-  if (config.merge.policy !== "off") return checkMergePolicy(deps, config, issue);
+  if (config.merge.policy !== "off" || config.merge.autonomy) return checkMergePolicy(deps, config, issue);
   return undefined;
 }
 
@@ -583,19 +574,14 @@ function release(inFlight: Set<number> | undefined, issue: number): void {
 export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?: Set<number>): Promise<PollResult> {
   const listedAt = releaseSeq;
   const openPrs = await deps.github.listPrs(config.repo, { state: "open" });
-  const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/"));
-  // STOP_IF pauses new pickups only; approvals, answers, retries and
-  // revises on existing runs keep flowing so a human can clear the backlog.
-  const stopIf = factoryPrs.length >= config.maxOpenFactoryPrs;
-  const autoStart = deps.state.getToggle("auto_start", true);
-  // Intake pauses (new factory:ready pickups only) while a daily cap is hit;
-  // an issue already in flight keeps going, since checkSpendCap parks it on
-  // its own next stage if the cap is still hit then (plan v2.7.0 item 7).
-  const budgetPaused = (await spendCapHit(deps, config)) !== undefined;
-  const intakeGated = autoStart && !stopIf && !budgetPaused;
+  // STOP_IF, the auto_start switch and the spend caps pause new pickups only (src/dispatch.ts);
+  // approvals, answers, retries and revises keep flowing so a human can clear the backlog.
+  const gate = await intakeGate(deps, config, openPrs);
+  const intakeGated = gate.open;
+  if (deps.machine) deps.machine.leases.beat(machineBeat(deps.machine));
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {
-    const filed = await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch(
+    const filed = await fireCron(deps.github, cronStore(deps), config.repo, workflow, deps.now?.() ?? new Date()).catch(
       (err) => (console.error("factory watch: cron trigger failed", err), [] as number[]),
     );
     for (const n of filed) await recordTriggered(deps, config, n, workflow, "on: cron:");
@@ -613,11 +599,11 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
   ]);
 
-  // The dependency gate (blockers.ts): demotes a ready issue that still has
-  // an open "Blocked by" to LABEL.blocked, and promotes a blocked issue back
-  // to ready the poll its last blocker clears. Both moves happen here, once
-  // per poll, before anything is dispatched.
-  const { clear: ready } = await resolveBlockers(deps.github, config.repo, readyRaw, blockedRaw);
+  // The dependency gate (blockers.ts), once per poll before any dispatch: a ready issue with an open
+  // "Blocked by" moves to LABEL.blocked, and back to ready the poll its last blocker clears.
+  const { clear } = await resolveBlockers(deps.github, config.repo, readyRaw, blockedRaw);
+  // Per-team and org caps hold back new pickups while work waits on people (src/org-caps.ts).
+  const ready = admitReady(clear, [...awaitingApproval, ...inReview], capsFor(config));
   const buckets = [ready, needsInfo, awaitingApproval, failed, needsHuman, inReview];
 
   const seen = new Set<number>();
@@ -642,8 +628,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   for (const issue of candidates) inFlight?.add(issue.number);
 
   // Drains retros the dashboard's operator-merge route queued (v2.10.0 item
-  // 3); independent of intake, so it runs even while stopIf/budgetPaused
-  // holds back new pickups.
+  // 3); independent of intake, so it runs even while intake is paused.
   await runQueuedRetros(deps, config);
 
   try {
@@ -660,14 +645,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
       .filter((_, i) => outcomes[i] && outcomes[i] !== "waiting")
       .map((issue) => issue.number);
     processed.push(...(await reconcileClosed(deps, config, new Set(buckets.flat().map((i) => i.number)), inFlight)));
-    if (stopIf)
-      return {
-        paused: true,
-        reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`,
-        processed,
-      };
-    if (budgetPaused)
-      return { paused: true, reason: "budget: today's spend cap is hit, new pickups are paused", processed };
+    if (gate.paused) return { paused: true, reason: gate.paused, processed };
     return { paused: false, processed };
   } finally {
     for (const issue of candidates) inFlight?.delete(issue.number);

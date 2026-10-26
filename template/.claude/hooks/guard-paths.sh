@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Read|Bash|Agent. Refuses writes to
-# protected paths (.factory/config.json's protectedPaths, plus .claude/** and
+# protected paths (.factory/config.json's protectedPaths, plus .claude/**, .agents/** and
 # .factory/** always), merges and force-pushes, and inside a factory stage the
 # shell shapes the stage's permission mode refuses, naming the fix, and a
 # backgrounded subagent, and any read of a path the runner hides (FACTORY_HIDDEN_PATHS). Writes to
@@ -288,7 +288,7 @@ if os.path.lexists(config_path):
     if not isinstance(globs, list) or not all(isinstance(g, str) for g in globs):
         block("guard-paths: blocked, .factory/config.json protectedPaths is not a list of strings (fails closed)")
 
-globs += [".claude/**", ".factory/**"]
+globs += [".claude/**", ".agents/**", ".factory/**"]
 
 for g in globs:
     if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(path, g):

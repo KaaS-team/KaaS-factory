@@ -1,0 +1,10 @@
+{
+  "name": "docker",
+  "kind": "runtime",
+  "summary": "Runs each command in a throwaway container.",
+  "env": [],
+  "enable": "`{\"kind\": \"docker\", \"image\": \"...\"}` in machine.json",
+  "module": "src/adapters/docker/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false
+}

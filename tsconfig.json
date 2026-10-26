@@ -17,6 +17,6 @@
     "noEmit": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src", "dashboard", "bin", "tests"],
+  "include": ["src", "dashboard", "bin", "tests", "ee"],
   "exclude": ["node_modules", "template", ".factory-state", "workspaces"]
 }

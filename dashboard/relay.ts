@@ -21,7 +21,10 @@ export function relayTarget(env: Record<string, string | undefined>): RelayTarge
   return { url, token, channel: env.FACTORY_RELAY_CHANNEL || "inbox" };
 }
 
-export function relayPublisher(handle: Handle, target: RelayTarget, send: typeof fetch = fetch) {
+// Seals a payload for the paired phones; undefined means nobody can open it, so nothing is sent.
+export type Sealer = (plaintext: string) => Promise<string | undefined>;
+
+export function relayPublisher(handle: Handle, target: RelayTarget, send: typeof fetch = fetch, sealer?: Sealer) {
   let last = "";
   const read = async (path: string) => {
     const res = await handle(new Request(`http://127.0.0.1${path}`), "127.0.0.1");
@@ -45,12 +48,15 @@ export function relayPublisher(handle: Handle, target: RelayTarget, send: typeof
         analytics: analytics && { week: analytics.week, spend7dUsd: analytics.spend7dUsd },
       });
       if (body === last) return false;
+      // With a sealer the relay only ever forwards ciphertext (src/e2e.ts).
+      const wire = sealer ? await sealer(body) : body;
+      if (wire === undefined) return false;
       // The relay closes every reply; Bun's pool still reuses that socket and the next send resets.
       const res = await send(`${target.url}/publish/${target.channel}`, {
         method: "POST",
         keepalive: false,
         headers: { authorization: `Bearer ${target.token}`, "content-type": "application/json" },
-        body,
+        body: wire,
       });
       if (!res.ok) return false;
       last = body;
@@ -61,10 +67,10 @@ export function relayPublisher(handle: Handle, target: RelayTarget, send: typeof
   };
 }
 
-export function startRelay(handle: Handle, env = process.env, everyMs = 10_000): void {
+export function startRelay(handle: Handle, env = process.env, everyMs = 10_000, sealer?: Sealer): void {
   const target = relayTarget(env);
   if (!target) return;
-  const tick = relayPublisher(handle, target);
+  const tick = relayPublisher(handle, target, fetch, sealer);
   void tick();
   setInterval(tick, everyMs);
   console.log(`factory dashboard: publishing the inbox to ${target.url} (channel ${target.channel})`);

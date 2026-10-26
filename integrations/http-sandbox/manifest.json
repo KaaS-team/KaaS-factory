@@ -1,0 +1,20 @@
+{
+  "name": "http-sandbox",
+  "kind": "runtime",
+  "configKind": "http",
+  "summary": "Any hosted sandbox behind the sandbox HTTP protocol, public or private.",
+  "env": [
+    "SANDBOX_TOKEN"
+  ],
+  "enable": "`{\"kind\": \"http\", \"url\": \"...\", \"tokenEnv\": \"SANDBOX_TOKEN\"}` in machine.json",
+  "module": "src/adapters/http-sandbox/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-runtimes.test.ts",
+    "env": [
+      "FACTORY_LIVE_SANDBOX_URL",
+      "FACTORY_LIVE_SANDBOX_TOKEN"
+    ]
+  }
+}

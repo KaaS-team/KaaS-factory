@@ -161,6 +161,23 @@ fn check_predicate(p: &Value, artifacts_dir: Option<&str>) -> Result<(), Tampere
     Ok(())
 }
 
+// The signed merge decision must judge this head, and a "merge" carries no refusal reason.
+fn check_merge(p: &Value, head: &str) -> Result<(), Tampered> {
+    let Some(m) = p.get("merge") else {
+        return Ok(());
+    };
+    if text(m, "headSha")? != head {
+        return tampered("merge.headSha", "does not name run.head.sha");
+    }
+    let reasons = get(m, "reasons")?
+        .as_array()
+        .map_or_else(|| tampered("merge.reasons", "not a list"), Ok)?;
+    if text(m, "outcome")? == "merge" && !reasons.is_empty() {
+        return tampered("merge.outcome", "merge with refusal reasons");
+    }
+    Ok(())
+}
+
 fn public_key(pem: &str) -> Result<VerifyingKey, Tampered> {
     let b64: String = pem.lines().filter(|l| !l.starts_with("-----")).collect();
     let der = B64
@@ -229,6 +246,7 @@ fn run(
         return tampered("subject[0].digest.gitCommit", "does not name run.head.sha");
     }
     check_predicate(p, artifacts_dir)?;
+    check_merge(p, head)?;
 
     let summary = format!(
         "{}#{} at {} proven={}",

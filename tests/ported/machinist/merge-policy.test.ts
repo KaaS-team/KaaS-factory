@@ -14,6 +14,8 @@ import {
   type DecideMergeInput,
   renderAuditComment,
 } from "../../../src/merge-policy";
+import type { PrFacts } from "../../../src/pr-facts";
+import { riskObject } from "../../../src/risk";
 
 const passingCheck: CiCheck = { name: "build", status: "COMPLETED", conclusion: "SUCCESS" };
 
@@ -222,4 +224,50 @@ test("the audit comment always carries the head-sha marker", () => {
 test("checkReadiness is the readiness half alone: eligibility problems never appear in its output", () => {
   const refusals = checkReadiness(readiness(), ci(), "main");
   expect(refusals).toEqual([]);
+});
+
+// Not in gate.py: the scaleup and enterprise profiles hold a merge for code owners (src/profile-rules.ts).
+test("decideMerge refuses with codeowner-approval while a touched file's code owner has not approved", () => {
+  const codeowners = { rules: [{ pattern: /^docs\//, owners: ["@docs-lead"] }], approvedBy: ["someone"] };
+  const decision = decideMerge(input({ codeowners }));
+  expect(decision.outcome).toBe("refuse");
+  if (decision.outcome === "refuse") expect(decision.refusals.map((r) => r.reason)).toEqual(["codeowner-approval"]);
+  expect(decideMerge(input({ codeowners: { ...codeowners, approvedBy: ["Docs-Lead"] } })).outcome).toBe("merge");
+});
+
+// Not ported: the autonomy tiers (src/autonomy.ts) decide from the PR facts document instead.
+function facts(overrides: Partial<PrFacts> = {}): PrFacts {
+  return {
+    cleanRoom: { ran: true, failToPass: true, passToPass: true },
+    changedLines: { mutants: 3, survived: [] },
+    tamper: [],
+    supplyChain: { highFindings: 0, newDependencies: [], alerts: 0 },
+    risk: riskObject({ risk: "low" }, { risk: "low", files: ["lib/a.ts"] }, { protectedPaths: [] }),
+    review: { builderModel: "builder", reviewers: [{ model: "reviewer", blockers: 0 }] },
+    ui: { changed: false, preview: false, smoke: false, unreviewedDiffs: 0 },
+    postMergeWatch: true,
+    ...overrides,
+  };
+}
+
+test("a low-risk change with every proof green merges with no human, and one red signal stops it", () => {
+  const tier = (o: Partial<DecideMergeInput>) =>
+    decideMerge(
+      input({
+        merge: mergeConfig({ autoPaths: [] }),
+        changedFiles: [file("lib/a.ts")],
+        autonomy: "semi",
+        facts: facts(),
+        ...o,
+      }),
+    );
+  expect(tier({}).outcome).toBe("merge");
+  const supervised = tier({ autonomy: "supervised" });
+  expect(supervised.outcome === "refuse" && supervised.refusals.map((r) => r.reason)).toEqual(["autonomy-supervised"]);
+  const survived = tier({ facts: facts({ changedLines: { mutants: 3, survived: ["lib/a.ts:4"] } }) });
+  expect(survived.outcome === "refuse" && survived.refusals.map((r) => r.reason)).toEqual(["signal-failed"]);
+  const medium = riskObject({ risk: "medium" }, { risk: "medium", files: ["lib/a.ts"] }, { protectedPaths: [] });
+  expect(tier({ facts: facts({ risk: medium }) }).outcome).toBe("refuse");
+  expect(tier({ facts: undefined }).outcome).toBe("refuse");
+  expect(tier({ changedFiles: Array.from({ length: 11 }, (_, i) => file(`lib/f${i}.ts`)) }).outcome).toBe("refuse");
 });

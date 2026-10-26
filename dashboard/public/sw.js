@@ -1,6 +1,6 @@
 // The cockpit's service worker: the shell opens offline, and nothing behind the token is ever stored,
 // so a lost phone's cache holds the page and no run data. A new SHELL list ships with a new CACHE name.
-const CACHE = "factory-shell-v1";
+const CACHE = "factory-shell-v2";
 const SHELL = [
   "/",
   "/tokens.css",
@@ -8,18 +8,37 @@ const SHELL = [
   "/app.js",
   "/manifest.webmanifest",
   "/icon.svg",
+  "/apple-touch-icon.png",
   "/fonts/geist.woff2",
+  "/lib/actions.js",
   "/lib/analytics-state.js",
+  "/lib/core.js",
+  "/lib/e2e.js",
   "/lib/exec-summary.js",
   "/lib/markdown.js",
+  "/lib/pane.js",
+  "/lib/rail.js",
   "/lib/relay-follow.js",
+  "/lib/remote.js",
+  "/lib/risk-badge.js",
   "/lib/routes.js",
   "/lib/run-metrics.js",
   "/lib/run-page.js",
   "/lib/runs-board.js",
+  "/lib/settings.js",
   "/lib/stations.js",
   "/lib/status-loader.js",
   "/lib/task-presentation.js",
+  "/lib/view-analytics.js",
+  "/lib/view-board.js",
+  "/lib/view-fleet.js",
+  "/lib/view-inbox.js",
+  "/lib/view-line.js",
+  "/lib/view-run.js",
+  "/lib/view-runs.js",
+  "/lib/view-settings.js",
+  "/lib/view-workflows.js",
+  "/lib/workflow-pages.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -51,4 +70,27 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => caches.match(path).then((hit) => hit ?? Response.error())),
   );
+});
+
+// A push carries only the two notice kinds (src/ports/notifier.ts); tapping one opens its issue.
+self.addEventListener("push", (event) => {
+  let n = {};
+  try {
+    n = event.data ? event.data.json() : {};
+  } catch {}
+  if (n.kind !== "needs-you" && n.kind !== "done") return;
+  const url = typeof n.url === "string" && n.url.startsWith("/") ? n.url : "/";
+  event.waitUntil(
+    self.registration.showNotification(String(n.title ?? "Factory"), {
+      body: String(n.body ?? ""),
+      icon: "/apple-touch-icon.png",
+      tag: url,
+      data: { url },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(self.clients.openWindow(event.notification.data?.url ?? "/"));
 });

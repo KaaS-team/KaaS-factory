@@ -42,7 +42,7 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v5.2.0 # pinned KaaS Factory release; bump deliberately
+  FACTORY_RUNNER_REF: v6.0.0 # pinned KaaS Factory release; bump deliberately
   FACTORY_RUNNER_REPO: KaaS-team/KaaS-factory
   CLAUDE_CODE_VERSION: "2.1.286" # pinned claude, same version the Dockerfile installs
   # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE

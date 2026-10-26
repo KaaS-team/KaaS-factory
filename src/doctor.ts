@@ -10,6 +10,7 @@ import { suggestSlots } from "./machine";
 import { loadWorkflow } from "./engine/workflows";
 import { MCP_REGISTRY, mcpProblems, parseMcpRegistry } from "./mcp";
 import { runtimeRefs, unknownRuntimes } from "./runtimes";
+import { type Health, probeChecks } from "./runtime-kit";
 import type { Workflow } from "./core/workflow";
 import { createHash } from "node:crypto";
 
@@ -33,6 +34,8 @@ export interface DoctorDeps {
   readonly fileExists: (path: string) => Promise<boolean>;
   readonly readFile: (path: string) => Promise<string | undefined>;
   readonly isExecutable: (path: string) => Promise<boolean>;
+  // probeRuntime over this machine's runtimes; absent, doctor checks names only.
+  readonly probeRuntime?: (runtime: string) => Promise<Health>;
 }
 
 export interface DoctorContext {
@@ -52,18 +55,13 @@ export interface DoctorContext {
   readonly templateOverrides?: readonly string[];
   // config.tmux.enabled: the watcher refuses to start without tmux, so doctor says so first.
   readonly tmux?: boolean;
-  // The pre-v2.6.2 shared paths (`defaultStatePath`/`workspacesDir` called
-  // with no `repo`), passed in so doctor can warn when they still exist.
-  // Never auto-migrated: that was an explicit design decision (a shared DB
-  // moved without asking could interleave two repos' history), so this
-  // check only names the path and leaves the move to the operator.
+  // The pre-v2.6.2 shared paths, warned about and never auto-migrated: a shared DB moved without
+  // asking could interleave two repos' history, so the move is left to the operator.
   readonly legacyStatePath?: string;
   readonly legacyWorkspacesDir?: string;
-  // config.resettable (default false). Gates the baseline-tag check below:
-  // a repo that never sets this has no reason to keep a baseline tag current.
+  // config.resettable: a repo that never sets it has no reason to keep a baseline tag current.
   readonly resettable?: boolean;
-  // The machine's own slot count (loadMachineConfig().slots), so doctor can
-  // compare it against suggestSlots()'s cores/memory heuristic. Advice only
+  // The machine's slot count, compared against suggestSlots()'s cores/memory heuristic. Advice only
   // (plan v2.7.0 item 5): nothing here enforces the suggestion.
   readonly configuredSlots?: number;
   // config.workflow: the watcher refuses to start on a workflow that does not parse.
@@ -307,6 +305,8 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
         detail: unknown.length ? unknown.join("; ") : refs.map((r) => `${r.where}: ${r.name}`).join(", "),
         fixable: false,
       });
+      // A name that exists can still be a box that is down.
+      if (deps.probeRuntime) checks.push(...(await probeChecks(refs, ctx.runtimeNames, deps.probeRuntime)));
     }
     const named = loaded.ok
       ? Object.values(loaded.workflow.steps).flatMap((s) => (s.mcp ?? []).map((n) => ({ step: s.id, n })))

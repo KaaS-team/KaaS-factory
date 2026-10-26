@@ -326,154 +326,264 @@
       "phase": "P3",
       "ask": "The factory is an MCP server, so any agent or IDE can start, read and approve tasks",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/mcp-server.test.ts",
+        "name": "an agent on stdio starts, reads and approves a task, signed on the tracker",
+        "mutation": "mcp: approve_plan signs the command with who sent it"
+      }
     },
     {
       "id": "runner-dial-out",
       "phase": "P3",
       "ask": "invoking any connected machine or sandbox: a runner registers once and dials out, with heartbeat and requeue",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/runner-channel.test.ts",
+        "name": "a lease whose runner is silent for 60s goes back to the queue and to a runner still heard from",
+        "mutation": "runners: a lease silent for 60s goes back to the queue"
+      }
     },
     {
       "id": "phone-pairing",
       "phase": "P3",
       "ask": "Pair a phone by QR, with revocable device keys",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/pairing.test.ts",
+        "name": "a QR pairs a phone once, the device is listed, and revoking it ends its session",
+        "mutation": "pairing: revoking a device ends its session"
+      }
     },
     {
       "id": "e2e-encryption",
       "phase": "P3",
       "ask": "The plane and relay carry ciphertext only",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/e2e.test.ts",
+        "name": "the relay receives a sealed box with no plaintext, and only the paired phone opens it",
+        "mutation": "relay: only a sealed box goes on the wire"
+      }
     },
     {
       "id": "web-push",
       "phase": "P3",
       "ask": "Needs you and Done reach the phone, muted while someone is present",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/web-push.test.ts",
+        "name": "needs-you and done reach the phone encrypted, and nothing is pushed while its person is present",
+        "mutation": "push: nobody is pushed while they are present"
+      }
     },
     {
       "id": "phone-approvals",
       "phase": "P3",
       "ask": "Approvals from the phone: the relay is read-only, so unblocking and approving stay on GitHub or the dashboard.",
       "source": "CHANGELOG v5.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/phone-approvals.test.ts",
+        "name": "a paired phone approves a plan as its person, on the tracker, until it is revoked",
+        "mutation": "pairing: a phone acts as its person"
+      }
     },
     {
       "id": "stale-pr-nudge-ios-icon",
       "phase": "P3",
       "ask": "A stale-PR nudge (the code host's PR record has no `updatedAt` yet) and a PNG touch icon for iOS.",
       "source": "CHANGELOG v5.0.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/stale-pr.test.ts",
+        "name": "a factory PR quiet for 3 days is nudged in the inbox, and iOS gets a 180px PNG touch icon",
+        "mutation": "inbox: a factory PR quiet for 3 days is nudged"
+      }
     },
     {
       "id": "phone-intake",
       "phase": "P3",
       "ask": "End to end from a phone: PWA trigger, board, factory, summary, human merge, public dashboard",
       "source": "spec 10 phone-intake",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/phone-intake.test.ts",
+        "name": "a phone files a task, a remote runner ships it, and the phone merges and sees it shipped",
+        "mutation": "push: a shipped run tells the phone it is done"
+      }
     },
     {
       "id": "mid-run-commands",
       "phase": "P3",
       "ask": "a message sent mid-run, queued and undoable until a runner reads it; takeover from the web; cancelling a stage that is running (cut from command-routes: they need the runner signal channel)",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/mid-run.test.ts",
+        "name": "a message is undoable until the runner reads it, and stop and takeover reach the runner",
+        "mutation": "runners: a message read by the runner can no longer be undone"
+      }
     },
     {
       "id": "control-anywhere",
       "phase": "P3",
       "ask": "deploying the factory on the web, controllable from local, web, mobile or anywhere",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/control-anywhere.test.ts",
+        "name": "a guarded web plane is driven from MCP, a browser, a phone and a remote runner",
+        "mutation": "runner: a message from anywhere reaches the run's folder"
+      }
     },
     {
       "id": "sandbox-contract",
       "phase": "P4",
       "ask": "The sandbox contract: create, exec, files, snapshot, pause and resume, expose, status, destroy, with capability flags",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "every runtime kind reports its flags, and a sandbox does each verb",
+        "mutation": "sandbox: a paused sandbox refuses commands"
+      }
     },
     {
       "id": "runtime-verify-kit",
       "phase": "P4",
       "ask": "factory runtime verify <name> runs one shared suite against any adapter",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "the kit passes a working runtime and names what a broken one gets wrong",
+        "mutation": "runtime kit: the exit code check bites"
+      }
     },
     {
       "id": "microsandbox-default",
       "phase": "P4",
       "ask": "local microsandbox supported by default",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "is microsandbox with msb and a hypervisor, otherwise local with a warning",
+        "mutation": "runtimes: no hypervisor means the default runs locally"
+      }
     },
     {
       "id": "any-sandbox",
       "phase": "P4",
       "ask": "also able to connect any sandboxes too not just microsandbox",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "any sandbox passes the same kit: an http sandbox and a wrap launcher, not only microsandbox",
+        "mutation": "http sandbox: the command reaches the sandbox"
+      }
     },
     {
       "id": "egress-proxy",
       "phase": "P4",
       "ask": "Deny-by-default egress on every runtime, keys injected by a proxy the guest cannot read",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/egress.test.ts",
+        "name": "denies every host off the list, and swaps a key in only toward that key's hosts",
+        "mutation": "egress: a key goes only to its own hosts"
+      }
     },
     {
       "id": "acp-readonly-mount",
       "phase": "P4",
       "ask": "A read-only mount for ACP stages. An agent process that leaves its process group can still write after the check; run read-only stages in a sandbox runtime where that matters.",
       "source": "CHANGELOG v5.0.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/acp-readonly-mount.test.ts",
+        "name": "a read-only ACP stage mounts the worktree read-only in the VM, a build stage does not",
+        "mutation": "microsandbox: a read-only stage mounts its worktree read-only"
+      }
     },
     {
       "id": "fleet-view",
       "phase": "P4",
       "ask": "Machines, tags, slots in use, last heartbeat and current task in one view",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/fleet.test.ts",
+        "name": "every machine, its tags, slots in use, last heartbeat and current task, in one view",
+        "mutation": "fleet: a poll writes this machine's heartbeat"
+      }
     },
     {
       "id": "slot-usage",
       "phase": "P4",
       "ask": "Machine slot usage on the Settings page (slots are local; only issue leases are shown).",
       "source": "CHANGELOG v3.5.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/fleet.test.ts",
+        "name": "the Settings page says how many slots are in use and whether each runtime the repo uses answers",
+        "mutation": "settings: slots in use come from the machine's leases"
+      }
     },
     {
       "id": "runtime-health-probe",
       "phase": "P4",
       "ask": "A live health probe per runtime; the Runtimes table shows configuration only.",
       "source": "CHANGELOG v3.5.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "a live runtime answers, an unreachable one says why, a hung one times out",
+        "mutation": "runtime probe: a down runtime says why"
+      }
     },
     {
       "id": "doctor-reachability",
       "phase": "P4",
       "ask": "A health probe per runtime in `factory doctor`; it checks names, not reachability.",
       "source": "CHANGELOG v3.3.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/doctor.test.ts",
+        "name": "each runtime the repo names is probed: a live one answers, a down one fails with why",
+        "mutation": "doctor: a runtime that does not answer fails"
+      }
     },
     {
       "id": "any-agent",
       "phase": "P4",
       "ask": "make sure that any coding agent can be connected",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/any-agent.test.ts",
+        "name": "the same ticket ships with a bare command, a preset CLI and an ACP server",
+        "mutation": "any agent: a bare command runs as its own argv"
+      }
     },
     {
       "id": "acp-seam",
       "phase": "P4",
       "ask": "Any coding agent runs the factory: one ACP seam, proven by the same ticket passing with two agents",
       "source": "spec 10 acp-seam",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/any-agent.test.ts",
+        "name": "one ACP seam: two unrelated ACP servers ship the same ticket the same way",
+        "mutation": "acp: a reply split across chunks is joined"
+      }
     },
     {
       "id": "mission-control",
@@ -492,455 +602,740 @@
       "phase": "P4",
       "ask": "make sure that it can be run on local or server too",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/local-or-server.test.ts",
+        "name": "the image copies every file the CLI and dashboard load, and runs from that copy alone",
+        "mutation": "server: the image copies the dashboard"
+      }
     },
     {
       "id": "lean-resources",
       "phase": "P4",
       "ask": "very lean on resources to run these",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/lean-resources.test.ts",
+        "name": "the CLI and the dashboard start under 100 MB, and the default sandbox is one CPU and 1 GB",
+        "mutation": "lean: the default sandbox asks for 1 GB"
+      }
     },
     {
       "id": "workflow-md",
       "phase": "P5",
       "ask": "configurable workflows: .factory/workflows/*.md with stages, needs, agent, tools, gates and approval",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-md.test.ts",
+        "name": "a .md workflow's stages, needs, agent, tools, gates and approval drive an issue",
+        "mutation": "workflow-md: a stage's tools become its MCP servers"
+      }
     },
     {
       "id": "safe-outputs",
       "phase": "P5",
       "ask": "Agent stages are read-only; only the runner's executor writes to the tracker or GitHub",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/safe-outputs.test.ts",
+        "name": "no agent stage is allowed a command that writes to GitHub, the tracker or the network",
+        "mutation": "safe outputs: outward allow rules are dropped"
+      }
     },
     {
       "id": "durable-resume",
       "phase": "P5",
       "ask": "A resume replays finished stages from the event log; approval is a wait-for-event token",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/durable-resume.test.ts",
+        "name": "an approved token resumes the run past the park without rerunning finished stages",
+        "mutation": "durable resume: finished stages replay from the event log"
+      }
     },
     {
       "id": "workflow-editor-pr",
       "phase": "P5",
       "ask": "A form editor that writes a workflow's YAML through a PR; the Workflows page is read-only.",
       "source": "CHANGELOG v3.5.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-pages.test.ts",
+        "name": "the workflow form opens a PR with the edited file and never writes the repo's own workflow",
+        "mutation": "workflow editor: an edit is a PR, never a write to the repo"
+      }
     },
     {
       "id": "events-page-replay",
       "phase": "P5",
       "ask": "An Events page with replay.",
       "source": "CHANGELOG v3.5.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-pages.test.ts",
+        "name": "the Events page lists each event with its deliveries, and Replay sends one event to its sinks again",
+        "mutation": "events page: replay sends the event again"
+      }
     },
     {
       "id": "events-tail-follow",
       "phase": "P5",
       "ask": "`factory events tail --follow`.",
       "source": "CHANGELOG v4.0.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/events-tail.test.ts",
+        "name": "tail --follow prints events recorded after it started, once each, until stopped",
+        "mutation": "events tail --follow: it keeps polling"
+      }
     },
     {
       "id": "minions-view",
       "phase": "P5",
       "ask": "Minions run locally only, in an empty workspace (no repo checkout). No dashboard view for minions or events.",
       "source": "CHANGELOG v4.0.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-pages.test.ts",
+        "name": "the Minions page lists every minion, what starts it, its workspace and its last run",
+        "mutation": "minions page: each minion shows its last run"
+      }
     },
     {
       "id": "deterministic-tool-step",
       "phase": "P5",
       "ask": "A deterministic tool step in a workflow",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/tool-step.test.ts",
+        "name": "a tool step calls one MCP tool with its arguments and no agent, then report closes the issue",
+        "mutation": "tool step: a passing tool call moves on"
+      }
     },
     {
       "id": "set-mode-web",
       "phase": "P6",
       "ask": "set a repo's autonomy mode from the web, written to the tracker first (cut from command-routes: the tiers land in P6)",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/plane-commands.test.ts",
+        "name": "an owner sets a repo's autonomy as a signed tracker comment the runner reads back",
+        "mutation": "plane: the autonomy mode is set by an owner only"
+      }
     },
     {
       "id": "autonomy-tiers",
       "phase": "P6",
       "ask": "completely steer triage, planning, execution, PR, review and risk analysis, then merge automatically on automated verification",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/autonomy.test.ts",
+        "name": "each tier steers triage, plan, build, PR, review and merge, and the web mode wins over config",
+        "mutation": "autonomy: semi approves a low-risk plan by itself"
+      }
     },
     {
       "id": "pr-facts-signed",
       "phase": "P6",
       "ask": "One PR facts document with every merge signal; the decision and its reasons are signed into the receipt",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/receipt.test.ts",
+        "name": "the merge decision, its reasons and the PR facts it read are signed into the receipt",
+        "mutation": "receipt: the merge decision is signed in"
+      }
     },
     {
       "id": "verify-clean-room",
       "phase": "P6",
       "ask": "Verify runs in a fresh checkout with no network and holdouts copied in only then",
       "source": "spec 10 verify-clean-room",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/clean-room.test.ts",
+        "name": "verify runs in a fresh checkout with no network, and holdouts come in from the base only then",
+        "mutation": "clean room: holdouts come from the base"
+      }
     },
     {
       "id": "verify-changed-lines",
       "phase": "P6",
       "ask": "Factory verify runs the kit's changed-line mutants (spec 10 changed-lines-proven) on every PR",
       "source": "spec 10 changed-lines-proven",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/changed-mutants.test.ts",
+        "name": "verify runs mutants on the changed lines of every PR and reports the lines no test checks",
+        "mutation": "mutants: a mutant the tests pass is reported"
+      }
     },
     {
       "id": "verify-tamper",
       "phase": "P6",
       "ask": "Factory verify fails a diff that weakens tests, runner config or skips, using the kit's tamper check (spec 10 tamper-guard)",
       "source": "spec 10 tamper-guard",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/tamper.test.ts",
+        "name": "a diff that weakens tests, runner config or skips fails the tamper check",
+        "mutation": "tamper: an added skip marker is a hit"
+      }
     },
     {
       "id": "different-model-review",
       "phase": "P6",
       "ask": "The reviewer runs on a different model from the builder; high risk adds a second",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/review-models.test.ts",
+        "name": "the reviewer runs on a different model from the builder, and high risk adds a second",
+        "mutation": "review: high risk needs a second reviewer"
+      }
     },
     {
       "id": "verify-visual-diff",
       "phase": "P6",
       "ask": "UI changes get a preview, a smoke test and a visual diff",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/visual.test.ts",
+        "name": "UI changes get a preview, a smoke test and a visual diff",
+        "mutation": "visual: a changed screenshot is an unreviewed diff"
+      }
     },
     {
       "id": "merge-serial",
       "phase": "P6",
       "ask": "Parallel agents never break main: one PR at a time, rebased and re-gated",
       "source": "spec 10 merge-serial",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/merge-queue.test.ts",
+        "name": "one PR merges at a time, and a head the rebase moved waits for its gates",
+        "mutation": "merge queue: one lease per repo"
+      }
     },
     {
       "id": "post-merge-revert",
       "phase": "P6",
       "ask": "A failing live smoke after merge opens a revert PR; change failure rate tightens thresholds",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/post-merge.test.ts",
+        "name": "a failing live smoke after merge opens a revert PR, and the change failure rate tightens thresholds",
+        "mutation": "post-merge: a high change failure rate halves the limits"
+      }
     },
     {
       "id": "risk-badge",
       "phase": "P6",
       "ask": "One risk object per task, shown as a badge everywhere",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/risk.test.ts",
+        "name": "one risk object per task reaches the board, the inbox and the badge",
+        "mutation": "risk badge: the badge names the level"
+      }
     },
     {
       "id": "auto-merge-low-risk",
       "phase": "P6",
       "ask": "No human merge for a low-risk change: every proof green and the diff inside the low-risk class",
       "source": "spec 10 auto-merge-low-risk",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/ported/machinist/merge-policy.test.ts",
+        "name": "a low-risk change with every proof green merges with no human, and one red signal stops it",
+        "mutation": "merge policy: a tier merges when every signal is green"
+      }
     },
     {
       "id": "plan-risk-floor",
       "phase": "P6",
       "ask": "Raising the plan's risk from a deterministic rating when the agent rates it lower.",
       "source": "CHANGELOG v3.2.0 #6",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/risk.test.ts",
+        "name": "a plan the agent rates lower than its files is raised to the deterministic rating",
+        "mutation": "risk: a plan rated under its files is raised"
+      }
     },
     {
       "id": "ui-qa-pm",
       "phase": "P7",
       "ask": "configurable workflows, monitorable by non-technical QA and PMs",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "a workflow reads as plain steps for a PM, and its automation switches are one click away",
+        "mutation": "p7: workflows link to the automation switches"
+      }
     },
     {
       "id": "ui-claude-codex",
       "phase": "P7",
       "ask": "a UI/UX following /frontend-design that borrows Claude/Codex app patterns without reinventing wheel",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "a run reads as a conversation: stages fold like tool calls, the plan card approves, and a sent message can be undone",
+        "mutation": "p7: undo takes a queued message back"
+      }
     },
     {
       "id": "ui-right-pane",
       "phase": "P7",
       "ask": "Outcome, Changes, Checks, Preview, Risk and Cost tabs beside the timeline",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "the run page puts Outcome, Changes, Checks, Preview and Risk beside the timeline, and Cost only for an operator",
+        "mutation": "p7: the pane keeps cost from anyone below operator"
+      }
     },
     {
       "id": "ui-mobile",
       "phase": "P7",
       "ask": "One column, bottom tabs, approve or answer in one tap",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "on a phone the cockpit is one column with bottom tabs, and an inbox row approves or answers in one tap",
+        "mutation": "p7: a listed question answers in one tap"
+      }
     },
     {
       "id": "settings-tabs",
       "phase": "P7",
       "ask": "Settings tabs; the page is one section per topic.",
       "source": "CHANGELOG v3.5.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "Settings is tabs, one panel per topic",
+        "mutation": "p7: settings hides operator tabs from a viewer"
+      }
     },
     {
       "id": "kaas-look",
       "phase": "P7",
       "ask": "kaas.team look for the dashboard",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "the dashboard wears the kaas.team look: Geist, the kaas tokens, the inset frame and pill tabs",
+        "mutation": "p7: a selected tab is the kaas.team pill"
+      }
     },
     {
       "id": "board-custom-step",
       "phase": "P7",
       "ask": "The dashboard board has no column for a custom step label; such an issue shows in the list only.",
       "source": "CHANGELOG v3.1.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "an issue on a custom workflow step gets its own board column, not only the list",
+        "mutation": "p7: a custom step label gets a board column"
+      }
     },
     {
       "id": "integration-manifests",
       "phase": "P8",
       "ask": "any system can be integrated by proper integrations ways through PR from public or private companies",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "every integration has a valid manifest whose contract test names each env key", "mutation": "integrations: a manifest's kind is checked"}
     },
     {
       "id": "connectors-catalogue",
       "phase": "P8",
       "ask": "Connectors catalogue",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "docs/integrations.md's generated table equals the manifests", "mutation": "integrations: the catalogue doc is generated from the manifests"}
     },
     {
       "id": "linear-agent-api",
       "phase": "P8",
       "ask": "Delegate a Linear issue to the factory as an agent session",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/linear-agent.test.ts", "name": "a delegated issue is acked inside 5s, gets a thought inside 10s, and starts a ready issue", "mutation": "linear agent: a delegated issue gets a first thought"}
     },
     {
       "id": "slack-assistant",
       "phase": "P8",
       "ask": "Start and steer a task from a Slack thread",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/slack.test.ts", "name": "a message starts a ready issue, and approve in the same thread steers it", "mutation": "slack: a delivery's signature covers its timestamp"}
     },
     {
       "id": "live-tracker-tests",
       "phase": "P8",
       "ask": "The native tracker adapters are tested against fixtures modeled on each vendor's documented API, not against live workspaces.",
       "source": "CHANGELOG v5.0.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "every tracker and runtime with a live block runs in its live suite, keyed by the manifest", "mutation": "live trackers: each live tracker is keyed by its manifest"}
     },
     {
       "id": "live-runtime-tests",
       "phase": "P8",
       "ask": "The `ssh`, `wrap` and `http` runtimes are tested against stand-ins and a reference server, not against a live VM, a Firecracker host or a hosted sandbox vendor.",
       "source": "CHANGELOG v3.3.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "every tracker and runtime with a live block runs in its live suite, keyed by the manifest", "mutation": "live runtimes: each live runtime is keyed by its manifest"}
     },
     {
       "id": "otel-genai",
       "phase": "P8",
       "ask": "One OTel trace per run with gen_ai spans",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/otel.test.ts", "name": "a run ends with one trace: a root span and a gen_ai span per stage, sent to the collector", "mutation": "otel: a stage span is a gen_ai invoke_agent span"}
     },
     {
       "id": "checks-api-progress",
       "phase": "P8",
       "ask": "Checks API progress (one check run per step).",
       "source": "CHANGELOG v3.2.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/checks-progress.test.ts", "name": "a step opens one check run on the branch head and its end concludes that run", "mutation": "checks: a failed step concludes its check run as a failure"}
     },
     {
       "id": "mcp-notifier",
       "phase": "P8",
       "ask": "The MCP notifier and event-source adapters, and `action: mcp`; the inbox chat channel stays a stub.",
       "source": "CHANGELOG v3.2.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/mcp-notifier.test.ts", "name": "each progress note is one tools/call on the notifier tool, in one session, with the token", "mutation": "mcp notifier: each note calls the configured tool"}
     },
     {
       "id": "ee-sso",
       "phase": "P9",
       "ask": "SSO through SAML and OIDC, then SCIM",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/sso.test.ts",
+        "name": "SCIM provisions a person, OIDC and SAML sign them in, and SCIM deprovisioning ends their access",
+        "mutation": "sso: SCIM deprovisioning ends plane access"
+      }
     },
     {
       "id": "ee-roles",
       "phase": "P9",
       "ask": "Custom roles",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/roles.test.ts",
+        "name": "a custom role grants and denies single routes on top of its base, and never grants an owner route",
+        "mutation": "roles: a custom role never grants an owner route"
+      }
     },
     {
       "id": "ee-audit-export",
       "phase": "P9",
       "ask": "Audit-log export",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/audit-export.test.ts",
+        "name": "an owner exports every audit row, oldest first, as JSON lines or CSV, and resumes after an id",
+        "mutation": "audit export: resumes after the id it is given"
+      }
     },
     {
       "id": "org-mode",
       "phase": "P9",
       "ask": "org mode / multi-tenant",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/org-mode.test.ts",
+        "name": "a role in one org reaches that org's repos only, and org settings stay with plane owners",
+        "mutation": "org mode: no role in a repo's org, no access to it"
+      }
     },
     {
       "id": "ee-spend-policy",
       "phase": "P9",
       "ask": "Fleet-wide spend policy",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/spend-policy.test.ts",
+        "name": "an org's repos together, and the whole fleet, hold back work no single repo cap would",
+        "mutation": "spend policy: an org's repos share one daily cap"
+      }
     },
     {
       "id": "profile-rules",
       "phase": "P9",
       "ask": "Concrete `scaleup` and `enterprise` profile rules (CODEOWNERS approvers, org caps, forced sandbox).",
       "source": "CHANGELOG v3.4.0 #7",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/profile-rules.test.ts",
+        "name": "a merge waits for each touched file's code owner, enterprise forces a sandbox, and both cap teams",
+        "mutation": "profile rules: a touched file waits for its code owner"
+      }
     },
     {
       "id": "org-caps",
       "phase": "P9",
       "ask": "Per-team back-pressure and org caps for `scaleup` and `enterprise` (v3.4).",
       "source": "CHANGELOG v3.2.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/org-caps.test.ts",
+        "name": "a team at its cap of work waiting on people gets no new pickups, other teams do, and the org cap holds all",
+        "mutation": "org caps: a team at its cap gets no new pickups"
+      }
     },
     {
       "id": "one-image",
       "phase": "P10",
       "ask": "One image for plane, relay and verify; docker compose up to self-host; bunx kaas-factory up on a laptop",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/deploy.test.ts",
+        "name": "the image builds the relay and verify, carries both, and runs the stack by default",
+        "mutation": "deploy: the image carries kaas-verify"
+      }
     },
     {
       "id": "hosted-coolify",
       "phase": "P10",
       "ask": "Coolify on netcup at factory.kaas.team",
       "source": "user, 26 Oct 2026",
-      "owner": "param"
+      "owner": "param",
+      "proof": {
+        "probe": "scripts/probes/hosted-coolify.sh"
+      }
     },
     {
       "id": "idle-rss",
       "phase": "P10",
       "ask": "Idle RSS of plane plus relay under 150 MB, asserted in CI",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/deploy.test.ts",
+        "name": "idle RSS of plane plus relay stays under 150 MB",
+        "mutation": "deploy: idle RSS budget is 150 MB"
+      }
     },
     {
       "id": "live-auto-merge",
       "phase": "P10",
       "ask": "One task on splitbill-demo goes from a phone to an automatic merge",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "probe": "scripts/probes/live-auto-merge.sh"
+      }
     },
     {
       "id": "teach-command",
       "phase": "P5",
       "ask": "factory teach \"<how we ship>\" reads the repo, its CI and the company brain, writes workflows, minions and skills, validates them and opens a PR (agentic-ai-lightning-sessions factory/research/v4/PLAN.md v4.4; deferred in CHANGELOG v4.0.0)",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/teach.test.ts",
+        "name": "teach reads the repo, its CI and the brain, and opens one PR with checked workflows and skills",
+        "mutation": "teach: every proposed file is checked before a PR"
+      }
     },
     {
       "id": "minions-checkout",
       "phase": "P5",
       "ask": "Minions run locally only, in an empty workspace (no repo checkout). No dashboard view for minions or events.",
       "source": "CHANGELOG v4.0.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/minion-checkout.test.ts",
+        "name": "a checkout minion runs in a fresh clone of the repo each time; without it the workspace is empty",
+        "mutation": "minions: checkout clones the repo into the workspace"
+      }
     },
     {
       "id": "package-owners",
       "phase": "P6",
       "ask": "Per-package owners and protected paths; `packages` gives gates only.",
       "source": "CHANGELOG v3.4.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/risk.test.ts",
+        "name": "a package's owners and protected paths make a change under it high risk, and a full merge waits for a person",
+        "mutation": "risk: a package's owners need a human merge"
+      }
     },
     {
       "id": "monorepo-proof",
       "phase": "P6",
       "ask": "The proof in a monorepo runs only the top-level `test` gate, not a package's.",
       "source": "CHANGELOG v3.4.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/monorepo-proof.test.ts",
+        "name": "the proof in a monorepo runs the touched package's test gate, not only the top-level one",
+        "mutation": "proof: a touched package's test gate runs too"
+      }
     },
     {
       "id": "workflow-from-late-type",
       "phase": "P5",
       "ask": "A workflow is chosen from the type label an issue was filed with; a type triage assigns later does not switch it.",
       "source": "CHANGELOG v3.4.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/late-route.test.ts",
+        "name": "an issue filed with no type label runs the workflow its triaged type routes to",
+        "mutation": "late route: a triaged type switches the workflow once"
+      }
     },
     {
       "id": "library-workflows",
       "phase": "P5",
       "ask": "Library workflows that need new step types: pr-review, test-authoring, coverage-gap, flaky-test, dependency-update, ci-fix, ci-cd-authoring, release-notes, harness-learn, ui-component, spec-to-plan and backlog-triage.",
       "source": "CHANGELOG v3.4.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/library-workflows.test.ts",
+        "name": "every library workflow ships with the runner, loads clean and is listed by harness validate",
+        "mutation": "library: spec-to-plan ends on a report, never a PR"
+      }
     },
     {
       "id": "harness-scaffold",
       "phase": "P5",
       "ask": "`factory harness scaffold` and `eval`.",
       "source": "CHANGELOG v3.4.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/harness-scaffold.test.ts",
+        "name": "eval scores each workflow's recorded runs: shipped rate, failed steps and cost",
+        "mutation": "harness eval: failed steps count per workflow"
+      }
     },
     {
       "id": "language-images",
       "phase": "P4",
       "ask": "Per-language Docker images and devcontainer support for the docker and ssh runtimes.",
       "source": "CHANGELOG v3.4.0 #6",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/language-images.test.ts",
+        "name": "an auto image follows the devcontainer, then the toolchain key, then the stack, for docker and ssh",
+        "mutation": "images: a devcontainer's image wins"
+      }
     },
     {
       "id": "toolchain-key",
       "phase": "P4",
       "ask": "A `toolchain` config key, and `factory init` writing `charter.md`.",
       "source": "CHANGELOG v3.4.0 #8",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/stack.test.ts",
+        "name": "init writes the toolchain key and a charter that names the stack, and leaves an edited charter",
+        "mutation": "init: the charter names the detected stack"
+      }
     },
     {
       "id": "remote-agent-steps",
       "phase": "P4",
       "ask": "Agent steps (triage, plan, build, verify, pr) on a remote runtime; they run where the factory runs. Only gates and `check` steps move.",
       "source": "CHANGELOG v3.3.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/remote-agent-steps.test.ts",
+        "name": "every agent step runs in the docker agentRuntime, and the ticket still ships",
+        "mutation": "agent runtime: an agent step runs in the docker container"
+      }
     },
     {
       "id": "cloud-routine-tick",
       "phase": "P4",
       "ask": "A Claude Code cloud routine that runs `factory tick` on a schedule, and `factory dispatch` driving the Actions template one step per job.",
       "source": "CHANGELOG v3.3.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dispatch.test.ts",
+        "name": "dispatch names the issues one tick would advance, and a routine runs factory tick on its cron",
+        "mutation": "routine: the cloud routine runs factory tick"
+      }
     },
     {
       "id": "blob-store",
       "phase": "P10",
       "ask": "Transcripts and artifacts to a shared blob store; they stay on the machine that ran the stage.",
       "source": "CHANGELOG v3.3.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/blobs.test.ts",
+        "name": "a stage on a runner reaches the blob store and the plane mirrors it onto its run paths",
+        "mutation": "blobs: a stage ships its run"
+      }
     },
     {
       "id": "cron-dedupe",
       "phase": "P5",
       "ask": "Cron dedupe through GitHub: two watchers could each still file one scheduled issue.",
       "source": "CHANGELOG v3.3.0 #6",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/cron-dedupe.test.ts",
+        "name": "two watchers sharing a lease store file one scheduled issue between them",
+        "mutation": "cron dedupe: a watcher claims the minute before filing"
+      }
     },
     {
       "id": "emit-chaining",
       "phase": "P5",
       "ask": "`emit` chaining between workflows, and a `labels:` mapping for a team's own label names.",
       "source": "CHANGELOG v3.2.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/emit-chaining.test.ts",
+        "name": "a shipped workflow's emit files a ready issue for the workflow listening on.emitted",
+        "mutation": "emit chaining: on.emitted hears a shipped workflow's emit"
+      }
     },
     {
       "id": "cron-dedupe-v32",
       "phase": "P5",
       "ask": "Cron dedupe through GitHub, so two watchers on one repo could each file the same scheduled issue (v3.3, with the GitHub store).",
       "source": "CHANGELOG v3.2.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/cron-dedupe.test.ts",
+        "name": "two watchers on clones of one remote file one scheduled issue through git lease refs",
+        "mutation": "cron dedupe v3.3: a held git lease ref is not taken"
+      }
     },
     {
       "id": "revision-role-check",
@@ -959,28 +1354,48 @@
       "phase": "P3",
       "ask": "`StorePort`, `SecretsPort`, `NotifierPort` and `EventSourcePort` land with their adapters in v3.2 and v3.3; `ExecutionPort` is a single `run` until the remote runtimes need prepare, collect and teardown (v3.3).",
       "source": "CHANGELOG v3.1.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/ports-landed.test.ts",
+        "name": "StorePort, SecretsPort, NotifierPort and EventSourcePort each exist with an adapter",
+        "mutation": "ports: StorePort has its SQLite adapter"
+      }
     },
     {
       "id": "contrib-agents",
       "phase": "P4",
       "ask": "`src/state.ts` and `src/agents/` stay where they are; the non-Claude presets move to `contrib/agents` later.",
       "source": "CHANGELOG v3.1.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/contrib-agents.test.ts",
+        "name": "every non-Claude, non-ACP preset lives in contrib/agents, and the core stays in place",
+        "mutation": "contrib: only the registry reaches a vendor preset"
+      }
     },
     {
       "id": "json-schema-hook",
       "phase": "P6",
       "ask": "`--json-schema` does not replace the stop-artifact hook: it constrains only the final message, and the hook checks the artifact files.",
       "source": "CHANGELOG v3.1.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/json-schema-hook.test.ts",
+        "name": "--json-schema constrains only the final message, and the hook still checks the artifact files",
+        "mutation": "executor: claude gets --json-schema beside the armed hook"
+      }
     },
     {
       "id": "rebuild-resume-any-agent",
       "phase": "P5",
       "ask": "A rebuild only resumes for the claude preset; the failure tail is not yet in other agents' prompts.",
       "source": "CHANGELOG v3.1.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/rebuild-resume.test.ts",
+        "name": "a rebuild's failure tail is in a non-claude agent's prompt",
+        "mutation": "rebuild: every agent's prompt carries the failure tail"
+      }
     },
     {
       "id": "hosted-compute",
@@ -1008,28 +1423,40 @@
       "phase": "P8",
       "ask": "A2A and AG-UI (an integration when a user needs it, never a default; may become a default)",
       "source": "user, 26 Oct 2026 (answer on the proposed outs)",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/a2a-agui.test.ts", "name": "with neither key set, the agent card, the A2A endpoint and the AG-UI stream are 404", "mutation": "a2a: the endpoint is off until FACTORY_A2A_TOKEN is set"}
     },
     {
       "id": "default-harness",
       "phase": "P5",
       "ask": "Factory will have defaults skills, subagents needed to run the factory and which can be usable for any coding agents too - basically default harness",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/harness-defaults.test.ts",
+        "name": "a repo with no .claude config ships an issue on the factory's default skills and subagents",
+        "mutation": "default harness: missing defaults are provided before a stage"
+      }
     },
     {
       "id": "repo-config-wins",
       "phase": "P5",
       "ask": "rest of the config harness comes from their codidng agent and repo .claude / .agents config itslef, so automatically it picks from what they configured, we will give default which if needed they overwirte and use it accordingly.",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/harness-defaults.test.ts",
+        "name": "a skill or subagent the repo configures in .claude or .agents wins over the default",
+        "mutation": "repo config wins: a repo's .agents skill is used over the default"
+      }
     },
     {
       "id": "any-board-steers",
       "phase": "P8",
       "ask": "sterrable from anywhere just by connecting their issue board or task board from different porject management tool.",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/any-board-steers.test.ts", "name": "on every board, a task started there is ready, and approve on it is a command the runner reads", "mutation": "steer: a task started from any board is labelled ready"}
     },
     {
       "id": "open-lean-core",
@@ -1042,6 +1469,14 @@
         "name": "the core runs on open source only, with no runtime npm package",
         "mutation": "licensing: no runtime npm package"
       }
+    },
+    {
+      "id": "viewer-no-operator-detail",
+      "phase": "P7",
+      "ask": "Operator detail (model names, tokens, spend, hosts) never reaches a customer: no viewer route returns it",
+      "source": "engineering standard, review 26 Oct 2026",
+      "owner": "agent",
+      "proof": {"test": "tests/plane-access.test.ts", "name": "no route a viewer can read returns a model, a cost, tokens or a host", "mutation": "plane: a viewer's JSON never carries a model, cost, tokens or host"}
     }
   ]
 }

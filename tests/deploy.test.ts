@@ -1,0 +1,106 @@
+// The deploy shape: one image for plane, relay and verify, `docker compose up` to self-host, and
+// `kaas-factory up` on a laptop running the same stack, idle under the memory budget.
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { IDLE_RSS_BUDGET_MB, treeRssKb } from "../src/deploy/rss";
+
+const ROOT = join(import.meta.dir, "..");
+const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
+// The same target directory as tests/relay.test.ts, so the relay is built once per checkout.
+const TARGET = join(
+  process.env.CARGO_TARGET_DIR ?? join(tmpdir(), "kaas-relay-target"),
+  createHash("sha256").update(ROOT).digest("hex").slice(0, 12),
+);
+const RELAY = join(TARGET, "release", "kaas-relay");
+
+function freePort(): number {
+  const s = Bun.serve({ port: 0, fetch: () => new Response() });
+  const port = s.port!;
+  s.stop(true);
+  return port;
+}
+
+async function until(ok: () => Promise<boolean>, ms: number): Promise<boolean> {
+  for (const end = Date.now() + ms; Date.now() < end; await Bun.sleep(200))
+    if (await ok().catch(() => false)) return true;
+  return false;
+}
+
+describe("one image", () => {
+  test("the image builds the relay and verify, carries both, and runs the stack by default", () => {
+    const docker = read("Dockerfile");
+    expect(docker).toContain("--manifest-path relay/Cargo.toml");
+    expect(docker).toContain("--manifest-path verify/Cargo.toml");
+    expect(docker).toMatch(
+      /^COPY --from=rust \/out\/release\/kaas-relay \/out\/release\/kaas-verify \/usr\/local\/bin\/$/m,
+    );
+    expect(docker).toMatch(/^CMD \["up"\]$/m);
+    // The health probes call curl, so it must survive the purge of build-only tools.
+    expect(docker).not.toMatch(/apt-get purge[^\n]*\bcurl\b/);
+
+    const compose = read("docker-compose.yml");
+    expect(compose).toContain('command: ["up"]');
+    expect(compose).toContain("FACTORY_HOME: /data");
+    expect(compose).toContain("- factory-data:/data");
+    expect(compose).toContain("http://127.0.0.1:4100/health");
+
+    const pkg = JSON.parse(read("package.json")) as { name: string; bin: Record<string, string> };
+    expect(pkg.bin[pkg.name]).toBe("./bin/factory");
+  });
+});
+
+describe("kaas-factory up with no repo", () => {
+  let proc: ReturnType<typeof Bun.spawn>;
+  let plane = "";
+  let relay = "";
+
+  beforeAll(async () => {
+    const built = Bun.spawnSync(
+      ["cargo", "build", "--release", "--locked", "--quiet", "--manifest-path", join(ROOT, "relay/Cargo.toml")],
+      { stderr: "pipe", env: { ...process.env, CARGO_TARGET_DIR: TARGET } },
+    );
+    if (built.exitCode !== 0) throw new Error(`cargo build of relay/ failed: ${built.stderr.toString()}`);
+    const [planePort, relayPort] = [freePort(), freePort()];
+    plane = `http://127.0.0.1:${planePort}`;
+    relay = `http://127.0.0.1:${relayPort}`;
+    proc = Bun.spawn(["bun", join(ROOT, "bin/factory"), "up"], {
+      cwd: mkdtempSync(join(tmpdir(), "factory-up-cwd-")),
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: mkdtempSync(join(tmpdir(), "factory-up-home-")),
+        FACTORY_HOME: mkdtempSync(join(tmpdir(), "factory-up-")),
+        FACTORY_DASHBOARD_PORT: String(planePort),
+        KAAS_RELAY_ADDR: `127.0.0.1:${relayPort}`,
+        KAAS_RELAY_BIN: RELAY,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const up = await until(async () => (await fetch(`${plane}/health`)).ok, 20_000);
+    if (!up)
+      throw new Error(`the stack never answered /health: ${await new Response(proc.stderr as ReadableStream).text()}`);
+  }, 300_000);
+
+  afterAll(() => proc?.kill());
+
+  test("serves /health and starts the relay beside the plane", async () => {
+    expect(await (await fetch(`${plane}/health`)).json()).toEqual({
+      ok: true,
+      service: "kaas-factory",
+      version: JSON.parse(read("package.json")).version,
+    });
+    expect(await until(async () => (await fetch(`${relay}/healthz`, { keepalive: false })).ok, 5_000)).toBe(true);
+  });
+
+  test("idle RSS of plane plus relay stays under 150 MB", async () => {
+    await Bun.sleep(3_000);
+    const mb = treeRssKb(proc.pid) / 1024;
+    console.log(`idle RSS, plane plus relay: ${mb.toFixed(1)} MB`);
+    expect(mb).toBeGreaterThan(0);
+    expect(IDLE_RSS_BUDGET_MB).toBe(150);
+    expect(mb).toBeLessThan(IDLE_RSS_BUDGET_MB);
+  }, 15_000);
+});

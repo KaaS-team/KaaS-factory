@@ -20,9 +20,23 @@ export interface Minion {
   readonly budgetUsd?: number;
   // Only "local" today: the run happens on this machine, in workspacesDir.
   readonly runtime: "local";
+  // A fresh clone of the repo as the workspace, for a minion that reads code; off, it starts empty.
+  readonly checkout?: boolean;
 }
 
-const KEYS = new Set(["name", "description", "on", "agent", "skill", "prompt", "mcp", "emit", "budgetUsd", "runtime"]);
+const KEYS = new Set([
+  "name",
+  "description",
+  "on",
+  "agent",
+  "skill",
+  "prompt",
+  "mcp",
+  "emit",
+  "budgetUsd",
+  "runtime",
+  "checkout",
+]);
 const ON_KEYS = new Set(["event", "cron", "tz"]);
 export const MINION_NAME = /^[a-z0-9][a-z0-9-]*$/;
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -70,6 +84,7 @@ export function parseMinion(raw: unknown): { ok: true; minion: Minion } | { ok: 
       problems.push("budgetUsd: must be a positive number");
     else budgetUsd = raw.budgetUsd;
   }
+  if (raw.checkout !== undefined && typeof raw.checkout !== "boolean") problems.push("checkout: true or false");
   if (raw.runtime !== undefined && raw.runtime !== "local")
     problems.push(`runtime: only "local" is supported, got ${JSON.stringify(raw.runtime)}`);
 
@@ -114,6 +129,7 @@ export function parseMinion(raw: unknown): { ok: true; minion: Minion } | { ok: 
       ...(skill !== undefined ? { skill } : {}),
       ...(emit !== undefined ? { emit } : {}),
       ...(budgetUsd !== undefined ? { budgetUsd } : {}),
+      ...(raw.checkout === true ? { checkout: true } : {}),
     },
   };
 }

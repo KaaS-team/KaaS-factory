@@ -1,15 +1,16 @@
 // Ported from owainlewis/assembler@7cac671 src/index.ts:64-90 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: validateConfig's harness rules (executable not a {prompt} placeholder, a command must be non-empty) live in agentProblems; the codex/claude providers are presets; errors are collected, not thrown one at a time; the key table, boot refusal and defaults are the factory's own.
-// Shape of the target repo's `.factory/config.json`. Built by the repo-specific
-// side (splitbill) or by whoever installs this template elsewhere; the runner
-// only reads it, and `factory doctor` checks it exists. Missing fields fall
-// back to DEFAULT_CONFIG so a minimal config.json still works.
+// Shape of the target repo's `.factory/config.json`: the runner only reads it, `factory doctor`
+// checks it exists, and a missing field falls back to DEFAULT_CONFIG, so a minimal one works.
 
 import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
 import { githubHost } from "./repo";
+import { type Toolchain, toolchainProblems } from "./images";
+import * as keys from "./config-merge";
 import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { LABEL } from "./labels";
+import { profileProblems } from "./profile-rules";
 
 export interface RiskPolicy {
   // Low risk (docs, test-only, a single non-protected module) is eligible for
@@ -28,10 +29,9 @@ export interface StageBudgets {
   readonly retro: number;
 }
 
-// Extra Bash patterns the repo grants its agents, on top of the read-only
-// git and shell basics in stage-permissions.ts. `read` applies to every
-// stage; `build` and `verify` add to that stage only. Each entry is a bare
-// pattern such as "make *" or "npm test *", never a compound command.
+// Extra Bash patterns the repo grants its agents, on top of the read-only git and shell basics in
+// stage-permissions.ts. `read` applies to every stage; `build` and `verify` add to that stage only.
+// Each entry is a bare pattern such as "make *" or "npm test *", never a compound command.
 export interface AgentCommands {
   readonly read: readonly string[];
   readonly build: readonly string[];
@@ -52,7 +52,7 @@ export interface GateSpec {
 
 // A package in a monorepo: its gates run from its own directory, and only when
 // the diff touches a file under `path` (or `always` is set). Top-level gates always run.
-export interface PackageSpec {
+export interface PackageSpec extends keys.PackageOwnership {
   readonly path: string; // relative to the repo root, e.g. "packages/api"
   readonly gates: readonly GateSpec[];
   readonly always?: boolean;
@@ -76,10 +76,9 @@ export function testGate(gates: readonly GateSpec[]): GateSpec | undefined {
   return gates.find((g) => g.role === "test") ?? gates.find((g) => g.name === "test");
 }
 
-// A route for one issue type (a label: the five in TYPE_LABELS, or one a repo
-// adds, e.g. lwp's "content"). `resolveRoute` (src/agents/executor.ts) checks
-// `stages[stage]` here before falling back to the repo-wide `stages`. Triage
-// runs before the type is known, so it never consults a route.
+// A route for one issue type (a label: the five in TYPE_LABELS, or one a repo adds, e.g. "content").
+// `resolveRoute` (src/agents/executor.ts) checks `stages[stage]` here before the repo-wide `stages`.
+// Triage runs before the type is known, so it never consults a route.
 export interface RouteConfig {
   readonly stages?: Partial<StageAgents>;
   readonly skills?: readonly string[];
@@ -108,9 +107,8 @@ export interface FactoryConfig {
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
   // Monorepo packages, each with its own gates; see PackageSpec.
   readonly packages?: readonly PackageSpec[];
-  // Opt-in: `reset`/`rebaseline` refuse on any repo where this is false (the
-  // default), so a live repo (lwp-website) can never be force-pushed back to
-  // a baseline tag by a stray `factory reset` (plan v2.6.2 item 2).
+  // Opt-in: `reset`/`rebaseline` refuse unless true, so a stray `factory reset` never force-pushes
+  // a live repo (lwp-website) back to a baseline tag (plan v2.6.2 item 2).
   readonly resettable: boolean;
   // Commands run once per fresh worktree, before any stage (e.g. "npm ci").
   // Idempotent via a marker file in the worktree; a failure parks the issue.
@@ -121,12 +119,9 @@ export interface FactoryConfig {
   readonly stages: StageAgents;
   // Per-type overrides, keyed by the type label. See RouteConfig.
   readonly routes: Readonly<Record<string, RouteConfig>>;
-  // Checked before every stage (plan v2.7.0 item 7). perIssueUsd is that
-  // issue's own lifetime spend; dailyUsd is this repo's spend since 00:00 UTC
-  // today. Either breached parks the issue with a "budget" inbox item.
-  // maxUnreportedRuns caps the count of stage runs with unknown cost (no
-  // price, no self-reported total) on one issue — a separate cap from the
-  // dollar ones, since an unpriced run can't be summed into them.
+  // Checked before every stage (plan v2.7.0 item 7): an issue's lifetime spend, the repo's since 00:00
+  // UTC, and the issue's runs with unknown cost, which no dollar sum can hold. A breach parks the
+  // issue with a "budget" inbox item.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
   readonly holdout: HoldoutConfig;
@@ -140,6 +135,8 @@ export interface FactoryConfig {
   readonly workflow: string;
   // Defaults for a company size (PROFILES); any key set explicitly still wins.
   readonly profile?: Profile;
+  readonly caps?: import("./org-caps").OrgCaps; // per-team and org back-pressure (src/org-caps.ts)
+  readonly toolchain?: Toolchain; // the image an "auto" docker or ssh runtime uses (src/images.ts)
   // Where gates and check steps run, by runtime name (src/runtimes.ts); unset is "local".
   readonly runtime?: RuntimeConfig;
   // Where issues live. GitHub by default; "http" speaks Tracker API v1 (docs/tracker-api.md).
@@ -269,7 +266,7 @@ export interface SpendConfig {
 // docs/README-only, 10-file, 200-line allow-list with repo config, since "a
 // blog post is often longer than machinist's 200 lines" (plan). A file under
 // FactoryConfig.protectedPaths is never eligible, whatever autoPaths says.
-export interface MergeConfig {
+export interface MergeConfig extends keys.MergeAutonomyFields {
   readonly policy: "off" | "dry-run" | "auto";
   readonly autoPaths: readonly string[];
   readonly maxFiles: number;
@@ -382,6 +379,8 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   templateOverrides: "strings",
   workflow: "string",
   profile: "string",
+  caps: "object",
+  toolchain: "string",
   runtime: "object",
   tracker: "object",
   labels: "object",
@@ -437,6 +436,8 @@ export function configProblems(raw: unknown): string[] {
     problems.push(`riskPolicy.autoApproveMaxRisk: expected "low" or "medium", got ${JSON.stringify(maxRisk)}`);
   if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))
     problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
+  problems.push(...profileProblems(cfg));
+  problems.push(...toolchainProblems(cfg.toolchain));
   nested("maxBudgetUsd", {
     triage: "positive",
     plan: "positive",
@@ -447,12 +448,11 @@ export function configProblems(raw: unknown): string[] {
   });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
   nested("runtime", { gates: "string", check: "string" });
-  nested("merge", { policy: "string", autoPaths: "strings", maxFiles: "posInt", maxLines: "posInt" });
+  nested("merge", keys.MERGE_KEYS);
+  // policy and autonomy are enums: a typo there would read as the default, which for autonomy
+  // is a different merge rule, so boot refuses it (src/config-merge.ts).
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
-    const policy = (cfg.merge as Record<string, unknown>).policy;
-    if (policy !== undefined && policy !== "off" && policy !== "dry-run" && policy !== "auto") {
-      problems.push(`merge.policy: expected "off", "dry-run" or "auto", got ${JSON.stringify(policy)}`);
-    }
+    problems.push(...keys.mergeProblems(cfg.merge as Record<string, unknown>));
   }
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
   nested("tmux", { enabled: "boolean", session: "string" });
@@ -479,7 +479,7 @@ export function configProblems(raw: unknown): string[] {
         const where = `packages[${i}]`;
         if (typeof p !== "object" || p === null) return problems.push(`${where}: expected an object`);
         const pkg = p as Record<string, unknown>;
-        checkKeys(pkg, { path: "string", gates: "object", always: "boolean" }, `${where}.`, problems);
+        checkKeys(pkg, keys.PACKAGE_KEYS, `${where}.`, problems);
         if (typeof pkg.path !== "string" || !pkg.path) problems.push(`${where}.path: required`);
         else if (pkg.path.startsWith("/") || pkg.path.split("/").includes(".."))
           problems.push(`${where}.path: must be relative to the repo root, got ${JSON.stringify(pkg.path)}`);

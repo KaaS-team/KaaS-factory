@@ -139,13 +139,14 @@ describe("pollOnce's inFlight set makes overlapping polls (what startWatch now r
   test("an issue that parks mid-batch is released at once, not when its batch's slowest issue finishes", async () => {
     // kaas-suite cards 34 and 36 planned in one batch with card 35, parked at
     // awaiting-approval, and sat approved until card 35's build and verify ended.
-    const { deps, github, executor, workspacesDir, cloneDir } = setup((n) => (n === 1 ? 300 : 10));
+    const { deps, github, executor, workspacesDir, cloneDir } = setup((n) => (n === 1 ? 2000 : 10));
     github.issues.set(2, baseIssue(2, ["factory:ready"]));
     const config = mergeConfig({ repo: "acme/repo", concurrency: 2 });
     const inFlight = new Set<number>();
 
     const batch = pollOnce(deps, config, inFlight); // #1 and #2 in one batch
-    await Bun.sleep(100); // #2 has parked at needs-info, #1 is still running
+    // Waits on #2 parking, not a fixed sleep, which a loaded machine outran.
+    for (let t = 0; t < 1800 && !(executor.starts.includes(2) && !inFlight.has(2)); t += 10) await Bun.sleep(10);
     expect(executor.active.has(1)).toBe(true);
     expect([...inFlight]).toEqual([1]);
 

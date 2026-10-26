@@ -1,8 +1,8 @@
 // Ported from owainlewis/machinist@3943516 internal/runner/runner.go:190-240 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the process-group kill is process_unix.go, and TypeScript on Bun (`detached` is setsid); the event cap and 1 MiB line cap follow events.go and codex_usage.go; the tool-call cap and stderr tail are the factory's own (audit finding #15).
-// The one executor: spawn any agent CLI, feed the prompt, watch its output
-// through the preset's line parser, and kill the whole process group on a
-// timeout or a runaway tool-call count.
+// The one executor: spawn any agent CLI, feed the prompt, watch its output through the preset's
+// line parser, and kill the whole process group on a timeout or a runaway tool-call count.
 
+import { crossModel } from "../review-models";
 import { tierFor } from "../core/model-tier";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,9 +21,10 @@ import {
 import { plain } from "../display";
 import { streamPath, takeoverMarker } from "../paths";
 import { McpError } from "../mcp";
-import { gatewaySanitizedEnv, isProviderCredential, sanitizeEnv } from "./env";
+import { gatewaySanitizedEnv, sanitizeEnv } from "./env";
 import { gatewayHost, type LlmGateway, mintStageKey, revokeKey } from "./gateway";
 import { renderPrompt } from "./prompt";
+import { provideDefaults } from "../harness-defaults";
 import { PRESETS } from "./presets";
 import { structuredCommand } from "./structured";
 import { replySchema, stageSchema } from "../schemas";
@@ -32,7 +33,8 @@ import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 import { portEnv } from "../port";
-import { agentArgs, guestGit, type MicrosandboxSpec, removeVm, SECRET } from "../adapters/microsandbox/execution";
+import { guestGit } from "../adapters/microsandbox/execution";
+import { type AgentSandbox, forGateway, removeSandbox, sandboxArgv } from "./agent-sandbox";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -147,8 +149,8 @@ export class CommandExecutor implements Executor {
     private readonly stages: StageAgents,
     private readonly routes: Readonly<Record<string, RouteConfig>> = {},
     private readonly recorder?: FixtureRecorder,
-    // machine.json `agentRuntime`: every agent this executor starts runs in this microVM.
-    private readonly vm?: MicrosandboxSpec,
+    // machine.json `agentRuntime`: every agent this executor starts runs in this microVM or container.
+    private readonly vm?: AgentSandbox,
     // machine.json `llmGateway`: every stage run gets its own key, capped at its maxBudgetUsd.
     private readonly gateway?: LlmGateway,
     // The env vars the runner's own tracker and runtime keys live in (tokenEnvNames); no agent sees them.
@@ -156,10 +158,11 @@ export class CommandExecutor implements Executor {
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
-    const agent =
-      opts.prompt !== undefined && opts.agent
-        ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts);
+    const route = (s: StageRunOptions["stage"]) =>
+      withTier(resolveRoute(this.agents, this.stages, this.routes, s, opts.type), opts);
+    const agent = opts.agent
+      ? resolveAgentByName(this.agents, opts.agent, opts.stage)
+      : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined, opts.reviewer);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)
@@ -194,10 +197,10 @@ export class CommandExecutor implements Executor {
   ): Promise<StageRunResult> {
     const artifactDir = join(opts.cwd, runDir(opts.issue));
     mkdirSync(artifactDir, { recursive: true });
+    provideDefaults(opts.cwd, agent.preset?.skillsDir);
 
     const ownCommand = agent.config.command !== undefined && !agent.preset?.wrapsCommand;
-    // A read-only stage on a preset that cannot write files returns them instead.
-    // A minion (opts.prompt) owes no stage file, so it never gets one written for it.
+    // A read-only stage on a preset that cannot write returns its file instead; a minion owes none.
     const readOnly =
       opts.prompt === undefined &&
       !stagePolicy(opts.stage).write &&
@@ -224,8 +227,10 @@ export class CommandExecutor implements Executor {
       opts.prompt !== undefined
         ? ""
         : await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
+    const reply = agent.config.outputSchema && (spec || readOnly) ? join(scratch, "reply.schema.json") : undefined;
+    if (reply) writeFileSync(reply, JSON.stringify(replySchema(opts.stage, types)));
     if (agent.preset?.ownsPrompt) {
-      ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig }));
+      ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig, schemaFile: reply }));
     } else {
       const prompt = opts.prompt ?? (await renderPrompt(opts, readOnly, types, contextPack));
       if (ownCommand && agent.config.command) {
@@ -235,12 +240,7 @@ export class CommandExecutor implements Executor {
         argv = rendered.argv;
         stdin = rendered.usesStdin ? prompt : undefined;
       } else if (agent.preset) {
-        let schemaFile: string | undefined;
-        if (readOnly && agent.config.outputSchema) {
-          schemaFile = join(scratch, "reply.schema.json");
-          writeFileSync(schemaFile, JSON.stringify(replySchema(opts.stage, types)));
-        }
-        ({ argv, stdin } = agent.preset.command(opts, agent.config, prompt, { schemaFile }));
+        ({ argv, stdin } = agent.preset.command(opts, agent.config, prompt, { schemaFile: spec ? undefined : reply }));
       } else {
         throw new Error(`agent "${agent.name}" has neither a preset nor a command`);
       }
@@ -276,10 +276,7 @@ export class CommandExecutor implements Executor {
     // Through a gateway the agent holds only its stage key: no provider key is passed on, in a VM or not.
     const via = key && this.gateway ? agent.preset?.gateway : undefined;
     const gatewayUrl = via ? { [via.baseUrl]: `${this.gateway!.url.replace(/\/$/, "")}${via.path ?? ""}` } : {};
-    const vm =
-      via && this.vm
-        ? { ...this.vm, secrets: this.vm.secrets?.filter((s) => !isProviderCredential(SECRET.exec(s)?.[1] ?? "")) }
-        : this.vm;
+    const vm = via && this.vm ? forGateway(this.vm) : this.vm;
     // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
     const vmName = vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
     if (vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
@@ -288,13 +285,15 @@ export class CommandExecutor implements Executor {
       : stageEnv;
     const proc = Bun.spawn(
       vm && vmName
-        ? agentArgs(vm, {
+        ? sandboxArgv(vm, {
             argv,
             cwd: opts.cwd,
             mounts: [scratch],
             env: guestEnv,
             stdinFile: stdin === undefined ? undefined : join(scratch, "stdin"),
             name: vmName,
+            readOnly,
+            forward: via ? [] : agent.preset?.envKeys,
             ...(via ? { secrets: [`${via.key}@${gatewayHost(this.gateway!)}`] } : {}),
           })
         : [...argv],
@@ -339,7 +338,7 @@ export class CommandExecutor implements Executor {
       } catch {
         proc.kill();
       }
-      if (vmName) removeVm(vmName);
+      if (vm && vmName) removeSandbox(vm, vmName);
       // A descendant that left the group (setsid) can still hold the pipe open:
       // give the reader a moment to drain, then stop waiting for it.
       setTimeout(() => cancelRead?.(), 2000).unref();

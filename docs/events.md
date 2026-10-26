@@ -32,6 +32,9 @@ missing from it, or when a factory type is never emitted.
 | `factory.pr.merged` | the PR merges; `by` is `factory`, `operator` (dashboard) or `human` (merged on GitHub, seen on the next poll) |
 | `factory.run.completed` | a run ends, with its outcome |
 | `factory.minion.completed` | a minion finishes, `ok` true or false |
+| `factory.approval.requested` | a step parks for approval; `token` is what resolves it |
+| `factory.approval.resolved` | that `token` is approved or revised (`POST /api/approvals/:token` on the dashboard) |
+| `factory.workflow.emitted` | a run of a workflow with `emit:` ships; workflows whose `on: emitted:` lists the name file an issue |
 
 Other apps' types, the only ones `POST /events` accepts: `tasks.task.ready`, `tasks.task.updated`,
 `wiki.page.updated`, `wiki.question.unanswered`, `decisions.decision.proposed`,
@@ -103,6 +106,7 @@ mcp: [docs]                       # optional, names in .factory/mcp.json
 emit: wiki.page.updated           # optional, another app's type; data is the JSON answer
 budgetUsd: 0.5                    # optional, default maxBudgetUsd.retro
 runtime: local                    # the only runtime today
+checkout: true                    # optional: run in a fresh clone of the repo, not an empty folder
 ```
 
 The watcher checks every minion when it starts and refuses to run with a bad one. A run does not
@@ -113,7 +117,7 @@ an event it emitted.
 
 A minion runs with the triage stage's tools and allow-list: read-only shell, writes only under
 `.factory/runs/issue-0/`, and only the MCP servers it names. Its working directory is its own
-workspace, not a checkout. The triggering event goes into the prompt between
+workspace: empty, or with `checkout: true` a fresh shallow clone of the repo each run. The triggering event goes into the prompt between
 `<untrusted-event-data>` tags, marked as data never to obey.
 `template/.factory/minions/wiki-refresh.yml.example` is a starting point.
 
@@ -121,5 +125,5 @@ workspace, not a checkout. The triggering event goes into the prompt between
 
 - `factory minion list --repo-dir .` lists and checks the minions.
 - `factory minion run <name> [--event <file.json>]` runs one now.
-- `factory events tail [--limit N] [--json]` shows recent events in and out, with delivery status.
+- `factory events tail [--limit N] [--follow] [--json]` shows recent events in and out, with delivery status; `--follow` keeps printing new ones as the watcher records them, until Ctrl-C.
 - `factory events replay <id>` sends one event to its sinks again.

@@ -468,4 +468,35 @@ describe("doctor: runtimes", () => {
     expect(missing.ok).toBe(false);
     expect(missing.detail).toContain('steps.l.runtime: no runtime "gpu"');
   });
+
+  test("each runtime the repo names is probed: a live one answers, a down one fails with why", async () => {
+    const probed: string[] = [];
+    const probing: DoctorDeps = {
+      ...reading,
+      probeRuntime: async (name) => (
+        probed.push(name),
+        name === "gpu"
+          ? { ok: false, ms: 10_000, detail: "ssh: connect to host gpu-1: timed out" }
+          : { ok: true, ms: 4, detail: "answered" }
+      ),
+    };
+    const rows = (
+      await runDoctor(probing, {
+        ...ctx,
+        workflow: "m",
+        runtime: { gates: "lwpr" },
+        runtimeNames: ["local", "lwpr", "gpu"],
+      })
+    ).filter((c) => c.name.startsWith("runtime "));
+    expect(rows).toEqual([
+      { name: "runtime lwpr answers", ok: true, detail: "answered in 4 ms", fixable: false },
+      {
+        name: "runtime gpu answers",
+        ok: false,
+        detail: "did not answer: ssh: connect to host gpu-1: timed out",
+        fixable: false,
+      },
+    ]);
+    expect(probed.sort()).toEqual(["gpu", "lwpr"]);
+  });
 });

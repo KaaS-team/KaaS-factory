@@ -4,10 +4,13 @@
 // CLI uses, so the page and the terminal cannot disagree.
 
 import type { FactoryConfig } from "../src/config";
+import type { Git } from "../src/git";
 import { plain } from "../src/display";
 import type { HarnessReport } from "../src/harness";
-import type { MachineConfig } from "../src/machine";
-import { BUILTIN_RUNTIMES, type RuntimeSpec, runtimeRefs } from "../src/runtimes";
+import type { MachineConfig, MachineLeases } from "../src/machine";
+import type { Health } from "../src/runtime-kit";
+import { BUILTIN_RUNTIMES, DEFAULT_RUNTIME, type RuntimeSpec, runtimeRefs, runtimeSpecs } from "../src/runtimes";
+import { fleetView, healthCache } from "./fleet";
 
 // What the dashboard needs to know about the repo it serves. Absent when it
 // was started without --repo-dir: the pages then say so instead of guessing.
@@ -17,6 +20,12 @@ export interface DashboardProject {
   readonly machine: MachineConfig;
   // Every lease ref on the remote; GitLeases.held in production.
   readonly leases: () => Promise<ReadonlyArray<{ key: string; holder: string; expiresAt: number }>>;
+  // This machine's slot leases and the fleet's heartbeats (FACTORY_HOME/machine.db).
+  readonly fleet?: Pick<MachineLeases, "holders" | "machines">;
+  // Tests stand in for probeRuntime here; production probes the runtime itself.
+  readonly probe?: (runtime: string) => Promise<Health>;
+  // The git a workflow edit branches with; a real one when absent.
+  readonly git?: Git;
 }
 
 export const NO_PROJECT =
@@ -82,14 +91,16 @@ export function settingsView(
       e.workflow ? runtimeRefs({}, e.workflow.steps).map((r) => ({ ...r, where: `${e.name}: ${r.where}` })) : [],
     ),
   ];
-  const specs: Record<string, RuntimeSpec> = { ...BUILTIN_RUNTIMES, ...(project.machine.runtimes ?? {}) };
+  const specs = runtimeSpecs(project.machine.runtimes);
   return {
     slots: project.machine.slots,
+    slotsInUse: project.fleet?.holders().length ?? 0,
+    machines: fleetView(project.fleet?.machines() ?? [], now),
     dailyUsd: project.machine.dailyUsd ?? null,
     runtimes: Object.entries(specs).map(([name, spec]) => ({
       name: plain(name),
       kind: spec.kind,
-      builtin: Object.hasOwn(BUILTIN_RUNTIMES, name),
+      builtin: name === DEFAULT_RUNTIME || Object.hasOwn(BUILTIN_RUNTIMES, name),
       target: plain(target(spec)),
       usedBy: refs.filter((r) => r.name === name).map((r) => plain(r.where)),
     })),
@@ -103,5 +114,14 @@ export function settingsView(
             expiresAt: l.expiresAt,
             live: l.expiresAt > now,
           })),
+  };
+}
+
+// The Settings page: the view above plus a cached probe of each runtime the repo uses.
+export function settingsWithHealth() {
+  const health = healthCache();
+  return async (...args: Parameters<typeof settingsView>) => {
+    const view = settingsView(...args);
+    return { ...view, health: await health(args[0], view.runtimes) };
   };
 }

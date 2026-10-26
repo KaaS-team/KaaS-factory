@@ -74,7 +74,7 @@ Prompt on stdin. Skills are read from `.pi/skills`. Unconfirmed: the read-only `
 
 ### mastracode
 
-Prompt on stdin, argv built by the ported flag table (`src/agents/presets/mastracode-flags.ts`).
+Prompt on stdin, argv built by the ported flag table (`contrib/agents/mastracode-flags.ts`).
 It has no `--version` flag (it would read it as a prompt), so `factory doctor` cannot check its pin.
 Unconfirmed: that `--mode plan` keeps a headless run read-only.
 

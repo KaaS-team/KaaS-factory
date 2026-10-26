@@ -1,0 +1,14 @@
+{
+  "name": "mcp-events",
+  "kind": "intake",
+  "summary": "Asks a tool on an MCP server for new CloudEvents every minute.",
+  "env": [
+    "FACTORY_MCP_EVENTS_URL",
+    "FACTORY_MCP_EVENTS_TOOL",
+    "FACTORY_MCP_TOKEN"
+  ],
+  "enable": "set `FACTORY_MCP_EVENTS_URL` and `FACTORY_MCP_EVENTS_TOOL` on the watcher",
+  "module": "src/integrations/mcp-client.ts",
+  "contract": "tests/mcp-notifier.test.ts",
+  "default": false
+}

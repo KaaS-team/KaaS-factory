@@ -4,6 +4,10 @@
     "prov": "http://www.w3.org/ns/prov#",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
     "kaas": "https://kaas.team/attestations/acceptance/v1#",
+    "merge": {
+      "@id": "kaas:mergeDecision",
+      "@type": "@json"
+    },
     "run": {
       "@id": "kaas:run"
     },

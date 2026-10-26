@@ -2,6 +2,8 @@
 // label helpers, running one agent stage, retro, and the spend caps. Moved
 // verbatim from watch.ts when the pipeline became a workflow (v3.1).
 
+import type { BlobStore } from "../ports/blob";
+import { shipStage } from "./blobs";
 import type { FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
@@ -35,7 +37,7 @@ import type { ProofGit, ProofStatus } from "../proof";
 import type { GhIssue } from "../github";
 import { withLease, type Held, type LeaseOpts } from "./lease";
 import type { LeasePort } from "../ports/lease";
-import type { SpendEntry, SpendStore, SpendTotal } from "../ports/spend";
+import type { SpendEntry, SpendPolicy, SpendStore, SpendTotal } from "../ports/spend";
 import type { ExecutionPort } from "../ports/execution";
 import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
@@ -89,13 +91,12 @@ export interface WatchDeps {
   // also recorded here and caps read the larger of the two, so they hold
   // across every worker.
   readonly spend?: SpendStore;
+  // An org or fleet cap read with the repo's; absent means the repo and machine caps alone.
+  readonly spendPolicy?: SpendPolicy;
   // Runtimes by name for check steps (src/runtimes.ts builds them); absent means check steps run like setup.
   readonly runtimes?: Readonly<Record<string, ExecutionPort>>;
-  // Absent means this process alone decides concurrency (config.concurrency,
-  // unchanged pre-v2.7.0 behaviour). Present means every dispatch first takes
-  // a machine-wide lease, so a second watcher (another repo, same
-  // FACTORY_HOME) sharing this machine's slots is respected too (plan
-  // v2.7.0 item 5).
+  // Absent: this process alone decides concurrency. Present: every dispatch first takes a machine-wide
+  // lease, so a second watcher on the same FACTORY_HOME shares this machine's slots (plan v2.7.0 item 5).
   readonly machine?: { readonly leases: MachineLeases; readonly config: MachineConfig; readonly spend: MachineSpend };
   // Where a stage streams its transcript and its pid/session (`factory takeover`). Absent: neither is written.
   readonly runFiles?: { transcript(issue: number): string; live(issue: number): string };
@@ -111,6 +112,8 @@ export interface WatchDeps {
   readonly bus?: EventBus;
   // The repo's .factory/minions, checked at boot (src/engine/minion.ts).
   readonly minions?: readonly Minion[];
+  // Where each stage's transcript and artifacts are copied for the plane; absent means they stay here.
+  readonly blobs?: BlobStore;
 }
 
 // Thrown by runStage when an operator stopped the agent to take it over;
@@ -325,7 +328,7 @@ export async function runStage(
   issue: GhIssue,
   stage: StageName,
   worktree: string,
-  extra: Pick<StageRunOptions, "resume" | "rejects"> & { readonly mcp?: readonly string[] } = {},
+  extra: Omit<Partial<StageRunOptions>, "mcp"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
   // Read from the clone of the base branch, never the worktree: an earlier step's agent can write
@@ -333,11 +336,8 @@ export async function runStage(
   // before anything is recorded or spent.
   const { mcp: mcpNames, ...rest } = extra;
   const mcp = mcpNames?.length ? mcpServersFor(deps.cloneDir, mcpNames) : undefined;
-  // rehydrate before clearing: rehydrate only ever repopulates *earlier*
-  // stages' artifacts from the thread, never this stage's own output, so the
-  // order only matters for readability, not correctness — but clearing after
-  // guarantees this stage never starts with a stale copy of its own last
-  // attempt (audit finding #9).
+  // Clearing after rehydrate means this stage never starts with a stale copy of its own last attempt
+  // (audit finding #9); rehydrate only repopulates earlier stages' artifacts.
   await rehydrate(worktree, issue);
   await writeIssueSnapshot(worktree, issue);
   await clearStageArtifacts(worktree, issueNumber, stage);
@@ -409,6 +409,7 @@ export async function runStage(
     tokens_out: run.tokens_out + result.tokensOut,
     cost_usd: run.cost_usd + (costUsd ?? 0),
   });
+  await shipStage(deps.blobs, config.repo, issueNumber, worktree, files.transcriptFile);
   if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
   return result;
 }
@@ -583,21 +584,21 @@ export function failureTail(text: string): string {
 
 export const EPOCH = "1970-01-01T00:00:00.000Z";
 
-// Why a daily cap holds back new work now, or undefined. The one resolver for
-// the poll's intake and for minions: the repo's cap (every worker's spend) and
-// this machine's cap across all its repos.
-export async function spendCapHit(deps: WatchDeps, config: FactoryConfig): Promise<string | undefined> {
+// Why a daily cap holds back new work now: the one resolver for intake, dispatch and minions, over the
+// repo's cap (every worker's spend) and this machine's cap across all its repos.
+export type SpendDeps = Pick<WatchDeps, "state" | "spend" | "machine" | "spendPolicy">;
+export async function spendCapHit(deps: SpendDeps, config: FactoryConfig): Promise<string | undefined> {
   const repoDailyUsd = config.spend.dailyUsd;
   if (repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd)
     return `the repo's daily spend cap ($${repoDailyUsd}) is reached`;
   const machineDailyUsd = deps.machine?.config.dailyUsd;
   if (machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd)
     return `this machine's daily spend cap ($${machineDailyUsd}) is reached`;
-  return undefined;
+  return deps.spendPolicy?.breached(config.repo, startOfTodayUtc());
 }
 
 // The repo's spend today: every worker's, from the shared store when there is one.
-export async function repoSpendToday(deps: WatchDeps, config: FactoryConfig): Promise<SpendTotal> {
+export async function repoSpendToday(deps: SpendDeps, config: FactoryConfig): Promise<SpendTotal> {
   return larger(deps.state.spendSummary(config.repo, startOfTodayUtc()), await deps.spend?.since(startOfTodayUtc()));
 }
 
@@ -640,13 +641,10 @@ export async function checkSpendCap(
     return `${config.repo} has spent $${repoToday.costUsd.toFixed(2)} today, at or over its dailyUsd cap of $${dailyUsd.toFixed(2)}`;
   }
   const machineDailyUsd = deps.machine?.config.dailyUsd;
-  if (machineDailyUsd !== undefined) {
-    const machineToday = deps.machine!.spend.todayUsd();
-    if (machineToday >= machineDailyUsd) {
-      return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
-    }
-  }
-  return undefined;
+  const machineToday = deps.machine?.spend.todayUsd() ?? 0;
+  if (machineDailyUsd !== undefined && machineToday >= machineDailyUsd)
+    return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
+  return deps.spendPolicy?.breached(config.repo, startOfTodayUtc());
 }
 // The PR body, then the Acceptance table when the repo has check-acceptance.py, then the signed Receipt,
 // then the "Factory run" summary unless config.prRunSummary is off.

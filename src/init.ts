@@ -3,7 +3,11 @@
 // init fills only what it read from the repo: repo, gates, setup and the
 // commands the build and verify stages may run.
 
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gateCount } from "./config";
+import { CHARTER_PATH } from "./context";
+import { toolchainOf } from "./images";
 import type { Stack } from "./stack";
 
 // A config a person has filled in (no TODO, at least one gate) is theirs: init leaves it alone.
@@ -22,9 +26,11 @@ export function initConfig(
   repo: string | undefined,
 ): Record<string, unknown> {
   const agentCommands = (example.agentCommands ?? {}) as Record<string, unknown>;
+  const toolchain = toolchainOf(stack.name);
   return {
     ...example,
     ...(repo ? { repo } : {}),
+    ...(toolchain ? { toolchain } : {}),
     gates: stack.gates,
     setup: stack.setup,
     agentCommands: { ...agentCommands, build: stack.commands, verify: stack.commands },
@@ -40,4 +46,26 @@ export function describeStack(stack: Stack): string[] {
       : ["gates: none"]),
     ...stack.notes.map((n) => `note: ${n}`),
   ];
+}
+
+// The charter names what init read; the risk tiers and protected paths stay TODO for a person,
+// so doctor still fails until they are written. An edited charter is never overwritten.
+export function initCharter(template: string, stack: Stack, repo: string | undefined): string {
+  const toolchain = toolchainOf(stack.name);
+  const read = [
+    "## Stack",
+    "",
+    `\`factory init\` read this repo as **${stack.name}**${toolchain ? `, toolchain \`${toolchain}\`` : ""}.`,
+    ...stack.gates.map((g) => `- gate \`${g.name}\`: \`${g.cmd}\``),
+    "",
+  ].join("\n");
+  const named = repo ? template.replace("# TODO: <repo> factory charter", `# ${repo} factory charter`) : template;
+  return named.replace("## Risk tiers", `${read}\n## Risk tiers`);
+}
+
+export function writeCharter(dir: string, template: string, stack: Stack, repo: string | undefined): boolean {
+  const path = join(dir, CHARTER_PATH);
+  if (existsSync(path) && readFileSync(path, "utf8") !== template) return false;
+  writeFileSync(path, initCharter(template, stack, repo));
+  return true;
 }

@@ -42,6 +42,8 @@ export interface GhPr {
   isDraft: boolean;
   closingIssuesReferences?: { number: number }[];
   isCrossRepository?: boolean;
+  // ISO time of the last push, comment or review; the stale-PR nudge reads it (src/stale-pr.ts).
+  updatedAt?: string;
 }
 
 export interface CiCheck {
@@ -76,6 +78,8 @@ export interface MergeReadiness {
   // only, no code copied): a reviewer who asked for changes on an old commit
   // no longer blocks a PR that has since been updated.
   readonly changesRequestedStale: boolean;
+  // Logins whose latest review approves; absent when the host did not say.
+  readonly approvedBy?: readonly string[];
 }
 
 // A user's role on the repo, highest first. "none" when they are not a collaborator.

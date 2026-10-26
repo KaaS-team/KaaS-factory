@@ -13,7 +13,8 @@
 // src/merge-policy.ts). `factory learn`'s branch never calls this check (it
 // uses outsideAllowedPaths instead), so its exemption never weakens this for
 // a normal build.
-export const ALWAYS_PROTECTED_PATHS = [".claude/**", ".factory/**"] as const;
+// `.agents/**` too: a repo's skills there are what the next stage reads (src/harness-defaults.ts).
+export const ALWAYS_PROTECTED_PATHS = [".claude/**", ".agents/**", ".factory/**"] as const;
 
 export function touchesProtectedPath(changedFiles: readonly string[], protectedPaths: readonly string[]): string[] {
   const patterns = [...protectedPaths, ...ALWAYS_PROTECTED_PATHS];

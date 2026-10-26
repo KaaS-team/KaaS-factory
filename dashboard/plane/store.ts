@@ -43,13 +43,15 @@ const LIMITS: AuditLimits = { rows: 50_000, refusals: 5_000, every: 1000 };
 const PAGE = 200;
 
 // A leaked database must not hand out live sessions, so only the digest is kept.
-const digest = (id: string) => createHash("sha256").update(id).digest("hex");
+export const digest = (id: string) => createHash("sha256").update(id).digest("hex");
 
 export class PlaneStore {
   private readonly db: Database;
+  // What else a removed member loses: remote.ts revokes their phones and push subscriptions here.
+  readonly onRemoved: ((login: string) => void)[] = [];
 
   constructor(
-    path = ":memory:",
+    readonly path = ":memory:",
     private readonly limits = LIMITS,
   ) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -89,6 +91,11 @@ export class PlaneStore {
     `);
   }
 
+  // Devices, runners, push and extensions share this file, each in its own tables.
+  get database(): Database {
+    return this.db;
+  }
+
   roleOf(login: string): Role | null {
     const row = this.db.query("SELECT role FROM plane_memberships WHERE login = ?").get(login) as {
       role: string;
@@ -96,10 +103,24 @@ export class PlaneStore {
     return row && isRole(row.role) ? row.role : null;
   }
 
+  // The role as written, which may name a custom role an extension resolves.
+  storedRole(login: string): string | null {
+    const row = this.db.query("SELECT role FROM plane_memberships WHERE login = ?").get(login) as {
+      role: string;
+    } | null;
+    return row?.role ?? null;
+  }
+
   setMember(login: string, role: Role | null, by: string): void {
+    this.assign(login, role, by);
+  }
+
+  // Like setMember, but takes any role name; only an extension that resolves the name should call it.
+  assign(login: string, role: string | null, by: string): void {
     if (role === null) {
       this.db.query("DELETE FROM plane_memberships WHERE login = ?").run(login);
       this.db.query("DELETE FROM plane_sessions WHERE login = ?").run(login);
+      for (const fn of this.onRemoved) fn(login);
       return;
     }
     this.db
@@ -176,6 +197,11 @@ export class PlaneStore {
            (SELECT id FROM plane_audit WHERE (status = 403) = ? ORDER BY id DESC LIMIT 1 OFFSET ?)`,
         )
         .run(refused, refused, keep - 1);
+  }
+
+  // Oldest first from `after`, so an export can resume where the last one stopped.
+  auditAfter(after: number, limit = PAGE): AuditRow[] {
+    return this.db.query("SELECT * FROM plane_audit WHERE id > ? ORDER BY id LIMIT ?").all(after, limit) as AuditRow[];
   }
 
   // Keyset paging: newest first, `before` is the last id the caller saw.

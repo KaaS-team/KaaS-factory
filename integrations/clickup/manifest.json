@@ -1,0 +1,20 @@
+{
+  "name": "clickup",
+  "kind": "tracker",
+  "summary": "ClickUp tasks in one list.",
+  "env": [
+    "CLICKUP_API_TOKEN"
+  ],
+  "enable": "`\"tracker\": {\"kind\": \"clickup\", \"workspace\": \"...\", \"list\": \"...\", \"tokenEnv\": \"CLICKUP_API_TOKEN\"}`",
+  "module": "src/adapters/trackers/clickup.ts",
+  "contract": "tests/trackers-clickup.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-trackers.test.ts",
+    "env": [
+      "FACTORY_LIVE_CLICKUP_WORKSPACE",
+      "FACTORY_LIVE_CLICKUP_LIST",
+      "FACTORY_LIVE_CLICKUP_TOKEN"
+    ]
+  }
+}

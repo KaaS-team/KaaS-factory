@@ -7,6 +7,7 @@ import { readFile } from "node:fs/promises";
 import { COMMENT_FILENAMES, JSON_FILENAMES, runDir } from "../artifacts";
 import { stageSchema } from "../schemas";
 import type { StageRunOptions } from "../executor";
+import { resolveSkill } from "../harness-defaults";
 
 export function stripFrontmatter(text: string): string {
   return text.startsWith("---\n") ? text.slice(text.indexOf("\n---", 3) + 4).replace(/^\n+/, "") : text;
@@ -52,7 +53,8 @@ export async function renderPrompt(
   types?: readonly string[],
   contextPack = "",
 ): Promise<string> {
-  const skill = await readFile(`${opts.cwd}/.claude/skills/factory-${opts.stage}/SKILL.md`, "utf8").catch(() => {
+  const found = resolveSkill(opts.cwd, `factory-${opts.stage}`);
+  const skill = await readFile(found?.path ?? "", "utf8").catch(() => {
     throw new Error(
       `stage skill .claude/skills/factory-${opts.stage}/SKILL.md not found in ${opts.cwd}; run \`factory install --update\``,
     );
@@ -63,6 +65,7 @@ export async function renderPrompt(
     stripFrontmatter(skill).trim(),
     "",
     ...(contextPack ? [contextPack, ""] : []),
+    ...(opts.resume ? [`## The last attempt was sent back\n\nThe tail of why:\n\n${opts.resume.failure}`, ""] : []),
     artifactContract(opts, readOnly, types),
     "",
   ].join("\n");

@@ -1,0 +1,13 @@
+{
+  "name": "otel",
+  "kind": "notifier",
+  "summary": "Exports one OpenTelemetry trace per run, a gen_ai span per stage.",
+  "env": [
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_HEADERS"
+  ],
+  "enable": "set `OTEL_EXPORTER_OTLP_ENDPOINT` on the watcher",
+  "module": "src/integrations/otel.ts",
+  "contract": "tests/otel.test.ts",
+  "default": false
+}

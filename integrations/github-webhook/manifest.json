@@ -1,0 +1,12 @@
+{
+  "name": "github-webhook",
+  "kind": "intake",
+  "summary": "Wakes the watcher on a signed GitHub webhook delivery.",
+  "env": [
+    "FACTORY_WEBHOOK_SECRET"
+  ],
+  "enable": "set `FACTORY_WEBHOOK_SECRET` on the plane",
+  "module": "src/webhook.ts",
+  "contract": "tests/webhook.test.ts",
+  "default": false
+}

@@ -5,6 +5,8 @@
 // changed.
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ALWAYS_PROTECTED_PATHS, touchesProtectedPath } from "../src/boundary";
 import { autoEligible } from "../src/merge-policy";
 
@@ -46,6 +48,16 @@ describe("touchesProtectedPath", () => {
     expect(touchesProtectedPath(changed, [])).toEqual([
       ".claude/skills/factory-build/SKILL.md",
       ".factory/memory/lessons.md",
+    ]);
+  });
+
+  // The hook and the push check refuse the same paths: one list, pinned here, not two kept by hand.
+  test("guard-paths.sh hardcodes exactly ALWAYS_PROTECTED_PATHS", () => {
+    const hook = readFileSync(join(import.meta.dir, "../template/.claude/hooks/guard-paths.sh"), "utf8");
+    const line = /^globs \+= (\[.*\])$/m.exec(hook)?.[1];
+    expect(line && JSON.parse(line)).toEqual([...ALWAYS_PROTECTED_PATHS]);
+    expect(touchesProtectedPath([".agents/skills/factory-verify/SKILL.md"], [])).toEqual([
+      ".agents/skills/factory-verify/SKILL.md",
     ]);
   });
 

@@ -42,6 +42,15 @@ export const STATE_LABELS = [
   LABEL.inReview,
 ] as const;
 
+// The label each of the five built-in stages carries while it runs.
+export const STEP_LABELS = {
+  triage: LABEL.triaging,
+  plan: LABEL.planning,
+  build: LABEL.building,
+  verify: LABEL.verifying,
+  pr: LABEL.inReview,
+} as const;
+
 // Parked: the loop stopped and a human (or a retry) is needed to continue.
 export const PARKED_LABELS = [LABEL.needsInfo, LABEL.needsHuman, LABEL.failed] as const;
 

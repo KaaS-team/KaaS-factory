@@ -162,7 +162,26 @@ function nativeTrackers(): void {
   });
 }
 
+// The store, secrets, event-source and notifier ports run their contracts in ports-landed.test.ts.
+const landed = (name: string) => () =>
+  test(`${name}: its contract runs in ports-landed`, () => {
+    const text = readFileSync(join(import.meta.dir, "ports-landed.test.ts"), "utf8");
+    expect(text).toContain(`"../src/adapters/${name}/`);
+  });
+
+// The blob adapters share one contract in blobs.test.ts.
+const blobs = (name: string) => () =>
+  test(`${name}: its contract runs in blobs.test.ts`, () => {
+    expect(readFileSync(join(import.meta.dir, "blobs.test.ts"), "utf8")).toContain(`"../src/adapters/${name}/blob"`);
+  });
+
 const REGISTRY: Record<string, () => void> = {
+  "blob-disk": blobs("blob-disk"),
+  "blob-s3": blobs("blob-s3"),
+  env: landed("env"),
+  sqlite: landed("sqlite"),
+  sse: landed("sse"),
+  webpush: landed("webpush"),
   trackers: nativeTrackers,
   "git-lease": () => leaseContract("git-lease", gitLeases),
   "github-store": () =>

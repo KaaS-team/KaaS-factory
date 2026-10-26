@@ -22,6 +22,10 @@ class FakeGitHub extends GitHub {
   override async listOpenIssues(): Promise<GhIssue[]> {
     return this.issues;
   }
+  // GET /api/mode reads the control issue; none here.
+  override async listIssuesByLabel() {
+    return [];
+  }
   // The inbox route also merges in learning-PR items (v2.10.0 item 4); no
   // fixture here opens one, so an empty list is the right default.
   override async listPrs(): Promise<GhPr[]> {
@@ -620,6 +624,8 @@ function project(over: Partial<DashboardProject> = {}): DashboardProject {
     cloneDir,
     config,
     machine: { slots: 3, runtimes: { box: { kind: "ssh", host: "build-1", dir: "/w" } } },
+    // Never dial build-1: the Settings route probes each runtime the repo uses.
+    probe: async () => ({ ok: true, ms: 1, detail: "factory-probe-ok" }),
     leases: async () => [
       { key: "issue-4", holder: "laptop", expiresAt: Date.now() + 20_000 },
       { key: "issue-5", holder: "ci", expiresAt: 0 },
@@ -669,7 +675,7 @@ describe("workflows and settings", () => {
       leasesError: string | null;
     };
     expect(body.slots).toBe(3);
-    expect(body.runtimes.map((r) => r.name)).toEqual(["local", "lwpr", "box"]);
+    expect(body.runtimes.map((r) => r.name)).toEqual(["default", "local", "lwpr", "box"]);
     expect(body.runtimes.find((r) => r.name === "box")).toMatchObject({
       kind: "ssh",
       builtin: false,
@@ -807,12 +813,14 @@ describe("text is plain()-ed on every read route", () => {
       (l) => l.startsWith("GET ") && !mod.PUBLIC_ROUTES.includes(l) && l !== "GET /api/stream",
     );
     expect(gets.length).toBeGreaterThan(8);
+    process.env.FACTORY_AGUI = "1";
     for (const label of gets) {
       const url = `http://localhost:4100${samplePath(label).replace(/\/artifacts$/, "/artifacts?file=plan.md")}`;
       const res = await dashboard.handle(new Request(url.replace(/^(.*\/runs\/)1/, `$1${run.id}`)), "127.0.0.1");
       expect(res.status, label).toBe(200);
       expect(dirty(await res.text()), label).toBe(false);
     }
+    delete process.env.FACTORY_AGUI;
   });
 });
 

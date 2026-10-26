@@ -49,18 +49,20 @@ export interface StageRunOptions {
   // local recording), and the live file names the running process for takeover.
   readonly transcriptFile?: string;
   readonly liveFile?: string;
-  // A rebuild continues the last build's session with the tail of why it was
-  // sent back. Only an agent that keeps sessions (the claude preset) uses it.
-  readonly resume?: { readonly sessionId: string; readonly failure: string };
+  // A rebuild carries the tail of why it was sent back to every agent's prompt; an agent that
+  // keeps sessions (the claude preset) also continues the last build's session.
+  readonly resume?: { readonly sessionId?: string; readonly failure: string };
   // The MCP servers this run starts with, in .mcp.json's server shape. Absent: none.
   readonly mcp?: Readonly<Record<string, unknown>>;
-  // A minion's whole prompt (src/engine/minion.ts), in place of the stage skill and the
-  // context pack; with it, `agent` names the agent directly instead of the stage routing.
+  // A minion's whole prompt (src/engine/minion.ts), in place of the stage skill and the context
+  // pack. `agent` (a minion's, or a workflow step's `agent:`) names the agent over the stage routing.
   readonly prompt?: string;
   // The issue's risk and size once triage or plan has judged them; picks the agent's model tier.
   readonly scope?: IssueScope;
   // Verify rejects so far on this issue; each one moves the build a model tier up.
   readonly rejects?: number;
+  // Which verify reviewer this session is: 0 (unset) the first, 1 the high-risk second on a third model.
+  readonly reviewer?: number;
 }
 
 // The killedReason a `factory takeover` stop gets. watch.ts parks on it

@@ -1,10 +1,13 @@
 // Ported from owainlewis/machinist@3943516 risk_delivery/gate.py (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the refusal list also follows owainlewis/agent-skills@766699e skills/herdr-issue-coordinator/SKILL.md:209-226 (MIT, Copyright (c) 2026 Owain Lewis), reused as ten named refusal reasons rather than copied code; gate.py's hardcoded docs/README-only, 10-file, 200-line allow-list becomes repo config (merge.autoPaths/maxFiles/maxLines), since a blog post is often longer than 200 lines; validate/auto_eligible/run become checkReadiness/autoEligible/decideMerge+attemptMerge, split so a caller can render the "dry-run" audit comment without ever calling mergePr; the merge always runs `gh pr merge --squash --match-head-commit`, never `--admin`, so a branch-protection block is respected even under policy "auto"; the audit comment carries a `factory:merge-policy:<headSha>` marker instead of gate.py's own comment format, to match this codebase's data-marker convention (src/watch.ts). gate.py's file-mode and rename checks read `git diff --raw` modes and `--no-renames` paths from src/git.ts diffStat, and binary files are refused because numstat counts no lines for them.
 
 import type { Risk } from "./artifacts";
+import { type Autonomy, mergeAutoAllowed } from "./autonomy";
 import { touchesProtectedPath } from "./boundary";
 import type { CiResult } from "./ci";
 import type { MergeConfig } from "./config";
 import type { GitHub, MergeReadiness } from "./github";
+import { type CodeownersRule, codeownerRefusals } from "./profile-rules";
+import { factRefusals, type PrFacts } from "./pr-facts";
 
 export interface ChangedFile {
   readonly path: string;
@@ -33,7 +36,10 @@ export type MergeRefusalReason =
   | "unresolved-threads"
   | "risk-not-low"
   | "not-auto-eligible"
-  | "policy-not-auto";
+  | "policy-not-auto"
+  | "codeowner-approval"
+  | "autonomy-supervised"
+  | "signal-failed";
 
 export interface MergeRefusal {
   readonly reason: MergeRefusalReason;
@@ -101,9 +107,11 @@ export function autoEligible(
   changedFiles: readonly ChangedFile[],
   merge: Pick<MergeConfig, "autoPaths" | "maxFiles" | "maxLines">,
   protectedPaths: readonly string[],
+  // "full" merges past the low-risk size class on its facts; protected paths, modes and binaries still hold.
+  mode?: Autonomy,
 ): MergeRefusal[] {
   const refusals: MergeRefusal[] = [];
-  if (risk !== "low") {
+  if (mode === undefined ? risk !== "low" : !mergeAutoAllowed(mode, risk)) {
     refusals.push({ reason: "risk-not-low", detail: `plan risk is "${risk}", auto-merge requires "low"` });
   }
   const paths = changedFiles.map((f) => f.path);
@@ -111,12 +119,15 @@ export function autoEligible(
   if (protectedHits.length > 0) {
     refusals.push({ reason: "not-auto-eligible", detail: `protected path(s): ${protectedHits.join(", ")}` });
   }
+  const sized = mode !== "full";
   const globs = merge.autoPaths.map((pattern) => new Bun.Glob(pattern));
-  const outside = paths.filter((path) => !globs.some((g) => g.match(path)));
+  // Under a tier an empty autoPaths means no allow-list: the risk floor already rates the paths.
+  const listed = sized && (mode === undefined || globs.length > 0);
+  const outside = listed ? paths.filter((path) => !globs.some((g) => g.match(path))) : [];
   if (outside.length > 0) {
     refusals.push({ reason: "not-auto-eligible", detail: `outside merge.autoPaths: ${outside.join(", ")}` });
   }
-  if (changedFiles.length > merge.maxFiles) {
+  if (sized && changedFiles.length > merge.maxFiles) {
     refusals.push({
       reason: "not-auto-eligible",
       detail: `${changedFiles.length} files changed, over merge.maxFiles (${merge.maxFiles})`,
@@ -137,7 +148,7 @@ export function autoEligible(
     });
   }
   const totalLines = changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0);
-  if (totalLines > merge.maxLines) {
+  if (sized && totalLines > merge.maxLines) {
     refusals.push({
       reason: "not-auto-eligible",
       detail: `${totalLines} lines changed, over merge.maxLines (${merge.maxLines})`,
@@ -154,6 +165,11 @@ export interface DecideMergeInput {
   readonly merge: MergeConfig;
   readonly protectedPaths: readonly string[];
   readonly expectedBaseRefName: string;
+  // Set when the profile asks a code owner to approve each touched file (src/profile-rules.ts).
+  readonly codeowners?: { readonly rules: readonly CodeownersRule[]; readonly approvedBy: readonly string[] };
+  // Set, the tier decides the merge from the PR facts instead of merge.policy alone.
+  readonly autonomy?: Autonomy;
+  readonly facts?: PrFacts;
 }
 
 // Authority is explicit only (herdr SKILL.md:18-23): "merge" is returned only
@@ -163,8 +179,23 @@ export interface DecideMergeInput {
 export function decideMerge(input: DecideMergeInput): MergeDecision {
   const headSha = input.readiness.headRefOid;
   const readinessRefusals = checkReadiness(input.readiness, input.ci, input.expectedBaseRefName);
-  const eligibilityRefusals = autoEligible(input.risk, input.changedFiles, input.merge, input.protectedPaths);
-  const refusals = [...readinessRefusals, ...eligibilityRefusals];
+  const mode = input.autonomy;
+  const eligibilityRefusals = autoEligible(input.risk, input.changedFiles, input.merge, input.protectedPaths, mode);
+  const owners = input.codeowners;
+  const ownerRefusals = owners ? codeownerRefusals(owners.rules, input.changedFiles, owners.approvedBy) : [];
+  const refusals = [...readinessRefusals, ...eligibilityRefusals, ...ownerRefusals];
+  if (mode !== undefined) {
+    if (mode === "supervised")
+      return { outcome: "refuse", headSha, refusals: [{ reason: "autonomy-supervised", detail: "a human merges" }] };
+    refusals.push(
+      ...(input.facts
+        ? factRefusals(input.facts, mode)
+        : [{ reason: "signal-failed" as const, detail: "no PR facts document" }]),
+    );
+    if (input.merge.policy === "dry-run")
+      return { outcome: "dry-run", headSha, eligible: refusals.length === 0, refusals };
+    return refusals.length ? { outcome: "refuse", headSha, refusals } : { outcome: "merge", headSha };
+  }
 
   if (input.merge.policy === "dry-run") {
     return { outcome: "dry-run", headSha, eligible: refusals.length === 0, refusals };

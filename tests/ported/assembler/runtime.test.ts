@@ -18,6 +18,11 @@ function repo(): string {
     join(dir, ".claude/skills/factory-plan/SKILL.md"),
     '---\nname: factory-plan\n---\nPLAN-BODY `touch bad` $(echo bad) "quotes"\nline\n',
   );
+  // Committed, so the repo's skill wins over the default (src/harness-defaults.ts).
+  const git = (...a: string[]) =>
+    Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir });
+  git("add", ".");
+  git("commit", "-qm", "skill");
   return dir;
 }
 

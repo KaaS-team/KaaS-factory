@@ -1,10 +1,6 @@
-// The cockpit (plan section 2). Bun.serve, one static page, JSON API + SSE
-// read from state.ts. No second source of truth: this server never invents
-// state, it reads what watch.ts wrote and posts replies through github.ts as
-// the signed-in `gh` user. /api/board is the exception on purpose — it
-// reads GitHub labels directly (dashboard/board.ts), so the board still
-// works with no local SQLite at all (a CI/VM run with no watcher on this
-// machine).
+// The cockpit (plan section 2): one static page, a JSON API and SSE, read from what watch.ts wrote;
+// replies go out through github.ts as the signed-in `gh` user. /api/board alone reads GitHub labels
+// (dashboard/board.ts), so the board works on a CI or VM run with no local SQLite at all.
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
@@ -13,25 +9,30 @@ import type { ScmPort } from "../src/github";
 import { makeScm } from "../src/scm";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { buildBoard } from "./board";
+import { paneRoutes } from "./pane";
 import { LABEL } from "../src/labels";
-import { InboxError, act, buildInbox, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
+import { InboxError, act, inboxWithRisk, parkReasons, type InboxAction } from "../src/inbox";
+import { prItems } from "../src/stale-pr";
 import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
-import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
+import { DEFAULT_CONFIG, eventsInboundSecretEnv, type FactoryConfig } from "../src/config";
 import { defaultStatePath, discoverRepos, factoryHome, streamPath, transcriptPath, workspacesDir } from "../src/paths";
 import { liveItems, proofView } from "./run-page";
 import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
-import { startRelay } from "./relay";
-import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
+import { HEALTH_ROUTE, healthRoute } from "./health";
+import { NO_PROJECT, settingsWithHealth, type DashboardProject } from "./project";
+import { workflowRoutes } from "./workflow-routes";
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
-import { commandRoutes, senderName } from "./plane/commands";
+import { senderName } from "./plane/commands";
+import { planeRoutes } from "./plane/mode";
+import { createRemote, REMOTE_PUBLIC_ROUTES } from "./plane/remote";
 import {
   readCapped,
   readDelivery,
@@ -41,7 +42,7 @@ import {
   WEBHOOK_SECRET_ENV,
 } from "../src/webhook";
 import { EVENT_SIGNATURE_HEADER, isExternalEventType, parseEvent, verifyEvent } from "../src/core/event";
-import { eventsInboundSecretEnv } from "../src/config";
+import { INTEGRATION_PUBLIC_ROUTES, integrationRoutes, type Secrets } from "./plane/integrations";
 
 // GitHub cannot hold a dashboard token, so this route authenticates by HMAC
 // instead (src/webhook.ts), and is the one public route reachable from off
@@ -56,10 +57,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FACTORY_DASHBOARD_PORT ?? 4100);
 const DB_PATH = process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH;
 const REPO = process.env.FACTORY_REPO ?? "";
-// Audit finding #16: the dashboard binds 127.0.0.1 by default (see the bottom
-// of this file) and refuses a non-loopback caller unless this token is set.
-// Read at module scope so createDashboard and bin/factory's cmdDashboard
-// both pick it up from the process env.
+// Audit finding #16: bound to 127.0.0.1 by default, and a non-loopback caller is refused unless this
+// is set. Module scope, so createDashboard and the CLI's dashboard both read it from the process env.
 const DASHBOARD_TOKEN = process.env.FACTORY_DASHBOARD_TOKEN ?? "";
 const BOARD_CACHE_MS = 10_000;
 
@@ -77,6 +76,9 @@ export const PUBLIC_ROUTES: readonly string[] = [
   "GET /auth/github/callback",
   WEBHOOK_ROUTE,
   EVENTS_ROUTE,
+  HEALTH_ROUTE,
+  ...INTEGRATION_PUBLIC_ROUTES,
+  ...REMOTE_PUBLIC_ROUTES,
 ];
 
 const ASSET_TYPES: Record<string, string> = {
@@ -85,6 +87,7 @@ const ASSET_TYPES: Record<string, string> = {
   woff2: "font/woff2",
   svg: "image/svg+xml",
   webmanifest: "application/manifest+json",
+  png: "image/png",
 };
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
@@ -128,12 +131,13 @@ export function createDashboard(
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
   // Read by name on every request; the value is never logged or returned.
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
-
+  const integrations = integrationRoutes({ state, tracker: github, repo, project, store: access.store });
+  const signed: Secrets = { ...integrations.secrets, [WEBHOOK_ROUTE]: webhookSecret, [EVENTS_ROUTE]: eventsSecret };
   const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<ScmPort["listOpenIssues"]>> }>();
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
   const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
   const prsInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listPrs"]>>>>();
-
+  const settings = settingsWithHealth();
   // Listing leases asks the remote, so the Settings page shares one answer for 15 s.
   let leasesCache: { at: number; value: Awaited<ReturnType<DashboardProject["leases"]>> | Error } | null = null;
   async function heldLeases(p: DashboardProject) {
@@ -240,6 +244,9 @@ export function createDashboard(
   // Every repo the multi-repo inbox reads from (v2.9.0 item 2): an explicit
   // FACTORY_REPOS list, else the single configured repo, else whatever repos
   // have ever run under FACTORY_HOME.
+  // With no repo of its own the plane lists every repo's runs, so tenancy narrows them to the caller's.
+  const visibleRuns = (req: Request) =>
+    state.listRuns(repo || undefined).filter((r) => access.visibleRepos(req, [r.repo]).length);
   function inboxRepos(): string[] {
     const fromEnv = (process.env.FACTORY_REPOS ?? "")
       .split(",")
@@ -287,7 +294,7 @@ export function createDashboard(
   const needRepo = (): Response | null => (repo ? null : json({ error: "FACTORY_REPO not set" }, { status: 500 }));
 
   async function inboxItem(r: string, number: number) {
-    return buildInbox(await cachedIssuesFor(r)).find((i) => i.issue === number);
+    return inboxWithRisk(await cachedIssuesFor(r)).find((i) => i.issue === number);
   }
 
   // Files a stage left in .factory/runs/issue-N/ of the issue's worktree. The
@@ -339,7 +346,9 @@ export function createDashboard(
 
   // The routing table is the only place a route exists, so the route-walk test
   // (tests/dashboard-routes.test.ts) sees every one of them.
+  const remote = createRemote({ access, github, repo, handle: (req) => readInProcess(req) });
   const routes: readonly Route[] = [
+    healthRoute,
     {
       method: "GET",
       pattern: /^\/(index\.html)?$/,
@@ -350,7 +359,7 @@ export function createDashboard(
       // Static files of the page itself: no data, so public like the shell.
       method: "GET",
       pattern:
-        /^\/(styles\.css|tokens\.css|app\.js|sw\.js|manifest\.webmanifest|icon\.svg|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
+        /^\/(styles\.css|tokens\.css|app\.js|sw\.js|manifest\.webmanifest|icon\.svg|apple-touch-icon\.png|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
       label: "GET /assets",
       handler: (_req, _url, m) => {
         try {
@@ -364,6 +373,7 @@ export function createDashboard(
       },
     },
     ...access.routes,
+    ...remote.routes,
     {
       method: "POST",
       pattern: /^\/webhook\/github$/,
@@ -618,8 +628,8 @@ export function createDashboard(
       label: "GET /api/line",
       role: "viewer",
       // Each recent run with the stages it went through, across every repo the inbox reads.
-      handler: () => {
-        const repos = repo ? [...new Set([repo, ...inboxRepos()])] : [];
+      handler: (req) => {
+        const repos = access.visibleRepos(req, repo ? [...new Set([repo, ...inboxRepos()])] : []);
         const rows = repos.flatMap((r) => {
           const st = stateFor(r);
           if (!st) return [];
@@ -647,9 +657,9 @@ export function createDashboard(
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
       role: "viewer",
-      handler: () =>
+      handler: (req) =>
         json(
-          analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [], new Date(), (agent) => {
+          analytics(visibleRuns(req), repo ? allStageRuns() : [], new Date(), (agent) => {
             const a = project?.config.agents[agent];
             return a?.models?.large ?? a?.model;
           }),
@@ -662,16 +672,8 @@ export function createDashboard(
       role: "viewer",
       handler: async () => json({ agents: await probedAgents() }),
     },
-    {
-      method: "GET",
-      pattern: /^\/api\/workflows$/,
-      label: "GET /api/workflows",
-      role: "viewer",
-      handler: async () =>
-        project
-          ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) })
-          : json({ available: false, reason: NO_PROJECT }),
-    },
+    // Workflows, Events, Minions and the workflow form: dashboard/workflow-routes.ts.
+    ...workflowRoutes({ state, github, workspacesDir: workspaces, project, actorOf: access.actorOf }),
     {
       method: "GET",
       pattern: /^\/api\/settings$/,
@@ -683,7 +685,7 @@ export function createDashboard(
           harnessReport(project.cloneDir, project.config),
           heldLeases(project),
         ]);
-        return json({ available: true, ...settingsView(project, report, leases, Date.now()) });
+        return json({ available: true, ...(await settings(project, report, leases, Date.now())) });
       },
     },
     {
@@ -694,23 +696,23 @@ export function createDashboard(
       // Aggregated across every repo under FACTORY_HOME (v2.9.0 item 2), or
       // narrowed to one with ?repo=. Each item carries its own repo so the
       // frontend can render and act on a mixed list.
-      handler: async (_req, url) => {
+      handler: async (req, url) => {
         const filter = url.searchParams.get("repo");
-        const repos = filter ? [filter] : inboxRepos();
+        const repos = filter ? [filter] : access.visibleRepos(req, inboxRepos());
         if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
         const perRepo = await Promise.all(
           repos.map(async (r) => [
             // Park reasons live in this dashboard's own DB, so only its repo has them.
-            ...buildInbox(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
+            ...inboxWithRisk(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
               (i) => ({ ...i, repo: r }),
             ),
-            ...learningPrItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
+            ...prItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r, risk: null })),
           ]),
         );
         const items = perRepo
           .flat()
           .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
-        return json({ repos: inboxRepos(), repo, items });
+        return json({ repos: access.visibleRepos(req, inboxRepos()), repo, items });
       },
     },
     {
@@ -760,7 +762,9 @@ export function createDashboard(
       },
     },
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
-    ...commandRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
+    ...planeRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
+    ...integrations.routes,
+    ...paneRoutes({ repo, workspacesFor, actorOf: access.actorOf, runs: state }),
     {
       method: "GET",
       pattern: /^\/api\/stream$/,
@@ -796,12 +800,9 @@ export function createDashboard(
     const url = new URL(req.url);
     const loopback = isLoopback(remoteAddress);
     const route = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
-    const isPublic = route !== undefined && PUBLIC_ROUTES.includes(route.label);
-
-    // The webhook carries its own HMAC, so GitHub may reach it with no dashboard token set.
-    const signedWebhook =
-      (route?.label === WEBHOOK_ROUTE && webhookSecret() !== "") ||
-      (route?.label === EVENTS_ROUTE && eventsSecret() !== "");
+    const isPublic = route !== undefined && (PUBLIC_ROUTES.includes(route.label) || route.public === true);
+    // A webhook carries its own signature, so its sender may reach it with no dashboard token set.
+    const signedWebhook = route !== undefined && (signed[route.label]?.() ?? "") !== "";
     if (!loopback && !access.guarded() && !signedWebhook) {
       return json(
         {
@@ -812,12 +813,12 @@ export function createDashboard(
     }
     // Every non-public route needs a caller with its role, so an unknown path
     // is refused before it can 404 (no route probing).
-    const refused = access.gate(req, route, isPublic, loopback, inProcess);
+    const refused = await access.gate(req, route, isPublic, loopback, inProcess);
     if (refused) return refused;
 
     // CSRF: a mutating request must be same-origin JSON, never the
     // `text/plain` a plain HTML form can send cross-site without a preflight.
-    if (req.method === "POST") {
+    if (req.method !== "GET" && !route?.public) {
       const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
       const cloudEvent = route?.label === EVENTS_ROUTE && contentType.startsWith("application/cloudevents+json");
       if (!contentType.startsWith("application/json") && !cloudEvent)
@@ -844,7 +845,7 @@ export function createDashboard(
   // Bun.serve passes two arguments, so only code in this process reaches the third.
   const readInProcess = (req: Request) => handle(req, "127.0.0.1", true);
 
-  return { handle, readInProcess, routeLabels, routeRoles, access };
+  return { handle, readInProcess, routeLabels, routeRoles, access, remote };
 }
 
 if (import.meta.main) {
@@ -862,10 +863,8 @@ if (import.meta.main) {
     undefined,
     servingAccess(),
   );
-  // 127.0.0.1 by default (audit finding #16): reach it over the network only
-  // by explicitly setting FACTORY_DASHBOARD_HOST=0.0.0.0 (the Docker image
-  // does this and relies on FACTORY_DASHBOARD_TOKEN instead) or an SSH
-  // tunnel, never by accident.
+  // 127.0.0.1 by default (audit finding #16): off the box only by setting FACTORY_DASHBOARD_HOST=0.0.0.0
+  // (docker-compose.yml does, with FACTORY_DASHBOARD_TOKEN) or through an SSH tunnel, never by accident.
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
   const server = Bun.serve({
     port: PORT,
@@ -873,5 +872,5 @@ if (import.meta.main) {
     fetch: (req: Request): Promise<Response> => dashboard.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${PORT} (repo=${REPO || "unset"})`);
-  startRelay(dashboard.readInProcess);
+  dashboard.remote.start();
 }

@@ -12,7 +12,7 @@ export interface AgentConfig {
   readonly model?: string;
   // Cheaper or stronger models by issue scope (src/core/model-tier.ts); unset tiers use `model`.
   readonly models?: { readonly small?: string; readonly large?: string };
-  // Pass the reply schema to the CLI (Codex --output-schema). Off until a live run confirms the CLI accepts it.
+  // Pass the reply schema to the CLI (Codex --output-schema, Claude --json-schema). Off until a live run confirms it.
   readonly outputSchema?: boolean;
 }
 

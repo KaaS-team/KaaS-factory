@@ -1,0 +1,19 @@
+{
+  "name": "linear",
+  "kind": "tracker",
+  "summary": "Linear issues in one team.",
+  "env": [
+    "LINEAR_API_KEY"
+  ],
+  "enable": "`\"tracker\": {\"kind\": \"linear\", \"team\": \"ENG\", \"tokenEnv\": \"LINEAR_API_KEY\"}`",
+  "module": "src/adapters/trackers/linear.ts",
+  "contract": "tests/trackers-linear.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-trackers.test.ts",
+    "env": [
+      "FACTORY_LIVE_LINEAR_KEY",
+      "FACTORY_LIVE_LINEAR_TEAM"
+    ]
+  }
+}

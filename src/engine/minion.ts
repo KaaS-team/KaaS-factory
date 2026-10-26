@@ -14,6 +14,7 @@ import { parseMinion, type Minion } from "../core/minion";
 import type { StageName, StageRunResult } from "../executor";
 import { mcpProblems, mcpServersFor, parseMcpRegistry, MCP_REGISTRY } from "../mcp";
 import { runDir } from "../artifacts";
+import { resolveSkill } from "../harness-defaults";
 import type { Stage } from "../state";
 import { emitEvent } from "./bus";
 import { priceResult, recordSpend, spendCapHit, type WatchDeps } from "./common";
@@ -63,7 +64,7 @@ export function loadMinions(cloneDir: string, config: Pick<FactoryConfig, "agent
     if (m.agent !== undefined && !Object.hasOwn(config.agents, m.agent))
       own.push(`agent: "${m.agent}" is not in config.agents`);
     if (m.skill !== undefined && !existsSync(skillPath(cloneDir, m.skill)))
-      own.push(`skill: .claude/skills/${m.skill}/SKILL.md not found`);
+      own.push(`skill: ${m.skill}/SKILL.md not found in .claude/skills, .agents/skills or the defaults`);
     own.push(...mcpProblems(registry, m.mcp).map((p) => `mcp: ${p}`));
     if (minions.some((x) => x.name === m.name)) own.push(`name: "${m.name}" is defined twice`);
     if (own.length > 0) problems.push(...own.map((p) => `${where}: ${p}`));
@@ -72,8 +73,9 @@ export function loadMinions(cloneDir: string, config: Pick<FactoryConfig, "agent
   return { minions, problems };
 }
 
+// The repo's skill under .claude/ or .agents/, else the factory's default of that name.
 function skillPath(cloneDir: string, skill: string): string {
-  return join(cloneDir, ".claude", "skills", skill, "SKILL.md");
+  return resolveSkill(cloneDir, skill)?.path ?? join(cloneDir, ".claude", "skills", skill, "SKILL.md");
 }
 
 export const UNTRUSTED_OPEN = "<untrusted-event-data>";
@@ -140,6 +142,13 @@ export interface MinionRun {
   readonly output?: unknown;
 }
 
+// A clean clone each run, so one run's edits never leak into the next one's reading of the code.
+function checkoutInto(cloneDir: string, cwd: string): string | undefined {
+  rmSync(cwd, { recursive: true, force: true });
+  const r = Bun.spawnSync(["git", "clone", "--quiet", "--depth", "1", `file://${cloneDir}`, cwd], { stderr: "pipe" });
+  return r.exitCode === 0 ? undefined : `minion checkout failed: ${r.stderr.toString().trim()}`;
+}
+
 // One run at a time per minion in this process: an event storm queues nothing.
 const running = new Set<string>();
 
@@ -170,6 +179,8 @@ async function runOnce(
   event: CloudEvent | undefined,
 ): Promise<MinionRun> {
   const cwd = join(deps.workspacesDir, `minion-${minion.name}`);
+  const failed = minion.checkout ? checkoutInto(deps.cloneDir, cwd) : undefined;
+  if (failed) return { minion: minion.name, status: "failed", reason: failed };
   const outputFile = join(cwd, runDir(MINION_ISSUE), MINION_OUTPUT);
   mkdirSync(join(cwd, runDir(MINION_ISSUE)), { recursive: true });
   rmSync(outputFile, { force: true });

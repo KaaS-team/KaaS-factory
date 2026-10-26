@@ -7,7 +7,9 @@
 import { copyFileSync, existsSync, mkdirSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { sparseCheckoutPatterns } from "../../git";
-import type { ExecResult, ExecutionPort } from "../../ports/execution";
+import type { AgentInVm, ExecResult, ExecutionPort } from "../../ports/execution";
+
+export type { AgentInVm };
 
 export interface MicrosandboxSpec {
   readonly kind: "microsandbox";
@@ -52,20 +54,6 @@ export function sandboxArgs(spec: MicrosandboxSpec, cmd: string, cwd: string, na
   return [...vmArgs(spec, name), "-v", `${host}:${cwd}`, "-w", cwd, spec.image, "--", "bash", "-c", cmd];
 }
 
-export interface AgentInVm {
-  readonly argv: readonly string[];
-  readonly cwd: string;
-  // Folders besides cwd the agent reads or writes, such as the stage's scratch dir.
-  readonly mounts: readonly string[];
-  // What the guest sees. Only plain values: anything secret goes in spec.secrets.
-  readonly env: Readonly<Record<string, string>>;
-  // msb 0.7 does not forward piped stdin, so the prompt is read from this file in the guest.
-  readonly stdinFile?: string;
-  readonly name: string;
-  // Per-run keys in spec.secrets' form, such as a stage's gateway key.
-  readonly secrets?: readonly string[];
-}
-
 export function agentArgs(
   spec: MicrosandboxSpec,
   run: AgentInVm,
@@ -74,7 +62,9 @@ export function agentArgs(
   const command = run.stdinFile ? ["bash", "-c", 'exec "$@" < "$0"', run.stdinFile, ...run.argv] : [...run.argv];
   return [
     ...vmArgs(spec, run.name, run.secrets),
-    ...[run.cwd, ...run.mounts].flatMap((d) => ["-v", `${real(d)}:${d}`]),
+    "-v",
+    `${real(run.cwd)}:${run.cwd}${run.readOnly ? ":ro" : ""}`,
+    ...run.mounts.flatMap((d) => ["-v", `${real(d)}:${d}`]),
     ...Object.entries(run.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
     "-w",
     run.cwd,

@@ -11,7 +11,7 @@ import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { tokenEnvNames } from "./agents/env";
 import { CommandExecutor } from "./agents/executor";
-import { DEFAULT_CONFIG, loadConfig, type FactoryConfig } from "./config";
+import { DEFAULT_CONFIG, loadConfig, repoFromRemoteUrl, type FactoryConfig } from "./config";
 import { EXIT, UsageError, failureJson, successJson } from "./cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "./watch";
 import { ShellGateRunner } from "./gates";
@@ -21,12 +21,14 @@ import { DiffAnchorRechecker } from "./recheck";
 import { scan, scanLighthouse } from "./scan";
 import { streamLogs } from "./logs";
 import { plain } from "./display";
-import { act, buildInbox, inboxPositionals, learningPrItems, parkReasons, type InboxAction } from "./inbox";
+import { act, buildInbox, inboxPositionals, parkReasons, type InboxAction } from "./inbox";
+import { prItems } from "./stale-pr";
+import { remoteCommand } from "./remote-cli";
 import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard, servingAccess as plane } from "../dashboard/server";
-import { startRelay } from "../dashboard/relay";
+import { blobStoreFromEnv } from "./blobs";
 import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
 import {
@@ -37,6 +39,7 @@ import {
   transcriptPath,
 } from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
+import { tailEvents } from "./events-tail";
 import { followStream } from "./view";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
 import { LABEL } from "./labels";
@@ -49,19 +52,19 @@ import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
 import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
-import { formatInventory, harnessReport } from "./harness";
+import { type CliContext, cmdHarness, cmdTeach } from "./harness-cli";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
-import { poolDbPath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
-import { SqliteUsageStore } from "./adapters/pool/execution";
-import { monthKey, poolReport } from "./core/sandbox-pool";
+import { spendPolicy } from "./ports/spend";
+import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { probeRuntime } from "./runtime-kit";
+import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { detectStack, diskFiles } from "./stack";
-import { describeStack, initConfig, isFilledIn } from "./init";
-import { repoFromRemoteUrl } from "./config";
+import { describeStack, initConfig, isFilledIn, writeCharter } from "./init";
 import { EventBus } from "./engine/bus";
 import { loadMinions, runMinion } from "./engine/minion";
 import { parseEvent } from "./core/event";
-
+import { watcherBus } from "./integrations/wire";
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -74,6 +77,8 @@ function flag(name: string): string | undefined {
 function has(name: string): boolean {
   return args.includes(`--${name}`);
 }
+
+const cli = { args, flag, has, resolveCloneDir: () => resolveCloneDir(), watchDeps: buildWatchDeps };
 
 async function fileExists(path: string): Promise<boolean> {
   return await Bun.file(path).exists();
@@ -150,8 +155,9 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     github,
     git: new Git(new GitCommandRunner()),
     state,
-    bus: new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}` }),
+    bus: watcherBus(state, config),
     minions: loaded.minions,
+    blobs: blobStoreFromEnv(),
     executor: new CommandExecutor(
       config.agents,
       config.stages,
@@ -168,15 +174,14 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
     setupRunner: new ShellSetupRunner(),
-    // Real cross-process leases: every real CLI invocation (watch, run, tick)
-    // shares this machine's FACTORY_HOME/machine.db, so a second repo's
-    // watcher on the same machine is respected (plan v2.7.0 item 5).
+    // Every CLI invocation shares FACTORY_HOME/machine.db, so a second repo's watcher here is respected.
     machine: { leases: new MachineLeases(), config: machineConfig, spend: new MachineSpend() },
     // Issue leases on the repo's own remote, so watchers on other machines,
     // CI jobs and cloud routines driving the same repo never run one issue twice.
     leases: { port: new GitLeases(cloneDir), holder, held: new Map() },
     // Spend on the issue and the ledger issue, so caps hold across all of them too.
     spend: new GitHubSpend(github, config.repo, holder),
+    spendPolicy: spendPolicy(),
   };
 }
 
@@ -313,7 +318,7 @@ async function cmdInbox(): Promise<void> {
   const reasons = existsSync(db) ? parkReasons(new FactoryState(db).listRuns(repo)) : undefined;
   const items = [
     ...buildInbox(await github.listOpenIssues(repo), reasons),
-    ...learningPrItems(await github.listPrs(repo, { state: "open" })),
+    ...prItems(await github.listPrs(repo, { state: "open" })),
   ];
   const [issueArg, actionArg] = inboxPositionals(args);
   if (issueArg) {
@@ -451,6 +456,7 @@ async function cmdDoctor(): Promise<void> {
       versionOf,
       fileExists,
       readFile: async (path) => ((await fileExists(path)) ? await Bun.file(path).text() : undefined),
+      probeRuntime: (name) => probeRuntime(runtimesFrom(loadMachineConfig().runtimes)[name]!, 10_000),
       isExecutable: async (path) => {
         try {
           accessSync(path, constants.X_OK);
@@ -514,14 +520,14 @@ function serveDashboard(
     fetch: (req: Request): Promise<Response> => app.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${port} (repo=${repo || "unset"})`);
-  startRelay(app.readInProcess);
+  app.remote.start();
   return port;
 }
 
 // The repo the Workflows and Settings pages describe.
 function dashboardProject(cloneDir: string, config: FactoryConfig): DashboardProject {
   const leases = new GitLeases(cloneDir);
-  return { cloneDir, config, machine: loadMachineConfig(), leases: () => leases.held() };
+  return { cloneDir, config, machine: loadMachineConfig(), leases: () => leases.held(), fleet: new MachineLeases() };
 }
 
 async function cmdDashboard(): Promise<void> {
@@ -836,6 +842,9 @@ async function cmdInit(): Promise<void> {
   }
   await Bun.write(target, text);
   console.log(`factory init: wrote ${target}${repo ? "" : ' (no github origin remote: set "repo" by hand)'}`);
+  const charter = readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "charter.md"), "utf8");
+  if (writeCharter(dir, charter, stack, repo))
+    console.log(`factory init: wrote ${join(dir, ".factory", "charter.md")}`);
   if (has("pr")) {
     const git = (...a: string[]) => {
       const r = Bun.spawnSync(["git", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" });
@@ -869,34 +878,15 @@ async function cmdInit(): Promise<void> {
   );
 }
 
-// `factory harness validate|inventory`: the repo's workflows, checked as the watcher loads them, or listed.
-async function cmdHarness(): Promise<void> {
-  const sub = args[1];
-  if (sub !== "validate" && sub !== "inventory")
-    throw new UsageError("usage: factory harness (validate | inventory) --repo-dir <path> [--json]");
-  const dir = resolve(flag("repo-dir") ?? ".");
-  const report = await harnessReport(dir, await loadConfig(dir));
-  if (has("json")) {
-    console.log(
-      successJson(
-        {
-          problems: report.problems,
-          workflows: report.entries.map(({ workflow, ...e }) => ({
-            ...e,
-            steps: workflow ? Object.keys(workflow.steps) : [],
-          })),
-        },
-        sub === "inventory" || !report.problems.length,
-      ),
-    );
-  } else if (sub === "inventory") {
-    for (const line of formatInventory(report)) console.log(line);
-  } else {
-    for (const p of report.problems) console.log(`factory harness: ${p}`);
-    if (!report.problems.length) console.log(`factory harness: ${report.entries.length} workflows, all valid`);
-  }
-  if (sub === "validate" && report.problems.length) process.exit(EXIT.checksFailed);
-}
+// `factory harness` and `factory teach` live in src/harness-cli.ts.
+const harnessCtx = (): CliContext => ({
+  args,
+  flag,
+  has,
+  cloneDir: resolveCloneDir,
+  watchDeps: buildWatchDeps,
+  statePath: stateDbPath,
+});
 
 // `factory minion list|run <name> [--event <json-file>]`: the repo's minions, or one run now.
 async function cmdMinion(): Promise<void> {
@@ -956,24 +946,17 @@ async function cmdMinion(): Promise<void> {
 async function cmdEvents(): Promise<void> {
   const sub = args[1];
   if (sub !== "tail" && sub !== "replay")
-    throw new UsageError("usage: factory events (tail [--limit N] | replay <id>) --repo-dir <path> [--json]");
+    throw new UsageError(
+      "usage: factory events (tail [--limit N] [--follow] | replay <id>) --repo-dir <path> [--json]",
+    );
   const cloneDir = resolve(flag("repo-dir") ?? ".");
   const config = await loadConfig(cloneDir);
   const state = new FactoryState(stateDbPath(config.repo));
   if (sub === "tail") {
-    const rows = state.busEvents(Number(flag("limit") ?? 50));
-    for (const r of rows) {
-      if (has("json"))
-        console.log(JSON.stringify({ ...r, data: JSON.parse(r.data), deliveries: state.busDeliveries(r.id) }));
-      else
-        console.log(
-          `${r.time}  ${r.direction === "in" ? "<-" : "->"}  ${r.type}  ${r.id}${r.subject ? `  ${r.subject}` : ""}${state
-            .busDeliveries(r.id)
-            .map((d) => `  [${d.status} ${d.sink}]`)
-            .join("")}`,
-        );
-    }
-    return;
+    const controller = new AbortController();
+    process.on("SIGINT", () => controller.abort());
+    const opts = { limit: Number(flag("limit") ?? 50), follow: has("follow"), json: has("json") };
+    return tailEvents(state, { ...opts, signal: controller.signal });
   }
   const id = args[2];
   if (!id || id.startsWith("--")) throw new UsageError("events replay: an event id is required");
@@ -1024,42 +1007,10 @@ async function cmdReceipt(): Promise<void> {
   if (!has("help")) process.exit(EXIT.error);
 }
 
-// `factory pool`: each pool in machine.json, its members' minutes used and left this month, and the last failure.
-async function cmdPool(): Promise<void> {
-  if (has("help")) {
-    console.log("usage: factory pool [--json]");
-    return;
-  }
-  const runtimes = loadMachineConfig().runtimes ?? {};
-  const month = monthKey(new Date());
-  const specs = Object.entries(runtimes).flatMap(([name, spec]) => (spec.kind === "pool" ? [{ name, spec }] : []));
-  const usage = specs.length ? new SqliteUsageStore(poolDbPath()).month(month) : {};
-  const pools = specs.map(({ name, spec }) => ({
-    name,
-    fallback: spec.fallback ?? "local",
-    members: poolReport(spec.members, usage),
-  }));
-  if (has("json")) {
-    console.log(successJson({ month, pools }));
-    return;
-  }
-  if (!pools.length) {
-    console.log("factory pool: no pool runtime in FACTORY_HOME/machine.json");
-    return;
-  }
-  for (const p of pools) {
-    console.log(`${p.name} (${month}, then ${p.fallback})`);
-    for (const m of p.members)
-      console.log(
-        `  ${m.runtime}  used ${m.used} of ${m.allowance} min, ${m.left} left${m.lastFailure ? `  last failure: ${plain(m.lastFailure)}` : ""}`,
-      );
-  }
-}
-
 async function main(): Promise<void> {
   switch (command) {
     case "up":
-      return cmdUp();
+      return flag("repo") || flag("repo-dir") ? cmdUp() : (await import("./deploy/stack")).startStack(cmdDashboard);
     case "init":
       return cmdInit();
     case "watch":
@@ -1099,15 +1050,27 @@ async function main(): Promise<void> {
     case "daemon":
       return cmdDaemon();
     case "harness":
-      return cmdHarness();
+      return cmdHarness(harnessCtx());
+    case "teach":
+      return cmdTeach(harnessCtx());
     case "minion":
       return cmdMinion();
     case "events":
       return cmdEvents();
     case "pool":
-      return cmdPool();
+      return cmdPool(cli);
+    case "runtime":
+      return cmdRuntime(cli);
+    case "dispatch":
+      return cmdDispatch(cli);
+    case "routine":
+      return cmdRoutine(cli);
     case "receipt":
       return cmdReceipt();
+    case "mcp":
+    case "runner":
+    case "pair":
+      return remoteCommand(args);
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

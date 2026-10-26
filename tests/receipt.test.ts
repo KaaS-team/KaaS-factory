@@ -23,6 +23,7 @@ import {
   writeRunReceipt,
 } from "../src/receipt";
 import { sanitizeEnv } from "../src/agents/env";
+import { type MergeRecord, mergeRecord, type PrFacts, withMerge } from "../src/pr-facts";
 import { ShellSetupRunner } from "../src/setup";
 import type { StageRun } from "../src/state";
 
@@ -407,5 +408,44 @@ describe("writeRunReceipt", () => {
     const w = worktree();
     clearRunFiles(w.repo, w.runDir);
     expect((await w.seal()).files).toEqual({ "acceptance.json": null, "holdout.json": null, "proof.json": null });
+  });
+});
+
+test("the merge decision, its reasons and the PR facts it read are signed into the receipt", () => {
+  const facts = {
+    cleanRoom: { ran: true, failToPass: true, passToPass: true },
+    tamper: ["tests/a.test.ts: adds a skip marker"],
+  };
+  const decision = {
+    outcome: "refuse" as const,
+    headSha: "b".repeat(40),
+    refusals: [{ reason: "signal-failed" as const, detail: "2: the diff weakens the proof" }],
+  };
+  const merge = mergeRecord(decision, facts as unknown as PrFacts, "full");
+  const env = signStatement(withMerge(buildStatement(input()), merge), key.privateKeyPem);
+  expect(kaasVerify(env, "--pubkey", join(dir, "key.pub")).code).toBe(0);
+  const signed = (decodeStatement(env) as unknown as { predicate: { merge: MergeRecord } }).predicate.merge;
+  expect(signed).toEqual({
+    autonomy: "full",
+    outcome: "refuse",
+    headSha: "b".repeat(40),
+    reasons: ["signal-failed: 2: the diff weakens the proof"],
+    facts: facts as unknown as PrFacts,
+  });
+  // A runner that signs "merge" over its own refusals, or a decision on another head, is caught.
+  const lie = (edit: (m: MergeRecord & { outcome: string; headSha: string }) => void) => {
+    const s = JSON.parse(JSON.stringify(withMerge(buildStatement(input()), merge))) as Statement & {
+      predicate: { merge: never };
+    };
+    edit(s.predicate.merge);
+    return kaasVerify(signStatement(s, key.privateKeyPem), "--pubkey", join(dir, "key.pub"));
+  };
+  expect(lie((m) => Object.assign(m, { outcome: "merge" }))).toEqual({
+    code: 1,
+    out: "TAMPERED  merge.outcome: merge with refusal reasons",
+  });
+  expect(lie((m) => Object.assign(m, { headSha: "c".repeat(40) }))).toEqual({
+    code: 1,
+    out: "TAMPERED  merge.headSha: does not name run.head.sha",
   });
 });

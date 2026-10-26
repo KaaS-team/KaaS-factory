@@ -242,7 +242,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--state",
       opts?.state ?? "open",
       "--json",
-      "number,url,state,headRefName,isDraft,closingIssuesReferences,isCrossRepository",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences,isCrossRepository,updatedAt",
       "--limit",
       "100",
     ]);
@@ -320,10 +320,8 @@ export class GitHub implements TrackerPort, CodeHostPort {
     await this.exec(["pr", "close", String(number), "--repo", repo]);
   }
 
-  // One shared shape for validatePr and waitForCi (src/ci.ts): state,
-  // headRefOid, closingIssuesReferences and statusCheckRollup all come off
-  // the same `gh pr view`. state is lowercased to match GhPr.state's
-  // "open"/"closed" convention elsewhere in this codebase.
+  // One `gh pr view` shape for validatePr and waitForCi (src/ci.ts); state is lowercased to match
+  // GhPr.state's "open"/"closed" convention elsewhere in this codebase.
   async prStatus(repo: string, number: number): Promise<PrStatus> {
     const result = await this.exec([
       "pr",
@@ -348,9 +346,8 @@ export class GitHub implements TrackerPort, CodeHostPort {
     };
   }
 
-  // The two `gh pr view` fields gate.py's Merge Readiness check needs
-  // (mergeable, reviewDecision) plus review-thread resolution, which only
-  // GraphQL exposes. state is lowercased for the same reason as prStatus.
+  // gate.py's Merge Readiness fields from `gh pr view`, plus review state, which only GraphQL has.
+  // state is lowercased for the same reason as prStatus.
   async mergeReadiness(repo: string, number: number): Promise<MergeReadiness> {
     const result = await this.exec([
       "pr",
@@ -371,7 +368,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
     };
     const [owner, name] = repo.split("/");
     if (!owner || !name) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
-    const { hasUnresolvedReviewThreads, changesRequestedStale } = await this.reviewState(
+    const { hasUnresolvedReviewThreads, changesRequestedStale, approvedBy } = await this.reviewState(
       owner,
       name,
       number,
@@ -386,37 +383,30 @@ export class GitHub implements TrackerPort, CodeHostPort {
       reviewDecision: (data.reviewDecision ?? "") as MergeReadiness["reviewDecision"],
       hasUnresolvedReviewThreads,
       changesRequestedStale,
+      approvedBy,
     };
   }
 
-  // One GraphQL call for both readiness facts that `gh pr view` can't expose:
-  // unresolved review threads, and whether every CHANGES_REQUESTED review is
-  // against a commit the head has since moved past.
+  // One GraphQL call for what `gh pr view` can't expose: unresolved threads, stale change requests,
+  // and who approved the head commit (gh's latestReviews leaves commit.oid empty).
   private async reviewState(
     owner: string,
     name: string,
     number: number,
     headRefOid: string,
-  ): Promise<{ hasUnresolvedReviewThreads: boolean; changesRequestedStale: boolean }> {
-    const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}reviews(last:50){nodes{state commit{oid}}}}}}`;
-    const result = await this.exec([
-      "api",
-      "graphql",
-      "-f",
-      `query=${query}`,
-      "-F",
-      `owner=${owner}`,
-      "-F",
-      `name=${name}`,
-      "-F",
-      `number=${number}`,
-    ]);
+  ): Promise<{ hasUnresolvedReviewThreads: boolean; changesRequestedStale: boolean; approvedBy: string[] }> {
+    const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}reviews(last:50){nodes{state commit{oid}}}latestReviews(first:100){nodes{state author{login} commit{oid}}}}}}`;
+    const vars = Object.entries({ owner, name, number }).flatMap(([k, v]) => ["-F", `${k}=${v}`]);
+    const result = await this.exec(["api", "graphql", "-f", `query=${query}`, ...vars]);
     const data = JSON.parse(result.stdout) as {
       data: {
         repository: {
           pullRequest: {
             reviewThreads: { nodes: { isResolved: boolean }[] };
             reviews: { nodes: { state: string; commit: { oid: string } | null }[] };
+            latestReviews?: {
+              nodes: { state: string; author: { login: string } | null; commit: { oid: string } | null }[];
+            };
           };
         };
       };
@@ -426,6 +416,9 @@ export class GitHub implements TrackerPort, CodeHostPort {
     return {
       hasUnresolvedReviewThreads: pr.reviewThreads.nodes.some((t) => !t.isResolved),
       changesRequestedStale: changesRequested.length > 0 && changesRequested.every((r) => r.commit?.oid !== headRefOid),
+      approvedBy: (pr.latestReviews?.nodes ?? [])
+        .filter((r) => r.state === "APPROVED" && r.commit?.oid === headRefOid)
+        .map((r) => r.author?.login ?? ""),
     };
   }
 

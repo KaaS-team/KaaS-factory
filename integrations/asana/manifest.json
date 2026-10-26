@@ -1,0 +1,20 @@
+{
+  "name": "asana",
+  "kind": "tracker",
+  "summary": "Asana tasks in one project.",
+  "env": [
+    "ASANA_TOKEN"
+  ],
+  "enable": "`\"tracker\": {\"kind\": \"asana\", \"workspace\": \"...\", \"project\": \"...\", \"tokenEnv\": \"ASANA_TOKEN\"}`",
+  "module": "src/adapters/trackers/asana.ts",
+  "contract": "tests/trackers-asana.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-trackers.test.ts",
+    "env": [
+      "FACTORY_LIVE_ASANA_WORKSPACE",
+      "FACTORY_LIVE_ASANA_PROJECT",
+      "FACTORY_LIVE_ASANA_TOKEN"
+    ]
+  }
+}

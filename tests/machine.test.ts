@@ -133,14 +133,14 @@ describe("agentRuntime", () => {
     expect(agentVm({ slots: 1 })).toBeUndefined();
   });
 
-  test("anything but a microsandbox runtime in the same file refuses to start", () => {
+  test("anything but a microsandbox or docker runtime in the same file refuses to start", () => {
     for (const bad of [
       { slots: 1, agentRuntime: "vm" },
-      { slots: 1, runtimes: { vm: { kind: "docker", image: "i" } }, agentRuntime: "vm" },
+      { slots: 1, runtimes: { vm: { kind: "ssh", host: "h", dir: "/w" } }, agentRuntime: "vm" },
       { slots: 1, runtimes: { vm }, agentRuntime: "local" },
     ])
       expect(() => loadMachineConfig({ FACTORY_HOME: home(bad) })).toThrow(
-        /"agentRuntime" must name a microsandbox runtime/,
+        /"agentRuntime" must name a microsandbox or docker runtime/,
       );
   });
 });
