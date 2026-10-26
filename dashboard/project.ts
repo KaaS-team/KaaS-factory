@@ -174,11 +174,11 @@ export function settingsWithHealth() {
 // Probing spawns `--version`, so each repo's answer is cached for a minute and shared by concurrent requests.
 export function agentsProbe(probes: { which: typeof which; versionOf: typeof versionOf }) {
   const cache = new Map<string, { at: number; rows: Promise<unknown[]> }>();
-  const probe = (fleet: Pick<FactoryConfig, "agents" | "stages">) =>
+  const probe = (fleet: Pick<FactoryConfig, "agents" | "stages">, local: boolean) =>
     Promise.all(
       agentCatalog(fleet.agents, fleet.stages).map(async (a) => {
         const row = { ...a, name: plain(a.name), binary: plain(a.binary) };
-        if (!a.configured) return { ...row, installed: null, version: null, checks: [] };
+        if (!a.configured || !local) return { ...row, installed: null, version: null, checks: [] };
         const checks = await agentChecks(a.name, fleet.agents, probes);
         const installed = await probes.which(a.binary);
         const version = installed ? ((await probes.versionOf(a.binary)) ?? "").split("\n")[0]!.trim() || null : null;
@@ -195,10 +195,13 @@ export function agentsProbe(probes: { which: typeof which; versionOf: typeof ver
         };
       }),
     );
-  return (repo: string, fleet: Pick<FactoryConfig, "agents" | "stages">): Promise<unknown[]> => {
+  // A mirrored config is any bucket writer's word and runs on another machine, so the plane never
+  // runs the binaries it names.
+  type Fleet = Pick<FactoryConfig, "agents" | "stages">;
+  return (repo: string, project: { config: Fleet; readOnly?: true } | null | undefined, fallback: Fleet) => {
     const hit = cache.get(repo);
     if (hit && Date.now() - hit.at < 60_000) return hit.rows;
-    const rows = probe(fleet);
+    const rows: Promise<unknown[]> = probe(project?.config ?? fallback, !project?.readOnly);
     cache.set(repo, { at: Date.now(), rows });
     rows.catch(() => cache.delete(repo));
     return rows;

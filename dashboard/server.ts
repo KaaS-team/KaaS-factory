@@ -579,8 +579,7 @@ export function createDashboard(
       label: "GET /api/agents",
       role: "viewer",
       repo: "query",
-      handler: async (req) =>
-        json({ agents: await agents(repoOf(req), (await projectFor(repoOf(req)))?.config ?? fleet) }),
+      handler: async (req) => json({ agents: await agents(repoOf(req), await projectFor(repoOf(req)), fleet) }),
     },
     // Workflows, Events, Minions and the workflow form: dashboard/workflow-routes.ts.
     ...workflowRoutes({ github, projectFor, stateFor, workspacesFor, repoOf, actorOf: access.actorOf }),

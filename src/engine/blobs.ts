@@ -123,9 +123,14 @@ export async function shipStage(
 export async function shipConfig(store: BlobStore | undefined, cloneDir: string, repo: string): Promise<number> {
   if (!store) return 0;
   const root = join(cloneDir, ".factory");
-  const sub = async (d: string) => (await readdir(join(root, d)).catch(() => [] as string[])).map((f) => `${d}/${f}`);
+  // A commit can make .factory or workflows/ a symlink, and O_NOFOLLOW guards only the last name.
+  const sub = async (d: string) =>
+    (await insideWorktree(join(root, d), cloneDir))
+      ? (await readdir(join(root, d)).catch(() => [] as string[])).map((f) => `${d}/${f}`)
+      : [];
   let sent = 0;
   try {
+    if (!(await insideWorktree(root, cloneDir))) return 0;
     for (const file of ["config.json", "mcp.json", ...(await sub("workflows")), ...(await sub("minions"))])
       if (CONFIG_FILE.test(file)) sent += Number(await upload(store, blobKeys.config(repo, file), join(root, file)));
   } catch (err) {

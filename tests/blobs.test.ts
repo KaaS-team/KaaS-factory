@@ -367,6 +367,35 @@ describe("the plane writes a runner's run rows into that repo's own DB", () => {
 });
 
 describe("a repo's config reaches the plane", () => {
+  test("a linked .factory or workflows dir ships nothing from where it points", async () => {
+    const outside = tmp("blobs-cfg-out-");
+    writeFileSync(join(outside, "config.json"), "{}");
+    mkdirSync(join(outside, "workflows"));
+    writeFileSync(join(outside, "workflows", "id_rsa.yml"), "secret");
+    const linkedRoot = tmp("blobs-cfg-lroot-");
+    symlinkSync(outside, join(linkedRoot, ".factory"));
+    const linkedSub = tmp("blobs-cfg-lsub-");
+    mkdirSync(join(linkedSub, ".factory"));
+    writeFileSync(join(linkedSub, ".factory", "config.json"), "{}");
+    symlinkSync(join(outside, "workflows"), join(linkedSub, ".factory", "workflows"));
+    const store = new DiskBlobStore(tmp("blobs-cfg-lstore-"));
+    expect(await shipConfig(store, linkedRoot, "acme/widgets")).toBe(0);
+    expect(await shipConfig(store, linkedSub, "acme/widgets")).toBe(1);
+    expect((await store.list("runs/")).map((e) => e.key)).toEqual([blobKeys.config("acme/widgets", "config.json")]);
+  });
+
+  test("a config edited to the same size reaches the plane again", async () => {
+    const store = new DiskBlobStore(tmp("blobs-cfg-edit-"));
+    const key = blobKeys.config("acme/widgets", "workflows/ship.yml");
+    const plane = { FACTORY_HOME: tmp("blobs-cfg-edit-plane-"), FACTORY_REPO: "acme/widgets" };
+    await store.put(key, bytes("timeout: 5"));
+    expect(await mirrorDown(store, plane)).toBe(1);
+    await store.put(key, bytes("timeout: 9"));
+    expect(await mirrorDown(store, plane)).toBe(1);
+    expect(readFileSync(localPathFor(key, plane)!, "utf8")).toBe("timeout: 9");
+    expect(await mirrorDown(store, plane)).toBe(0);
+  });
+
   test("the runner ships only .factory config, workflow and minion files, never a link or a dotfile", async () => {
     const store = new DiskBlobStore(tmp("blobs-cfg-store-"));
     const clone = tmp("blobs-cfg-clone-");

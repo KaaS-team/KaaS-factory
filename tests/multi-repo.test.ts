@@ -293,7 +293,8 @@ describe("each repo's own config", () => {
       ),
     ).toBe(3);
     expect(await mirrorDown(store, process.env, [B])).toBe(3);
-    const probes = { which: () => null, versionOf: async () => null };
+    const asked: string[] = [];
+    const probes = { which: (b: string) => (asked.push(b), null), versionOf: async () => null };
     const dash = createDashboard(
       states[A]!,
       fakeGitHub() as never,
@@ -324,7 +325,11 @@ describe("each repo's own config", () => {
       leasesError: null,
       codex: 0,
     });
+    expect(asked.length).toBeGreaterThan(0);
+    asked.length = 0;
     const b = await view(B);
+    // B's config came through the bucket, so the plane runs none of the binaries it names.
+    expect(asked).toEqual([]);
     expect(b.workflows).not.toContain("a-flow");
     expect(b).toMatchObject({
       workflows: expect.arrayContaining(["b-flow"]),

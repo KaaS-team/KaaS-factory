@@ -1,7 +1,7 @@
 // Picks the blob store from the environment, and mirrors it down onto the plane's own paths, so
 // the dashboard reads a run from another machine through the same files it always reads.
 // FACTORY_ variables never reach an agent (src/agents/env.ts), so the bucket keys stay with the runner.
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { S3Client } from "bun";
 import { DiskBlobStore } from "./adapters/blob-disk/blob";
@@ -209,10 +209,13 @@ export async function mirrorDown(
             console.error(`[blobs] mirror: skipped ${JSON.stringify(key)}`);
             continue;
           }
-          if (path && (await stat(path).catch(() => undefined))?.size === size) continue;
+          // Transcripts only grow, so an equal size is the same file; an edited config can keep its size.
+          const config = mine.kind === "config";
+          if (path && !config && (await stat(path).catch(() => undefined))?.size === size) continue;
           const body = await store.get(key);
           // The listed size is the store's word; the body read is the one that counts.
           if (!body || body.byteLength > MAX_BLOB_BYTES) continue;
+          if (config && Buffer.from(body).equals(await readFile(path!).catch(() => Buffer.alloc(0)))) continue;
           if (mine.kind === "state") {
             db ??= new FactoryState(defaultStatePath(env, repo));
             wrote += Number(importRunState(db, repo, mine.issue, body) > 0);

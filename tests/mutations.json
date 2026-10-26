@@ -796,5 +796,9 @@
   {"name": "project: the Agents page reads the asked repo's config", "file": "dashboard/server.ts", "find": "(await projectFor(repoOf(req)))?.config ?? fleet", "replace": "fleet", "test": "tests/multi-repo.test.ts"},
   {"name": "workflow routes: the editor answers read only for a repo with no clone", "file": "dashboard/workflow-routes.ts", "find": "if (project.readOnly) return json({ error: READ_ONLY }, 409);\n        const body", "replace": "const body", "test": "tests/multi-repo.test.ts"},
   {"name": "workflow routes: replay refuses a shipped config's sinks", "file": "dashboard/workflow-routes.ts", "find": "if (project.readOnly) return json({ error: READ_ONLY }, 409);\n        const bus", "replace": "const bus", "test": "tests/multi-repo.test.ts"},
-  {"name": "workflow routes: the Settings leases cache is per repo", "file": "dashboard/workflow-routes.ts", "find": "const hit = leasesCache.get(r);", "replace": "const hit = [...leasesCache.values()][0];", "test": "tests/multi-repo.test.ts"}
+  {"name": "workflow routes: the Settings leases cache is per repo", "file": "dashboard/workflow-routes.ts", "find": "const hit = leasesCache.get(r);", "replace": "const hit = [...leasesCache.values()][0];", "test": "tests/multi-repo.test.ts"},
+  {"name": "agents: a mirrored config's binaries are probed on the plane", "file": "dashboard/project.ts", "find": "if (!a.configured || !local) return", "replace": "if (!a.configured) return", "test": "tests/multi-repo.test.ts"},
+  {"name": "blobs: a linked .factory dir ships where it points", "file": "src/engine/blobs.ts", "find": "    if (!(await insideWorktree(root, cloneDir))) return 0;\n", "replace": "", "test": "tests/blobs.test.ts"},
+  {"name": "blobs: a linked workflows dir ships where it points", "file": "src/engine/blobs.ts", "find": "(await insideWorktree(join(root, d), cloneDir))\n      ?", "replace": "true\n      ?", "test": "tests/blobs.test.ts"},
+  {"name": "blobs: a config edited to the same size stays stale on the plane", "file": "src/blobs.ts", "find": "if (path && !config && (await", "replace": "if (path && (await", "test": "tests/blobs.test.ts"}
 ]
