@@ -74,6 +74,15 @@ function recordedWorkflow(issue: GhIssue): string | undefined {
 
 const WORKFLOW_MARKER = "workflow";
 
+// An issue a route's trigger filed runs that workflow, not the repo's, so pickup reads it back (recordedWorkflow).
+async function recordTriggered(deps: WatchDeps, config: FactoryConfig, n: number, workflow: Workflow, via: string) {
+  if (workflow.name === workflowOf(deps).name) return;
+  const body = withDataMarker(`Running workflow \`${workflow.name}\` (\`${via}\`).`, WORKFLOW_MARKER, {
+    name: workflow.name,
+  });
+  await deps.github.commentIssue(config.repo, n, body);
+}
+
 // The repo's workflow and every one a route names: what cron fires and recovery scans.
 function allWorkflows(deps: WatchDeps): Workflow[] {
   return [workflowOf(deps), ...Object.values(deps.routeWorkflows ?? {})];
@@ -592,9 +601,10 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const intakeGated = autoStart && !stopIf && !budgetPaused;
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {
-    await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch((err) =>
-      console.error("factory watch: cron trigger failed", err),
+    const filed = await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch(
+      (err) => (console.error("factory watch: cron trigger failed", err), [] as number[]),
     );
+    for (const n of filed) await recordTriggered(deps, config, n, workflow, "on: cron:");
   }
   // A minion runs for minutes: started here, never awaited by the poll.
   for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date()))
@@ -776,16 +786,7 @@ export async function handleEvent(deps: WatchDeps, config: FactoryConfig, event:
       const n = await fireEvent(deps.github, config.repo, workflow, event);
       if (n === undefined) continue;
       filed++;
-      // Not the repo's workflow: record it on the issue so pickup runs this one (recordedWorkflow).
-      if (workflow.name !== workflowOf(deps).name) {
-        await deps.github.commentIssue(
-          config.repo,
-          n,
-          withDataMarker(`Running workflow \`${workflow.name}\` (\`on: event: ${event.type}\`).`, WORKFLOW_MARKER, {
-            name: workflow.name,
-          }),
-        );
-      }
+      await recordTriggered(deps, config, n, workflow, `on: event: ${event.type}`);
     } catch (err) {
       console.error(`factory watch: event trigger ${workflow.name} on ${event.type} failed`, err);
     }

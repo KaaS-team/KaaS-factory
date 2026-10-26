@@ -16,6 +16,15 @@ The runner ships these. Each one stops a bad output at a different rung:
 | `bug-to-pr` | triage, build, verify, pr | verify rejects back to build; no plan step |
 | `docs-to-pr` | triage, build, pr | the gates only (a lint or link check); red gates park it |
 | `approved-plan-to-pr` | triage, plan, build, verify, pr | every plan parks for a person, whatever its risk |
+| `dependency-update` | triage, build, verify, pr | verify rejects a bump the tests do not cover; files itself weekly |
+| `security-audit` | triage, plan, build, verify, pr | every plan parks for a person; files itself daily |
+| `flaky-tests` | triage, build, verify, pr | verify rejects a fix that is not stable; files itself weekly |
+
+The last three carry their own `on: cron:` schedule. A schedule fires only for `config.workflow` and
+the workflows a route names, so route a type to one to turn it on. The issue it files records that
+workflow, so pickup runs it and not `config.workflow`. Each one's body tells triage to refuse when
+there is nothing to do: the issue parks as `factory:needs-human` with no PR, and the schedule files no
+new one until a maintainer closes it.
 
 `routes.<type>.workflow` runs a type on its own workflow, for example
 `"routes": { "docs": { "workflow": "docs-to-pr" } }`. The type comes from the label the issue was

@@ -404,12 +404,16 @@ const PLAN = {
 };
 const RED = "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=links";
 
+const SCHEDULED = ["dependency-update", "security-audit", "flaky-tests"];
+
 describe("the workflow library", () => {
   test("every bundled workflow parses, and its name is its file's", () => {
     const names = readdirSync(BUNDLED)
       .filter((f) => f.endsWith(".yml"))
       .map((f) => f.slice(0, -4));
-    expect(names).toEqual(expect.arrayContaining(["feature-to-pr", "bug-to-pr", "docs-to-pr", "approved-plan-to-pr"]));
+    expect(names).toEqual(
+      expect.arrayContaining(["feature-to-pr", "bug-to-pr", "docs-to-pr", "approved-plan-to-pr", ...SCHEDULED]),
+    );
     for (const name of names) expect(bundledWorkflow(name).name).toBe(name);
   });
 
@@ -456,6 +460,45 @@ describe("the workflow library", () => {
     expect(e.github.issues.get(1)!.labels.map((l) => l.name)).toEqual([LABEL.awaitingApproval]);
     expect(e.github.seenLabels).not.toContain(LABEL.building);
   });
+  test("docs/workflows.md's library table has a row for every bundled workflow", () => {
+    const doc = readFileSync(join(import.meta.dir, "..", "docs", "workflows.md"), "utf8");
+    for (const f of readdirSync(BUNDLED).filter((f) => f.endsWith(".yml")))
+      expect(doc).toContain(`| \`${f.slice(0, -4)}\` |`);
+  });
+
+  test("each scheduled workflow files its own issue on a cron", () => {
+    for (const name of SCHEDULED) expect(bundledWorkflow(name).triggers.cron.length).toBeGreaterThan(0);
+  });
+
+  test("security-audit: a low-risk, auto-approvable plan still parks for a person", async () => {
+    const e = engine(
+      bundledWorkflow("security-audit"),
+      0,
+      {},
+      {},
+      {},
+      { outputs: { plan: [PLAN] }, config: { toggles: { autoApproveLowRisk: true } } },
+    );
+    await e.run();
+    expect(e.github.issues.get(1)!.labels.map((l) => l.name)).toEqual([LABEL.awaitingApproval]);
+    expect(e.github.seenLabels).not.toContain(LABEL.building);
+  });
+
+  for (const name of ["dependency-update", "flaky-tests"])
+    test(`${name}: no plan; a change verify rejects goes back to build, and only the rebuilt one ships`, async () => {
+      const e = engine(
+        bundledWorkflow(name),
+        0,
+        {},
+        {},
+        {},
+        { outputs: { build: [BUILD, BUILD], verify: [VERDICT("reject"), VERDICT("pass")] } },
+      );
+      expect(await e.run()).toBe("shipped");
+      expect(e.github.seenLabels).not.toContain(LABEL.planning);
+      expect(e.executor.mcp.filter(([stage]) => stage === "build")).toHaveLength(2);
+      expect(e.github.createdPrs).toHaveLength(1);
+    });
 });
 
 describe("routes.<type>.workflow picks the workflow an issue runs", () => {
