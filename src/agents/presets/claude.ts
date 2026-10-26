@@ -5,7 +5,13 @@
 
 import { readFileSync } from "node:fs";
 import type { StageEvent, StageName, StageRunOptions } from "../../executor";
-import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../../stage-permissions";
+import {
+  projectPlugins,
+  STAGE_DISALLOWED_TOOLS,
+  STAGE_GUIDANCE,
+  STAGE_TOOLS,
+  stageSettings,
+} from "../../stage-permissions";
 import type { AgentPreset } from "../types";
 import { isUsageResultCandidate, readUsage } from "../usage";
 
@@ -184,7 +190,7 @@ export function claudeArgs(opts: StageRunOptions, contextPack = "", mcpConfig?: 
     "--tools",
     STAGE_TOOLS[opts.stage].join(","),
     "--settings",
-    stageSettings(opts.stage, opts.issue, opts.agentCommands, Object.keys(opts.mcp ?? {})),
+    stageSettings(opts.stage, opts.issue, opts.agentCommands, Object.keys(opts.mcp ?? {}), projectPlugins(opts.cwd)),
     "--append-system-prompt",
     contextPack ? `${STAGE_GUIDANCE}\n\n${contextPack}` : STAGE_GUIDANCE,
     "--max-budget-usd",
