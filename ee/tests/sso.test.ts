@@ -31,7 +31,7 @@ async function jwt(claims: Record<string, unknown>, alg = "RS256") {
 // The IdP: discovery, the token endpoint (which mints whatever `claims` says) and the JWKS.
 function idp(claims: (nonce: string) => Promise<string>) {
   let nonce = "";
-  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     if (url === `${ISSUER}/.well-known/openid-configuration`)
       return Response.json({
@@ -48,7 +48,7 @@ function idp(claims: (nonce: string) => Promise<string>) {
     if (url === `${ISSUER}/jwks`) return Response.json({ keys: [jwk] });
     return new Response("unexpected", { status: 500 });
   }) as typeof fetch;
-  return { fetch, setNonce: (n: string) => (nonce = n) };
+  return { fetch: fakeFetch, setNonce: (n: string) => (nonce = n) };
 }
 
 const env = {

@@ -22,7 +22,7 @@ export interface PlaneExtension {
   guards?(): boolean;
   // Turns a stored role the ladder does not know (a custom role) into an actor; null refuses.
   actor?(login: string, storedRole: string): Actor | null;
-  // The last word on a route: false refuses, true allows, undefined leaves it to the role ladder.
+  // false refuses, true allows, undefined leaves it to the role ladder; any false beats any true.
   allows?(who: Actor, route: Route, req: Request): boolean | undefined;
 }
 

@@ -285,13 +285,11 @@ export function createAccess(opts: AccessOptions) {
   };
   for (const e of exts) routes.push(...(e.routes?.(ctx) ?? []));
 
-  // An extension may refuse (tenancy) or grant (a custom role) before the ladder decides.
+  // Extensions speak before the ladder: any refusal (tenancy, a denied route) wins over any grant.
   function permitted(who: Actor, route: Route | undefined, req: Request): boolean {
-    for (const e of route ? exts : []) {
-      const said = e.allows?.(who, route!, req);
-      if (said !== undefined) return said;
-    }
-    return atLeast(who.role, route?.role ?? "owner");
+    const said = route ? exts.map((e) => e.allows?.(who, route, req)) : [];
+    if (said.includes(false)) return false;
+    return said.includes(true) || atLeast(who.role, route?.role ?? "owner");
   }
 
   // Returns a refusal, or null when the caller may run the route.
