@@ -516,14 +516,24 @@
       "phase": "P4",
       "ask": "make sure that any coding agent can be connected",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/any-agent.test.ts",
+        "name": "the same ticket ships with a bare command, a preset CLI and an ACP server",
+        "mutation": "any agent: a bare command runs as its own argv"
+      }
     },
     {
       "id": "acp-seam",
       "phase": "P4",
       "ask": "Any coding agent runs the factory: one ACP seam, proven by the same ticket passing with two agents",
       "source": "spec 10 acp-seam",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/any-agent.test.ts",
+        "name": "one ACP seam: two unrelated ACP servers ship the same ticket the same way",
+        "mutation": "acp: a reply split across chunks is joined"
+      }
     },
     {
       "id": "mission-control",

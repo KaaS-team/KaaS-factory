@@ -583,6 +583,8 @@
   {"name": "fleet: a quiet machine is marked stale", "file": "dashboard/fleet.ts", "find": "stale: now - m.heartbeatAt > STALE_MS,", "replace": "stale: false,", "test": "tests/fleet.test.ts"},
   {"name": "settings: a runtime probe is cached across requests", "file": "dashboard/fleet.ts", "find": "clock() - hit.at > HEALTH_TTL_MS", "replace": "true", "test": "tests/fleet.test.ts"},
   {"name": "doctor: a runtime that does not answer fails", "file": "src/runtime-kit.ts", "find": "return { name: `runtime ${name} answers`, ok: h.ok, detail, fixable: false };", "replace": "return { name: `runtime ${name} answers`, ok: true, detail, fixable: false };", "test": "tests/doctor.test.ts"},
+  {"name": "any agent: a bare command runs as its own argv", "file": "src/agents/executor.ts", "find": "const ownCommand = agent.config.command !== undefined && !agent.preset?.wrapsCommand;", "replace": "const ownCommand = false;", "test": "tests/any-agent.test.ts"},
+  {"name": "acp: a reply split across chunks is joined", "file": "src/agents/acp-bridge.ts", "find": "if (e.kind === \"text\") message += e.text;", "replace": "if (e.kind === \"text\") message = e.text ?? \"\";", "test": "tests/any-agent.test.ts"},
   {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},
