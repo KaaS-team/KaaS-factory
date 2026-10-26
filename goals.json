@@ -968,7 +968,7 @@
       "owner": "agent",
       "proof": {
         "test": "tests/cron-dedupe.test.ts",
-        "name": "two watchers on clones of one remote file one scheduled issue (together: %p)",
+        "name": "two watchers on clones of one remote file one scheduled issue through git lease refs",
         "mutation": "cron dedupe v3.3: a held git lease ref is not taken"
       }
     },

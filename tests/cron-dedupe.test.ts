@@ -92,9 +92,8 @@ describe("cron dedupe", () => {
   });
 
   // Run together the push's compare-and-swap decides; one after the other the lease the first left does.
-  test.each([true, false])(
-    "two watchers on clones of one remote file one scheduled issue (together: %p)",
-    async (together) => {
+  test("two watchers on clones of one remote file one scheduled issue through git lease refs", async () => {
+    for (const together of [true, false]) {
       const remote = join(root, `origin-${together}.git`);
       Bun.spawnSync(["git", "init", "-q", "--bare", remote]);
       const clone = (n: number) => {
@@ -109,6 +108,6 @@ describe("cron dedupe", () => {
       expect(gh.issues.size).toBe(1);
       const refs = Bun.spawnSync(["git", "for-each-ref", "--format=%(refname)", "refs/factory/lease"], { cwd: remote });
       expect(refs.stdout.toString().trim()).toBe("refs/factory/lease/cron.nightly.0.29858520");
-    },
-  );
+    }
+  });
 });
