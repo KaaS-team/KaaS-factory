@@ -1,12 +1,12 @@
 import type { AgentPreset } from "../types";
 import { acpPreset } from "./acp";
 import { claudePreset } from "./claude";
-import { codexPreset } from "./codex";
-import { cursorPreset } from "./cursor";
-import { geminiPreset } from "./gemini";
-import { mastracodePreset } from "./mastracode";
-import { opencodePreset } from "./opencode";
-import { piPreset } from "./pi";
+import { codexPreset } from "../../../contrib/agents/codex";
+import { cursorPreset } from "../../../contrib/agents/cursor";
+import { geminiPreset } from "../../../contrib/agents/gemini";
+import { mastracodePreset } from "../../../contrib/agents/mastracode";
+import { opencodePreset } from "../../../contrib/agents/opencode";
+import { piPreset } from "../../../contrib/agents/pi";
 
 export const PRESETS: Record<string, AgentPreset> = {
   claude: claudePreset,

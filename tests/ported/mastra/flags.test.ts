@@ -1,12 +1,7 @@
 // Ported from mastra-ai/mastra@68fece5 mastracode/sdk/src/headless/cli.test.ts:49-150,279-310 (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Deviations: vitest becomes bun:test; parseHeadlessArgs lives in cli.ts, which is not ported, so each case asserts through the flag table's own coerce functions; mastraArgv cases are new.
 
 import { describe, expect, it } from "bun:test";
-import {
-  FLAGS,
-  buildParseArgsOptions,
-  mastraArgv,
-  renderFlagUsage,
-} from "../../../src/agents/presets/mastracode-flags";
+import { FLAGS, buildParseArgsOptions, mastraArgv, renderFlagUsage } from "../../../contrib/agents/mastracode-flags";
 
 const coerce = (key: string, raw: string) => FLAGS.find((f) => f.key === key)!.coerce!(raw);
 

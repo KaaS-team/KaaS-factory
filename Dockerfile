@@ -60,6 +60,7 @@ RUN bun install --frozen-lockfile
 
 COPY bin ./bin
 COPY src ./src
+COPY contrib ./contrib
 COPY dashboard ./dashboard
 COPY template ./template
 COPY template-ci ./template-ci

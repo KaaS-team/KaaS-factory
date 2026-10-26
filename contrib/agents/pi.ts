@@ -2,9 +2,9 @@
 // pi's docs/json.md; usage is on each assistant message_end (pi-ai `Usage`), so it is summed.
 // Read-only stages get a read-only tool allow-list and return their artifacts as the final message.
 
-import type { StageEvent } from "../../executor";
-import { type AgentPreset, stagePolicy } from "../types";
-import { isUsageResultCandidate } from "../usage";
+import type { StageEvent } from "../../src/executor";
+import { type AgentPreset, stagePolicy } from "../../src/agents/types";
+import { isUsageResultCandidate } from "../../src/agents/usage";
 
 interface PiLine {
   type?: string;

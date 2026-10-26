@@ -1,17 +1,8 @@
-// Ported from mastra-ai/mastra@68fece5 mastracode/sdk/src/headless/flags.ts:1-230 (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Deviations: the enum lists and OutputMode are inlined instead of imported from types.ts and cli.ts; formatting follows this repo; mastraArgv() at the end is new and builds the argv from validated values.
+// Ported from mastra-ai/mastra@68fece5 mastracode/sdk/src/headless/flags.ts:1-230 (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Deviations: block comments are shortened to this repo's three-line limit; the enum lists and OutputMode are inlined instead of imported from types.ts and cli.ts; formatting follows this repo; mastraArgv() at the end is new and builds the argv from validated values.
 // Licensed under the Apache License, Version 2.0; see https://www.apache.org/licenses/LICENSE-2.0 and THIRD_PARTY_NOTICES.md.
-/**
- * Declarative flag specification for the headless CLI.
- *
- * A single table is the source of truth for three things that previously drifted
- * apart in `cli.ts`:
- *   1. the `node:util` `parseArgs` option config,
- *   2. per-flag value coercion + validation, and
- *   3. the `--help` usage text.
- *
- * Adding a flag means adding one row here; parsing, validation, and the usage
- * listing all follow automatically.
- */
+// Declarative flag specification for the headless CLI: one table is the source of truth for the
+// `parseArgs` config, per-flag coercion and validation, and the `--help` text, which had drifted
+// apart in `cli.ts`. Adding a flag means adding one row here.
 export type OutputMode = "human" | "json" | "jsonl";
 export type RunMode = "build" | "plan" | "fast";
 export type ThinkingLevel = "off" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -49,12 +40,8 @@ const validate = {
   },
 };
 
-/**
- * One CLI flag. `key` is the long name (e.g. `output`); `field` is the
- * HeadlessArgs (cli.ts upstream) property it populates. `coerce`
- * converts the raw string and validates it. Boolean flags omit `coerce` and set
- * `field` to `true` when present.
- */
+// One CLI flag. `key` is the long name (e.g. `output`); `field` is the HeadlessArgs (cli.ts upstream)
+// property it populates. `coerce` converts and validates the raw string; a boolean flag omits it.
 export interface FlagSpec {
   /** Long flag name without the leading `--`. */
   key: string;

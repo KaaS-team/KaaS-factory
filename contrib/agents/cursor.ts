@@ -1,10 +1,9 @@
-// Cursor Agent: `cursor-agent -p --output-format stream-json --force --workspace <cwd> <prompt>`.
-// The CLI documents no stdin prompt, so the prompt is the last argument. stream-json
-// reports no token usage in 2026.01.23, so usage stays "not reported". Read-only
-// stages run with `--mode plan` and return their artifacts as the final message.
+// Cursor Agent: `cursor-agent -p --output-format stream-json --force --workspace <cwd> <prompt>`. No
+// stdin prompt is documented, so the prompt is the last argument; stream-json reports no token usage in
+// 2026.01.23. Read-only stages run with `--mode plan` and return their artifacts as the final message.
 
-import type { StageEvent } from "../../executor";
-import { type AgentPreset, stagePolicy } from "../types";
+import type { StageEvent } from "../../src/executor";
+import { type AgentPreset, stagePolicy } from "../../src/agents/types";
 
 interface CursorLine {
   type?: string;

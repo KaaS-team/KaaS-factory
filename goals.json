@@ -1056,7 +1056,12 @@
       "phase": "P4",
       "ask": "`src/state.ts` and `src/agents/` stay where they are; the non-Claude presets move to `contrib/agents` later.",
       "source": "CHANGELOG v3.1.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/contrib-agents.test.ts",
+        "name": "every non-Claude, non-ACP preset lives in contrib/agents, and the core stays in place",
+        "mutation": "contrib: only the registry reaches a vendor preset"
+      }
     },
     {
       "id": "json-schema-hook",

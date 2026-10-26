@@ -3,9 +3,9 @@
 // Build and pr run workspace-write; triage, plan and verify run read-only and
 // return their artifacts as the final message, which the runner writes.
 
-import type { StageEvent } from "../../executor";
-import { type AgentPreset, stagePolicy } from "../types";
-import { isUsageResultCandidate, readUsage } from "../usage";
+import type { StageEvent } from "../../src/executor";
+import { type AgentPreset, stagePolicy } from "../../src/agents/types";
+import { isUsageResultCandidate, readUsage } from "../../src/agents/usage";
 
 interface CodexLine {
   type?: string;

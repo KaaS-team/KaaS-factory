@@ -1,12 +1,10 @@
-// Mastra Code (Apache-2.0, Kepler Software, Inc.): `mastracode -o jsonl --permission-mode auto`
-// with the prompt on stdin. Each jsonl line is a raw AgentController event; the shapes
-// (`message_update` text-delta, `tool_start`, `usage_update`) come from @mastra/code-sdk's
-// types and its usage accumulator. Nothing is copied from any `ee/` directory.
+// Mastra Code (Apache-2.0, Kepler Software, Inc.): `mastracode -o jsonl --permission-mode auto`, prompt on
+// stdin. Each line is an AgentController event, shaped per @mastra/code-sdk's types (nothing from `ee/`).
 // Exit code 2 means the --timeout expired. Read-only stages use `--mode plan`.
 
-import type { StageEvent } from "../../executor";
-import { type AgentPreset, stagePolicy } from "../types";
-import { isUsageResultCandidate } from "../usage";
+import type { StageEvent } from "../../src/executor";
+import { type AgentPreset, stagePolicy } from "../../src/agents/types";
+import { isUsageResultCandidate } from "../../src/agents/usage";
 import { mastraArgv } from "./mastracode-flags";
 
 interface MastraLine {

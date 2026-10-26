@@ -43,7 +43,7 @@ path = [
   "src/agents/env.ts",
   "src/agents/executor.ts",
   "src/agents/final-message.ts",
-  "src/agents/presets/codex.ts",
+  "contrib/agents/codex.ts",
   "src/agents/reply.ts",
   "src/agents/structured.ts",
   "src/agents/usage.ts",
@@ -87,7 +87,7 @@ SPDX-License-Identifier = "MIT AND Apache-2.0"
 
 [[annotations]]
 path = [
-  "src/agents/presets/mastracode-flags.ts",
+  "contrib/agents/mastracode-flags.ts",
   "tests/ported/mastra/flags.test.ts",
 ]
 precedence = "override"
