@@ -7,8 +7,9 @@ import { dirname, join, relative, resolve } from "node:path";
 import { daemonPlatform } from "../src/daemon";
 
 const root = resolve(import.meta.dir, "..");
-const copied = [...readFileSync(join(root, "Dockerfile"), "utf8").matchAll(/^COPY (\S+) \.\/(\S+)$/gm)].map(
-  (m) => m[1]!,
+// `COPY a b ./` copies several sources at once, so every word before the `./` target counts.
+const copied = [...readFileSync(join(root, "Dockerfile"), "utf8").matchAll(/^COPY ((?:[^-\s]\S* )+)\.\/\S*$/gm)].flatMap(
+  (m) => m[1]!.trim().split(" "),
 );
 
 // Every repo file reachable from the entrypoints, dynamic imports included.
@@ -18,6 +19,8 @@ function reachable(entries: string[]): Set<string> {
   const walk = (file: string) => {
     if (seen.has(file)) return;
     seen.add(file);
+    // A JSON import (package.json for the version) must be copied too, but has no imports of its own.
+    if (file.endsWith(".json")) return;
     for (const { path } of ts.scanImports(readFileSync(file, "utf8").replace(/^#!.*/, ""))) {
       if (!path.startsWith(".")) continue;
       const base = resolve(dirname(file), path);

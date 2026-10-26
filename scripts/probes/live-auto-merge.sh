@@ -1,9 +1,9 @@
 #!/bin/bash
-# One splitbill-demo task went from a command sent through the control plane (the phone's path) to
+# One task went from a command sent through the control plane (the phone's path) to
 # a pull request the merge policy merged by itself: a merged PR carrying the auto audit comment
 # whose issue carries a comment signed by the control plane.
 set -euo pipefail
-repo=learnwithparam/splitbill-demo
+repo=${FACTORY_PROBE_REPO:?set FACTORY_PROBE_REPO to the owner/name the factory works on}
 for pr in $(gh pr list -R "$repo" --state merged --limit 50 --json number --jq '.[].number'); do
   gh api "repos/$repo/issues/$pr/comments" --paginate --jq '.[].body' | grep -q 'Merge policy: \*\*auto\*\*' || continue
   for issue in $(gh pr view "$pr" -R "$repo" --json closingIssuesReferences --jq '.closingIssuesReferences[].number'); do

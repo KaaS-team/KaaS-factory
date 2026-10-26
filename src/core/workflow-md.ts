@@ -24,14 +24,6 @@ const STAGE_KEYS = new Set([
 const TOP_KEYS = new Set(["name", "description", "on", "limits", "emit", "stages"]);
 const PASS = ["agent", "retries", "timeout", "run", "runtime", "reject", "revise", "tool", "with", "env"] as const;
 const RISKS = ["low", "medium", "high"] as const;
-// The labels the factory has always used for its five stages; any other stage gets factory:<id>.
-const LABELS: Record<string, string> = {
-  triage: "factory:triaging",
-  plan: "factory:planning",
-  build: "factory:building",
-  verify: "factory:verifying",
-  pr: "factory:in-review",
-};
 
 export type MdResult = { ok: true; raw: Record<string, unknown>; body: string } | { ok: false; problems: string[] };
 
@@ -39,7 +31,13 @@ export function isWorkflowMd(text: string): boolean {
   return /^---\r?\n/.test(text);
 }
 
-export function workflowMdToRaw(text: string, parseYaml: (s: string) => unknown): MdResult {
+// `stepLabels` is the labels the factory has always used for its five stages (src/labels.ts, which
+// core cannot import); any other stage gets factory:<id>.
+export function workflowMdToRaw(
+  text: string,
+  parseYaml: (s: string) => unknown,
+  stepLabels: Readonly<Record<string, string>>,
+): MdResult {
   const end = text.indexOf("\n---", 3);
   if (!isWorkflowMd(text) || end < 0) return { ok: false, problems: ["frontmatter: needs --- lines around it"] };
   let front: unknown;
@@ -68,7 +66,7 @@ export function workflowMdToRaw(text: string, parseYaml: (s: string) => unknown)
     const uses = typeof s.uses === "string" ? s.uses : id;
     const step: Record<string, unknown> = {
       uses,
-      label: typeof s.label === "string" ? s.label : (LABELS[id] ?? `factory:${id}`),
+      label: typeof s.label === "string" ? s.label : (stepLabels[id] ?? `factory:${id}`),
     };
     for (const k of PASS) if (s[k] !== undefined) step[k] = s[k];
     if (s.tools !== undefined) step.mcp = s.tools;

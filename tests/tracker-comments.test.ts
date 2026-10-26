@@ -24,6 +24,7 @@ const WRITERS: Record<string, { sites: number; driver: string } | { sites: numbe
   "blockers.ts": { sites: 1, driver: "tests/blockers.test.ts" },
   "engine/common.ts": { sites: 3, driver: "tests/spend-caps.test.ts" },
   "engine/triggers.ts": { sites: 2, driver: "tests/triggers.test.ts" },
+  "engine/late-route.ts": { sites: 1, driver: "tests/late-route.test.ts" },
   "scm.ts": { sites: 7, driver: "tests/tracker-contract.test.ts" },
   "watch.ts": { sites: 3, driver: "tests/scenarios.test.ts" },
   "cli.ts": { sites: 1, echoes: "factory park posts the --reason its caller passed" },
@@ -31,6 +32,7 @@ const WRITERS: Record<string, { sites: number; driver: string } | { sites: numbe
   "reset.ts": { sites: 1, echoes: "reset re-files the seed issues the repo itself holds" },
   "scan.ts": { sites: 1, echoes: "scan files the audit tool's own finding text" },
   "mcp-server.ts": { sites: 1, echoes: "start_task files the title and body its MCP caller wrote" },
+  "integrations/steer.ts": { sites: 1, echoes: "a board's new task files the title and body its sender wrote" },
 };
 
 function writeSites(): Record<string, number> {

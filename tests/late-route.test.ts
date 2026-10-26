@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { loadWorkflow } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
 import { engine, removeEngineDirs } from "./engine-harness";
+import { type FakeGitHub, visibleLeaks } from "./harness";
 
 afterAll(removeEngineDirs);
 
@@ -48,7 +49,9 @@ describe("workflow from a late type", () => {
     const stages = e.executor.pinned.map(([s]) => s);
     // docs-to-pr has no plan and no verify; feature-to-pr has both.
     expect(stages).toEqual(["triage", "build", "pr"]);
-    expect(e.github.issues.get(1)!.comments.some((c) => c.body.includes("Running workflow `docs-to-pr`"))).toBe(true);
+    const github: FakeGitHub = e.github;
+    const switched = github.issues.get(1)!.comments.find((c) => c.body.includes("Running workflow `docs-to-pr`"));
+    expect(switched && visibleLeaks(switched.body)).toEqual([]);
   });
 
   test("an issue filed with a type label keeps the workflow that label chose", async () => {

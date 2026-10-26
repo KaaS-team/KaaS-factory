@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG, type FactoryConfig } from "../config";
 import type { Workflow, WorkflowResult } from "../core/workflow";
 import { parseWorkflowFull } from "../core/workflow-extras";
 import { isWorkflowMd, workflowMdToRaw } from "../core/workflow-md";
+import { STEP_LABELS } from "../labels";
 import { ALL_STEP_TYPES } from "./registry";
 
 export const DEFAULT_WORKFLOW = DEFAULT_CONFIG.workflow;
@@ -21,7 +22,7 @@ export const BUNDLED_DIR = join(import.meta.dir, "..", "..", "template", ".facto
 export function parseWorkflowText(text: string): WorkflowResult {
   let raw: unknown;
   if (isWorkflowMd(text)) {
-    const md = workflowMdToRaw(text, (s) => Bun.YAML.parse(s));
+    const md = workflowMdToRaw(text, (s) => Bun.YAML.parse(s), STEP_LABELS);
     if (!md.ok) return md;
     raw = md.raw;
   } else

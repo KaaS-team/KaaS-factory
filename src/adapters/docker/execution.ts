@@ -5,8 +5,7 @@
 // worktree are not root's.
 
 import { resolveImage } from "../../images";
-import type { AgentInVm } from "../microsandbox/execution";
-import type { ExecResult, ExecutionPort } from "../../ports/execution";
+import type { AgentInVm, ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface DockerSpec {
   readonly kind: "docker";

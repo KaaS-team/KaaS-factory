@@ -1,6 +1,5 @@
-// One MCP tool call over stdio, with no agent in the loop: a workflow's `tool` step. JSON-RPC 2.0,
-// one message per line (the MCP stdio transport): initialize, initialized, tools/call, then the
-// server is stopped. The server is third-party code, so it gets only toolEnv below, never the
+// A workflow's `tool` step: one MCP tool call over stdio (JSON-RPC 2.0, one message per line), no
+// agent in the loop. The server is third-party code, so it gets only toolEnv below, never the
 // runner's tokens.
 
 import { gatewaySanitizedEnv } from "./agents/env";
