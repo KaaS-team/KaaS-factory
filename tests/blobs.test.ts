@@ -1,7 +1,7 @@
 // Transcripts and artifacts reach a shared blob store when a stage ends, and the plane mirrors them
 // back onto the paths its run page reads, so a run on another machine shows on the plane.
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { S3Client } from "bun";
@@ -9,7 +9,7 @@ import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
 import { S3BlobStore } from "../src/adapters/blob-s3/blob";
 import { blobStoreFromEnv, localPathFor, mirroredRepos, mirrorDown } from "../src/blobs";
 import { mergeConfig } from "../src/config";
-import { blobKeys, parseBlobKey } from "../src/engine/blobs";
+import { blobKeys, parseBlobKey, shipStage } from "../src/engine/blobs";
 import { LABEL } from "../src/labels";
 import type { BlobEntry, BlobStore } from "../src/ports/blob";
 import { FactoryState } from "../src/state";
@@ -170,6 +170,27 @@ describe("a stage ships its run to the blob store", () => {
     expect(existsSync(local)).toBe(true);
     expect(readFileSync(local, "utf8")).toBe(shipped);
     expect(await mirrorDown(store, plane)).toBe(0);
+  });
+});
+
+describe("a stage ships only files inside its worktree", () => {
+  test("a symlinked artifact or run directory is skipped while a real artifact ships", async () => {
+    const store = new DiskBlobStore(tmp("blobs-link-store-"));
+    const secret = join(tmp("blobs-link-secret-"), "factory.env");
+    writeFileSync(secret, "GH_TOKEN=leak");
+    const wt = tmp("blobs-link-wt-");
+    const run = join(wt, ".factory/runs/issue-1");
+    mkdirSync(run, { recursive: true });
+    writeFileSync(join(run, "plan.json"), "{}");
+    symlinkSync(secret, join(run, "secrets.txt"));
+    expect(await shipStage(store, "acme/widgets", 1, wt)).toBe(1);
+    expect(await store.get(blobKeys.artifact("acme/widgets", 1, "secrets.txt"))).toBeUndefined();
+
+    const outside = tmp("blobs-link-outside-");
+    writeFileSync(join(outside, "factory.env"), "GH_TOKEN=leak");
+    mkdirSync(join(wt, ".factory/runs"), { recursive: true });
+    symlinkSync(outside, join(wt, ".factory/runs/issue-2"));
+    expect(await shipStage(store, "acme/widgets", 2, wt)).toBe(0);
   });
 });
 

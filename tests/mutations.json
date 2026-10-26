@@ -570,6 +570,8 @@
   {"name": "deploy: idle RSS budget is 150 MB", "file": "src/deploy/rss.ts", "find": "export const IDLE_RSS_BUDGET_MB = 150;", "replace": "export const IDLE_RSS_BUDGET_MB = 15;", "test": "tests/deploy.test.ts"},
   {"name": "blobs: a stage ships its run", "file": "src/engine/common.ts", "find": "await shipStage(deps.blobs, config.repo, issueNumber, worktree, files.transcriptFile);", "replace": "", "test": "tests/blobs.test.ts"},
   {"name": "blobs: the mirror skips unserved repos", "file": "src/blobs.ts", "find": "parseBlobKey(key)?.repo === repo ? localPathFor(key, env) : undefined", "replace": "localPathFor(key, env)", "test": "tests/blobs.test.ts"},
+  {"name": "blobs: an artifact symlink is not followed", "file": "src/engine/blobs.ts", "find": "constants.O_RDONLY | constants.O_NOFOLLOW", "replace": "constants.O_RDONLY", "test": "tests/blobs.test.ts"},
+  {"name": "blobs: a linked run directory is not shipped", "file": "src/engine/blobs.ts", "find": "    if (!(await insideWorktree(dir, worktree))) return sent;\n", "replace": "", "test": "tests/blobs.test.ts"},
   {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},

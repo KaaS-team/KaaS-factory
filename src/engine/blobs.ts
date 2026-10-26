@@ -1,7 +1,8 @@
 // A stage's transcript and artifacts, copied to the shared blob store when the stage ends, so the
 // plane on another machine shows the same run page. One spelling of each key, used both ways.
-import { readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { constants } from "node:fs";
+import { open, readdir, realpath } from "node:fs/promises";
+import { join, sep } from "node:path";
 import { runDir } from "../artifacts";
 import { streamPath } from "../paths";
 import type { BlobStore } from "../ports/blob";
@@ -33,11 +34,25 @@ export function parseBlobKey(key: string): BlobKind | undefined {
   return { kind: rest === "transcript.log" ? "transcript" : "stream", repo: repo!, issue };
 }
 
+// The agent writes the run directory, so a symlink there could point at the runner's secrets.
+// O_NOFOLLOW refuses a link, and reading the opened handle means the file cannot be swapped after the check.
 async function upload(store: BlobStore, key: string, path: string): Promise<boolean> {
-  const s = await stat(path).catch(() => undefined);
-  if (!s?.isFile() || s.size > MAX_BLOB_BYTES) return false;
-  await store.put(key, new Uint8Array(await Bun.file(path).arrayBuffer()));
-  return true;
+  const fh = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => undefined);
+  if (!fh) return false;
+  try {
+    const s = await fh.stat();
+    if (!s.isFile() || s.size > MAX_BLOB_BYTES) return false;
+    await store.put(key, new Uint8Array(await fh.readFile()));
+    return true;
+  } finally {
+    await fh.close();
+  }
+}
+
+// A linked run directory would let every name in it resolve outside the worktree.
+async function insideWorktree(dir: string, worktree: string): Promise<boolean> {
+  const [d, w] = await Promise.all([realpath(dir).catch(() => ""), realpath(worktree).catch(() => "")]);
+  return !!d && !!w && d.startsWith(w + sep);
 }
 
 // Never throws: the stage's work is done whether or not the copy lands, and the next stage retries it.
@@ -56,6 +71,7 @@ export async function shipStage(
       sent += Number(await upload(store, blobKeys.stream(repo, issue), streamPath(transcriptFile)));
     }
     const dir = join(worktree, runDir(issue));
+    if (!(await insideWorktree(dir, worktree))) return sent;
     for (const name of await readdir(dir).catch(() => [] as string[])) {
       if (/^[\w.-]+$/.test(name))
         sent += Number(await upload(store, blobKeys.artifact(repo, issue, name), join(dir, name)));
