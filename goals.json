@@ -1,0 +1,932 @@
+{
+  "phases": [
+    {
+      "id": "P0",
+      "title": "Goals ledger and backfill",
+      "release": "5.0.1"
+    },
+    {
+      "id": "P1",
+      "title": "Rename, licence, product shape",
+      "release": "5.1.0"
+    },
+    {
+      "id": "P2",
+      "title": "Control plane and commands",
+      "release": "5.2.0"
+    },
+    {
+      "id": "P3",
+      "title": "Remote control from anywhere",
+      "release": "5.3.0"
+    },
+    {
+      "id": "P4",
+      "title": "Fleet, any sandbox, any agent",
+      "release": "5.4.0"
+    },
+    {
+      "id": "P5",
+      "title": "Configurable workflows",
+      "release": "5.5.0"
+    },
+    {
+      "id": "P6",
+      "title": "Verification, risk, auto-merge",
+      "release": "5.6.0"
+    },
+    {
+      "id": "P7",
+      "title": "UI for QA and PMs",
+      "release": "5.7.0"
+    },
+    {
+      "id": "P8",
+      "title": "Integrations",
+      "release": "5.8.0"
+    },
+    {
+      "id": "P9",
+      "title": "ee/ and enterprise minimum",
+      "release": "5.9.0"
+    },
+    {
+      "id": "P10",
+      "title": "Deploy",
+      "release": "6.0.0"
+    },
+    {
+      "id": "triage",
+      "title": "Older deferrals: schedule into a phase, or out with Param's words"
+    }
+  ],
+  "goals": [
+    {
+      "id": "goals-ledger",
+      "phase": "P0",
+      "ask": "here why we left out many of the planned things in last run, how to make sure such things won't happen again? how to verify each of these even when compaction happens and you sterr end to end of all plahses done with perfection.",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "the ledger lints clean against this repo",
+        "mutation": "goals: the ledger lints"
+      }
+    },
+    {
+      "id": "no-weak-proofs",
+      "phase": "P0",
+      "ask": "A goal reads green only on a real proof: no --help, file-exists or echo-and-exit stub",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "a probe that only checks existence, echoes or calls --help is refused",
+        "mutation": "goals: weak probes are refused"
+      }
+    },
+    {
+      "id": "test-proof-bites",
+      "phase": "P0",
+      "ask": "A test proof names a test that exists and a mutation that turns it red",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "a test proof needs the named test and a mutation on that file",
+        "mutation": "goals: a test proof needs its mutation"
+      }
+    },
+    {
+      "id": "out-needs-param",
+      "phase": "P0",
+      "ask": "Nothing is cut silently: a goal is out only with Param's words and a date",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "out needs Param's quote and a date",
+        "mutation": "goals: out needs Param's words"
+      }
+    },
+    {
+      "id": "deferral-names-goal",
+      "phase": "P0",
+      "ask": "Every Not in this release bullet after v5.0.0 names its goal",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "a deferral after v5.0.0 must name a goal that exists",
+        "mutation": "goals: deferrals name a goal"
+      }
+    },
+    {
+      "id": "release-gate",
+      "phase": "P0",
+      "ask": "A version cannot ship while a goal of its phase has no proof",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "a release that includes a phase needs a proof for each of its goals",
+        "mutation": "goals: the release gate"
+      }
+    },
+    {
+      "id": "next-after-compact",
+      "phase": "P0",
+      "ask": "After a compaction the next goal is the first thing in context",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "SessionStart prints the next goal, and next skips proven and out goals",
+        "mutation": "goals: SessionStart runs --next"
+      }
+    },
+    {
+      "id": "backfill-deferrals",
+      "phase": "P0",
+      "ask": "Every past Not in this release bullet from v3.1.0 to v5.0.0 is a goal",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/goals.test.ts",
+        "name": "every deferral bullet from v3.1.0 to v5.0.0 is a goal",
+        "mutation": "goals: backfill covers every bullet"
+      }
+    },
+    {
+      "id": "spec10-delegates",
+      "phase": "P0",
+      "ask": "Spec 10's factory rows run this ledger, so nothing is tracked twice",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent",
+      "proof": {
+        "probe": "scripts/probes/spec10-delegates.sh"
+      }
+    },
+    {
+      "id": "rename-repo",
+      "phase": "P1",
+      "ask": "one small thing for github, rename the software factory as KaaS-factory",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "rename-package",
+      "phase": "P1",
+      "ask": "package, crates and docs say kaas-factory; the factory CLI and FACTORY_* stay",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "licence-open-core",
+      "phase": "P1",
+      "ask": "Apache-2.0 core plus a commercial ee/, copyright Secret SaaS OÜ",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "licence-brand",
+      "phase": "P1",
+      "ask": "Logo and icon under brand/, all rights reserved; forks rebrand (TRADEMARKS.md)",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "licence-design",
+      "phase": "P1",
+      "ask": "licensing including design components",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "reuse-lint",
+      "phase": "P1",
+      "ask": "Every file's licence is machine-checked (REUSE.toml, reuse lint in make check)",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "dco",
+      "phase": "P1",
+      "ask": "Contributions to the core carry a DCO sign-off, checked in CI",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "ee-boundary",
+      "phase": "P1",
+      "ask": "Nothing outside ee/ imports ee/, so the core builds without it",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "teach-moved",
+      "phase": "P1",
+      "ask": "move from an educational project to a real company project: teach/ and research/ leave the repo",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "per-source-quality",
+      "phase": "P1",
+      "ask": "yes go with 1 and also make sure that it can be run on local or server too. Also, make sure that any coding agent can be connected, any system can be integrated by proper integrations ways through PR from public or private companies to steer the ship. Make sure the structure and right code standards for per source quality and very lean on resources to run these and local microsandbox supported by default and also able to connect any sandboxes too not just microsandbox",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "plane-users",
+      "phase": "P2",
+      "ask": "GitHub sign-in with users, memberships (owner, operator, approver, viewer), sessions and audit; the token is break-glass",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "command-routes",
+      "phase": "P2",
+      "ask": "start, approve plan, message, answer, cancel, takeover and set mode from the web, each written to the tracker first",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "issue-bound-seal",
+      "phase": "P2",
+      "ask": "A footer seal bound to the issue. One runner-written description pasted into another still decodes, since a description is sealed before the tracker gives it an id.",
+      "source": "CHANGELOG v5.0.0 #5",
+      "owner": "agent"
+    },
+    {
+      "id": "factory-mcp-server",
+      "phase": "P2",
+      "ask": "The factory is an MCP server, so any agent or IDE can start, read and approve tasks",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "runner-dial-out",
+      "phase": "P3",
+      "ask": "invoking any connected machine or sandbox: a runner registers once and dials out, with heartbeat and requeue",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "phone-pairing",
+      "phase": "P3",
+      "ask": "Pair a phone by QR, with revocable device keys",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "e2e-encryption",
+      "phase": "P3",
+      "ask": "The plane and relay carry ciphertext only",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "web-push",
+      "phase": "P3",
+      "ask": "Needs you and Done reach the phone, muted while someone is present",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "phone-approvals",
+      "phase": "P3",
+      "ask": "Approvals from the phone: the relay is read-only, so unblocking and approving stay on GitHub or the dashboard.",
+      "source": "CHANGELOG v5.0.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "stale-pr-nudge-ios-icon",
+      "phase": "P3",
+      "ask": "A stale-PR nudge (the code host's PR record has no `updatedAt` yet) and a PNG touch icon for iOS.",
+      "source": "CHANGELOG v5.0.0 #2",
+      "owner": "agent"
+    },
+    {
+      "id": "phone-intake",
+      "phase": "P3",
+      "ask": "End to end from a phone: PWA trigger, board, factory, summary, human merge, public dashboard",
+      "source": "spec 10 phone-intake",
+      "owner": "agent"
+    },
+    {
+      "id": "control-anywhere",
+      "phase": "P3",
+      "ask": "deploying the factory on the web, controllable from local, web, mobile or anywhere",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "sandbox-contract",
+      "phase": "P4",
+      "ask": "The sandbox contract: create, exec, files, snapshot, pause and resume, expose, status, destroy, with capability flags",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "runtime-verify-kit",
+      "phase": "P4",
+      "ask": "factory runtime verify <name> runs one shared suite against any adapter",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "microsandbox-default",
+      "phase": "P4",
+      "ask": "local microsandbox supported by default",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "any-sandbox",
+      "phase": "P4",
+      "ask": "also able to connect any sandboxes too not just microsandbox",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "egress-proxy",
+      "phase": "P4",
+      "ask": "Deny-by-default egress on every runtime, keys injected by a proxy the guest cannot read",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "acp-readonly-mount",
+      "phase": "P4",
+      "ask": "A read-only mount for ACP stages. An agent process that leaves its process group can still write after the check; run read-only stages in a sandbox runtime where that matters.",
+      "source": "CHANGELOG v5.0.0 #4",
+      "owner": "agent"
+    },
+    {
+      "id": "fleet-view",
+      "phase": "P4",
+      "ask": "Machines, tags, slots in use, last heartbeat and current task in one view",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "slot-usage",
+      "phase": "P4",
+      "ask": "Machine slot usage on the Settings page (slots are local; only issue leases are shown).",
+      "source": "CHANGELOG v3.5.0 #4",
+      "owner": "agent"
+    },
+    {
+      "id": "runtime-health-probe",
+      "phase": "P4",
+      "ask": "A live health probe per runtime; the Runtimes table shows configuration only.",
+      "source": "CHANGELOG v3.5.0 #3",
+      "owner": "agent"
+    },
+    {
+      "id": "doctor-reachability",
+      "phase": "P4",
+      "ask": "A health probe per runtime in `factory doctor`; it checks names, not reachability.",
+      "source": "CHANGELOG v3.3.0 #4",
+      "owner": "agent"
+    },
+    {
+      "id": "any-agent",
+      "phase": "P4",
+      "ask": "make sure that any coding agent can be connected",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "acp-seam",
+      "phase": "P4",
+      "ask": "Any coding agent runs the factory: one ACP seam, proven by the same ticket passing with two agents",
+      "source": "spec 10 acp-seam",
+      "owner": "agent"
+    },
+    {
+      "id": "mission-control",
+      "phase": "P4",
+      "ask": "Mission control: one command shows each free account's minutes used and left",
+      "source": "spec 10 mission-control",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-pool.test.ts",
+        "name": "the report shows each member's allowance, used, left and last failure",
+        "mutation": "pool: the report shows minutes left"
+      }
+    },
+    {
+      "id": "local-or-server",
+      "phase": "P4",
+      "ask": "make sure that it can be run on local or server too",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "lean-resources",
+      "phase": "P4",
+      "ask": "very lean on resources to run these",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "workflow-md",
+      "phase": "P5",
+      "ask": "configurable workflows: .factory/workflows/*.md with stages, needs, agent, tools, gates and approval",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "safe-outputs",
+      "phase": "P5",
+      "ask": "Agent stages are read-only; only the runner's executor writes to the tracker or GitHub",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "durable-resume",
+      "phase": "P5",
+      "ask": "A resume replays finished stages from the event log; approval is a wait-for-event token",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "workflow-editor-pr",
+      "phase": "P5",
+      "ask": "A form editor that writes a workflow's YAML through a PR; the Workflows page is read-only.",
+      "source": "CHANGELOG v3.5.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "events-page-replay",
+      "phase": "P5",
+      "ask": "An Events page with replay.",
+      "source": "CHANGELOG v3.5.0 #2",
+      "owner": "agent"
+    },
+    {
+      "id": "events-tail-follow",
+      "phase": "P5",
+      "ask": "`factory events tail --follow`.",
+      "source": "CHANGELOG v4.0.0 #3",
+      "owner": "agent"
+    },
+    {
+      "id": "minions-view",
+      "phase": "P5",
+      "ask": "Minions run locally only, in an empty workspace (no repo checkout). No dashboard view for minions or events.",
+      "source": "CHANGELOG v4.0.0 #2",
+      "owner": "agent"
+    },
+    {
+      "id": "deterministic-tool-step",
+      "phase": "P5",
+      "ask": "A deterministic tool step in a workflow",
+      "source": "CHANGELOG v4.0.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "autonomy-tiers",
+      "phase": "P6",
+      "ask": "completely steer triage, planning, execution, PR, review and risk analysis, then merge automatically on automated verification",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "pr-facts-signed",
+      "phase": "P6",
+      "ask": "One PR facts document with every merge signal; the decision and its reasons are signed into the receipt",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "verify-clean-room",
+      "phase": "P6",
+      "ask": "Verify runs in a fresh checkout with no network and holdouts copied in only then",
+      "source": "spec 10 verify-clean-room",
+      "owner": "agent"
+    },
+    {
+      "id": "verify-changed-lines",
+      "phase": "P6",
+      "ask": "Factory verify runs the kit's changed-line mutants (spec 10 changed-lines-proven) on every PR",
+      "source": "spec 10 changed-lines-proven",
+      "owner": "agent"
+    },
+    {
+      "id": "verify-tamper",
+      "phase": "P6",
+      "ask": "Factory verify fails a diff that weakens tests, runner config or skips, using the kit's tamper check (spec 10 tamper-guard)",
+      "source": "spec 10 tamper-guard",
+      "owner": "agent"
+    },
+    {
+      "id": "different-model-review",
+      "phase": "P6",
+      "ask": "The reviewer runs on a different model from the builder; high risk adds a second",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "verify-visual-diff",
+      "phase": "P6",
+      "ask": "UI changes get a preview, a smoke test and a visual diff",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "merge-serial",
+      "phase": "P6",
+      "ask": "Parallel agents never break main: one PR at a time, rebased and re-gated",
+      "source": "spec 10 merge-serial",
+      "owner": "agent"
+    },
+    {
+      "id": "post-merge-revert",
+      "phase": "P6",
+      "ask": "A failing live smoke after merge opens a revert PR; change failure rate tightens thresholds",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "risk-badge",
+      "phase": "P6",
+      "ask": "One risk object per task, shown as a badge everywhere",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "auto-merge-low-risk",
+      "phase": "P6",
+      "ask": "No human merge for a low-risk change: every proof green and the diff inside the low-risk class",
+      "source": "spec 10 auto-merge-low-risk",
+      "owner": "agent"
+    },
+    {
+      "id": "plan-risk-floor",
+      "phase": "P6",
+      "ask": "Raising the plan's risk from a deterministic rating when the agent rates it lower.",
+      "source": "CHANGELOG v3.2.0 #6",
+      "owner": "agent"
+    },
+    {
+      "id": "ui-qa-pm",
+      "phase": "P7",
+      "ask": "configurable workflows, monitorable by non-technical QA and PMs",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "ui-claude-codex",
+      "phase": "P7",
+      "ask": "a UI/UX following /frontend-design that borrows Claude/Codex app patterns without reinventing wheel",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "ui-right-pane",
+      "phase": "P7",
+      "ask": "Outcome, Changes, Checks, Preview, Risk and Cost tabs beside the timeline",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "ui-mobile",
+      "phase": "P7",
+      "ask": "One column, bottom tabs, approve or answer in one tap",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "settings-tabs",
+      "phase": "P7",
+      "ask": "Settings tabs; the page is one section per topic.",
+      "source": "CHANGELOG v3.5.0 #5",
+      "owner": "agent"
+    },
+    {
+      "id": "kaas-look",
+      "phase": "P7",
+      "ask": "kaas.team look for the dashboard",
+      "source": "CHANGELOG v4.0.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "board-custom-step",
+      "phase": "P7",
+      "ask": "The dashboard board has no column for a custom step label; such an issue shows in the list only.",
+      "source": "CHANGELOG v3.1.0 #4",
+      "owner": "agent"
+    },
+    {
+      "id": "integration-manifests",
+      "phase": "P8",
+      "ask": "any system can be integrated by proper integrations ways through PR from public or private companies",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "connectors-catalogue",
+      "phase": "P8",
+      "ask": "Connectors catalogue",
+      "source": "CHANGELOG v4.0.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "linear-agent-api",
+      "phase": "P8",
+      "ask": "Delegate a Linear issue to the factory as an agent session",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "slack-assistant",
+      "phase": "P8",
+      "ask": "Start and steer a task from a Slack thread",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "live-tracker-tests",
+      "phase": "P8",
+      "ask": "The native tracker adapters are tested against fixtures modeled on each vendor's documented API, not against live workspaces.",
+      "source": "CHANGELOG v5.0.0 #3",
+      "owner": "agent"
+    },
+    {
+      "id": "live-runtime-tests",
+      "phase": "P8",
+      "ask": "The `ssh`, `wrap` and `http` runtimes are tested against stand-ins and a reference server, not against a live VM, a Firecracker host or a hosted sandbox vendor.",
+      "source": "CHANGELOG v3.3.0 #2",
+      "owner": "agent"
+    },
+    {
+      "id": "otel-genai",
+      "phase": "P8",
+      "ask": "One OTel trace per run with gen_ai spans",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "checks-api-progress",
+      "phase": "P8",
+      "ask": "Checks API progress (one check run per step).",
+      "source": "CHANGELOG v3.2.0 #2",
+      "owner": "agent"
+    },
+    {
+      "id": "mcp-notifier",
+      "phase": "P8",
+      "ask": "The MCP notifier and event-source adapters, and `action: mcp`; the inbox chat channel stays a stub.",
+      "source": "CHANGELOG v3.2.0 #3",
+      "owner": "agent"
+    },
+    {
+      "id": "ee-sso",
+      "phase": "P9",
+      "ask": "SSO through SAML and OIDC, then SCIM",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "ee-roles",
+      "phase": "P9",
+      "ask": "Custom roles",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "ee-audit-export",
+      "phase": "P9",
+      "ask": "Audit-log export",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "org-mode",
+      "phase": "P9",
+      "ask": "org mode / multi-tenant",
+      "source": "CHANGELOG v4.0.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "ee-spend-policy",
+      "phase": "P9",
+      "ask": "Fleet-wide spend policy",
+      "source": "user, 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "profile-rules",
+      "phase": "P9",
+      "ask": "Concrete `scaleup` and `enterprise` profile rules (CODEOWNERS approvers, org caps, forced sandbox).",
+      "source": "CHANGELOG v3.4.0 #7",
+      "owner": "agent"
+    },
+    {
+      "id": "org-caps",
+      "phase": "P9",
+      "ask": "Per-team back-pressure and org caps for `scaleup` and `enterprise` (v3.4).",
+      "source": "CHANGELOG v3.2.0 #5",
+      "owner": "agent"
+    },
+    {
+      "id": "one-image",
+      "phase": "P10",
+      "ask": "One image for plane, relay and verify; docker compose up to self-host; bunx kaas-factory up on a laptop",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "hosted-coolify",
+      "phase": "P10",
+      "ask": "Coolify on netcup at factory.kaas.team",
+      "source": "user, 26 Oct 2026",
+      "owner": "param"
+    },
+    {
+      "id": "idle-rss",
+      "phase": "P10",
+      "ask": "Idle RSS of plane plus relay under 150 MB, asserted in CI",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "live-auto-merge",
+      "phase": "P10",
+      "ask": "One task on splitbill-demo goes from a phone to an automatic merge",
+      "source": "plan approved 26 Oct 2026",
+      "owner": "agent"
+    },
+    {
+      "id": "teach-command",
+      "phase": "triage",
+      "ask": "factory teach",
+      "source": "CHANGELOG v4.0.0 #1",
+      "owner": "param"
+    },
+    {
+      "id": "minions-checkout",
+      "phase": "triage",
+      "ask": "Minions run locally only, in an empty workspace (no repo checkout). No dashboard view for minions or events.",
+      "source": "CHANGELOG v4.0.0 #2",
+      "owner": "param"
+    },
+    {
+      "id": "package-owners",
+      "phase": "triage",
+      "ask": "Per-package owners and protected paths; `packages` gives gates only.",
+      "source": "CHANGELOG v3.4.0 #1",
+      "owner": "param"
+    },
+    {
+      "id": "monorepo-proof",
+      "phase": "triage",
+      "ask": "The proof in a monorepo runs only the top-level `test` gate, not a package's.",
+      "source": "CHANGELOG v3.4.0 #2",
+      "owner": "param"
+    },
+    {
+      "id": "workflow-from-late-type",
+      "phase": "triage",
+      "ask": "A workflow is chosen from the type label an issue was filed with; a type triage assigns later does not switch it.",
+      "source": "CHANGELOG v3.4.0 #3",
+      "owner": "param"
+    },
+    {
+      "id": "library-workflows",
+      "phase": "triage",
+      "ask": "Library workflows that need new step types: pr-review, test-authoring, coverage-gap, flaky-test, dependency-update, ci-fix, ci-cd-authoring, release-notes, harness-learn, ui-component, spec-to-plan and backlog-triage.",
+      "source": "CHANGELOG v3.4.0 #4",
+      "owner": "param"
+    },
+    {
+      "id": "harness-scaffold",
+      "phase": "triage",
+      "ask": "`factory harness scaffold` and `eval`.",
+      "source": "CHANGELOG v3.4.0 #5",
+      "owner": "param"
+    },
+    {
+      "id": "language-images",
+      "phase": "triage",
+      "ask": "Per-language Docker images and devcontainer support for the docker and ssh runtimes.",
+      "source": "CHANGELOG v3.4.0 #6",
+      "owner": "param"
+    },
+    {
+      "id": "toolchain-key",
+      "phase": "triage",
+      "ask": "A `toolchain` config key, and `factory init` writing `charter.md`.",
+      "source": "CHANGELOG v3.4.0 #8",
+      "owner": "param"
+    },
+    {
+      "id": "remote-agent-steps",
+      "phase": "triage",
+      "ask": "Agent steps (triage, plan, build, verify, pr) on a remote runtime; they run where the factory runs. Only gates and `check` steps move.",
+      "source": "CHANGELOG v3.3.0 #1",
+      "owner": "param"
+    },
+    {
+      "id": "cloud-routine-tick",
+      "phase": "triage",
+      "ask": "A Claude Code cloud routine that runs `factory tick` on a schedule, and `factory dispatch` driving the Actions template one step per job.",
+      "source": "CHANGELOG v3.3.0 #3",
+      "owner": "param"
+    },
+    {
+      "id": "blob-store",
+      "phase": "triage",
+      "ask": "Transcripts and artifacts to a shared blob store; they stay on the machine that ran the stage.",
+      "source": "CHANGELOG v3.3.0 #5",
+      "owner": "param"
+    },
+    {
+      "id": "cron-dedupe",
+      "phase": "triage",
+      "ask": "Cron dedupe through GitHub: two watchers could each still file one scheduled issue.",
+      "source": "CHANGELOG v3.3.0 #6",
+      "owner": "param"
+    },
+    {
+      "id": "emit-chaining",
+      "phase": "triage",
+      "ask": "`emit` chaining between workflows, and a `labels:` mapping for a team's own label names.",
+      "source": "CHANGELOG v3.2.0 #1",
+      "owner": "param"
+    },
+    {
+      "id": "cron-dedupe-v32",
+      "phase": "triage",
+      "ask": "Cron dedupe through GitHub, so two watchers on one repo could each file the same scheduled issue (v3.3, with the GitHub store).",
+      "source": "CHANGELOG v3.2.0 #4",
+      "owner": "param"
+    },
+    {
+      "id": "revision-role-check",
+      "phase": "triage",
+      "ask": "`src/revision.ts` and `src/derive.ts` still take a revision's or answer's text from any `COLLABORATOR` comment; only the command itself is role-checked.",
+      "source": "CHANGELOG v3.2.0 #7",
+      "owner": "param"
+    },
+    {
+      "id": "ports-landed",
+      "phase": "triage",
+      "ask": "`StorePort`, `SecretsPort`, `NotifierPort` and `EventSourcePort` land with their adapters in v3.2 and v3.3; `ExecutionPort` is a single `run` until the remote runtimes need prepare, collect and teardown (v3.3).",
+      "source": "CHANGELOG v3.1.0 #1",
+      "owner": "param"
+    },
+    {
+      "id": "contrib-agents",
+      "phase": "triage",
+      "ask": "`src/state.ts` and `src/agents/` stay where they are; the non-Claude presets move to `contrib/agents` later.",
+      "source": "CHANGELOG v3.1.0 #2",
+      "owner": "param"
+    },
+    {
+      "id": "json-schema-hook",
+      "phase": "triage",
+      "ask": "`--json-schema` does not replace the stop-artifact hook: it constrains only the final message, and the hook checks the artifact files.",
+      "source": "CHANGELOG v3.1.0 #3",
+      "owner": "param"
+    },
+    {
+      "id": "rebuild-resume-any-agent",
+      "phase": "triage",
+      "ask": "A rebuild only resumes for the claude preset; the failure tail is not yet in other agents' prompts.",
+      "source": "CHANGELOG v3.1.0 #5",
+      "owner": "param"
+    },
+    {
+      "id": "out-hosted-compute",
+      "phase": "triage",
+      "ask": "Hosted compute run by us",
+      "source": "proposed out, 26 Oct 2026",
+      "owner": "param"
+    },
+    {
+      "id": "out-best-of-n",
+      "phase": "triage",
+      "ask": "Best-of-N attempts",
+      "source": "proposed out, 26 Oct 2026",
+      "owner": "param"
+    },
+    {
+      "id": "out-test-mgmt-sync",
+      "phase": "triage",
+      "ask": "Sync with TestRail, Qase or Xray",
+      "source": "proposed out, 26 Oct 2026",
+      "owner": "param"
+    },
+    {
+      "id": "out-a2a-agui",
+      "phase": "triage",
+      "ask": "A2A and AG-UI",
+      "source": "proposed out, 26 Oct 2026",
+      "owner": "param"
+    }
+  ]
+}
