@@ -24,7 +24,7 @@ Every SQLite file lives under `FACTORY_HOME` (`/data` in the image).
 | `KAAS_RELAY_PUBLISH_TOKEN`, `KAAS_RELAY_SUBSCRIBE_TOKEN` | Relay tokens, 16 characters or more and different. Unset, `up` makes a pair and writes the subscribe token to `$FACTORY_HOME/relay-subscribe-token`. |
 | `FACTORY_BLOB_BUCKET`, `FACTORY_BLOB_ENDPOINT`, `FACTORY_BLOB_ACCESS_KEY_ID`, `FACTORY_BLOB_SECRET_ACCESS_KEY`, `FACTORY_BLOB_REGION` | An S3-compatible bucket (Cloudflare R2 works). |
 | `FACTORY_BLOB_DIR` | A shared directory instead of a bucket. |
-| `FACTORY_BLOB_REPOS` | Comma-separated `owner/name` list the plane mirrors. Defaults to `FACTORY_REPO`; with neither, nothing is mirrored. |
+| `FACTORY_REPOS` | Comma-separated `owner/name` list the plane serves and mirrors. Defaults to every repo under `FACTORY_HOME`, plus `FACTORY_REPO`. |
 
 ## The blob store
 

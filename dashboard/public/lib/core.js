@@ -113,6 +113,9 @@ export function glyph(kind, label) {
 }
 
 export const repoOf = (row) => row.repo ?? state.repo;
+// A page about one repo (board, toggles) acts on the picked project; the server refuses a guess.
+export const focusRepo = () => state.repoFilter || state.repo || state.repos[0] || "";
+export const repoQuery = () => (focusRepo() ? `?repo=${encodeURIComponent(focusRepo())}` : "");
 export const inRepo = (repo) => !state.repoFilter || repo === state.repoFilter;
 export const short = (repo) => (repo || "").split("/").pop();
 export const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;

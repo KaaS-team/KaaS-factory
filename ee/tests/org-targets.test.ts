@@ -2,9 +2,7 @@
 // The org gate checks the repo the handler acts on, never a different one the request also names,
 // and the lists the dashboard opens on show a member only their own org's repos.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { BODY_REPO, orgsExtension, QUERY_REPO } from "../plane/orgs";
+import { orgsExtension } from "../plane/orgs";
 import { cookieFor, plane } from "./plane";
 
 const BASE = "http://localhost:4100";
@@ -44,29 +42,22 @@ afterEach(() => {
 });
 
 describe("org mode targets", () => {
-  test("a request naming two repos, or a repo that is not a string, gets a 400, and default-repo routes ignore ?repo", async () => {
+  test("a request naming two repos, or a repo that is not a string, gets a 400, and the gate checks the repo the handler acts on", async () => {
     const { p, bob } = await twoOrgs();
     const act = { action: "dismiss" };
     const status = async (label: string, body?: unknown) => (await call(p, label, bob, body)).status;
     expect(await status("POST /api/inbox/1/act?repo=blue/app", { ...act, repo: "acme/widgets" })).toBe(400);
     expect(await status("POST /api/inbox/1/act", { ...act, repo: ["blue/app"] })).toBe(400);
     expect(await status("POST /api/inbox/1/act?repo=blue/app", { ...act, repo: "blue/app" })).not.toBe(403);
-    // With no body repo the handler acts on the plane's own repo, so a query naming bob's repo is no key.
-    expect(await status("POST /api/inbox/1/act?repo=blue/app", act)).toBe(403);
-    expect(await status("GET /api/runs?repo=blue/app")).toBe(403);
-    expect(await status("GET /api/analytics?repo=blue/app")).toBe(403);
+    // The plane resolves one repo per request, so ?repo= on a body route is the repo it acts on:
+    // bob's repo has nothing waiting, and the plane's own repo is one he cannot see: both 404.
+    expect(await status("POST /api/inbox/1/act?repo=blue/app", act)).toBe(404);
+    expect(await status("POST /api/inbox/1/act", act)).toBe(404);
+    expect(await status("GET /api/runs?repo=blue/app")).toBe(200);
+    expect(await status("GET /api/runs?repo=acme/widgets")).toBe(404);
+    expect(await status("GET /api/analytics?repo=blue/app")).toBe(200);
     expect(await status("GET /api/issues/1/thread?repo=blue/app")).toBe(200);
-    expect(await status("GET /api/issues/1/thread?repo=acme/widgets")).toBe(403);
-
-    // The two sets name exactly the core routes whose handlers read a repo from the request.
-    const server = readFileSync(join(import.meta.dir, "../../dashboard/server.ts"), "utf8");
-    const reads = (needle: RegExp) =>
-      server
-        .split(/\n {4}\{\n/)
-        .filter((block) => needle.test(block))
-        .map((block) => /label: "([^"]+)"/.exec(block)?.[1]);
-    expect(reads(/searchParams\.get\("repo"\)/).sort()).toEqual([...QUERY_REPO].sort());
-    expect(reads(/body\.repo/).sort()).toEqual([...BODY_REPO].sort());
+    expect(await status("GET /api/issues/1/thread?repo=acme/widgets")).toBe(404);
   });
 
   test("the inbox and the line list a member's own org repos, and every repo for a plane owner", async () => {
@@ -94,9 +85,9 @@ describe("org mode targets", () => {
       const res = await call(p, "GET /api/analytics", cookie);
       return res.status === 200 ? ((await res.json()) as { runs: number }).runs : res.status;
     };
-    expect(await runs(owner)).toBe(3);
-    // bob's org owns blue/app alone; the plane's gate repo is red's, where he has no role.
-    expect(await runs(bob)).toBe(403);
+    // loose/repo is not one this plane serves, so even its owner's count leaves it out.
+    expect(await runs(owner)).toBe(2);
+    expect(await runs(bob)).toBe(1);
     const member = { org: "red", login: "bob", role: "viewer" };
     expect((await call(p, "POST /api/orgs/members", owner, member)).status).toBe(200);
     expect(await runs(bob)).toBe(2);

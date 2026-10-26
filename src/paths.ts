@@ -63,6 +63,20 @@ export function discoverRepos(env: NodeJS.ProcessEnv = process.env): string[] {
   return repos.sort();
 }
 
+// The one list of repos a dashboard serves and a plane mirrors: FACTORY_REPOS when set, else every
+// repo that has run here, plus the repo a dashboard was started for.
+export function servedRepos(env: NodeJS.ProcessEnv = process.env, primary = ""): string[] {
+  const listed = (env.FACTORY_REPOS ?? "")
+    .split(",")
+    .map((r) => r.trim())
+    .filter(isRepoName);
+  return [...new Set([...(primary ? [primary] : []), ...(listed.length ? listed : discoverRepos(env))])];
+}
+
+export function isRepoName(repo: string): boolean {
+  return /^[\w.-]+\/[\w.-]+$/.test(repo) && !repo.split("/").some((p) => p === "." || p === "..");
+}
+
 // Where a given issue's worktree lives, always absolute regardless of what
 // cwd the process was started from.
 export function worktreePath(issue: number, env: NodeJS.ProcessEnv = process.env, repo?: string): string {

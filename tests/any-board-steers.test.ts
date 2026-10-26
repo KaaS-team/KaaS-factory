@@ -22,7 +22,12 @@ describe("any board steers", () => {
   });
 
   test("a steer needs the role of the dashboard route it stands for", () => {
-    const routes = commandRoutes({ github: {} as never, repo: REPO, actorOf: () => undefined, invalidate: () => {} });
+    const routes = commandRoutes({
+      github: {} as never,
+      repoOf: () => REPO,
+      actorOf: () => undefined,
+      invalidate: () => {},
+    });
     const role = (label: string) => routes.find((r) => r.label === label)!.role;
     const steer = (action: string): Steer => ({ kind: "act", issue: 1, action: action as never, text: "" });
     expect(roleFor({ kind: "start", title: "t", body: "" })).toBe(role("POST /api/tasks")!);

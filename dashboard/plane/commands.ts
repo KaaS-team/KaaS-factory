@@ -10,7 +10,8 @@ import type { Role } from "./store";
 
 export interface CommandDeps {
   github: Pick<ScmPort, "getIssue" | "commentIssue" | "createIssue">;
-  repo: string;
+  // The repo the access gate resolved for this request (dashboard/plane/repo-scope.ts).
+  repoOf: (req: Request) => string;
   actorOf: (req: Request) => Actor | undefined;
   invalidate: (repo: string) => void;
 }
@@ -37,25 +38,24 @@ const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 
 export function commandRoutes(deps: CommandDeps): Route[] {
-  const needRepo = () => (deps.repo ? null : json({ error: "FACTORY_REPO not set" }, 500));
   const command = ([name, { action, role }]: [string, { action: InboxAction; role: Role }]): Route => ({
     method: "POST",
     pattern: new RegExp(`^/api/issues/(\\d+)/${name}$`),
     label: `POST /api/issues/:n/${name}`,
     role,
+    repo: "body",
     handler: async (req, _url, m) => {
-      const missing = needRepo();
-      if (missing) return missing;
+      const repo = deps.repoOf(req);
       const n = Number(m[1]);
       const body = (await req.json().catch(() => ({}))) as { text?: unknown };
       // Read the issue fresh: a cached state could let a command through that the issue no longer takes.
-      const item = buildInbox([await deps.github.getIssue(deps.repo, n)])[0];
+      const item = buildInbox([await deps.github.getIssue(repo, n)])[0];
       if (!item?.actions.includes(action))
         return json({ error: `#${n} is not waiting for ${name}${item ? ` (it is ${item.kind})` : ""}` }, 409);
       try {
         const text = typeof body.text === "string" ? body.text : "";
-        const posted = await act(deps.github, deps.repo, item, action, text, senderName(deps.actorOf(req)));
-        deps.invalidate(deps.repo);
+        const posted = await act(deps.github, repo, item, action, text, senderName(deps.actorOf(req)));
+        deps.invalidate(repo);
         return json({ ok: true, posted });
       } catch (err) {
         if (err instanceof InboxError) return json({ error: err.message }, 400);
@@ -70,10 +70,10 @@ export function commandRoutes(deps: CommandDeps): Route[] {
       pattern: /^\/api\/tasks$/,
       label: "POST /api/tasks",
       role: "operator",
+      repo: "body",
       // A task is an issue labelled ready, so the runner picks it up the same way as one filed by hand.
       handler: async (req) => {
-        const missing = needRepo();
-        if (missing) return missing;
+        const repo = deps.repoOf(req);
         const body = (await req.json().catch(() => ({}))) as { title?: unknown; body?: unknown; type?: unknown };
         const title = typeof body.title === "string" ? body.title.trim() : "";
         if (!title || title.length > TITLE_MAX)
@@ -84,13 +84,8 @@ export function commandRoutes(deps: CommandDeps): Route[] {
         if (type !== null && !TYPE_LABELS.includes(type as (typeof TYPE_LABELS)[number]))
           return json({ error: `type must be one of ${TYPE_LABELS.join(", ")}` }, 400);
         const labels = [LABEL.ready, ...(type ? [type as string] : [])];
-        const issue = await deps.github.createIssue(
-          deps.repo,
-          title,
-          signedBy(text, senderName(deps.actorOf(req))),
-          labels,
-        );
-        deps.invalidate(deps.repo);
+        const issue = await deps.github.createIssue(repo, title, signedBy(text, senderName(deps.actorOf(req))), labels);
+        deps.invalidate(repo);
         return json({ ok: true, issue });
       },
     },

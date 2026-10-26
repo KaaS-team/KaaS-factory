@@ -1,7 +1,21 @@
 // Settings as tabs, one panel per topic. Runtimes and leases name hosts, so they are operator tabs;
 // the automation switches are the owner's to flip and everyone else's to read.
 
-import { api, h, heading, isOperator, money, post, quiet, shell, state, stateOr, table } from "./core.js";
+import {
+  api,
+  focusRepo,
+  h,
+  heading,
+  isOperator,
+  money,
+  post,
+  quiet,
+  repoQuery,
+  shell,
+  state,
+  stateOr,
+  table,
+} from "./core.js";
 import { readRelay, saveRelay } from "./relay-follow.js";
 import { enablePush } from "./remote.js";
 import { healthCell, leasesPanel, machinesPanel, slotsText } from "./settings.js";
@@ -28,7 +42,7 @@ const SWITCHES = [
 
 export async function loadToggles() {
   state.data.toggles = "loading";
-  state.data.toggles = await api("/api/toggles").catch(() => null);
+  state.data.toggles = await api(`/api/toggles${repoQuery()}`).catch(() => null);
   shell.render();
 }
 
@@ -65,7 +79,7 @@ function automation() {
           onchange: async (e) => {
             const value = e.target.checked;
             try {
-              await post("/api/toggles", { key, value });
+              await post("/api/toggles", { key, value, repo: focusRepo() || undefined });
               t[key] = value;
               state.toast = `${label}: ${value ? "on" : "off"}`;
             } catch (err) {

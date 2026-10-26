@@ -2,7 +2,7 @@
 // the server goes in as a text node (see h() in lib/core.js); no markup is ever built from it.
 // This file is the shell: routing, loading and the render loop. Each view lives in lib/view-*.js.
 
-import { api, h, heading, plural, post, quiet, shell, short, state, stateOr } from "/lib/core.js";
+import { api, h, heading, plural, post, quiet, repoQuery, shell, short, state, stateOr } from "/lib/core.js";
 import { renderNav } from "/lib/rail.js";
 import { readRelay } from "/lib/relay-follow.js";
 import { followRelay, startRemote } from "/lib/remote.js";
@@ -34,7 +34,7 @@ const VIEWS = {
 const LOADERS = {
   inbox: ["analytics", "/api/analytics"],
   line: ["line", "/api/line"],
-  board: ["board", "/api/board"],
+  board: ["board", () => `/api/board${repoQuery()}`],
   runs: ["runs", "/api/runs"],
   task: ["line", "/api/line"],
   workflows: ["workflows", "/api/workflows"],
@@ -64,6 +64,7 @@ function startFollowing() {
 function setRepo(repo) {
   state.repoFilter = state.repoFilter === repo ? "" : repo;
   loadInbox().then(render);
+  loadView();
 }
 
 // The toast repeats the action's own word ("Approve plan" comes back as "Plan approved").
@@ -169,7 +170,7 @@ async function loadInbox() {
 const loaders = {};
 function load([name, path]) {
   loaders[name] ||= createStatusLoader({
-    request: () => api(path),
+    request: () => api(typeof path === "function" ? path() : path),
     apply: (r) => {
       if (r.kind === "success") {
         state.data[name] = r.status;

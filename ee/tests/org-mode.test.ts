@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-KaaS-EE
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { orgsExtension } from "../plane/orgs";
 import { cookieFor, plane } from "./plane";
 
@@ -14,7 +14,18 @@ const call = (p: ReturnType<typeof plane>, label: string, cookie: string, body?:
     }),
   );
 };
-const refused = async (res: Promise<Response>) => [401, 403].includes((await res).status);
+// A repo the caller may not see answers 404, like one the plane does not serve.
+const refused = async (res: Promise<Response>) => [401, 403, 404].includes((await res).status);
+
+let saved: string | undefined;
+beforeEach(() => {
+  saved = process.env.FACTORY_REPOS;
+  process.env.FACTORY_REPOS = "acme/widgets,blue/app";
+});
+afterEach(() => {
+  if (saved === undefined) delete process.env.FACTORY_REPOS;
+  else process.env.FACTORY_REPOS = saved;
+});
 
 describe("org mode", () => {
   test("a role in one org reaches that org's repos only, and org settings stay with plane owners", async () => {
@@ -34,13 +45,16 @@ describe("org mode", () => {
     expect(await refused(call(p, "POST /api/tasks", alice, { title: "t" }))).toBe(false);
     expect(await refused(call(p, "GET /api/issues/1/thread?repo=blue/app", alice))).toBe(true);
     expect(await refused(call(p, "GET /api/issues/1/thread?repo=loose/repo", alice))).toBe(true);
-    expect(await refused(call(p, "GET /api/runs", bob))).toBe(true);
+    // A list is narrowed to the caller's repos; naming a repo that is not theirs is refused.
+    expect(await refused(call(p, "GET /api/runs", bob))).toBe(false);
+    expect(await refused(call(p, "GET /api/runs?repo=acme/widgets", bob))).toBe(true);
     expect(await refused(call(p, "GET /api/issues/1/thread?repo=blue/app", bob))).toBe(false);
     // The target in a JSON body counts, so a write cannot slip past with no query string.
     expect(await refused(call(p, "POST /api/inbox/1/act", bob, { repo: "acme/widgets", action: "dismiss" }))).toBe(
       true,
     );
-    expect(await refused(call(p, "POST /api/inbox/1/act", bob, { repo: "blue/app", action: "dismiss" }))).toBe(false);
+    // bob may act on his own repo; it has nothing waiting, so the role check passes and the item is 404.
+    expect((await call(p, "POST /api/inbox/1/act", bob, { repo: "blue/app", action: "dismiss" })).status).toBe(404);
     expect(await refused(call(p, "POST /api/tasks", carol, { title: "t" }))).toBe(true);
     expect(await refused(call(p, "GET /api/runs", carol))).toBe(false);
 
@@ -52,6 +66,6 @@ describe("org mode", () => {
 
     // Leaving an org ends access to its repos on the next request.
     await ok("POST /api/orgs/members", { org: "red", login: "alice", role: null });
-    expect(await refused(call(p, "GET /api/runs", alice))).toBe(true);
+    expect(await refused(call(p, "GET /api/runs?repo=acme/widgets", alice))).toBe(true);
   });
 });

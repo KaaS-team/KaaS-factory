@@ -33,7 +33,6 @@ const PUSH_EVERY_MS = 10_000;
 export interface RemoteDeps {
   access: ReturnType<typeof createAccess>;
   github: Pick<ScmPort, "commentIssue">;
-  repo: string;
   handle: (req: Request) => Promise<Response>;
   env?: Record<string, string | undefined>;
   send?: typeof fetch;
@@ -102,7 +101,7 @@ export function createRemote(deps: RemoteDeps) {
       signedInAs: (req) => store.sessionLogin(sessionIdOf(req)),
       startSession: deps.access.startSession,
     }),
-    ...runnerRoutes({ hub, github: deps.github, repo: deps.repo, actorOf: deps.access.actorOf }),
+    ...runnerRoutes({ hub, github: deps.github, repoOf: deps.access.repoOf, actorOf: deps.access.actorOf }),
     ...push.routes,
   ];
 

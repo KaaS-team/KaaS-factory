@@ -14,7 +14,7 @@ const MESSAGE_MAX = 4000;
 export interface RunnerDeps {
   hub: RunnerHub;
   github: Pick<ScmPort, "commentIssue">;
-  repo: string;
+  repoOf: (req: Request) => string;
   actorOf: (req: Request) => Actor | undefined;
 }
 
@@ -76,7 +76,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       const n = issueOf(m);
       if (!hub.holder(n)) return json({ error: `no runner holds #${n}` }, 409);
       const who = senderName(deps.actorOf(req));
-      if (deps.repo) await deps.github.commentIssue(deps.repo, n, signedBy(`Asked the runner to ${verb}.`, who));
+      await deps.github.commentIssue(deps.repoOf(req), n, signedBy(`Asked the runner to ${verb}.`, who));
       return json({ ok: true, runner: hub.signal(n, type, who) });
     };
   return [
@@ -139,6 +139,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       pattern: /^\/api\/issues\/(\d+)\/dispatch$/,
       label: "POST /api/issues/:n/dispatch",
       role: "operator",
+      repo: "body",
       handler: (_req, _url, m) => {
         hub.enqueue(issueOf(m));
         return json({ ok: true, runner: hub.holder(issueOf(m)) });
@@ -149,6 +150,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       pattern: /^\/api\/issues\/(\d+)\/messages$/,
       label: "GET /api/issues/:n/messages",
       role: "viewer",
+      repo: "query",
       handler: (_req, _url, m) => json({ messages: hub.messages(issueOf(m)) }),
     },
     {
@@ -156,6 +158,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       pattern: /^\/api\/issues\/(\d+)\/message$/,
       label: "POST /api/issues/:n/message",
       role: "operator",
+      repo: "body",
       handler: async (req, _url, m) => {
         const text = String((await body(req)).text ?? "").trim();
         if (!text || text.length > MESSAGE_MAX)
@@ -168,6 +171,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       pattern: /^\/api\/issues\/(\d+)\/messages\/(\d+)\/undo$/,
       label: "POST /api/issues/:n/messages/:id/undo",
       role: "operator",
+      repo: "body",
       handler: (_req, _url, m) =>
         hub.undo(issueOf(m), Number(m[2])) ? json({ ok: true }) : json({ error: "the runner already read it" }, 409),
     },
@@ -176,6 +180,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       pattern: /^\/api\/issues\/(\d+)\/stop$/,
       label: "POST /api/issues/:n/stop",
       role: "operator",
+      repo: "body",
       handler: signal("cancel", "stop"),
     },
     {
@@ -183,6 +188,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       pattern: /^\/api\/issues\/(\d+)\/takeover$/,
       label: "POST /api/issues/:n/takeover",
       role: "operator",
+      repo: "body",
       handler: signal("takeover", "hand the running stage over"),
     },
   ];

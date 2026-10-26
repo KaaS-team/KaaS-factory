@@ -93,16 +93,15 @@ export function paneView(input: PaneInput, operator: boolean): Pane {
 }
 
 export interface PaneDeps {
-  repo: string;
+  repoOf: (req: Request) => string;
   workspacesFor: (repo: string) => string;
-  runs: Pick<FactoryState, "listStageRuns" | "listRuns">;
+  runs: (repo: string) => Pick<FactoryState, "listStageRuns" | "listRuns"> | null;
   actorOf: (req: Request) => Actor | undefined;
 }
 
 const MAX_RISKS = 100;
 
 export function paneRoutes(deps: PaneDeps): Route[] {
-  const repoOf = (url: URL) => url.searchParams.get("repo") || deps.repo;
   const artifact = (r: string, n: number, stage: "triage" | "plan" | "build" | "verify") =>
     readStageArtifacts(join(deps.workspacesFor(r), `issue-${n}`), n, stage).then((a) => a.json);
   return [
@@ -112,9 +111,9 @@ export function paneRoutes(deps: PaneDeps): Route[] {
       pattern: /^\/api\/risk$/,
       label: "GET /api/risk",
       role: "viewer",
-      handler: async (_req, url) => {
-        const r = repoOf(url);
-        if (!r) return Response.json({ error: "no repo configured or specified" }, { status: 400 });
+      repo: "query",
+      handler: async (req, url) => {
+        const r = deps.repoOf(req);
         const issues = (url.searchParams.get("issues") ?? "")
           .split(",")
           .map(Number)
@@ -137,9 +136,10 @@ export function paneRoutes(deps: PaneDeps): Route[] {
       pattern: /^\/api\/issues\/(\d+)\/pane$/,
       label: "GET /api/issues/:n/pane",
       role: "viewer",
-      handler: async (req, url, m) => {
-        const r = repoOf(url);
-        if (!r) return Response.json({ error: "no repo configured or specified" }, { status: 400 });
+      repo: "query",
+      handler: async (req, _url, m) => {
+        const r = deps.repoOf(req);
+        const runs = deps.runs(r);
         const n = Number(m[1]);
         const [triage, plan, build, verify, gate] = await Promise.all([
           ...(["triage", "plan", "build", "verify"] as const).map((s) => artifact(r, n, s)),
@@ -154,8 +154,8 @@ export function paneRoutes(deps: PaneDeps): Route[] {
               build,
               verify,
               gate,
-              stages: deps.runs.listStageRuns(r, { issue: n }).map((s) => ({ ...s, agent: plain(s.agent) })),
-              prUrl: deps.runs.listRuns(r).find((x) => x.issue === n)?.pr_url ?? null,
+              stages: (runs?.listStageRuns(r, { issue: n }) ?? []).map((s) => ({ ...s, agent: plain(s.agent) })),
+              prUrl: runs?.listRuns(r).find((x) => x.issue === n)?.pr_url ?? null,
             } as PaneInput,
             operator,
           ),
