@@ -1,0 +1,95 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - text: factory
+      - generic [ref=e8]: 3 repos
+    - navigation "Views" [ref=e9]:
+      - link "Inbox 7" [ref=e10] [cursor=pointer]:
+        - /url: "#/inbox"
+        - generic [ref=e13]: Inbox
+        - generic [ref=e14]: "7"
+      - link "Line" [ref=e15] [cursor=pointer]:
+        - /url: "#/line"
+      - link "Runs" [ref=e19] [cursor=pointer]:
+        - /url: "#/runs"
+      - generic [ref=e23]: Repos
+      - button "kaas-suite" [ref=e24] [cursor=pointer]
+      - button "claude-verification-harness" [ref=e28] [cursor=pointer]
+      - button "splitbill-demo" [ref=e32] [cursor=pointer]
+      - link "Workflows" [ref=e37] [cursor=pointer]:
+        - /url: "#/workflows"
+      - link "Analytics" [ref=e41] [cursor=pointer]:
+        - /url: "#/analytics"
+      - link "Agents" [ref=e45] [cursor=pointer]:
+        - /url: "#/agents"
+      - link "Settings" [ref=e49] [cursor=pointer]:
+        - /url: "#/settings"
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - checkbox "Start new issues automatically" [checked] [ref=e55]
+        - text: Start new issues automatically
+      - generic [ref=e56]:
+        - checkbox "Approve low-risk plans" [ref=e57]
+        - text: Approve low-risk plans
+  - generic [ref=e58]:
+    - generic [ref=e59]:
+      - link "factory" [ref=e60] [cursor=pointer]:
+        - /url: "#/line"
+      - generic [ref=e63]: Inbox
+    - main [ref=e64]:
+      - generic [ref=e66]:
+        - generic [ref=e68]:
+          - heading "Inbox" [level=1] [ref=e69]
+          - paragraph [ref=e70]: Everything the factory is waiting on you for.
+        - generic [ref=e71]:
+          - generic [ref=e73]:
+            - 'button "Plan to approve #178 Splitting $10.00 three ways loses a cent Plan to approve · splitbill-demo Plan (rev 1) Goal: Make splitCents apply the remainder rule so an expense''s shares always add up to exactly the original amount. Acceptance 12d" [ref=e74] [cursor=pointer]':
+              - img "Plan to approve" [ref=e75]
+              - generic [ref=e77]:
+                - strong [ref=e78]: "#178 Splitting $10.00 three ways loses a cent"
+                - generic [ref=e79]: Plan to approve · splitbill-demo
+                - generic [ref=e80]: "Plan (rev 1) Goal: Make splitCents apply the remainder rule so an expense's shares always add up to exactly the original amount. Acceptance"
+              - generic [ref=e81]: 12d
+            - 'button "Pull request to review #190 CSV export shows raw cents instead of a formatted amount Pull request to review · splitbill-demo Verdict: pass Acceptance criteria evidence AC-1: pass: the runner''s revert proof (make test) shows exportCsv > formats the amount column as 12d" [ref=e82] [cursor=pointer]':
+              - img "Pull request to review" [ref=e83]
+              - generic [ref=e85]:
+                - strong [ref=e86]: "#190 CSV export shows raw cents instead of a formatted amount"
+                - generic [ref=e87]: Pull request to review · splitbill-demo
+                - generic [ref=e88]: "Verdict: pass Acceptance criteria evidence AC-1: pass: the runner's revert proof (make test) shows exportCsv > formats the amount column as"
+              - generic [ref=e89]: 12d
+            - 'button "Plan to approve #1 Orders over $50 ship free Plan to approve · claude-verification-harness Plan (rev 1) Goal: shipping(cart) charges nothing when the cart''s subtotal is over $50.00 (5000 cents), and keeps the standard $5.99 otherwi 11d" [ref=e90] [cursor=pointer]':
+              - img "Plan to approve" [ref=e91]
+              - generic [ref=e93]:
+                - strong [ref=e94]: "#1 Orders over $50 ship free"
+                - generic [ref=e95]: Plan to approve · claude-verification-harness
+                - generic [ref=e96]: "Plan (rev 1) Goal: shipping(cart) charges nothing when the cart's subtotal is over $50.00 (5000 cents), and keeps the standard $5.99 otherwi"
+              - generic [ref=e97]: 11d
+            - 'button "Needs a human #181 Any group member can delete any other member''s expense Needs a human · splitbill-demo Triage Disposition: refused Type: security Risk: high Confidence: 0.95 Done when: canDeleteExpense returns false for a member who is neither 11d" [ref=e98] [cursor=pointer]':
+              - img "Needs a human" [ref=e99]
+              - generic [ref=e101]:
+                - strong [ref=e102]: "#181 Any group member can delete any other member's expense"
+                - generic [ref=e103]: Needs a human · splitbill-demo
+                - generic [ref=e104]: "Triage Disposition: refused Type: security Risk: high Confidence: 0.95 Done when: canDeleteExpense returns false for a member who is neither"
+              - generic [ref=e105]: 11d
+            - 'button "Pull request to review #177 README has no run steps or CLI example Pull request to review · splitbill-demo Verdict: pass Acceptance criteria evidence AC-1: pass: make test (runner proof) shows README Run it > Run it section lists install, dev and 11d" [ref=e106] [cursor=pointer]':
+              - img "Pull request to review" [ref=e107]
+              - generic [ref=e109]:
+                - strong [ref=e110]: "#177 README has no run steps or CLI example"
+                - generic [ref=e111]: Pull request to review · splitbill-demo
+                - generic [ref=e112]: "Verdict: pass Acceptance criteria evidence AC-1: pass: make test (runner proof) shows README Run it > Run it section lists install, dev and"
+              - generic [ref=e113]: 11d
+            - 'button "Pull request to review #193 Settle up in whole dollars Pull request to review · splitbill-demo Verdict: pass Acceptance criteria evidence AC-1: pass: bun test tests/balances.test.ts → issue example: $100 dinner for three gives $33 tran 11d" [ref=e114] [cursor=pointer]':
+              - img "Pull request to review" [ref=e115]
+              - generic [ref=e117]:
+                - strong [ref=e118]: "#193 Settle up in whole dollars"
+                - generic [ref=e119]: Pull request to review · splitbill-demo
+                - generic [ref=e120]: "Verdict: pass Acceptance criteria evidence AC-1: pass: bun test tests/balances.test.ts → issue example: $100 dinner for three gives $33 tran"
+              - generic [ref=e121]: 11d
+            - 'button "Pull request to review #195 Exporting an unknown group prints an empty CSV Pull request to review · splitbill-demo Verdict: pass Acceptance criteria evidence AC-1: pass: make test with src/cli.ts reverted fails splitbill export > export reports an unknown 11d" [ref=e122] [cursor=pointer]':
+              - img "Pull request to review" [ref=e123]
+              - generic [ref=e125]:
+                - strong [ref=e126]: "#195 Exporting an unknown group prints an empty CSV"
+                - generic [ref=e127]: Pull request to review · splitbill-demo
+                - generic [ref=e128]: "Verdict: pass Acceptance criteria evidence AC-1: pass: make test with src/cli.ts reverted fails splitbill export > export reports an unknown"
+              - generic [ref=e129]: 11d
+          - paragraph [ref=e134]: Select an item to read it

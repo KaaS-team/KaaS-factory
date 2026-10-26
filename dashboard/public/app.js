@@ -1542,6 +1542,8 @@ async function toggles() {
   }
 }
 
+// Installable as an app; registration fails over plain http off localhost, and the page works the same.
+navigator.serviceWorker?.register("/sw.js").catch(() => {});
 window.addEventListener("hashchange", onRoute);
 onRoute();
 loadInbox().then(render);

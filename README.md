@@ -147,6 +147,11 @@ body ends with a "Factory run" section (stage, agent, duration, tool calls, cost
 what needed help, takeovers included); `"prRunSummary": false` leaves it out, for a public repo
 that should not show models and spend.
 
+The dashboard installs as an app on a phone or desktop (Add to Home Screen, or the browser's
+install button) when it is served over https or from localhost. Its service worker keeps only the
+page itself, so the cockpit opens offline and shows nothing until it reaches the dashboard again;
+inbox, runs and every other `/api` answer are never stored on the device.
+
 ## Scripting the CLI
 
 `run`, `tick`, `watch --once` and `doctor` take `--json`: success is `{"ok":true,"data":...}` on

@@ -98,6 +98,8 @@ const ASSET_TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
   js: "text/javascript; charset=utf-8",
   woff2: "font/woff2",
+  svg: "image/svg+xml",
+  webmanifest: "application/manifest+json",
 };
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
@@ -363,7 +365,8 @@ export function createDashboard(
     {
       // Static files of the page itself: no data, so public like the shell.
       method: "GET",
-      pattern: /^\/(styles\.css|tokens\.css|app\.js|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
+      pattern:
+        /^\/(styles\.css|tokens\.css|app\.js|sw\.js|manifest\.webmanifest|icon\.svg|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
       label: "GET /assets",
       handler: (_req, _url, m) => {
         try {

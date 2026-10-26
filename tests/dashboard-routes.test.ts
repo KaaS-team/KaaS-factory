@@ -4,7 +4,7 @@
 // read and write routes (inbox, analytics, stages, artifacts).
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitHub, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
@@ -807,5 +807,64 @@ describe("text is plain()-ed on every read route", () => {
       expect(res.status, label).toBe(200);
       expect(dirty(await res.text()), label).toBe(false);
     }
+  });
+});
+
+// The service worker run against stubs: what it precaches, and which fetches it answers.
+function loadWorker() {
+  const listeners: Record<string, (e: unknown) => void> = {};
+  const self = {
+    addEventListener: (t: string, f: (e: unknown) => void) => (listeners[t] = f),
+    location: { origin: "http://localhost:4100" },
+  };
+  const src = readFileSync(join(import.meta.dir, "..", "dashboard", "public", "sw.js"), "utf8");
+  const shell = new Function("self", "caches", "fetch", `${src}\nreturn SHELL;`)(
+    self,
+    {},
+    () => new Promise(() => {}),
+  ) as string[];
+  const answers = (method: string, path: string) => {
+    let answered = false;
+    listeners.fetch!({
+      request: { method, url: `http://localhost:4100${path}` },
+      respondWith: () => (answered = true),
+      waitUntil: () => {},
+    });
+    return answered;
+  };
+  return { shell, answers };
+}
+
+describe("the cockpit installs as an app", () => {
+  test("every file the worker precaches is public, so install works before sign-in", async () => {
+    const { dashboard } = await make(TOKEN);
+    for (const path of loadWorker().shell) {
+      const res = await dashboard.handle(new Request(`http://localhost:4100${path}`), "203.0.113.7");
+      expect(res.status, path).toBe(200);
+    }
+  });
+
+  test("the worker precaches every page module, so the cockpit opens offline", () => {
+    const lib = readdirSync(join(import.meta.dir, "..", "dashboard", "public", "lib")).filter((f) => f.endsWith(".js"));
+    expect(loadWorker().shell).toEqual(expect.arrayContaining(["/", ...lib.map((f) => `/lib/${f}`)]));
+  });
+
+  test("the worker never answers for the API or a write, so no run data is stored", () => {
+    const { answers } = loadWorker();
+    expect(answers("GET", "/app.js")).toBe(true);
+    expect(answers("GET", "/index.html")).toBe(true);
+    expect(answers("GET", "/api/inbox")).toBe(false);
+    expect(answers("GET", "/api/runs/1")).toBe(false);
+    expect(answers("POST", "/api/session")).toBe(false);
+  });
+
+  test("the manifest is served as one, starts inside its scope, and names a served icon", async () => {
+    const { dashboard } = await make(TOKEN);
+    const res = await dashboard.handle(new Request("http://localhost:4100/manifest.webmanifest"), "203.0.113.7");
+    expect(res.headers.get("content-type")).toBe("application/manifest+json");
+    const m = (await res.json()) as { start_url: string; scope: string; display: string; icons: { src: string }[] };
+    expect(m.start_url.startsWith(m.scope)).toBe(true);
+    expect(m.display).toBe("standalone");
+    for (const icon of m.icons) expect(loadWorker().shell).toContain(icon.src);
   });
 });

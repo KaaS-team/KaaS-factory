@@ -494,5 +494,9 @@
   {"name": "on the loop: a park notice older than the plan opens the window", "file": "src/derive.ts", "find": "if (!notice || Date.parse(notice.createdAt) < Date.parse(notBefore)) return undefined;", "replace": "if (!notice) return undefined;", "test": "tests/workflow.test.ts"},
   {"name": "library: a routed workflow's cron issue records no workflow", "file": "src/watch.ts", "find": "    for (const n of filed) await recordTriggered(deps, config, n, workflow, \"on: cron:\");", "replace": "", "test": "tests/triggers.test.ts"},
   {"name": "library: security-audit auto-approves a plan", "file": "template/.factory/workflows/security-audit.yml", "find": "      - park: awaiting-approval\n        approve: build\n        revise: plan", "replace": "      - to: build", "test": "tests/workflow.test.ts"},
-  {"name": "library: the docs table drops a bundled workflow", "file": "docs/workflows.md", "find": "| `flaky-tests` | triage, build, verify, pr |", "replace": "| flaky | triage, build, verify, pr |", "test": "tests/workflow.test.ts"}
+  {"name": "library: the docs table drops a bundled workflow", "file": "docs/workflows.md", "find": "| `flaky-tests` | triage, build, verify, pr |", "replace": "| flaky | triage, build, verify, pr |", "test": "tests/workflow.test.ts"},
+  {"name": "pwa: the worker answers for the API", "file": "dashboard/public/sw.js", "find": "  if (!SHELL.includes(path)) return;\n", "replace": "", "test": "tests/dashboard-routes.test.ts"},
+  {"name": "pwa: a page module is missing from the precache", "file": "dashboard/public/sw.js", "find": "  \"/lib/stations.js\",\n", "replace": "", "test": "tests/dashboard-routes.test.ts"},
+  {"name": "pwa: the manifest is not a public asset", "file": "dashboard/server.ts", "find": "|manifest\\.webmanifest", "replace": "", "test": "tests/dashboard-routes.test.ts"},
+  {"name": "pwa: the icon uses a colour that is not a token", "file": "dashboard/public/icon.svg", "find": "fill=\"#171717\"", "replace": "fill=\"#123456\"", "test": "tests/tokens.test.ts"}
 ]

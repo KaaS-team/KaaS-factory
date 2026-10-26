@@ -88,6 +88,17 @@ describe("design tokens", () => {
     expect(hits).toEqual([]);
   });
 
+  test("the app manifest and icon use only token colours", () => {
+    const tokens = new Set(
+      [...readFileSync(TOKENS_CSS, "utf8").matchAll(/--[\w-]+:(#[0-9a-f]{3,8})\b/gi)].map((m) => m[1]),
+    );
+    for (const f of ["manifest.webmanifest", "icon.svg"]) {
+      const used = [...readFileSync(join(PUBLIC, f), "utf8").matchAll(/#[0-9a-f]{6}\b/gi)].map((m) => m[0]);
+      expect(used.length, f).toBeGreaterThan(0);
+      for (const c of used) expect(tokens, `${f} ${c}`).toContain(c);
+    }
+  });
+
   test("every var(--x) the page uses is a defined token", () => {
     const defined = new Set([...readFileSync(TOKENS_CSS, "utf8").matchAll(/--([\w-]+):/g)].map((m) => m[1]));
     const used = walk(PUBLIC)
