@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDashboard, PUBLIC_ROUTES } from "../dashboard/server";
 import { createAccess } from "../dashboard/plane/access";
+import { SELF_SERVICE_ROUTES } from "../dashboard/plane/remote";
 import { atLeast, PlaneStore, ROLES, type Role } from "../dashboard/plane/store";
 import { GitHub } from "../src/github";
 import { FactoryState } from "../src/state";
@@ -126,7 +127,8 @@ describe("roles", () => {
 
   test("a write needs more than viewer, and settings and members need owner", () => {
     const p = make();
-    for (const label of guardedRoutes(p).filter((l) => l.startsWith("POST ") && l !== "POST /api/logout"))
+    const own = (l: string) => l === "POST /api/logout" || SELF_SERVICE_ROUTES.includes(l);
+    for (const label of guardedRoutes(p).filter((l) => l.startsWith("POST ") && !own(l)))
       expect(atLeast(roleOf(p, label)!, "approver"), label).toBe(true);
     for (const label of ["POST /api/toggles", "POST /api/members", "GET /api/members", "GET /api/audit"])
       expect(roleOf(p, label), label).toBe("owner");

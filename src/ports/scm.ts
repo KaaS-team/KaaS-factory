@@ -42,6 +42,8 @@ export interface GhPr {
   isDraft: boolean;
   closingIssuesReferences?: { number: number }[];
   isCrossRepository?: boolean;
+  // ISO time of the last push, comment or review; the stale-PR nudge reads it (src/stale-pr.ts).
+  updatedAt?: string;
 }
 
 export interface CiCheck {

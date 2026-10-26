@@ -255,7 +255,11 @@ describe("the cockpit follows it", () => {
 describe("wiring", () => {
   test("both ways of starting the dashboard start the publisher", () => {
     for (const file of ["src/cli.ts", "dashboard/server.ts"])
-      expect(readFileSync(join(ROOT, file), "utf8")).toMatch(/startRelay\((dashboard|app)\.readInProcess\);/);
+      expect(readFileSync(join(ROOT, file), "utf8")).toMatch(/^ {2}(dashboard|app)\.remote\.start\(\);$/m);
+    // The plane's remote half owns the publisher, and seals what it sends.
+    expect(readFileSync(join(ROOT, "dashboard/plane/remote.ts"), "utf8")).toContain(
+      "startRelay(deps.handle, env, 10_000, sealer);",
+    );
   });
 
   test("an unreachable dashboard falls back to the relay's inbox, read-only", () => {

@@ -8,7 +8,8 @@ import { ACTIVE, stationStates, WAITING } from "/lib/stations.js";
 import { markdownText, renderMarkdown } from "/lib/markdown.js";
 import { feedCard, proofPanel } from "/lib/run-page.js";
 import { execSummary } from "/lib/exec-summary.js";
-import { followRelay, readRelay, saveRelay } from "/lib/relay-follow.js";
+import { readRelay, saveRelay } from "/lib/relay-follow.js";
+import { followRelay, remotePanel, startRemote } from "/lib/remote.js";
 
 const ACTION_LABEL = {
   approve: "Approve plan",
@@ -26,6 +27,7 @@ const KIND_HEADLINE = {
   parked: "A run needs a human",
   failed: "A run failed",
   budget: "A run hit its budget",
+  "stale-pr": "A pull request has gone quiet",
 };
 const KIND_LABEL = {
   "approve-plan": "Plan to approve",
@@ -35,6 +37,7 @@ const KIND_LABEL = {
   parked: "Needs a human",
   failed: "Failed",
   budget: "Over budget",
+  "stale-pr": "Quiet pull request",
 };
 const ICONS = {
   inbox: "M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5",
@@ -1409,6 +1412,7 @@ function settingsView() {
           ),
     ),
     relaySettings(),
+    remotePanel(),
   );
 }
 
@@ -1637,6 +1641,7 @@ window.addEventListener("hashchange", onRoute);
 onRoute();
 startFollowing();
 loadInbox().then(render);
+startRemote(() => loadInbox().then(render));
 toggles();
 setInterval(() => {
   loadInbox().then(() => state.route.view === "inbox" && !document.activeElement?.closest?.("#composer") && render());

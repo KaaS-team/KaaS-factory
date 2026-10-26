@@ -95,12 +95,19 @@ export function createAccess(opts: AccessOptions) {
     return !guarded() && loopback ? { login: LOCAL, role: "owner" } : null;
   }
 
-  function startSession(req: Request, login: string, extra: Record<string, string> = {}, status = 200): Response {
+  function startSession(
+    req: Request,
+    login: string,
+    extra: Record<string, string> = {},
+    status = 200,
+    // A paired phone passes its own id and a longer life, so revoking the device can end the session.
+    id = randomBytes(32).toString("hex"),
+    ttlMs = SESSION_TTL_MS,
+  ): Response {
     // The cookie is a random id, never the token, so a leaked cookie cannot be replayed as a Bearer token.
-    const id = randomBytes(32).toString("hex");
-    store.openSession(id, login, SESSION_TTL_MS);
+    store.openSession(id, login, ttlMs);
     const headers = new Headers(extra);
-    headers.append("set-cookie", setCookie(req, SESSION_COOKIE, id, SESSION_TTL_MS / 1000));
+    headers.append("set-cookie", setCookie(req, SESSION_COOKIE, id, ttlMs / 1000));
     if (status === 302) {
       headers.append("set-cookie", setCookie(req, STATE_COOKIE, "", 0, "Lax"));
       return new Response(null, { status, headers });
@@ -299,5 +306,5 @@ export function createAccess(opts: AccessOptions) {
     }
   }
 
-  return { routes, guarded, gate, audited, actorOf, store };
+  return { routes, guarded, gate, audited, actorOf, store, startSession };
 }

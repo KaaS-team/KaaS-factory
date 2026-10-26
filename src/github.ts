@@ -242,7 +242,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--state",
       opts?.state ?? "open",
       "--json",
-      "number,url,state,headRefName,isDraft,closingIssuesReferences,isCrossRepository",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences,isCrossRepository,updatedAt",
       "--limit",
       "100",
     ]);

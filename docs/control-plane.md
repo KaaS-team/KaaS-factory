@@ -36,8 +36,32 @@ nothing is posted. The comment goes out under the runner's tracker account and e
 naming who sent it. The runner strips that line before it reads the command or hands an answer to
 the agent.
 
-A message sent while a stage runs, taking over a run and cancelling a running stage need the runner
-signal channel, and come later.
+## Runners, steering a run in flight
+
+A runner on another machine registers once with a one-time token from `POST /api/runners/token`
+(owner), read from stdin by `factory runner register --url <plane>`. `factory runner start` then
+dials out to `/runner/stream` and needs no open port. It beats every 15s. A lease whose runner is
+silent for 60s goes back to the queue. `POST /api/issues/<n>/dispatch` (operator) queues an issue.
+
+| Route | Role | Does |
+|---|---|---|
+| `POST /api/issues/<n>/message` | operator | queues a message for the runner, kept in the run's folder |
+| `POST /api/issues/<n>/messages/<id>/undo` | operator | withdraws it, until the runner has read it (then 409) |
+| `POST /api/issues/<n>/takeover` | operator | posts a signed note, then stops the stage so a human can resume it |
+| `POST /api/issues/<n>/stop` | operator | posts a signed note, then cancels the running stage |
+
+## Phones
+
+`factory pair --url <plane> --login <member>` prints a QR. The phone claims it once, keeps its key
+in the browser, and acts as that member until an owner or the member revokes it at
+`POST /api/devices/revoke`. The relay carries only boxes sealed for the paired phones, and sends
+nothing while none is paired. Web Push sends only "needs you" and "done", and none while someone has
+the dashboard open.
+
+## MCP
+
+`factory mcp --repo <owner/name>` serves MCP on stdio with `list_tasks`, `read_task`, `start_task`
+and `approve_plan`. They post the same signed comments as the routes above.
 
 ## Turning on GitHub sign-in
 

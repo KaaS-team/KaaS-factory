@@ -58,6 +58,21 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "render a stage's raw agent output in colour: tool calls, edit diffs, test results (the tmux issue window runs this)",
   },
   {
+    name: "mcp",
+    usage: "mcp (--repo <owner/name> | --repo-dir <path>) [--as <name>]",
+    does: "serve MCP on stdio, so an agent or IDE can list, read, start and approve tasks",
+  },
+  {
+    name: "runner",
+    usage: "runner register --url <plane> [--name <n>] (token on stdin) | runner start --repo-dir <path>",
+    does: "register this machine with a control plane once, then dial out for work with heartbeats",
+  },
+  {
+    name: "pair",
+    usage: "pair --url <plane> --login <member> (FACTORY_DASHBOARD_TOKEN set)",
+    does: "print a QR that pairs a phone to the plane as that member",
+  },
+  {
     name: "inbox",
     usage: "inbox [<N> <action> [--text <words>]] (--repo <owner/name> | --repo-dir <path>) [--json]",
     does: "list what waits for a human; with <N> <action>, post the same /factory comment a human would",

@@ -17,7 +17,11 @@ describe("factory help", () => {
   });
 
   test("every flag the CLI reads is documented", () => {
-    const used = new Set([...readFileSync(cli, "utf8").matchAll(/(?:flag|has)\("([a-z-]+)"\)/g)].map((m) => m[1]));
+    const remote = readFileSync(join(import.meta.dir, "..", "src", "remote-cli.ts"), "utf8");
+    const used = new Set([
+      ...[...readFileSync(cli, "utf8").matchAll(/(?:flag|has)\("([a-z-]+)"\)/g)].map((m) => m[1]),
+      ...[...remote.matchAll(/flagOf\(argv, "([a-z-]+)"\)/g)].map((m) => m[1]),
+    ]);
     for (const f of used) expect(helpText()).toContain(`--${f}`);
   });
 
