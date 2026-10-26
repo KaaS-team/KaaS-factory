@@ -81,8 +81,9 @@ and the timeout is the only cap. `factory doctor` says so.
 ## Agents that speak ACP
 
 The `acp` preset runs any Agent Client Protocol server: put its argv in `command`, and the bridge in
-`src/agents/acp-bridge.ts` starts a session, sends the stage prompt and turns the session updates into
-the runner's events. For example, Codex through ACP's adapter:
+`src/agents/acp-bridge.ts` starts a session through `src/agents/acp-client.ts`, sends the stage prompt
+and turns the session updates into the runner's events. An agent that answers another protocol version
+than 1 is refused before any session. For example, Codex through ACP's adapter:
 
 ```json
 {

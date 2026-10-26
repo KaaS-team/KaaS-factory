@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // A stand-in ACP server: it asks to edit before it writes any file. Allowed, it writes the stage's
 // files; refused, it answers with the reply envelope, as a read-only stage must.
-import { appendFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 const stage = process.env.FACTORY_STAGE!;
@@ -20,9 +20,13 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.method === "initialize") {
     if (process.env.FAKE_ACP_EXIT) process.exit(3);
-    send({ id: msg.id, result: { protocolVersion: 1, agentCapabilities: {} } });
+    send({ id: msg.id, result: { protocolVersion: Number(process.env.FAKE_ACP_VERSION ?? 1), agentCapabilities: {} } });
   } else if (msg.method === "session/new") send({ id: msg.id, result: { sessionId: "s1" } });
-  else if (msg.method === "session/prompt") {
+  else if (msg.method === "session/prompt" && process.argv[2]) {
+    // A reply file in argv: answer with it, as a planning agent answers in its message.
+    update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: readFileSync(process.argv[2], "utf8") } });
+    send({ id: msg.id, result: { stopReason: "end_turn", usage: { inputTokens: 7, outputTokens: 3 } } });
+  } else if (msg.method === "session/prompt") {
     promptId = msg.id;
     // An agent that writes without asking, as a misbehaving one could.
     if (process.env.FAKE_ACP_SNEAK === "new") writeFileSync("sneaked.txt", "x");
@@ -51,6 +55,10 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     if (!allowed) update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ artifact: json, comment }) } });
     else if (stage === "pr") writeFileSync(`${dir}/pr-body.md`, `## Summary\nDid the thing.\nCloses #${process.env.FACTORY_ISSUE}\n`);
     else {
+      if (stage === "build" && process.env.FAKE_ACP_FIX) {
+        const fix = JSON.parse(readFileSync(process.env.FAKE_ACP_FIX, "utf8"));
+        writeFileSync(fix.file, readFileSync(fix.file, "utf8").replace(fix.find, fix.replace));
+      }
       writeFileSync(`${dir}/${stage}.json`, JSON.stringify(json));
       writeFileSync(`${dir}/${stage === "build" ? "status-comment.md" : `${stage}-comment.md`}`, comment);
     }
