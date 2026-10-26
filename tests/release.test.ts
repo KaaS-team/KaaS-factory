@@ -110,3 +110,15 @@ test("the product repo carries no teaching material", () => {
   );
   expect(offenders).toEqual([]);
 });
+
+// The prose rules held only where someone ran the script by hand, so eight em dashes sat in
+// CHANGELOG.md until v6.1.0; every tracked Markdown file is now checked on each gate.
+test("every tracked Markdown file passes check-prose", () => {
+  const skip =
+    /^(node_modules|\.git|\.worktrees|\.factory-state|workspaces|artifacts|reports)\/|\/target\/|\/node_modules\//;
+  const md = (readdirSync(ROOT, { recursive: true }) as string[]).filter((p) => p.endsWith(".md") && !skip.test(p));
+  expect(md).toContain("CHANGELOG.md");
+  const out = Bun.spawnSync(["python3", "scripts/kaas/check-prose.py", ...md], { cwd: ROOT });
+  expect(`${out.stdout}${out.stderr}`).toContain("0 violation(s)");
+  expect(out.exitCode).toBe(0);
+});

@@ -19,7 +19,7 @@ RUN cargo build --release --locked --manifest-path relay/Cargo.toml --target-dir
 
 FROM oven/bun:1.3.4-slim
 
-ARG GH_CLI_VERSION=2.63.2
+ARG GH_CLI_VERSION=2.102.0
 ARG NODE_MAJOR=20
 # Which agent CLIs the image carries. Every version below equals its preset's `version`
 # (tests/agents-registry.test.ts). Cursor has no versioned download, so it is host-only.

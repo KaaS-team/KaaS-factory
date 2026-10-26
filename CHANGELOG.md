@@ -1,5 +1,31 @@
 # Changelog
 
+## v6.1.0
+
+One hosted plane now serves every repo it is installed on. Upgraders: `FACTORY_BLOB_REPOS` is gone;
+the plane serves the repos its runners report and, with a GitHub App, every repo the App reaches
+that holds `.factory/config.json`. See [docs/control-plane.md](docs/control-plane.md).
+
+- Every route acts on the repo it names, and runner jobs are keyed by repo and issue, so two repos'
+  issue 12 never collide.
+- The hosted plane shows runs from every runner, per repo, through the stage blob store, and each
+  repo's own config drives its pages.
+- GitHub App: set `FACTORY_GITHUB_APP_ID`, `FACTORY_GITHUB_APP_PRIVATE_KEY` and
+  `FACTORY_GITHUB_APP_OWNERS`, and each owner's calls run on its own installation token and rate
+  limit; App-installed repos join the board by themselves, and each person sees only the repos they
+  can read.
+- A stage no longer loads the plugins a target repo enables in its own `.claude/settings.json` or
+  `settings.local.json`, so a repo's guards cannot block the factory's own writes.
+- A failed stage names the refused call and what refused it (a hook by its script, the allow list,
+  or a gate), and `/factory retry` starts nothing when the last two failures share a cause and the
+  config, issue and machine are unchanged; `--force` runs it anyway (#96).
+- `factory init` writes offline read commands for the detected stack, so plan can inspect
+  dependencies under dontAsk; `factory doctor` fails when a dependency route has none left, and
+  `factory watch` warns when config.json is newer than the copy it loaded (#97).
+- The image's gh is 2.102.0: 2.63.2 had no `closingIssuesReferences`, so the hosted inbox failed on
+  every read. The image smoke now runs every `gh --json` field set the code asks for against it.
+- Every Markdown file is checked for prose rules on each gate (`tests/release.test.ts`).
+
 ## v6.0.0
 
 KaaS Factory becomes a product you steer from anywhere: a phone, the web, Slack or Linear, with
@@ -760,12 +786,12 @@ Not in v2.9.0:
 ## v2.8.0
 
 The merge-policy half of the lwp-website pilot: the factory can now tell whether an in-review PR
-is safe to merge on its own, and — only when a repo opts in — merge it. Merging stays "off" by
+is safe to merge on its own, and, only when a repo opts in, merge it. Merging stays "off" by
 default; nothing here changes behavior for a repo that doesn't set `merge.policy`.
 
 - **`src/ci.ts`.** `validatePr` and the CI half of the pipeline (ported from machinist
   `agent.py:439-459,487-592`): `waitForCi` polls a PR's checks until they finish or time out, and
-  the new one-shot `ciStatusNow` takes a single snapshot instead — a non-blocking read for a poll
+  the new one-shot `ciStatusNow` takes a single snapshot instead: a non-blocking read for a poll
   loop that must never hold a worker slot. Both now share one `ciResultFrom` helper for the
   finished/passing logic, so that check is written once, not twice.
 - **`src/merge-policy.ts`.** Ported from machinist `risk_delivery/gate.py`, with the
@@ -773,7 +799,7 @@ default; nothing here changes behavior for a repo that doesn't set `merge.policy
   `skills/herdr-issue-coordinator/SKILL.md:209-226`) as its ten named refusal reasons.
   `merge.policy` is `"off"` (default), `"dry-run"` (assesses and posts an audit comment, never
   merges) or `"auto"` (merges once every gate holds). `auto` also needs `merge.autoPaths`,
-  `maxFiles` and `maxLines` — a repo config allow-list in place of gate.py's hardcoded
+  `maxFiles` and `maxLines`, a repo config allow-list in place of gate.py's hardcoded
   docs/README-only, 10-file, 200-line one, since a blog post is often longer than 200 lines.
   Authority is explicit only: no config, no merge. The merge itself always runs
   `gh pr merge --squash --match-head-commit`, never `--admin`, so a branch-protection block is
@@ -782,11 +808,11 @@ default; nothing here changes behavior for a repo that doesn't set `merge.policy
   generic `review-pr` one.
 - **Wired into `resumeInReview`, not the pipeline's terminal "pr" stage.** `waitForCi`'s own wait
   can run up to 20 minutes; blocking a worker slot on it would undo v2.7.0's continuous dispatch.
-  Instead `checkMergePolicy` runs once per poll — non-blocking, one CI snapshot, one readiness
-  read — and skips entirely when `merge.policy` is `"off"`. A human `/factory revise` or
+  Instead `checkMergePolicy` runs once per poll (non-blocking, one CI snapshot, one readiness
+  read) and skips entirely when `merge.policy` is `"off"`. A human `/factory revise` or
   `/factory cancel` on the same issue always wins over the merge check that poll.
 - **`src/github.ts`:** `prStatus`, `mergeReadiness` (including unresolved review threads, which
-  needs its own GraphQL call — neither `gh pr view` nor `gh pr checks` exposes it) and `mergePr`.
+  needs its own GraphQL call; neither `gh pr view` nor `gh pr checks` exposes it) and `mergePr`.
   **`src/git.ts`:** `diffStat`, the per-file added/deleted line counts `autoEligible` sizes a
   change by.
 
@@ -798,8 +824,8 @@ by name in `tests/ported/machinist/merge-policy.test.ts` (this caught a genuine 
 for auto-merge whatever `autoPaths` says, both at the module level and at the scenario level.
 
 Not in v2.8.0:
-- The lwp-website-side scaffolding — `.factory/config.json`, `protectedPaths`, `charter.md`,
-  issue forms, gate fixes, the copied writing/lwp-shared skills, the CI workflow — and the five
+- The lwp-website-side scaffolding (`.factory/config.json`, `protectedPaths`, `charter.md`,
+  issue forms, gate fixes, the copied writing/lwp-shared skills, the CI workflow) and the five
   pilot issues themselves. Separate PR, against `lwp-website`.
 - gate.py's git-tree-truncation, file-mode and renamed-file checks: not ported, not needed by this
   codebase's diff shape.
