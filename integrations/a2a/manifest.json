@@ -1,0 +1,12 @@
+{
+  "name": "a2a",
+  "kind": "agent",
+  "summary": "Lets another agent start and steer a task over A2A (agent card plus JSON-RPC).",
+  "env": [
+    "FACTORY_A2A_TOKEN"
+  ],
+  "enable": "set `FACTORY_A2A_TOKEN` on the plane",
+  "module": "src/integrations/a2a.ts",
+  "contract": "tests/a2a-agui.test.ts",
+  "default": false
+}

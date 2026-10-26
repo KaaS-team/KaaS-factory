@@ -1,0 +1,20 @@
+{
+  "name": "jira",
+  "kind": "tracker",
+  "summary": "Jira Cloud or Data Center issues in one project.",
+  "env": [
+    "JIRA_API_TOKEN"
+  ],
+  "enable": "`\"tracker\": {\"kind\": \"jira\", \"url\": \"...\", \"project\": \"SHOP\", \"tokenEnv\": \"JIRA_API_TOKEN\"}`",
+  "module": "src/adapters/trackers/jira.ts",
+  "contract": "tests/trackers-jira.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-trackers.test.ts",
+    "env": [
+      "FACTORY_LIVE_JIRA_URL",
+      "FACTORY_LIVE_JIRA_PROJECT",
+      "FACTORY_LIVE_JIRA_TOKEN"
+    ]
+  }
+}

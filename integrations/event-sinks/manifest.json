@@ -1,0 +1,10 @@
+{
+  "name": "event-sinks",
+  "kind": "notifier",
+  "summary": "Posts each factory CloudEvent, signed, to the URLs config names.",
+  "env": [],
+  "enable": "`\"events\": {\"sinks\": [{\"url\": \"...\", \"secretEnv\": \"...\"}]}`",
+  "module": "src/engine/bus.ts",
+  "contract": "tests/events.test.ts",
+  "default": false
+}

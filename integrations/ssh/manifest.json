@@ -1,0 +1,17 @@
+{
+  "name": "ssh",
+  "kind": "runtime",
+  "summary": "Copies the worktree to a box over ssh and runs there.",
+  "env": [],
+  "enable": "`{\"kind\": \"ssh\", \"host\": \"...\", \"dir\": \"...\"}` in machine.json",
+  "module": "src/adapters/ssh/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-runtimes.test.ts",
+    "env": [
+      "FACTORY_LIVE_SSH_HOST",
+      "FACTORY_LIVE_SSH_DIR"
+    ]
+  }
+}

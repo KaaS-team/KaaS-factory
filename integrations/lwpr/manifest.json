@@ -1,0 +1,10 @@
+{
+  "name": "lwpr",
+  "kind": "runtime",
+  "summary": "Runs on a build box through the lwpr CLI.",
+  "env": [],
+  "enable": "`{\"kind\": \"lwpr\"}` in machine.json",
+  "module": "src/adapters/lwpr/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false
+}

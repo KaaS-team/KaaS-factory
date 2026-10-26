@@ -702,63 +702,72 @@
       "phase": "P8",
       "ask": "any system can be integrated by proper integrations ways through PR from public or private companies",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "every integration has a valid manifest whose contract test names each env key", "mutation": "integrations: a manifest's kind is checked"}
     },
     {
       "id": "connectors-catalogue",
       "phase": "P8",
       "ask": "Connectors catalogue",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "docs/integrations.md's generated table equals the manifests", "mutation": "integrations: the catalogue doc is generated from the manifests"}
     },
     {
       "id": "linear-agent-api",
       "phase": "P8",
       "ask": "Delegate a Linear issue to the factory as an agent session",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/linear-agent.test.ts", "name": "a delegated issue is acked inside 5s, gets a thought inside 10s, and starts a ready issue", "mutation": "linear agent: a delegated issue gets a first thought"}
     },
     {
       "id": "slack-assistant",
       "phase": "P8",
       "ask": "Start and steer a task from a Slack thread",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/slack.test.ts", "name": "a message starts a ready issue, and approve in the same thread steers it", "mutation": "slack: a delivery's signature covers its timestamp"}
     },
     {
       "id": "live-tracker-tests",
       "phase": "P8",
       "ask": "The native tracker adapters are tested against fixtures modeled on each vendor's documented API, not against live workspaces.",
       "source": "CHANGELOG v5.0.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "every tracker and runtime with a live block runs in its live suite, keyed by the manifest", "mutation": "live trackers: each live tracker is keyed by its manifest"}
     },
     {
       "id": "live-runtime-tests",
       "phase": "P8",
       "ask": "The `ssh`, `wrap` and `http` runtimes are tested against stand-ins and a reference server, not against a live VM, a Firecracker host or a hosted sandbox vendor.",
       "source": "CHANGELOG v3.3.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/integrations.test.ts", "name": "every tracker and runtime with a live block runs in its live suite, keyed by the manifest", "mutation": "live runtimes: each live runtime is keyed by its manifest"}
     },
     {
       "id": "otel-genai",
       "phase": "P8",
       "ask": "One OTel trace per run with gen_ai spans",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/otel.test.ts", "name": "a run ends with one trace: a root span and a gen_ai span per stage, sent to the collector", "mutation": "otel: a stage span is a gen_ai invoke_agent span"}
     },
     {
       "id": "checks-api-progress",
       "phase": "P8",
       "ask": "Checks API progress (one check run per step).",
       "source": "CHANGELOG v3.2.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/checks-progress.test.ts", "name": "a step opens one check run on the branch head and its end concludes that run", "mutation": "checks: a failed step concludes its check run as a failure"}
     },
     {
       "id": "mcp-notifier",
       "phase": "P8",
       "ask": "The MCP notifier and event-source adapters, and `action: mcp`; the inbox chat channel stays a stub.",
       "source": "CHANGELOG v3.2.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/mcp-notifier.test.ts", "name": "each progress note is one tools/call on the notifier tool, in one session, with the token", "mutation": "mcp notifier: each note calls the configured tool"}
     },
     {
       "id": "ee-sso",
@@ -1008,7 +1017,8 @@
       "phase": "P8",
       "ask": "A2A and AG-UI (an integration when a user needs it, never a default; may become a default)",
       "source": "user, 26 Oct 2026 (answer on the proposed outs)",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/a2a-agui.test.ts", "name": "with neither key set, the agent card, the A2A endpoint and the AG-UI stream are 404", "mutation": "a2a: the endpoint is off until FACTORY_A2A_TOKEN is set"}
     },
     {
       "id": "default-harness",
@@ -1029,7 +1039,8 @@
       "phase": "P8",
       "ask": "sterrable from anywhere just by connecting their issue board or task board from different porject management tool.",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {"test": "tests/any-board-steers.test.ts", "name": "on every board, a task started there is ready, and approve on it is a command the runner reads", "mutation": "steer: a task started from any board is labelled ready"}
     },
     {
       "id": "open-lean-core",

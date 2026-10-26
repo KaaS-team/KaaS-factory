@@ -1,0 +1,12 @@
+{
+  "name": "events-inbound",
+  "kind": "intake",
+  "summary": "Takes signed CloudEvents from other apps on POST /events.",
+  "env": [
+    "FACTORY_EVENTS_SECRET"
+  ],
+  "enable": "set `FACTORY_EVENTS_SECRET` on the plane",
+  "module": "dashboard/server.ts",
+  "contract": "tests/events.test.ts",
+  "default": false
+}

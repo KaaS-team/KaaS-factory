@@ -1,0 +1,10 @@
+{
+  "name": "github",
+  "kind": "tracker",
+  "summary": "Issues and PRs on GitHub through the gh CLI.",
+  "env": [],
+  "enable": "the default; `gh auth login` on the machine",
+  "module": "src/github.ts",
+  "contract": "tests/github.test.ts",
+  "default": true
+}

@@ -1,0 +1,12 @@
+{
+  "name": "codespaces",
+  "kind": "runtime",
+  "summary": "Runs in a GitHub Codespace through gh.",
+  "env": [
+    "GH_TOKEN"
+  ],
+  "enable": "`{\"kind\": \"codespaces\", \"codespace\": \"...\", \"tokenEnv\": \"GH_TOKEN\"}` in machine.json",
+  "module": "src/adapters/codespaces/execution.ts",
+  "contract": "tests/runtimes-codespaces.test.ts",
+  "default": false
+}

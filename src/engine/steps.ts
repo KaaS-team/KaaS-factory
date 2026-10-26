@@ -43,6 +43,7 @@ import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
 import type { Step, StepKind, Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
+import { mcpStep } from "./mcp-step";
 import {
   failureTail,
   finish,
@@ -86,7 +87,6 @@ export interface StepType extends StepKind {
 }
 
 const stop = (outcome: Outcome): StepResult => ({ kind: "stop", outcome });
-
 // A needs-info answer from a step: ask, or hand over once the question rounds are used up.
 async function askOrHandOver(sc: StepCtx, question: string | undefined): Promise<StepResult> {
   const { deps, config, issue, ctx, step, workflow } = sc;
@@ -521,4 +521,4 @@ const check: StepType = {
   },
 };
 
-export const STEP_TYPES: Readonly<Record<string, StepType>> = { triage, plan, build, verify, pr, check };
+export const STEP_TYPES: Readonly<Record<string, StepType>> = { triage, plan, build, verify, pr, check, mcp: mcpStep };

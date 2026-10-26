@@ -1,0 +1,13 @@
+{
+  "name": "linear-agent",
+  "kind": "intake",
+  "summary": "Delegate a Linear issue to the factory as an agent session; steer it from the session.",
+  "env": [
+    "LINEAR_AGENT_TOKEN",
+    "LINEAR_WEBHOOK_SECRET"
+  ],
+  "enable": "a Linear OAuth app (actor=app); set both keys on the plane and the watcher",
+  "module": "src/integrations/linear-agent.ts",
+  "contract": "tests/linear-agent.test.ts",
+  "default": false
+}

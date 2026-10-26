@@ -237,6 +237,7 @@ describe("POST /events", () => {
   afterEach(() => restore());
 
   function dashboardWith(secret: string | undefined) {
+    expect(DEFAULT_EVENTS_SECRET_ENV).toBe("FACTORY_EVENTS_SECRET");
     const before = process.env[DEFAULT_EVENTS_SECRET_ENV];
     if (secret === undefined) delete process.env[DEFAULT_EVENTS_SECRET_ENV];
     else process.env[DEFAULT_EVENTS_SECRET_ENV] = secret;

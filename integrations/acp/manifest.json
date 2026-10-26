@@ -1,0 +1,10 @@
+{
+  "name": "acp",
+  "kind": "agent",
+  "summary": "Drives any Agent Client Protocol agent as a stage agent.",
+  "env": [],
+  "enable": "an agent with `\"preset\": \"acp\", \"command\": [...]` in config",
+  "module": "src/agents/acp-bridge.ts",
+  "contract": "tests/agents-acp.test.ts",
+  "default": false
+}

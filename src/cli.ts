@@ -61,7 +61,7 @@ import { repoFromRemoteUrl } from "./config";
 import { EventBus } from "./engine/bus";
 import { loadMinions, runMinion } from "./engine/minion";
 import { parseEvent } from "./core/event";
-
+import { watcherBus } from "./integrations/wire";
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -150,7 +150,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     github,
     git: new Git(new GitCommandRunner()),
     state,
-    bus: new EventBus({ store: state, sinks: config.events.sinks, source: `factory/${config.repo}` }),
+    bus: watcherBus(state, config),
     minions: loaded.minions,
     executor: new CommandExecutor(
       config.agents,
