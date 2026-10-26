@@ -584,6 +584,8 @@
   {"name": "rebuild: a sessionless agent is still told why it came back", "file": "src/engine/steps.ts", "find": "return failure !== undefined ? { resume: { ...(id ? { sessionId: id } : {}), failure } } : {};", "replace": "return id ? { resume: { sessionId: id, failure: failure! } } : {};", "test": "tests/scenarios.test.ts"},
   {"name": "events tail --follow: each event prints once", "file": "src/events-tail.ts", "find": "after = Math.max(after, r.seq ?? after);", "replace": "", "test": "tests/events-tail.test.ts"},
   {"name": "events tail --follow: it keeps polling", "file": "src/events-tail.ts", "find": "if (!opts.follow || opts.signal?.aborted) return;", "replace": "return;", "test": "tests/events-tail.test.ts"},
+  {"name": "minions: checkout clones the repo into the workspace", "file": "src/engine/minion.ts", "find": "const failed = minion.checkout ? checkoutInto(deps.cloneDir, cwd) : undefined;", "replace": "const failed = undefined;", "test": "tests/minion-checkout.test.ts"},
+  {"name": "minions: each checkout run starts from a clean clone", "file": "src/engine/minion.ts", "find": "  rmSync(cwd, { recursive: true, force: true });\n  const r = Bun.spawnSync", "replace": "  const r = Bun.spawnSync", "test": "tests/minion-checkout.test.ts"},
   {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},

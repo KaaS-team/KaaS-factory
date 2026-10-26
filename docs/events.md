@@ -106,6 +106,7 @@ mcp: [docs]                       # optional, names in .factory/mcp.json
 emit: wiki.page.updated           # optional, another app's type; data is the JSON answer
 budgetUsd: 0.5                    # optional, default maxBudgetUsd.retro
 runtime: local                    # the only runtime today
+checkout: true                    # optional: run in a fresh clone of the repo, not an empty folder
 ```
 
 The watcher checks every minion when it starts and refuses to run with a bad one. A run does not
@@ -116,7 +117,7 @@ an event it emitted.
 
 A minion runs with the triage stage's tools and allow-list: read-only shell, writes only under
 `.factory/runs/issue-0/`, and only the MCP servers it names. Its working directory is its own
-workspace, not a checkout. The triggering event goes into the prompt between
+workspace: empty, or with `checkout: true` a fresh shallow clone of the repo each run. The triggering event goes into the prompt between
 `<untrusted-event-data>` tags, marked as data never to obey.
 `template/.factory/minions/wiki-refresh.yml.example` is a starting point.
 

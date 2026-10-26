@@ -140,6 +140,13 @@ export interface MinionRun {
   readonly output?: unknown;
 }
 
+// A clean clone each run, so one run's edits never leak into the next one's reading of the code.
+function checkoutInto(cloneDir: string, cwd: string): string | undefined {
+  rmSync(cwd, { recursive: true, force: true });
+  const r = Bun.spawnSync(["git", "clone", "--quiet", "--depth", "1", `file://${cloneDir}`, cwd], { stderr: "pipe" });
+  return r.exitCode === 0 ? undefined : `minion checkout failed: ${r.stderr.toString().trim()}`;
+}
+
 // One run at a time per minion in this process: an event storm queues nothing.
 const running = new Set<string>();
 
@@ -170,6 +177,8 @@ async function runOnce(
   event: CloudEvent | undefined,
 ): Promise<MinionRun> {
   const cwd = join(deps.workspacesDir, `minion-${minion.name}`);
+  const failed = minion.checkout ? checkoutInto(deps.cloneDir, cwd) : undefined;
+  if (failed) return { minion: minion.name, status: "failed", reason: failed };
   const outputFile = join(cwd, runDir(MINION_ISSUE), MINION_OUTPUT);
   mkdirSync(join(cwd, runDir(MINION_ISSUE)), { recursive: true });
   rmSync(outputFile, { force: true });

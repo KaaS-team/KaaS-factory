@@ -874,7 +874,12 @@
       "phase": "P5",
       "ask": "Minions run locally only, in an empty workspace (no repo checkout). No dashboard view for minions or events.",
       "source": "CHANGELOG v4.0.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/minion-checkout.test.ts",
+        "name": "a checkout minion runs in a fresh clone of the repo each time; without it the workspace is empty",
+        "mutation": "minions: checkout clones the repo into the workspace"
+      }
     },
     {
       "id": "package-owners",
