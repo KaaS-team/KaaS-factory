@@ -317,8 +317,8 @@ export async function resumeParked(
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
   if (!latest) return undefined;
   const verb = parseChatOps(latest.body).type;
+  // The caller hands over a writers-only thread (trustedThread), so this verb is a writer's.
   if (verb !== "cancel" && verb !== "retry") return undefined;
-  if (!(await commandIsTrusted(deps, config, latest))) return undefined;
   if (verb === "cancel") return cancelRun(issue, deps, config);
   // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
   const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);

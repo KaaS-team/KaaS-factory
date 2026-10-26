@@ -575,6 +575,18 @@ describe("routes.<type>.workflow picks the workflow an issue runs", () => {
     e.github.issues.get(1)!.comments = [forged(8, "NONE", "docs-to-pr")];
     await recoverInFlight(e.deps, e.config);
     expect(e.github.seenLabels).toContain(LABEL.verifying);
+    // A fresh claim reads the unfiltered thread, so the marker check itself must drop the outsider's.
+    const fresh = engine(
+      defaultWorkflow(),
+      0,
+      {},
+      {},
+      { routeWorkflows: { "docs-to-pr": bundledWorkflow("docs-to-pr") } },
+      { labels: [LABEL.ready, "feature"], outputs: { plan: [PLAN] } },
+    );
+    fresh.github.issues.get(1)!.comments = [forged(8, "NONE", "docs-to-pr")];
+    await fresh.run();
+    expect(fresh.github.seenLabels).toContain(LABEL.verifying);
     // A read-only collaborator still shows as COLLABORATOR, so the marker is weighed by who wrote it.
     const reader = engine(
       defaultWorkflow(),
