@@ -63,7 +63,9 @@ function globToRegex(glob: string): RegExp {
       return part.replace(/[.+^${}()|[\]\\]/g, "\\$&");
     })
     .join("");
-  return new RegExp(`${anchored ? "^" : "^(?:.*/)?"}${body}${dirOnly ? "/.*" : "(?:/.*)?"}$`);
+  // A literal last segment also owns what sits under it; `docs/*` owns docs' direct children only.
+  const literal = !/[*?]/.test(p.slice(p.lastIndexOf("/") + 1));
+  return new RegExp(`${anchored ? "^" : "^(?:.*/)?"}${body}${dirOnly ? "/.*" : literal ? "(?:/.*)?" : ""}$`);
 }
 
 export function ownersOf(rules: readonly CodeownersRule[], path: string): readonly string[] {

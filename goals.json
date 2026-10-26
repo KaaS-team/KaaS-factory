@@ -804,7 +804,7 @@
       "owner": "agent",
       "proof": {
         "test": "ee/tests/org-mode.test.ts",
-        "name": "a role in one org reaches that org's repos only, and cross-repo views stay with plane owners",
+        "name": "a role in one org reaches that org's repos only, and org settings stay with plane owners",
         "mutation": "org mode: no role in a repo's org, no access to it"
       }
     },

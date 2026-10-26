@@ -286,8 +286,10 @@ export function createAccess(opts: AccessOptions) {
   for (const e of exts) routes.push(...(e.routes?.(ctx) ?? []));
 
   // Extensions speak before the ladder: any refusal (tenancy, a denied route) wins over any grant.
-  async function permitted(who: Actor, route: Route | undefined, req: Request): Promise<boolean> {
+  async function permitted(who: Actor, route: Route | undefined, req: Request): Promise<boolean | Response> {
     const said = route ? await Promise.all(exts.map((e) => e.allows?.(who, route, req))) : [];
+    const malformed = said.find((s) => s instanceof Response);
+    if (malformed) return malformed;
     if (said.includes(false)) return false;
     return said.includes(true) || atLeast(who.role, route?.role ?? "owner");
   }
@@ -299,7 +301,9 @@ export function createAccess(opts: AccessOptions) {
     if (!who) return json({ error: "unauthorized" }, 401);
     seenActors.set(req, who);
     const need = route?.role ?? "owner";
-    if (await permitted(who, route, req)) return null;
+    const verdict = await permitted(who, route, req);
+    if (verdict instanceof Response) return verdict;
+    if (verdict) return null;
     if (req.method !== "GET" && route)
       store.record({ actor: who.login, role: who.role, route: route.label, issue: null, status: 403 });
     return json({ error: `needs the ${need} role` }, 403);
@@ -335,5 +339,11 @@ export function createAccess(opts: AccessOptions) {
     }
   }
 
-  return { routes, guarded, gate, audited, actorOf, store };
+  // The repos a caller may list: every repo, unless an extension (tenancy) narrows them.
+  const visibleRepos = (req: Request, repos: readonly string[]): string[] => {
+    const who = actorOf(req);
+    return exts.reduce((left, e) => (who && e.visibleRepos ? e.visibleRepos(who, left) : left), [...repos]);
+  };
+
+  return { routes, guarded, gate, audited, actorOf, visibleRepos, store };
 }

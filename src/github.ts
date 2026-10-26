@@ -320,10 +320,8 @@ export class GitHub implements TrackerPort, CodeHostPort {
     await this.exec(["pr", "close", String(number), "--repo", repo]);
   }
 
-  // One shared shape for validatePr and waitForCi (src/ci.ts): state,
-  // headRefOid, closingIssuesReferences and statusCheckRollup all come off
-  // the same `gh pr view`. state is lowercased to match GhPr.state's
-  // "open"/"closed" convention elsewhere in this codebase.
+  // One `gh pr view` shape for validatePr and waitForCi (src/ci.ts); state is lowercased to match
+  // GhPr.state's "open"/"closed" convention elsewhere in this codebase.
   async prStatus(repo: string, number: number): Promise<PrStatus> {
     const result = await this.exec([
       "pr",
@@ -348,8 +346,8 @@ export class GitHub implements TrackerPort, CodeHostPort {
     };
   }
 
-  // gate.py's Merge Readiness fields from `gh pr view`, plus review-thread resolution, which only
-  // GraphQL exposes. state is lowercased for the same reason as prStatus.
+  // gate.py's Merge Readiness fields from `gh pr view`, plus review threads, which only GraphQL has.
+  // state is lowercased as in prStatus; an approval counts only on the head commit it reviewed.
   async mergeReadiness(repo: string, number: number): Promise<MergeReadiness> {
     const result = await this.exec([
       "pr",
@@ -367,7 +365,7 @@ export class GitHub implements TrackerPort, CodeHostPort {
       headRefOid: string;
       mergeable: string;
       reviewDecision: string;
-      latestReviews?: { author?: { login?: string }; state?: string }[];
+      latestReviews?: { author?: { login?: string }; state?: string; commit?: { oid?: string } }[];
     };
     const [owner, name] = repo.split("/");
     if (!owner || !name) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
@@ -386,7 +384,9 @@ export class GitHub implements TrackerPort, CodeHostPort {
       reviewDecision: (data.reviewDecision ?? "") as MergeReadiness["reviewDecision"],
       hasUnresolvedReviewThreads,
       changesRequestedStale,
-      approvedBy: (data.latestReviews ?? []).filter((r) => r.state === "APPROVED").map((r) => r.author?.login ?? ""),
+      approvedBy: (data.latestReviews ?? [])
+        .filter((r) => r.state === "APPROVED" && r.commit?.oid === data.headRefOid)
+        .map((r) => r.author?.login ?? ""),
     };
   }
 

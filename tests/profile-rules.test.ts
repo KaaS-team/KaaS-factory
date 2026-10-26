@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configProblems, mergeConfig } from "../src/config";
+import { GitHub } from "../src/github";
 import { decideMerge } from "../src/merge-policy";
 import { capsFor, codeownerCheck, ownersOf, parseCodeowners } from "../src/profile-rules";
 
@@ -72,5 +73,49 @@ describe("scaleup and enterprise profile rules", () => {
     expect(capsFor(mergeConfig({ repo: "a/b", profile: "enterprise" }))).toEqual({ perTeam: 2, org: 10 });
     expect(capsFor(mergeConfig({ repo: "a/b", profile: "team" }))).toBeUndefined();
     expect(capsFor(mergeConfig({ repo: "a/b", profile: "scaleup", caps: { perTeam: 5 } }))).toEqual({ perTeam: 5 });
+  });
+
+  test("a trailing /* owns a directory's direct children only, so a deeper path keeps an earlier rule's owner", () => {
+    const rules = parseCodeowners("*  @lead\n/docs/sub/  @sub\ndocs/*  @writer\n/src/*.ts @ts\n");
+    expect(ownersOf(rules, "docs/a.md")).toEqual(["@writer"]);
+    expect(ownersOf(rules, "docs/sub/b.md")).toEqual(["@sub"]);
+    expect(ownersOf(rules, "src/a.ts")).toEqual(["@ts"]);
+    expect(ownersOf(rules, "src/lib/a.ts")).toEqual(["@lead"]);
+  });
+
+  test("a code owner's approval of an older commit does not satisfy the owner wait", async () => {
+    const view = {
+      state: "OPEN",
+      isDraft: false,
+      baseRefName: "main",
+      headRefOid: "new",
+      mergeable: "MERGEABLE",
+      reviewDecision: "APPROVED",
+      latestReviews: [
+        { author: { login: "dba" }, state: "APPROVED", commit: { oid: "old" } },
+        { author: { login: "lead" }, state: "APPROVED", commit: { oid: "new" } },
+      ],
+    };
+    const graphql = { data: { repository: { pullRequest: { reviewThreads: { nodes: [] }, reviews: { nodes: [] } } } } };
+    const gh = new GitHub({
+      run: async (args: string[]) => ({
+        code: 0,
+        stdout: JSON.stringify(args[0] === "api" ? graphql : view),
+        stderr: "",
+      }),
+    });
+    const r = await gh.mergeReadiness("o/r", 1);
+    expect(r.approvedBy).toEqual(["lead"]);
+    const held = decideMerge({
+      readiness: r,
+      ci: { ...ci, headSha: "new" },
+      risk: "low",
+      changedFiles: [{ path: "db/1.sql", additions: 1, deletions: 0 }],
+      merge: { policy: "auto", autoPaths: ["**"], maxFiles: 10, maxLines: 200 },
+      protectedPaths: [],
+      expectedBaseRefName: "main",
+      codeowners: { rules: parseCodeowners("*.sql @dba\n"), approvedBy: r.approvedBy ?? [] },
+    });
+    expect(held.outcome === "refuse" && held.refusals.map((x) => x.reason)).toEqual(["codeowner-approval"]);
   });
 });

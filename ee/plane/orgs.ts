@@ -8,22 +8,38 @@ import { json } from "./http";
 
 // Routes about the caller, not a repo.
 const PLANE_WIDE = new Set(["GET /api/me", "POST /api/logout"]);
-// These read across every repo the plane knows, so only a plane owner may call them unfiltered.
-const ACROSS_REPOS = new Set(["GET /api/line", "GET /api/analytics"]);
+// Lists the core narrows to the caller's repos through visibleRepos, so the gate lets them through.
+const LISTS = new Set(["GET /api/line"]);
+// Where each repo-taking core route reads its repo (dashboard/server.ts); every other route acts on
+// the plane's own repo, whatever the request says. ee/tests/org-mode.test.ts pins both sets.
+export const QUERY_REPO = new Set([
+  "GET /api/issues/:n/thread",
+  "GET /api/issues/:n/review",
+  "GET /api/issues/:n/live",
+  "GET /api/issues/:n/proof",
+  "GET /api/inbox",
+]);
+export const BODY_REPO = new Set(["POST /api/issues/:n/merge", "POST /api/inbox/:n/act"]);
 const NAME = /^[a-z][a-z\d-]{1,38}$/;
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 
-// The repo a request acts on: `?repo=`, a JSON body's `repo`, else the plane's own repo.
-async function targetRepo(req: Request, defaultRepo: string): Promise<string> {
-  const q = new URL(req.url).searchParams.get("repo");
-  if (q) return q;
-  if (req.method !== "GET") {
+// The repo a route acts on, read the way its handler reads it, or a 400 for a request that names
+// two repos or a repo that is not a string.
+async function targetRepo(req: Request, label: string, defaultRepo: string): Promise<string | Response> {
+  const q = new URL(req.url).searchParams.get("repo") || undefined;
+  let named: unknown;
+  if (req.method !== "GET" && req.method !== "HEAD") {
     const b = (await req
       .clone()
       .json()
       .catch(() => null)) as { repo?: unknown } | null;
-    if (typeof b?.repo === "string" && b.repo !== "") return b.repo;
+    named = b && typeof b === "object" ? b.repo : undefined;
   }
+  if (named !== undefined && typeof named !== "string") return json({ error: "repo must be a string" }, 400);
+  const body = named || undefined;
+  if (q && body && q !== body) return json({ error: "?repo= and the body name different repos" }, 400);
+  if (QUERY_REPO.has(label)) return q ?? defaultRepo;
+  if (BODY_REPO.has(label)) return body ?? defaultRepo;
   return defaultRepo;
 }
 
@@ -103,12 +119,16 @@ export function orgsExtension(defaultRepo: string): PlaneExtension {
       const need = route.role ?? "owner";
       // Plane owners run the fleet; owner-only routes stay with the plane ladder.
       if (atLeast(who.role, "owner") || need === "owner" || PLANE_WIDE.has(route.label)) return undefined;
-      if (ACROSS_REPOS.has(route.label)) return false;
-      if (route.label === "GET /api/inbox" && !new URL(req.url).searchParams.get("repo")) return false;
-      const role = roleIn(who.login, await targetRepo(req, defaultRepo));
+      const unfiltered = route.label === "GET /api/inbox" && !new URL(req.url).searchParams.get("repo");
+      if (LISTS.has(route.label) || unfiltered) return undefined;
+      const target = await targetRepo(req, route.label, defaultRepo);
+      if (target instanceof Response) return target;
+      const role = roleIn(who.login, target);
       // A repo no org owns is the fleet's, so only plane owners reach it.
       if (!role) return false;
       return atLeast(role, need);
     },
+    visibleRepos: (who, repos) =>
+      atLeast(who.role, "owner") ? [...repos] : repos.filter((r) => !!roleIn(who.login, r)),
   };
 }

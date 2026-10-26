@@ -17,7 +17,7 @@ const call = (p: ReturnType<typeof plane>, label: string, cookie: string, body?:
 const refused = async (res: Promise<Response>) => [401, 403].includes((await res).status);
 
 describe("org mode", () => {
-  test("a role in one org reaches that org's repos only, and cross-repo views stay with plane owners", async () => {
+  test("a role in one org reaches that org's repos only, and org settings stay with plane owners", async () => {
     const p = plane([orgsExtension("acme/widgets")]);
     p.store.setMember("boss", "owner", "test");
     const owner = cookieFor(p, "boss");
@@ -32,10 +32,10 @@ describe("org mode", () => {
     const [alice, bob, carol] = [cookieFor(p, "alice"), cookieFor(p, "bob"), cookieFor(p, "carol")];
 
     expect(await refused(call(p, "POST /api/tasks", alice, { title: "t" }))).toBe(false);
-    expect(await refused(call(p, "GET /api/runs?repo=blue/app", alice))).toBe(true);
-    expect(await refused(call(p, "GET /api/runs?repo=loose/repo", alice))).toBe(true);
+    expect(await refused(call(p, "GET /api/issues/1/thread?repo=blue/app", alice))).toBe(true);
+    expect(await refused(call(p, "GET /api/issues/1/thread?repo=loose/repo", alice))).toBe(true);
     expect(await refused(call(p, "GET /api/runs", bob))).toBe(true);
-    expect(await refused(call(p, "GET /api/runs?repo=blue/app", bob))).toBe(false);
+    expect(await refused(call(p, "GET /api/issues/1/thread?repo=blue/app", bob))).toBe(false);
     // The target in a JSON body counts, so a write cannot slip past with no query string.
     expect(await refused(call(p, "POST /api/inbox/1/act", bob, { repo: "acme/widgets", action: "dismiss" }))).toBe(
       true,
@@ -44,8 +44,7 @@ describe("org mode", () => {
     expect(await refused(call(p, "POST /api/tasks", carol, { title: "t" }))).toBe(true);
     expect(await refused(call(p, "GET /api/runs", carol))).toBe(false);
 
-    expect(await refused(call(p, "GET /api/line", alice))).toBe(true);
-    expect(await refused(call(p, "GET /api/inbox", alice))).toBe(true);
+    expect(await refused(call(p, "GET /api/inbox?repo=blue/app", alice))).toBe(true);
     expect(await refused(call(p, "GET /api/inbox?repo=acme/widgets", alice))).toBe(false);
     expect(await refused(call(p, "GET /api/orgs", alice))).toBe(true);
     expect((await call(p, "GET /api/line", owner)).status).toBe(200);

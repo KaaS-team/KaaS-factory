@@ -618,8 +618,8 @@ export function createDashboard(
       label: "GET /api/line",
       role: "viewer",
       // Each recent run with the stages it went through, across every repo the inbox reads.
-      handler: () => {
-        const repos = repo ? [...new Set([repo, ...inboxRepos()])] : [];
+      handler: (req) => {
+        const repos = access.visibleRepos(req, repo ? [...new Set([repo, ...inboxRepos()])] : []);
         const rows = repos.flatMap((r) => {
           const st = stateFor(r);
           if (!st) return [];
@@ -694,9 +694,9 @@ export function createDashboard(
       // Aggregated across every repo under FACTORY_HOME (v2.9.0 item 2), or
       // narrowed to one with ?repo=. Each item carries its own repo so the
       // frontend can render and act on a mixed list.
-      handler: async (_req, url) => {
+      handler: async (req, url) => {
         const filter = url.searchParams.get("repo");
-        const repos = filter ? [filter] : inboxRepos();
+        const repos = filter ? [filter] : access.visibleRepos(req, inboxRepos());
         if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
         const perRepo = await Promise.all(
           repos.map(async (r) => [
@@ -710,7 +710,7 @@ export function createDashboard(
         const items = perRepo
           .flat()
           .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
-        return json({ repos: inboxRepos(), repo, items });
+        return json({ repos: access.visibleRepos(req, inboxRepos()), repo, items });
       },
     },
     {
