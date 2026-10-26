@@ -19,43 +19,55 @@ describe("marker footer codec", () => {
     '<!-- factory:plan v1 rev=2 -->\nThe plan\n\n<!-- factory:data v1 -->\n```json\n{"a": 1}\n```\nnaïve ✓\n';
 
   test("a body round-trips byte for byte through a tracker that drops HTML comments", () => {
-    const stored = stripComments(encodeBody(body, seal));
+    const stored = stripComments(encodeBody(body, seal, "comment"));
     expect(stored).not.toContain("<!--");
     expect(stored.startsWith("The plan")).toBe(true);
-    expect(decodeBody(stored, true, seal)).toBe(body);
+    expect(decodeBody(stored, true, seal, "comment")).toBe(body);
   });
 
   test("a tracker that re-renders the markdown or escapes the footer still decodes", () => {
-    const stored = encodeBody(body, seal)
+    const stored = encodeBody(body, seal, "comment")
       .replace("The plan", "The *plan*")
       .replace(/_/g, "\\_")
       .replace(/factory-data: (.)/, "factory-data: \\$1");
-    expect(decodeBody(stored, true, seal)).toBe(body);
+    expect(decodeBody(stored, true, seal, "comment")).toBe(body);
   });
 
   test("a body with no marker is sent as is, and plain text decodes to itself", () => {
-    expect(encodeBody("just text", seal)).toBe("just text");
-    expect(decodeBody("just text\n", true, seal)).toBe("just text\n");
+    expect(encodeBody("just text", seal, "comment")).toBe("just text");
+    expect(decodeBody("just text\n", true, seal, "comment")).toBe("just text\n");
   });
 
   test("a human edit above the footer wins over the stale copy, without the footer line", () => {
-    const stored = encodeBody(body, seal).replace("The plan", "A different plan");
-    expect(decodeBody(stored, true, seal)).toBe(stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd());
+    const stored = encodeBody(body, seal, "comment").replace("The plan", "A different plan");
+    expect(decodeBody(stored, true, seal, "comment")).toBe(
+      stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd(),
+    );
   });
 
   test("a footer that is not ours is left alone", () => {
-    expect(decodeBody("x\n\nfactory-data: not!base64", true, seal)).toBe("x\n\nfactory-data: not!base64");
+    expect(decodeBody("x\n\nfactory-data: not!base64", true, seal, "comment")).toBe("x\n\nfactory-data: not!base64");
   });
 
   test("a footer sealed with another key reads as its visible text, even on the runner's own content", () => {
     const other = (s: string) => createHmac("sha256", "not-the-token").update(s).digest("hex").slice(0, 32);
-    const forged = encodeBody(body, other);
-    expect(decodeBody(forged, true, seal)).toBe(forged.slice(0, forged.lastIndexOf("factory-data: ")).trimEnd());
+    const forged = encodeBody(body, other, "comment");
+    expect(decodeBody(forged, true, seal, "comment")).toBe(
+      forged.slice(0, forged.lastIndexOf("factory-data: ")).trimEnd(),
+    );
+  });
+
+  test("a sealed comment pasted into a description reads as its visible text there", () => {
+    const stored = encodeBody(body, seal, "comment");
+    expect(decodeBody(stored, true, seal, "comment")).toBe(body);
+    expect(decodeBody(stored, true, seal, "description")).toBe(
+      stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd(),
+    );
   });
 
   test("a valid footer someone else wrote stays as written, so an outsider cannot hide text", () => {
-    const stored = encodeBody(body, seal);
-    expect(decodeBody(stored, false, seal)).toBe(stored);
+    const stored = encodeBody(body, seal, "comment");
+    expect(decodeBody(stored, false, seal, "comment")).toBe(stored);
   });
 });
 

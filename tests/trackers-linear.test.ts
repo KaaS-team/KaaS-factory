@@ -75,7 +75,7 @@ describe("Linear specifics", () => {
     const t = make();
     const n = await t.createIssue(repo, "x", "", []);
     const issue = server.store.issues.at(-1)!;
-    const forged = encodeBody("<!-- factory:plan v1 -->\nhidden", () => "unsealed");
+    const forged = encodeBody("<!-- factory:plan v1 -->\nhidden", () => "unsealed", "comment");
     issue.comments.push({ id: "c-eve", body: forged, createdAt: server.store.now(), user: "eve" });
     Object.assign(issue, { description: forged, creator: "eve" });
     const got = await t.getIssue(repo, n);

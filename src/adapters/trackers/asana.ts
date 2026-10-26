@@ -114,7 +114,7 @@ export class AsanaTracker implements TrackerPort {
         id: this.saw(gidNumber(s.gid)),
         author,
         authorAssociation: association(author ? await this.roleOf("", author) : "none"),
-        body: decodeBody(s.text, author !== "" && author === self, this.seal),
+        body: decodeBody(s.text, author !== "" && author === self, this.seal, "comment"),
         createdAt: new Date(s.created_at).toISOString(),
       });
     }
@@ -123,7 +123,7 @@ export class AsanaTracker implements TrackerPort {
     return {
       number: gidNumber(raw.gid),
       title: raw.name,
-      body: decodeBody(raw.notes, raw.created_by?.gid === self, this.seal),
+      body: decodeBody(raw.notes, raw.created_by?.gid === self, this.seal, "description"),
       labels: raw.tags.map((t) => ({ name: t.name })),
       comments,
       state: raw.completed ? "CLOSED" : "OPEN",
@@ -177,7 +177,11 @@ export class AsanaTracker implements TrackerPort {
     const gid = await this.scoped(n);
     return this.saw(
       gidNumber(
-        (await this.one<{ gid: string }>("POST", `/tasks/${gid}/stories`, { text: encodeBody(body, this.seal) })).gid,
+        (
+          await this.one<{ gid: string }>("POST", `/tasks/${gid}/stories`, {
+            text: encodeBody(body, this.seal, "comment"),
+          })
+        ).gid,
       ),
     );
   }
@@ -185,7 +189,7 @@ export class AsanaTracker implements TrackerPort {
   async editComment(_repo: string, id: number, body: string): Promise<void> {
     if (!this.seen.has(id)) await this.listOpenIssues();
     if (!this.seen.has(id)) throw new Error(`asana: no comment ${id} on an open task in project ${this.spec.project}`);
-    await this.one("PUT", `/stories/${id}`, { text: encodeBody(body, this.seal) });
+    await this.one("PUT", `/stories/${id}`, { text: encodeBody(body, this.seal, "comment") });
   }
   async addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
     const gid = await this.scoped(n);
@@ -214,7 +218,7 @@ export class AsanaTracker implements TrackerPort {
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     const t = await this.one<{ gid: string }>("POST", "/tasks", {
       name: title,
-      notes: encodeBody(body, this.seal),
+      notes: encodeBody(body, this.seal, "description"),
       projects: [this.spec.project],
       workspace: this.spec.workspace,
       tags: await this.tagIds(labels),

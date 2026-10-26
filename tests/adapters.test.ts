@@ -150,7 +150,10 @@ function nativeTrackers(): void {
       const calls = [...readFileSync(join(dir, f), "utf8").matchAll(/\b(?:decodeBody|fromHtml)\(([^;]*?)\),?\n/g)]
         .map((m) => m[1]!)
         .filter((args) => !args.startsWith("\n") && !args.includes(": string"));
-      expect({ f, calls: calls.length > 0 && calls.every((a) => /=== self, this\.seal\s*$/.test(a)) }).toEqual({
+      expect({
+        f,
+        calls: calls.length > 0 && calls.every((a) => /=== self, this\.seal, "(comment|description)"\s*$/.test(a)),
+      }).toEqual({
         f,
         calls: true,
       });

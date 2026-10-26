@@ -82,7 +82,8 @@ GitHub stays the default tracker, `claude` the default agent and `local` the def
   exited, and fails the stage if a file changed. It detects a write after the fact; it is not a
   read-only mount.
 - Fix: a `factory-data:` footer is decoded only on a comment or issue the runner's own tracker user
-  wrote, and only when its HMAC, keyed by the tracker token, holds. Anyone else's footer reaches the
+  wrote, and only when its HMAC, keyed by the tracker token and bound to the field (comment or
+  description), holds. Anyone else's footer reaches the
   agent as written, so it cannot hide text from the humans. Rotating the token turns old footers
   back into their visible text.
 - CI: `make check` keeps the runner's Rust toolchain reachable under its throwaway `HOME`.
@@ -94,6 +95,10 @@ Not in this release:
 - A stale-PR nudge (the code host's PR record has no `updatedAt` yet) and a PNG touch icon for iOS.
 - The native tracker adapters are tested against fixtures modeled on each vendor's documented API,
   not against live workspaces.
+- A read-only mount for ACP stages. An agent process that leaves its process group can still write
+  after the check; run read-only stages in a sandbox runtime where that matters.
+- A footer seal bound to the issue. One runner-written description pasted into another still
+  decodes, since a description is sealed before the tracker gives it an id.
 
 ## v4.0.3
 

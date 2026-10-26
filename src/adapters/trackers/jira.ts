@@ -114,7 +114,7 @@ export class JiraTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author: c.author.accountId,
         authorAssociation: association(await this.roleOf("", c.author.accountId)),
-        body: decodeBody(c.body, c.author.accountId === self, this.seal),
+        body: decodeBody(c.body, c.author.accountId === self, this.seal, "comment"),
         createdAt: new Date(c.created).toISOString(),
       });
     }
@@ -124,7 +124,7 @@ export class JiraTracker implements TrackerPort {
     return {
       number: keyNumber(raw.key),
       title: f.summary,
-      body: decodeBody(f.description ?? "", f.creator?.accountId === self, this.seal),
+      body: decodeBody(f.description ?? "", f.creator?.accountId === self, this.seal, "description"),
       labels: f.labels.map((name) => ({ name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -180,7 +180,7 @@ export class JiraTracker implements TrackerPort {
   async commentIssue(_repo: string, n: number, body: string): Promise<number> {
     const key = this.key(n);
     const c = await this.client.request<{ id: string }>("POST", `/rest/api/2/issue/${key}/comment`, {
-      body: { body: encodeBody(body, this.seal) },
+      body: { body: encodeBody(body, this.seal, "comment") },
     });
     this.commentKey.set(c.id, key);
     return this.comments.number(c.id);
@@ -191,7 +191,7 @@ export class JiraTracker implements TrackerPort {
     const key = vendorId && this.commentKey.get(vendorId);
     if (!vendorId || !key) throw new Error(`jira: no comment ${id} on an open issue`);
     await this.client.request("PUT", `/rest/api/2/issue/${key}/comment/${vendorId}`, {
-      body: { body: encodeBody(body, this.seal) },
+      body: { body: encodeBody(body, this.seal, "comment") },
     });
   }
   addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
@@ -216,7 +216,7 @@ export class JiraTracker implements TrackerPort {
           project: { key: this.spec.project },
           issuetype: { name: this.spec.issueType ?? "Task" },
           summary: title,
-          description: encodeBody(body, this.seal),
+          description: encodeBody(body, this.seal, "description"),
           labels,
         },
       },

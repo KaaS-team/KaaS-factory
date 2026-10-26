@@ -115,7 +115,7 @@ export class ClickUpTracker implements TrackerPort {
         id: this.saw(commentNumber(c.id)),
         author,
         authorAssociation: association(await this.roleOf("", author)),
-        body: decodeBody(c.comment_text, author === self, this.seal),
+        body: decodeBody(c.comment_text, author === self, this.seal, "comment"),
         createdAt: new Date(Number(c.date)).toISOString(),
       });
     }
@@ -124,7 +124,12 @@ export class ClickUpTracker implements TrackerPort {
     return {
       number: taskNumber(raw.id),
       title: raw.name,
-      body: decodeBody(raw.markdown_description ?? raw.description ?? "", String(raw.creator?.id) === self, this.seal),
+      body: decodeBody(
+        raw.markdown_description ?? raw.description ?? "",
+        String(raw.creator?.id) === self,
+        this.seal,
+        "description",
+      ),
       labels: raw.tags.map((t) => ({ name: t.name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -181,7 +186,7 @@ export class ClickUpTracker implements TrackerPort {
       "POST",
       `/api/v2/task/${await this.scoped(n)}/comment`,
       {
-        body: { comment_text: encodeBody(body, this.seal), notify_all: false },
+        body: { comment_text: encodeBody(body, this.seal, "comment"), notify_all: false },
       },
     );
     return this.saw(commentNumber(String(c.id)));
@@ -190,7 +195,9 @@ export class ClickUpTracker implements TrackerPort {
   async editComment(_repo: string, id: number, body: string): Promise<void> {
     if (!this.seen.has(id)) await this.listOpenIssues();
     if (!this.seen.has(id)) throw new Error(`clickup: no comment ${id} on an open task in list ${this.spec.list}`);
-    await this.client.request("PUT", `/api/v2/comment/${id}`, { body: { comment_text: encodeBody(body, this.seal) } });
+    await this.client.request("PUT", `/api/v2/comment/${id}`, {
+      body: { comment_text: encodeBody(body, this.seal, "comment") },
+    });
   }
   async addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
     const id = await this.scoped(n);
@@ -225,7 +232,7 @@ export class ClickUpTracker implements TrackerPort {
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     await this.ensureTags(labels);
     const t = await this.client.request<{ id: string }>("POST", `/api/v2/list/${this.spec.list}/task`, {
-      body: { name: title, markdown_content: encodeBody(body, this.seal), tags: labels },
+      body: { name: title, markdown_content: encodeBody(body, this.seal, "description"), tags: labels },
     });
     return taskNumber(t.id);
   }

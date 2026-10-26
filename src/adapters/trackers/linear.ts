@@ -131,7 +131,7 @@ export class LinearTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author,
         authorAssociation: association(author ? await this.roleOf("", author) : "none"),
-        body: decodeBody(c.body, author === self, this.seal),
+        body: decodeBody(c.body, author === self, this.seal, "comment"),
         createdAt: c.createdAt,
       });
     }
@@ -140,7 +140,7 @@ export class LinearTracker implements TrackerPort {
     return {
       number: raw.number,
       title: raw.title,
-      body: decodeBody(raw.description ?? "", raw.creator?.id === self, this.seal),
+      body: decodeBody(raw.description ?? "", raw.creator?.id === self, this.seal, "description"),
       labels: raw.labels.nodes.map((l) => ({ name: l.name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -223,7 +223,7 @@ export class LinearTracker implements TrackerPort {
   }
   async commentIssue(_repo: string, n: number, body: string): Promise<number> {
     const d = await this.gql<{ commentCreate: { comment: Node } }>(Q.commentCreate, {
-      input: { issueId: (await this.raw(n)).id, body: encodeBody(body, this.seal) },
+      input: { issueId: (await this.raw(n)).id, body: encodeBody(body, this.seal, "comment") },
     });
     return this.comments.number(d.commentCreate.comment.id);
   }
@@ -231,7 +231,7 @@ export class LinearTracker implements TrackerPort {
     if (!this.comments.vendorId(id)) await this.listOpenIssues();
     const vendorId = this.comments.vendorId(id);
     if (!vendorId) throw new Error(`linear: no comment ${id} on an open issue of ${this.spec.team}`);
-    await this.gql(Q.commentUpdate, { id: vendorId, input: { body: encodeBody(body, this.seal) } });
+    await this.gql(Q.commentUpdate, { id: vendorId, input: { body: encodeBody(body, this.seal, "comment") } });
   }
   addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
     return this.labels(n, labels, []);
@@ -258,7 +258,7 @@ export class LinearTracker implements TrackerPort {
       input: {
         teamId: (await this.team()).id,
         title,
-        description: encodeBody(body, this.seal),
+        description: encodeBody(body, this.seal, "description"),
         labelIds: await this.labelIds(labels),
       },
     });

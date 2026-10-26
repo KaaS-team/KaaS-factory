@@ -70,21 +70,24 @@ const FOOTER = "factory-data: ";
 // Only letters and digits count, so a tracker that re-renders markdown (escapes, bullets) still matches.
 const norm = (s: string) => s.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
 export type Seal = (s: string) => string;
-const sealed = (seal: Seal, visible: string, body: string) => seal(JSON.stringify([norm(visible), body]));
+// The field is sealed too, so a runner comment pasted into an issue description does not decode there.
+export type Field = "comment" | "description";
+const sealed = (seal: Seal, field: Field, visible: string, body: string) =>
+  seal(JSON.stringify([field, norm(visible), body]));
 
 // Bodies with a marker carry the original in a last visible line, since Linear, Plane, Jira, ClickUp and
 // Asana may each drop an HTML comment. The visible text stays readable for the humans in the tracker.
-export function encodeBody(body: string, seal: Seal): string {
+export function encodeBody(body: string, seal: Seal, field: Field): string {
   if (!body.includes("<!--")) return body;
   const visible = body.replace(/<!--[\s\S]*?-->\n?/g, "").trimEnd();
-  const data = Buffer.from(JSON.stringify({ v: sealed(seal, visible, body), b: body })).toString("base64url");
+  const data = Buffer.from(JSON.stringify({ v: sealed(seal, field, visible, body), b: body })).toString("base64url");
   return `${visible}\n\n${FOOTER}${data}`;
 }
 
 // The original body when the runner wrote it (`ours`), its seal holds and the text above it is
 // unchanged. Anyone else's footer stays as written, so an agent reads exactly what the humans see;
 // a human who edited the runner's text gets their edit back, without the markers.
-export function decodeBody(text: string, ours: boolean, seal: Seal): string {
+export function decodeBody(text: string, ours: boolean, seal: Seal, field: Field): string {
   if (!ours) return text;
   const at = text.lastIndexOf(FOOTER);
   if (at === -1 || (at > 0 && text[at - 1] !== "\n")) return text;
@@ -97,7 +100,7 @@ export function decodeBody(text: string, ours: boolean, seal: Seal): string {
   try {
     const data = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { v?: string; b?: string };
     if (typeof data.b === "string" && typeof data.v === "string") {
-      const want = Buffer.from(sealed(seal, visible, data.b));
+      const want = Buffer.from(sealed(seal, field, visible, data.b));
       const got = Buffer.from(data.v);
       if (got.length === want.length && timingSafeEqual(got, want)) return data.b;
     }

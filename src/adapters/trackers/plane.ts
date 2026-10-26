@@ -9,6 +9,7 @@ import {
   encodeBody,
   IdMap,
   memoOnce,
+  type Field,
   type Seal,
   VendorClient,
   VendorHttpError,
@@ -54,10 +55,10 @@ const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 
 // Plane stores rich text as HTML. The runner's text goes in a <pre>, and anything a human wrote comes
 // back as plain lines.
-export function toHtml(text: string, seal: Seal): string {
-  return `<pre>${escapeHtml(encodeBody(text, seal))}</pre>`;
+export function toHtml(text: string, seal: Seal, field: Field): string {
+  return `<pre>${escapeHtml(encodeBody(text, seal, field))}</pre>`;
 }
-export function fromHtml(html: string, ours: boolean, seal: Seal): string {
+export function fromHtml(html: string, ours: boolean, seal: Seal, field: Field): string {
   const pre = /^<pre>([\s\S]*)<\/pre>$/.exec(html.trim());
   const text = pre
     ? pre[1]!
@@ -70,6 +71,7 @@ export function fromHtml(html: string, ours: boolean, seal: Seal): string {
     text.replace(/&(lt|gt|quot|#39|nbsp|amp);/g, (e) => ENTITIES[e]!),
     ours,
     seal,
+    field,
   );
 }
 
@@ -156,7 +158,7 @@ export class PlaneTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author: c.actor_id,
         authorAssociation: association(await this.roleOf("", c.actor_id)),
-        body: fromHtml(c.comment_html, c.actor_id === self, this.seal),
+        body: fromHtml(c.comment_html, c.actor_id === self, this.seal, "comment"),
         createdAt: c.created_at,
       });
     }
@@ -165,7 +167,7 @@ export class PlaneTracker implements TrackerPort {
     return {
       number: raw.sequence_id,
       title: raw.name,
-      body: fromHtml(raw.description_html ?? "", raw.created_by_id === self, this.seal),
+      body: fromHtml(raw.description_html ?? "", raw.created_by_id === self, this.seal, "description"),
       labels: raw.label_ids.flatMap((id) => (labelNames.has(id) ? [{ name: labelNames.get(id)! }] : [])),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -227,7 +229,7 @@ export class PlaneTracker implements TrackerPort {
   async commentIssue(_repo: string, n: number, body: string): Promise<number> {
     const w = await this.item(n);
     const c = await this.client.request<{ id: string }>("POST", `${this.base}/work-items/${w.id}/comments/`, {
-      body: { comment_html: toHtml(body, this.seal) },
+      body: { comment_html: toHtml(body, this.seal, "comment") },
     });
     this.commentItem.set(c.id, w.id);
     return this.comments.number(c.id);
@@ -238,7 +240,7 @@ export class PlaneTracker implements TrackerPort {
     const itemId = vendorId && this.commentItem.get(vendorId);
     if (!vendorId || !itemId) throw new Error(`plane: no comment ${id} on an open work item`);
     await this.client.request("PATCH", `${this.base}/work-items/${itemId}/comments/${vendorId}/`, {
-      body: { comment_html: toHtml(body, this.seal) },
+      body: { comment_html: toHtml(body, this.seal, "comment") },
     });
   }
   addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
@@ -275,7 +277,11 @@ export class PlaneTracker implements TrackerPort {
   }
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     const w = await this.client.request<WorkItem>("POST", `${this.base}/work-items/`, {
-      body: { name: title, description_html: toHtml(body, this.seal), label_ids: await this.labelIds(labels) },
+      body: {
+        name: title,
+        description_html: toHtml(body, this.seal, "description"),
+        label_ids: await this.labelIds(labels),
+      },
     });
     this.bySequence.set(w.sequence_id, w.id);
     return w.sequence_id;
