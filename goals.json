@@ -278,7 +278,12 @@
       "phase": "P1",
       "ask": "yes go with 1 and also make sure that it can be run on local or server too. Also, make sure that any coding agent can be connected, any system can be integrated by proper integrations ways through PR from public or private companies to steer the ship. Make sure the structure and right code standards for per source quality and very lean on resources to run these and local microsandbox supported by default and also able to connect any sandboxes too not just microsandbox",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/quality.test.ts",
+        "name": "no source file grows past its quality baseline",
+        "mutation": "quality: an over-limit file cannot grow"
+      }
     },
     {
       "id": "plane-users",
@@ -806,7 +811,7 @@
     {
       "id": "teach-command",
       "phase": "P5",
-      "ask": "factory teach \"<how we ship>\" reads the repo, its CI and the company brain, writes workflows, minions and skills, validates them and opens a PR (research/v4/PLAN.md v4.4; deferred in CHANGELOG v4.0.0)",
+      "ask": "factory teach \"<how we ship>\" reads the repo, its CI and the company brain, writes workflows, minions and skills, validates them and opens a PR (agentic-ai-lightning-sessions factory/research/v4/PLAN.md v4.4; deferred in CHANGELOG v4.0.0)",
       "source": "CHANGELOG v4.0.0 #1",
       "owner": "agent"
     },

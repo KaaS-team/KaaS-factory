@@ -545,6 +545,7 @@
   {"name": "goals: a test proof names a real test call", "file": "scripts/goals.ts", "find": "`(^|\\\\n)\\\\s*(test|it)", "replace": "`(test|it)", "test": "tests/goals.test.ts"},
   {"name": "release: the old name is gone", "file": "dashboard/public/manifest.webmanifest", "find": "What KaaS Factory is doing", "replace": "What the software factory is doing", "test": "tests/release.test.ts"},
   {"name": "release: teaching material stays out", "file": "Makefile", "find": ".PHONY: agent-matrix install", "replace": ".PHONY: agent-matrix install\n# make demo runs teach/demo/up.sh", "test": "tests/release.test.ts"},
+  {"name": "quality: an over-limit file cannot grow", "file": "src/cli.ts", "find": "import { homedir, hostname } from \"node:os\";", "replace": "import { homedir, hostname } from \"node:os\";\n\n", "test": "tests/quality.test.ts"},
   {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},

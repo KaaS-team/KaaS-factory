@@ -1,5 +1,29 @@
 # Changelog
 
+## v5.1.0
+
+Software Factory is now KaaS Factory, an open-core product. Upgraders: point `FACTORY_RUNNER_REF`
+and any clone at `KaaS-team/KaaS-factory`; the `factory` command and `FACTORY_*` variables keep
+their names.
+
+- Name: the package is `kaas-factory`, the Rust crates `kaas-factory-verify` and
+  `kaas-factory-relay`, and the docs, CI and dashboard say KaaS Factory. A test fails on the old
+  name anywhere outside history, recorded transcripts and the vendored kit.
+- Licence: the core is Apache-2.0, copyright Secret SaaS OÜ. `ee/` is under the KaaS Factory
+  Enterprise License, the name and icon are reserved (`TRADEMARKS.md`), the Geist font stays
+  OFL-1.1 and ported files keep their MIT or Apache notice. `REUSE.toml` states each file's licence,
+  `reuse lint` runs in `make check`, and a test fails when core code imports `ee/` or a runtime npm
+  package appears.
+- Contributions are signed off (DCO); CI fails a pull request with an unsigned commit or a sign-off
+  that is not the author's. `CONTRIBUTING.md` says how.
+- The lessons, demo scripts and research notes moved to the `factory/` folder of
+  `learnwithparam/agentic-ai-lightning-sessions`, with the `worksheets` workflow and `make demo`.
+  A test keeps teaching material out of the product.
+- Code standards: `quality-baseline.json` freezes the 13 files over 400 lines and every long
+  comment run at today's size; a test fails when one grows.
+- Not in this release: `factory teach "<how we ship>"`, which writes workflows and skills from a
+  plain description (goal: teach-command).
+
 ## v5.0.1
 
 The goals ledger, so planned work is never dropped silently again. Upgraders: nothing to change.
