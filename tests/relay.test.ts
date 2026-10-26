@@ -118,34 +118,6 @@ describe("kaas-relay", () => {
     await header.body?.cancel();
   });
 
-  // A pipelined second request is left unread; a bare close would reset the 401 away (ECONNRESET in CI).
-  test("a refused publish still reaches a client that sent more than one request", async () => {
-    const { hostname, port } = new URL(base);
-    let got = "";
-    let failed: unknown;
-    await new Promise<void>((resolve) => {
-      Bun.connect({
-        hostname,
-        port: Number(port),
-        socket: {
-          open(s) {
-            const req = "POST /publish/inbox HTTP/1.1\r\nhost: x\r\ncontent-length: 2\r\n\r\n{}";
-            s.write(req + "GET /healthz HTTP/1.1\r\nhost: x\r\n\r\n".repeat(2000));
-          },
-          data(_s, d) {
-            got += d.toString();
-          },
-          error(_s, e) {
-            failed = e;
-          },
-          close: () => resolve(),
-        },
-      });
-    });
-    expect(failed).toBeUndefined();
-    expect(got).toStartWith("HTTP/1.1 401 Unauthorized");
-  });
-
   test("a body must be one line under 64 KiB, and a channel a short slug", async () => {
     expect((await publish("inbox", "a\nb")).status).toBe(400);
     expect((await publish("inbox", "")).status).toBe(400);

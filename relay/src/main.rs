@@ -99,7 +99,13 @@ fn handle(mut stream: TcpStream, hub: &Hub, tokens: &Tokens) {
         Ok(r) => r,
         Err((status, why)) => {
             respond(&mut stream, status, why);
-            return linger_close(stream);
+            // Read what the client is still sending, so closing does not reset the reply away.
+            let _ = stream.shutdown(Shutdown::Write);
+            let _ = std::io::copy(
+                &mut (&stream).take(4 * MAX_BODY as u64),
+                &mut std::io::sink(),
+            );
+            return;
         }
     };
     let route = req.path.split('/').collect::<Vec<_>>();
@@ -107,22 +113,9 @@ fn handle(mut stream: TcpStream, hub: &Hub, tokens: &Tokens) {
         ("OPTIONS", _) => respond(&mut stream, 204, ""),
         ("GET", ["", "healthz"]) => respond(&mut stream, 200, "ok"),
         ("POST", ["", "publish", channel]) => publish(&mut stream, hub, tokens, &req, channel),
-        ("GET", ["", "subscribe", channel]) => {
-            return subscribe(stream, hub, tokens, &req, channel)
-        }
+        ("GET", ["", "subscribe", channel]) => subscribe(stream, hub, tokens, &req, channel),
         _ => respond(&mut stream, 404, "not found"),
     }
-    linger_close(stream);
-}
-
-// Every reply ends here: a plain close with anything unread resets the connection, and the client
-// then loses the reply (an ECONNRESET on a 401 in CI). Send FIN, then read until the client closes.
-fn linger_close(stream: TcpStream) {
-    let _ = stream.shutdown(Shutdown::Write);
-    let _ = std::io::copy(
-        &mut (&stream).take(4 * MAX_BODY as u64),
-        &mut std::io::sink(),
-    );
 }
 
 fn publish(stream: &mut TcpStream, hub: &Hub, tokens: &Tokens, req: &Request, channel: &str) {

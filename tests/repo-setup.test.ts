@@ -65,3 +65,10 @@ test("settings name their schema and deny secrets, token spend and force-push", 
 test("CI runs the gate with an empty HOME, so nothing passes only on one machine", () => {
   expect(read(".github/workflows/ci.yml")).toContain('HOME="$(mktemp -d)" make check');
 });
+
+// relay/target was committed once: clippy run inside the crate builds there, not in CARGO_TARGET_DIR.
+test("every Rust crate's build output is ignored", () => {
+  const ignored = read(".gitignore").split("\n");
+  for (const toml of new Bun.Glob("*/Cargo.toml").scanSync({ cwd: ROOT }))
+    expect(ignored).toContain(`${toml.replace("Cargo.toml", "")}target/`);
+});
