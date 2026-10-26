@@ -30,7 +30,15 @@ Every SQLite file lives under `FACTORY_HOME` (`/data` in the image).
 
 A runner on another machine uploads each stage's transcript and artifacts when the stage ends,
 under `runs/<owner>/<name>/issue-N/`. Every 30 seconds the plane copies new keys onto its own run
-paths, for the repos it serves only, so its run page shows them. It skips and logs any other key. Set the same blob variables on the plane and on every runner.
+paths, for the repos it serves only, so its run page shows them. It skips and logs any other key.
+The runner also uploads `state.json`, the issue's run row and stage attempts, after each stage and
+when a run's status changes; the plane writes it into that repo's own `factory.db`, so Line, Runs and
+Analytics show remote runs. A file whose rows name another repo or issue, or break the schema, is
+refused whole. Each time a runner starts it uploads its clone's `.factory/config.json`, `mcp.json`,
+workflows and minions under `runs/<owner>/<name>/config/`, and the plane copies them to
+`FACTORY_HOME/<owner>/<name>/config/`. Settings, Workflows, Minions and Agents with `?repo=B` then
+read B's own config: the plane's clone of B if it has one, else that copy. A copy is read only, so the
+workflow editor and event replay answer 409 for it. Set the same blob variables on the plane and on every runner.
 Agents never see them: the executor strips every `FACTORY_` variable.
 
 ## Memory

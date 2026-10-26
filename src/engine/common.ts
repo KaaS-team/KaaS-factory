@@ -409,7 +409,7 @@ export async function runStage(
     tokens_out: run.tokens_out + result.tokensOut,
     cost_usd: run.cost_usd + (costUsd ?? 0),
   });
-  await shipStage(deps.blobs, config.repo, issueNumber, worktree, files.transcriptFile);
+  await shipStage(deps.blobs, config.repo, issueNumber, worktree, files.transcriptFile, deps.state);
   if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
   return result;
 }

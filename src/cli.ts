@@ -28,7 +28,7 @@ import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard, servingAccess as plane } from "../dashboard/server";
-import { blobStoreFromEnv } from "./blobs";
+import { runnerBlobStore } from "./blobs";
 import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
 import {
@@ -158,7 +158,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     state,
     bus: watcherBus(state, config),
     minions: loaded.minions,
-    blobs: blobStoreFromEnv(),
+    blobs: runnerBlobStore(cloneDir, config.repo),
     executor: new CommandExecutor(
       config.agents,
       config.stages,
