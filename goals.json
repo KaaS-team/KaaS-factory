@@ -862,6 +862,18 @@
       }
     },
     {
+      "id": "public-dashboard",
+      "phase": "P6",
+      "ask": "A public dashboard of what shipped and what it cost; no model name, host or token reaches it.",
+      "source": "spec 10 public-dashboard",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/ledger-public.test.ts",
+        "name": "no model name, host, token count, prompt or stack trace reaches the public ledger",
+        "mutation": "public ledger: a model name in a title reaches the page"
+      }
+    },
+    {
       "id": "plan-risk-floor",
       "phase": "P6",
       "ask": "Raising the plan's risk from a deterministic rating when the agent rates it lower.",
