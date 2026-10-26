@@ -377,8 +377,8 @@
       "owner": "agent",
       "proof": {
         "test": "tests/web-push.test.ts",
-        "name": "needs-you and done reach the phone encrypted, and nothing is pushed while someone is present",
-        "mutation": "push: nothing is pushed while someone is present"
+        "name": "needs-you and done reach the phone encrypted, and nothing is pushed while its person is present",
+        "mutation": "push: nobody is pushed while they are present"
       }
     },
     {

@@ -47,6 +47,9 @@ function cookie(req: Request, name: string): string {
   return "";
 }
 
+// The raw session id, so a paired phone's session can be matched to its device row.
+export const sessionIdOf = (req: Request) => cookie(req, SESSION_COOKIE);
+
 // Behind a TLS-terminating proxy the request arrives as http, so X-Forwarded-Proto counts too.
 const isHttps = (req: Request) =>
   new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";

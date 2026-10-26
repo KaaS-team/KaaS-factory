@@ -47,6 +47,8 @@ export const digest = (id: string) => createHash("sha256").update(id).digest("he
 
 export class PlaneStore {
   private readonly db: Database;
+  // What else a removed member loses: remote.ts revokes their phones and push subscriptions here.
+  readonly onRemoved: ((login: string) => void)[] = [];
 
   constructor(
     readonly path = ":memory:",
@@ -105,6 +107,7 @@ export class PlaneStore {
     if (role === null) {
       this.db.query("DELETE FROM plane_memberships WHERE login = ?").run(login);
       this.db.query("DELETE FROM plane_sessions WHERE login = ?").run(login);
+      for (const fn of this.onRemoved) fn(login);
       return;
     }
     this.db

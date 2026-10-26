@@ -13,6 +13,7 @@ export const DEVICE_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_DEVICES = 20;
 // A raw uncompressed P-256 point is 65 bytes, 87 characters of base64url.
 const PUBLIC_KEY = /^[A-Za-z0-9_-]{87}$/;
+const COLS = "id, login, name, public_key, created_at, revoked_at";
 
 export interface Device {
   id: string;
@@ -24,9 +25,13 @@ export interface Device {
 }
 
 export class DeviceStore {
+  // Called with each revoked device id, so its push subscriptions go with it.
+  readonly onRevoked: ((id: string) => void)[] = [];
+
   constructor(
     private readonly db: Database,
     private readonly now = Date.now,
+    private readonly roleOf: (login: string) => Role | null = () => null,
   ) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS plane_pairings (
@@ -55,6 +60,14 @@ export class DeviceStore {
     return { token, expiresAt };
   }
 
+  // Who a token would pair, without spending it, so the phone can ask before it claims.
+  peek(token: string): string | null {
+    const row = this.db
+      .query("SELECT login FROM plane_pairings WHERE token_hash = ? AND expires_at > ?")
+      .get(digest(token), this.now()) as { login: string } | null;
+    return row?.login ?? null;
+  }
+
   // Spends the token: a second claim with it, or a late one, gets null.
   claim(token: string, name: string, publicKey: string, sessionId: string): Device | null {
     const row = this.db
@@ -80,7 +93,7 @@ export class DeviceStore {
   }
 
   list(login?: string): Device[] {
-    const cols = "id, login, name, public_key, created_at, revoked_at";
+    const cols = COLS;
     return (
       login === undefined
         ? this.db.query(`SELECT ${cols} FROM plane_devices ORDER BY created_at DESC LIMIT 200`).all()
@@ -91,7 +104,14 @@ export class DeviceStore {
   }
 
   get(id: string): Device | null {
-    return this.list().find((d) => d.id === id) ?? null;
+    return this.db.query(`SELECT ${COLS} FROM plane_devices WHERE id = ?`).get(id) as Device | null;
+  }
+
+  // The live device a session belongs to, or null for a session that no phone opened.
+  bySession(sessionId: string): Device | null {
+    return this.db
+      .query(`SELECT ${COLS} FROM plane_devices WHERE session_hash = ? AND revoked_at IS NULL`)
+      .get(digest(sessionId)) as Device | null;
   }
 
   revoke(id: string): boolean {
@@ -100,14 +120,20 @@ export class DeviceStore {
       .get(new Date(this.now()).toISOString(), id) as { session_hash: string } | null;
     if (!row) return false;
     this.db.query("DELETE FROM plane_sessions WHERE id_hash = ?").run(row.session_hash);
+    for (const fn of this.onRevoked) fn(id);
     return true;
   }
 
-  // Who a sealed box is for: every device not revoked.
+  // A removed member's phones go with them.
+  revokeLogin(login: string): void {
+    const ids = this.db.query("SELECT id FROM plane_devices WHERE login = ? AND revoked_at IS NULL").all(login);
+    for (const { id } of ids as { id: string }[]) this.revoke(id);
+  }
+
+  // Who a sealed box is for: every live device whose person is still a member.
   recipients(): Recipient[] {
-    return this.list()
-      .filter((d) => d.revoked_at === null)
-      .map((d) => ({ id: d.id, publicKey: d.public_key }));
+    const live = this.db.query(`SELECT ${COLS} FROM plane_devices WHERE revoked_at IS NULL`).all() as Device[];
+    return live.filter((d) => this.roleOf(d.login) !== null).map((d) => ({ id: d.id, publicKey: d.public_key }));
   }
 }
 
@@ -115,6 +141,8 @@ export interface DeviceDeps {
   devices: DeviceStore;
   actorOf: (req: Request) => Actor | undefined;
   senderKey: () => Promise<string>;
+  // The login of the session this browser already holds, read even on the public claim route.
+  signedInAs: (req: Request) => string | null;
   roleOf: (login: string) => Role | null;
   startSession: (
     req: Request,
@@ -158,6 +186,18 @@ export function deviceRoutes(deps: DeviceDeps): Route[] {
     },
     {
       method: "POST",
+      pattern: /^\/api\/pair\/peek$/,
+      label: "POST /api/pair/peek",
+      // Read-only: the phone shows who it would pair as, and pins the key the plane itself publishes.
+      handler: async (req) => {
+        const { token } = (await req.json().catch(() => ({}))) as { token?: unknown };
+        const login = typeof token === "string" ? deps.devices.peek(token) : null;
+        if (!login) return json({ error: "this pairing code was used or has expired; make a new one" }, 401);
+        return json({ login, sender: await deps.senderKey() });
+      },
+    },
+    {
+      method: "POST",
       pattern: /^\/api\/pair\/claim$/,
       label: "POST /api/pair/claim",
       handler: async (req) => {
@@ -165,6 +205,11 @@ export function deviceRoutes(deps: DeviceDeps): Route[] {
         if (typeof body.token !== "string" || typeof body.publicKey !== "string" || !PUBLIC_KEY.test(body.publicKey))
           return json({ error: "a pairing needs its token and the device's public key" }, 400);
         const name = typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 60) : "phone";
+        // A browser already signed in as someone else is never switched to another login by a link.
+        const signedIn = deps.signedInAs(req);
+        const pairs = deps.devices.peek(body.token);
+        if (signedIn && !signedIn.startsWith("~") && pairs && signedIn !== pairs)
+          return json({ error: "this browser is signed in as someone else; sign out first" }, 409);
         const sessionId = randomBytes(32).toString("hex");
         const device = deps.devices.claim(body.token, name, body.publicKey, sessionId);
         if (!device) return json({ error: "this pairing code was used or has expired; make a new one" }, 401);

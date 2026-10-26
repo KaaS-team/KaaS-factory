@@ -2,7 +2,8 @@
 // claims it once with its own key, and every paired device is listed and can be revoked at once.
 import { describe, expect, test } from "bun:test";
 import { newDeviceKey } from "../dashboard/public/lib/e2e.js";
-import { cookieOf, makePlane, owner } from "./remote-plane";
+import { claimPairing } from "../dashboard/public/lib/remote.js";
+import { cookieOf, makePlane, owner, pairPhone } from "./remote-plane";
 
 const tokenOf = (link: string) => /#pair=([\w-]+)\./.exec(link)![1]!;
 
@@ -37,5 +38,53 @@ describe("phone pairing", () => {
     const p = makePlane();
     expect((await p.call("POST", "/api/pair", owner)).status).toBe(403);
     expect((await p.call("POST", "/api/pair", owner, { login: "stranger" })).status).toBe(403);
+  });
+
+  test("a device past the list cap is still found and revocable", async () => {
+    const p = makePlane();
+    p.member("approver", "ana");
+    const phone = await pairPhone(p, "ana", (await newDeviceKey()).publicKey);
+    // Newer rows push Ana's phone past the 200 the device list shows.
+    const add = p.store.database.query("INSERT INTO plane_devices VALUES (?, 'ana', 'old', 'k', ?, ?, '2999-01-01')");
+    for (let i = 0; i < 201; i++)
+      add.run(`filler-${i}`, `h${i}`, `2999-01-01T00:00:${String(i % 60).padStart(2, "0")}Z`);
+    expect(p.remote.devices.list().some((d) => d.id === phone.device)).toBe(false);
+    expect(p.remote.devices.get(phone.device)?.login).toBe("ana");
+    expect((await p.call("POST", "/api/devices/revoke", owner, { id: phone.device })).status).toBe(200);
+    expect((await p.call("GET", "/api/me", phone.cookie)).status).toBe(401);
+  });
+
+  test("the claim needs confirmation and uses the plane key", async () => {
+    const p = makePlane();
+    p.member("approver", "ana");
+    const bob = p.member("approver", "bob");
+    const { link } = (await (await p.call("POST", "/api/pair", owner, { login: "ana" })).json()) as { link: string };
+    const token = /#pair=([\w-]+)\./.exec(link)![1]!;
+    const forged = { hash: `#pair=${token}.${"A".repeat(87)}`, pathname: "/" };
+    const asked: string[] = [];
+    const saved: { sender: string }[] = [];
+    const io = (cookie: string, yes: boolean) => ({
+      post: (path: string, body: unknown) => p.call("POST", path, cookie, body),
+      me: async () => {
+        const res = await p.call("GET", "/api/me", cookie);
+        return res.ok ? ((await res.json()) as { login: string }).login : null;
+      },
+      confirm: async (login: string) => (asked.push(login), yes),
+      save: async (record: { sender: string }) => void saved.push(record),
+      forget: () => {},
+    });
+
+    // A browser signed in as Bob is never switched to Ana, by the page or by the plane.
+    expect(await claimPairing(forged, io(bob, true))).toBe(false);
+    expect(
+      (await p.call("POST", "/api/pair/claim", bob, { token, publicKey: (await newDeviceKey()).publicKey })).status,
+    ).toBe(409);
+    // Saying no claims nothing, so the code still works.
+    expect(await claimPairing(forged, io("", false))).toBe(false);
+    expect(asked).toEqual(["ana"]);
+    expect(saved).toEqual([]);
+    expect(await claimPairing(forged, io("", true))).toBe(true);
+    // The pinned sender is the key the plane publishes, not the forged one in the link.
+    expect(saved.map((r) => r.sender)).toEqual([(await p.remote.e2eKey()).publicKey]);
   });
 });

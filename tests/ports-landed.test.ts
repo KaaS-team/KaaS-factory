@@ -75,8 +75,9 @@ describe("ports landed", () => {
       (async () => new Response(null, { status: 201 })) as unknown as typeof fetch,
     );
     const keys = { p256dh: Buffer.alloc(65, 4).toString("base64url"), auth: Buffer.alloc(16, 1).toString("base64url") };
-    expect(await push.subscribe({ endpoint: "https://10.0.0.1/push", keys })).toBe(false);
-    expect(await push.subscribe({ endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys })).toBe(true);
+    const owner = { login: "ana", device: null };
+    expect(await push.subscribe({ endpoint: "https://10.0.0.1/push", keys }, owner)).toBe(false);
+    expect(await push.subscribe({ endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys }, owner)).toBe(true);
     expect((await push.subscriptions()).map((s) => s.endpoint)).toEqual(["https://fcm.googleapis.com/fcm/send/abc"]);
   });
 });

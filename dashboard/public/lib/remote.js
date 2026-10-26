@@ -1,8 +1,8 @@
 // The phone side of remote control: claim a pairing link, keep the device key, open sealed relay
 // lines, turn on push and tell the plane someone is looking (so it does not push at the same time).
 // The device key is a non-extractable CryptoKey kept in IndexedDB; it never leaves this browser.
-import { newDeviceKey, openBox } from "/lib/e2e.js";
-import { followRelay as followPlain } from "/lib/relay-follow.js";
+import { newDeviceKey, openBox } from "./e2e.js";
+import { followRelay as followPlain } from "./relay-follow.js";
 
 const DB = "factory-remote";
 const PRESENCE_MS = 20_000;
@@ -25,21 +25,40 @@ function idb(mode, fn) {
 }
 const loadDevice = () => idb("readonly", (s) => s.get("self")).catch(() => undefined);
 
-// `#pair=<token>.<factory public key>` from the QR: claim once, then drop it from the address bar.
-export async function claimPairing(loc = location) {
+const browserIo = {
+  post: postJson,
+  me: async () => {
+    const res = await fetch("/api/me");
+    return res.ok ? (await res.json()).login : null;
+  },
+  confirm: async (login) =>
+    window.confirm(`Pair this browser as ${login}? It will see and act on the factory as them.`),
+  save: (record) => idb("readwrite", (s) => s.put(record, "self")),
+  forget: (loc) => history.replaceState(null, "", loc.pathname),
+};
+
+// `#pair=<token>.<key>` from the QR. A link can be sent by anyone, so the phone first asks who it
+// would pair as, refuses to switch a signed-in browser to someone else, and waits for a yes. The
+// sender key is the one the plane publishes, never the one in the link.
+export async function claimPairing(loc = location, io = browserIo) {
   const m = /^#pair=([\w-]+)\.([\w-]+)$/.exec(loc.hash);
   if (!m) return false;
-  history.replaceState(null, "", loc.pathname);
+  io.forget(loc);
+  const peek = await io.post("/api/pair/peek", { token: m[1] });
+  if (!peek.ok) return false;
+  const { login, sender } = await peek.json();
+  const current = await io.me();
+  if (current && !current.startsWith("~") && current !== login) return false;
+  if (!(await io.confirm(login))) return false;
   const key = await newDeviceKey();
-  const res = await postJson("/api/pair/claim", {
+  const res = await io.post("/api/pair/claim", {
     token: m[1],
-    name: navigator.platform || "phone",
+    name: globalThis.navigator?.platform || "phone",
     publicKey: key.publicKey,
   });
   if (!res.ok) return false;
-  const { device, sender } = await res.json();
-  // The sender key is pinned from the QR, not from the plane's answer, so a swapped plane cannot read along.
-  await idb("readwrite", (s) => s.put({ id: device, privateKey: key.privateKey, sender: m[2] || sender }, "self"));
+  const { device } = await res.json();
+  await io.save({ id: device, privateKey: key.privateKey, sender });
   return true;
 }
 

@@ -82,3 +82,23 @@ export function makePlane(github = new TrackerGitHub()) {
 
 export const owner = `Bearer ${TOKEN}`;
 export const cookieOf = (res: Response) => res.headers.getSetCookie()[0]!.split(";")[0]!;
+
+type Plane = ReturnType<typeof makePlane>;
+
+// Pairs a phone for a member the way the QR does, and returns its session cookie and device id.
+export async function pairPhone(p: Plane, login: string, publicKey: string) {
+  const { link } = (await (await p.call("POST", "/api/pair", owner, { login })).json()) as { link: string };
+  const token = /#pair=([\w-]+)\./.exec(link)![1]!;
+  const res = await p.call("POST", "/api/pair/claim", "", { token, publicKey });
+  return { cookie: cookieOf(res), device: ((await res.json()) as { device: string }).device };
+}
+
+// Swaps the plane's push transport for one that records each endpoint it would reach.
+export function recordPushes(p: Plane): string[] {
+  const sent: string[] = [];
+  (p.remote.notifier as unknown as { send: typeof fetch }).send = (async (url: string) => {
+    sent.push(String(url));
+    return new Response(null, { status: 201 });
+  }) as unknown as typeof fetch;
+  return sent;
+}

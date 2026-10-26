@@ -52,11 +52,13 @@ silent for 60s goes back to the queue. `POST /api/issues/<n>/dispatch` (operator
 
 ## Phones
 
-`factory pair --url <plane> --login <member>` prints a QR. The phone claims it once, keeps its key
-in the browser, and acts as that member until an owner or the member revokes it at
-`POST /api/devices/revoke`. The relay carries only boxes sealed for the paired phones, and sends
-nothing while none is paired. Web Push sends only "needs you" and "done", and none while someone has
-the dashboard open.
+`factory pair --url <plane> --login <member>` prints a QR. The phone shows which member it would
+pair as and claims only after a yes; a browser signed in as someone else is refused. It pins the key
+the plane publishes, keeps its own key in the browser, and acts as that member until it is revoked
+at `POST /api/devices/revoke` or the member is removed. The relay carries only boxes sealed for
+paired phones of current members, and sends nothing while none is paired. Web Push sends only
+"needs you" and "done", each subscription belongs to one member, and a member who has the dashboard
+open gets no push.
 
 ## MCP
 

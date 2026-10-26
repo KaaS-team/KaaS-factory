@@ -28,6 +28,15 @@ export interface PushSubscription {
   readonly keys: { readonly p256dh: string; readonly auth: string };
 }
 
+// Who a subscription belongs to: the member, and the paired phone when one opened the session.
+export interface PushOwner {
+  readonly login: string;
+  readonly device: string | null;
+}
+interface Stored extends PushSubscription {
+  readonly owner: PushOwner;
+}
+
 type Jwk = Parameters<typeof subtle.importKey>[1] & { kty?: string };
 interface Vapid {
   publicKey: string;
@@ -73,6 +82,8 @@ export class WebPushNotifier implements NotifierPort {
     private readonly subject: string,
     private readonly send: typeof fetch = fetch,
     private readonly now = Date.now,
+    // Checked on every push, so a removed member or a revoked phone is skipped even before cleanup.
+    private readonly eligible: (owner: PushOwner) => boolean = () => true,
   ) {}
 
   private async vapid(): Promise<Vapid> {
@@ -92,21 +103,43 @@ export class WebPushNotifier implements NotifierPort {
     return (await this.vapid()).publicKey;
   }
 
-  async subscribe(sub: PushSubscription): Promise<boolean> {
+  // An endpoint someone else already holds is refused, so nobody takes over another's notifications.
+  async subscribe(sub: PushSubscription, owner: PushOwner): Promise<boolean> {
     if (!pushEndpointAllowed(sub.endpoint) || unb64u(sub.keys?.p256dh ?? "").length !== 65) return false;
     if (unb64u(sub.keys.auth ?? "").length !== 16) return false;
-    await this.store.put(SUB_PREFIX + sub.endpoint, JSON.stringify(sub));
+    const held = await this.held(sub.endpoint);
+    if (held && held.owner.login !== owner.login) return false;
+    const row: Stored = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, owner };
+    await this.store.put(SUB_PREFIX + sub.endpoint, JSON.stringify(row));
     return true;
   }
 
-  async unsubscribe(endpoint: string): Promise<void> {
-    await this.store.delete(SUB_PREFIX + endpoint);
+  private async held(endpoint: string): Promise<Stored | null> {
+    const row = await this.store.get(SUB_PREFIX + endpoint);
+    return row ? (JSON.parse(row) as Stored) : null;
   }
 
-  async subscriptions(): Promise<PushSubscription[]> {
+  // Only the owner may unsubscribe; resolves to whether a subscription was removed.
+  async unsubscribe(endpoint: string, login: string): Promise<boolean> {
+    const held = await this.held(endpoint);
+    if (!held || held.owner.login !== login) return false;
+    await this.store.delete(SUB_PREFIX + endpoint);
+    return true;
+  }
+
+  // Drops every subscription whose owner matches, for a revoked phone or a removed member.
+  async drop(match: (owner: PushOwner) => boolean): Promise<void> {
+    for (const sub of await this.subscriptions())
+      if (match(sub.owner)) await this.store.delete(SUB_PREFIX + sub.endpoint);
+  }
+
+  async subscriptions(): Promise<Stored[]> {
     const keys = await this.store.list(SUB_PREFIX);
     const rows = await Promise.all(keys.map((k) => this.store.get(k)));
-    return rows.filter((r): r is string => !!r).map((r) => JSON.parse(r) as PushSubscription);
+    return rows
+      .filter((r): r is string => !!r)
+      .map((r) => JSON.parse(r) as Stored)
+      .filter((r) => !!r.owner);
   }
 
   private async jwt(endpoint: string): Promise<string> {
@@ -124,7 +157,7 @@ export class WebPushNotifier implements NotifierPort {
     const v = await this.vapid();
     let sent = 0;
     for (const sub of await this.subscriptions()) {
-      if (!pushEndpointAllowed(sub.endpoint)) continue;
+      if (!pushEndpointAllowed(sub.endpoint) || !this.eligible(sub.owner)) continue;
       try {
         const res = await this.send(sub.endpoint, {
           method: "POST",
@@ -137,7 +170,7 @@ export class WebPushNotifier implements NotifierPort {
           },
           body: await encryptPush(JSON.stringify(notice), sub),
         });
-        if (res.status === 404 || res.status === 410) await this.unsubscribe(sub.endpoint);
+        if (res.status === 404 || res.status === 410) await this.store.delete(SUB_PREFIX + sub.endpoint);
         else if (res.ok) sent++;
       } catch {
         // One unreachable push service never stops the rest.
