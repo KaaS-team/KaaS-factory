@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 // Files over the limits are frozen at their size in quality-baseline.json, so each phase can only
@@ -24,4 +24,14 @@ test("no source file grows past its quality baseline", () => {
       .filter((l) => l.includes("FAIL")),
   ).toEqual([]);
   expect(run.exitCode).toBe(0);
+});
+
+// A baseline above a file's size leaves slack the file can grow back into, so each one is the size.
+test("every line baseline is the file's current size", () => {
+  const { lines } = JSON.parse(readFileSync(join(ROOT, "quality-baseline.json"), "utf8"));
+  const size = (text: string) => text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
+  const drift = Object.entries(lines as Record<string, number>)
+    .map(([file, n]) => [file, n, size(readFileSync(join(ROOT, file), "utf8"))])
+    .filter(([, n, now]) => n !== now);
+  expect(drift).toEqual([]);
 });
