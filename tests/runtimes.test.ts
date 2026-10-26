@@ -278,6 +278,7 @@ describe("names", () => {
       JSON.stringify({ slots: 1, runtimes: { box: { kind: "ssh", host: "h", dir: "/d" } } }),
     );
     expect(Object.keys(runtimesFrom(loadMachineConfig({ FACTORY_HOME: home }).runtimes))).toEqual([
+      "default",
       "local",
       "lwpr",
       "box",

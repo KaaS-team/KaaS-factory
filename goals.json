@@ -937,7 +937,12 @@
       "phase": "P4",
       "ask": "A Claude Code cloud routine that runs `factory tick` on a schedule, and `factory dispatch` driving the Actions template one step per job.",
       "source": "CHANGELOG v3.3.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dispatch.test.ts",
+        "name": "dispatch names the issues one tick would advance, and a routine runs factory tick on its cron",
+        "mutation": "routine: the cloud routine runs factory tick"
+      }
     },
     {
       "id": "blob-store",

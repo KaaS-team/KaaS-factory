@@ -212,15 +212,22 @@ export function executionFor(spec: Exclude<RuntimeSpec, PoolSpec>): ExecutionPor
   }
 }
 
-// Built-ins plus the machine's own, one ExecutionPort each; a pool after the
-// runtimes it names, falling back to local.
+// Every runtime name and its spec: `default`, the built-ins, then the machine's own.
+export function runtimeSpecs(
+  machine: Readonly<Record<string, RuntimeSpec>> = {},
+  probe: HostProbe = hostProbe,
+): Readonly<Record<string, RuntimeSpec>> {
+  return { [DEFAULT_RUNTIME]: defaultRuntime(probe).spec, ...BUILTIN_RUNTIMES, ...machine };
+}
+
+// One ExecutionPort per runtimeSpecs entry; a pool after the runtimes it names, falling back to local.
 export function runtimesFrom(
   machine: Readonly<Record<string, RuntimeSpec>> = {},
   env: NodeJS.ProcessEnv = process.env,
   probe: HostProbe = hostProbe,
 ): Readonly<Record<string, ExecutionPort>> {
-  const ports: Record<string, ExecutionPort> = { [DEFAULT_RUNTIME]: executionFor(defaultSpec(probe)) };
-  const all = Object.entries({ ...BUILTIN_RUNTIMES, ...machine });
+  const ports: Record<string, ExecutionPort> = {};
+  const all = Object.entries(runtimeSpecs(machine, probe));
   for (const [name, spec] of all) if (spec.kind !== "pool") ports[name] = executionFor(spec);
   let store: SqliteUsageStore | undefined;
   for (const [name, spec] of all)
@@ -230,10 +237,6 @@ export function runtimesFrom(
       ports[name] = new PoolExecution(spec, ports, fallback, store);
     }
   return ports;
-}
-
-function defaultSpec(probe: HostProbe): Exclude<RuntimeSpec, PoolSpec> {
-  return defaultRuntime(probe).spec as Exclude<RuntimeSpec, PoolSpec>;
 }
 
 // Pool usage shares machine.db with slot leases and spend.

@@ -118,6 +118,21 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "each pool runtime in machine.json: every member's free minutes used and left this month, and its last failure",
   },
   {
+    name: "runtime",
+    usage: "runtime (list [--probe] | verify <name>) [--json]",
+    does: "list runtimes with their sandbox flags (--probe: does each answer); verify runs the shared conformance kit on one",
+  },
+  {
+    name: "dispatch",
+    usage: "dispatch (--repo-dir <path> | --repo <owner/name>) [--json]",
+    does: "the issues one tick would advance, written to $GITHUB_OUTPUT as a matrix for one `factory run` job each",
+  },
+  {
+    name: "routine",
+    usage: "routine (--repo <owner/name> | --repo-dir <path>) [--cron <expr>] [--json]",
+    does: "print a Claude Code cloud routine (name, cron, prompt) that runs `factory tick` on a schedule",
+  },
+  {
     name: "receipt",
     usage: "receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <key.pub>) [--json]",
     does: "keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code)",

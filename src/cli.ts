@@ -52,9 +52,8 @@ import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
 import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
-import { poolDbPath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
-import { SqliteUsageStore } from "./adapters/pool/execution";
-import { monthKey, poolReport } from "./core/sandbox-pool";
+import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
 import { repoFromRemoteUrl } from "./config";
@@ -74,6 +73,8 @@ function flag(name: string): string | undefined {
 function has(name: string): boolean {
   return args.includes(`--${name}`);
 }
+
+const cli = { args, flag, has, resolveCloneDir: () => resolveCloneDir() };
 
 async function fileExists(path: string): Promise<boolean> {
   return await Bun.file(path).exists();
@@ -1024,38 +1025,6 @@ async function cmdReceipt(): Promise<void> {
   if (!has("help")) process.exit(EXIT.error);
 }
 
-// `factory pool`: each pool in machine.json, its members' minutes used and left this month, and the last failure.
-async function cmdPool(): Promise<void> {
-  if (has("help")) {
-    console.log("usage: factory pool [--json]");
-    return;
-  }
-  const runtimes = loadMachineConfig().runtimes ?? {};
-  const month = monthKey(new Date());
-  const specs = Object.entries(runtimes).flatMap(([name, spec]) => (spec.kind === "pool" ? [{ name, spec }] : []));
-  const usage = specs.length ? new SqliteUsageStore(poolDbPath()).month(month) : {};
-  const pools = specs.map(({ name, spec }) => ({
-    name,
-    fallback: spec.fallback ?? "local",
-    members: poolReport(spec.members, usage),
-  }));
-  if (has("json")) {
-    console.log(successJson({ month, pools }));
-    return;
-  }
-  if (!pools.length) {
-    console.log("factory pool: no pool runtime in FACTORY_HOME/machine.json");
-    return;
-  }
-  for (const p of pools) {
-    console.log(`${p.name} (${month}, then ${p.fallback})`);
-    for (const m of p.members)
-      console.log(
-        `  ${m.runtime}  used ${m.used} of ${m.allowance} min, ${m.left} left${m.lastFailure ? `  last failure: ${plain(m.lastFailure)}` : ""}`,
-      );
-  }
-}
-
 async function main(): Promise<void> {
   switch (command) {
     case "up":
@@ -1105,7 +1074,13 @@ async function main(): Promise<void> {
     case "events":
       return cmdEvents();
     case "pool":
-      return cmdPool();
+      return cmdPool(cli);
+    case "runtime":
+      return cmdRuntime(cli);
+    case "dispatch":
+      return cmdDispatch(cli);
+    case "routine":
+      return cmdRoutine(cli);
     case "receipt":
       return cmdReceipt();
     default:
