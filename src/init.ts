@@ -1,14 +1,14 @@
 // `factory init`: turn a detected stack into .factory/config.json. The
 // shipped config.example.json is the base, so every key it documents stays;
-// init fills only what it read from the repo: repo, gates, setup and the
-// commands the build and verify stages may run.
+// init fills only what it read from the repo: repo, gates, setup, the commands
+// the build and verify stages may run, and the read commands every stage may run.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gateCount } from "./config";
 import { CHARTER_PATH } from "./context";
 import { toolchainOf } from "./images";
-import type { Stack } from "./stack";
+import { readCommands, type Stack } from "./stack";
 
 // A config a person has filled in (no TODO, at least one gate) is theirs: init leaves it alone.
 export function isFilledIn(text: string | undefined): boolean {
@@ -33,7 +33,7 @@ export function initConfig(
     ...(toolchain ? { toolchain } : {}),
     gates: stack.gates,
     setup: stack.setup,
-    agentCommands: { ...agentCommands, build: stack.commands, verify: stack.commands },
+    agentCommands: { ...agentCommands, read: readCommands(stack), build: stack.commands, verify: stack.commands },
   };
 }
 
