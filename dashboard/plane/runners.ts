@@ -35,10 +35,12 @@ export class RunnerHub {
   ) {
     // Jobs and messages keyed by issue alone predate multi-repo planes. They are transient (a job is
     // dispatched again from the board), so an old table is dropped rather than guessed into a repo.
-    for (const t of ["plane_jobs", "plane_messages"]) {
-      const cols = db.query(`SELECT name FROM pragma_table_info('${t}')`).all() as { name: string }[];
-      if (cols.length && !cols.some((c) => c.name === "repo")) db.exec(`DROP TABLE ${t}`);
-    }
+    const keyedByIssue = (t: string) => {
+      const cols = (db.query("SELECT name FROM pragma_table_info(?)").all(t) as { name: string }[]).map((c) => c.name);
+      return cols.length > 0 && !cols.includes("repo");
+    };
+    if (keyedByIssue("plane_jobs")) db.exec("DROP TABLE plane_jobs");
+    if (keyedByIssue("plane_messages")) db.exec("DROP TABLE plane_messages");
     db.exec(`
       CREATE TABLE IF NOT EXISTS plane_runner_tokens (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS plane_runners (

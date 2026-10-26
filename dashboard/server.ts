@@ -297,7 +297,7 @@ export function createDashboard(
 
   // The routing table is the only place a route exists, so the route-walk test
   // (tests/dashboard-routes.test.ts) sees every one of them.
-  const remote = createRemote({ access, github, handle: (req) => readInProcess(req) });
+  const remote = createRemote({ access, github, served: inboxRepos, handle: (req) => readInProcess(req) });
   const routes: readonly Route[] = [
     healthRoute,
     {

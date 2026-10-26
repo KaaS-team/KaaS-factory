@@ -64,6 +64,16 @@ describe("org mode", () => {
     expect((await call(p, "GET /api/line", owner)).status).toBe(200);
     expect(await (await call(p, "GET /api/me", bob)).json()).toMatchObject({ login: "bob", role: "viewer" });
 
+    // The fleet view shows an operator only their org's repos and leases, even on a shared runner.
+    const hub = p.dashboard.remote.hub;
+    const box = hub.register(hub.issueToken(), "shared-box")!;
+    hub.heartbeat(box.id, ["acme/widgets", "blue/app"]);
+    hub.enqueue({ repo: "blue/app", issue: 3 });
+    const fleet = async (cookie: string) =>
+      ((await (await call(p, "GET /api/runners", cookie)).json()) as { runners: unknown[] }).runners;
+    expect(await fleet(owner)).toMatchObject([{ repos: ["acme/widgets", "blue/app"], leases: [{ repo: "blue/app" }] }]);
+    expect(await fleet(alice)).toMatchObject([{ repos: ["acme/widgets"], leases: [] }]);
+
     // Leaving an org ends access to its repos on the next request.
     await ok("POST /api/orgs/members", { org: "red", login: "alice", role: null });
     expect(await refused(call(p, "GET /api/runs?repo=acme/widgets", alice))).toBe(true);

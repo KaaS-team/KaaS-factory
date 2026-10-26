@@ -172,6 +172,19 @@ describe("one plane, many repos", () => {
     ]);
   });
 
+  test("a runner holds only the served repos it declares", async () => {
+    const { dashboard } = plane();
+    const hub = dashboard.remote.hub;
+    const box = hub.register(hub.issueToken(), "a-box")!;
+    const beat = new Request(`${BASE}/runner/events`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${box.secret}`, "content-type": "application/json" },
+      body: JSON.stringify({ type: "heartbeat", repos: [A, "acme/elsewhere", 7] }),
+    });
+    expect((await dashboard.handle(beat, "127.0.0.1")).status).toBe(200);
+    expect(hub.reposOf(box.id)).toEqual([A]);
+  });
+
   test("a run's events answer only under the repo the run is in, even from the shared pre-v2.6.2 DB", async () => {
     const shared = new FactoryState(":memory:");
     const other = shared.upsertRun({ issue: 9, repo: "acme/x", title: "not yours", stage: "plan", status: "running" });

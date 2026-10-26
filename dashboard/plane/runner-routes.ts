@@ -3,7 +3,6 @@
 // The runner routes skip the session gate (PUBLIC_ROUTES) because each one checks the secret itself.
 import type { ScmPort } from "../../src/github";
 import { signedBy } from "../../src/chatops";
-import { isRepoName } from "../../src/paths";
 import type { Actor, Route } from "./access";
 import { senderName } from "./commands";
 import { HEARTBEAT_MS, type RunnerHub, type Signal } from "./runners";
@@ -17,6 +16,8 @@ export interface RunnerDeps {
   github: Pick<ScmPort, "commentIssue">;
   repoOf: (req: Request) => string;
   actorOf: (req: Request) => Actor | undefined;
+  served: () => string[];
+  visibleRepos: (req: Request, repos: readonly string[]) => string[];
 }
 
 const json = (data: unknown, status = 200) =>
@@ -109,7 +110,9 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
         const runner = authed(req);
         if (!runner) return json({ error: "unauthorized" }, 401);
         const b = await body(req);
-        const repos = Array.isArray(b.repos) ? b.repos.filter((r): r is string => isRepoName(r)) : undefined;
+        // A runner holds only repos this plane serves, whatever checkouts it declares.
+        const served = deps.served();
+        const repos = Array.isArray(b.repos) ? b.repos.filter((r): r is string => served.includes(r)) : undefined;
         hub.heartbeat(runner, repos);
         if (b.type === "heartbeat") return json({ ok: true });
         if (b.type === "done")
@@ -133,9 +136,16 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       pattern: /^\/api\/runners$/,
       label: "GET /api/runners",
       role: "operator",
-      handler: () => {
+      // An operator sees only the repos and leases of repos they may see, as on every other list.
+      handler: (req) => {
         hub.sweep();
-        return json({ runners: hub.list() });
+        const seen = new Set(deps.visibleRepos(req, deps.served()));
+        const runners = hub.list().map((r) => ({
+          ...r,
+          repos: r.repos.filter((x) => seen.has(x)),
+          leases: r.leases.filter((j) => seen.has(j.repo)),
+        }));
+        return json({ runners });
       },
     },
     {
