@@ -64,6 +64,8 @@ export interface AgentInVm {
   readonly name: string;
   // Per-run keys in spec.secrets' form, such as a stage's gateway key.
   readonly secrets?: readonly string[];
+  // The worktree mounted read-only: an agent that leaves its process group still cannot write.
+  readonly readOnly?: boolean;
 }
 
 export function agentArgs(
@@ -74,7 +76,9 @@ export function agentArgs(
   const command = run.stdinFile ? ["bash", "-c", 'exec "$@" < "$0"', run.stdinFile, ...run.argv] : [...run.argv];
   return [
     ...vmArgs(spec, run.name, run.secrets),
-    ...[run.cwd, ...run.mounts].flatMap((d) => ["-v", `${real(d)}:${d}`]),
+    "-v",
+    `${real(run.cwd)}:${run.cwd}${run.readOnly ? ":ro" : ""}`,
+    ...run.mounts.flatMap((d) => ["-v", `${real(d)}:${d}`]),
     ...Object.entries(run.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
     "-w",
     run.cwd,

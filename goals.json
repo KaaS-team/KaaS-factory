@@ -456,7 +456,12 @@
       "phase": "P4",
       "ask": "A read-only mount for ACP stages. An agent process that leaves its process group can still write after the check; run read-only stages in a sandbox runtime where that matters.",
       "source": "CHANGELOG v5.0.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/acp-readonly-mount.test.ts",
+        "name": "a read-only ACP stage mounts the worktree read-only in the VM, a build stage does not",
+        "mutation": "microsandbox: a read-only stage mounts its worktree read-only"
+      }
     },
     {
       "id": "fleet-view",

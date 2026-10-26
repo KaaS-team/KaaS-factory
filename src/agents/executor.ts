@@ -196,8 +196,7 @@ export class CommandExecutor implements Executor {
     mkdirSync(artifactDir, { recursive: true });
 
     const ownCommand = agent.config.command !== undefined && !agent.preset?.wrapsCommand;
-    // A read-only stage on a preset that cannot write files returns them instead.
-    // A minion (opts.prompt) owes no stage file, so it never gets one written for it.
+    // A read-only stage on a preset that cannot write returns its file instead; a minion owes none.
     const readOnly =
       opts.prompt === undefined &&
       !stagePolicy(opts.stage).write &&
@@ -295,6 +294,7 @@ export class CommandExecutor implements Executor {
             env: guestEnv,
             stdinFile: stdin === undefined ? undefined : join(scratch, "stdin"),
             name: vmName,
+            readOnly,
             ...(via ? { secrets: [`${via.key}@${gatewayHost(this.gateway!)}`] } : {}),
           })
         : [...argv],

@@ -577,6 +577,7 @@
   {"name": "dispatch: a hit spend cap stops intake", "file": "src/dispatch.ts", "find": "if ((await spendCapHit(deps, config)) !== undefined)", "replace": "if (false)", "test": "tests/dispatch.test.ts"},
   {"name": "egress: a key goes only to its own hosts", "file": "src/egress.ts", "find": "if (!s.hosts.includes(host)) return deny(", "replace": "if (false) return deny(", "test": "tests/egress.test.ts"},
   {"name": "egress: a host off the list is denied", "file": "src/egress.ts", "find": "if (!allow.has(host)) return deny(", "replace": "if (false) return deny(", "test": "tests/egress.test.ts"},
+  {"name": "microsandbox: a read-only stage mounts its worktree read-only", "file": "src/agents/executor.ts", "find": "            readOnly,\n", "replace": "", "test": "tests/acp-readonly-mount.test.ts"},
   {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},
