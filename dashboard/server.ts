@@ -6,7 +6,6 @@
 // works with no local SQLite at all (a CI/VM run with no watcher on this
 // machine).
 
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,7 +21,7 @@ import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
-import { defaultStatePath, discoverRepos, streamPath, transcriptPath, workspacesDir } from "../src/paths";
+import { defaultStatePath, discoverRepos, factoryHome, streamPath, transcriptPath, workspacesDir } from "../src/paths";
 import { liveItems, proofView } from "./run-page";
 import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
@@ -31,6 +30,8 @@ import { analytics } from "./analytics";
 import { startRelay } from "./relay";
 import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
 import { harnessReport } from "../src/harness";
+import { createAccess, type Route } from "./plane/access";
+import { PlaneStore } from "./plane/store";
 import {
   readCapped,
   readDelivery,
@@ -66,31 +67,14 @@ function isLoopback(address: string | undefined): boolean {
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
-// Compare digests so the check takes the same time wherever the strings differ.
-export function tokenMatches(presented: string, expected: string): boolean {
-  const a = createHash("sha256").update(presented).digest();
-  const b = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(a, b);
-}
-
-const SESSION_COOKIE = "factory_session";
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-const MAX_SESSIONS = 1000;
-
-function cookie(req: Request, name: string): string {
-  for (const part of (req.headers.get("cookie") ?? "").split(";")) {
-    const [k, ...v] = part.trim().split("=");
-    if (k === name) return v.join("=");
-  }
-  return "";
-}
-
 // The only routes reachable without a token. Everything else is default-deny;
 // tests/dashboard-routes.test.ts walks every route against this list.
 export const PUBLIC_ROUTES: readonly string[] = [
   "GET /",
   "GET /assets",
   "POST /api/session",
+  "GET /auth/github",
+  "GET /auth/github/callback",
   WEBHOOK_ROUTE,
   EVENTS_ROUTE,
 ];
@@ -123,6 +107,13 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
   };
 }
 
+// One members file per factory home: a plane serves every repo its inbox does.
+export const servingAccess = () =>
+  createAccess({
+    token: DASHBOARD_TOKEN,
+    store: new PlaneStore(process.env.FACTORY_PLANE_DB ?? join(factoryHome(), "plane.db")),
+  });
+
 export function createDashboard(
   state: FactoryState,
   github: ScmPort,
@@ -132,12 +123,12 @@ export function createDashboard(
   fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG,
   probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf },
   project?: DashboardProject,
+  access = createAccess({ token: DASHBOARD_TOKEN }),
 ) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
   // Read by name on every request; the value is never logged or returned.
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
 
-  const sessions = new Map<string, number>();
   const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<ScmPort["listOpenIssues"]>> }>();
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
   const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
@@ -346,14 +337,6 @@ export function createDashboard(
     });
   }
 
-  type Handler = (req: Request, url: URL, m: RegExpMatchArray) => Response | Promise<Response>;
-  interface Route {
-    readonly method: "GET" | "POST";
-    readonly pattern: RegExp;
-    readonly label: string;
-    readonly handler: Handler;
-  }
-
   // The routing table is the only place a route exists, so the route-walk test
   // (tests/dashboard-routes.test.ts) sees every one of them.
   const routes: readonly Route[] = [
@@ -380,35 +363,7 @@ export function createDashboard(
         }
       },
     },
-    {
-      method: "POST",
-      pattern: /^\/api\/session$/,
-      label: "POST /api/session",
-      // Trade the token for an HttpOnly cookie so a browser never puts it in a URL.
-      handler: async (req) => {
-        const body = (await req.json().catch(() => ({}))) as { token?: string };
-        if (!DASHBOARD_TOKEN || typeof body.token !== "string" || !tokenMatches(body.token, DASHBOARD_TOKEN)) {
-          return json({ error: "unauthorized" }, { status: 401 });
-        }
-        // The cookie is a random id, never the token, so a leaked cookie cannot be replayed as a Bearer token.
-        const id = randomBytes(32).toString("hex");
-        const now = Date.now();
-        for (const [k, expires] of sessions) if (expires <= now) sessions.delete(k);
-        if (sessions.size >= MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
-        sessions.set(id, now + SESSION_TTL_MS);
-        // Behind a TLS-terminating proxy the request arrives as http, so X-Forwarded-Proto counts too.
-        const https = new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
-        const secure = https ? "; Secure" : "";
-        return json(
-          { ok: true },
-          {
-            headers: {
-              "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`,
-            },
-          },
-        );
-      },
-    },
+    ...access.routes,
     {
       method: "POST",
       pattern: /^\/webhook\/github$/,
@@ -479,18 +434,21 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/runs$/,
       label: "GET /api/runs",
+      role: "viewer",
       handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }),
     },
     {
       method: "GET",
       pattern: /^\/api\/board$/,
       label: "GET /api/board",
+      role: "viewer",
       handler: async () => needRepo() ?? json({ repo, cards: buildBoard(await cachedIssues()) }),
     },
     {
       method: "POST",
       pattern: /^\/api\/mark-ready$/,
       label: "POST /api/mark-ready",
+      role: "operator",
       handler: async (req) => {
         const body = (await req.json()) as { issue?: number };
         const missing = needRepo();
@@ -505,6 +463,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/thread$/,
       label: "GET /api/issues/:n/thread",
+      role: "viewer",
       handler: async (_req, url, m) => {
         const r = url.searchParams.get("repo") || repo;
         if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
@@ -515,6 +474,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/artifacts$/,
       label: "GET /api/issues/:n/artifacts",
+      role: "viewer",
       handler: (_req, url, m) => artifacts(Number(m[1]), url),
     },
     {
@@ -524,6 +484,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/review$/,
       label: "GET /api/issues/:n/review",
+      role: "viewer",
       handler: async (_req, url, m) => {
         const r = url.searchParams.get("repo") || repo;
         if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
@@ -557,6 +518,7 @@ export function createDashboard(
       method: "POST",
       pattern: /^\/api\/issues\/(\d+)\/merge$/,
       label: "POST /api/issues/:n/merge",
+      role: "approver",
       handler: async (req, _url, m) => {
         const body = (await req.json().catch(() => ({}))) as { repo?: string };
         const r = body.repo || repo;
@@ -586,6 +548,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/live$/,
       label: "GET /api/issues/:n/live",
+      role: "viewer",
       handler: (_req, url, m) => {
         const r = url.searchParams.get("repo") || repo;
         if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
@@ -602,6 +565,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/proof$/,
       label: "GET /api/issues/:n/proof",
+      role: "viewer",
       handler: async (_req, url, m) => {
         const r = url.searchParams.get("repo") || repo;
         if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
@@ -628,6 +592,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/runs\/(\d+)\/events$/,
       label: "GET /api/runs/:id/events",
+      role: "viewer",
       handler: (_req, url, m) => {
         const events = state.listEvents(Number(m[1]), { after: Number(url.searchParams.get("after") ?? "0") });
         return json({ events: events.map((e) => ({ ...e, text: plain(e.text) })) });
@@ -637,6 +602,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/runs\/(\d+)\/stages$/,
       label: "GET /api/runs/:id/stages",
+      role: "viewer",
       handler: (_req, _url, m) => {
         const run = state.listRuns(repo || undefined).find((r) => r.id === Number(m[1]));
         if (!run) return json({ error: "no such run" }, { status: 404 });
@@ -650,6 +616,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/line$/,
       label: "GET /api/line",
+      role: "viewer",
       // Each recent run with the stages it went through, across every repo the inbox reads.
       handler: () => {
         const repos = repo ? [...new Set([repo, ...inboxRepos()])] : [];
@@ -679,6 +646,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
+      role: "viewer",
       handler: () =>
         json(
           analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [], new Date(), (agent) => {
@@ -691,12 +659,14 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/agents$/,
       label: "GET /api/agents",
+      role: "viewer",
       handler: async () => json({ agents: await probedAgents() }),
     },
     {
       method: "GET",
       pattern: /^\/api\/workflows$/,
       label: "GET /api/workflows",
+      role: "viewer",
       handler: async () =>
         project
           ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) })
@@ -706,6 +676,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/settings$/,
       label: "GET /api/settings",
+      role: "viewer",
       handler: async () => {
         if (!project) return json({ available: false, reason: NO_PROJECT });
         const [report, leases] = await Promise.all([
@@ -719,6 +690,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/inbox$/,
       label: "GET /api/inbox",
+      role: "viewer",
       // Aggregated across every repo under FACTORY_HOME (v2.9.0 item 2), or
       // narrowed to one with ?repo=. Each item carries its own repo so the
       // frontend can render and act on a mixed list.
@@ -745,6 +717,7 @@ export function createDashboard(
       method: "POST",
       pattern: /^\/api\/inbox\/(\d+)\/act$/,
       label: "POST /api/inbox/:n/act",
+      role: "operator",
       handler: async (req, _url, m) => {
         const body = (await req.json()) as { action?: InboxAction; text?: string; repo?: string };
         const r = body.repo || repo;
@@ -765,6 +738,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/toggles$/,
       label: "GET /api/toggles",
+      role: "viewer",
       handler: () =>
         json({
           auto_start: state.getToggle("auto_start", true),
@@ -775,6 +749,7 @@ export function createDashboard(
       method: "POST",
       pattern: /^\/api\/toggles$/,
       label: "POST /api/toggles",
+      role: "owner",
       handler: async (req) => {
         const body = (await req.json()) as { key: string; value: boolean };
         if (body.key !== "auto_start" && body.key !== "auto_approve_low_risk")
@@ -789,6 +764,7 @@ export function createDashboard(
       method: "POST",
       pattern: /^\/api\/reply$/,
       label: "POST /api/reply",
+      role: "operator",
       handler: async (req) => {
         const body = (await req.json()) as { issue: number; text: string };
         const missing = needRepo();
@@ -801,6 +777,7 @@ export function createDashboard(
       method: "POST",
       pattern: /^\/api\/command$/,
       label: "POST /api/command",
+      role: "operator",
       handler: async (req) => {
         const body = (await req.json()) as {
           issue: number;
@@ -822,6 +799,7 @@ export function createDashboard(
       method: "GET",
       pattern: /^\/api\/stream$/,
       label: "GET /api/stream",
+      role: "viewer",
       handler: (req) => {
         const stream = new ReadableStream({
           start(controller) {
@@ -845,17 +823,10 @@ export function createDashboard(
     },
   ];
 
-  function authorized(req: Request): boolean {
-    const header = req.headers.get("authorization") ?? "";
-    if (header.startsWith("Bearer ")) return tokenMatches(header.slice(7), DASHBOARD_TOKEN);
-    const expires = sessions.get(cookie(req, SESSION_COOKIE));
-    return expires !== undefined && expires > Date.now();
-  }
-
   // `remoteAddress` comes from `server.requestIP(req)` at the real Bun.serve
   // call site; undefined (unknown) is treated as NOT loopback: fail closed,
   // the same rule as guard-paths.sh.
-  async function handle(req: Request, remoteAddress?: string): Promise<Response> {
+  async function handle(req: Request, remoteAddress?: string, inProcess = false): Promise<Response> {
     const url = new URL(req.url);
     const loopback = isLoopback(remoteAddress);
     const route = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
@@ -865,15 +836,18 @@ export function createDashboard(
     const signedWebhook =
       (route?.label === WEBHOOK_ROUTE && webhookSecret() !== "") ||
       (route?.label === EVENTS_ROUTE && eventsSecret() !== "");
-    if (!loopback && !DASHBOARD_TOKEN && !signedWebhook) {
+    if (!loopback && !access.guarded() && !signedWebhook) {
       return json(
-        { error: "refused: reachable from a non-loopback address with no FACTORY_DASHBOARD_TOKEN set" },
+        {
+          error: "refused: reachable from a non-loopback address with no FACTORY_DASHBOARD_TOKEN or GitHub sign-in set",
+        },
         { status: 503 },
       );
     }
-    // Token, when set, guards every non-public route for every caller, so an
-    // unknown path is refused before it can 404 (no route probing).
-    if (DASHBOARD_TOKEN && !isPublic && !authorized(req)) return json({ error: "unauthorized" }, { status: 401 });
+    // Every non-public route needs a caller with its role, so an unknown path
+    // is refused before it can 404 (no route probing).
+    const refused = access.gate(req, route, isPublic, loopback, inProcess);
+    if (refused) return refused;
 
     // CSRF: a mutating request must be same-origin JSON, never the
     // `text/plain` a plain HTML form can send cross-site without a preflight.
@@ -895,19 +869,33 @@ export function createDashboard(
     }
 
     if (!route) return json({ error: "not found" }, { status: 404 });
-    return route.handler(req, url, url.pathname.match(route.pattern)!);
+    return access.audited(req, route, async () => route.handler(req, url, url.pathname.match(route.pattern)!));
   }
 
   const routeLabels = routes.map((r) => r.label);
+  const routeRoles = Object.fromEntries(routes.map((r) => [r.label, r.role]));
 
-  return { handle, routeLabels };
+  // Bun.serve passes two arguments, so only code in this process reaches the third.
+  const readInProcess = (req: Request) => handle(req, "127.0.0.1", true);
+
+  return { handle, readInProcess, routeLabels, routeRoles, access };
 }
 
 if (import.meta.main) {
   const state = new FactoryState(DB_PATH);
   // No config file here, so the default tracker; `factory dashboard --repo-dir` reads the repo's.
   const github = makeScm(DEFAULT_CONFIG);
-  const dashboard = createDashboard(state, github, REPO);
+  const dashboard = createDashboard(
+    state,
+    github,
+    REPO,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    servingAccess(),
+  );
   // 127.0.0.1 by default (audit finding #16): reach it over the network only
   // by explicitly setting FACTORY_DASHBOARD_HOST=0.0.0.0 (the Docker image
   // does this and relies on FACTORY_DASHBOARD_TOKEN instead) or an SSH
@@ -919,5 +907,5 @@ if (import.meta.main) {
     fetch: (req: Request): Promise<Response> => dashboard.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${PORT} (repo=${REPO || "unset"})`);
-  startRelay(dashboard.handle);
+  startRelay(dashboard.readInProcess);
 }

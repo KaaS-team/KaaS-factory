@@ -255,7 +255,7 @@ describe("the cockpit follows it", () => {
 describe("wiring", () => {
   test("both ways of starting the dashboard start the publisher", () => {
     for (const file of ["src/cli.ts", "dashboard/server.ts"])
-      expect(readFileSync(join(ROOT, file), "utf8")).toContain("startRelay(dashboard.handle);");
+      expect(readFileSync(join(ROOT, file), "utf8")).toMatch(/startRelay\((dashboard|app)\.readInProcess\);/);
   });
 
   test("an unreachable dashboard falls back to the relay's inbox, read-only", () => {

@@ -761,7 +761,7 @@ describe("text is plain()-ed on every read route", () => {
         },
       ],
     };
-    const { dashboard, state } = await make(
+    const { mod, dashboard, state } = await make(
       "",
       [issue],
       project({
@@ -798,7 +798,7 @@ describe("text is plain()-ed on every read route", () => {
     writeFileSync(join(dir, "plan.md"), `plan${ESC}`);
 
     const gets = (dashboard.routeLabels as string[]).filter(
-      (l) => l.startsWith("GET ") && !["GET /", "GET /assets", "GET /api/stream"].includes(l),
+      (l) => l.startsWith("GET ") && !mod.PUBLIC_ROUTES.includes(l) && l !== "GET /api/stream",
     );
     expect(gets.length).toBeGreaterThan(8);
     for (const label of gets) {

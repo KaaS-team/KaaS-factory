@@ -290,7 +290,12 @@
       "phase": "P2",
       "ask": "GitHub sign-in with users, memberships (owner, operator, approver, viewer), sessions and audit; the token is break-glass",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/plane-access.test.ts",
+        "name": "each role reaches exactly the routes its rank allows",
+        "mutation": "plane: a role gates every route"
+      }
     },
     {
       "id": "command-routes",
