@@ -1,5 +1,20 @@
 # Changelog
 
+## v6.1.0
+
+One hosted plane now serves every repo it is installed on. Upgraders: `FACTORY_BLOB_REPOS` is gone;
+the plane serves the repos its runners report and, with a GitHub App, every repo the App reaches
+that holds `.factory/config.json`. See [docs/control-plane.md](docs/control-plane.md).
+
+- Every route acts on the repo it names, and runner jobs are keyed by repo and issue, so two repos'
+  issue 12 never collide.
+- The hosted plane shows runs from every runner, per repo, through the stage blob store, and each
+  repo's own config drives its pages.
+- GitHub App: set `FACTORY_GITHUB_APP_ID`, `FACTORY_GITHUB_APP_PRIVATE_KEY` and
+  `FACTORY_GITHUB_APP_OWNERS`, and each owner's calls run on its own installation token and rate
+  limit; App-installed repos join the board by themselves, and each person sees only the repos they
+  can read.
+
 ## v6.0.0
 
 KaaS Factory becomes a product you steer from anywhere: a phone, the web, Slack or Linear, with
