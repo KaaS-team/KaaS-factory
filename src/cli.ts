@@ -60,6 +60,7 @@ import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { probeRuntime } from "./runtime-kit";
 import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { detectStack, diskFiles } from "./stack";
+import { warnWhenStale } from "./config-health";
 import { describeStack, initConfig, isFilledIn, writeCharter } from "./init";
 import { EventBus } from "./engine/bus";
 import { loadMinions, runMinion } from "./engine/minion";
@@ -189,12 +190,10 @@ async function cmdWatch(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   await requireTmux(config);
-  const deps = await buildWatchDeps(cloneDir, config);
+  const deps = warnWhenStale(await buildWatchDeps(cloneDir, config));
   console.log(`factory watch: polling ${config.repo} every ${config.pollIntervalSeconds}s`);
-  // Re-drive anything a crashed or previously-killed process left sitting in
-  // a running label before the first poll — otherwise it just sits there,
-  // since none of pollOnce's resume paths look for a running label (audit
-  // finding #21).
+  // Re-drive anything a crashed or previously-killed process left sitting in a running label before the first poll;
+  // otherwise it just sits there, since none of pollOnce's resume paths look for a running label (audit finding #21).
   const recovered = await recoverInFlight(deps, config);
   if (recovered.length) console.log(`factory watch: recovered #${recovered.join(", #")}`);
   if (has("once")) {
