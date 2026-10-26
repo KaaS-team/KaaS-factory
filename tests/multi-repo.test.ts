@@ -65,18 +65,10 @@ function fakeGitHub() {
   }) as typeof known;
 }
 
-function plane() {
+function plane(shared = new FactoryState(":memory:")) {
   const github = fakeGitHub();
   const probes = { which: () => null, versionOf: async () => null };
-  const dashboard = createDashboard(
-    new FactoryState(":memory:"),
-    github as never,
-    "",
-    false,
-    join(home, "ws"),
-    undefined,
-    probes as never,
-  );
+  const dashboard = createDashboard(shared, github as never, "", false, join(home, "ws"), undefined, probes as never);
   return { github, dashboard };
 }
 
@@ -160,6 +152,39 @@ describe("one plane, many repos", () => {
       200,
     );
     expect(github.created).toEqual([{ repo: B, title: "Fix the cart" }]);
+  });
+
+  test("a runner command acts on the job in the repo it names, never the same number in another", async () => {
+    const { dashboard } = plane();
+    const hub = dashboard.remote.hub;
+    const box = hub.register(hub.issueToken(), "a-box")!;
+    hub.heartbeat(box.id, [A]);
+    const post = (path: string, repo: string) => dashboard.handle(request(`POST ${path}`, repo), "127.0.0.1");
+    expect((await post("/api/issues/1/dispatch", A)).status).toBe(200);
+    expect((await post("/api/issues/1/dispatch", B)).status).toBe(200);
+    expect(hub.holder({ repo: A, issue: 1 })).toBe(box.id);
+    expect(hub.holder({ repo: B, issue: 1 })).toBeNull();
+    expect((await post("/api/issues/1/stop", B)).status).toBe(409);
+    expect((await post("/api/issues/1/stop", A)).status).toBe(200);
+    expect(hub.events(box.id, 0).map((e) => [e.type, JSON.parse(e.data).repo])).toEqual([
+      ["lease", A],
+      ["cancel", A],
+    ]);
+  });
+
+  test("a run's events answer only under the repo the run is in, even from the shared pre-v2.6.2 DB", async () => {
+    const shared = new FactoryState(":memory:");
+    const other = shared.upsertRun({ issue: 9, repo: "acme/x", title: "not yours", stage: "plan", status: "running" });
+    shared.appendEvent(other.id, "plan", "log", "a secret plan");
+    process.env.FACTORY_REPOS = `${A},${B},acme/c`;
+    try {
+      const { dashboard } = plane(shared);
+      // acme/c never ran here, so its reads fall back to the shared DB that holds acme/x's run.
+      const res = await dashboard.handle(request(`GET /api/runs/${other.id}/events`, "acme/c"), "127.0.0.1");
+      expect([res.status, await res.text()]).toEqual([404, JSON.stringify({ error: "no such run" })]);
+    } finally {
+      process.env.FACTORY_REPOS = `${A},${B}`;
+    }
   });
 
   test("with one served repo, a request that names none acts on it", async () => {

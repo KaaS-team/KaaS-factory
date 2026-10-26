@@ -3,6 +3,7 @@
 // The runner routes skip the session gate (PUBLIC_ROUTES) because each one checks the secret itself.
 import type { ScmPort } from "../../src/github";
 import { signedBy } from "../../src/chatops";
+import { isRepoName } from "../../src/paths";
 import type { Actor, Route } from "./access";
 import { senderName } from "./commands";
 import { HEARTBEAT_MS, type RunnerHub, type Signal } from "./runners";
@@ -68,16 +69,17 @@ function stream(hub: RunnerHub, runner: string, req: Request, url: URL): Respons
 export function runnerRoutes(deps: RunnerDeps): Route[] {
   const { hub } = deps;
   const authed = (req: Request) => hub.runnerOf(secretOf(req));
-  const issueOf = (m: RegExpMatchArray) => Number(m[1]);
+  // The repo comes from the access gate, so the job a route acts on is the one its tenancy check saw.
+  const jobOf = (req: Request, m: RegExpMatchArray) => ({ repo: deps.repoOf(req), issue: Number(m[1]) });
   // Stop and takeover go to the tracker first, as every other command does, then to the runner.
   const signal =
     (type: Signal, verb: string): Route["handler"] =>
     async (req, _url, m) => {
-      const n = issueOf(m);
-      if (!hub.holder(n)) return json({ error: `no runner holds #${n}` }, 409);
+      const job = jobOf(req, m);
+      if (!hub.holder(job)) return json({ error: `no runner holds #${job.issue}` }, 409);
       const who = senderName(deps.actorOf(req));
-      await deps.github.commentIssue(deps.repoOf(req), n, signedBy(`Asked the runner to ${verb}.`, who));
-      return json({ ok: true, runner: hub.signal(n, type, who) });
+      await deps.github.commentIssue(job.repo, job.issue, signedBy(`Asked the runner to ${verb}.`, who));
+      return json({ ok: true, runner: hub.signal(job, type, who) });
     };
   return [
     {
@@ -107,9 +109,11 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
         const runner = authed(req);
         if (!runner) return json({ error: "unauthorized" }, 401);
         const b = await body(req);
-        hub.heartbeat(runner);
+        const repos = Array.isArray(b.repos) ? b.repos.filter((r): r is string => isRepoName(r)) : undefined;
+        hub.heartbeat(runner, repos);
         if (b.type === "heartbeat") return json({ ok: true });
-        if (b.type === "done") return json({ ok: hub.done(runner, Number(b.issue)) });
+        if (b.type === "done")
+          return json({ ok: hub.done(runner, { repo: String(b.repo ?? ""), issue: Number(b.issue) }) });
         if (b.type === "read") {
           const ok = hub.read(runner, Number(b.id));
           return ok ? json({ ok }) : json({ error: "that message was undone" }, 409);
@@ -140,9 +144,9 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       label: "POST /api/issues/:n/dispatch",
       role: "operator",
       repo: "body",
-      handler: (_req, _url, m) => {
-        hub.enqueue(issueOf(m));
-        return json({ ok: true, runner: hub.holder(issueOf(m)) });
+      handler: (req, _url, m) => {
+        hub.enqueue(jobOf(req, m));
+        return json({ ok: true, runner: hub.holder(jobOf(req, m)) });
       },
     },
     {
@@ -151,7 +155,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       label: "GET /api/issues/:n/messages",
       role: "viewer",
       repo: "query",
-      handler: (_req, _url, m) => json({ messages: hub.messages(issueOf(m)) }),
+      handler: (req, _url, m) => json({ messages: hub.messages(jobOf(req, m)) }),
     },
     {
       method: "POST",
@@ -163,7 +167,7 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
         const text = String((await body(req)).text ?? "").trim();
         if (!text || text.length > MESSAGE_MAX)
           return json({ error: `a message is 1 to ${MESSAGE_MAX} characters` }, 400);
-        return json({ ok: true, id: hub.message(issueOf(m), text, deps.actorOf(req)?.login ?? "") });
+        return json({ ok: true, id: hub.message(jobOf(req, m), text, deps.actorOf(req)?.login ?? "") });
       },
     },
     {
@@ -172,8 +176,8 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       label: "POST /api/issues/:n/messages/:id/undo",
       role: "operator",
       repo: "body",
-      handler: (_req, _url, m) =>
-        hub.undo(issueOf(m), Number(m[2])) ? json({ ok: true }) : json({ error: "the runner already read it" }, 409),
+      handler: (req, _url, m) =>
+        hub.undo(jobOf(req, m), Number(m[2])) ? json({ ok: true }) : json({ error: "the runner already read it" }, 409),
     },
     {
       method: "POST",

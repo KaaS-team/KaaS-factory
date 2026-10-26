@@ -141,7 +141,8 @@ export const tone = (status) =>
           ? "live"
           : "";
 export const statusText = (s) => s.replace(/-/g, " ");
-export const cleanBody = (body) => body.replace(/<!--[\s\S]*?-->/g, "").trim();
+// -{2} not --: semgrep reads "<!--" in a regex as an HTML comment and fails the security scan.
+export const cleanBody = (body) => body.replace(/<!-{2}[\s\S]*?-{2}>/g, "").trim();
 
 // #/runs/<owner>/<name>/<issue>, or #/runs/<issue> for the configured repo.
 export const runKey = (jobID) => {

@@ -12,7 +12,7 @@ import { DEFAULT_CONFIG, loadConfig } from "./config";
 import { createMcpServer, serveStdio } from "./mcp-server";
 import { factoryHome, livePath } from "./paths";
 import { encodeQr, qrToTerminal } from "./qr";
-import { dialOut, registerRunner, type RunnerCreds, type RunnerWork } from "./runner-channel";
+import { dialOut, type RunnerCreds, type RunnerJob, type RunnerWork, registerRunner } from "./runner-channel";
 import { makeScm } from "./scm";
 import { readLive, stopRunningStage } from "./takeover";
 
@@ -47,31 +47,56 @@ function saveCreds(file: string, creds: RunnerCreds & { lastSeq?: number }): voi
   chmodSync(file, 0o600);
 }
 
-// The work a dialled-out runner does: the same `factory run` a local watcher would start.
-export function runnerWork(repo: string, repoDir: string): RunnerWork {
-  const children = new Map<number, ChildProcess>();
+// The work a dialled-out runner does: the same `factory run` a local watcher would start, in the
+// checkout of the repo the job is for. `dirs` maps each repo the runner declared to its checkout.
+export function runnerWork(dirs: ReadonlyMap<string, string>): RunnerWork {
+  const children = new Map<string, ChildProcess>();
+  const key = (j: RunnerJob) => `${j.repo}#${j.issue}`;
+  const dirOf = (j: RunnerJob) => {
+    const dir = dirs.get(j.repo);
+    if (!dir) throw new Error(`this runner has no checkout of ${j.repo}`);
+    return dir;
+  };
   return {
-    run: (issue) =>
+    run: (job) =>
       new Promise((done) => {
-        const child = spawn("bun", [BIN, "run", "--issue", String(issue), "--repo-dir", repoDir], { stdio: "inherit" });
-        children.set(issue, child);
+        const argv = [BIN, "run", "--issue", String(job.issue), "--repo-dir", dirOf(job)];
+        const child = spawn("bun", argv, { stdio: "inherit" });
+        children.set(key(job), child);
         child.on("exit", () => {
-          children.delete(issue);
+          children.delete(key(job));
           done();
         });
       }),
-    deliver: async (issue, text) => {
-      const dir = join(repoDir, runDir(issue));
+    deliver: async (job, text) => {
+      const dir = join(dirOf(job), runDir(job.issue));
       mkdirSync(dir, { recursive: true });
       appendFileSync(join(dir, "messages.md"), `- ${new Date().toISOString()}: ${text.replace(/\n/g, " ")}\n`);
     },
-    stop: async (issue, kind) => {
-      const live = readLive(livePath(repo, issue));
+    stop: async (job, kind) => {
+      const live = readLive(livePath(job.repo, job.issue));
       // Takeover leaves the session resumable for a human; cancel ends the whole run.
-      if (kind === "takeover" && live) await stopRunningStage(livePath(repo, issue), live);
-      else children.get(issue)?.kill("SIGTERM");
+      if (kind === "takeover" && live) await stopRunningStage(livePath(job.repo, job.issue), live);
+      else children.get(key(job))?.kill("SIGTERM");
     },
   };
+}
+
+// `--repo-dir` once per checkout; each names its repo through its own .factory config.
+async function checkoutsOf(argv: readonly string[]): Promise<Map<string, string>> {
+  const given = argv.flatMap((a, i) => (a === "--repo-dir" && argv[i + 1] ? [argv[i + 1]!] : []));
+  // One checkout keeps --repo and FACTORY_REPO; with several, only each checkout's config can say.
+  if (given.length < 2) {
+    const { repo, repoDir } = await repoOf(argv, "runner start");
+    return new Map([[repo, repoDir]]);
+  }
+  const dirs = new Map<string, string>();
+  for (const dir of given.map((d) => resolve(d))) {
+    const { repo } = await loadConfig(dir);
+    if (!repo) throw new UsageError(`runner start: ${dir} has no repo in its .factory config`);
+    dirs.set(repo, dir);
+  }
+  return dirs;
 }
 
 async function cmdRunner(argv: readonly string[]): Promise<void> {
@@ -85,16 +110,19 @@ async function cmdRunner(argv: readonly string[]): Promise<void> {
     return;
   }
   if (argv[1] !== "start")
-    throw new UsageError("runner: register --url <plane> [--name <n>] | start --repo-dir <path>");
+    throw new UsageError(
+      "runner: register --url <plane> [--name <n>] | start --repo-dir <path> [--repo-dir <path>]...",
+    );
   if (!existsSync(file))
     throw new UsageError("runner start: not registered; run `factory runner register --url <plane>` first");
   const creds = JSON.parse(readFileSync(file, "utf8")) as RunnerCreds & { lastSeq?: number };
-  const { repo, repoDir } = await repoOf(argv, "runner start");
+  const dirs = await checkoutsOf(argv);
   const controller = new AbortController();
   process.on("SIGINT", () => controller.abort());
   const source = new SseEventSource(`${creds.url}/runner/stream`, () => creds.secret);
-  const link = dialOut(creds, runnerWork(repo, repoDir), { source, signal: controller.signal, after: creds.lastSeq });
-  console.log(`dialled out to ${creds.url} as ${creds.id}`);
+  const repos = [...dirs.keys()];
+  const link = dialOut(creds, runnerWork(dirs), { source, repos, signal: controller.signal, after: creds.lastSeq });
+  console.log(`dialled out to ${creds.url} as ${creds.id} for ${repos.join(", ")}`);
   await link.done;
   saveCreds(file, { ...creds, lastSeq: link.lastSeq() });
 }

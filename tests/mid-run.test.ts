@@ -30,12 +30,18 @@ describe("mid-run commands", () => {
     let finish = () => {};
     const work: RunnerWork = {
       run: () => new Promise<void>((resolve) => (finish = resolve)),
-      deliver: async (n, text) => void got.push(`${n}:${text}`),
-      stop: async (n, kind) => void got.push(`${n}:${kind}`),
+      deliver: async (j, text) => void got.push(`${j.issue}:${text}`),
+      stop: async (j, kind) => void got.push(`${j.issue}:${kind}`),
     };
     const abort = new AbortController();
     const source = new SseEventSource(`${creds.url}/runner/stream`, () => creds.secret, p.net);
-    const ch = dialOut(creds, work, { source, fetch: p.net, signal: abort.signal, retryMs: 20 });
+    const ch = dialOut(creds, work, {
+      source,
+      repos: ["acme/widgets"],
+      fetch: p.net,
+      signal: abort.signal,
+      retryMs: 20,
+    });
     await until(() => p.remote.hub.list()[0]?.online === true);
     await p.call("POST", "/api/issues/7/dispatch", operator);
 

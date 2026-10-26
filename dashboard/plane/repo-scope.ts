@@ -1,6 +1,7 @@
 // Where a route reads the repo it acts on, checked once before any handler or extension sees it,
 // so a handler, the tenancy check and the audit row can never disagree about the target.
 import { isRepoName } from "../../src/paths";
+import type { FactoryState } from "../../src/state";
 
 // query: `?repo=`; body: the JSON body's `repo`; filter: an optional `?repo=` that narrows a list.
 export type RepoSource = "query" | "body" | "filter";
@@ -50,4 +51,10 @@ export async function resolveRepo(
   if (!repo) return refuse("pick a repo: this plane serves more than one", 400);
   if (!served.includes(repo) || visible([repo]).length === 0) return refuse("unknown repo", 404);
   return repo;
+}
+
+// Run ids are per DB, and the shared pre-v2.6.2 DB holds many repos, so a run must be the named repo's.
+export function runIn(st: FactoryState | null, repo: string, id: number) {
+  const run = st?.listRuns(repo).find((r) => r.id === id);
+  return st && run ? { st, run } : null;
 }

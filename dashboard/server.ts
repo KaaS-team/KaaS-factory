@@ -30,7 +30,7 @@ import { workflowRoutes } from "./workflow-routes";
 import { harnessReport } from "../src/harness";
 import { artifacts } from "./artifacts";
 import { createAccess, type Route } from "./plane/access";
-import type { RepoScope } from "./plane/repo-scope";
+import { type RepoScope, runIn } from "./plane/repo-scope";
 import { PlaneStore } from "./plane/store";
 import { senderName } from "./plane/commands";
 import { planeRoutes } from "./plane/mode";
@@ -550,11 +550,11 @@ export function createDashboard(
       pattern: /^\/api\/runs\/(\d+)\/events$/,
       label: "GET /api/runs/:id/events",
       role: "viewer",
-      // Run ids are per DB, so the repo says whose run this is.
       repo: "query",
       handler: (req, url, m) => {
-        const after = Number(url.searchParams.get("after") ?? "0");
-        const events = stateFor(repoOf(req))?.listEvents(Number(m[1]), { after }) ?? [];
+        const hit = runIn(stateFor(repoOf(req)), repoOf(req), Number(m[1]));
+        if (!hit) return json({ error: "no such run" }, { status: 404 });
+        const events = hit.st.listEvents(hit.run.id, { after: Number(url.searchParams.get("after") ?? "0") });
         return json({ events: events.map((e) => ({ ...e, text: plain(e.text) })) });
       },
     },
@@ -565,9 +565,9 @@ export function createDashboard(
       role: "viewer",
       repo: "query",
       handler: (req, _url, m) => {
-        const st = stateFor(repoOf(req));
-        const run = st?.listRuns(repoOf(req)).find((r) => r.id === Number(m[1]));
-        if (!st || !run) return json({ error: "no such run" }, { status: 404 });
+        const hit = runIn(stateFor(repoOf(req)), repoOf(req), Number(m[1]));
+        if (!hit) return json({ error: "no such run" }, { status: 404 });
+        const { st, run } = hit;
         return json({
           run: plainRun(run),
           stages: st.listStageRuns(run.repo, { issue: run.issue }).map(plainStage),
