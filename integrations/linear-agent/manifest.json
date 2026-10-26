@@ -4,9 +4,10 @@
   "summary": "Delegate a Linear issue to the factory as an agent session; steer it from the session.",
   "env": [
     "LINEAR_AGENT_TOKEN",
-    "LINEAR_WEBHOOK_SECRET"
+    "LINEAR_WEBHOOK_SECRET",
+    "FACTORY_LINEAR_USERS"
   ],
-  "enable": "a Linear OAuth app (actor=app); set both keys on the plane and the watcher",
+  "enable": "a Linear OAuth app (actor=app); set the keys on the plane and the watcher, with `FACTORY_LINEAR_USERS=<linear user id>:login` mapping each Linear user to a plane member",
   "module": "src/integrations/linear-agent.ts",
   "contract": "tests/linear-agent.test.ts",
   "default": false

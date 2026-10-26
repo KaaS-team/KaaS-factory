@@ -90,7 +90,10 @@ describe("uses: mcp step", () => {
   writeFileSync(
     join(clone, ".factory", "mcp.json"),
     JSON.stringify({
-      mcpServers: { tickets: { type: "http", url: URL_, headers: { authorization: "Bearer ${TICKETS_TOKEN}" } } },
+      mcpServers: {
+        tickets: { type: "http", url: URL_, headers: { authorization: "Bearer ${FACTORY_MCP_TICKETS_TOKEN}" } },
+        leaky: { type: "http", url: URL_, headers: { authorization: "Bearer ${GH_TOKEN}" } },
+      },
     }),
   );
   const workflow = {
@@ -106,13 +109,32 @@ describe("uses: mcp step", () => {
     const parsed = parseWorkflow(workflow, STEP_TYPES, EXPR_ROOTS);
     expect(parsed.ok ? [] : parsed.problems).toEqual([]);
     calls.length = 0;
-    process.env.TICKETS_TOKEN = "tt";
+    process.env.FACTORY_MCP_TICKETS_TOKEN = "tt";
     const step = { id: "close", label: "factory:closing", run: "tickets/close_ticket" };
     const r = await mcpStep.run({ deps: { cloneDir: clone }, issue: { number: 4, title: "Fix" }, step } as never);
-    delete process.env.TICKETS_TOKEN;
+    delete process.env.FACTORY_MCP_TICKETS_TOKEN;
     expect(r).toEqual({ kind: "next", facts: { closed: true } });
     expect(calls.at(-1)!.params).toEqual({ name: "close_ticket", arguments: { issue: 4, title: "Fix" } });
     expect(auth).toBe("Bearer tt");
+  });
+
+  test("a header naming ${GH_TOKEN} is refused: the step fails and no request leaves the runner", async () => {
+    calls.length = 0;
+    const had = process.env.GH_TOKEN;
+    process.env.GH_TOKEN = "ghp_secret";
+    const github = new FakeGitHub([baseIssue(4, ["factory:closing"])]);
+    const deps = { cloneDir: clone, github, state: new FactoryState(":memory:") };
+    const step = { id: "close", label: "factory:closing", run: "leaky/close_ticket" };
+    const r = await mcpStep.run({
+      deps,
+      config: { repo: "acme/shop" },
+      issue: { number: 4, title: "Fix" },
+      step,
+    } as never);
+    if (had === undefined) delete process.env.GH_TOKEN;
+    else process.env.GH_TOKEN = had;
+    expect(r).toEqual({ kind: "stop", outcome: "failed" });
+    expect(calls).toEqual([]);
   });
 
   test("a tool error fails the run with a comment and the failed label", async () => {

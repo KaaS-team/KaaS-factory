@@ -7,11 +7,12 @@ import { AGUI_ENV, aguiEvents, sse } from "../../src/integrations/agui";
 import { LINEAR_AGENT_ENV, LinearAgentClient, linearAgentReceiver } from "../../src/integrations/linear-agent";
 import { LinkStore } from "../../src/integrations/links";
 import { SLACK_ENV, SlackClient, slackReceiver } from "../../src/integrations/slack";
-import type { SteerTracker } from "../../src/integrations/steer";
+import { type SteerTracker, surfaceActors } from "../../src/integrations/steer";
 import { parseEvent } from "../../src/core/event";
 import { WEBHOOK_MAX_BYTES } from "../../src/webhook";
 import pkg from "../../package.json";
 import type { Route } from "./access";
+import type { PlaneStore } from "./store";
 
 export const LINEAR_ROUTE = "POST /integrations/linear";
 export const SLACK_ROUTE = "POST /integrations/slack";
@@ -26,7 +27,9 @@ export interface IntegrationDeps {
   readonly state: Pick<FactoryState, "busEvents">;
   readonly tracker: SteerTracker;
   readonly repo: string;
-  readonly trackerKind?: string;
+  readonly project?: { readonly config: { readonly tracker: { readonly kind: string } } };
+  // Plane members' roles; a Slack or Linear user steers only as the member its allowlist maps it to.
+  readonly store: Pick<PlaneStore, "roleOf">;
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly links?: () => LinkStore;
 }
@@ -59,7 +62,7 @@ export function integrationRoutes(deps: IntegrationDeps) {
         if (!secret) return notFound();
         if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
         const client = new LinearAgentClient(env.LINEAR_AGENT_URL, env);
-        const sameBoard = deps.trackerKind === "linear";
+        const sameBoard = deps.project?.config.tracker.kind === "linear";
         return linearAgentReceiver({
           secret,
           repo: deps.repo,
@@ -67,6 +70,7 @@ export function integrationRoutes(deps: IntegrationDeps) {
           links: links(),
           client,
           sameBoard,
+          actor: surfaceActors(env[LINEAR_AGENT_ENV.users], (login) => deps.store.roleOf(login)),
           defer,
         })(req);
       },
@@ -80,7 +84,10 @@ export function integrationRoutes(deps: IntegrationDeps) {
         if (!secret) return notFound();
         if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
         const client = new SlackClient(env.SLACK_API_URL, env);
-        return slackReceiver({ secret, repo: deps.repo, tracker: deps.tracker, links: links(), client, defer })(req);
+        const actor = surfaceActors(env[SLACK_ENV.users], (login) => deps.store.roleOf(login));
+        return slackReceiver({ secret, repo: deps.repo, tracker: deps.tracker, links: links(), client, actor, defer })(
+          req,
+        );
       },
     },
     {

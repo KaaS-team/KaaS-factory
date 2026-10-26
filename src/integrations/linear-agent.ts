@@ -7,9 +7,13 @@ import { keyNumber, VendorClient } from "../adapters/trackers/kit";
 import { InboxError } from "../inbox";
 import type { LinkStore } from "./links";
 import type { Progress } from "./progress";
-import { applySteer, parseSteer, type SteerTracker } from "./steer";
+import { applySteer, cleanName, mayApply, parseSteer, type Steer, type SteerTracker, type SurfaceActor } from "./steer";
 
-export const LINEAR_AGENT_ENV = { token: "LINEAR_AGENT_TOKEN", secret: "LINEAR_WEBHOOK_SECRET" } as const;
+export const LINEAR_AGENT_ENV = {
+  token: "LINEAR_AGENT_TOKEN",
+  secret: "LINEAR_WEBHOOK_SECRET",
+  users: "FACTORY_LINEAR_USERS",
+} as const;
 export const SURFACE = "linear-agent";
 // Linear retries a webhook it sees no answer to within 5s, and marks a session unresponsive at 10s.
 export const ACK_MS = 5_000;
@@ -44,13 +48,14 @@ export interface SessionEvent {
   readonly url: string;
   readonly prompt: string;
   readonly creator: string;
+  readonly creatorId?: string;
 }
 
 export function parseSessionEvent(raw: unknown): SessionEvent | undefined {
   const p = raw as {
     type?: string;
     action?: string;
-    agentSession?: { id?: string; issue?: Record<string, string>; creator?: { name?: string } };
+    agentSession?: { id?: string; issue?: Record<string, string>; creator?: { id?: string; name?: string } };
     agentActivity?: { content?: { body?: string } };
   };
   const s = p?.agentSession;
@@ -64,7 +69,8 @@ export function parseSessionEvent(raw: unknown): SessionEvent | undefined {
     description: s.issue.description ?? "",
     url: s.issue.url ?? "",
     prompt: p.agentActivity?.content?.body ?? "",
-    creator: s.creator?.name ?? "a Linear user",
+    creator: cleanName(s.creator?.name ?? "a Linear user"),
+    ...(s.creator?.id ? { creatorId: s.creator.id } : {}),
   };
 }
 
@@ -119,6 +125,8 @@ export interface ReceiverDeps {
   readonly client: Pick<LinearAgentClient, "activity">;
   // The factory's tracker is this Linear team, so the delegated issue is labelled, not copied.
   readonly sameBoard: boolean;
+  // The factory member a Linear user id steers as (FACTORY_LINEAR_USERS); anyone unmapped is refused.
+  readonly actor: (user: string | undefined) => SurfaceActor | undefined;
   // Work that runs after the ack; a test awaits it.
   readonly defer: (work: Promise<void>) => void;
   readonly now?: () => number;
@@ -140,13 +148,18 @@ export function linearAgentReceiver(deps: ReceiverDeps): (req: Request) => Promi
   };
 }
 
+export const REFUSED = "Not sent: your Linear account is not a factory member who may do that.";
+
 async function handle(deps: ReceiverDeps, e: SessionEvent): Promise<void> {
+  const actor = deps.actor(e.creatorId);
   const by = `${e.creator} in Linear`;
+  const refused = (steer: Steer) => !mayApply(actor, steer);
   if (e.action === "created") {
+    const steer: Steer = deps.sameBoard
+      ? { kind: "ready", issue: keyNumber(e.key) }
+      : { kind: "start", title: e.title, body: [e.description, e.url].filter(Boolean).join("\n\n") };
+    if (refused(steer)) return void (await deps.client.activity(e.session, { type: "error", body: REFUSED }));
     await deps.client.activity(e.session, { type: "thought", body: `Picked up ${e.key}. Starting the factory.` });
-    const steer = deps.sameBoard
-      ? ({ kind: "ready", issue: keyNumber(e.key) } as const)
-      : ({ kind: "start", title: e.title, body: [e.description, e.url].filter(Boolean).join("\n\n") } as const);
     const { issue } = await applySteer(deps.tracker, deps.repo, steer, by);
     deps.links.put({ surface: SURFACE, external: e.session, repo: deps.repo, issue });
     return;
@@ -154,6 +167,7 @@ async function handle(deps: ReceiverDeps, e: SessionEvent): Promise<void> {
   const link = deps.links.byExternal(SURFACE, e.session);
   const steer = link ? parseSteer(e.prompt, link.issue) : undefined;
   if (!link || !steer) return;
+  if (refused(steer)) return void (await deps.client.activity(e.session, { type: "error", body: REFUSED }));
   try {
     const { posted } = await applySteer(deps.tracker, deps.repo, steer, by);
     await deps.client.activity(e.session, { type: "thought", body: `Sent to the factory: ${posted.split("\n")[0]}` });

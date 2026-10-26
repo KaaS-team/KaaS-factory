@@ -14,8 +14,14 @@ interface HttpServer {
   headers?: Record<string, string>;
 }
 
-// ${VAR} in a header, as Claude Code expands it, so a token stays in the env.
-const expand = (v: string, env: NodeJS.ProcessEnv) => v.replace(/\$\{(\w+)\}/g, (_, k: string) => env[k] ?? "");
+// ${VAR} in a header keeps a token in the env. Only FACTORY_MCP_* names expand: a workflow names the
+// URL, so any other name (GH_TOKEN, the agent's key) would let it send a runner secret anywhere.
+export const MCP_VAR = /^FACTORY_MCP_\w+$/;
+const expand = (v: string, env: NodeJS.ProcessEnv) =>
+  v.replace(/\$\{(\w+)\}/g, (_, k: string) => {
+    if (!MCP_VAR.test(k)) throw new Error(`mcp header names \${${k}}; only FACTORY_MCP_* variables expand`);
+    return env[k] ?? "";
+  });
 
 export function mcpTarget(run: string, cloneDir: string, env: NodeJS.ProcessEnv = process.env) {
   const [server = "", tool = ""] = run.trim().split("/");
@@ -28,13 +34,11 @@ export function mcpTarget(run: string, cloneDir: string, env: NodeJS.ProcessEnv 
 export const mcpStep: StepType = {
   command: true,
   async run({ deps, config, issue, step }): Promise<StepResult> {
-    const { client, tool } = mcpTarget(step.run!, deps.cloneDir);
-    const r: ToolResult = await client
-      .callTool(tool, { issue: issue.number, title: issue.title })
-      .catch((e: Error) => ({
-        isError: true,
-        content: [{ type: "text", text: e.message }],
-      }));
+    const failed = (e: Error): ToolResult => ({ isError: true, content: [{ type: "text", text: e.message }] });
+    const r: ToolResult = await Promise.resolve()
+      .then(() => mcpTarget(step.run!, deps.cloneDir))
+      .then(({ client, tool }) => client.callTool(tool, { issue: issue.number, title: issue.title }))
+      .catch(failed);
     const text = r.content?.find((c) => c.type === "text")?.text ?? "";
     if (!r.isError) return { kind: "next", facts: r.structuredContent ?? { ok: true, text } };
     await postComment(

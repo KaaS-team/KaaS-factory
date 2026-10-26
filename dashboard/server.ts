@@ -129,7 +129,7 @@ export function createDashboard(
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
   // Read by name on every request; the value is never logged or returned.
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
-  const integrations = integrationRoutes({ state, tracker: github, repo, trackerKind: project?.config.tracker.kind });
+  const integrations = integrationRoutes({ state, tracker: github, repo, project, store: access.store });
   const signed: Secrets = { ...integrations.secrets, [WEBHOOK_ROUTE]: webhookSecret, [EVENTS_ROUTE]: eventsSecret };
   const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<ScmPort["listOpenIssues"]>> }>();
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();

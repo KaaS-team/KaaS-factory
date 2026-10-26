@@ -7,9 +7,13 @@ import { VendorClient } from "../adapters/trackers/kit";
 import { InboxError } from "../inbox";
 import type { LinkStore } from "./links";
 import type { Progress } from "./progress";
-import { applySteer, parseSteer, type SteerTracker } from "./steer";
+import { applySteer, cleanName, mayApply, parseSteer, type SteerTracker, type SurfaceActor } from "./steer";
 
-export const SLACK_ENV = { token: "SLACK_BOT_TOKEN", secret: "SLACK_SIGNING_SECRET" } as const;
+export const SLACK_ENV = {
+  token: "SLACK_BOT_TOKEN",
+  secret: "SLACK_SIGNING_SECRET",
+  users: "FACTORY_SLACK_USERS",
+} as const;
 export const SURFACE = "slack";
 const SKEW_S = 300;
 
@@ -49,6 +53,8 @@ export interface SlackDeps {
   readonly links: LinkStore;
   readonly client: Pick<SlackClient, "setStatus" | "reply" | "call">;
   readonly defer: (work: Promise<void>) => void;
+  // The factory member a Slack user id steers as (FACTORY_SLACK_USERS); anyone unmapped is refused.
+  readonly actor: (user: string | undefined) => SurfaceActor | undefined;
   readonly nowS?: () => number;
 }
 
@@ -63,6 +69,8 @@ interface SlackEvent {
   subtype?: string;
   assistant_thread?: { channel_id?: string; thread_ts?: string };
 }
+
+export const REFUSED = "Not sent: your Slack account is not a factory member who may do that.";
 
 export function slackReceiver(deps: SlackDeps): (req: Request) => Promise<Response> {
   const nowS = deps.nowS ?? (() => Math.floor(Date.now() / 1000));
@@ -89,17 +97,18 @@ async function handle(deps: SlackDeps, e: SlackEvent): Promise<void> {
     });
     return;
   }
-  // The bot's own replies come back as messages too; only a person's text steers. The signature names
-  // the user id bare: a `<@U1>` mention would stop unsigned() from stripping it off an answer.
+  // The bot's own replies come back as messages too; only a person's text steers.
   if (e.type !== "message" || e.bot_id || e.subtype || !e.channel || !e.text) return;
   const thread = e.thread_ts ?? e.ts ?? "";
   const external = `${e.channel}:${thread}`;
   const link = deps.links.byExternal(SURFACE, external);
   const steer = parseSteer(e.text, link?.issue);
   if (!steer) return;
+  const actor = deps.actor(e.user);
+  if (!mayApply(actor, steer)) return deps.client.reply(e.channel, thread, REFUSED);
   await deps.client.setStatus(e.channel, thread, "is sending that to the factory...");
   try {
-    const { issue, posted } = await applySteer(deps.tracker, deps.repo, steer, `Slack user ${e.user ?? "unknown"}`);
+    const { issue, posted } = await applySteer(deps.tracker, deps.repo, steer, `@${cleanName(actor!.login)} in Slack`);
     if (!link) deps.links.put({ surface: SURFACE, external, repo: deps.repo, issue });
     await deps.client.reply(
       e.channel,

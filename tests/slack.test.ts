@@ -4,7 +4,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { parseChatOps } from "../src/chatops";
 import { LinkStore } from "../src/integrations/links";
-import { SLACK_ENV, SlackClient, slackProgress, slackReceiver, SURFACE } from "../src/integrations/slack";
+import { REFUSED, SLACK_ENV, SlackClient, slackProgress, slackReceiver, SURFACE } from "../src/integrations/slack";
+import { surfaceActors } from "../src/integrations/steer";
 import { MemoryTracker } from "./fixtures/tracker-server";
 
 const SECRET = "slack-signing";
@@ -29,10 +30,13 @@ const signed = (payload: unknown, ts = String(now)) => {
     headers: { "content-type": "application/json", "x-slack-request-timestamp": ts, "x-slack-signature": sig },
   });
 };
-const message = (text: string) => ({
+const message = (text: string, user = "U42") => ({
   type: "event_callback",
-  event: { type: "message", channel: "D1", thread_ts: "171.5", ts: "171.9", user: "U42", text },
+  event: { type: "message", channel: "D1", thread_ts: "171.5", ts: "171.9", user, text },
 });
+// FACTORY_SLACK_USERS maps U42 to an operator and U7 to a viewer; U99 is in no allowlist.
+const ROLES: Record<string, "operator" | "viewer"> = { ada: "operator", vic: "viewer" };
+const actor = surfaceActors("U42:ada, U7:vic", (login) => ROLES[login] ?? null);
 
 function receiver() {
   const tracker = new MemoryTracker();
@@ -44,6 +48,7 @@ function receiver() {
     tracker,
     links,
     client,
+    actor,
     defer: (w) => void pending.push(w),
     nowS: () => now,
   });
@@ -67,6 +72,30 @@ describe("Slack assistant thread", () => {
     await r.settle();
     const last = (await r.tracker.getIssue("acme/shop", issue)).comments.at(-1)!.body;
     expect(parseChatOps(last)).toEqual({ type: "answer", text: "It is the checkout page" });
+  });
+
+  test("an unmapped user's start and a viewer's approve are refused, and a #N for another issue is ignored", async () => {
+    calls.length = 0;
+    const r = receiver();
+    await r.handle(signed(message("start: Fix the cart", "U99")));
+    await r.settle();
+    expect(r.links.byExternal(SURFACE, "D1:171.5")).toBeUndefined();
+    expect(calls.map((c) => c.body.text)).toEqual([REFUSED]);
+    await r.handle(signed(message("start: Fix the cart")));
+    await r.settle();
+    const { issue } = r.links.byExternal(SURFACE, "D1:171.5")!;
+    await r.tracker.addLabels("acme/shop", issue, ["factory:awaiting-approval"]);
+    const other = await r.tracker.createIssue("acme/shop", "Other", "", ["factory:awaiting-approval"]);
+    const before = (await r.tracker.getIssue("acme/shop", issue)).comments.length;
+    for (const [text, user] of [
+      ["approve", "U99"],
+      ["approve", "U7"],
+      [`approve #${other}`, "U42"],
+    ] as const)
+      await r.handle(signed(message(text, user)));
+    await r.settle();
+    expect((await r.tracker.getIssue("acme/shop", issue)).comments).toHaveLength(before);
+    expect((await r.tracker.getIssue("acme/shop", other)).comments).toHaveLength(0);
   });
 
   test("an unsigned or replayed delivery is refused, and the URL check echoes its challenge", async () => {

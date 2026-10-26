@@ -48,6 +48,7 @@ function plane(env: Record<string, string>) {
     repo: REPO,
     env,
     links: () => links,
+    store: { roleOf: () => null },
   });
   const call = (label: string, req: Request) => {
     const r = routes.find((x) => x.label === label)!;
@@ -103,6 +104,20 @@ describe("A2A and AG-UI", () => {
     expect(parseChatOps(last)).toEqual({ type: "approve" });
     expect((await p.call(A2A_ROUTE, rpc({ method: "tasks/get" }, "wrong"))).status).toBe(401);
     expect(taskState(["factory:failed"], false)).toBe("failed");
+  });
+
+  test("a message steers only its taskId's task, and one with no taskId cannot steer at all", async () => {
+    const p = plane({ [A2A_ENV.token]: "a2a-tok" });
+    const result = async (req: Request) => (await (await p.call(A2A_ROUTE, req)).json()) as { result?: { id: string } };
+    const mine = (await result(send("Fix the cart"))).result!.id;
+    const other = await p.tracker.createIssue(REPO, "Other", "", ["factory:awaiting-approval"]);
+    await p.tracker.addLabels(REPO, Number(mine), ["factory:awaiting-approval"]);
+    expect((await result(send(`approve #${other}`, mine))).result).toBeUndefined();
+    expect((await result(send(`approve #${other}`))).result).toBeUndefined();
+    for (const n of [other, Number(mine)])
+      expect((await p.tracker.getIssue(REPO, n)).comments.some((c) => parseChatOps(c.body)?.type === "approve")).toBe(
+        false,
+      );
   });
 
   test("the AG-UI stream turns one issue's run into its run, step and finish events", async () => {

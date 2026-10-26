@@ -38,9 +38,9 @@ the table shows the name the examples use.
 | `otel` | notifier | Exports one OpenTelemetry trace per run, a gen_ai span per stage. | set `OTEL_EXPORTER_OTLP_ENDPOINT` on the watcher | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | no | n/a |
 | `events-inbound` | intake | Takes signed CloudEvents from other apps on POST /events. | set `FACTORY_EVENTS_SECRET` on the plane | `FACTORY_EVENTS_SECRET` | no | n/a |
 | `github-webhook` | intake | Wakes the watcher on a signed GitHub webhook delivery. | set `FACTORY_WEBHOOK_SECRET` on the plane | `FACTORY_WEBHOOK_SECRET` | no | n/a |
-| `linear-agent` | intake | Delegate a Linear issue to the factory as an agent session; steer it from the session. | a Linear OAuth app (actor=app); set both keys on the plane and the watcher | `LINEAR_AGENT_TOKEN`, `LINEAR_WEBHOOK_SECRET` | no | n/a |
+| `linear-agent` | intake | Delegate a Linear issue to the factory as an agent session; steer it from the session. | a Linear OAuth app (actor=app); set the keys on the plane and the watcher, with `FACTORY_LINEAR_USERS=<linear user id>:login` mapping each Linear user to a plane member | `LINEAR_AGENT_TOKEN`, `LINEAR_WEBHOOK_SECRET`, `FACTORY_LINEAR_USERS` | no | n/a |
 | `mcp-events` | intake | Asks a tool on an MCP server for new CloudEvents every minute. | set `FACTORY_MCP_EVENTS_URL` and `FACTORY_MCP_EVENTS_TOOL` on the watcher | `FACTORY_MCP_EVENTS_URL`, `FACTORY_MCP_EVENTS_TOOL`, `FACTORY_MCP_TOKEN` | no | n/a |
-| `slack` | intake | Start and steer a task from a Slack assistant thread. | a Slack app with the assistant view; set both keys on the plane and the watcher | `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` | no | n/a |
+| `slack` | intake | Start and steer a task from a Slack assistant thread. | a Slack app with the assistant view; set the keys on the plane and the watcher, with `FACTORY_SLACK_USERS=U01ABC:login` mapping each Slack user to a plane member | `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `FACTORY_SLACK_USERS` | no | n/a |
 <!-- integrations-table:end -->
 
 ## Steering from anywhere
@@ -50,16 +50,23 @@ ready label or an inbox action, and the action is a signed comment on the issue 
 happens. So a Linear session, a Slack thread, an A2A client and the dashboard all leave the same
 record on the tracker, and a runner that only polls the tracker obeys each of them.
 
-A message reads `approve`, `revise <what>`, `answer <text>`, `retry` or `cancel`, with an optional
-`#42`. Free text in a thread already bound to an issue is an answer; anywhere else it starts a task.
+A message reads `approve`, `revise <what>`, `answer <text>`, `retry` or `cancel`. A thread, session or
+A2A task is bound to one issue and steers only that one: a `#42` naming any other issue drops the
+message. Free text in a bound thread is an answer; anywhere else it starts a task.
+
+Slack and Linear users steer only as a plane member, mapped by `FACTORY_SLACK_USERS` and
+`FACTORY_LINEAR_USERS` (`U01ABC:ada, U02DEF:grace`, the vendor's user id then the member's login).
+Each command needs the role its dashboard route needs: starting a task and revise, answer, retry or
+cancel need operator, and approve needs approver. An unmapped user, or one whose role is too low, is
+refused in the thread.
 
 - **Linear.** Install a Linear OAuth app with `actor=app` and the `app:assignable` and
   `app:mentionable` scopes, point its webhook at `POST /integrations/linear` on the plane, and set
-  `LINEAR_AGENT_TOKEN` and `LINEAR_WEBHOOK_SECRET`. Delegating an issue opens an agent session: the
+  `LINEAR_AGENT_TOKEN`, `LINEAR_WEBHOOK_SECRET` and `FACTORY_LINEAR_USERS`. Delegating an issue opens an agent session: the
   plane acks at once, posts a first thought, and starts the run. The watcher then posts each step as
   an activity and keeps the session's plan and PR link current.
 - **Slack.** Create a Slack app with the assistant view, point its event subscription at
-  `POST /integrations/slack`, and set `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET`. A message in an
+  `POST /integrations/slack`, and set `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and `FACTORY_SLACK_USERS`. A message in an
   assistant thread starts a task; later messages in that thread steer it.
 - **A2A.** Set `FACTORY_A2A_TOKEN`. The plane serves its agent card at
   `/.well-known/agent-card.json` and takes `message/send` and `tasks/get` on `POST /a2a`.
@@ -83,7 +90,8 @@ notify: { uses: mcp, label: factory:notifying, run: tickets/close_ticket, next: 
 ```
 
 The tool gets `{issue, title}` and spends no tokens. An error from the tool fails the run with a comment
-on the issue. Header values may use `${VAR}`, read from the runner's env, so a token stays out of the file.
+on the issue. Header values may use `${FACTORY_MCP_*}` names, read from the runner's env, so a token
+stays out of the file. Any other name, such as `${GH_TOKEN}`, fails the step before a request is sent.
 
 ## Adding an integration
 

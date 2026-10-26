@@ -3,7 +3,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { parseChatOps } from "../src/chatops";
 import { loadManifests } from "../src/integrations/catalogue";
-import { applySteer, parseSteer } from "../src/integrations/steer";
+import { commandRoutes } from "../dashboard/plane/commands";
+import { applySteer, mayApply, parseSteer, roleFor, type Steer } from "../src/integrations/steer";
 import { LABEL } from "../src/labels";
 import { startBoards } from "./fixtures/boards";
 
@@ -20,6 +21,24 @@ describe("any board steers", () => {
     expect(Object.keys(boards.make).sort()).toEqual(trackers);
   });
 
+  test("a steer needs the role of the dashboard route it stands for", () => {
+    const routes = commandRoutes({ github: {} as never, repo: REPO, actorOf: () => undefined, invalidate: () => {} });
+    const role = (label: string) => routes.find((r) => r.label === label)!.role;
+    const steer = (action: string): Steer => ({ kind: "act", issue: 1, action: action as never, text: "" });
+    expect(roleFor({ kind: "start", title: "t", body: "" })).toBe(role("POST /api/tasks")!);
+    for (const [action, name] of [
+      ["approve", "approve-plan"],
+      ["revise", "revise"],
+      ["answer", "answer"],
+      ["retry", "retry"],
+      ["cancel", "cancel"],
+    ])
+      expect(roleFor(steer(action!)), action).toBe(role(`POST /api/issues/:n/${name}`)!);
+    expect(mayApply({ login: "vic", role: "viewer" }, steer("approve"))).toBe(false);
+    expect(mayApply({ login: "amy", role: "approver" }, steer("approve"))).toBe(true);
+    expect(mayApply({ login: "amy", role: "approver" }, steer("retry"))).toBe(false);
+  });
+
   test("on every board, a task started there is ready, and approve on it is a command the runner reads", async () => {
     for (const kind of trackers) {
       const tracker = boards.make[kind]!();
@@ -30,7 +49,7 @@ describe("any board steers", () => {
         kind,
       ).toContain(LABEL.ready);
       await tracker.addLabels(REPO, issue, [LABEL.awaitingApproval]);
-      await applySteer(tracker, REPO, parseSteer(`approve #${issue}`)!, `Ada on ${kind}`);
+      await applySteer(tracker, REPO, parseSteer("approve", issue)!, `Ada on ${kind}`);
       const last = (await tracker.getIssue(REPO, issue)).comments.at(-1)!.body;
       expect(parseChatOps(last), kind).toEqual({ type: "approve" });
     }

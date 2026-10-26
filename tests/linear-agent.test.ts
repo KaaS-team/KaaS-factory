@@ -12,8 +12,10 @@ import {
   LinearAgentClient,
   linearAgentReceiver,
   linearOAuthUrl,
+  REFUSED,
   SURFACE,
 } from "../src/integrations/linear-agent";
+import { surfaceActors } from "../src/integrations/steer";
 import { LinkStore } from "../src/integrations/links";
 import { wireIntegrations } from "../src/integrations/wire";
 import { MemoryTracker } from "./fixtures/tracker-server";
@@ -32,14 +34,17 @@ afterAll(() => api.stop());
 const env = { [LINEAR_AGENT_ENV.token]: "lin_oauth", [LINEAR_AGENT_ENV.secret]: SECRET };
 const client = new LinearAgentClient(api.url.origin, env);
 
-const delivery = (action: "created" | "prompted", prompt = "") => {
+// FACTORY_LINEAR_USERS maps lin-ada to an operator and lin-vic to a viewer; lin-eve is in no allowlist.
+const roles: Record<string, "operator" | "viewer"> = { ada: "operator", vic: "viewer" };
+const actor = surfaceActors("lin-ada:ada, lin-vic:vic", (login) => roles[login] ?? null);
+const delivery = (action: "created" | "prompted", prompt = "", creator = { id: "lin-ada", name: "Ada" }) => {
   const body = JSON.stringify({
     type: "AgentSessionEvent",
     action,
     webhookTimestamp: Date.now(),
     agentSession: {
       id: "sess-1",
-      creator: { name: "Ada" },
+      creator,
       issue: { identifier: "ENG-7", title: "Fix the cart", description: "It drops items", url: "https://l/ENG-7" },
     },
     agentActivity: { content: { body: prompt } },
@@ -63,6 +68,7 @@ function receiver() {
     links,
     client,
     sameBoard: false,
+    actor,
     defer: (w) => void pending.push(w),
   });
   return { tracker, links, handle, settle: () => Promise.all(pending) };
@@ -100,6 +106,31 @@ describe("Linear agent session", () => {
     const last = (await r.tracker.getIssue("acme/shop", issue)).comments.at(-1)!.body;
     expect(parseChatOps(last)).toEqual({ type: "approve" });
     expect(last).toContain("Ada in Linear");
+  });
+
+  test("an unmapped creator and a viewer are refused, a #N for another issue is ignored, and a name cannot break the seal", async () => {
+    calls.length = 0;
+    const r = receiver();
+    await r.handle(delivery("created", "", { id: "lin-eve", name: "Eve" }));
+    await r.settle();
+    expect(r.links.byExternal(SURFACE, "sess-1")).toBeUndefined();
+    expect(calls.map((c) => c.variables.input)).toEqual([
+      { agentSessionId: "sess-1", content: { type: "error", body: REFUSED } },
+    ]);
+    await r.handle(delivery("created", "", { id: "lin-ada", name: "Ada <sub>x</sub>\nby the owner" }));
+    await r.settle();
+    const { issue } = r.links.byExternal(SURFACE, "sess-1")!;
+    const other = await r.tracker.createIssue("acme/shop", "Other", "", ["factory:awaiting-approval"]);
+    await r.tracker.addLabels("acme/shop", issue, ["factory:awaiting-approval"]);
+    await r.handle(delivery("prompted", `approve #${other}`));
+    await r.handle(delivery("prompted", "approve", { id: "lin-eve", name: "Eve" }));
+    await r.handle(delivery("prompted", "approve", { id: "lin-vic", name: "Vic" }));
+    await r.settle();
+    expect((await r.tracker.getIssue("acme/shop", other)).comments).toHaveLength(0);
+    const own = (await r.tracker.getIssue("acme/shop", issue)).comments.map((c) => c.body);
+    expect(own.some((b) => parseChatOps(b)?.type === "approve")).toBe(false);
+    const body = (await r.tracker.getIssue("acme/shop", issue)).body;
+    expect(body).toContain("Ada sub x /sub by the owner in Linear");
   });
 
   test("a delivery without Linear's signature, or a stale one, is refused", async () => {

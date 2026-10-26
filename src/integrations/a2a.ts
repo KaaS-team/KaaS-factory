@@ -87,8 +87,9 @@ export async function a2aRpc(deps: A2aDeps, req: Request): Promise<Response> {
     .join("\n");
   const link = msg?.taskId ? deps.links.byExternal(SURFACE, msg.taskId) : undefined;
   if (msg?.taskId && !link) return rpcError(call.id, -32001, "task not found");
+  // Bound to its taskId's issue, so a #N in the text never reaches another task; with no taskId it starts one.
   const steer = parseSteer(text, link?.issue);
-  if (!steer) return rpcError(call.id, -32602, "the message has no text");
+  if (!steer) return rpcError(call.id, -32602, "the message has no text, or names a task other than its taskId");
   try {
     const { issue } = await applySteer(deps.tracker, deps.repo, steer, "an A2A client");
     deps.links.put({ surface: SURFACE, external: String(issue), repo: deps.repo, issue });
