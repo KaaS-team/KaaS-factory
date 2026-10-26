@@ -1,4 +1,4 @@
-# Software Factory
+# KaaS Factory
 
 A GitHub-native SDLC loop for coding agents: triage, plan, build, verify, PR. You watch
 it happen in issues, comments, and a dashboard, instead of an agent's private terminal.
@@ -52,7 +52,7 @@ runs; [docs/workflows.md](docs/workflows.md) has the format.
 | Mode | Start | Auth | State lives in | Cockpit |
 |---|---|---|---|---|
 | **Local** | `make up REPO_DIR=../repo` (or `factory up --repo-dir ../repo`) | `gh auth login`, `claude` login (interactive) | `~/.factory` (`FACTORY_HOME`) | `http://localhost:4100` |
-| **VM (Docker)** | `docker build -t software-factory .`, then `docker run -d --env-file factory.env -v factory-data:/data -p 127.0.0.1:4100:4100 software-factory up --repo owner/name` | `GH_TOKEN` + `ANTHROPIC_API_KEY` (or `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`) in an env file, mode `600`, never on a command line | the `/data` named volume (clone, worktrees, the SQLite cache) | `ssh -L 4100:localhost:4100 vm`, then open `localhost:4100` |
+| **VM (Docker)** | `docker build -t kaas-factory .`, then `docker run -d --env-file factory.env -v factory-data:/data -p 127.0.0.1:4100:4100 kaas-factory up --repo owner/name` | `GH_TOKEN` + `ANTHROPIC_API_KEY` (or `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`) in an env file, mode `600`, never on a command line | the `/data` named volume (clone, worktrees, the SQLite cache) | `ssh -L 4100:localhost:4100 vm`, then open `localhost:4100` |
 | **CI (GitHub Actions)** | `factory install <target-dir> --ci`, rename the written `factory.yml.example` to `factory.yml`, set repo variable `FACTORY_MODE=actions` | repo secrets `FACTORY_GH_TOKEN` (fine-grained PAT or GitHub App token, a plain `GITHUB_TOKEN`-authored PR never re-triggers this repo's own CI) and `ANTHROPIC_API_KEY` | none, every run starts from nothing and rebuilds from the issue thread | the issue thread itself, or point a local `factory dashboard --repo owner/name` at it as a cockpit |
 
 Every mode drives `advanceIssue()` (`src/watch.ts`) through the same three entry points:
@@ -233,8 +233,8 @@ session in `teach/sessions.json`, which is the single list of them. The older `0
 ## Quickstart
 
 ```bash
-git clone git@github.com:KaaS-team/software-factory.git
-cd software-factory
+git clone git@github.com:KaaS-team/KaaS-factory.git
+cd KaaS-factory
 make install                    # bun install
 make check                      # typecheck + test + skills validation
 ```

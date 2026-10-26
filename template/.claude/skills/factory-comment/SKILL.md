@@ -1,6 +1,6 @@
 ---
 name: factory-comment
-description: Writes a factory GitHub comment (triage, question, plan, status, or verdict) from the shared templates in assets/, so every stage speaks in one voice. Use whenever another factory-* skill needs to produce a comment body or an issue-thread question for the software factory loop.
+description: Writes a factory GitHub comment (triage, question, plan, status, or verdict) from the shared templates in assets/, so every stage speaks in one voice. Use whenever another factory-* skill needs to produce a comment body or an issue-thread question for the KaaS Factory loop.
 ---
 
 # factory-comment

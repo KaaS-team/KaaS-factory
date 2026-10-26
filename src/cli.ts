@@ -544,7 +544,7 @@ async function cmdDashboard(): Promise<void> {
 }
 
 // The Docker image's entrypoint command (plan "Run anywhere", VM mode):
-// `docker run ... software-factory up --repo owner/name`. One process, one
+// `docker run ... kaas-factory up --repo owner/name`. One process, one
 // PID 1, running both the poll loop and the cockpit — a container only gets
 // to hold open one foreground process, unlike `make up`'s two background
 // shells on a laptop.

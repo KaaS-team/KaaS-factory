@@ -82,4 +82,4 @@ jobs:
         with:
           context: .
           push: false
-          tags: software-factory:ci
+          tags: kaas-factory:ci

@@ -1,6 +1,6 @@
 ---
 name: factory-triage
-description: Classifies a GitHub issue by type, checks it against the repo's charter for protected paths and tiers, and writes the triage handoff (proceed, needs-info, refused, or duplicate). Use as the first stage when the software factory picks up an issue labeled factory:ready.
+description: Classifies a GitHub issue by type, checks it against the repo's charter for protected paths and tiers, and writes the triage handoff (proceed, needs-info, refused, or duplicate). Use as the first stage when KaaS Factory picks up an issue labeled factory:ready.
 ---
 
 # factory-triage

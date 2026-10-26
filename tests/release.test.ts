@@ -2,7 +2,8 @@
 // ref; this pins them together so a release cannot bump one and forget the other.
 
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { LABEL } from "../src/labels";
 
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -16,7 +17,7 @@ test("template-ci FACTORY_RUNNER_REF is v<package.json version>", () => {
 // The repo moved to KaaS-team in v5.0.0; a stale owner would send every adopter's CI to a redirect.
 test("the CI template and the README clone line name the same KaaS-team runner repo", () => {
   const repo = /FACTORY_RUNNER_REPO: (\S+)/.exec(read("template-ci/factory.yml.example"))?.[1];
-  expect(repo).toBe("KaaS-team/software-factory");
+  expect(repo).toBe("KaaS-team/KaaS-factory");
   expect(read("README.md")).toContain(`git clone git@github.com:${repo}.git`);
 });
 
@@ -73,4 +74,30 @@ describe("the CI template", () => {
     expect(ci).toContain("github.event.review.author_association");
     expect(ci).toContain('then target="--pr $PR"');
   });
+});
+
+// Renamed to KaaS Factory in v5.1.0. History, recorded transcripts, the vendored kit and the
+// mutation that reintroduces it keep the old name; teach/ leaves the repo in P1c.
+const OLD_NAME_KEPT = [
+  "CHANGELOG.md",
+  "goals.json",
+  "tests/fixtures/",
+  "scripts/lwp/",
+  "node_modules/",
+  ".git",
+  ".git/",
+  "tests/mutations.json",
+  "teach/",
+];
+test("nothing outside history names the old repo", () => {
+  const root = join(import.meta.dir, "..");
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      const rel = relative(root, path) + (statSync(path).isDirectory() ? "/" : "");
+      if (OLD_NAME_KEPT.some((k) => rel === k) || /^(verify|relay)\/target\//.test(rel)) return [];
+      return rel.endsWith("/") ? walk(path) : [rel];
+    });
+  const offenders = walk(root).filter((rel) => /software[- ]factory/i.test(readFileSync(join(root, rel), "latin1")));
+  expect(offenders).toEqual([]);
 });

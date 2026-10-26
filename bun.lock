@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "software-factory",
+      "name": "kaas-factory",
       "devDependencies": {
         "@biomejs/biome": "2.5.14",
         "@types/bun": "^1.3.4",

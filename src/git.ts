@@ -31,12 +31,7 @@ async function spawnGit(args: string[], cwd?: string, env?: Record<string, strin
 // A bare CI runner or container has no git identity, and `commit` and
 // `commit-tree` refuse to run without one. Supply a fallback only when none is
 // configured, so a developer's own identity is never overridden.
-export const FALLBACK_IDENTITY = [
-  "-c",
-  "user.name=software-factory",
-  "-c",
-  "user.email=factory@users.noreply.github.com",
-];
+export const FALLBACK_IDENTITY = ["-c", "user.name=kaas-factory", "-c", "user.email=factory@users.noreply.github.com"];
 
 // Pure so it's unit-testable without a real repo: non-cone sparse-checkout
 // wants a leading "/*" (everything) followed by a "!"-negated pattern per

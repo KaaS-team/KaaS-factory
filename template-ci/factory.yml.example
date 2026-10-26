@@ -42,8 +42,8 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v5.0.1 # pinned software-factory release; bump deliberately
-  FACTORY_RUNNER_REPO: KaaS-team/software-factory
+  FACTORY_RUNNER_REF: v5.0.1 # pinned KaaS Factory release; bump deliberately
+  FACTORY_RUNNER_REPO: KaaS-team/KaaS-factory
   CLAUDE_CODE_VERSION: "2.1.286" # pinned claude, same version the Dockerfile installs
   # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE
   # FACTORY_AGENTS (space separated, default "claude"); add a repo secret for each one's key
@@ -93,7 +93,7 @@ jobs:
       - name: Set up your toolchain
         run: echo "no language runtime needed beyond what ubuntu-latest ships, or add a setup step here"
 
-      - name: Checkout software-factory (pinned)
+      - name: Checkout KaaS Factory (pinned)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.FACTORY_RUNNER_REPO }}

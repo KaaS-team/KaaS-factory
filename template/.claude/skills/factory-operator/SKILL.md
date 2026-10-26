@@ -1,6 +1,6 @@
 ---
 name: factory-operator
-description: Use the software factory to create, assign and monitor a task. Use when a coding agent needs to hand work to the factory, label an issue factory:ready, or read what the factory is waiting on. Not used by the factory's own stages.
+description: Use KaaS Factory to create, assign and monitor a task. Use when a coding agent needs to hand work to the factory, label an issue factory:ready, or read what the factory is waiting on. Not used by the factory's own stages.
 ---
 <!-- Ported from owainlewis/machinist@3943516 skills/machinist/SKILL.md:1-75 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: machinist run/submit become the factory:ready label; status comes from factory inbox and factory logs. -->
 
