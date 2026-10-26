@@ -819,5 +819,8 @@
   {"name": "github app: a token is minted for an owner outside the named ones", "file": "src/github-app.ts", "find": "    if (!this.owners.has(owner)) return null;\n", "replace": "", "test": "tests/github-app.test.ts"},
   {"name": "github app: a repo without the factory installed is served", "file": "src/github-app.ts", "find": "(await this.hasFactory(token, r.full_name, r.pushed_at ?? \"\"))", "replace": "true", "test": "tests/github-app.test.ts"},
   {"name": "github app: an unchanged repo is asked for its config on every listing", "file": "src/github-app.ts", "find": "if (seen && seen.pushed === pushed) return seen.has;", "replace": "", "test": "tests/github-app.test.ts"},
-  {"name": "release: an em dash in CHANGELOG.md passes the gate", "file": "CHANGELOG.md", "find": "and, only when a repo opts in, merge it", "replace": "and — only when a repo opts in — merge it", "test": "tests/release.test.ts"}
+  {"name": "release: an em dash in CHANGELOG.md passes the gate", "file": "CHANGELOG.md", "find": "and, only when a repo opts in, merge it", "replace": "and — only when a repo opts in — merge it", "test": "tests/release.test.ts"},
+  {"name": "gh-fields: the scan misses pr calls", "file": "src/deploy/gh-fields.ts", "find": "\"(pr|issue|label|run|release|repo|workflow)\"", "replace": "\"(issue|label|run|release|repo|workflow)\"", "test": "tests/gh-fields.test.ts"},
+  {"name": "gh-fields: an unknown field is never reported", "file": "src/deploy/gh-fields.ts", "find": "return line ? [{ call, error: line }] : [];", "replace": "return [];", "test": "tests/gh-fields.test.ts"},
+  {"name": "gh-fields: the image smoke skips the field check", "file": ".github/workflows/ci.yml", "find": "          docker exec factory bun src/deploy/gh-fields.ts\n", "replace": "", "test": "tests/gh-fields.test.ts"}
 ]

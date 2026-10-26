@@ -16,6 +16,8 @@ that holds `.factory/config.json`. See [docs/control-plane.md](docs/control-plan
   can read.
 - A stage no longer loads the plugins a target repo enables in its own `.claude/settings.json` or
   `settings.local.json`, so a repo's guards cannot block the factory's own writes.
+- The image's gh is 2.102.0: 2.63.2 had no `closingIssuesReferences`, so the hosted inbox failed on
+  every read. The image smoke now runs every `gh --json` field set the code asks for against it.
 - Every Markdown file is checked for prose rules on each gate (`tests/release.test.ts`).
 
 ## v6.0.0

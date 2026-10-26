@@ -125,6 +125,7 @@ jobs:
           docker exec factory curl -fsS http://127.0.0.1:4100/health
           docker exec factory curl -fsS http://127.0.0.1:4200/healthz
           docker exec factory test -x /usr/local/bin/kaas-verify
+          docker exec factory bun src/deploy/gh-fields.ts
           sleep 5
           docker exec factory bun src/deploy/rss.ts 1
       - name: Container log on failure
