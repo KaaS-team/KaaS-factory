@@ -4,6 +4,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { DoctorCheck } from "./doctor";
 import type { ExecResult, ExecutionPort } from "./ports/execution";
 import { type SandboxCapabilities, SandboxUnsupported } from "./ports/sandbox";
 import { sandboxProvider } from "./sandbox";
@@ -153,4 +154,21 @@ export function formatKit(name: string, checks: readonly KitCheck[]): string {
     ...checks.map((c) => `${c.skipped ? "SKIP" : c.ok ? "PASS" : "FAIL"} ${c.name}${c.detail ? `: ${c.detail}` : ""}`),
     failed ? `runtime ${name}: ${failed} of ${checks.length} checks failed` : `runtime ${name}: every check passed`,
   ].join("\n");
+}
+
+// `factory doctor`'s reachability rows: one probe per runtime the config or workflow names and this
+// machine has (an unknown name already fails the check before it), run side by side.
+export async function probeChecks(
+  refs: readonly { name: string }[],
+  known: readonly string[],
+  probe: (runtime: string) => Promise<Health>,
+): Promise<DoctorCheck[]> {
+  const names = [...new Set(refs.map((r) => r.name))].filter((n) => known.includes(n));
+  return Promise.all(
+    names.map(async (name) => {
+      const h = await probe(name);
+      const detail = h.ok ? `answered in ${h.ms} ms` : `did not answer: ${h.detail}`;
+      return { name: `runtime ${name} answers`, ok: h.ok, detail, fixable: false };
+    }),
+  );
 }

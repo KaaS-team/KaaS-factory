@@ -504,7 +504,12 @@
       "phase": "P4",
       "ask": "A health probe per runtime in `factory doctor`; it checks names, not reachability.",
       "source": "CHANGELOG v3.3.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/doctor.test.ts",
+        "name": "each runtime the repo names is probed: a live one answers, a down one fails with why",
+        "mutation": "doctor: a runtime that does not answer fails"
+      }
     },
     {
       "id": "any-agent",

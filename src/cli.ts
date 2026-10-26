@@ -53,6 +53,7 @@ import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { probeRuntime } from "./runtime-kit";
 import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
@@ -452,6 +453,7 @@ async function cmdDoctor(): Promise<void> {
       versionOf,
       fileExists,
       readFile: async (path) => ((await fileExists(path)) ? await Bun.file(path).text() : undefined),
+      probeRuntime: (name) => probeRuntime(runtimesFrom(loadMachineConfig().runtimes)[name]!, 10_000),
       isExecutable: async (path) => {
         try {
           accessSync(path, constants.X_OK);
