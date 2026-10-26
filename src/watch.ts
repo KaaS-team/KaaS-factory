@@ -47,6 +47,7 @@ import { defaultWorkflow } from "./engine/workflows";
 
 import { cronStore, fireCron, fireEvent } from "./engine/triggers";
 import { recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
+import { refuseRepeat } from "./engine/failure";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
@@ -300,9 +301,8 @@ export async function resumeAwaitingApproval(
   return "waiting";
 }
 
-// `/factory retry` on a `failed` or `needs-human` issue (audit finding #18):
-// before this, both were dead ends. Resumes from whichever stage last
-// posted a data marker, recovered by deriveIssueState.
+// `/factory retry` on a `failed` or `needs-human` issue (audit finding #18): resumes from whichever stage last
+// posted a data marker (deriveIssueState), unless the same failure repeated with nothing changed (#86).
 export async function resumeParked(
   issue: GhIssue,
   deps: WatchDeps,
@@ -310,16 +310,16 @@ export async function resumeParked(
 ): Promise<Outcome | undefined> {
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
   if (!latest) return undefined;
-  const verb = parseChatOps(latest.body).type;
-  // The caller hands over a writers-only thread (trustedThread), so this verb is a writer's.
-  if (verb !== "cancel" && verb !== "retry") return undefined;
-  if (verb === "cancel") return cancelRun(issue, deps, config);
+  // The caller hands over a writers-only thread (trustedThread), so this command is a writer's.
+  const command = parseChatOps(latest.body);
+  if (command.type === "cancel") return cancelRun(issue, deps, config);
+  if (command.type !== "retry") return undefined;
   // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
   const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
   if (lastRunner && Date.parse(lastRunner.createdAt) >= Date.parse(latest.createdAt)) return undefined;
-
   const currentLabel = labelsOf(issue).find((n) => n === LABEL.failed || n === LABEL.needsHuman);
   if (!currentLabel) return undefined;
+  if (await refuseRepeat(deps, config, issue, command.force === true)) return "waiting";
 
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
   const worktree = worktreeFor(deps, issue.number);

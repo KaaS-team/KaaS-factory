@@ -13,9 +13,10 @@ import {
   type StageRunOptions,
   type StageRunResult,
   type Executor,
+  type Refusal,
 } from "./ports/agent";
 export { OPERATOR_TAKEOVER };
-export type { StageName, StageEvent, StageRunOptions, StageRunResult, Executor };
+export type { StageName, StageEvent, StageRunOptions, StageRunResult, Executor, Refusal };
 
 export function aggregateStageEvents(events: StageEvent[], exitCode: number, stderrTail?: string): StageRunResult {
   let toolCalls = 0;
@@ -25,6 +26,8 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
   let costReported = false;
   let tokensCached = 0;
   const permissionDenials: string[] = [];
+  const denied: NonNullable<StageEvent["denied"]>[number][] = [];
+  const refusedBy = new Map<string, string>();
   let finalText: string | undefined;
   let sessionId: string | undefined;
   let final: { in: number; out: number; cached: number } | "invalid" | undefined;
@@ -47,7 +50,9 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
         costReported = true;
       }
       permissionDenials.push(...(e.denials ?? []));
+      denied.push(...(e.denied ?? []));
     }
+    if (e.kind === "refusal" && e.toolUseId && e.refusedBy) refusedBy.set(e.toolUseId, e.refusedBy);
   }
   if (final === "invalid") {
     tokensIn = 0;
@@ -69,6 +74,16 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
     costReported,
     exitCode,
     permissionDenials,
+    // A denial no hook claimed is the permission rules': under dontAsk, the stage's allow list.
+    ...(denied.length
+      ? {
+          refusals: denied.map((d) => ({
+            tool: d.tool,
+            target: d.target,
+            by: refusedBy.get(d.id ?? "") ?? "allowlist",
+          })),
+        }
+      : {}),
     usageComplete: final !== "invalid",
     ...(finalMessage ? { finalMessage } : {}),
     ...(sessionId ? { sessionId } : {}),
