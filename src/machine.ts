@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { cpus, freemem, hostname } from "node:os";
 import { dirname } from "node:path";
 import { factoryHome } from "./paths";
-import type { MicrosandboxSpec } from "./adapters/microsandbox/execution";
+import type { AgentSandbox } from "./agents/agent-sandbox";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
 import { GATEWAY_KEY_ENV, isProviderHost, type LlmGateway } from "./agents/gateway";
 
@@ -63,10 +63,12 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
   }
   if (raw.agentRuntime !== undefined) {
     const named = (raw.runtimes as Record<string, RuntimeSpec> | undefined)?.[raw.agentRuntime as string];
-    if (named?.kind !== "microsandbox")
+    if (named?.kind !== "microsandbox" && named?.kind !== "docker")
       throw new Error(
-        `${path}: "agentRuntime" must name a microsandbox runtime in "runtimes", got ${JSON.stringify(raw.agentRuntime)}`,
+        `${path}: "agentRuntime" must name a microsandbox or docker runtime in "runtimes", got ${JSON.stringify(raw.agentRuntime)}`,
       );
+    if (named.kind === "docker" && (named.network ?? "none") === "none")
+      throw new Error(`${path}: the docker agentRuntime needs a "network": the agent calls its model`);
   }
   if (raw.llmGateway !== undefined) gatewayProblem(raw, path);
   if (
@@ -105,9 +107,10 @@ function gatewayProblem(raw: Record<string, unknown>, path: string): void {
   const local = parsed?.hostname === "127.0.0.1" || parsed?.hostname === "localhost";
   if (!parsed || !(parsed.protocol === "https:" || (parsed.protocol === "http:" && local)))
     throw new Error(`${path}: "llmGateway.url" must be an https URL, got ${JSON.stringify(url)}`);
-  const vm = raw.agentRuntime
-    ? (raw.runtimes as Record<string, MicrosandboxSpec>)[raw.agentRuntime as string]
+  const named = raw.agentRuntime
+    ? (raw.runtimes as Record<string, AgentSandbox>)[raw.agentRuntime as string]
     : undefined;
+  const vm = named?.kind === "microsandbox" ? named : undefined;
   if (vm && !(vm.allow ?? []).includes(parsed.hostname))
     throw new Error(`${path}: the agentRuntime's "allow" must list the llmGateway host ${parsed.hostname}`);
   const around = vm?.allow?.find(isProviderHost);
@@ -125,10 +128,10 @@ export function machineGateway(m: MachineConfig, env: NodeJS.ProcessEnv = proces
   return { url: m.llmGateway.url, masterKey };
 }
 
-// The VM every agent stage runs in, when machine.json names one.
-export function agentVm(m: MachineConfig): MicrosandboxSpec | undefined {
+// The microVM or container every agent stage runs in, when machine.json names one.
+export function agentVm(m: MachineConfig): AgentSandbox | undefined {
   const spec = m.agentRuntime ? m.runtimes?.[m.agentRuntime] : undefined;
-  return spec?.kind === "microsandbox" ? spec : undefined;
+  return spec?.kind === "microsandbox" || spec?.kind === "docker" ? spec : undefined;
 }
 
 // Advice only (`factory doctor` prints it, nothing enforces it): roughly one

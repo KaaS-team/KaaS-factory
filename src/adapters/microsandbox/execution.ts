@@ -66,6 +66,8 @@ export interface AgentInVm {
   readonly secrets?: readonly string[];
   // The worktree mounted read-only: an agent that leaves its process group still cannot write.
   readonly readOnly?: boolean;
+  // Env var names a container reads from the client's env (its provider keys); msb uses `secrets`.
+  readonly forward?: readonly string[];
 }
 
 export function agentArgs(

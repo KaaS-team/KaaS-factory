@@ -5,6 +5,7 @@
 // worktree are not root's.
 
 import { resolveImage } from "../../images";
+import type { AgentInVm } from "../microsandbox/execution";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface DockerSpec {
@@ -57,6 +58,49 @@ export function containerArgs(
     "bash",
     "-c",
     cmd,
+  ];
+}
+
+// An agent stage in a container (machine.json `agentRuntime`): a writable root, since agents keep
+// caches, and the network the spec names, since the agent calls its model.
+export function dockerAgentArgs(
+  spec: DockerSpec,
+  run: AgentInVm,
+  forward: readonly string[],
+  user = `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
+): string[] {
+  const command = run.stdinFile ? ["bash", "-c", 'exec "$@" < "$0"', run.stdinFile, ...run.argv] : [...run.argv];
+  return [
+    "docker",
+    "run",
+    "--rm",
+    "--name",
+    run.name,
+    "--cap-drop=ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--network",
+    spec.network ?? "none",
+    "--memory",
+    spec.memory ?? "4g",
+    "--cpus",
+    String(spec.cpus ?? 2),
+    "--pids-limit",
+    String(spec.pids ?? 512),
+    ...(spec.runtime ? ["--runtime", spec.runtime] : []),
+    "--user",
+    user,
+    "-e",
+    "HOME=/tmp",
+    "-v",
+    `${run.cwd}:${run.cwd}${run.readOnly ? ":ro" : ""}`,
+    ...run.mounts.flatMap((d) => ["-v", `${d}:${d}`]),
+    ...Object.entries(run.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
+    ...forward.flatMap((k) => ["-e", k]),
+    "-w",
+    run.cwd,
+    resolveImage(spec.image, run.cwd),
+    ...command,
   ];
 }
 

@@ -985,7 +985,12 @@
       "phase": "P4",
       "ask": "Agent steps (triage, plan, build, verify, pr) on a remote runtime; they run where the factory runs. Only gates and `check` steps move.",
       "source": "CHANGELOG v3.3.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/remote-agent-steps.test.ts",
+        "name": "every agent step runs in the docker agentRuntime, and the ticket still ships",
+        "mutation": "agent runtime: an agent step runs in the docker container"
+      }
     },
     {
       "id": "cloud-routine-tick",

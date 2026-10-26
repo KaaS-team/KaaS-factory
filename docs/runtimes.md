@@ -1,7 +1,8 @@
 # Runtimes
 
 A runtime is where a gate or a `check` step's shell command runs. Agent steps (triage, plan,
-build, verify, pr) still run on the machine that runs the factory.
+build, verify, pr) run on the machine that runs the factory, or in the microVM or container that
+`machine.json`'s `agentRuntime` names (see [Agents in the VM](#agents-in-the-vm)).
 
 ## Picking one
 
@@ -17,7 +18,9 @@ running the step fails that issue with a comment saying which name is missing.
 
 ## Defining one
 
-`local` (this machine) and `lwpr` (`lwpr run` as it is configured here) always exist. Hosts, images
+`local` (this machine), `lwpr` (`lwpr run` as it is configured here) and `default` always exist.
+`default` is a 1 GB, one-CPU microsandbox VM where `msb` and a hypervisor are installed, and `local`
+with a warning where they are not. Hosts, images
 and tokens belong to the machine, not the repo, so you define every other runtime in
 `FACTORY_HOME/machine.json`:
 
@@ -37,8 +40,8 @@ and tokens belong to the machine, not the repo, so you define every other runtim
 
 | kind | what it does | keys |
 |---|---|---|
-| `docker` | A throwaway container. The worktree is mounted at its own path, everything else is read-only. It runs with no capabilities, no privilege escalation, capped memory, CPU and pids, and no network unless `network` names one. | `image` (required), `network`, `memory`, `cpus`, `pids`, `runtime` (for example `runsc` for gVisor) |
-| `ssh` | rsyncs the worktree to `<dir>/<worktree name>` on the host, then runs the command there. `.git` is never copied. | `host`, `dir` (both required), `exclude` (default `node_modules`) |
+| `docker` | A throwaway container. The worktree is mounted at its own path, everything else is read-only. It runs with no capabilities, no privilege escalation, capped memory, CPU and pids, and no network unless `network` names one. | `image` (required; `auto` for the repo's language image), `network`, `memory`, `cpus`, `pids`, `runtime` (for example `runsc` for gVisor) |
+| `ssh` | rsyncs the worktree to `<dir>/<worktree name>` on the host, then runs the command there, in `docker run <image>` on the host when `image` is set. `.git` is never copied. | `host`, `dir` (both required), `exclude` (default `node_modules`), `image` (`auto` for the repo's language image) |
 | `lwpr` | `lwpr run` packs the worktree and runs the command on the lwpr box. | `app`, `timeoutMin`, `setup` |
 | `wrap` | Any launcher: a Firecracker microVM, podman, bubblewrap, nsjail. `{cmd}` must be exactly one element of `argv`, and the bash command goes there. `{cwd}` is the worktree path wherever it appears. | `argv` (required) |
 | `http` | A hosted sandbox (e2b, Daytona, Modal or your own) behind the protocol below. | `url` (required; https, or http to loopback only), `tokenEnv`, `exclude` |
@@ -46,7 +49,38 @@ and tokens belong to the machine, not the repo, so you define every other runtim
 | `microsandbox` | A microVM on this machine through `msb` (see below): no network except `allow`, and keys the guest cannot read. | `image` (required), `allow` (hosts, port 443), `secrets` (`ENV@host[,host]`, each host in `allow`), `memory` (default `4G`), `cpus` (default 2) |
 | `codespaces` | A GitHub Codespace, through `gh codespace ssh` (see below). | `codespace` (required), `tokenEnv`, `root` (default `/tmp/factory`), `exclude` (default `node_modules`) |
 
-`factory doctor` lists the runtimes the repo uses and flags any that are missing.
+`factory doctor` lists the runtimes the repo uses, flags any that are missing, and runs `true` on
+each one it can reach, failing a runtime that does not answer in 10 seconds with the reason.
+`factory runtime list --probe` does the same for every runtime, and the dashboard's Settings page
+shows each used runtime's last probe, cached for five minutes.
+
+### Language images
+
+With `"image": "auto"`, a `docker` or `ssh` runtime picks the image per run from the worktree itself,
+so one machine runtime serves every repo it hosts:
+
+1. the `image` in `.devcontainer/devcontainer.json` or `.devcontainer.json` (a devcontainer built
+   from a Dockerfile has none, so it falls through);
+2. the repo's `toolchain` key in `.factory/config.json`: `node`, `bun`, `python`, `go`, `ruby` or
+   `rust` (`src/images.ts` has each image);
+3. the stack `factory init` detects (a `uv.lock` repo gets the Python image), else Node.
+
+`factory init` writes the `toolchain` key and fills `.factory/charter.md` with the stack it read.
+
+## The sandbox contract
+
+Every runtime kind reports what it can do (`src/ports/sandbox.ts`): its isolation (`none`,
+`container`, `microvm`, `remote`), whether it is a host you bring, snapshot, pause with memory kept,
+expose a port, and whether egress is denied, open or up to the provider. A verb a kind cannot do throws
+instead of pretending. `factory runtime list` prints the flags, and `factory runtime verify <name>`
+runs one shared kit against a runtime: a command and its exit code, stderr apart from stdout, files
+and env, then snapshot, pause, expose and destroy where the flags claim them. A new sandbox passes the
+same kit as microsandbox; the http and wrap kinds are proven with it in `tests/sandbox-contract.test.ts`.
+
+`src/egress.ts` is the same rule as msb's proxy for a guest without one: the guest reaches only the
+hosts on an allow-list, through the proxy, and holds a placeholder that the proxy swaps for the real
+key only on a request to that key's hosts. No adapter routes through it yet; `docker` with no
+`network` and `microsandbox` with no `allow` already deny egress.
 
 ## A pool of free tiers
 
@@ -135,14 +169,17 @@ proves all three against public echo servers; it runs only where `msb` is instal
 
 ### Agents in the VM
 
-`"agentRuntime": "<name>"` in `machine.json` names a `microsandbox` runtime, and every agent stage on
-this machine then starts inside it: the worktree and the stage's scratch folder are mounted, the guest
+`"agentRuntime": "<name>"` in `machine.json` names a `microsandbox` or `docker` runtime, and every
+agent stage on this machine then starts inside it: the worktree and the stage's scratch folder are mounted, the guest
 gets only the `FACTORY_*` values and the preset's own settings, and nothing else from this machine's
 env. The image must hold the agent CLI and git. Give its key as a secret, for example
 `"secrets": ["ANTHROPIC_API_KEY@api.anthropic.com"]` with `api.anthropic.com` in `allow`, so the agent
 holds a placeholder it cannot leak. msb 0.7 does not pass piped stdin through, so a prompt sent on
 stdin is written to the scratch folder and fed to the agent from there. `FACTORY_SLOTS` overrides
-only the slot count and keeps the rest of `machine.json`.
+only the slot count and keeps the rest of `machine.json`. A stage that may not write, on a preset that
+returns its artifact instead (an ACP server), mounts the worktree read-only. A `docker` agentRuntime must name a `network`, since the agent calls
+its model; its image must hold the agent CLI, and the preset's keys go as `-e NAME`, so docker reads
+each value from its own env and none is on a command line.
 
 The guest's git is a mirror of the stage repo made for that run, with the blobs of every hidden
 path (the holdouts) repacked out, so `git show origin/main:holdout/x` fails inside the VM whatever
@@ -189,6 +226,24 @@ each of them. Two things are shared through GitHub, so it is safe:
   An issue labelled `needs:gpu` is skipped by every worker whose machine does not list `gpu`, at
   pickup and when a restart recovers in-flight issues, so it waits for one that does. A machine with
   no `capabilities` takes only issues with no `needs:` label.
+
+## The fleet
+
+Every poll writes this machine's heartbeat to `FACTORY_HOME/machine.db`: its name, `capabilities`,
+slots, slots in use and the issues it holds. The dashboard's Settings page lists every machine that
+beats into that file, marking one quiet for two minutes as gone quiet.
+
+`factory dispatch` prints the issues one tick would advance, as a GitHub Actions matrix with one
+`factory run` job each, behind the same intake gate as `factory watch` (the pause switch,
+`maxOpenFactoryPrs` and the spend caps). `factory routine` prints a Claude Code cloud routine that runs
+`factory tick` on a cron.
+
+## Local or server
+
+The same `bin/factory` runs on a laptop and in the image the `Dockerfile` builds;
+`tests/local-or-server.test.ts` builds a copy from only what the Dockerfile copies and runs the CLI
+and the dashboard from it. The CLI and the dashboard each start in under 100 MB
+(`tests/lean-resources.test.ts`).
 
 ## In the background
 

@@ -21,7 +21,7 @@ import {
 import { plain } from "../display";
 import { streamPath, takeoverMarker } from "../paths";
 import { McpError } from "../mcp";
-import { gatewaySanitizedEnv, isProviderCredential, sanitizeEnv } from "./env";
+import { gatewaySanitizedEnv, sanitizeEnv } from "./env";
 import { gatewayHost, type LlmGateway, mintStageKey, revokeKey } from "./gateway";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
@@ -32,7 +32,8 @@ import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 import { portEnv } from "../port";
-import { agentArgs, guestGit, type MicrosandboxSpec, removeVm, SECRET } from "../adapters/microsandbox/execution";
+import { guestGit } from "../adapters/microsandbox/execution";
+import { type AgentSandbox, forGateway, removeSandbox, sandboxArgv } from "./agent-sandbox";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -147,8 +148,8 @@ export class CommandExecutor implements Executor {
     private readonly stages: StageAgents,
     private readonly routes: Readonly<Record<string, RouteConfig>> = {},
     private readonly recorder?: FixtureRecorder,
-    // machine.json `agentRuntime`: every agent this executor starts runs in this microVM.
-    private readonly vm?: MicrosandboxSpec,
+    // machine.json `agentRuntime`: every agent this executor starts runs in this microVM or container.
+    private readonly vm?: AgentSandbox,
     // machine.json `llmGateway`: every stage run gets its own key, capped at its maxBudgetUsd.
     private readonly gateway?: LlmGateway,
     // The env vars the runner's own tracker and runtime keys live in (tokenEnvNames); no agent sees them.
@@ -275,10 +276,7 @@ export class CommandExecutor implements Executor {
     // Through a gateway the agent holds only its stage key: no provider key is passed on, in a VM or not.
     const via = key && this.gateway ? agent.preset?.gateway : undefined;
     const gatewayUrl = via ? { [via.baseUrl]: `${this.gateway!.url.replace(/\/$/, "")}${via.path ?? ""}` } : {};
-    const vm =
-      via && this.vm
-        ? { ...this.vm, secrets: this.vm.secrets?.filter((s) => !isProviderCredential(SECRET.exec(s)?.[1] ?? "")) }
-        : this.vm;
+    const vm = via && this.vm ? forGateway(this.vm) : this.vm;
     // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
     const vmName = vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
     if (vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
@@ -287,7 +285,7 @@ export class CommandExecutor implements Executor {
       : stageEnv;
     const proc = Bun.spawn(
       vm && vmName
-        ? agentArgs(vm, {
+        ? sandboxArgv(vm, {
             argv,
             cwd: opts.cwd,
             mounts: [scratch],
@@ -295,6 +293,7 @@ export class CommandExecutor implements Executor {
             stdinFile: stdin === undefined ? undefined : join(scratch, "stdin"),
             name: vmName,
             readOnly,
+            forward: via ? [] : agent.preset?.envKeys,
             ...(via ? { secrets: [`${via.key}@${gatewayHost(this.gateway!)}`] } : {}),
           })
         : [...argv],
@@ -339,7 +338,7 @@ export class CommandExecutor implements Executor {
       } catch {
         proc.kill();
       }
-      if (vmName) removeVm(vmName);
+      if (vm && vmName) removeSandbox(vm, vmName);
       // A descendant that left the group (setsid) can still hold the pipe open:
       // give the reader a moment to drain, then stop waiting for it.
       setTimeout(() => cancelRead?.(), 2000).unref();
