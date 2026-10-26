@@ -113,7 +113,7 @@ registry fails the issue before the step runs, and `factory doctor` reports it f
 
 ## `if:`
 
-`if:` reads a step's JSON by its id (`plan.risk`), `toggles.autoApproveLowRisk` and `config` (so `config.riskPolicy.autoApproveMaxRisk`). It
+`if:` reads a step's JSON by its id (`plan.risk`), `toggles.autoApproveLowRisk`, the plan step's tier toggles `toggles.tiered` and `toggles.tierApproves` (src/autonomy.ts), and `config` (so `config.riskPolicy.autoApproveMaxRisk`). It
 has `==`, `!=`, `&&`, `||`, `!`, parentheses, and string, number and boolean literals. A name it
 cannot resolve is a load error.
 

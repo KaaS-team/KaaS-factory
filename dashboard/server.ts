@@ -11,7 +11,7 @@ import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { buildBoard } from "./board";
 import { paneRoutes } from "./pane";
 import { LABEL } from "../src/labels";
-import { InboxError, act, buildInbox, parkReasons, type InboxAction } from "../src/inbox";
+import { InboxError, act, inboxWithRisk, parkReasons, type InboxAction } from "../src/inbox";
 import { prItems } from "../src/stale-pr";
 import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
@@ -30,7 +30,8 @@ import { NO_PROJECT, settingsWithHealth, workflowsView, type DashboardProject } 
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
-import { commandRoutes, senderName } from "./plane/commands";
+import { senderName } from "./plane/commands";
+import { planeRoutes } from "./plane/mode";
 import { createRemote, REMOTE_PUBLIC_ROUTES } from "./plane/remote";
 import {
   readCapped,
@@ -293,7 +294,7 @@ export function createDashboard(
   const needRepo = (): Response | null => (repo ? null : json({ error: "FACTORY_REPO not set" }, { status: 500 }));
 
   async function inboxItem(r: string, number: number) {
-    return buildInbox(await cachedIssuesFor(r)).find((i) => i.issue === number);
+    return inboxWithRisk(await cachedIssuesFor(r)).find((i) => i.issue === number);
   }
 
   // Files a stage left in .factory/runs/issue-N/ of the issue's worktree. The
@@ -710,10 +711,10 @@ export function createDashboard(
         const perRepo = await Promise.all(
           repos.map(async (r) => [
             // Park reasons live in this dashboard's own DB, so only its repo has them.
-            ...buildInbox(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
+            ...inboxWithRisk(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
               (i) => ({ ...i, repo: r }),
             ),
-            ...prItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
+            ...prItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r, risk: null })),
           ]),
         );
         const items = perRepo
@@ -769,7 +770,7 @@ export function createDashboard(
       },
     },
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
-    ...commandRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
+    ...planeRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
     ...integrations.routes,
     ...paneRoutes({ repo, workspacesFor, actorOf: access.actorOf, stagesFor: (r, n) => state.listStageRuns(r, { issue: n }).map(plainStage), prUrlFor: (r, n) => state.listRuns(r).find((x) => x.issue === n)?.pr_url ?? null }),
     {

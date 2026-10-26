@@ -20,6 +20,7 @@ const SHELL = [
   "/lib/rail.js",
   "/lib/relay-follow.js",
   "/lib/remote.js",
+  "/lib/risk-badge.js",
   "/lib/routes.js",
   "/lib/run-metrics.js",
   "/lib/run-page.js",

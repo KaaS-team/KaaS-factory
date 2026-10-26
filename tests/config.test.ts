@@ -290,14 +290,14 @@ describe("packages", () => {
         packages: [
           { path: "../x", gates: [] },
           { gates: [{ name: "t", cmd: "x", required: true, role: "unit" }] },
-          { path: "p", gates: [], owners: ["@a"] },
+          { path: "p", gates: [], team: ["@a"] },
         ],
       }),
     ).toEqual([
       'packages[0].path: must be relative to the repo root, got "../x"',
       "packages[1].path: required",
       'packages[1].gates[0].role: "unit" is not one of test, lint, typecheck, build, format, audit, docs',
-      "packages[2].owners: unknown key (allowed: path, gates, always)",
+      "packages[2].team: unknown key (allowed: path, gates, always, owners, protectedPaths)",
     ]);
   });
 

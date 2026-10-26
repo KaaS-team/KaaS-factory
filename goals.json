@@ -682,91 +682,156 @@
       "phase": "P6",
       "ask": "set a repo's autonomy mode from the web, written to the tracker first (cut from command-routes: the tiers land in P6)",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/plane-commands.test.ts",
+        "name": "an owner sets a repo's autonomy as a signed tracker comment the runner reads back",
+        "mutation": "plane: the autonomy mode is set by an owner only"
+      }
     },
     {
       "id": "autonomy-tiers",
       "phase": "P6",
       "ask": "completely steer triage, planning, execution, PR, review and risk analysis, then merge automatically on automated verification",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/autonomy.test.ts",
+        "name": "each tier steers triage, plan, build, PR, review and merge, and the web mode wins over config",
+        "mutation": "autonomy: semi approves a low-risk plan by itself"
+      }
     },
     {
       "id": "pr-facts-signed",
       "phase": "P6",
       "ask": "One PR facts document with every merge signal; the decision and its reasons are signed into the receipt",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/receipt.test.ts",
+        "name": "the merge decision, its reasons and the PR facts it read are signed into the receipt",
+        "mutation": "receipt: the merge decision is signed in"
+      }
     },
     {
       "id": "verify-clean-room",
       "phase": "P6",
       "ask": "Verify runs in a fresh checkout with no network and holdouts copied in only then",
       "source": "spec 10 verify-clean-room",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/clean-room.test.ts",
+        "name": "verify runs in a fresh checkout with no network, and holdouts come in from the base only then",
+        "mutation": "clean room: holdouts come from the base"
+      }
     },
     {
       "id": "verify-changed-lines",
       "phase": "P6",
       "ask": "Factory verify runs the kit's changed-line mutants (spec 10 changed-lines-proven) on every PR",
       "source": "spec 10 changed-lines-proven",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/changed-mutants.test.ts",
+        "name": "verify runs mutants on the changed lines of every PR and reports the lines no test checks",
+        "mutation": "mutants: a mutant the tests pass is reported"
+      }
     },
     {
       "id": "verify-tamper",
       "phase": "P6",
       "ask": "Factory verify fails a diff that weakens tests, runner config or skips, using the kit's tamper check (spec 10 tamper-guard)",
       "source": "spec 10 tamper-guard",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/tamper.test.ts",
+        "name": "a diff that weakens tests, runner config or skips fails the tamper check",
+        "mutation": "tamper: an added skip marker is a hit"
+      }
     },
     {
       "id": "different-model-review",
       "phase": "P6",
       "ask": "The reviewer runs on a different model from the builder; high risk adds a second",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/review-models.test.ts",
+        "name": "the reviewer runs on a different model from the builder, and high risk adds a second",
+        "mutation": "review: high risk needs a second reviewer"
+      }
     },
     {
       "id": "verify-visual-diff",
       "phase": "P6",
       "ask": "UI changes get a preview, a smoke test and a visual diff",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/visual.test.ts",
+        "name": "UI changes get a preview, a smoke test and a visual diff",
+        "mutation": "visual: a changed screenshot is an unreviewed diff"
+      }
     },
     {
       "id": "merge-serial",
       "phase": "P6",
       "ask": "Parallel agents never break main: one PR at a time, rebased and re-gated",
       "source": "spec 10 merge-serial",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/merge-queue.test.ts",
+        "name": "one PR merges at a time, and a head the rebase moved waits for its gates",
+        "mutation": "merge queue: one lease per repo"
+      }
     },
     {
       "id": "post-merge-revert",
       "phase": "P6",
       "ask": "A failing live smoke after merge opens a revert PR; change failure rate tightens thresholds",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/post-merge.test.ts",
+        "name": "a failing live smoke after merge opens a revert PR, and the change failure rate tightens thresholds",
+        "mutation": "post-merge: a high change failure rate halves the limits"
+      }
     },
     {
       "id": "risk-badge",
       "phase": "P6",
       "ask": "One risk object per task, shown as a badge everywhere",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/risk.test.ts",
+        "name": "one risk object per task reaches the board, the inbox and the badge",
+        "mutation": "risk badge: the badge names the level"
+      }
     },
     {
       "id": "auto-merge-low-risk",
       "phase": "P6",
       "ask": "No human merge for a low-risk change: every proof green and the diff inside the low-risk class",
       "source": "spec 10 auto-merge-low-risk",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/ported/machinist/merge-policy.test.ts",
+        "name": "a low-risk change with every proof green merges with no human, and one red signal stops it",
+        "mutation": "merge policy: a tier merges when every signal is green"
+      }
     },
     {
       "id": "plan-risk-floor",
       "phase": "P6",
       "ask": "Raising the plan's risk from a deterministic rating when the agent rates it lower.",
       "source": "CHANGELOG v3.2.0 #6",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/risk.test.ts",
+        "name": "a plan the agent rates lower than its files is raised to the deterministic rating",
+        "mutation": "risk: a plan rated under its files is raised"
+      }
     },
     {
       "id": "ui-qa-pm",
@@ -1071,14 +1136,24 @@
       "phase": "P6",
       "ask": "Per-package owners and protected paths; `packages` gives gates only.",
       "source": "CHANGELOG v3.4.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/risk.test.ts",
+        "name": "a package's owners and protected paths make a change under it high risk, and a full merge waits for a person",
+        "mutation": "risk: a package's owners need a human merge"
+      }
     },
     {
       "id": "monorepo-proof",
       "phase": "P6",
       "ask": "The proof in a monorepo runs only the top-level `test` gate, not a package's.",
       "source": "CHANGELOG v3.4.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/monorepo-proof.test.ts",
+        "name": "the proof in a monorepo runs the touched package's test gate, not only the top-level one",
+        "mutation": "proof: a touched package's test gate runs too"
+      }
     },
     {
       "id": "workflow-from-late-type",
@@ -1223,7 +1298,12 @@
       "phase": "P6",
       "ask": "`--json-schema` does not replace the stop-artifact hook: it constrains only the final message, and the hook checks the artifact files.",
       "source": "CHANGELOG v3.1.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/json-schema-hook.test.ts",
+        "name": "--json-schema constrains only the final message, and the hook still checks the artifact files",
+        "mutation": "executor: claude gets --json-schema beside the armed hook"
+      }
     },
     {
       "id": "rebuild-resume-any-agent",

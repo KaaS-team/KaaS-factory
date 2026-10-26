@@ -5,7 +5,9 @@
 // from the output tail this writes to proof.json. Mirrors src/holdout.ts: an injectable
 // runner plus a pure function, so tests never need a real agent.
 
+import { type GateSpec, type PackageSpec, testGate } from "./config";
 import type { CommandResult } from "./github";
+import { touchedPackages } from "./risk";
 
 // "unavailable": the repo has no test gate, so nothing could prove the change. It is shown
 // in the PR's run summary rather than passing silently.
@@ -151,4 +153,20 @@ export class ShellProofGit implements ProofGit {
   test(worktree: string, cmd: string) {
     return sh(["bash", "-c", cmd], worktree);
   }
+}
+
+// The proof's command: the top-level test gate, then the test gate of each package the change
+// touches, run from that package's path. Without the package gates a monorepo change under
+// packages/api is "proven" by tests that never load it.
+export function proofCommand(
+  gates: readonly GateSpec[],
+  packages: readonly PackageSpec[],
+  paths: readonly string[],
+): string | undefined {
+  const pkg = touchedPackages(packages, paths).flatMap((p) => {
+    const g = testGate(p.gates);
+    return g ? [`(cd '${p.path.replaceAll("'", "'\\''")}' && ${g.cmd})`] : [];
+  });
+  const all = [testGate(gates)?.cmd, ...pkg].filter((c): c is string => !!c);
+  return all.length ? all.join(" && ") : undefined;
 }

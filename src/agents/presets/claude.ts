@@ -3,6 +3,7 @@
 // prompt, so this preset ignores the rendered one.
 // Flags checked against `claude --help` on 2026-10-05 (2.1.289), --effort and --tools included.
 
+import { readFileSync } from "node:fs";
 import type { StageEvent, StageName, StageRunOptions } from "../../executor";
 import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../../stage-permissions";
 import type { AgentPreset } from "../types";
@@ -188,7 +189,13 @@ export const claudePreset: AgentPreset = {
   // skill and ignores everything else spawnStage would otherwise put there.
   mcp: true,
   command: (opts, agent, prompt, ctx) => ({
-    argv: ["claude", ...claudeArgs(opts, prompt, ctx?.mcpConfig), ...claudeModelArgs(opts.stage, agent.model)],
+    argv: [
+      "claude",
+      ...claudeArgs(opts, prompt, ctx?.mcpConfig),
+      ...claudeModelArgs(opts.stage, agent.model),
+      // The flag takes the schema itself, not a path (claude --help, 2.1.286).
+      ...(ctx?.schemaFile ? ["--json-schema", readFileSync(ctx.schemaFile, "utf8")] : []),
+    ],
   }),
   parseLine: parseStreamJsonLine,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "result"),

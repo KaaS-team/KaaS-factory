@@ -4,6 +4,7 @@
 import { ACTION_DONE, actionLabel, choicesOf, needsText, REVIEW_KINDS } from "./actions.js";
 import { execSummary } from "./exec-summary.js";
 import { markdownText, renderMarkdown } from "./markdown.js";
+import { riskBadge } from "./risk-badge.js";
 import {
   age,
   api,
@@ -208,7 +209,7 @@ function conversation(item) {
     h(
       "div",
       { class: "panel-pad" },
-      h("h2", null, `#${item.issue} ${item.title}`),
+      h("h2", null, `#${item.issue} ${item.title} `, riskBadge(h, item.risk)),
       h(
         "span",
         { class: "muted" },

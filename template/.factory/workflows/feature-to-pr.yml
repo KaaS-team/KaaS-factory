@@ -14,7 +14,7 @@ steps:
     uses: plan
     label: factory:planning
     next:
-      - if: plan.autoApproveEligible && toggles.autoApproveLowRisk && (plan.risk == 'low' || plan.risk == 'medium' && config.riskPolicy.autoApproveMaxRisk == 'medium')
+      - if: plan.autoApproveEligible && (toggles.tierApproves || !toggles.tiered && toggles.autoApproveLowRisk && (plan.risk == 'low' || plan.risk == 'medium' && config.riskPolicy.autoApproveMaxRisk == 'medium'))
         to: build
       - park: awaiting-approval
         approve: build

@@ -18,6 +18,10 @@ const scratch = mkdtempSync(join(tmpdir(), "factory-plane-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 class QuietGitHub extends GitHub {
+  // GET /api/mode reads the control issue; none here.
+  override async listIssuesByLabel() {
+    return [];
+  }
   override async listOpenIssues() {
     return [];
   }

@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
 import { githubHost } from "./repo";
 import { type Toolchain, toolchainProblems } from "./images";
+import * as keys from "./config-merge";
 import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { LABEL } from "./labels";
@@ -51,7 +52,7 @@ export interface GateSpec {
 
 // A package in a monorepo: its gates run from its own directory, and only when
 // the diff touches a file under `path` (or `always` is set). Top-level gates always run.
-export interface PackageSpec {
+export interface PackageSpec extends keys.PackageOwnership {
   readonly path: string; // relative to the repo root, e.g. "packages/api"
   readonly gates: readonly GateSpec[];
   readonly always?: boolean;
@@ -265,7 +266,7 @@ export interface SpendConfig {
 // docs/README-only, 10-file, 200-line allow-list with repo config, since "a
 // blog post is often longer than machinist's 200 lines" (plan). A file under
 // FactoryConfig.protectedPaths is never eligible, whatever autoPaths says.
-export interface MergeConfig {
+export interface MergeConfig extends keys.MergeAutonomyFields {
   readonly policy: "off" | "dry-run" | "auto";
   readonly autoPaths: readonly string[];
   readonly maxFiles: number;
@@ -447,12 +448,11 @@ export function configProblems(raw: unknown): string[] {
   });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
   nested("runtime", { gates: "string", check: "string" });
-  nested("merge", { policy: "string", autoPaths: "strings", maxFiles: "posInt", maxLines: "posInt" });
+  nested("merge", keys.MERGE_KEYS);
+  // policy and autonomy are enums: a typo there would read as the default, which for autonomy
+  // is a different merge rule, so boot refuses it (src/config-merge.ts).
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
-    const policy = (cfg.merge as Record<string, unknown>).policy;
-    if (policy !== undefined && policy !== "off" && policy !== "dry-run" && policy !== "auto") {
-      problems.push(`merge.policy: expected "off", "dry-run" or "auto", got ${JSON.stringify(policy)}`);
-    }
+    problems.push(...keys.mergeProblems(cfg.merge as Record<string, unknown>));
   }
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
   nested("tmux", { enabled: "boolean", session: "string" });
@@ -479,7 +479,7 @@ export function configProblems(raw: unknown): string[] {
         const where = `packages[${i}]`;
         if (typeof p !== "object" || p === null) return problems.push(`${where}: expected an object`);
         const pkg = p as Record<string, unknown>;
-        checkKeys(pkg, { path: "string", gates: "object", always: "boolean" }, `${where}.`, problems);
+        checkKeys(pkg, keys.PACKAGE_KEYS, `${where}.`, problems);
         if (typeof pkg.path !== "string" || !pkg.path) problems.push(`${where}.path: required`);
         else if (pkg.path.startsWith("/") || pkg.path.split("/").includes(".."))
           problems.push(`${where}.path: must be relative to the repo root, got ${JSON.stringify(pkg.path)}`);

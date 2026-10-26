@@ -10,6 +10,7 @@
 import type { GhIssue } from "../src/github";
 import { plain } from "../src/display";
 import { LABEL, findLabel, isParkedLabel, isStateLabel } from "../src/labels";
+import { type RateOptions, type RiskObject, riskOfIssue } from "../src/risk";
 
 export type BoardColumn = "intake" | "triage" | "plan" | "build" | "verify" | "step" | "pr" | "attention";
 
@@ -25,6 +26,8 @@ export interface BoardCard {
   readonly needsMarkReady: boolean;
   // A workflow's own step label (factory:linting gives "linting"), so the board gives it a column.
   readonly step: string | null;
+  // The task's one risk object (src/risk.ts); null until triage or the plan rated it.
+  readonly risk: RiskObject | null;
 }
 
 const STATE_TO_COLUMN: Readonly<Record<string, BoardColumn>> = {
@@ -52,7 +55,7 @@ export function columnFor(labelNames: readonly string[]): BoardColumn {
 // A factory: label the factory does not ship can only come from a workflow step (labelsFor).
 const isStepLabel = (name: string) => name.startsWith("factory:") && !findLabel(name);
 
-export function buildBoard(issues: readonly GhIssue[]): BoardCard[] {
+export function buildBoard(issues: readonly GhIssue[], rate: RateOptions = { protectedPaths: [] }): BoardCard[] {
   return issues.map((issue) => {
     const names = issue.labels.map((l) => l.name);
     const stateLabel = names.find(isStateLabel) ?? null;
@@ -66,6 +69,7 @@ export function buildBoard(issues: readonly GhIssue[]): BoardCard[] {
       typeLabels: names.filter((n) => !isStateLabel(n) && !isParkedLabel(n) && !isStepLabel(n) && n !== LABEL.monitor),
       needsMarkReady: stateLabel === null && parkedLabel === null && !names.some(isStepLabel),
       step: names.find(isStepLabel)?.slice("factory:".length) ?? null,
+      risk: riskOfIssue(issue, rate),
     };
   });
 }

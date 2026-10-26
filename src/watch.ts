@@ -10,6 +10,7 @@
 // comment thread alone, so a restarted watcher, a fresh CI job, or a runner
 // on a different machine can all resume any issue.
 
+import { mergeContext, settleMerge, tierInput } from "./merge-autonomy";
 import { resolveBlockers } from "./blockers";
 import { intakeGate } from "./dispatch";
 import type { FactoryConfig } from "./config";
@@ -365,22 +366,21 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     // The PR head, not the worktree's: the policy judges the commit --match-head-commit merges.
     const changedFiles = await deps.git.diffStat(worktree, config.base, readiness.headRefOid);
     const plan = await readStageArtifacts(worktree, issueNumber, "plan");
-    const risk = (plan.json as Pick<PlanArtifact, "risk"> | undefined)?.risk ?? "high";
+    const auto = await mergeContext(deps, config, worktree, issueNumber, changedFiles, pr.number);
     const decision = decideMerge({
       readiness,
       ci,
-      risk,
       changedFiles,
-      merge: config.merge,
       protectedPaths: config.protectedPaths,
       expectedBaseRefName: config.base,
       codeowners: codeownerCheck(config.profile, deps.cloneDir, readiness.approvedBy),
+      ...tierInput(auto, config, (plan.json as Pick<PlanArtifact, "risk"> | undefined)?.risk),
     });
 
-    const marker = mergePolicyMarker(decision.headSha);
-    if (!issue.comments.some((c) => c.body.includes(marker)))
-      await postComment(deps, config, issueNumber, renderAuditComment(decision));
-    const merged = await attemptMerge(deps.github, config.repo, pr.number, decision);
+    const fresh = !issue.comments.some((c) => c.body.includes(mergePolicyMarker(decision.headSha)));
+    const post = fresh ? (body: string) => postComment(deps, config, issueNumber, body) : undefined;
+    const run = { worktree, pr: pr.number, branch: head, issue: issueNumber, post };
+    const merged = await settleMerge(deps, config, auto, decision, run);
     if (merged) return await recordMerge(deps, config, issue, pr.number, "factory");
   } catch (err) {
     console.error(`merge-policy check failed for #${issue.number}:`, err);
@@ -478,7 +478,7 @@ export async function resumeInReview(
   }
   // A human command always wins over auto-merge, so this only runs once
   // there is nothing to revise or cancel.
-  if (config.merge.policy !== "off") return checkMergePolicy(deps, config, issue);
+  if (config.merge.policy !== "off" || config.merge.autonomy) return checkMergePolicy(deps, config, issue);
   return undefined;
 }
 

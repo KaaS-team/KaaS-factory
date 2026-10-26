@@ -22,6 +22,10 @@ class FakeGitHub extends GitHub {
   override async listOpenIssues(): Promise<GhIssue[]> {
     return this.issues;
   }
+  // GET /api/mode reads the control issue; none here.
+  override async listIssuesByLabel() {
+    return [];
+  }
   // The inbox route also merges in learning-PR items (v2.10.0 item 4); no
   // fixture here opens one, so an empty list is the right default.
   override async listPrs(): Promise<GhPr[]> {
