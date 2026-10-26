@@ -584,5 +584,5 @@
   {"name": "merge queue: the gate runs in a clean checkout", "file": "src/merge-queue.ts", "find": "return await runGates(i.gateRunner, room);", "replace": "return await runGates(i.gateRunner, i.worktree);", "test": "tests/merge-queue.test.ts"},
   {"name": "clean room: a failed archive fails closed", "file": "src/clean-room.ts", "find": "if (archive.exitCode !== 0) throw", "replace": "if (archive.exitCode !== 0) return;\n  if (false) throw", "test": "tests/clean-room.test.ts"},
   {"name": "clean room: a failed tar fails closed", "file": "src/clean-room.ts", "find": "if (list.exitCode !== 0 || extract.exitCode !== 0)", "replace": "if (false)", "test": "tests/clean-room.test.ts"},
-  {"name": "clean room: restored holdouts are checked on disk", "file": "src/clean-room.ts", "find": "if (!files.length || missing.length) throw", "replace": "if (false) throw", "test": "tests/clean-room.test.ts"}
+  {"name": "clean room: restored holdouts are checked on disk", "file": "src/clean-room.ts", "find": "if (!files.length || missing.length)", "replace": "if (false)", "test": "tests/clean-room.test.ts"}
 ]
