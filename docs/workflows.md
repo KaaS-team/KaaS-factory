@@ -60,6 +60,11 @@ uses, and the set opens as one PR on a `factory/teach-*` branch. A file outside
 `.factory/workflows/`, `.factory/minions/` or `.claude/skills/`, or one that does not load, opens
 no PR.
 
+A repo needs no `.claude/` config to run. Before each stage the runner puts every factory skill and
+subagent the repo lacks where the agent reads skills, taken from the runner's `template/`, and lists
+them in the worktree's git exclude so no PR carries them. A skill or subagent the repo has under
+`.claude/` or `.agents/` wins over the default.
+
 ## Step keys
 
 | key | meaning |

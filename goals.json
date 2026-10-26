@@ -1100,14 +1100,24 @@
       "phase": "P5",
       "ask": "Factory will have defaults skills, subagents needed to run the factory and which can be usable for any coding agents too - basically default harness",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/harness-defaults.test.ts",
+        "name": "a repo with no .claude config ships an issue on the factory's default skills and subagents",
+        "mutation": "default harness: missing defaults are provided before a stage"
+      }
     },
     {
       "id": "repo-config-wins",
       "phase": "P5",
       "ask": "rest of the config harness comes from their codidng agent and repo .claude / .agents config itslef, so automatically it picks from what they configured, we will give default which if needed they overwirte and use it accordingly.",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/harness-defaults.test.ts",
+        "name": "a skill or subagent the repo configures in .claude or .agents wins over the default",
+        "mutation": "repo config wins: a repo's .agents skill is used over the default"
+      }
     },
     {
       "id": "any-board-steers",

@@ -97,7 +97,7 @@ describe("loadMinions", () => {
     const all = loadMinions(dir, config).problems.join("\n");
     expect(all).toContain(`${MINIONS_DIR}/a.yml: name: "b" must match the file name`);
     expect(all).toContain('agent: "ghost" is not in config.agents');
-    expect(all).toContain("skill: .claude/skills/missing/SKILL.md not found");
+    expect(all).toContain("skill: missing/SKILL.md not found in .claude/skills, .agents/skills or the defaults");
     expect(all).toContain("mcp:");
     expect(all).toContain(`${MINIONS_DIR}/c.yml: description: required`);
   });

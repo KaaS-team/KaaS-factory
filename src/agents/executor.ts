@@ -1,7 +1,6 @@
 // Ported from owainlewis/machinist@3943516 internal/runner/runner.go:190-240 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the process-group kill is process_unix.go, and TypeScript on Bun (`detached` is setsid); the event cap and 1 MiB line cap follow events.go and codex_usage.go; the tool-call cap and stderr tail are the factory's own (audit finding #15).
-// The one executor: spawn any agent CLI, feed the prompt, watch its output
-// through the preset's line parser, and kill the whole process group on a
-// timeout or a runaway tool-call count.
+// The one executor: spawn any agent CLI, feed the prompt, watch its output through the preset's
+// line parser, and kill the whole process group on a timeout or a runaway tool-call count.
 
 import { tierFor } from "../core/model-tier";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -24,6 +23,7 @@ import { McpError } from "../mcp";
 import { gatewaySanitizedEnv, isProviderCredential, sanitizeEnv } from "./env";
 import { gatewayHost, type LlmGateway, mintStageKey, revokeKey } from "./gateway";
 import { renderPrompt } from "./prompt";
+import { provideDefaults } from "../harness-defaults";
 import { PRESETS } from "./presets";
 import { structuredCommand } from "./structured";
 import { replySchema, stageSchema } from "../schemas";
@@ -193,6 +193,7 @@ export class CommandExecutor implements Executor {
   ): Promise<StageRunResult> {
     const artifactDir = join(opts.cwd, runDir(opts.issue));
     mkdirSync(artifactDir, { recursive: true });
+    provideDefaults(opts.cwd, agent.preset?.skillsDir);
 
     const ownCommand = agent.config.command !== undefined && !agent.preset?.wrapsCommand;
     // A read-only stage on a preset that cannot write files returns them instead.
