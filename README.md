@@ -216,9 +216,8 @@ layer actually lives in this repo:
 | **Verification** | What proof exists before a human looks? | runner-run `gates.sh` (`src/gates.ts`), the verify stage (reverts the fix, proves the new test actually catches it), `factory-reviewer`, the CI required check |
 | **Delivery** | How does work reach a person, and who ships it? | a PR from the target repo's own PR template, a human merges it, branch protection, `factory scan` feeding new issues into intake |
 
-Teaching checkpoints are `checkpoint/<name>` tags in `learnwithparam/splitbill-demo`, one per
-session in `teach/sessions.json`, which is the single list of them. The older `01-boundary` to
-`06-delivery` branches in `learnwithparam/splitbill` are legacy and no longer move.
+The lessons, demo scripts and research notes that used to live here are in the `factory/` folder of
+`learnwithparam/agentic-ai-lightning-sessions`.
 
 ## Requirements
 

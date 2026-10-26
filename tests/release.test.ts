@@ -2,7 +2,7 @@
 // ref; this pins them together so a release cannot bump one and forget the other.
 
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { LABEL } from "../src/labels";
 
@@ -77,7 +77,7 @@ describe("the CI template", () => {
 });
 
 // Renamed to KaaS Factory in v5.1.0. History, recorded transcripts, the vendored kit and the
-// mutation that reintroduces it keep the old name; teach/ leaves the repo in P1c.
+// mutation that reintroduces it keep the old name.
 const OLD_NAME_KEPT = [
   "CHANGELOG.md",
   "goals.json",
@@ -87,17 +87,26 @@ const OLD_NAME_KEPT = [
   ".git",
   ".git/",
   "tests/mutations.json",
-  "teach/",
 ];
+const ROOT = join(import.meta.dir, "..");
+const repoFiles = (dir = ROOT): string[] =>
+  readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    const rel = relative(ROOT, path) + (statSync(path).isDirectory() ? "/" : "");
+    if (OLD_NAME_KEPT.some((k) => rel === k) || /^(verify|relay)\/target\/|^reports\//.test(rel)) return [];
+    return rel.endsWith("/") ? repoFiles(path) : [rel];
+  });
 test("nothing outside history names the old repo", () => {
-  const root = join(import.meta.dir, "..");
-  const walk = (dir: string): string[] =>
-    readdirSync(dir).flatMap((name) => {
-      const path = join(dir, name);
-      const rel = relative(root, path) + (statSync(path).isDirectory() ? "/" : "");
-      if (OLD_NAME_KEPT.some((k) => rel === k) || /^(verify|relay)\/target\//.test(rel)) return [];
-      return rel.endsWith("/") ? walk(path) : [rel];
-    });
-  const offenders = walk(root).filter((rel) => /software[- ]factory/i.test(readFileSync(join(root, rel), "latin1")));
+  const offenders = repoFiles().filter((rel) => /software[- ]factory/i.test(readFileSync(join(ROOT, rel), "latin1")));
+  expect(offenders).toEqual([]);
+});
+
+// Lessons and research moved to agentic-ai-lightning-sessions/factory in v5.1.0; a path back
+// into them would be a dead link in the product.
+test("the product repo carries no teaching material", () => {
+  expect(existsSync(join(ROOT, "teach")) || existsSync(join(ROOT, "research"))).toBe(false);
+  const offenders = repoFiles().filter((rel) =>
+    /(^|[^-\w])(teach|research)\//.test(readFileSync(join(ROOT, rel), "latin1")),
+  );
   expect(offenders).toEqual([]);
 });

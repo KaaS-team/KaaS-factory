@@ -51,7 +51,7 @@ test("every licence REUSE.toml names has its text, and no text goes unused", () 
 });
 
 test("every ported file keeps its upstream licence", () => {
-  const ported = files.filter((f) => /\.(ts|js|css|md)$/.test(f) && !f.startsWith("teach/"));
+  const ported = files.filter((f) => /\.(ts|js|css|md)$/.test(f));
   for (const f of ported) {
     const head = read(f).split("\n").slice(0, 8).join("\n");
     if (!/^(?:\/\/|\/\*|<!--) Ported from /m.test(head)) continue;

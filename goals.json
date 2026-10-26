@@ -266,7 +266,12 @@
       "phase": "P1",
       "ask": "move from an educational project to a real company project: teach/ and research/ leave the repo",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/release.test.ts",
+        "name": "the product repo carries no teaching material",
+        "mutation": "release: teaching material stays out"
+      }
     },
     {
       "id": "per-source-quality",
@@ -800,8 +805,8 @@
     },
     {
       "id": "teach-command",
-      "phase": "P1",
-      "ask": "factory teach",
+      "phase": "P5",
+      "ask": "factory teach \"<how we ship>\" reads the repo, its CI and the company brain, writes workflows, minions and skills, validates them and opens a PR (research/v4/PLAN.md v4.4; deferred in CHANGELOG v4.0.0)",
       "source": "CHANGELOG v4.0.0 #1",
       "owner": "agent"
     },

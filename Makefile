@@ -1,4 +1,4 @@
-.PHONY: agent-matrix demo install check check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix install check check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
@@ -83,7 +83,3 @@ scan:
 agent-matrix:
 	bun scripts/agent-matrix.ts
 
-# The lesson's tmux layout, then attach; RECORD=1 records the attach with asciinema.
-demo:
-	teach/demo/$${SESSION:-lightning-2}.sh up
-	teach/demo/$${SESSION:-lightning-2}.sh $(if $(RECORD),--record,) attach
