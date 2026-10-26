@@ -192,9 +192,19 @@ RUNNERS = {"github": "ubuntu-", "ubicloud": "ubicloud-"}
 # (a pull request, by hand) at 3 minutes, scheduled at 9. 25 Oct 2026: shards on every push spent 464 minutes.
 PAID = ("ubicloud-", "self-hosted")
 CAP = {"run": 3, "schedule": 9}
+# Ubicloud bills only the owner's own companies, on its smallest machine; every other owner (aeosome, hyplabAI)
+# runs on GitHub. 25 Oct 2026 billed premium at 1.7x standard. Why: docs/decisions/scripts.md.
+UBICLOUD = "ubicloud-standard-2"
+UBICLOUD_OWNERS = {"param-harrison", "learnwithparam", "kaas-team"}
 
 
-def spend_errors(flows: dict[str, str]) -> list[str]:
+def owner(root: Path) -> str:
+    url = subprocess.run(["git", "remote", "get-url", "origin"], cwd=root, capture_output=True, text=True).stdout
+    m = re.search(r"github\.com[:/]([^/]+)/", url)
+    return m.group(1).lower() if m else ""
+
+
+def spend_errors(flows: dict[str, str], own: str = "") -> list[str]:
     errs = []
     for name, text in flows.items():
         head, _, body = text.partition("\njobs:\n")
@@ -206,6 +216,12 @@ def spend_errors(flows: dict[str, str]) -> list[str]:
         ]
         if paid and re.search(r"(?m)^  push:", head):
             errs.append(f"{name}: runs on a paid runner on every push; trigger it on pull_request or schedule")
+        for job, b in jobs:
+            on = (re.search(r"(?m)^    runs-on:\s*(\S+)", b) or ["", ""])[1]
+            if on.startswith("ubicloud-") and on != UBICLOUD:
+                errs.append(f"{name}: job {job} runs on {on}; Ubicloud jobs run on {UBICLOUD}, the cheapest machine")
+            if on.startswith("ubicloud-") and own and own not in UBICLOUD_OWNERS:
+                errs.append(f"{name}: job {job} runs on Ubicloud, but {own} repos run on GitHub's runners")
         for job, b in paid:
             t = re.search(r"(?m)^    timeout-minutes:\s*(\d+)\s*$", b)
             if not t or int(t.group(1)) > cap:
@@ -218,11 +234,13 @@ def ci_errors(root: Path, cfg: dict) -> list[str]:
     each schedule cron in repo.json is a cron some workflow runs on, so the two cannot drift."""
     flows = {f.name: f.read_text() for f in sorted((root / ".github/workflows").glob("*.y*ml"))}
     crons = {m for t in flows.values() for m in re.findall(r"(?m)^\s*-\s*cron:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", t)}
-    errs = spend_errors(flows) + [
+    errs = spend_errors(flows, owner(root)) + [
         f"schedule.{stage} is {cron!r}, but no workflow runs on that cron; repo.json and the workflow must agree"
         for stage, cron in sorted((cfg.get("schedule") or {}).items())
         if cron not in crons
     ]
+    if (root / ".lwpr.toml").exists():
+        errs.append(".lwpr.toml is left over: the build box runs apps only since 25 Oct 2026; delete it")
     runner = (cfg.get("ci") or {}).get("runner")
     if not runner:
         return errs
