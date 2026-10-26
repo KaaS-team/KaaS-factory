@@ -38,6 +38,7 @@ const SHELL = [
   "/lib/view-runs.js",
   "/lib/view-settings.js",
   "/lib/view-workflows.js",
+  "/lib/workflow-pages.js",
 ];
 
 self.addEventListener("install", (event) => {

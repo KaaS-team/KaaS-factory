@@ -215,10 +215,10 @@ describe("the prompt", () => {
     expect(prompt).not.toContain("name: factory-");
   });
 
-  test("a missing skill says how to fix it", async () => {
-    await expect(renderPrompt({ stage: "plan", issue: 1, cwd: scratch, maxBudgetUsd: 1 })).rejects.toThrow(
-      /factory install --update/,
-    );
+  test("a stage skill the repo lacks comes from the default harness", async () => {
+    const prompt = await renderPrompt({ stage: "plan", issue: 1, cwd: scratch, maxBudgetUsd: 1 });
+    const bundled = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-plan/SKILL.md"), "utf8");
+    expect(prompt).toContain(stripFrontmatter(bundled).trim().slice(0, 200));
   });
 });
 

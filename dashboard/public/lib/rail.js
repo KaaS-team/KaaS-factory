@@ -3,6 +3,7 @@
 
 import { api, h, isOperator, repoOf, runHref, runKey, shell, short, state, svg } from "./core.js";
 import { ACTIVE } from "./stations.js";
+import { EXTRA_ICONS, EXTRA_NAV } from "./workflow-pages.js";
 
 const ICONS = {
   inbox: "M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5",
@@ -12,6 +13,7 @@ const ICONS = {
   analytics: "M5 20V10M12 20V4M19 20v-7",
   agents: "M8 8h8v8H8zM4 10v4M20 10v4M10 4h4M10 20h4",
   workflows: "M4 5h6v4H4zM14 15h6v4h-6zM7 9v3h10v3",
+  ...EXTRA_ICONS,
   settings:
     "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1",
 };
@@ -25,6 +27,7 @@ export const NAV = [
   ["board", "Board"],
   ["runs", "Runs"],
   ["workflows", "Workflows"],
+  ...EXTRA_NAV,
   ["analytics", "Analytics"],
   ["agents", "Fleet"],
   ["settings", "Settings"],

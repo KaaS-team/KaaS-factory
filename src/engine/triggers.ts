@@ -9,6 +9,7 @@ import type { CronTrigger, Workflow } from "../core/workflow";
 import type { ScmPort } from "../ports/scm";
 import { LABEL } from "../labels";
 import { isExternalEventType, type CloudEvent } from "../core/event";
+import type { LeasePort } from "../ports/lease";
 
 export const CRON_CATCHUP_MINUTES = 60;
 const MINUTE = 60_000;
@@ -16,6 +17,7 @@ const MINUTE = 60_000;
 export interface CronStore {
   getSetting(key: string): string | undefined;
   setSetting(key: string, value: string): void;
+  readonly claim?: CronClaim;
 }
 
 // The hidden line that ties a filed issue to the trigger that filed it.
@@ -38,6 +40,27 @@ export function cronWindow(store: CronStore, key: string, now: Date): { from: nu
   return from >= to ? undefined : { from, to };
 }
 
+// One filing per schedule minute across every watcher on the repo: listing open issues and then
+// filing races (two watchers both see none). A lease ref on the shared remote is the
+// compare-and-swap; it is never released, so the second watcher's claim of that minute fails.
+export type CronClaim = (key: string, now: number) => Promise<boolean>;
+const CLAIM_TTL_MS = 24 * 60 * MINUTE;
+
+export function cronStore(deps: { state: CronStore; leases?: { port: LeasePort; holder: string } }): CronStore {
+  const { state, leases } = deps;
+  return {
+    getSetting: (k) => state.getSetting(k),
+    setSetting: (k, v) => state.setSetting(k, v),
+    ...(leases ? { claim: (key, now) => leases.port.acquire(key, leases.holder, CLAIM_TTL_MS, now) } : {}),
+  } satisfies CronStore;
+}
+
+// The last minute in (from, to] the schedule matched: the same for every watcher that saw it.
+function matchedMinute(t: Pick<CronTrigger, "cron" | "tz">, from: number, to: number): number {
+  for (let m = to; m > from; m -= MINUTE) if (cronMatches(t.cron, new Date(m), t.tz)) return m;
+  return to;
+}
+
 // Returns the numbers of the issues it filed.
 export async function fireCron(
   github: ScmPort,
@@ -46,6 +69,7 @@ export async function fireCron(
   workflow: Workflow,
   now: Date,
 ): Promise<number[]> {
+  const claim = store.claim;
   const triggers = workflow.triggers.cron;
   if (triggers.length === 0) return [];
   const key = `cron:last:${repo}:${workflow.name}`;
@@ -56,8 +80,15 @@ export async function fireCron(
   const due = triggers.map((t, i) => [t, i] as const).filter(([t]) => matchedSince(t, from, to));
   const filed: number[] = [];
   if (due.length > 0) {
-    const open = await github.listOpenIssues(repo);
-    for (const [t, i] of due) {
+    const claimed: (readonly [CronTrigger, number])[] = [];
+    for (const d of due)
+      if (
+        !claim ||
+        (await claim(`cron.${workflow.name}.${d[1]}.${matchedMinute(d[0], from, to) / MINUTE}`, now.getTime()))
+      )
+        claimed.push(d);
+    const open = claimed.length ? await github.listOpenIssues(repo) : [];
+    for (const [t, i] of claimed) {
       const marker = cronMarker(workflow.name, i);
       if (open.some((issue) => (issue.body ?? "").includes(marker))) continue;
       const body = `${t.body ? `${t.body}\n\n` : ""}Filed by the \`${workflow.name}\` workflow's schedule \`${t.cron.src}\` (${t.tz}).\n\n${marker}`;
@@ -76,6 +107,14 @@ export function eventMarker(workflow: string, eventId: string): string {
 
 const EVENT_DATA_MAX = 4000;
 
+// `emit:` chaining: a shipped run of one workflow announces its name, and every workflow whose
+// `on: emitted:` lists that name files its own issue.
+export const EMITTED = "factory.workflow.emitted";
+function chained(workflow: Workflow, event: CloudEvent): boolean {
+  const name = (event.data as { emit?: unknown } | null)?.emit;
+  return event.type === EMITTED && typeof name === "string" && (workflow.triggers.emitted ?? []).includes(name);
+}
+
 // Files one issue when the event's type is one the workflow listens for.
 // Returns its number, or undefined when nothing was filed. Only the factory's
 // own events file it as factory:ready. Another app's event (POST /events, or a
@@ -88,7 +127,7 @@ export async function fireEvent(
   workflow: Workflow,
   event: CloudEvent,
 ): Promise<number | undefined> {
-  if (!workflow.triggers.event.includes(event.type)) return undefined;
+  if (!workflow.triggers.event.includes(event.type) && !chained(workflow, event)) return undefined;
   const marker = eventMarker(workflow.name, event.id);
   const open = await github.listOpenIssues(repo);
   if (open.some((issue) => (issue.body ?? "").includes(marker))) return undefined;

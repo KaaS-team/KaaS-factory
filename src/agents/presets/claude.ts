@@ -127,7 +127,7 @@ export function claudeArgs(opts: StageRunOptions, contextPack = "", mcpConfig?: 
     "-p",
     opts.resume ? `${command}\n\nThe last attempt was sent back. The tail of why:\n\n${opts.resume.failure}` : command,
     // A fork keeps the earlier attempt's context but records this one under its own session id.
-    ...(opts.resume ? ["--resume", opts.resume.sessionId, "--fork-session"] : []),
+    ...(opts.resume?.sessionId ? ["--resume", opts.resume.sessionId, "--fork-session"] : []),
     "--output-format",
     "stream-json",
     "--verbose",

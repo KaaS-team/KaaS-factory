@@ -3,7 +3,7 @@
 
 import { api, h, heading, isOperator, money, post, quiet, shell, state, stateOr, table } from "./core.js";
 import { readRelay, saveRelay } from "./relay-follow.js";
-import { remotePanel } from "./remote.js";
+import { enablePush } from "./remote.js";
 import { healthCell, leasesPanel, machinesPanel, slotsText } from "./settings.js";
 
 const isOwner = () => state.me?.role === "owner";
@@ -114,7 +114,23 @@ function leases(d) {
   );
 }
 
-const phone = () => h("div", null, relayForm(), remotePanel());
+const phone = () => h("div", null, relayForm(), pushPanel());
+
+function pushPanel() {
+  const button = h("button", { class: "btn", type: "button" }, "Turn on notifications");
+  button.onclick = async () => {
+    button.disabled = true;
+    const ok = await enablePush().catch(() => false);
+    button.textContent = ok ? "Notifications are on" : "This browser cannot take notifications";
+  };
+  return h(
+    "section",
+    null,
+    h("h3", null, "This phone"),
+    h("p", { class: "muted" }, "Get a notification when the factory needs you or finishes a task."),
+    button,
+  );
+}
 
 function relayForm() {
   const cfg = readRelay(localStorage);

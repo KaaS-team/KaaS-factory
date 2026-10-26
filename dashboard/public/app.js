@@ -2,7 +2,7 @@
 // the server goes in as a text node (see h() in lib/core.js); no markup is ever built from it.
 // This file is the shell: routing, loading and the render loop. Each view lives in lib/view-*.js.
 
-import { api, h, plural, post, shell, short, state } from "/lib/core.js";
+import { api, h, heading, plural, post, quiet, shell, short, state, stateOr } from "/lib/core.js";
 import { renderNav } from "/lib/rail.js";
 import { readRelay } from "/lib/relay-follow.js";
 import { followRelay, startRemote } from "/lib/remote.js";
@@ -17,6 +17,7 @@ import { live, pollLive, runView } from "/lib/view-run.js";
 import { runsView } from "/lib/view-runs.js";
 import { settingsView } from "/lib/view-settings.js";
 import { workflowsView } from "/lib/view-workflows.js";
+import { EXTRA_LOADERS, extraViews } from "/lib/workflow-pages.js";
 
 const VIEWS = {
   inbox: inboxView,
@@ -25,6 +26,7 @@ const VIEWS = {
   runs: runsView,
   task: runView,
   workflows: workflowsView,
+  ...extraViews({ h, heading, stateOr, quiet, post }),
   analytics: analyticsView,
   agents: agentsView,
   settings: settingsView,
@@ -36,6 +38,7 @@ const LOADERS = {
   runs: ["runs", "/api/runs"],
   task: ["line", "/api/line"],
   workflows: ["workflows", "/api/workflows"],
+  ...EXTRA_LOADERS,
   analytics: ["analytics", "/api/analytics"],
   agents: ["agents", "/api/agents"],
   settings: ["settings", "/api/settings"],

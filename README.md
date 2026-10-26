@@ -299,8 +299,11 @@ Config example:
 `riskPolicy.autoApproveMaxRisk` (`low` or `medium`) is the highest plan risk that auto-approves.
 
 Add `gates` (the commands `gates.sh` runs, each `{ "name": ..., "cmd": ... }`) and `agentCommands`
-(`read`, `build`, `verify`: Bash patterns each stage may run, for example `["bun *", "make *"]` for
-build). Stages get only what the config grants, through `--settings` on `claude -p`; a project
+(`read`, `build`, `verify`: Bash patterns each stage may run, for example `["make test", "make *"]` for
+build). A pattern is fixed words with at most a trailing `*` or `:*`; one that names a wrapper or
+interpreter (`env`, `bash`, `python`, `bun`, `npx`, `xargs` and the like), a path, shell syntax, or a
+command that reaches outward (`gh`, `curl`, `git push`, `git -c`, `npm publish`) is dropped, because
+only the runner writes to GitHub or the tracker. Stages get only what the config grants, through `--settings` on `claude -p`; a project
 `permissions.allow` block is ignored in headless mode. `gates.sh` prints
 `FACTORY_GATES: status=GREEN|RED|MISCONFIGURED passed=N failed=N skipped=N failed_gates=a,b`.
 A gate may name its `role` (`test`, `lint`, `typecheck`, `build`, `format`, `audit` or `docs`). The

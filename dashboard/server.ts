@@ -26,7 +26,8 @@ import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from ".
 import { analytics } from "./analytics";
 import { startRelay } from "./relay";
 import { HEALTH_ROUTE, healthRoute } from "./health";
-import { NO_PROJECT, settingsWithHealth, workflowsView, type DashboardProject } from "./project";
+import { NO_PROJECT, settingsWithHealth, type DashboardProject } from "./project";
+import { workflowRoutes } from "./workflow-routes";
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
@@ -672,16 +673,8 @@ export function createDashboard(
       role: "viewer",
       handler: async () => json({ agents: await probedAgents() }),
     },
-    {
-      method: "GET",
-      pattern: /^\/api\/workflows$/,
-      label: "GET /api/workflows",
-      role: "viewer",
-      handler: async () =>
-        project
-          ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) })
-          : json({ available: false, reason: NO_PROJECT }),
-    },
+    // Workflows, Events, Minions and the workflow form: dashboard/workflow-routes.ts.
+    ...workflowRoutes({ state, github, workspacesDir: workspaces, project, actorOf: access.actorOf }),
     {
       method: "GET",
       pattern: /^\/api\/settings$/,

@@ -65,6 +65,18 @@ open gets no push.
 `factory mcp --repo <owner/name>` serves MCP on stdio with `list_tasks`, `read_task`, `start_task`
 and `approve_plan`. They post the same signed comments as the routes above.
 
+## Events, minions and workflows
+
+The Events and Minions pages need operator, since event data and minion runs carry spend and agent
+names. Events lists the outbox and inbox with each delivery's status, and Replay
+(`POST /api/events/<id>/replay`) sends one event to its sinks again, like `factory events replay`.
+Minions lists each minion, what starts it, whether it runs in a clone of the repo, and its last run.
+
+The Workflows page is read-only. Its "Propose a change" form sets a step's agent, timeout or retries
+and posts to `POST /api/workflow-edit` (operator). The runner rewrites the file, checks it with the
+watcher's own parser, and opens a PR on a `factory/workflow-<name>-<hash>` branch. A form the
+parser refuses answers 422, and nothing is pushed. The rewrite drops comments in the file.
+
 ## Turning on GitHub sign-in
 
 1. Create a GitHub OAuth app. Set its callback URL to `https://<your plane>/auth/github/callback`.

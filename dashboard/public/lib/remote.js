@@ -93,21 +93,3 @@ export function startRemote(onPaired) {
     .catch(() => {});
   return startPresence();
 }
-
-export function remotePanel() {
-  const box = document.createElement("section");
-  const title = document.createElement("h3");
-  title.textContent = "This phone";
-  const note = document.createElement("p");
-  note.textContent = "Get a notification when the factory needs you or finishes a task.";
-  const button = document.createElement("button");
-  button.type = "button";
-  button.textContent = "Turn on notifications";
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    const ok = await enablePush().catch(() => false);
-    button.textContent = ok ? "Notifications are on" : "This browser cannot take notifications";
-  });
-  box.append(title, note, button);
-  return box;
-}

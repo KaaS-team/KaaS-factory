@@ -1,7 +1,6 @@
 // Ported from owainlewis/machinist@3943516 internal/runner/runner.go:190-240 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the process-group kill is process_unix.go, and TypeScript on Bun (`detached` is setsid); the event cap and 1 MiB line cap follow events.go and codex_usage.go; the tool-call cap and stderr tail are the factory's own (audit finding #15).
-// The one executor: spawn any agent CLI, feed the prompt, watch its output
-// through the preset's line parser, and kill the whole process group on a
-// timeout or a runaway tool-call count.
+// The one executor: spawn any agent CLI, feed the prompt, watch its output through the preset's
+// line parser, and kill the whole process group on a timeout or a runaway tool-call count.
 
 import { crossModel } from "../review-models";
 import { tierFor } from "../core/model-tier";
@@ -25,6 +24,7 @@ import { McpError } from "../mcp";
 import { gatewaySanitizedEnv, sanitizeEnv } from "./env";
 import { gatewayHost, type LlmGateway, mintStageKey, revokeKey } from "./gateway";
 import { renderPrompt } from "./prompt";
+import { provideDefaults } from "../harness-defaults";
 import { PRESETS } from "./presets";
 import { structuredCommand } from "./structured";
 import { replySchema, stageSchema } from "../schemas";
@@ -160,10 +160,9 @@ export class CommandExecutor implements Executor {
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
     const route = (s: StageRunOptions["stage"]) =>
       withTier(resolveRoute(this.agents, this.stages, this.routes, s, opts.type), opts);
-    const agent =
-      opts.prompt !== undefined && opts.agent
-        ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined, opts.reviewer);
+    const agent = opts.agent
+      ? resolveAgentByName(this.agents, opts.agent, opts.stage)
+      : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined, opts.reviewer);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)
@@ -198,6 +197,7 @@ export class CommandExecutor implements Executor {
   ): Promise<StageRunResult> {
     const artifactDir = join(opts.cwd, runDir(opts.issue));
     mkdirSync(artifactDir, { recursive: true });
+    provideDefaults(opts.cwd, agent.preset?.skillsDir);
 
     const ownCommand = agent.config.command !== undefined && !agent.preset?.wrapsCommand;
     // A read-only stage on a preset that cannot write returns its file instead; a minion owes none.

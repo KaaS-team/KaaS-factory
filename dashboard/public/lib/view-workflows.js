@@ -1,7 +1,8 @@
 // Workflows in words a QA lead or PM can follow: which issues each one takes, what each step does,
 // and where it stops for a person. The step ids and runtimes stay behind an operator's fold.
 
-import { h, heading, isOperator, quiet, shell, state, stateOr } from "./core.js";
+import { h, heading, isOperator, post, quiet, shell, state, stateOr } from "./core.js";
+import { workflowEditor } from "./workflow-pages.js";
 
 export const STEP_WORDS = {
   triage: "Reads the issue and decides whether it is clear enough to start",
@@ -108,6 +109,7 @@ function workflowCard(w) {
             ),
           ),
           h("p", { class: "muted" }, w.source === "repo" ? "Defined in .factory/workflows" : "Built into the runner"),
+          workflowEditor({ h, post }, w),
         )
       : null,
   );

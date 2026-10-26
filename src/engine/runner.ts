@@ -23,8 +23,11 @@ import {
   type RunCtx,
   type WatchDeps,
 } from "./common";
-import { RuntimeMissing, STEP_TYPES } from "./steps";
+import { RuntimeMissing } from "./steps";
+import { ALL_STEP_TYPES as STEP_TYPES } from "./registry";
 import { emitEvent } from "./bus";
+import { readJournal } from "./journal";
+import { lateRoute } from "./late-route";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
 const PARKED: ReadonlySet<Outcome> = new Set(["needs-info", "needs-human", "awaiting-approval", "failed"]);
@@ -41,38 +44,40 @@ export async function runWorkflow(
   ctx: RunCtx = { rejectRound: 0, questionRound: 0 },
 ): Promise<Outcome> {
   if (!workflow.steps[startStep]) throw new Error(`workflow ${workflow.name} has no step "${startStep}"`);
-  const at = { step: startStep };
-  const base = { repo: config.repo, issue: issue.number, workflow: workflow.name };
+  const at = { step: startStep, workflow };
+  const base = () => ({ repo: config.repo, issue: issue.number, workflow: at.workflow.name, sha: at.workflow.sha });
   const subject = `issue/${issue.number}`;
   let outcome: Outcome;
   try {
-    outcome = await walk(deps, config, workflow, issue, at, worktree, ctx);
+    outcome = await walk(deps, config, issue, at, worktree, ctx);
   } catch (e) {
     emitEvent(
       deps.bus,
       "factory.step.failed",
-      { ...base, step: at.step, error: e instanceof Error ? e.message : String(e) },
+      { ...base(), step: at.step, error: e instanceof Error ? e.message : String(e) },
       subject,
     );
     throw e;
   }
-  if (PARKED.has(outcome)) emitEvent(deps.bus, "factory.issue.parked", { ...base, step: at.step, outcome }, subject);
+  if (PARKED.has(outcome)) emitEvent(deps.bus, "factory.issue.parked", { ...base(), step: at.step, outcome }, subject);
+  if (outcome === "shipped" && at.workflow.emit)
+    emitEvent(deps.bus, "factory.workflow.emitted", { ...base(), emit: at.workflow.emit }, subject);
   if (!NOT_A_RUN.has(outcome))
-    emitEvent(deps.bus, "factory.run.completed", { ...base, step: at.step, outcome }, subject);
+    emitEvent(deps.bus, "factory.run.completed", { ...base(), step: at.step, outcome }, subject);
   return outcome;
 }
 
 async function walk(
   deps: WatchDeps,
   config: FactoryConfig,
-  workflow: Workflow,
   issue: GhIssue,
-  at: { step: string },
+  at: { step: string; workflow: Workflow },
   worktree: string,
   ctx: RunCtx,
 ): Promise<Outcome> {
+  let workflow = at.workflow;
   let step: Step = workflow.steps[at.step]!;
-  const base = { repo: config.repo, issue: issue.number, workflow: workflow.name };
+  const base = () => ({ repo: config.repo, issue: issue.number, workflow: workflow.name, sha: workflow.sha });
   const subject = `issue/${issue.number}`;
   const issueNumber = issue.number;
   // What `if:` reads: each step's JSON, seeded from the thread so a resumed run sees earlier steps.
@@ -82,6 +87,26 @@ async function walk(
     const seen = latestDataFor(markers, id);
     if (seen !== undefined) facts[id] = seen;
   }
+  const scope = async (at: { uses?: string }) => ({
+    ...facts,
+    toggles: {
+      autoApproveLowRisk: deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk),
+      ...(at.uses === "plan"
+        ? await tierToggles(deps.github, config.repo, config.merge, (facts.plan as { risk?: unknown } | undefined)?.risk)
+        : { tiered: false, tierApproves: false }),
+    },
+    config,
+  });
+  // Steps the journal shows finished are not run again; a park edge is passed only once its token was approved.
+  const journal = readJournal(deps.state, issueNumber, workflow);
+  const held = step.label;
+  for (let done = journal.finished.get(step.id); done?.result === "next"; done = journal.finished.get(step.id)) {
+    if (done.facts !== undefined) facts[step.id] = done.facts;
+    const edge = pickEdge(step.next, await scope(step));
+    if ("park" in edge && !journal.approved.has(step.id)) break;
+    step = workflow.steps["park" in edge ? edge.approve : edge.to]!;
+  }
+  if (step.label !== held) await moveLabel(deps, config, issueNumber, held, step.label);
 
   try {
     for (;;) {
@@ -100,15 +125,20 @@ async function walk(
         return await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: overBudget });
       }
       at.step = step.id;
-      emitEvent(deps.bus, "factory.step.started", { ...base, step: step.id, uses: step.uses }, subject);
+      emitEvent(deps.bus, "factory.step.started", { ...base(), step: step.id, uses: step.uses }, subject);
       const result = await STEP_TYPES[step.uses]!.run({ deps, config, issue, worktree, ctx, step, workflow });
       if (result.kind === "stop" && result.outcome === "failed")
-        emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, outcome: result.outcome }, subject);
+        emitEvent(deps.bus, "factory.step.failed", { ...base(), step: step.id, outcome: result.outcome }, subject);
       else
         emitEvent(
           deps.bus,
           "factory.step.completed",
-          { ...base, step: step.id, result: result.kind === "stop" ? result.outcome : result.kind },
+          {
+            ...base(),
+            step: step.id,
+            result: result.kind === "stop" ? result.outcome : result.kind,
+            ...(result.kind === "next" && result.facts !== undefined ? { facts: result.facts } : {}),
+          },
           subject,
         );
       if (result.kind === "stop") return result.outcome;
@@ -119,23 +149,18 @@ async function walk(
         continue;
       }
       if (result.facts !== undefined) facts[step.id] = result.facts;
-      const edge = pickEdge(step.next, {
-        ...facts,
-        toggles: {
-          autoApproveLowRisk: deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk),
-          ...(step.uses === "plan"
-            ? await tierToggles(
-                deps.github,
-                config.repo,
-                config.merge,
-                (facts.plan as { risk?: unknown } | undefined)?.risk,
-              )
-            : { tiered: false, tierApproves: false }),
-        },
-        config,
-      });
+      const from = step.label;
+      const routed = step.uses === "triage" ? await lateRoute(deps, config, workflow, issue, result.facts) : undefined;
+      if (routed) {
+        workflow = at.workflow = routed.workflow;
+        step = routed.step;
+        facts[step.id] = result.facts;
+      }
+      const edge = pickEdge(step.next, await scope(step));
       if ("park" in edge) {
-        await moveLabel(deps, config, issueNumber, step.label, LABEL.awaitingApproval);
+        await moveLabel(deps, config, issueNumber, from, LABEL.awaitingApproval);
+        const token = crypto.randomUUID();
+        emitEvent(deps.bus, "factory.approval.requested", { ...base(), step: step.id, token }, subject);
         if (edge.after) {
           const at = new Date((deps.now?.() ?? new Date()).getTime() + edge.after).toISOString();
           await postComment(
@@ -150,12 +175,12 @@ async function walk(
         return "awaiting-approval";
       }
       const to: Step = workflow.steps[edge.to]!;
-      await moveLabel(deps, config, issueNumber, step.label, to.label);
+      await moveLabel(deps, config, issueNumber, from, to.label);
       step = to;
     }
   } catch (e) {
     if (e instanceof McpError || e instanceof RuntimeMissing)
-      emitEvent(deps.bus, "factory.step.failed", { ...base, step: step.id, error: e.message }, subject);
+      emitEvent(deps.bus, "factory.step.failed", { ...base(), step: step.id, error: e.message }, subject);
     if (e instanceof McpError) {
       // A server the step names is not in the base branch's .factory/mcp.json: nothing ran, so a retry after the fix is free.
       await postComment(

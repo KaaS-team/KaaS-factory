@@ -114,8 +114,13 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   },
   {
     name: "harness",
-    usage: "harness (validate | inventory) --repo-dir <path> [--json]",
-    does: "validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types",
+    usage: "harness (validate | inventory | scaffold <name> | eval [--since <days>]) --repo-dir <path> [--json]",
+    does: "validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types; scaffold: write a starting .factory/workflows/<name>.md; eval: runs, shipped rate, failed steps and cost per workflow from the event log",
+  },
+  {
+    name: "teach",
+    usage: 'teach "<how we ship>" (--repo-dir <path> | --repo <owner/name>) [--json]',
+    does: "one agent reads the repo, its CI and the brain MCP server, and opens a PR with the workflows, minions and skills it proposes, each checked first",
   },
   {
     name: "minion",
