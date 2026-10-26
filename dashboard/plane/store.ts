@@ -96,7 +96,25 @@ export class PlaneStore {
     return row && isRole(row.role) ? row.role : null;
   }
 
+  // The role as written, which may name a custom role an extension resolves.
+  storedRole(login: string): string | null {
+    const row = this.db.query("SELECT role FROM plane_memberships WHERE login = ?").get(login) as {
+      role: string;
+    } | null;
+    return row?.role ?? null;
+  }
+
+  // Extensions keep their own tables beside these, in the same file.
+  database(): Database {
+    return this.db;
+  }
+
   setMember(login: string, role: Role | null, by: string): void {
+    this.assign(login, role, by);
+  }
+
+  // Like setMember, but takes any role name; only an extension that resolves the name should call it.
+  assign(login: string, role: string | null, by: string): void {
     if (role === null) {
       this.db.query("DELETE FROM plane_memberships WHERE login = ?").run(login);
       this.db.query("DELETE FROM plane_sessions WHERE login = ?").run(login);
@@ -176,6 +194,11 @@ export class PlaneStore {
            (SELECT id FROM plane_audit WHERE (status = 403) = ? ORDER BY id DESC LIMIT 1 OFFSET ?)`,
         )
         .run(refused, refused, keep - 1);
+  }
+
+  // Oldest first from `after`, so an export can resume where the last one stopped.
+  auditAfter(after: number, limit = PAGE): AuditRow[] {
+    return this.db.query("SELECT * FROM plane_audit WHERE id > ? ORDER BY id LIMIT ?").all(after, limit) as AuditRow[];
   }
 
   // Keyset paging: newest first, `before` is the last id the caller saw.

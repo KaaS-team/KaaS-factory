@@ -1,0 +1,31 @@
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Version="2.0" ID="_resp1" IssueInstant="2026-10-26T10:00:00Z" Destination="https://plane.example/auth/saml/acs">
+  <saml:Issuer>https://idp.example/metadata</saml:Issuer>
+  <samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>
+  <saml:Assertion Version="2.0" IssueInstant="2026-10-26T10:00:00Z" ID="_assert1">
+    <saml:Issuer>https://idp.example/metadata</saml:Issuer>
+    <saml:Subject>
+      <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">Alice@Acme.example</saml:NameID>
+      <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData Recipient="https://plane.example/auth/saml/acs" NotOnOrAfter="2026-10-26T10:05:00Z"/></saml:SubjectConfirmation>
+    </saml:Subject>
+    <saml:Conditions NotOnOrAfter="2026-10-26T10:05:00Z" NotBefore="2026-10-26T09:59:00Z">
+      <saml:AudienceRestriction><saml:Audience>https://plane.example/saml</saml:Audience></saml:AudienceRestriction>
+    </saml:Conditions>
+    <saml:AuthnStatement AuthnInstant="2026-10-26T10:00:00Z"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>
+    <saml:AttributeStatement><saml:Attribute Name="note"><saml:AttributeValue>a &amp; b &lt; c "q"</saml:AttributeValue></saml:Attribute></saml:AttributeStatement>
+  <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><ds:Reference URI="#_assert1"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>TuDsBcuJMFBcCqhp2H4UMDwfDP0HBkWqP914x6n6y00=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>ddX+IK6XYQJnKvgfyh4ScrJww7F6YIaeW+xw1Y0cP6eS6BGqjJv8TUbgc4zcYiIoF+y1TDygDMm7Rb8Fk2OBq8xgcXf27VzvJpY500iD4bItIhcy+3HAuCRn7/SX/qPLEoFQLYtaQp9CMfUpiyVjqSwTI1O4PETRqV8CG/V52x0x9YtyFxJT7t80lwVviyEHhDCE92NNK4JzUn00xdXctAv2jImMPivVNtpYivJycVtG0bZhC6Mk5GR8NbmnAwuSkWWoovUFupvu4oqfUzov6nMIpHJpxZ0ynPK/IFLU/yQdGxi/UcWJSV208B6pSczmk2ZkEzswHjakN9pVwppFCw==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>MIIC7DCCAdSgAwIBAgIUc74FxUTFT8ezmDR7baIk6XJzn5QwDQYJKoZIhvcNAQEL
+BQAwFjEUMBIGA1UEAwwLZml4dHVyZS1pZHAwHhcNMjYxMDI2MTM0NjQyWhcNMzYx
+MDIzMTM0NjQyWjAWMRQwEgYDVQQDDAtmaXh0dXJlLWlkcDCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBAKCwrhMPQpEsReFAAvWvmCVvjpuU0WvPDBAiu9VX
+EtiOFWlcaWxYr0Uhs9PBtlbhl93iBkIt39Nb/lqRSTIq8kXFLTAe6dHxDj1gnUfI
+d1G8LPhby1pEyv84aXReCSyTZD+x2zltsf8Oi7xW/8NzKtarP2+/Dpb6CytC9HL6
+8WQBPUc6zHMLP/KQRm8vp6D3368T4ehCgb1JJEMfEbzFEBsdoAz+0W7slPVlnQgZ
+MjBLAB3qeFyI9dyzTm+msD2+8GAfm9QaoxVm19BGVRmDv7Xeo7koxWUgyuAgQ5Hf
+lkLFLZxL190eh6kVLMCBJymNMricg7OSaltTyeqf08Da/P0CAwEAAaMyMDAwHQYD
+VR0OBBYEFEIKBiqgf4aRw1Eu8IIEPw0s3TQlMA8GA1UdEwEB/wQFMAMBAf8wDQYJ
+KoZIhvcNAQELBQADggEBAGvs1ahbdwi95nJ62+VgqY/LG9PldwycK84VfHc+dixz
+nF7I/ZQUUy9rjy+wgypOrPrtXTeltBQFOJNY/I6HUY+K7koutF4SgdGu91fMJbNY
+Io0QhtNX97PF1+d+XzjMjWCrpd/IRxeKGE8C3RZ5lFEcoyQCc3MpQbYSyVW2P+BZ
+kAY6qzRtJwaeZM7MjXQ0L2BaXjV/4QgIJGMYLfoyBRynLcQC16T7ePCoMN/zr9fA
+Hl2mP23Irnc0pS7F+8LOvgrTLqNC3fuUodQD4a4tGRlXFWVF77hKykdhBoWtYV6Q
+ll6dhr7Ov1lmrhpLeeI5A4iR4XE3prGcsjK25VWCYuU=
+</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature></saml:Assertion></samlp:Response>

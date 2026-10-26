@@ -2,21 +2,27 @@
 // token stays as break-glass; people sign in with GitHub and an owner grants
 // them a role (docs/control-plane.md).
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { planeExtensions, type PlaneContext, type PlaneExtension } from "./extension";
 import { atLeast, isRole, PlaneStore, type Role } from "./store";
 
 export type Handler = (req: Request, url: URL, m: RegExpMatchArray) => Response | Promise<Response>;
 export interface Route {
-  readonly method: "GET" | "POST";
+  readonly method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   readonly pattern: RegExp;
   readonly label: string;
   // Missing means owner: a route nobody classified fails closed.
   readonly role?: Role;
   readonly handler: Handler;
+  // The route checks its own credential (a signed assertion, a SCIM token), so the plane lets the
+  // caller through unauthenticated and skips the cookie CSRF check, which only guards cookie auth.
+  readonly public?: boolean;
 }
 
 export interface Actor {
   login: string;
   role: Role;
+  // A custom role's name; `role` is then the ladder rank it starts from.
+  custom?: string;
 }
 
 // Not valid GitHub logins, so no account can collide with them.
@@ -64,6 +70,7 @@ export interface AccessOptions {
   store?: PlaneStore;
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
+  extensions?: readonly PlaneExtension[];
 }
 
 export function createAccess(opts: AccessOptions) {
@@ -73,8 +80,9 @@ export function createAccess(opts: AccessOptions) {
   const clientId = () => env[CLIENT_ID_ENV] ?? "";
   const clientSecret = () => env[CLIENT_SECRET_ENV] ?? "";
   const github = () => clientId() !== "" && clientSecret() !== "";
+  const exts = opts.extensions ?? planeExtensions();
   // The plane may face a network only when something guards it.
-  const guarded = () => opts.token !== "" || github();
+  const guarded = () => opts.token !== "" || github() || exts.some((e) => e.guards?.() === true);
   // A break-glass session names the token that opened it, so rotating or removing the token ends it.
   const glass = opts.token
     ? `${BREAK_GLASS}:${createHash("sha256").update(opts.token).digest("hex").slice(0, 16)}`
@@ -89,10 +97,21 @@ export function createAccess(opts: AccessOptions) {
       if (glass !== "" && login === glass) return { login: BREAK_GLASS, role: "owner" };
     } else if (login) {
       // The role is read on every request, so removing a member ends their access at once.
-      const role = store.roleOf(login);
-      if (role) return { login, role };
+      const who = member(login);
+      if (who) return who;
     }
     return !guarded() && loopback ? { login: LOCAL, role: "owner" } : null;
+  }
+
+  function member(login: string): Actor | null {
+    const role = store.roleOf(login);
+    if (role) return { login, role };
+    const stored = store.storedRole(login);
+    for (const e of stored ? exts : []) {
+      const who = e.actor?.(login, stored!);
+      if (who) return who;
+    }
+    return null;
   }
 
   function startSession(req: Request, login: string, extra: Record<string, string> = {}, status = 200): Response {
@@ -185,8 +204,8 @@ export function createAccess(opts: AccessOptions) {
           return json({ error: (e as Error).message }, 502);
         }
         store.seen(user.login, user.id, user.name);
-        const member = store.roleOf(user.login);
-        const role = member && store.claim(user.login, user.id) ? member : null;
+        const known = member(user.login);
+        const role = known && store.claim(user.login, user.id) ? known.role : null;
         store.record({
           actor: user.login,
           role: role ?? "none",
@@ -256,6 +275,25 @@ export function createAccess(opts: AccessOptions) {
   const seenActors = new WeakMap<Request, Actor>();
   const actorOf = (req: Request) => seenActors.get(req);
 
+  const ctx: PlaneContext = {
+    store,
+    env,
+    fetch: doFetch,
+    startSession: (req, login, to = "/") => startSession(req, login, { location: to }, 302),
+    actorOf,
+    member,
+  };
+  for (const e of exts) routes.push(...(e.routes?.(ctx) ?? []));
+
+  // An extension may refuse (tenancy) or grant (a custom role) before the ladder decides.
+  function permitted(who: Actor, route: Route | undefined, req: Request): boolean {
+    for (const e of route ? exts : []) {
+      const said = e.allows?.(who, route!, req);
+      if (said !== undefined) return said;
+    }
+    return atLeast(who.role, route?.role ?? "owner");
+  }
+
   // Returns a refusal, or null when the caller may run the route.
   function gate(req: Request, route: Route | undefined, isPublic: boolean, loopback: boolean, inProcess = false) {
     if (isPublic) return null;
@@ -263,8 +301,8 @@ export function createAccess(opts: AccessOptions) {
     if (!who) return json({ error: "unauthorized" }, 401);
     seenActors.set(req, who);
     const need = route?.role ?? "owner";
-    if (atLeast(who.role, need)) return null;
-    if (req.method === "POST" && route)
+    if (permitted(who, route, req)) return null;
+    if (req.method !== "GET" && route)
       store.record({ actor: who.login, role: who.role, route: route.label, issue: null, status: 403 });
     return json({ error: `needs the ${need} role` }, 403);
   }
@@ -272,7 +310,7 @@ export function createAccess(opts: AccessOptions) {
   // Every write a person could make is kept with who made it and how it ended.
   async function audited(req: Request, route: Route | undefined, run: () => Promise<Response>): Promise<Response> {
     const who = actorOf(req);
-    if (req.method !== "POST" || !who || !route) return run();
+    if (req.method === "GET" || !who || !route) return run();
     const fromPath = new URL(req.url).pathname.match(/\/(\d+)(?:\/|$)/)?.[1];
     const fromBody = fromPath
       ? undefined

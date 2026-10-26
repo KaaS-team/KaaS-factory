@@ -796,7 +796,7 @@ export function createDashboard(
     const url = new URL(req.url);
     const loopback = isLoopback(remoteAddress);
     const route = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
-    const isPublic = route !== undefined && PUBLIC_ROUTES.includes(route.label);
+    const isPublic = route !== undefined && (PUBLIC_ROUTES.includes(route.label) || route.public === true);
 
     // The webhook carries its own HMAC, so GitHub may reach it with no dashboard token set.
     const signedWebhook =
@@ -817,7 +817,7 @@ export function createDashboard(
 
     // CSRF: a mutating request must be same-origin JSON, never the
     // `text/plain` a plain HTML form can send cross-site without a preflight.
-    if (req.method === "POST") {
+    if (req.method !== "GET" && !route?.public) {
       const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
       const cloudEvent = route?.label === EVENTS_ROUTE && contentType.startsWith("application/cloudevents+json");
       if (!contentType.startsWith("application/json") && !cloudEvent)
