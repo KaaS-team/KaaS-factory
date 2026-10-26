@@ -6,7 +6,7 @@ import { appendFileSync } from "node:fs";
 import { resolveBlockers } from "./blockers";
 import { parseCron } from "./core/cron";
 import type { FactoryConfig } from "./config";
-import { spendCapHit, type SpendDeps, type WatchDeps } from "./engine/common";
+import { spendCapHit, type WatchDeps } from "./engine/common";
 import type { GhPr } from "./github";
 import { LABEL } from "./labels";
 import { canServe } from "./machine";
@@ -30,6 +30,8 @@ export interface Dispatch {
   readonly jobs: DispatchJob[];
   readonly paused?: string;
 }
+
+type SpendDeps = Pick<WatchDeps, "state" | "spend" | "machine">;
 
 export interface IntakeGate {
   readonly open: boolean;
