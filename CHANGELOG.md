@@ -39,7 +39,8 @@ GitHub stays the default tracker, `claude` the default agent and `local` the def
   what waits on you and for how long, and the 7-day spend. `/api/analytics` gains `week`.
 - kaas-relay (`relay/`, std-only Rust): the dashboard publishes the inbox and the week to it when
   `FACTORY_RELAY_URL` and `FACTORY_RELAY_TOKEN` are set; the cockpit follows it with a separate
-  read-only token, so a phone off the network still sees the inbox. Nothing travels back.
+  read-only token, so a phone off the network still sees the inbox. Nothing travels back. Each
+  reply is closed only after the client stops sending, so a refused request is never lost to a reset.
 - `machine.json` `llmGateway` runs every agent stage on its own LiteLLM key, capped at the stage's
   `maxBudgetUsd` and revoked when the stage ends; the agent holds no provider key and never the
   master key (`FACTORY_LLM_GATEWAY_KEY`). Only the `claude` and `codex` presets can use it.
