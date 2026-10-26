@@ -2,7 +2,7 @@
 // file is rewritten, checked by the same parser the watcher uses, and goes out as a PR. Nothing
 // writes the repo's workflows directly, so the Workflows page stays read-only.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isWorkflowMd } from "./core/workflow-md";
 import { BUNDLED_DIR, parseWorkflowText } from "./engine/workflows";
@@ -14,6 +14,7 @@ export type WorkflowField = (typeof WORKFLOW_FIELDS)[number];
 export type WorkflowForm = Readonly<Record<string, Partial<Record<WorkflowField, unknown>>>>;
 
 const NAME = /^[\w-]+$/;
+const POISON = new Set(["__proto__", "constructor", "prototype"]);
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 
 export interface WorkflowSource {
@@ -32,8 +33,10 @@ export function workflowSource(cloneDir: string, name: string): WorkflowSource |
   ])
     for (const ext of [".yml", ".md"]) {
       const file = join(dir, `${name}${ext}`);
-      if (existsSync(file))
-        return { name, path: `.factory/workflows/${name}${ext}`, text: readFileSync(file, "utf8"), bundled };
+      if (!existsSync(file)) continue;
+      // A repo can plant the file as a symlink to anything on the runner; it is never followed.
+      if (lstatSync(file).isSymbolicLink()) return undefined;
+      return { name, path: `.factory/workflows/${name}${ext}`, text: readFileSync(file, "utf8"), bundled };
     }
   return undefined;
 }
@@ -48,11 +51,12 @@ export function applyForm(text: string, form: WorkflowForm): { text: string } | 
   if (!isObj(steps)) return { problems: ["the workflow has no steps to edit"] };
   const problems: string[] = [];
   for (const [step, fields] of Object.entries(form)) {
-    const target = steps[step];
+    const target = NAME.test(step) && !POISON.has(step) && Object.hasOwn(steps, step) ? steps[step] : undefined;
     if (!isObj(target)) problems.push(`${step}: no such step`);
     else
       for (const [k, v] of Object.entries(fields ?? {})) {
-        if (!(WORKFLOW_FIELDS as readonly string[]).includes(k)) problems.push(`${step}.${k}: not an editable field`);
+        if (POISON.has(k) || !(WORKFLOW_FIELDS as readonly string[]).includes(k))
+          problems.push(`${step}.${k}: not an editable field`);
         else if (v === null || v === "") delete target[k];
         else target[k] = v;
       }

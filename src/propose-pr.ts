@@ -2,8 +2,8 @@
 // dashboard or the CLI (a workflow edit, `factory teach`, `factory harness scaffold`). It never
 // merges, and it refuses to push a file outside the paths its caller allows.
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, normalize } from "node:path";
+import { lstatSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, join, normalize, sep } from "node:path";
 import { outsideAllowedPaths } from "./boundary";
 import type { Git } from "./git";
 import type { ScmPort } from "./github";
@@ -35,6 +35,7 @@ export async function proposeFiles(deps: ProposeDeps, p: Proposal): Promise<{ pr
   await deps.git.ensureBranchWorktree(deps.cloneDir, dir, p.branch, p.base);
   for (const [path, text] of Object.entries(p.files)) {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
+    if (!writableInside(dir, path)) throw new Error(`refusing to write through a symlink: ${path}`);
     writeFileSync(join(dir, path), text);
   }
   await deps.git.commitAll(dir, p.title);
@@ -47,4 +48,17 @@ export async function proposeFiles(deps: ProposeDeps, p: Proposal): Promise<{ pr
     ? open.url
     : await deps.github.createPr({ repo: p.repo, base: p.base, head: p.branch, title: p.title, body: p.body });
   return { prUrl, branch: p.branch };
+}
+
+// The branch's files come from the repo, so a planted symlink (file or parent dir) would carry the
+// write anywhere on the runner.
+function writableInside(dir: string, path: string): boolean {
+  const root = realpathSync(dir);
+  const parent = realpathSync(dirname(join(dir, path)));
+  if (parent !== root && !parent.startsWith(root + sep)) return false;
+  try {
+    return !lstatSync(join(dir, path)).isSymbolicLink();
+  } catch {
+    return true;
+  }
 }
