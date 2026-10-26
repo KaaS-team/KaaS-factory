@@ -579,5 +579,10 @@
   {"name": "merge queue: one land at a time", "file": "src/merge-queue.ts", "find": "const next = this.tail.then(fn, fn);", "replace": "const next = fn();", "test": "tests/merge-queue.test.ts"},
   {"name": "clean room: holdouts run in the clone, not the worktree", "file": "src/holdout.ts", "find": "return await this.exec.run(holdout.cmd, room);", "replace": "return await this.exec.run(holdout.cmd, worktreeDir);", "test": "tests/clean-room.test.ts"},
   {"name": "clean room: hidden paths stay out of the checkout", "file": "src/clean-room.ts", "find": "must([\"sparse-checkout\", \"set\", ...sparseCheckoutPatterns(hidden)], dir);", "replace": "must([\"sparse-checkout\", \"set\", \"/*\"], dir);", "test": "tests/clean-room.test.ts"},
-  {"name": "clean room: Linux runs in a new net namespace", "file": "src/clean-room.ts", "find": "\"--net\", \"bash\"", "replace": "\"bash\"", "test": "tests/clean-room.test.ts"}
+  {"name": "clean room: Linux runs in a new net namespace", "file": "src/clean-room.ts", "find": "\"--net\", \"bash\"", "replace": "\"bash\"", "test": "tests/clean-room.test.ts"},
+  {"name": "merge queue: a pushed rebase is requeued, never merged in that pass", "file": "src/merge-queue.ts", "find": "return { outcome: \"requeued\", head: rebased.head, base };", "replace": "await port.merge(rebased.head);\n      return { outcome: \"merged\", head: rebased.head, base };", "test": "tests/merge-queue.test.ts"},
+  {"name": "merge queue: the gate runs in a clean checkout", "file": "src/merge-queue.ts", "find": "return await runGates(i.gateRunner, room);", "replace": "return await runGates(i.gateRunner, i.worktree);", "test": "tests/merge-queue.test.ts"},
+  {"name": "clean room: a failed archive fails closed", "file": "src/clean-room.ts", "find": "if (archive.exitCode !== 0) throw", "replace": "if (archive.exitCode !== 0) return;\n  if (false) throw", "test": "tests/clean-room.test.ts"},
+  {"name": "clean room: a failed tar fails closed", "file": "src/clean-room.ts", "find": "if (list.exitCode !== 0 || extract.exitCode !== 0)", "replace": "if (false)", "test": "tests/clean-room.test.ts"},
+  {"name": "clean room: restored holdouts are checked on disk", "file": "src/clean-room.ts", "find": "if (!files.length || missing.length) throw", "replace": "if (false) throw", "test": "tests/clean-room.test.ts"}
 ]

@@ -20,14 +20,15 @@ afterAll(() => {
 const GREEN = "FACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0 failed_gates=-";
 const RED = "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=pair";
 
-function fakePort(bases: string[], gate = GREEN) {
+// rebase keeps "pr-head" when the PR already sits on `onto` (upToDate says so), else it moves it.
+function fakePort(bases: string[], gate = GREEN, upToDate: (onto: string) => boolean = () => true) {
   const calls = { rebased: [] as string[], merged: [] as string[], pushed: [] as string[], reports: [] as string[] };
   let at = 0;
   const port: LandPort = {
     fetchBase: async () => bases[Math.min(at++, bases.length - 1)]!,
     rebase: async (onto) => {
       calls.rebased.push(onto);
-      return { ok: true, head: `head-on-${onto}` };
+      return { ok: true, head: upToDate(onto) ? "pr-head" : `head-on-${onto}` };
     },
     gate: async () => ({
       status: gate.includes("GREEN") ? "GREEN" : "RED",
@@ -37,8 +38,8 @@ function fakePort(bases: string[], gate = GREEN) {
       failedGates: [],
       raw: gate,
     }),
-    push: async (head) => {
-      calls.pushed.push(head);
+    push: async (expected) => {
+      calls.pushed.push(expected);
       return { ok: true, detail: "" };
     },
     merge: async (head) => {
@@ -52,12 +53,27 @@ function fakePort(bases: string[], gate = GREEN) {
 }
 
 describe("land", () => {
-  test("main moving between the gate and the merge sends the PR round again, onto the new main", async () => {
-    const { port, calls } = fakePort(["m1", "m2", "m2", "m2"]);
+  test("a PR already on the latest main merges its own head, with no push", async () => {
+    const { port, calls } = fakePort(["m1", "m1"]);
+    expect(await land(port, "pr-head")).toEqual({ outcome: "merged", head: "pr-head", base: "m1" });
+    expect(calls.pushed).toEqual([]);
+  });
+
+  test("a rebase that moves the head is pushed and requeued, never merged in the same pass", async () => {
+    const { port, calls } = fakePort(["m2", "m2"], GREEN, (onto) => onto === "m1");
     const result = await land(port, "pr-head");
-    expect(result).toEqual({ outcome: "merged", head: "head-on-m2", base: "m2" });
+    expect(result).toEqual({ outcome: "requeued", head: "head-on-m2", base: "m2" });
+    expect(calls.pushed).toEqual(["pr-head"]);
+    expect(calls.merged).toEqual([]);
+    expect(calls.reports[0]).toContain("merges once the merge policy passes");
+  });
+
+  test("main moving between the gate and the merge sends the PR round again, onto the new main", async () => {
+    const { port, calls } = fakePort(["m1", "m2", "m2"], GREEN, (onto) => onto === "m1");
+    const result = await land(port, "pr-head");
+    expect(result).toEqual({ outcome: "requeued", head: "head-on-m2", base: "m2" });
     expect(calls.rebased).toEqual(["m1", "m2"]);
-    expect(calls.merged).toEqual(["head-on-m2"]);
+    expect(calls.merged).toEqual([]);
   });
 
   test("a gate that goes red after the rebase is not merged, and the PR is told why", async () => {
@@ -132,14 +148,14 @@ function git(cwd: string, ...args: string[]): string {
 // gates.sh goes red only when a.txt and b.txt are both present: a break neither PR shows alone.
 const GATES = `if [ -e a.txt ] && [ -e b.txt ]; then echo "${RED}"; else echo "${GREEN}"; fi\n`;
 
-function repo() {
+function repo(gates = GATES) {
   const root = mkdtempSync(join(tmpdir(), "factory-merge-queue-"));
   dirs.push(root);
   git(root, "init", "-q", "--bare", "-b", "main", "origin.git");
   git(root, "clone", "-q", "origin.git", "clone");
   const clone = join(root, "clone");
   mkdirSync(join(clone, ".factory"));
-  writeFileSync(join(clone, ".factory/gates.sh"), GATES);
+  writeFileSync(join(clone, ".factory/gates.sh"), gates);
   git(clone, "add", "-A");
   git(clone, "commit", "-q", "-m", "base");
   git(clone, "push", "-q", "origin", "HEAD:main");
@@ -187,18 +203,33 @@ describe("land on a real repo", () => {
     expect(reports.join("\n")).toContain("not merged");
   });
 
-  test("a PR behind main is rebased, pushed with a lease and merged on top of it", async () => {
+  test("a PR behind main is rebased and pushed with a lease, then merged on the next pass at that head", async () => {
     const r = repo();
     const a = r.branch(1, "a.txt");
     const c = r.branch(3, "c.txt");
     expect(await land(gitLandPort(r.lander(a, []), a.head), a.head)).toMatchObject({ outcome: "merged" });
-    const result = await land(gitLandPort(r.lander(c, []), c.head), c.head);
-    expect(result.outcome).toBe("merged");
+    const first = await land(gitLandPort(r.lander(c, []), c.head), c.head);
+    expect(first.outcome).toBe("requeued");
+    r.fetch();
+    expect(r.onMain("c.txt")).toBe(false);
+    const pushed = git(r.origin, "rev-parse", "refs/heads/factory/issue-3");
+    expect(pushed).not.toBe(c.head);
+    expect(first).toMatchObject({ head: pushed });
+    // The next poll's merge policy judged the pushed head; the queue now lands it as is.
+    expect(await land(gitLandPort(r.lander(c, []), pushed), pushed)).toMatchObject({ outcome: "merged", head: pushed });
     r.fetch();
     expect(r.onMain("a.txt")).toBe(true);
     expect(r.onMain("c.txt")).toBe(true);
-    const pushed = git(r.origin, "rev-parse", "refs/heads/factory/issue-3");
-    expect(pushed).not.toBe(c.head);
     expect(git(r.origin, "rev-parse", "refs/heads/main")).toBe(pushed);
+  });
+
+  test("the gate runs on the committed head, not the agent's worktree: a file it left there does not count", async () => {
+    const r = repo(`if [ -e ok.txt ]; then echo "${GREEN}"; else echo "${RED}"; fi\n`);
+    const d = r.branch(4, "d.txt");
+    writeFileSync(join(d.wt, "ok.txt"), "agent-left\n");
+    const result = await land(gitLandPort(r.lander(d, []), d.head), d.head);
+    expect(result).toMatchObject({ outcome: "refused", reason: "gate" });
+    r.fetch();
+    expect(r.onMain("d.txt")).toBe(false);
   });
 });

@@ -9,6 +9,7 @@
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { cleanCheckout } from "./clean-room";
 import type { CommandResult, CommandRunner } from "./github";
 import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
@@ -182,6 +183,11 @@ export class Git {
   async fetchBase(worktreeDir: string, base: string): Promise<string> {
     await this.runner.run(["fetch", "-q", "origin", base], { cwd: worktreeDir });
     return (await this.runner.run(["rev-parse", `origin/${base}`], { cwd: worktreeDir })).stdout.trim();
+  }
+
+  // A fresh clone holding only `head`, for checks that must not trust the worktree's files.
+  cleanCheckout(worktreeDir: string, head: string): string {
+    return cleanCheckout(worktreeDir, "", [], head);
   }
 
   async rebaseOnto(

@@ -2,7 +2,7 @@
 // copied in after checkout, and it has no network.
 
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LocalExecution } from "../src/adapters/local/execution";
@@ -95,6 +95,55 @@ describe("verify clean room", () => {
     });
     expect(out.code).not.toBe(0);
   });
+
+  test("holdouts fail closed when the base does not resolve: the command never runs", async () => {
+    const wt = buildWorktree();
+    git(join(wt, "..", "clone"), "update-ref", "-d", "refs/remotes/origin/main");
+    const out = await new ShellHoldoutRunner(new LocalExecution()).run(wt, "main", {
+      paths: ["holdout/**"],
+      cmd: "echo RAN",
+    });
+    expect(out.code).toBe(1);
+    expect(out.stdout).not.toContain("RAN");
+    expect(out.stderr).toContain("clean room");
+  });
+
+  test("holdouts fail closed when a holdout path is not on the base", async () => {
+    const wt = buildWorktree();
+    const out = await new ShellHoldoutRunner(new LocalExecution()).run(wt, "main", {
+      paths: ["missing/**"],
+      cmd: "echo RAN",
+    });
+    expect(out.code).toBe(1);
+    expect(out.stdout).not.toContain("RAN");
+  });
+
+  // A tar that drops the extract (exit 0) or fails it (exit 1): either way the command never runs.
+  for (const code of [0, 1])
+    test(`holdouts fail closed when the extract leaves files out (tar -x exits ${code})`, async () => {
+      const wt = buildWorktree();
+      const bin = mkdtempSync(join(tmpdir(), "factory-clean-room-bin-"));
+      dirs.push(bin);
+      const real = Bun.which("tar")!;
+      writeFileSync(
+        join(bin, "tar"),
+        `#!/bin/sh\ncase "$1" in -x) cat >/dev/null; exit ${code};; esac\nexec ${real} "$@"\n`,
+      );
+      chmodSync(join(bin, "tar"), 0o755);
+      const path = process.env.PATH;
+      process.env.PATH = `${bin}:${path}`;
+      try {
+        const out = await new ShellHoldoutRunner(new LocalExecution()).run(wt, "main", {
+          paths: ["holdout/**"],
+          cmd: "echo RAN",
+        });
+        expect(out.code).toBe(1);
+        expect(out.stdout).not.toContain("RAN");
+        expect(out.stderr).toContain(code ? "tar failed" : "holdouts not restored");
+      } finally {
+        process.env.PATH = path;
+      }
+    });
 
   test("a worktree that is not a git checkout fails the run instead of grading the directory", async () => {
     const dir = mkdtempSync(join(tmpdir(), "factory-clean-room-nogit-"));

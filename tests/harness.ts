@@ -5,8 +5,8 @@
 
 import { mayTake, type LeaseRecord } from "../src/core/lease";
 import type { LeasePort } from "../src/ports/lease";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
 import { runDir } from "../src/artifacts";
@@ -306,6 +306,10 @@ export class FakeGit extends Git {
 
   override async rebaseOnto(_w: string, _onto: string, head: string): Promise<{ ok: true; head: string }> {
     return { ok: true, head };
+  }
+
+  override cleanCheckout(): string {
+    return mkdtempSync(join(tmpdir(), "fake-clean-room-"));
   }
 
   changed: string[] = [];
