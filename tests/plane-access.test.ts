@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDashboard, PUBLIC_ROUTES } from "../dashboard/server";
-import { createAccess } from "../dashboard/plane/access";
+import { createAccess, OPERATOR_KEYS } from "../dashboard/plane/access";
 import { SELF_SERVICE_ROUTES } from "../dashboard/plane/remote";
 import { atLeast, PlaneStore, ROLES, type Role } from "../dashboard/plane/store";
 import { GitHub } from "../src/github";
@@ -69,7 +69,7 @@ function make(opts: { token?: string; github?: boolean; dbPath?: string } = {}) 
     undefined,
     access,
   );
-  return { dashboard, store, dbPath };
+  return { dashboard, store, dbPath, state };
 }
 
 const BASE = "http://localhost:4100";
@@ -149,6 +149,54 @@ describe("roles", () => {
         else expect(got, `${role} ${label}`).toBe(403);
       }
     }
+  });
+});
+
+// Every key at any depth, so a nested stage row's model is found as surely as a top-level one.
+const keysOf = (v: unknown): string[] =>
+  Array.isArray(v)
+    ? v.flatMap(keysOf)
+    : v && typeof v === "object"
+      ? Object.entries(v).flatMap(([k, x]) => [k, ...keysOf(x)])
+      : [];
+
+describe("operator detail", () => {
+  test("no route a viewer can read returns a model, a cost, tokens or a host", async () => {
+    const p = make();
+    p.state.upsertRun({ issue: 1, repo: "acme/widgets", title: "t", stage: "build", status: "shipped" });
+    const at = new Date().toISOString();
+    p.state.recordStageRun({
+      repo: "acme/widgets",
+      issue: 1,
+      stage: "build",
+      agent: "claude",
+      model: "model-only-operators-see",
+      started_at: at,
+      finished_at: at,
+      duration_ms: 5,
+      tool_calls: 1,
+      tokens_in: 900,
+      tokens_out: 100,
+      cost_usd: 1.25,
+      exit_code: 0,
+      killed_reason: null,
+    });
+    const reads = guardedRoutes(p).filter((l) => l.startsWith("GET ") && roleOf(p, l) === "viewer");
+    expect(reads.length).toBeGreaterThan(15);
+    const read = async (label: string, role: Role) => {
+      const res = await p.dashboard.handle(request(label, { cookie: await asRole(p, role) }), "127.0.0.1");
+      // A stream never ends; a viewer's JSON is what this pins.
+      return (res.headers.get("content-type") ?? "").startsWith("application/json") ? res.text() : "";
+    };
+    let operatorSaw = 0;
+    for (const label of reads) {
+      const body = await read(label, "viewer");
+      expect(body, label).not.toContain("model-only-operators-see");
+      if (body) expect(keysOf(JSON.parse(body)).filter((k) => OPERATOR_KEYS.has(k)), label).toEqual([]);
+      if ((await read(label, "operator")).includes("model-only-operators-see")) operatorSaw++;
+    }
+    // The seeded run reaches the routes an operator reads, so the viewer's clean bodies are not empty ones.
+    expect(operatorSaw).toBeGreaterThan(0);
   });
 });
 
