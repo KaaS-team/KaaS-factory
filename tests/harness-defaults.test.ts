@@ -74,7 +74,7 @@ describe("default harness", () => {
     const worktree = join(workspacesDir, "issue-1");
     expect(defaultSkills()).toContain("factory-build");
     for (const s of defaultSkills()) expect(existsSync(join(worktree, ".claude/skills", s, "SKILL.md"))).toBe(true);
-    expect(defaultSubagents()).toEqual(["factory-reviewer"]);
+    expect(defaultSubagents()).toEqual(["factory-plan-critic", "factory-reviewer"]);
     expect(existsSync(join(worktree, ".claude/agents/factory-reviewer.md"))).toBe(true);
     state.close();
   });

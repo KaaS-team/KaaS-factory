@@ -30,30 +30,27 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
 
 ## 2. Research through Explore, not yourself
 
-Delegate codebase questions ("where does X live", "what calls it", "what
-tests cover it") to the built-in `Explore` subagent. Ask it targeted
-questions, tell it to answer with file:line evidence using Grep, Glob and
-Read only (it does not get the shell rules), and use its conclusions; do
-not read the whole codebase into your own context doing the same search.
+Delegate codebase questions ("where does X live", "what calls it", "what tests cover it") to the
+built-in `Explore` subagent. Ask it targeted questions, tell it to answer with file:line evidence
+using Grep, Glob and Read only (it does not get the shell rules), and use its conclusions.
 
 ## 3. Write the plan
 
-One line goal. Acceptance criteria `AC-1..n` (ids are never renumbered on a revision), each checkable by a named
-command or test. Non-goals `NG-1..n`: binding; the verifier fails a diff
-that crosses one, so write ones you actually mean. Files to touch. Repo
-skills to apply, or "none". Risk: low, medium, or high, with the charter rule
-that justifies it.
+One line goal. Acceptance criteria `AC-1..n` (ids are never renumbered on a revision), each ending
+"checked by `<test or command>`"; explanation goes before "checked by", since build runs every
+backticked command after it. Name only commands build or verify may run: read-only git, the repo's
+`agentCommands` in `.factory/config.json` that do not start with an interpreter or wrapper (node,
+python3, npx, bash), and .factory/gates.sh for the gate. Non-goals `NG-1..n`: binding; the
+verifier fails a diff that crosses one, so write ones you mean. Files to touch. Repo skills to
+apply, or "none". Risk: low, medium, or high, with the charter rule that justifies it.
 
-When `proof` is `test` (the default): name the test to write first for each
-AC. When `proof` is `check`: name the exact command that proves each AC
-instead (e.g. a repo-specific audit script, a prose lint, a link check);
-build runs that command, and no test file is expected.
+When `proof` is `test` (the default): name the test to write first for each AC. When `proof` is
+`check`: name the exact command that proves each AC instead (e.g. a repo audit script, a prose
+lint, a link check); build runs that command, and no test file is expected.
 
-**Risk policy:**
-- **low**: docs, test-only, or a single non-protected module. Eligible for
-  auto-approve when the repo's toggle is on.
-- **medium, high, a dependency major, or anything near a protected path**:
-  always waits for a human's `/factory approve`, toggle or not.
+**Risk policy:** **low** is docs, test-only, or one non-protected module, eligible for auto-approve
+when the toggle is on. **medium, high, a dependency major, or near a protected path** always
+waits for a human's `/factory approve`.
 
 If triage's `done_when` turns out unplannable (genuinely ambiguous, not just
 inconvenient), you may still post a question and hand back to needs-info;
@@ -61,9 +58,10 @@ that escape hatch exists here too, not only in `factory-build`.
 
 ## 4. Write the outputs
 
-Use `factory-comment`'s `plan.md` template for
-`.factory/runs/issue-<N>/plan-comment.md`, with `rev` set to 1 on a first
-plan, or the previous revision + 1 when `revise.md` is present. Then write
+Use `factory-comment`'s `plan.md` template for `.factory/runs/issue-<N>/plan-comment.md`, with
+`rev` set to 1 on a first plan, or the previous revision + 1 when `revise.md` is present. Then
+dispatch `factory-plan-critic` once, in the foreground, with the issue number; fix every must-fix
+item it returns in `plan-comment.md`, and never dispatch it again. Then write
 `.factory/runs/issue-<N>/plan.json`:
 
 ```json

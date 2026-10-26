@@ -93,6 +93,17 @@ export function stageAllowRules(stage: StageName, issue: number, extra?: AgentCo
   return rules;
 }
 
+// Whether one plain command (no &&, ; or |) matches a `Bash(...)` rule: a trailing `*` is a
+// prefix, anything else is the whole command. The one reading of the rules the runner and the
+// skill-command test share.
+export function bashAllowed(rules: readonly string[], cmd: string): boolean {
+  return rules.some((r) => {
+    const pat = /^Bash\((.*)\)$/.exec(r)?.[1];
+    if (pat === undefined) return false;
+    return pat.endsWith("*") ? cmd.startsWith(pat.slice(0, -1)) : cmd === pat;
+  });
+}
+
 // `mcp__<server>` allows every tool of a server the step named; under dontAsk an unlisted tool is denied.
 export function stageSettings(
   stage: StageName,
