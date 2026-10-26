@@ -813,5 +813,7 @@
   {"name": "board cache: a webhook clears every repo's lists", "file": "dashboard/plane/board-cache.ts", "find": "hits.delete(`prs\\n${repo}`);", "replace": "hits.clear();", "test": "tests/github-app.test.ts"},
   {"name": "board cache: a hooked repo keeps the 10s TTL", "file": "dashboard/plane/board-cache.ts", "find": "? HOOKED_MS : POLL_MS", "replace": "? POLL_MS : POLL_MS", "test": "tests/github-app.test.ts"},
   {"name": "board cache: a low rate budget does not double the TTL", "file": "dashboard/plane/board-cache.ts", "find": "return (await low(repo)) ? base * 2 : base;", "replace": "return base;", "test": "tests/github-app.test.ts"},
-  {"name": "board cache: the rate budget is read on every list", "file": "dashboard/plane/board-cache.ts", "find": "if (seen && now() - seen.at < RATE_CHECK_MS) return seen.low;", "replace": "", "test": "tests/github-app.test.ts"}
+  {"name": "board cache: the rate budget is read on every list", "file": "dashboard/plane/board-cache.ts", "find": "if (seen && now() - seen.at < RATE_CHECK_MS) return seen.low;", "replace": "", "test": "tests/github-app.test.ts"},
+  {"name": "github app: an installation outside the named owners is served", "file": "src/github-app.ts", "find": "        if (!this.owners.has(owner)) continue;\n", "replace": "", "test": "tests/github-app.test.ts"},
+  {"name": "github app: a token is minted for an owner outside the named ones", "file": "src/github-app.ts", "find": "    if (!this.owners.has(owner)) return null;\n", "replace": "", "test": "tests/github-app.test.ts"}
 ]

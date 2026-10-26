@@ -22,6 +22,7 @@ Every SQLite file lives under `FACTORY_HOME` (`/data` in the image).
 | `FACTORY_GITHUB_CLIENT_ID`, `FACTORY_GITHUB_CLIENT_SECRET` | GitHub sign-in for members. |
 | `GH_TOKEN` | The token the plane uses to post commands to GitHub. |
 | `FACTORY_GITHUB_APP_ID`, `FACTORY_GITHUB_APP_PRIVATE_KEY` | A GitHub App, set together: its id and its PEM private key (`\n` escapes work). See below. |
+| `FACTORY_GITHUB_APP_OWNERS` | The accounts whose installations the App serves, comma separated. It defaults to `FACTORY_REPO`'s owner. Anyone may install a public App, so an installation on any other account is ignored. |
 | `KAAS_RELAY_PUBLISH_TOKEN`, `KAAS_RELAY_SUBSCRIBE_TOKEN` | Relay tokens, 16 characters or more and different. Unset, `up` makes a pair and writes the subscribe token to `$FACTORY_HOME/relay-subscribe-token`. |
 | `FACTORY_BLOB_BUCKET`, `FACTORY_BLOB_ENDPOINT`, `FACTORY_BLOB_ACCESS_KEY_ID`, `FACTORY_BLOB_SECRET_ACCESS_KEY`, `FACTORY_BLOB_REGION` | An S3-compatible bucket (Cloudflare R2 works). |
 | `FACTORY_BLOB_DIR` | A shared directory instead of a bucket. |

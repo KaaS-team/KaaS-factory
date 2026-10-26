@@ -7,7 +7,11 @@ import { type CommandResult, type CommandRunner, GhCommandRunner } from "./githu
 import { feedServedRepos, isRepoName } from "./paths";
 import type { RateBudget } from "./ports/scm";
 
-export const APP_ENV = { id: "FACTORY_GITHUB_APP_ID", key: "FACTORY_GITHUB_APP_PRIVATE_KEY" } as const;
+export const APP_ENV = {
+  id: "FACTORY_GITHUB_APP_ID",
+  key: "FACTORY_GITHUB_APP_PRIVATE_KEY",
+  owners: "FACTORY_GITHUB_APP_OWNERS",
+} as const;
 // GitHub mints a token for an hour; one reused into its last minutes can expire mid-run.
 export const TOKEN_MARGIN_MS = 5 * 60_000;
 export const INSTALLED_TTL_MS = 5 * 60_000;
@@ -30,6 +34,8 @@ interface Minted {
 export interface AppOptions {
   appId: string;
   privateKey: string;
+  // Anyone may install a public App, so only these accounts' installations are served.
+  owners: readonly string[];
   fetch?: typeof fetch;
   now?: () => number;
   apiUrl?: string;
@@ -43,6 +49,7 @@ export class GitHubApp {
   private readonly tokens = new Map<string, Minted>();
   private readonly minting = new Map<string, Promise<string | null>>();
   private readonly installs = new Map<string, number | null>();
+  private readonly owners: ReadonlySet<string>;
 
   constructor(private readonly opts: AppOptions) {
     // Checked at boot, and the error never echoes the key.
@@ -54,6 +61,7 @@ export class GitHubApp {
     this.doFetch = opts.fetch ?? fetch;
     this.now = opts.now ?? Date.now;
     this.api = opts.apiUrl ?? "https://api.github.com";
+    this.owners = new Set(opts.owners.map((o) => o.toLowerCase()));
   }
 
   private async call(path: string, auth: string, method = "GET"): Promise<Response> {
@@ -74,6 +82,7 @@ export class GitHubApp {
   // The installation token for a repo's owner, or null when the App is not installed there.
   async tokenFor(repo: string): Promise<string | null> {
     const owner = repo.split("/")[0]!.toLowerCase();
+    if (!this.owners.has(owner)) return null;
     const held = this.tokens.get(owner);
     if (held && this.now() < held.expiresAt - TOKEN_MARGIN_MS) return held.token;
     const pending = this.minting.get(owner);
@@ -105,6 +114,7 @@ export class GitHubApp {
       const list = await this.body<{ id: number; account: { login: string } }[]>(res, "listing installations");
       for (const inst of list) {
         const owner = inst.account.login.toLowerCase();
+        if (!this.owners.has(owner)) continue;
         this.installs.set(owner, inst.id);
         const held = this.tokens.get(owner);
         const token =
@@ -164,7 +174,11 @@ export function appFromEnv(env: Record<string, string | undefined> = process.env
   const key = env[APP_ENV.key] ?? "";
   if (!id && !key) return null;
   if (!id || !key) throw new Error(`${APP_ENV.id} and ${APP_ENV.key} are set together or not at all`);
-  if (shared?.id !== id) shared = { id, app: new GitHubApp({ appId: id, privateKey: key }) };
+  const owners = (env[APP_ENV.owners] || (env.FACTORY_REPO ?? "").split("/")[0] || "").split(",").map((o) => o.trim());
+  const named = owners.filter(Boolean);
+  if (named.length === 0) throw new Error(`${APP_ENV.owners} (or FACTORY_REPO) names the accounts the App serves`);
+  const tag = `${id}:${named.join(",")}`;
+  if (shared?.id !== tag) shared = { id: tag, app: new GitHubApp({ appId: id, privateKey: key, owners: named }) };
   return shared.app;
 }
 

@@ -27,6 +27,7 @@ function fakeGitHub(clock: { t: number }) {
   const installs: Record<string, { id: number; repos: string[] }> = {
     acme: { id: 1, repos: ["acme/a", "acme/b"] },
     beta: { id: 2, repos: ["beta/x"] },
+    stranger: { id: 3, repos: ["stranger/q"] },
   };
   const calls: string[] = [];
   const minted: string[] = [];
@@ -67,7 +68,11 @@ function fakeGitHub(clock: { t: number }) {
 function app() {
   const clock = { t: Date.parse("2026-10-26T10:00:00Z") };
   const gh = fakeGitHub(clock);
-  return { clock, gh, app: new GitHubApp({ appId: "42", privateKey: PEM, fetch: gh.fetch, now: () => clock.t }) };
+  return {
+    clock,
+    gh,
+    app: new GitHubApp({ appId: "42", privateKey: PEM, owners: ["acme", "Beta"], fetch: gh.fetch, now: () => clock.t }),
+  };
 }
 
 // What gh would have been spawned with, without spawning it.
@@ -104,6 +109,16 @@ describe("GitHub App installation tokens", () => {
     expect(inner.runs.at(-1)!.token).toBe(gh.minted[2]);
   });
 
+  test("an installation outside the named owners is never served or minted for", async () => {
+    const { gh, app: a } = app();
+    expect(await a.installedRepos()).toEqual(["acme/a", "acme/b", "beta/x"]);
+    expect(await a.tokenFor("stranger/q")).toBeNull();
+    expect(gh.calls.filter((c) => c.includes("/3/") || c.includes("stranger"))).toEqual([]);
+    const env = { FACTORY_GITHUB_APP_ID: "7", FACTORY_GITHUB_APP_PRIVATE_KEY: PEM };
+    expect(() => appFromEnv(env)).toThrow("FACTORY_GITHUB_APP_OWNERS (or FACTORY_REPO) names the accounts");
+    expect(appFromEnv({ ...env, FACTORY_REPO: "acme/a" })).not.toBeNull();
+  });
+
   test("a repo the App is not installed on keeps gh's own login", async () => {
     const { app: a } = app();
     const inner = recorder();
@@ -122,6 +137,7 @@ describe("GitHub App installation tokens", () => {
       const broken = new GitHubApp({
         appId: "42",
         privateKey: PEM,
+        owners: ["acme"],
         fetch: (async () => new Response(JSON.stringify({ token: gh.minted[0] }), { status: 500 })) as never,
       });
       const err = await broken.tokenFor("acme/a").catch((e: Error) => e.message);
@@ -147,7 +163,7 @@ describe("GitHub App installation tokens", () => {
       "FACTORY_GITHUB_APP_ID and FACTORY_GITHUB_APP_PRIVATE_KEY are set together",
     );
     expect(appFromEnv({})).toBeNull();
-    expect(() => new GitHubApp({ appId: "42", privateKey: "not-a-key" })).toThrow(
+    expect(() => new GitHubApp({ appId: "42", privateKey: "not-a-key", owners: ["acme"] })).toThrow(
       "FACTORY_GITHUB_APP_PRIVATE_KEY is not a PEM private key",
     );
   });
