@@ -18,7 +18,7 @@ export function isHumanComment(comment: Pick<GhComment, "authorAssociation" | "b
 export type Command =
   | { type: "approve" }
   | { type: "revise"; text: string }
-  | { type: "retry" }
+  | { type: "retry"; force?: true }
   | { type: "cancel" }
   | { type: "answer"; text: string };
 
@@ -41,7 +41,8 @@ export function parseChatOps(signed: string): Command {
     const verb = match[1]!.toLowerCase();
     const rest = (match[2] ?? "").trim();
     if (verb === "approve") return { type: "approve" };
-    if (verb === "retry") return { type: "retry" };
+    // --force runs a retry the repeat-failure guard (src/engine/failure.ts) would refuse.
+    if (verb === "retry") return /^--force\b/.test(rest) ? { type: "retry", force: true } : { type: "retry" };
     if (verb === "cancel") return { type: "cancel" };
     return { type: "revise", text: rest };
   }

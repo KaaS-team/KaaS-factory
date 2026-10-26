@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { AgentCommands } from "./config";
 import type { StageName } from "./executor";
 import { safeCommands } from "./safe-outputs";
@@ -93,14 +95,63 @@ export function stageAllowRules(stage: StageName, issue: number, extra?: AgentCo
   return rules;
 }
 
+// The plugins a repo's .claude/settings.json or settings.local.json turns on. --setting-sources
+// project,local still loads them, so a stage would run their hooks and pay for their skills (#88).
+export function projectPlugins(cwd: string): string[] {
+  const names = new Set<string>();
+  for (const file of ["settings.json", "settings.local.json"]) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(cwd, ".claude", file), "utf8"));
+      for (const [name, on] of Object.entries(parsed?.enabledPlugins ?? {})) if (on) names.add(name);
+    } catch {
+      // No file, or not JSON: Claude Code loads nothing from it either.
+    }
+  }
+  return [...names];
+}
+
 // `mcp__<server>` allows every tool of a server the step named; under dontAsk an unlisted tool is denied.
+// --settings outranks the project's own files, so `false` here keeps each project plugin out of the stage.
 export function stageSettings(
   stage: StageName,
   issue: number,
   extra?: AgentCommands,
   mcpServers: readonly string[] = [],
+  plugins: readonly string[] = [],
 ): string {
   return JSON.stringify({
     permissions: { allow: [...stageAllowRules(stage, issue, extra), ...mcpServers.map((s) => `mcp__${s}`)] },
+    ...(plugins.length ? { enabledPlugins: Object.fromEntries(plugins.map((p) => [p, false])) } : {}),
   });
+}
+
+// A compound command's parts, split on ;, &&, ||, | and newlines outside quotes, as dontAsk checks each one.
+export function commandParts(command: string): string[] {
+  const parts: string[] = [];
+  let quote = "";
+  let part = "";
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i]!;
+    if (quote) quote = ch === quote ? "" : quote;
+    else if (ch === "'" || ch === '"') quote = ch;
+    else if (ch === ";" || ch === "\n" || ch === "|" || (ch === "&" && command[i + 1] === "&")) {
+      if (command[i + 1] === ch) i++;
+      parts.push(part);
+      part = "";
+      continue;
+    }
+    part += ch;
+  }
+  return [...parts, part].map((p) => p.trim()).filter(Boolean);
+}
+
+const covers = (rule: string, part: string): boolean => {
+  const pat = /^Bash\((.*)\)$/.exec(rule)?.[1];
+  if (pat === undefined) return false;
+  return pat.endsWith("*") ? part.startsWith(pat.slice(0, -1)) || part === pat.slice(0, -1).trimEnd() : part === pat;
+};
+
+// The first part of a Bash command no allow rule covers: the part dontAsk refused, or undefined when every part is allowed.
+export function uncoveredPart(command: string, allow: readonly string[]): string | undefined {
+  return commandParts(command).find((part) => !allow.some((rule) => covers(rule, part)));
 }

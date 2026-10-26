@@ -5,7 +5,13 @@
 
 import { readFileSync } from "node:fs";
 import type { StageEvent, StageName, StageRunOptions } from "../../executor";
-import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../../stage-permissions";
+import {
+  projectPlugins,
+  STAGE_DISALLOWED_TOOLS,
+  STAGE_GUIDANCE,
+  STAGE_TOOLS,
+  stageSettings,
+} from "../../stage-permissions";
 import type { AgentPreset } from "../types";
 import { isUsageResultCandidate, readUsage } from "../usage";
 
@@ -19,11 +25,24 @@ interface StreamJsonLine {
   cost_usd?: number;
   total_cost_usd?: number;
   message?: {
-    content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>;
+    content?: Array<{
+      type: string;
+      text?: string;
+      name?: string;
+      input?: Record<string, unknown>;
+      // On a user line's tool_result: which call it answers, and whether it is an error.
+      tool_use_id?: string;
+      is_error?: boolean;
+      content?: unknown;
+    }>;
     usage?: { input_tokens?: number; output_tokens?: number };
   };
   usage?: unknown;
-  permission_denials?: Array<{ tool_name?: string; tool_input?: { file_path?: string; command?: string } }>;
+  permission_denials?: Array<{
+    tool_name?: string;
+    tool_use_id?: string;
+    tool_input?: { file_path?: string; command?: string };
+  }>;
   // On the init event. A server that could not start reports status "failed"
   // (seen on 2.1.294); the *_errors arrays are absent when nothing failed.
   mcp_servers?: Array<{ name?: string; status?: string }>;
@@ -49,6 +68,23 @@ export function toolTarget(input: Record<string, unknown> | undefined): string |
   if (!value) return undefined;
   return value.trim().split("\n")[0]!;
 }
+
+// What refused a call, read off the error claude answered it with: dontAsk names its mode, a hook its script.
+// A hook that names no script is known only by its event (a user plugin's PreToolUse on kaas.team#5).
+export function refusedBy(text: string): string | undefined {
+  if (/^Permission to use \S+ has been denied/.test(text)) return "allowlist";
+  const hook = /^(\w+)(?::\w+)? hook error: /.exec(text);
+  if (!hook) return undefined;
+  const script = /\/hooks\/([\w.-]+?)(?:\.\w+)?[\s\]]/.exec(text.split("\n")[0]!);
+  return `hook:${script?.[1] ?? hook[1]}`;
+}
+
+const resultText = (content: unknown): string =>
+  typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content.map((c) => (typeof c?.text === "string" ? c.text : "")).join("\n")
+      : "";
 
 export function parseStreamJsonLine(line: string): StageEvent[] {
   const trimmed = line.trim();
@@ -85,10 +121,18 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
         tokensOut: parsed.message.usage.output_tokens ?? 0,
       });
     }
+  } else if (parsed.type === "user" && Array.isArray(parsed.message?.content)) {
+    for (const block of parsed.message.content) {
+      const by = block.type === "tool_result" && block.is_error ? refusedBy(resultText(block.content)) : undefined;
+      if (by && block.tool_use_id) events.push({ kind: "refusal", toolUseId: block.tool_use_id, refusedBy: by });
+    }
   } else if (parsed.type === "result") {
-    const denials = (parsed.permission_denials ?? []).map((d) =>
-      `${d.tool_name ?? "tool"} ${d.tool_input?.file_path ?? d.tool_input?.command ?? ""}`.trim(),
-    );
+    const denied = (parsed.permission_denials ?? []).map((d) => ({
+      tool: d.tool_name ?? "tool",
+      target: d.tool_input?.file_path ?? d.tool_input?.command ?? "",
+      ...(d.tool_use_id ? { id: d.tool_use_id } : {}),
+    }));
+    const denials = denied.map((d) => `${d.tool} ${d.target}`.trim());
     // Cumulative usage incl. cache tokens (machinist codex_usage.go); a result with no usage keeps the per-message sums.
     if (parsed.usage !== undefined) {
       const usage = readUsage(parsed.usage, true);
@@ -110,7 +154,7 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
         ? {}
         : { costUsd: parsed.total_cost_usd ?? parsed.cost_usd }),
       text: parsed.subtype,
-      ...(denials.length ? { denials } : {}),
+      ...(denials.length ? { denials, denied } : {}),
       ...(parsed.result ? { finalText: parsed.result } : {}),
     });
   }
@@ -146,7 +190,7 @@ export function claudeArgs(opts: StageRunOptions, contextPack = "", mcpConfig?: 
     "--tools",
     STAGE_TOOLS[opts.stage].join(","),
     "--settings",
-    stageSettings(opts.stage, opts.issue, opts.agentCommands, Object.keys(opts.mcp ?? {})),
+    stageSettings(opts.stage, opts.issue, opts.agentCommands, Object.keys(opts.mcp ?? {}), projectPlugins(opts.cwd)),
     "--append-system-prompt",
     contextPack ? `${STAGE_GUIDANCE}\n\n${contextPack}` : STAGE_GUIDANCE,
     "--max-budget-usd",

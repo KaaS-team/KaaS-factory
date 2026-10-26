@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { claudeArgs } from "../src/agents/presets/claude";
 import type { StageName } from "../src/executor";
-import { stageSettings } from "../src/stage-permissions";
+import { commandParts, projectPlugins, stageSettings, uncoveredPart } from "../src/stage-permissions";
 
 const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr"];
 
@@ -77,4 +80,47 @@ describe("skill commands are permitted by their stage", () => {
       for (const cmd of cmds) expect([cmd, allowed(allow, cmd)]).toEqual([cmd, true]);
     });
   }
+});
+
+describe("uncoveredPart", () => {
+  test("splits a compound command outside quotes", () => {
+    expect(commandParts(`git log --oneline -3 && echo "a; b" | wc -l || true\nls`)).toEqual([
+      "git log --oneline -3",
+      'echo "a; b"',
+      "wc -l",
+      "true",
+      "ls",
+    ]);
+  });
+
+  test("names the first part the allow list does not cover (#91)", () => {
+    const allow = ["Bash(git status*)", "Bash(head *)", "Bash(ls)"];
+    expect(uncoveredPart("git status --short; npm ls zod undici 2>&1 | head -20", allow)).toBe(
+      "npm ls zod undici 2>&1",
+    );
+    expect(uncoveredPart("git status && ls", allow)).toBeUndefined();
+    expect(uncoveredPart("ls -la", allow)).toBe("ls -la");
+  });
+});
+
+// #88: kaas.team's .claude/settings.json turned on the operator's plugins, and one of their hooks refused every plan Write.
+describe("project plugins stay out of a stage", () => {
+  test("every plugin the repo turns on is turned off in the stage settings", () => {
+    const dir = mkdtempSync(join(tmpdir(), "plugins-"));
+    mkdirSync(join(dir, ".claude"));
+    writeFileSync(
+      join(dir, ".claude", "settings.json"),
+      JSON.stringify({ enabledPlugins: { "guards@m": true, "off@m": false } }),
+    );
+    writeFileSync(join(dir, ".claude", "settings.local.json"), JSON.stringify({ enabledPlugins: { "local@m": true } }));
+    expect(projectPlugins(dir)).toEqual(["guards@m", "local@m"]);
+    const argv = claudeArgs({ stage: "plan", issue: 5, cwd: dir, maxBudgetUsd: 1 });
+    const settings = JSON.parse(argv[argv.indexOf("--settings") + 1]!);
+    expect(settings.enabledPlugins).toEqual({ "guards@m": false, "local@m": false });
+  });
+
+  test("a repo with no settings file adds no enabledPlugins key", () => {
+    expect(projectPlugins(mkdtempSync(join(tmpdir(), "plugins-")))).toEqual([]);
+    expect(JSON.parse(stageSettings("plan", 1)).enabledPlugins).toBeUndefined();
+  });
 });

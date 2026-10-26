@@ -7,7 +7,7 @@ import type { IssueScope } from "../core/model-tier";
 export type StageName = "triage" | "plan" | "build" | "verify" | "pr" | "retro";
 
 export interface StageEvent {
-  readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated" | "session" | "startup_error";
+  readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated" | "session" | "startup_error" | "refusal";
   readonly toolName?: string;
   // On "tool_use" events: the file, command or pattern the call touched, so a watcher can follow along.
   readonly toolTarget?: string;
@@ -23,6 +23,10 @@ export interface StageEvent {
   readonly costUsd?: number;
   // On "result" events: tool calls the permission system refused, as "Tool path".
   readonly denials?: string[];
+  // On "result" events: the same calls with their tool_use ids; on "refusal" events: the id and what refused it.
+  readonly denied?: ReadonlyArray<{ readonly tool: string; readonly target: string; readonly id?: string }>;
+  readonly toolUseId?: string;
+  readonly refusedBy?: string;
   // The agent's own closing message (Claude `result.result`, Codex `agent_message`).
   readonly finalText?: string;
   // On "session" events: the id `claude --resume` takes (factory takeover).
@@ -89,6 +93,8 @@ export interface StageRunResult {
   readonly stderrTail?: string;
   // Tool calls `claude` refused (from the result event's permission_denials).
   readonly permissionDenials: string[];
+  // The same calls with what refused each: "allowlist", "hook:<name>" (src/engine/failure.ts names them).
+  readonly refusals?: readonly Refusal[];
   // The agent's last message, capped at 16 KiB (machinist final_message.go).
   readonly finalMessage?: string;
   // False when an over-long event line or a missing parser meant tokens are
@@ -98,6 +104,12 @@ export interface StageRunResult {
   readonly model?: string | null;
   // The agent's session, when its CLI reports one and keeps it resumable.
   readonly sessionId?: string;
+}
+
+export interface Refusal {
+  readonly tool: string;
+  readonly target: string;
+  readonly by: string;
 }
 
 export interface Executor {

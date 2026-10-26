@@ -33,6 +33,12 @@ export function workspacesDir(env: NodeJS.ProcessEnv = process.env, repo?: strin
   return repo ? `${repoHome(repo, env)}/workspaces` : `${factoryHome(env)}/workspaces`;
 }
 
+// The plane's copy of a repo's .factory/ config, written by the blob mirror (src/blobs.ts) when the
+// plane holds no clone of that repo; shaped like a clone so the clone readers work on it unchanged.
+export function configMirrorDir(repo: string, env: NodeJS.ProcessEnv = process.env): string {
+  return `${repoHome(repo, env)}/config`;
+}
+
 export function defaultStatePath(env: NodeJS.ProcessEnv = process.env, repo?: string): string {
   return repo ? `${repoHome(repo, env)}/factory.db` : `${factoryHome(env)}/factory.db`;
 }
@@ -63,14 +69,22 @@ export function discoverRepos(env: NodeJS.ProcessEnv = process.env): string[] {
   return repos.sort();
 }
 
+// A hosted plane adds the repos its GitHub App is installed on (src/github-app.ts), fed in as a
+// sync source so servedRepos stays the one list and stays sync.
+let fedRepos: () => readonly string[] = () => [];
+export function feedServedRepos(source: (() => readonly string[]) | null): void {
+  fedRepos = source ?? (() => []);
+}
+
 // The one list of repos a dashboard serves and a plane mirrors: FACTORY_REPOS when set, else every
-// repo that has run here, plus the repo a dashboard was started for.
+// repo that has run here, plus the repo a dashboard was started for and any fed in above.
 export function servedRepos(env: NodeJS.ProcessEnv = process.env, primary = ""): string[] {
   const listed = (env.FACTORY_REPOS ?? "")
     .split(",")
     .map((r) => r.trim())
     .filter(isRepoName);
-  return [...new Set([...(primary ? [primary] : []), ...(listed.length ? listed : discoverRepos(env))])];
+  const fed = fedRepos().filter(isRepoName);
+  return [...new Set([...(primary ? [primary] : []), ...(listed.length ? listed : discoverRepos(env)), ...fed])];
 }
 
 export function isRepoName(repo: string): boolean {

@@ -46,6 +46,7 @@ import { LABEL, typesFor } from "../labels";
 import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
 import { prBody, renderWhatChanged } from "./pr-body";
+import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { flooredPlan, proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
 import {
@@ -56,7 +57,6 @@ import {
   recheckFindings,
   runRetro,
   runStage,
-  stageFailure,
   stageJson,
   stopStep,
   upsertStatusComment,
@@ -126,15 +126,9 @@ const triage: StepType = {
     const art = await readStageArtifacts(worktree, issueNumber, "triage");
     const { json, problem } = stageJson<TriageArtifact>("triage", art.json, typesFor(config.routes));
     if (result.exitCode !== 0 || !json) {
-      await moveLabel(deps, config, issueNumber, step.label, LABEL.failed);
-      finish(
-        deps,
-        config,
-        issueNumber,
-        "failed",
-        problem ?? stageFailure(result, "triage produced no valid triage.json"),
-      );
-      return stop("failed");
+      const fallback = "triage produced no valid triage.json";
+      const cause = stageCause(config, issueNumber, "triage", result, { problem, fallback });
+      return stop(await failStage(deps, config, issue, step.label, "triage", cause));
     }
     const triageStop = stepStop(json);
     if (triageStop) return stop(await stopStep(deps, config, issueNumber, step.label, triageStop));
@@ -161,9 +155,9 @@ const plan: StepType = {
     // to "not eligible" and park as awaiting-approval with no plan comment
     // to approve against — stuck forever (audit finding #10).
     if (result.exitCode !== 0 || !json) {
-      await moveLabel(deps, config, issueNumber, step.label, LABEL.failed);
-      finish(deps, config, issueNumber, "failed", problem ?? stageFailure(result, "plan produced no valid plan.json"));
-      return stop("failed");
+      const fallback = "plan produced no valid plan.json";
+      const cause = stageCause(config, issueNumber, "plan", result, { problem, fallback });
+      return stop(await failStage(deps, config, issue, step.label, "plan", cause));
     }
     const planStop = stepStop(json);
     if (planStop) return stop(await stopStep(deps, config, issueNumber, step.label, planStop));
@@ -227,14 +221,9 @@ const build: StepType = {
     if (art.comment) await upsertStatusComment(deps, config, issue, art.comment, { build: json ?? null, gate });
 
     if (result.exitCode !== 0 || !json || gate.status !== "GREEN") {
-      await moveLabel(deps, config, issueNumber, step.label, LABEL.failed);
       deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
-      const reason =
-        problem ??
-        stageFailure(result) ??
-        `gates ${gate.status.toLowerCase()}${gate.failedGates.length ? `: ${gate.failedGates.join(", ")}` : ""}`;
-      finish(deps, config, issueNumber, "failed", reason);
-      return stop("failed");
+      const cause = stageCause(config, issueNumber, "build", result, { problem, gate });
+      return stop(await failStage(deps, config, issue, step.label, "build", cause));
     }
 
     // The runner commits — the build skill's own instructions say so, but
@@ -398,12 +387,14 @@ const verify: StepType = {
       if (art.comment)
         await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
+      const fallback = json ? "verify uncertain" : "verify produced no valid verdict.json";
+      const cause = stageCause(config, issueNumber, "verify", result, { fallback });
       finish(
         deps,
         config,
         issueNumber,
         "needs-human",
-        stageFailure(result, json ? "verify uncertain" : "verify produced no valid verdict.json"),
+        (await failureLine(deps, config, issueNumber, "verify", cause)).line,
       );
       return stop("needs-human");
     }
