@@ -8,10 +8,11 @@ import { join } from "node:path";
 import { S3Client } from "bun";
 import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
 import { S3BlobStore } from "../src/adapters/blob-s3/blob";
-import { blobStoreFromEnv, localPathFor, mirroredRepos, mirrorDown } from "../src/blobs";
+import { blobStoreFromEnv, importRunState, localPathFor, mirroredRepos, mirrorDown } from "../src/blobs";
 import { mergeConfig } from "../src/config";
 import { blobKeys, parseBlobKey, shipStage } from "../src/engine/blobs";
 import { LABEL } from "../src/labels";
+import { defaultStatePath } from "../src/paths";
 import type { BlobEntry, BlobStore } from "../src/ports/blob";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
@@ -122,6 +123,8 @@ describe("blob store adapters", () => {
       issue: 3,
       name: "x.md",
     });
+    expect(parseBlobKey(blobKeys.state("a/b", 3))).toEqual({ kind: "state", repo: "a/b", issue: 3 });
+    expect(localPathFor(blobKeys.state("a/b", 3), { FACTORY_HOME: "/x" })).toBeUndefined();
     expect(parseBlobKey("backups/2026-10-26/state.db")).toBeUndefined();
   });
 });
@@ -171,6 +174,12 @@ describe("a stage ships its run to the blob store", () => {
     expect(existsSync(local)).toBe(true);
     expect(readFileSync(local, "utf8")).toBe(shipped);
     expect(await mirrorDown(store, plane)).toBe(0);
+
+    const db = new FactoryState(defaultStatePath(plane, "acme/widgets"));
+    const runner = deps.state.getRun("acme/widgets", 1)!;
+    expect(db.getRun("acme/widgets", 1)).toEqual({ ...runner, id: db.getRun("acme/widgets", 1)!.id });
+    expect(db.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual(["triage", "plan"]);
+    db.close();
   });
 });
 
@@ -221,5 +230,94 @@ describe("the plane mirrors only what it serves", () => {
     expect(localPathFor("runs/acme/widgets/../../evil/x/issue-1/files/a.md", plane)).toBeUndefined();
     expect(existsSync(localPathFor(blobKeys.artifact("evil/other", 2, "plan.json"), plane)!)).toBe(false);
     expect(await mirrorDown(store, { FACTORY_HOME: plane.FACTORY_HOME })).toBe(0);
+  });
+});
+
+// A runner's state for one issue, shipped the way a stage ships it.
+async function shipRows(store: BlobStore, repo: string, issue: number, verdict?: string) {
+  const st = new FactoryState(":memory:");
+  st.upsertRun({ issue, repo, title: "t", stage: "verify", status: "verifying" });
+  for (const [stage, at] of [
+    ["build", "2026-10-26T10:00:00.000Z"],
+    ["verify", "2026-10-26T11:00:00.000Z"],
+  ] as const)
+    st.recordStageRun({
+      repo,
+      issue,
+      stage,
+      agent: "claude",
+      model: null,
+      started_at: at,
+      finished_at: at,
+      duration_ms: 1,
+      tool_calls: 2,
+      tokens_in: 3,
+      tokens_out: 4,
+      cost_usd: 0.5,
+      exit_code: 0,
+      killed_reason: null,
+    });
+  if (verdict) st.setVerifyVerdict(repo, issue, verdict);
+  expect(await shipStage(store, repo, issue, tmp("blobs-rows-wt-"), undefined, st)).toBe(1);
+  st.close();
+}
+
+const counts = (env: NodeJS.ProcessEnv, repo: string) => {
+  if (!existsSync(defaultStatePath(env, repo))) return null;
+  const db = new FactoryState(defaultStatePath(env, repo));
+  try {
+    return {
+      runs: db.listRuns().length,
+      stages: db.listStageRuns(repo).length,
+      repos: db.listRuns().map((r) => r.repo),
+    };
+  } finally {
+    db.close();
+  }
+};
+
+describe("the plane writes a runner's run rows into that repo's own DB", () => {
+  test("a state file lands only in its repo's DB, an unserved repo is skipped, and a replay changes nothing", async () => {
+    const store = new DiskBlobStore(tmp("blobs-rows-store-"));
+    const plane = { FACTORY_HOME: tmp("blobs-rows-plane-"), FACTORY_REPO: "acme/widgets", FACTORY_REPOS: "acme/b" };
+    await shipRows(store, "acme/b", 4);
+    await shipRows(store, "evil/other", 4);
+    expect(await mirrorDown(store, plane)).toBe(1);
+    expect(counts(plane, "acme/b")).toEqual({ runs: 1, stages: 2, repos: ["acme/b"] });
+    expect(counts(plane, "acme/widgets")).toBeNull();
+    expect(counts(plane, "evil/other")).toBeNull();
+
+    expect(await mirrorDown(store, plane)).toBe(0);
+    expect(counts(plane, "acme/b")).toEqual({ runs: 1, stages: 2, repos: ["acme/b"] });
+
+    await shipRows(store, "acme/b", 4, "pass");
+    expect(await mirrorDown(store, plane)).toBe(1);
+    expect(counts(plane, "acme/b")).toEqual({ runs: 1, stages: 2, repos: ["acme/b"] });
+    const db = new FactoryState(defaultStatePath(plane, "acme/b"));
+    expect(db.listStageRuns("acme/b", { issue: 4 }).map((r) => r.verdict)).toEqual([null, "pass"]);
+    db.close();
+  });
+
+  test("a state file whose rows name another repo, issue or type is refused whole", async () => {
+    const st = new FactoryState(":memory:");
+    const store = new DiskBlobStore(tmp("blobs-rows-src-"));
+    await shipRows(store, "acme/widgets", 5);
+    const good = JSON.parse(text(await store.get(blobKeys.state("acme/widgets", 5)))!);
+    const body = (f: unknown) => bytes(JSON.stringify(f));
+    const stage0 = good.stages[0];
+    for (const bad of [
+      { ...good, run: { ...good.run, repo: "acme/b" } },
+      { ...good, stages: [{ ...stage0, repo: "acme/b" }] },
+      { ...good, stages: [{ ...stage0, issue: 6 }] },
+      { ...good, stages: [{ ...stage0, tokens_in: "3" }] },
+      { ...good, run: { ...good.run, status: "pwned" } },
+      { ...good, stages: "x" },
+    ])
+      expect(() => importRunState(st, "acme/widgets", 5, body(bad))).toThrow("is not a run of that issue");
+    expect(() => importRunState(st, "acme/b", 5, body(good))).toThrow("is not a run of that issue");
+    expect(st.listRuns()).toEqual([]);
+    expect(importRunState(st, "acme/widgets", 5, body(good))).toBe(3);
+    expect(importRunState(st, "acme/widgets", 5, body(good))).toBe(0);
+    st.close();
   });
 });

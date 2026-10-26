@@ -15,10 +15,8 @@ export type Stage = "triage" | "plan" | "build" | "verify" | "pr";
 export type RetroTrigger = "merged" | "rejected" | "gave-up";
 export type RetroStatus = "queued" | "done" | "failed";
 
-// One row per final outcome. Queued by all four triggers (checkMergePolicy,
-// cancelRun, the verify-reject cap, and the dashboard's operator-merge route);
-// only the dashboard trigger, which has no Executor to run retro itself,
-// stays "queued" until watch.ts's poll loop drains it.
+// One row per final outcome, queued by checkMergePolicy, cancelRun, the verify-reject cap and the
+// operator-merge route; only that last one, with no Executor, stays "queued" until watch.ts drains it.
 export interface RetroRow {
   id: number;
   repo: string;
@@ -105,9 +103,7 @@ export interface StageRun {
 export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete" | "session_id" | "verdict"> &
   Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id">>;
 
-// Absolute, rooted at FACTORY_HOME (~/.factory by default, /data in Docker) —
-// see paths.ts. A relative path here broke on any machine where the process
-// cwd wasn't the target repo (audit finding #1).
+// Absolute under FACTORY_HOME (paths.ts): a cwd-relative path broke off the target repo (audit finding #1).
 export const DEFAULT_DB_PATH = defaultStatePath();
 
 export interface BusEventRow {
@@ -311,6 +307,11 @@ export class FactoryState {
     `);
   }
 
+  // src/blobs.ts writes a mirrored run's rows in one write transaction, so a reader never sees half.
+  write<T>(fn: (db: Database) => T): T {
+    return this.db.transaction(() => fn(this.db)).immediate();
+  }
+
   upsertRun(input: { issue: number; repo: string; title: string; stage: Stage; status: RunStatus }): Run {
     const now = new Date().toISOString();
     this.db
@@ -358,9 +359,8 @@ export class FactoryState {
     const set = keys.map((k) => `${k} = $${k}`).join(", ");
     const params: Record<string, unknown> = { $repo: repo, $issue: issue, $updated_at: new Date().toISOString() };
     for (const k of keys) params[`$${k}`] = (patch as Record<string, unknown>)[k];
-    // The bound keys are dynamic (built from `patch`), so bun:sqlite's
-    // per-call ParamsType inference can't type this statically; the values
-    // are already constrained to Run's own field types above.
+    // The bound keys come from `patch`, so bun:sqlite cannot infer them; the values are already
+    // constrained to Run's own field types above.
     this.db
       .query(`UPDATE runs SET ${set}, updated_at = $updated_at WHERE repo = $repo AND issue = $issue`)
       .run(params as unknown as SQLQueryBindings);
