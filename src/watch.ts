@@ -11,6 +11,7 @@
 // on a different machine can all resume any issue.
 
 import { resolveBlockers } from "./blockers";
+import { intakeGate } from "./dispatch";
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
@@ -29,7 +30,6 @@ import {
   labelsOf,
   leased,
   postComment,
-  spendCapHit,
   runQueuedRetros,
   runRetro,
   worktreeFor,
@@ -583,16 +583,10 @@ function release(inFlight: Set<number> | undefined, issue: number): void {
 export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?: Set<number>): Promise<PollResult> {
   const listedAt = releaseSeq;
   const openPrs = await deps.github.listPrs(config.repo, { state: "open" });
-  const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/"));
-  // STOP_IF pauses new pickups only; approvals, answers, retries and
-  // revises on existing runs keep flowing so a human can clear the backlog.
-  const stopIf = factoryPrs.length >= config.maxOpenFactoryPrs;
-  const autoStart = deps.state.getToggle("auto_start", true);
-  // Intake pauses (new factory:ready pickups only) while a daily cap is hit;
-  // an issue already in flight keeps going, since checkSpendCap parks it on
-  // its own next stage if the cap is still hit then (plan v2.7.0 item 7).
-  const budgetPaused = (await spendCapHit(deps, config)) !== undefined;
-  const intakeGated = autoStart && !stopIf && !budgetPaused;
+  // STOP_IF, the auto_start switch and the spend caps pause new pickups only (src/dispatch.ts);
+  // approvals, answers, retries and revises keep flowing so a human can clear the backlog.
+  const gate = await intakeGate(deps, config, openPrs);
+  const intakeGated = gate.open;
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {
     const filed = await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch(
@@ -642,8 +636,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   for (const issue of candidates) inFlight?.add(issue.number);
 
   // Drains retros the dashboard's operator-merge route queued (v2.10.0 item
-  // 3); independent of intake, so it runs even while stopIf/budgetPaused
-  // holds back new pickups.
+  // 3); independent of intake, so it runs even while intake is paused.
   await runQueuedRetros(deps, config);
 
   try {
@@ -660,14 +653,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
       .filter((_, i) => outcomes[i] && outcomes[i] !== "waiting")
       .map((issue) => issue.number);
     processed.push(...(await reconcileClosed(deps, config, new Set(buckets.flat().map((i) => i.number)), inFlight)));
-    if (stopIf)
-      return {
-        paused: true,
-        reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`,
-        processed,
-      };
-    if (budgetPaused)
-      return { paused: true, reason: "budget: today's spend cap is hit, new pickups are paused", processed };
+    if (gate.paused) return { paused: true, reason: gate.paused, processed };
     return { paused: false, processed };
   } finally {
     for (const issue of candidates) inFlight?.delete(issue.number);

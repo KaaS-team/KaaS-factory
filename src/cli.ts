@@ -74,7 +74,7 @@ function has(name: string): boolean {
   return args.includes(`--${name}`);
 }
 
-const cli = { args, flag, has, resolveCloneDir: () => resolveCloneDir() };
+const cli = { args, flag, has, resolveCloneDir: () => resolveCloneDir(), watchDeps: buildWatchDeps };
 
 async function fileExists(path: string): Promise<boolean> {
   return await Bun.file(path).exists();

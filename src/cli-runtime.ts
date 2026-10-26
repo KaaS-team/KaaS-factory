@@ -3,7 +3,8 @@
 
 import { SqliteUsageStore } from "./adapters/pool/execution";
 import { successJson, UsageError, EXIT } from "./cli-output";
-import { loadConfig } from "./config";
+import { loadConfig, type FactoryConfig } from "./config";
+import type { WatchDeps } from "./engine/common";
 import { monthKey, poolReport } from "./core/sandbox-pool";
 import { plain } from "./display";
 import { cloudRoutine, dispatchJobs, writeActionsOutput } from "./dispatch";
@@ -11,13 +12,13 @@ import { loadMachineConfig } from "./machine";
 import { formatKit, probeRuntime, verifyRuntime } from "./runtime-kit";
 import { defaultRuntime, poolDbPath, runtimeSpecs, runtimesFrom } from "./runtimes";
 import { capabilitiesOf } from "./sandbox";
-import { makeScm } from "./scm";
 
 export interface CliContext {
   readonly args: readonly string[];
   flag(name: string): string | undefined;
   has(name: string): boolean;
   resolveCloneDir(): Promise<string>;
+  watchDeps(cloneDir: string, config: FactoryConfig): Promise<WatchDeps>;
 }
 
 // `factory pool`: each pool in machine.json, its members' minutes used and left this month, and the last failure.
@@ -84,10 +85,7 @@ export async function cmdRuntime(cli: CliContext): Promise<void> {
 export async function cmdDispatch(cli: CliContext): Promise<void> {
   const cloneDir = await cli.resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const result = await dispatchJobs(makeScm(config), config.repo, {
-    maxOpenFactoryPrs: config.maxOpenFactoryPrs,
-    capabilities: loadMachineConfig().capabilities,
-  });
+  const result = await dispatchJobs(await cli.watchDeps(cloneDir, config), config);
   writeActionsOutput(result, process.env.GITHUB_OUTPUT);
   if (cli.has("json")) return void console.log(successJson(result, true));
   if (result.paused) console.log(`factory dispatch: intake paused, ${result.paused}`);

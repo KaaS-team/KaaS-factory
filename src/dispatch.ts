@@ -5,7 +5,9 @@
 import { appendFileSync } from "node:fs";
 import { resolveBlockers } from "./blockers";
 import { parseCron } from "./core/cron";
-import type { ScmPort } from "./github";
+import type { FactoryConfig } from "./config";
+import { spendCapHit, type SpendDeps, type WatchDeps } from "./engine/common";
+import type { GhPr } from "./github";
 import { LABEL } from "./labels";
 import { canServe } from "./machine";
 
@@ -29,28 +31,39 @@ export interface Dispatch {
   readonly paused?: string;
 }
 
-export async function dispatchJobs(
-  github: ScmPort,
-  repo: string,
-  opts: { maxOpenFactoryPrs: number; capabilities?: readonly string[] },
-): Promise<Dispatch> {
-  const open = (await github.listPrs(repo, { state: "open" })).filter((p) => p.headRefName.startsWith("factory/"));
-  const paused =
-    open.length >= opts.maxOpenFactoryPrs
-      ? `STOP_IF: ${open.length} factory PRs open in review (limit ${opts.maxOpenFactoryPrs})`
-      : undefined;
+export interface IntakeGate {
+  readonly open: boolean;
+  readonly paused?: string;
+}
+
+// The one place that decides whether new factory:ready issues are picked up, for a tick and a dispatch.
+export async function intakeGate(deps: SpendDeps, config: FactoryConfig, openPrs: readonly GhPr[]): Promise<IntakeGate> {
+  const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/")).length;
+  if (factoryPrs >= config.maxOpenFactoryPrs)
+    return { open: false, paused: `STOP_IF: ${factoryPrs} factory PRs open in review (limit ${config.maxOpenFactoryPrs})` };
+  // An issue already in flight keeps going: checkSpendCap parks it on its own next stage (plan v2.7.0 item 7).
+  if ((await spendCapHit(deps, config)) !== undefined)
+    return { open: false, paused: "budget: today's spend cap is hit, new pickups are paused" };
+  return { open: deps.state.getToggle("auto_start", true) };
+}
+
+export async function dispatchJobs(deps: SpendDeps & Pick<WatchDeps, "github">, config: FactoryConfig): Promise<Dispatch> {
+  const { github } = deps;
+  const repo = config.repo;
+  const gate = await intakeGate(deps, config, await github.listPrs(repo, { state: "open" }));
   // Same intake as a tick: a blocked ready issue is demoted, not dispatched.
-  const ready = paused
-    ? []
-    : (
+  const ready = gate.open
+    ? (
         await resolveBlockers(
           github,
           repo,
           await github.listIssuesByLabel(repo, LABEL.ready),
           await github.listIssuesByLabel(repo, LABEL.blocked),
         )
-      ).clear;
+      ).clear
+    : [];
   const resumed = await Promise.all(RESUME_LABELS.map((l) => github.listIssuesByLabel(repo, l)));
+  const capabilities = deps.machine?.config.capabilities;
   const seen = new Set<number>();
   const jobs: DispatchJob[] = [];
   for (const [label, issues] of [
@@ -58,12 +71,12 @@ export async function dispatchJobs(
     ...RESUME_LABELS.map((l, i) => [l, resumed[i]!] as const),
   ])
     for (const issue of issues) {
-      if (seen.has(issue.number) || !canServe(opts.capabilities, issue.labels)) continue;
+      if (seen.has(issue.number) || !canServe(capabilities, issue.labels)) continue;
       seen.add(issue.number);
       jobs.push({ issue: issue.number, label });
     }
   jobs.sort((a, b) => a.issue - b.issue);
-  return paused ? { jobs, paused } : { jobs };
+  return gate.paused ? { jobs, paused: gate.paused } : { jobs };
 }
 
 // What a later `strategy: matrix: ${{ fromJSON(needs.dispatch.outputs.matrix) }}` reads.

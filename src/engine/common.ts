@@ -115,6 +115,8 @@ export interface WatchDeps {
 
 // Thrown by runStage when an operator stopped the agent to take it over;
 // runWorkflow parks the issue instead of counting a failure.
+export type SpendDeps = Pick<WatchDeps, "state" | "spend" | "machine">;
+
 export class OperatorTakeover extends Error {
   constructor(readonly stage: Stage) {
     super(`operator takeover during ${stage}`);
@@ -586,7 +588,7 @@ export const EPOCH = "1970-01-01T00:00:00.000Z";
 // Why a daily cap holds back new work now, or undefined. The one resolver for
 // the poll's intake and for minions: the repo's cap (every worker's spend) and
 // this machine's cap across all its repos.
-export async function spendCapHit(deps: WatchDeps, config: FactoryConfig): Promise<string | undefined> {
+export async function spendCapHit(deps: SpendDeps, config: FactoryConfig): Promise<string | undefined> {
   const repoDailyUsd = config.spend.dailyUsd;
   if (repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd)
     return `the repo's daily spend cap ($${repoDailyUsd}) is reached`;
@@ -597,7 +599,7 @@ export async function spendCapHit(deps: WatchDeps, config: FactoryConfig): Promi
 }
 
 // The repo's spend today: every worker's, from the shared store when there is one.
-export async function repoSpendToday(deps: WatchDeps, config: FactoryConfig): Promise<SpendTotal> {
+export async function repoSpendToday(deps: SpendDeps, config: FactoryConfig): Promise<SpendTotal> {
   return larger(deps.state.spendSummary(config.repo, startOfTodayUtc()), await deps.spend?.since(startOfTodayUtc()));
 }
 
