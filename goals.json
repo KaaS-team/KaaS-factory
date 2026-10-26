@@ -958,7 +958,12 @@
       "phase": "P5",
       "ask": "`emit` chaining between workflows, and a `labels:` mapping for a team's own label names.",
       "source": "CHANGELOG v3.2.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/emit-chaining.test.ts",
+        "name": "a shipped workflow's emit files a ready issue for the workflow listening on.emitted",
+        "mutation": "emit chaining: on.emitted hears a shipped workflow's emit"
+      }
     },
     {
       "id": "cron-dedupe-v32",
