@@ -20,7 +20,8 @@ const refused = async (res: Promise<Response>) => [401, 403, 404].includes((awai
 let saved: string | undefined;
 beforeEach(() => {
   saved = process.env.FACTORY_REPOS;
-  process.env.FACTORY_REPOS = "acme/widgets,blue/app";
+  // loose/repo is served but owned by no org, so only plane owners reach it.
+  process.env.FACTORY_REPOS = "acme/widgets,blue/app,loose/repo";
 });
 afterEach(() => {
   if (saved === undefined) delete process.env.FACTORY_REPOS;
@@ -77,5 +78,11 @@ describe("org mode", () => {
     // Leaving an org ends access to its repos on the next request.
     await ok("POST /api/orgs/members", { org: "red", login: "alice", role: null });
     expect(await refused(call(p, "GET /api/runs?repo=acme/widgets", alice))).toBe(true);
+  });
+
+  test("an unscoped route on a plane whose own repo no org owns is for plane owners only", async () => {
+    const p = plane([orgsExtension("loose/repo")]);
+    p.store.setMember("dave", "operator", "test");
+    expect(await refused(call(p, "GET /api/runners", cookieFor(p, "dave")))).toBe(true);
   });
 });
