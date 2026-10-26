@@ -9,9 +9,9 @@
 
 import type { GhIssue } from "../src/github";
 import { plain } from "../src/display";
-import { LABEL, isParkedLabel, isStateLabel } from "../src/labels";
+import { LABEL, findLabel, isParkedLabel, isStateLabel } from "../src/labels";
 
-export type BoardColumn = "intake" | "triage" | "plan" | "build" | "verify" | "pr" | "attention";
+export type BoardColumn = "intake" | "triage" | "plan" | "build" | "verify" | "step" | "pr" | "attention";
 
 export interface BoardCard {
   readonly issue: number;
@@ -23,6 +23,8 @@ export interface BoardCard {
   // No factory:* label at all yet — a plain issue (hand-filed, or from
   // `factory scan`) that a human still needs to mark ready.
   readonly needsMarkReady: boolean;
+  // A workflow's own step label (factory:linting gives "linting"), so the board gives it a column.
+  readonly step: string | null;
 }
 
 const STATE_TO_COLUMN: Readonly<Record<string, BoardColumn>> = {
@@ -44,8 +46,11 @@ export function columnFor(labelNames: readonly string[]): BoardColumn {
   if (parked) return "attention";
   const state = labelNames.find(isStateLabel);
   if (state) return STATE_TO_COLUMN[state] ?? "intake";
-  return "intake";
+  return labelNames.some(isStepLabel) ? "step" : "intake";
 }
+
+// A factory: label the factory does not ship can only come from a workflow step (labelsFor).
+const isStepLabel = (name: string) => name.startsWith("factory:") && !findLabel(name);
 
 export function buildBoard(issues: readonly GhIssue[]): BoardCard[] {
   return issues.map((issue) => {
@@ -58,8 +63,9 @@ export function buildBoard(issues: readonly GhIssue[]): BoardCard[] {
       column: columnFor(names),
       stateLabel,
       parkedLabel,
-      typeLabels: names.filter((n) => !isStateLabel(n) && !isParkedLabel(n) && n !== LABEL.monitor),
-      needsMarkReady: stateLabel === null && parkedLabel === null,
+      typeLabels: names.filter((n) => !isStateLabel(n) && !isParkedLabel(n) && !isStepLabel(n) && n !== LABEL.monitor),
+      needsMarkReady: stateLabel === null && parkedLabel === null && !names.some(isStepLabel),
+      step: names.find(isStepLabel)?.slice("factory:".length) ?? null,
     };
   });
 }

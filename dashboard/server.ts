@@ -9,6 +9,7 @@ import type { ScmPort } from "../src/github";
 import { makeScm } from "../src/scm";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { buildBoard } from "./board";
+import { paneRoutes } from "./pane";
 import { LABEL } from "../src/labels";
 import { InboxError, act, buildInbox, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
 import { plain } from "../src/display";
@@ -764,6 +765,7 @@ export function createDashboard(
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
     ...commandRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
     ...integrations.routes,
+    ...paneRoutes({ repo, workspacesFor, actorOf: access.actorOf, stagesFor: (r, n) => state.listStageRuns(r, { issue: n }).map(plainStage), prUrlFor: (r, n) => state.listRuns(r).find((x) => x.issue === n)?.pr_url ?? null }),
     {
       method: "GET",
       pattern: /^\/api\/stream$/,

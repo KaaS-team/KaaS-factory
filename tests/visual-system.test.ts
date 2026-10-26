@@ -4,14 +4,17 @@
 // the rule that page code never renders server text as HTML.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const dir = join(import.meta.dir, "..", "dashboard", "public");
 const css = readFileSync(join(dir, "styles.css"), "utf8");
 const tokensCss = readFileSync(join(dir, "tokens.css"), "utf8");
 const html = readFileSync(join(dir, "index.html"), "utf8");
-const app = readFileSync(join(dir, "app.js"), "utf8");
+// The page code is the shell plus one module per view, so every rule below reads all of it.
+const app = [join(dir, "app.js"), ...readdirSync(join(dir, "lib")).filter((f) => f.endsWith(".js")).map((f) => join(dir, "lib", f))]
+  .map((f) => readFileSync(f, "utf8"))
+  .join("\n");
 
 describe("visual system", () => {
   test("one light theme, as on kaas.team: no dark variant and no theme switch", () => {
@@ -48,8 +51,11 @@ describe("visual system", () => {
       "analyticsView",
       "agentsView",
       "settingsView",
+      "boardView",
     ]) {
-      const body = app.slice(app.indexOf(`function ${view}`));
+      const at = app.indexOf(`function ${view}(`);
+      expect(at, view).toBeGreaterThan(-1);
+      const body = app.slice(at);
       expect(body.slice(0, body.indexOf("\n}\n")), view).toMatch(/heading\(/);
     }
   });

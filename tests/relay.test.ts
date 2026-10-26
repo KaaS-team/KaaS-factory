@@ -259,7 +259,7 @@ describe("wiring", () => {
   });
 
   test("an unreachable dashboard falls back to the relay's inbox, read-only", () => {
-    const app = readFileSync(join(ROOT, "dashboard/public/app.js"), "utf8");
+    const app = ["app.js", "lib/view-inbox.js"].map((f) => readFileSync(join(ROOT, "dashboard/public", f), "utf8")).join("\n");
     expect(app).toContain("state.inbox = state.relay.items;");
     expect(app).toContain("disabled: state.offline,");
     expect(app).toContain("startFollowing();\nloadInbox()");
