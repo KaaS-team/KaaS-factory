@@ -134,10 +134,8 @@ const commandIsTrusted = (deps: WatchDeps, config: FactoryConfig, c: GhComment) 
   isWriter(deps.github, config.repo, c);
 const keepTrusted = (deps: WatchDeps, config: FactoryConfig, comments: readonly GhComment[]) =>
   writersOnly(deps.github, config.repo, comments);
-const trustedThread = async (deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<GhIssue> => ({
-  ...issue,
-  comments: await keepTrusted(deps, config, issue.comments),
-});
+const trustedThread = async (deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<GhIssue> =>
+  Object.assign({}, issue, { comments: await keepTrusted(deps, config, issue.comments) });
 
 async function readyIsTrusted(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<boolean> {
   const by = await deps.github.labeledBy(config.repo, issue.number, LABEL.ready);
@@ -525,6 +523,7 @@ export async function reconcileClosed(
 // call this with nothing but the issue's current GitHub state.
 export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, listed: GhIssue): Promise<Outcome> {
   const names = labelsOf(listed);
+  // A fresh claim reads the live thread as stages post to it; nothing in it is a human command yet.
   if (names.includes(LABEL.ready)) return processReadyIssue(listed, deps, config);
   const issue = await trustedThread(deps, config, listed);
   // A parked run's PR merged by hand ships it; nothing else would, since only in-review checks.

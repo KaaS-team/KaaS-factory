@@ -20,7 +20,8 @@ GitHub sign-in. See [docs/control-plane.md](docs/control-plane.md).
   docs/decisions/native-trackers.md.
 - Only comments from people with write access or higher are read when a run resumes. A read-only
   collaborator's revise text no longer reaches the agent, and their comment no longer holds a
-  maintainer's reply.
+  maintainer's reply. A comment carrying a `factory` marker is read as the runner's only when the
+  runner or a writer wrote it, so pasted markers no longer steer a run.
 - Not in this release: the factory as an MCP server (goal: factory-mcp-server), messages sent while
   a stage runs and taking over a run (goal: mid-run-commands), and setting the autonomy mode from
   the web (goal: set-mode-web). The audit row of a refused request does not record its issue yet.

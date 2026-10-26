@@ -861,7 +861,7 @@ describe("in-review and claim paths", () => {
     c.github.issues.get(1)!.comments = [
       {
         id: 1,
-        author: "bot",
+        author: "factory-bot",
         authorAssociation: "OWNER",
         body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`,
         createdAt: "2026-01-01T00:00:00Z",
@@ -885,7 +885,7 @@ describe("in-review and claim paths", () => {
     c.github.issues.get(1)!.comments = [
       {
         id: 1,
-        author: "bot",
+        author: "factory-bot",
         authorAssociation: "OWNER",
         body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`,
         createdAt: "2026-01-01T00:00:00Z",
@@ -913,7 +913,7 @@ describe("in-review and claim paths", () => {
     waiting.comments = [
       {
         id: 5,
-        author: "bot",
+        author: "factory-bot",
         authorAssociation: "OWNER",
         body: "<!-- factory:plan v1 rev=1 -->",
         createdAt: "2026-01-01T00:00:00Z",

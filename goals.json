@@ -323,7 +323,7 @@
     },
     {
       "id": "factory-mcp-server",
-      "phase": "P2",
+      "phase": "P3",
       "ask": "The factory is an MCP server, so any agent or IDE can start, read and approve tasks",
       "source": "plan approved 26 Oct 2026",
       "owner": "agent"
@@ -956,7 +956,7 @@
     },
     {
       "id": "ports-landed",
-      "phase": "P2",
+      "phase": "P3",
       "ask": "`StorePort`, `SecretsPort`, `NotifierPort` and `EventSourcePort` land with their adapters in v3.2 and v3.3; `ExecutionPort` is a single `run` until the remote runtimes need prepare, collect and teardown (v3.3).",
       "source": "CHANGELOG v3.1.0 #1",
       "owner": "agent"
