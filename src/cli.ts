@@ -56,7 +56,7 @@ import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { probeRuntime } from "./runtime-kit";
 import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { detectStack, diskFiles } from "./stack";
-import { describeStack, initConfig, isFilledIn } from "./init";
+import { describeStack, initConfig, isFilledIn, writeCharter } from "./init";
 import { repoFromRemoteUrl } from "./config";
 import { EventBus } from "./engine/bus";
 import { loadMinions, runMinion } from "./engine/minion";
@@ -839,6 +839,9 @@ async function cmdInit(): Promise<void> {
   }
   await Bun.write(target, text);
   console.log(`factory init: wrote ${target}${repo ? "" : ' (no github origin remote: set "repo" by hand)'}`);
+  const charter = readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "charter.md"), "utf8");
+  if (writeCharter(dir, charter, stack, repo))
+    console.log(`factory init: wrote ${join(dir, ".factory", "charter.md")}`);
   if (has("pr")) {
     const git = (...a: string[]) => {
       const r = Bun.spawnSync(["git", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" });

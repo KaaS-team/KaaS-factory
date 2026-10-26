@@ -102,6 +102,23 @@ describe("factory init", () => {
     expect(readFileSync(path, "utf8")).toContain('"bun run lint"');
   });
 
+  test("init writes the toolchain key and a charter that names the stack, and leaves an edited charter", () => {
+    const dir = copy("go");
+    expect(init(dir).exitCode).toBe(0);
+    const config = JSON.parse(readFileSync(join(dir, ".factory", "config.json"), "utf8"));
+    expect(config.toolchain).toBe("go");
+    expect(configProblems(config)).toEqual([]);
+    const path = join(dir, ".factory", "charter.md");
+    const charter = readFileSync(path, "utf8");
+    expect(charter.split("\n")[0]).toBe("# acme/widgets factory charter");
+    expect(charter).toContain("read this repo as **go**, toolchain `go`");
+    expect(charter).toContain("- gate `test`: `go test ./...`");
+    expect(charter).toContain("TODO what may be auto-approved");
+    writeFileSync(path, "# ours\n");
+    expect(init(dir, "--force").exitCode).toBe(0);
+    expect(readFileSync(path, "utf8")).toBe("# ours\n");
+  });
+
   test("--dry-run prints the config and writes nothing", () => {
     const dir = copy("go");
     const r = init(dir, "--dry-run");

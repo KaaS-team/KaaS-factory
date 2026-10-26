@@ -4,10 +4,12 @@
 // spec asks for it. The command runs as this user, so files it writes in the
 // worktree are not root's.
 
+import { resolveImage } from "../../images";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface DockerSpec {
   readonly kind: "docker";
+  // "auto" picks the repo's language image per run (src/images.ts).
   readonly image: string;
   // "none" (default) or a docker network name such as "bridge".
   readonly network?: string;
@@ -51,7 +53,7 @@ export function containerArgs(
     `${cwd}:${cwd}`,
     "-w",
     cwd,
-    spec.image,
+    resolveImage(spec.image, cwd),
     "bash",
     "-c",
     cmd,

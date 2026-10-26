@@ -6,6 +6,7 @@
 
 import { basename } from "node:path";
 import { shq } from "../../core/frame";
+import { resolveImage } from "../../images";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface SshSpec {
@@ -13,6 +14,9 @@ export interface SshSpec {
   readonly host: string;
   readonly dir: string;
   readonly exclude?: readonly string[];
+  // Run in this image on the host (docker there), "auto" for the repo's language image, so the
+  // host needs docker instead of every repo's toolchain.
+  readonly image?: string;
 }
 
 export function sshArgs(spec: SshSpec, cmd: string, cwd: string): { sync: string[]; run: string[] } {
@@ -33,8 +37,20 @@ export function sshArgs(spec: SshSpec, cmd: string, cwd: string): { sync: string
       `${spec.host}:${remote}/`,
     ],
     // ssh joins its arguments into one remote shell line, so the whole command is one quoted word.
-    run: ["ssh", "-o", "BatchMode=yes", spec.host, `bash -c ${shq(`cd ${shq(remote)} && ${cmd}`)}`],
+    run: [
+      "ssh",
+      "-o",
+      "BatchMode=yes",
+      spec.host,
+      spec.image
+        ? inImage(resolveImage(spec.image, cwd), remote, cmd)
+        : `bash -c ${shq(`cd ${shq(remote)} && ${cmd}`)}`,
+    ],
   };
+}
+
+function inImage(image: string, dir: string, cmd: string): string {
+  return ["docker", "run", "--rm", "-v", `${dir}:${dir}`, "-w", dir, image, "bash", "-c", cmd].map(shq).join(" ");
 }
 
 async function spawn(argv: string[], cwd: string): Promise<ExecResult> {

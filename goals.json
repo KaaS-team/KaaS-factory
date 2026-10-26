@@ -961,14 +961,24 @@
       "phase": "P4",
       "ask": "Per-language Docker images and devcontainer support for the docker and ssh runtimes.",
       "source": "CHANGELOG v3.4.0 #6",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/language-images.test.ts",
+        "name": "an auto image follows the devcontainer, then the toolchain key, then the stack, for docker and ssh",
+        "mutation": "images: a devcontainer's image wins"
+      }
     },
     {
       "id": "toolchain-key",
       "phase": "P4",
       "ask": "A `toolchain` config key, and `factory init` writing `charter.md`.",
       "source": "CHANGELOG v3.4.0 #8",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/stack.test.ts",
+        "name": "init writes the toolchain key and a charter that names the stack, and leaves an edited charter",
+        "mutation": "init: the charter names the detected stack"
+      }
     },
     {
       "id": "remote-agent-steps",

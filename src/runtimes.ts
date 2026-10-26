@@ -74,7 +74,7 @@ const SHAPES: Readonly<
     required: ["image"],
     fields: { image: "string", network: "string", memory: "string", cpus: "posInt", pids: "posInt", runtime: "string" },
   },
-  ssh: { required: ["host", "dir"], fields: { host: "string", dir: "string", exclude: "strings" } },
+  ssh: { required: ["host", "dir"], fields: { host: "string", dir: "string", exclude: "strings", image: "string" } },
   lwpr: { required: [], fields: { app: "string", timeoutMin: "posInt", setup: "boolean" } },
   wrap: { required: ["argv"], fields: { argv: "strings" } },
   http: { required: ["url"], fields: { url: "string", tokenEnv: "string", exclude: "strings" } },
