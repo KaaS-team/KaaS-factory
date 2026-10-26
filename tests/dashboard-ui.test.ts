@@ -2,7 +2,7 @@
 // createElement, setAttribute, append and addEventListener (lib/core.js h()), so this is enough to
 // read what a QA lead or PM would see, and to press its buttons, without a browser.
 
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildBoard } from "../dashboard/board";
@@ -77,7 +77,14 @@ Object.assign(globalThis, {
   localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   confirm: () => true,
 });
+// Only the dashboard's own relative paths are faked, and the real fetch comes back after this file:
+// bun runs every test file in one process, so a leaked stub answers later files' local servers.
+const realFetch = globalThis.fetch;
+afterAll(() => {
+  globalThis.fetch = realFetch;
+});
 globalThis.fetch = (async (path: string, init?: { body?: string }) => {
+  if (/^https?:/.test(String(path))) return realFetch(path, init as RequestInit);
   if (init?.body) posts.push({ path, body: JSON.parse(init.body) });
   return new Response("{}", { status: 200 });
 }) as unknown as typeof fetch;

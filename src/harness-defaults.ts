@@ -71,10 +71,9 @@ export const defaultSubagents = (): string[] =>
     .filter((f) => f.endsWith(".md"))
     .map((f) => f.slice(0, -3));
 
-// Before every stage: put each factory skill and subagent where the agent reads it (`skillsDir`,
-// default .claude/skills), from the repo's committed .agents/ copy when it has one, else the
-// default. The repo's committed copy stays; anything else there is replaced fresh, so a stage's
-// edit never reaches the next one. Git ignores what is provided, so no PR carries it.
+// Before every stage: each factory skill and subagent lands where the agent reads it, from the
+// repo's committed copy, else the default. Anything else there is replaced fresh, so a stage's
+// edit never reaches the next one; git ignores what is provided, so no PR carries it.
 export function provideDefaults(cwd: string, skillsDir = ".claude/skills"): string[] {
   const provided: string[] = [];
   for (const name of defaultSkills()) {
