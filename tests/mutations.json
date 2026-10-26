@@ -17,6 +17,7 @@
   {"name": "verify prove: a redirect revert", "file": "template/.claude/skills/factory-verify/references/prove.md", "find": "`git restore --source=<base> -- <non-test files>`", "replace": "`git show <base>:<file> > <file>`", "test": "tests/skills.test.ts"},
   {"name": "agents: guidance drifts", "file": "src/stage-permissions.ts", "find": "A refusal is about that one command, not Bash", "replace": "A refusal is about that command, not Bash", "test": "tests/skills.test.ts"},
   {"name": "argv: strict MCP", "file": "src/agents/presets/claude.ts", "find": "    \"--strict-mcp-config\",\n", "replace": "", "test": "tests/agents.test.ts"},
+  {"name": "stage: project plugins off", "file": "src/agents/presets/claude.ts", "find": ", projectPlugins(opts.cwd)),", "replace": "),", "test": "tests/stage-permissions.test.ts"},
   {"name": "argv: ScheduleWakeup allowed", "file": "src/stage-permissions.ts", "find": "  \"ScheduleWakeup\",\n", "replace": "", "test": "tests/agents.test.ts"},
   {"name": "guidance: drops a refused shape", "file": "src/stage-permissions.ts", "find": "or has cd or VAR=value at the start", "replace": "or has VAR=value at the start", "test": "tests/agents.test.ts"},
   {"name": "score: refusals counted", "file": "scripts/e2e-score.ts", "find": "if (DENIAL.test(line)) verifyDenials++;", "replace": "", "test": "tests/e2e-score.test.ts"},

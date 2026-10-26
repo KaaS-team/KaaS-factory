@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { claudeArgs } from "../src/agents/presets/claude";
 import type { StageName } from "../src/executor";
-import { stageSettings } from "../src/stage-permissions";
+import { projectPlugins, stageSettings } from "../src/stage-permissions";
 
 const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr"];
 
@@ -77,4 +80,26 @@ describe("skill commands are permitted by their stage", () => {
       for (const cmd of cmds) expect([cmd, allowed(allow, cmd)]).toEqual([cmd, true]);
     });
   }
+});
+
+// #88: kaas.team's .claude/settings.json turned on the operator's plugins, and one of their hooks refused every plan Write.
+describe("project plugins stay out of a stage", () => {
+  test("every plugin the repo turns on is turned off in the stage settings", () => {
+    const dir = mkdtempSync(join(tmpdir(), "plugins-"));
+    mkdirSync(join(dir, ".claude"));
+    writeFileSync(
+      join(dir, ".claude", "settings.json"),
+      JSON.stringify({ enabledPlugins: { "guards@m": true, "off@m": false } }),
+    );
+    writeFileSync(join(dir, ".claude", "settings.local.json"), JSON.stringify({ enabledPlugins: { "local@m": true } }));
+    expect(projectPlugins(dir)).toEqual(["guards@m", "local@m"]);
+    const argv = claudeArgs({ stage: "plan", issue: 5, cwd: dir, maxBudgetUsd: 1 });
+    const settings = JSON.parse(argv[argv.indexOf("--settings") + 1]!);
+    expect(settings.enabledPlugins).toEqual({ "guards@m": false, "local@m": false });
+  });
+
+  test("a repo with no settings file adds no enabledPlugins key", () => {
+    expect(projectPlugins(mkdtempSync(join(tmpdir(), "plugins-")))).toEqual([]);
+    expect(JSON.parse(stageSettings("plan", 1)).enabledPlugins).toBeUndefined();
+  });
 });
