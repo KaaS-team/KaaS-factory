@@ -1020,7 +1020,12 @@
       "phase": "P5",
       "ask": "A rebuild only resumes for the claude preset; the failure tail is not yet in other agents' prompts.",
       "source": "CHANGELOG v3.1.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/rebuild-resume.test.ts",
+        "name": "a rebuild's failure tail is in a non-claude agent's prompt",
+        "mutation": "rebuild: every agent's prompt carries the failure tail"
+      }
     },
     {
       "id": "hosted-compute",

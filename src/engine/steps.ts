@@ -170,13 +170,13 @@ const plan: StepType = {
   },
 };
 
-// A rebuild after a reject resumes the last build session, told why it came
-// back; a first build, or one whose agent kept no session, starts fresh.
-function rebuildFrom(sc: StepCtx): { resume?: { sessionId: string; failure: string } } {
+// A rebuild is told why it came back, any agent; it forks the build session only if one was kept.
+function rebuildFrom(sc: StepCtx): { resume?: { sessionId?: string; failure: string } } {
   const failure = sc.ctx.failure;
   delete sc.ctx.failure;
-  const last = failure === undefined ? undefined : sc.deps.state.lastSession(sc.config.repo, sc.issue.number, "build");
-  return last && failure !== undefined ? { resume: { sessionId: last.session_id, failure } } : {};
+  const id =
+    failure === undefined ? "" : sc.deps.state.lastSession(sc.config.repo, sc.issue.number, "build")?.session_id;
+  return failure !== undefined ? { resume: { ...(id ? { sessionId: id } : {}), failure } } : {};
 }
 
 const build: StepType = {

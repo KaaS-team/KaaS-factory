@@ -63,6 +63,7 @@ export async function renderPrompt(
     stripFrontmatter(skill).trim(),
     "",
     ...(contextPack ? [contextPack, ""] : []),
+    ...(opts.resume ? [`## The last attempt was sent back\n\nThe tail of why:\n\n${opts.resume.failure}`, ""] : []),
     artifactContract(opts, readOnly, types),
     "",
   ].join("\n");

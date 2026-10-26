@@ -581,6 +581,21 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("11c. a rebuild by an agent that kept no session is still told why it came back", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build(), { sessionId: "" });
+    c.push("verify", { ...verdict("reject"), "verdict-comment.md": "<!-- factory:verdict v1 -->\nstill throws" });
+    c.push("build", build());
+    c.push("verify", verdict("pass"));
+    c.push("pr", pr());
+    expect(await c.step()).toBe("shipped");
+    expect(c.executor.resumed[4]).toEqual({ failure: "<!-- factory:verdict v1 -->\nstill throws" });
+    done(c);
+  });
+
   test("11b. a rebuild after a reject resumes the last build session, told why it came back", async () => {
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);
