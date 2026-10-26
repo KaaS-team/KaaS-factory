@@ -396,28 +396,48 @@
       "phase": "P4",
       "ask": "The sandbox contract: create, exec, files, snapshot, pause and resume, expose, status, destroy, with capability flags",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "every runtime kind reports its flags, and a sandbox does each verb",
+        "mutation": "sandbox: a paused sandbox refuses commands"
+      }
     },
     {
       "id": "runtime-verify-kit",
       "phase": "P4",
       "ask": "factory runtime verify <name> runs one shared suite against any adapter",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "the kit passes a working runtime and names what a broken one gets wrong",
+        "mutation": "runtime kit: the exit code check bites"
+      }
     },
     {
       "id": "microsandbox-default",
       "phase": "P4",
       "ask": "local microsandbox supported by default",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "is microsandbox with msb and a hypervisor, otherwise local with a warning",
+        "mutation": "runtimes: no hypervisor means the default runs locally"
+      }
     },
     {
       "id": "any-sandbox",
       "phase": "P4",
       "ask": "also able to connect any sandboxes too not just microsandbox",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "any sandbox passes the same kit: an http sandbox and a wrap launcher, not only microsandbox",
+        "mutation": "http sandbox: the command reaches the sandbox"
+      }
     },
     {
       "id": "egress-proxy",
@@ -452,7 +472,12 @@
       "phase": "P4",
       "ask": "A live health probe per runtime; the Runtimes table shows configuration only.",
       "source": "CHANGELOG v3.5.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "a live runtime answers, an unreachable one says why, a hung one times out",
+        "mutation": "runtime probe: a down runtime says why"
+      }
     },
     {
       "id": "doctor-reachability",

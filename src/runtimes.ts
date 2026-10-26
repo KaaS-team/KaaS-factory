@@ -16,6 +16,7 @@ import { MicrosandboxExecution, type MicrosandboxSpec, SECRET } from "./adapters
 import { PoolExecution, type PoolSpec, SqliteUsageStore } from "./adapters/pool/execution";
 import { SshExecution, type SshSpec } from "./adapters/ssh/execution";
 import { CMD, WrapExecution, type WrapSpec } from "./adapters/wrap/execution";
+import { existsSync } from "node:fs";
 import { factoryHome } from "./paths";
 import type { ExecutionPort } from "./ports/execution";
 
@@ -35,6 +36,30 @@ export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = {
   local: { kind: "local" },
   lwpr: { kind: "lwpr" },
 };
+
+// `default` is the one place the factory picks a sandbox for you: a microsandbox VM where `msb` and a
+// hypervisor are present, otherwise this machine, which `factory doctor` warns about.
+export const DEFAULT_RUNTIME = "default";
+export const DEFAULT_VM: MicrosandboxSpec = { kind: "microsandbox", image: "node:22-slim", memory: "1G", cpus: 1 };
+
+export interface HostProbe {
+  readonly which: (bin: string) => boolean;
+  readonly hypervisor: () => boolean;
+}
+export const hostProbe: HostProbe = {
+  which: (bin) => Bun.which(bin) !== null,
+  hypervisor: () =>
+    process.platform === "darwin"
+      ? Bun.spawnSync(["sysctl", "-n", "kern.hv_support"]).stdout.toString().trim() === "1"
+      : existsSync("/dev/kvm"),
+};
+
+export function defaultRuntime(probe: HostProbe = hostProbe): { spec: RuntimeSpec; warning?: string } {
+  const local = (why: string) => ({ spec: { kind: "local" } as const, warning: `${why}, so \`default\` runs on this machine unsandboxed` });
+  if (!probe.which("msb")) return local("msb is not installed");
+  if (!probe.hypervisor()) return local("no hypervisor (KVM or Hypervisor.framework)");
+  return { spec: DEFAULT_VM };
+}
 
 const NAME = /^[\w-]{1,64}$/;
 type Field = "string" | "posInt" | "boolean" | "strings" | "members";
@@ -64,6 +89,8 @@ const SHAPES: Readonly<
   },
   pool: { required: ["members"], fields: { members: "members", reserveMin: "posInt", fallback: "string" } },
 };
+
+export const RUNTIME_KINDS = Object.keys(SHAPES) as RuntimeSpec["kind"][];
 
 // Kinds a pool can cut off at the minutes it holds: one fetch each, aborted by its signal.
 const POOLABLE = new Set<unknown>(["http", "agent37"]);
@@ -142,7 +169,7 @@ export function runtimeProblems(raw: unknown, where = "runtimes"): string[] {
   for (const [name, spec] of Object.entries(raw as Record<string, unknown>)) {
     const at = `${where}.${name}`;
     if (!NAME.test(name)) problems.push(`${at}: a name is letters, digits, _ and -`);
-    if (Object.hasOwn(BUILTIN_RUNTIMES, name)) problems.push(`${at}: "${name}" is built in`);
+    if (Object.hasOwn(BUILTIN_RUNTIMES, name) || name === DEFAULT_RUNTIME) problems.push(`${at}: "${name}" is built in`);
     const s = (spec ?? {}) as Record<string, unknown>;
     const shape = SHAPES[s.kind as RuntimeSpec["kind"]];
     if (!shape) {
@@ -190,8 +217,9 @@ export function executionFor(spec: Exclude<RuntimeSpec, PoolSpec>): ExecutionPor
 export function runtimesFrom(
   machine: Readonly<Record<string, RuntimeSpec>> = {},
   env: NodeJS.ProcessEnv = process.env,
+  probe: HostProbe = hostProbe,
 ): Readonly<Record<string, ExecutionPort>> {
-  const ports: Record<string, ExecutionPort> = {};
+  const ports: Record<string, ExecutionPort> = { [DEFAULT_RUNTIME]: executionFor(defaultSpec(probe)) };
   const all = Object.entries({ ...BUILTIN_RUNTIMES, ...machine });
   for (const [name, spec] of all) if (spec.kind !== "pool") ports[name] = executionFor(spec);
   let store: SqliteUsageStore | undefined;
@@ -202,6 +230,10 @@ export function runtimesFrom(
       ports[name] = new PoolExecution(spec, ports, fallback, store);
     }
   return ports;
+}
+
+function defaultSpec(probe: HostProbe): Exclude<RuntimeSpec, PoolSpec> {
+  return defaultRuntime(probe).spec as Exclude<RuntimeSpec, PoolSpec>;
 }
 
 // Pool usage shares machine.db with slot leases and spend.
