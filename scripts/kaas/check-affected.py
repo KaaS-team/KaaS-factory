@@ -40,6 +40,8 @@ context_errors, ci_errors, hook_errors, glob_re = (
 
 STAMP = ".claude/.gate-ran"
 FULL_AT = 60
+# A full gate slower than this, with no impact map, fails the audit: the same 3-minute budget a PR gets in CI.
+SLOW_GATE = 180
 # Vendored from the kaas kit, whose evals test them, and no check's verdict reads them, so a kit sync
 # alone runs nothing. check-prose and check-quality stay mapped: a new rule can fail this repo's own files.
 INERT_KIT = [
@@ -87,12 +89,21 @@ def read_stamp(root: Path) -> str | None:
         return None
 
 
-def write_stamp(root: Path, mode: str) -> str | None:
+def write_stamp(root: Path, mode: str, took: float) -> str | None:
     tid = tree_id(root)
     if tid:
         (root / STAMP).parent.mkdir(parents=True, exist_ok=True)
-        (root / STAMP).write_text(f"{tid} {mode}\n")
+        (root / STAMP).write_text(f"{tid} {mode} {took:.0f}\n")
     return tid
+
+
+def full_seconds(root: Path) -> int | None:
+    """How long the last full gate here took, from the stamp it left; None when the stamp is not a timed full run."""
+    try:
+        parts = (root / STAMP).read_text().split()
+    except OSError:
+        return None
+    return int(parts[2]) if len(parts) > 2 and parts[1] == "full" and parts[2].isdigit() else None
 
 
 def resolve_base(root: Path, impact: dict, explicit: str | None) -> tuple[str | None, str]:
@@ -232,6 +243,7 @@ def stamps(p: dict) -> bool:
 
 def execute(root: Path, cfg: dict, p: dict) -> int:
     steps = p["steps"]
+    t0 = time.time()
     logs = Path(tempfile.mkdtemp(prefix="affected-"))
     alone = {c["name"] for c in (cfg.get("impact") or {}).get("checks", []) if c.get("alone")}
     first = [s for s in steps if s[0] in alone or p["mode"] == "full"]
@@ -262,7 +274,7 @@ def execute(root: Path, cfg: dict, p: dict) -> int:
     if not stamps(p):
         print(f"affected: {len(steps)} check(s) passed ({p['mode']}, {p['stage']}); no stamp below the push stage")
         return 0
-    tid = write_stamp(root, p["mode"])
+    tid = write_stamp(root, p["mode"], time.time() - t0)
     print(f"affected: {len(steps)} check(s) passed ({p['mode']}); stamp {(tid or 'unavailable')[:12]}")
     return 0
 
@@ -281,6 +293,12 @@ def audit(root: Path, cfg: dict) -> int:
         return 1
     impact = cfg.get("impact") or {}
     if not impact.get("checks"):
+        if (took := full_seconds(root)) and took > SLOW_GATE:
+            print(
+                f"affected  FAIL  the full gate took {took}s here, past {SLOW_GATE}s, and repo.json has no impact "
+                "map, so every change waits for all of it. Map it (the eng-impact-map skill)"
+            )
+            return 1
         print("affected  ok  no impact map: every change runs the full gate")
         return 0
     bad = [c.get("name", "?") for c in impact["checks"] if not (c.get("name") and c.get("when") and c.get("run"))]
