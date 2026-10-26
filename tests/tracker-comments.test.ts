@@ -30,6 +30,7 @@ const WRITERS: Record<string, { sites: number; driver: string } | { sites: numbe
   "inbox.ts": { sites: 1, echoes: "act posts the /factory command an operator typed" },
   "reset.ts": { sites: 1, echoes: "reset re-files the seed issues the repo itself holds" },
   "scan.ts": { sites: 1, echoes: "scan files the audit tool's own finding text" },
+  "mcp-server.ts": { sites: 1, echoes: "start_task files the title and body its MCP caller wrote" },
 };
 
 function writeSites(): Record<string, number> {

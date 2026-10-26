@@ -43,13 +43,15 @@ const LIMITS: AuditLimits = { rows: 50_000, refusals: 5_000, every: 1000 };
 const PAGE = 200;
 
 // A leaked database must not hand out live sessions, so only the digest is kept.
-const digest = (id: string) => createHash("sha256").update(id).digest("hex");
+export const digest = (id: string) => createHash("sha256").update(id).digest("hex");
 
 export class PlaneStore {
   private readonly db: Database;
+  // What else a removed member loses: remote.ts revokes their phones and push subscriptions here.
+  readonly onRemoved: ((login: string) => void)[] = [];
 
   constructor(
-    path = ":memory:",
+    readonly path = ":memory:",
     private readonly limits = LIMITS,
   ) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -89,6 +91,11 @@ export class PlaneStore {
     `);
   }
 
+  // Devices, runners, push and extensions share this file, each in its own tables.
+  get database(): Database {
+    return this.db;
+  }
+
   roleOf(login: string): Role | null {
     const row = this.db.query("SELECT role FROM plane_memberships WHERE login = ?").get(login) as {
       role: string;
@@ -104,11 +111,6 @@ export class PlaneStore {
     return row?.role ?? null;
   }
 
-  // Extensions keep their own tables beside these, in the same file.
-  database(): Database {
-    return this.db;
-  }
-
   setMember(login: string, role: Role | null, by: string): void {
     this.assign(login, role, by);
   }
@@ -118,6 +120,7 @@ export class PlaneStore {
     if (role === null) {
       this.db.query("DELETE FROM plane_memberships WHERE login = ?").run(login);
       this.db.query("DELETE FROM plane_sessions WHERE login = ?").run(login);
+      for (const fn of this.onRemoved) fn(login);
       return;
     }
     this.db

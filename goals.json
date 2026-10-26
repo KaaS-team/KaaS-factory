@@ -326,70 +326,120 @@
       "phase": "P3",
       "ask": "The factory is an MCP server, so any agent or IDE can start, read and approve tasks",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/mcp-server.test.ts",
+        "name": "an agent on stdio starts, reads and approves a task, signed on the tracker",
+        "mutation": "mcp: approve_plan signs the command with who sent it"
+      }
     },
     {
       "id": "runner-dial-out",
       "phase": "P3",
       "ask": "invoking any connected machine or sandbox: a runner registers once and dials out, with heartbeat and requeue",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/runner-channel.test.ts",
+        "name": "a lease whose runner is silent for 60s goes back to the queue and to a runner still heard from",
+        "mutation": "runners: a lease silent for 60s goes back to the queue"
+      }
     },
     {
       "id": "phone-pairing",
       "phase": "P3",
       "ask": "Pair a phone by QR, with revocable device keys",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/pairing.test.ts",
+        "name": "a QR pairs a phone once, the device is listed, and revoking it ends its session",
+        "mutation": "pairing: revoking a device ends its session"
+      }
     },
     {
       "id": "e2e-encryption",
       "phase": "P3",
       "ask": "The plane and relay carry ciphertext only",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/e2e.test.ts",
+        "name": "the relay receives a sealed box with no plaintext, and only the paired phone opens it",
+        "mutation": "relay: only a sealed box goes on the wire"
+      }
     },
     {
       "id": "web-push",
       "phase": "P3",
       "ask": "Needs you and Done reach the phone, muted while someone is present",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/web-push.test.ts",
+        "name": "needs-you and done reach the phone encrypted, and nothing is pushed while its person is present",
+        "mutation": "push: nobody is pushed while they are present"
+      }
     },
     {
       "id": "phone-approvals",
       "phase": "P3",
       "ask": "Approvals from the phone: the relay is read-only, so unblocking and approving stay on GitHub or the dashboard.",
       "source": "CHANGELOG v5.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/phone-approvals.test.ts",
+        "name": "a paired phone approves a plan as its person, on the tracker, until it is revoked",
+        "mutation": "pairing: a phone acts as its person"
+      }
     },
     {
       "id": "stale-pr-nudge-ios-icon",
       "phase": "P3",
       "ask": "A stale-PR nudge (the code host's PR record has no `updatedAt` yet) and a PNG touch icon for iOS.",
       "source": "CHANGELOG v5.0.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/stale-pr.test.ts",
+        "name": "a factory PR quiet for 3 days is nudged in the inbox, and iOS gets a 180px PNG touch icon",
+        "mutation": "inbox: a factory PR quiet for 3 days is nudged"
+      }
     },
     {
       "id": "phone-intake",
       "phase": "P3",
       "ask": "End to end from a phone: PWA trigger, board, factory, summary, human merge, public dashboard",
       "source": "spec 10 phone-intake",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/phone-intake.test.ts",
+        "name": "a phone files a task, a remote runner ships it, and the phone merges and sees it shipped",
+        "mutation": "push: a shipped run tells the phone it is done"
+      }
     },
     {
       "id": "mid-run-commands",
       "phase": "P3",
       "ask": "a message sent mid-run, queued and undoable until a runner reads it; takeover from the web; cancelling a stage that is running (cut from command-routes: they need the runner signal channel)",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/mid-run.test.ts",
+        "name": "a message is undoable until the runner reads it, and stop and takeover reach the runner",
+        "mutation": "runners: a message read by the runner can no longer be undone"
+      }
     },
     {
       "id": "control-anywhere",
       "phase": "P3",
       "ask": "deploying the factory on the web, controllable from local, web, mobile or anywhere",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/control-anywhere.test.ts",
+        "name": "a guarded web plane is driven from MCP, a browser, a phone and a remote runner",
+        "mutation": "runner: a message from anywhere reaches the run's folder"
+      }
     },
     {
       "id": "sandbox-contract",
@@ -1059,7 +1109,12 @@
       "phase": "P3",
       "ask": "`StorePort`, `SecretsPort`, `NotifierPort` and `EventSourcePort` land with their adapters in v3.2 and v3.3; `ExecutionPort` is a single `run` until the remote runtimes need prepare, collect and teardown (v3.3).",
       "source": "CHANGELOG v3.1.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/ports-landed.test.ts",
+        "name": "StorePort, SecretsPort, NotifierPort and EventSourcePort each exist with an adapter",
+        "mutation": "ports: StorePort has its SQLite adapter"
+      }
     },
     {
       "id": "contrib-agents",

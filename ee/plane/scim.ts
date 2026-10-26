@@ -27,7 +27,7 @@ const scimError = (status: number, detail: string) =>
   json({ schemas: [ERROR], status: String(status), detail }, status, TYPE);
 
 export function scimRoutes(ctx: PlaneContext): Route[] {
-  const db = ctx.store.database();
+  const db = ctx.store.database;
   db.exec(`CREATE TABLE IF NOT EXISTS ee_scim_users (
     id TEXT PRIMARY KEY, user_name TEXT NOT NULL UNIQUE, external_id TEXT, active INTEGER NOT NULL
   )`);

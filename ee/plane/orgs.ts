@@ -46,7 +46,7 @@ async function targetRepo(req: Request, label: string, defaultRepo: string): Pro
 export function orgsExtension(defaultRepo: string): PlaneExtension {
   let roleIn: (login: string, repo: string) => Role | null | undefined = () => undefined;
   const routes = (ctx: PlaneContext): Route[] => {
-    const db = ctx.store.database();
+    const db = ctx.store.database;
     db.exec(`CREATE TABLE IF NOT EXISTS ee_org_repos (repo TEXT PRIMARY KEY, org TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS ee_org_members (org TEXT NOT NULL, login TEXT NOT NULL, role TEXT NOT NULL,
         PRIMARY KEY (org, login))`);

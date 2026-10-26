@@ -21,7 +21,9 @@ import { DiffAnchorRechecker } from "./recheck";
 import { scan, scanLighthouse } from "./scan";
 import { streamLogs } from "./logs";
 import { plain } from "./display";
-import { act, buildInbox, inboxPositionals, learningPrItems, parkReasons, type InboxAction } from "./inbox";
+import { act, buildInbox, inboxPositionals, parkReasons, type InboxAction } from "./inbox";
+import { prItems } from "./stale-pr";
+import { remoteCommand } from "./remote-cli";
 import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
@@ -314,7 +316,7 @@ async function cmdInbox(): Promise<void> {
   const reasons = existsSync(db) ? parkReasons(new FactoryState(db).listRuns(repo)) : undefined;
   const items = [
     ...buildInbox(await github.listOpenIssues(repo), reasons),
-    ...learningPrItems(await github.listPrs(repo, { state: "open" })),
+    ...prItems(await github.listPrs(repo, { state: "open" })),
   ];
   const [issueArg, actionArg] = inboxPositionals(args);
   if (issueArg) {
@@ -515,7 +517,7 @@ function serveDashboard(
     fetch: (req: Request): Promise<Response> => app.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${port} (repo=${repo || "unset"})`);
-  startRelay(app.readInProcess);
+  app.remote.start();
   return port;
 }
 
@@ -1109,6 +1111,10 @@ async function main(): Promise<void> {
       return cmdPool();
     case "receipt":
       return cmdReceipt();
+    case "mcp":
+    case "runner":
+    case "pair":
+      return remoteCommand(args);
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

@@ -3,6 +3,7 @@
 
 import { api, h, heading, isOperator, money, post, quiet, shell, state, stateOr, table } from "./core.js";
 import { readRelay, saveRelay } from "./relay-follow.js";
+import { remotePanel } from "./remote.js";
 
 const isOwner = () => state.me?.role === "owner";
 
@@ -123,7 +124,9 @@ function leases(d) {
   );
 }
 
-function phone() {
+const phone = () => h("div", null, relayForm(), remotePanel());
+
+function relayForm() {
   const cfg = readRelay(localStorage);
   return h(
     "form",

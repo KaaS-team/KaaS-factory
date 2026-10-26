@@ -18,7 +18,8 @@ export type InboxKind =
   | "parked"
   | "failed"
   | "budget"
-  | "learning-pr";
+  | "learning-pr"
+  | "stale-pr";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
 
 // Actions that carry the human's own words.

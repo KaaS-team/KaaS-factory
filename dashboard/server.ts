@@ -11,7 +11,8 @@ import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { buildBoard } from "./board";
 import { paneRoutes } from "./pane";
 import { LABEL } from "../src/labels";
-import { InboxError, act, buildInbox, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
+import { InboxError, act, buildInbox, parkReasons, type InboxAction } from "../src/inbox";
+import { prItems } from "../src/stale-pr";
 import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
@@ -30,6 +31,7 @@ import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
 import { commandRoutes, senderName } from "./plane/commands";
+import { createRemote, REMOTE_PUBLIC_ROUTES } from "./plane/remote";
 import {
   readCapped,
   readDelivery,
@@ -75,6 +77,7 @@ export const PUBLIC_ROUTES: readonly string[] = [
   EVENTS_ROUTE,
   HEALTH_ROUTE,
   ...INTEGRATION_PUBLIC_ROUTES,
+  ...REMOTE_PUBLIC_ROUTES,
 ];
 
 const ASSET_TYPES: Record<string, string> = {
@@ -83,6 +86,7 @@ const ASSET_TYPES: Record<string, string> = {
   woff2: "font/woff2",
   svg: "image/svg+xml",
   webmanifest: "application/manifest+json",
+  png: "image/png",
 };
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
@@ -341,6 +345,7 @@ export function createDashboard(
 
   // The routing table is the only place a route exists, so the route-walk test
   // (tests/dashboard-routes.test.ts) sees every one of them.
+  const remote = createRemote({ access, github, repo, handle: (req) => readInProcess(req) });
   const routes: readonly Route[] = [
     healthRoute,
     {
@@ -353,7 +358,7 @@ export function createDashboard(
       // Static files of the page itself: no data, so public like the shell.
       method: "GET",
       pattern:
-        /^\/(styles\.css|tokens\.css|app\.js|sw\.js|manifest\.webmanifest|icon\.svg|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
+        /^\/(styles\.css|tokens\.css|app\.js|sw\.js|manifest\.webmanifest|icon\.svg|apple-touch-icon\.png|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
       label: "GET /assets",
       handler: (_req, _url, m) => {
         try {
@@ -367,6 +372,7 @@ export function createDashboard(
       },
     },
     ...access.routes,
+    ...remote.routes,
     {
       method: "POST",
       pattern: /^\/webhook\/github$/,
@@ -707,7 +713,7 @@ export function createDashboard(
             ...buildInbox(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
               (i) => ({ ...i, repo: r }),
             ),
-            ...learningPrItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
+            ...prItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
           ]),
         );
         const items = perRepo
@@ -846,7 +852,7 @@ export function createDashboard(
   // Bun.serve passes two arguments, so only code in this process reaches the third.
   const readInProcess = (req: Request) => handle(req, "127.0.0.1", true);
 
-  return { handle, readInProcess, routeLabels, routeRoles, access };
+  return { handle, readInProcess, routeLabels, routeRoles, access, remote };
 }
 
 if (import.meta.main) {
@@ -873,5 +879,5 @@ if (import.meta.main) {
     fetch: (req: Request): Promise<Response> => dashboard.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${PORT} (repo=${REPO || "unset"})`);
-  startRelay(dashboard.readInProcess);
+  dashboard.remote.start();
 }

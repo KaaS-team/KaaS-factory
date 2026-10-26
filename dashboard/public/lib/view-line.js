@@ -34,6 +34,7 @@ export const KIND_HEADLINE = {
   parked: "A run needs a human",
   failed: "A run failed",
   budget: "A run hit its budget",
+  "stale-pr": "A pull request has gone quiet",
 };
 const REPO_ICON = "M5 5h14v14H5zM9 5v14";
 const TYPES = [

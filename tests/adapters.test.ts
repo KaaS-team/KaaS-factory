@@ -162,7 +162,18 @@ function nativeTrackers(): void {
   });
 }
 
+// The store, secrets, event-source and notifier ports run their contracts in ports-landed.test.ts.
+const landed = (name: string) => () =>
+  test(`${name}: its contract runs in ports-landed`, () => {
+    const text = readFileSync(join(import.meta.dir, "ports-landed.test.ts"), "utf8");
+    expect(text).toContain(`"../src/adapters/${name}/`);
+  });
+
 const REGISTRY: Record<string, () => void> = {
+  env: landed("env"),
+  sqlite: landed("sqlite"),
+  sse: landed("sse"),
+  webpush: landed("webpush"),
   trackers: nativeTrackers,
   "git-lease": () => leaseContract("git-lease", gitLeases),
   "github-store": () =>

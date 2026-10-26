@@ -53,6 +53,9 @@ function cookie(req: Request, name: string): string {
   return "";
 }
 
+// The raw session id, so a paired phone's session can be matched to its device row.
+export const sessionIdOf = (req: Request) => cookie(req, SESSION_COOKIE);
+
 // Behind a TLS-terminating proxy the request arrives as http, so X-Forwarded-Proto counts too.
 const isHttps = (req: Request) =>
   new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
@@ -114,12 +117,19 @@ export function createAccess(opts: AccessOptions) {
     return null;
   }
 
-  function startSession(req: Request, login: string, extra: Record<string, string> = {}, status = 200): Response {
+  function startSession(
+    req: Request,
+    login: string,
+    extra: Record<string, string> = {},
+    status = 200,
+    // A paired phone passes its own id and a longer life, so revoking the device can end the session.
+    id = randomBytes(32).toString("hex"),
+    ttlMs = SESSION_TTL_MS,
+  ): Response {
     // The cookie is a random id, never the token, so a leaked cookie cannot be replayed as a Bearer token.
-    const id = randomBytes(32).toString("hex");
-    store.openSession(id, login, SESSION_TTL_MS);
+    store.openSession(id, login, ttlMs);
     const headers = new Headers(extra);
-    headers.append("set-cookie", setCookie(req, SESSION_COOKIE, id, SESSION_TTL_MS / 1000));
+    headers.append("set-cookie", setCookie(req, SESSION_COOKIE, id, ttlMs / 1000));
     if (status === 302) {
       headers.append("set-cookie", setCookie(req, STATE_COOKIE, "", 0, "Lax"));
       return new Response(null, { status, headers });
@@ -345,5 +355,5 @@ export function createAccess(opts: AccessOptions) {
     return exts.reduce((left, e) => (who && e.visibleRepos ? e.visibleRepos(who, left) : left), [...repos]);
   };
 
-  return { routes, guarded, gate, audited, actorOf, visibleRepos, store };
+  return { routes, guarded, gate, audited, actorOf, visibleRepos, store, startSession };
 }

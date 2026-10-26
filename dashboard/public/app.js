@@ -4,7 +4,8 @@
 
 import { api, h, plural, post, shell, short, state } from "/lib/core.js";
 import { renderNav } from "/lib/rail.js";
-import { followRelay, readRelay } from "/lib/relay-follow.js";
+import { readRelay } from "/lib/relay-follow.js";
+import { followRelay, startRemote } from "/lib/remote.js";
 import { routeFromHash } from "/lib/routes.js";
 import { createStatusLoader } from "/lib/status-loader.js";
 import { analyticsView } from "/lib/view-analytics.js";
@@ -204,6 +205,7 @@ api("/api/me")
   .finally(onRoute);
 startFollowing();
 loadInbox().then(render);
+startRemote(() => loadInbox().then(render));
 setInterval(() => {
   loadInbox().then(() => state.route.view === "inbox" && !document.activeElement?.closest?.("#composer") && render());
   loadView();

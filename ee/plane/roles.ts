@@ -18,7 +18,7 @@ const NAME = /^[a-z][a-z\d-]{1,30}$/;
 export function rolesExtension(): PlaneExtension {
   let get: (name: string) => CustomRole | null = () => null;
   const routes = (ctx: PlaneContext): Route[] => {
-    const db = ctx.store.database();
+    const db = ctx.store.database;
     db.exec(
       "CREATE TABLE IF NOT EXISTS ee_roles (name TEXT PRIMARY KEY, base TEXT NOT NULL, allow TEXT NOT NULL, deny TEXT NOT NULL)",
     );
