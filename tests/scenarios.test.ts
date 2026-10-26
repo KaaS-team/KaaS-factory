@@ -515,6 +515,53 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("10e. a retry into the same failure with nothing changed is refused, and --force runs it (#86)", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.gateRunner.line = "FACTORY_GATES: status=RED passed=1 failed=1 skipped=0 failed_gates=unit";
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    expect(await c.step()).toBe("failed");
+    c.push("build", build());
+    c.github.say(1, "/factory retry");
+    expect(await c.step()).toBe("failed");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toStartWith("build attempt 2: the change refused by gate:unit");
+    const runs = c.state.listStageRuns("acme/widgets", { issue: 1 }).length;
+    c.github.say(1, "/factory retry");
+    expect(await c.step()).toBe("waiting");
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).length).toBe(runs);
+    expect(labels(c.github, 1)).toEqual([LABEL.failed]);
+    expect(c.github.issues.get(1)!.comments.at(-1)!.body).toStartWith(
+      "cause unchanged: build: the change refused by gate:unit",
+    );
+    expect(await c.step()).toBe("waiting");
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).length).toBe(runs);
+    expect(c.github.issues.get(1)!.comments.filter((x) => x.body.startsWith("cause unchanged")).length).toBe(1);
+    c.gateRunner.line = "FACTORY_GATES: status=GREEN passed=2 failed=0 skipped=0 failed_gates=-";
+    c.push("build", build());
+    c.push("verify", verdict("pass"));
+    c.push("pr", pr());
+    c.github.say(1, "/factory retry --force");
+    expect(await c.step()).toBe("shipped");
+    done(c);
+  });
+
+  test("10f. an edited issue body lets the same retry run again (#86)", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", {}, { exitCode: 1, killedReason: "timed out after 15 minutes" });
+    expect(await c.step()).toBe("failed");
+    c.push("triage", {}, { exitCode: 1, killedReason: "timed out after 15 minutes" });
+    c.github.say(1, "/factory retry");
+    expect(await c.step()).toBe("failed");
+    c.github.issues.get(1)!.body = "do the thing, in smaller steps";
+    c.push("triage", {}, { exitCode: 1, killedReason: "timed out after 15 minutes" });
+    c.github.say(1, "/factory retry");
+    expect(await c.step()).toBe("failed");
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).length).toBe(3);
+    done(c);
+  });
+
   test("10b. an operator takeover mid-build parks needs-human; retry resumes at build and the PR says so", async () => {
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);
@@ -656,7 +703,9 @@ describe("failure paths", () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage(), { exitCode: 1, killedReason: "timed out after 15 minutes" });
     expect(await c.step()).toBe("failed");
-    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe("timed out after 15 minutes");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe(
+      "triage attempt 1: timed out after 15 minutes; spent $0.01 on this issue",
+    );
     done(c);
   });
 
@@ -665,6 +714,21 @@ describe("failure paths", () => {
     c.push("triage", {}, { exitCode: 0, permissionDenials: ["Write .factory/runs/issue-1/triage.json"] });
     expect(await c.step()).toBe("failed");
     expect(c.state.getRun("acme/widgets", 1)!.reason).toContain("Write .factory/runs/issue-1/triage.json");
+    done(c);
+  });
+
+  test("14i. a refused part of a compound command is named with its source, attempt and spend (#91)", async () => {
+    const c = setup([LABEL.ready]);
+    const target = "git status --short; npm ls zod undici 2>&1 | head -20";
+    c.push("triage", {}, { exitCode: 0, refusals: [{ tool: "Bash", target, by: "hook:guard-paths" }] });
+    expect(await c.step()).toBe("failed");
+    const reason = c.state.getRun("acme/widgets", 1)!.reason!;
+    expect(reason).toBe(
+      "triage attempt 1: `npm ls zod undici 2>&1` refused by hook:guard-paths; spent $0.01 on this issue",
+    );
+    const comment = c.github.issues.get(1)!.comments.at(-1)!.body;
+    expect(comment).toContain("Failed: triage attempt 1: `npm ls zod undici 2>&1` refused by hook:guard-paths");
+    expect(comment).not.toContain("spent");
     done(c);
   });
 
@@ -817,13 +881,17 @@ describe("failure paths", () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage({ dispositon: "proceed" }));
     expect(await c.step()).toBe("failed");
-    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe('triage.json has unknown field "dispositon"');
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe(
+      'triage attempt 1: triage.json has unknown field "dispositon"; spent $0.01 on this issue',
+    );
     const d = setup([LABEL.ready]);
     d.state.setToggle("auto_approve_low_risk", true);
     d.push("triage", triage());
     d.push("plan", plan("low", { file: ["src/b.ts"] }));
     expect(await d.step()).toBe("failed");
-    expect(d.state.getRun("acme/widgets", 1)!.reason).toBe('plan.json has unknown field "file"');
+    expect(d.state.getRun("acme/widgets", 1)!.reason).toBe(
+      'plan attempt 1: plan.json has unknown field "file"; spent $0.02 on this issue',
+    );
     done(c);
     done(d);
   });

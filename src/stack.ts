@@ -151,6 +151,17 @@ function rust(files: RepoFiles): Stack | undefined {
   };
 }
 
+// The package managers whose node_modules `npm ls` can read.
+const NODE_STACKS = new Set(["bun", "pnpm", "yarn", "npm", "node"]);
+
+// What every stage may run to read installed versions, so a dependency plan is not refused (#87). Offline
+// forms only: `npm view` and `uv tree` reach the registry, a free `*` admits --registry, and `node *` runs any code.
+export function readCommands(stack: Pick<Stack, "name">): string[] {
+  const node = NODE_STACKS.has(stack.name) ? ["npm ls", "npm ls --all", "npm ls --depth *"] : [];
+  const uv = stack.name === "uv" ? ["uv pip list", "uv tree --frozen --offline"] : [];
+  return [...node, ...uv, "git ls-tree *"];
+}
+
 function ciOf(files: RepoFiles): string | undefined {
   if (files.exists(".github/workflows")) return "GitHub Actions";
   if (files.exists(".gitlab-ci.yml")) return "GitLab CI";
