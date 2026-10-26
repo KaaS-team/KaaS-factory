@@ -1,22 +1,4 @@
 {
-  "names": {
-    "src/engine/common.ts": 1
-  },
-  "lines": {
-    "dashboard/public/app.js": 1644,
-    "dashboard/server.ts": 877,
-    "src/agents/executor.ts": 477,
-    "src/agents/structured.ts": 401,
-    "src/cli.ts": 1123,
-    "src/config.ts": 770,
-    "src/doctor.ts": 445,
-    "src/engine/common.ts": 671,
-    "src/engine/steps.ts": 524,
-    "src/github.ts": 495,
-    "src/receipt.ts": 459,
-    "src/state.ts": 726,
-    "src/watch.ts": 796
-  },
   "comments": {
     "dashboard/board.ts": 1,
     "dashboard/project.ts": 1,
@@ -98,7 +80,7 @@
     "src/stack.ts": 1,
     "src/stage-permissions.ts": 2,
     "src/state.ts": 2,
-    "src/watch.ts": 13,
+    "src/watch.ts": 12,
     "src/webhook.ts": 1,
     "template/.claude/hooks/guard-paths.sh": 3,
     "template/.claude/hooks/stop-artifact.sh": 1,
@@ -145,5 +127,23 @@
     "tests/tokens.test.ts": 1,
     "tests/tracker-comments.test.ts": 1,
     "tests/visual-system.test.ts": 1
+  },
+  "lines": {
+    "dashboard/public/app.js": 1644,
+    "dashboard/server.ts": 877,
+    "src/agents/executor.ts": 477,
+    "src/agents/structured.ts": 401,
+    "src/cli.ts": 1123,
+    "src/config.ts": 770,
+    "src/doctor.ts": 445,
+    "src/engine/common.ts": 671,
+    "src/engine/steps.ts": 524,
+    "src/github.ts": 495,
+    "src/receipt.ts": 459,
+    "src/state.ts": 726,
+    "src/watch.ts": 792
+  },
+  "names": {
+    "src/engine/common.ts": 1
   }
 }

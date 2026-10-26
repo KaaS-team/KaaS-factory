@@ -947,7 +947,12 @@
       "phase": "P2",
       "ask": "`src/revision.ts` and `src/derive.ts` still take a revision's or answer's text from any `COLLABORATOR` comment; only the command itself is role-checked.",
       "source": "CHANGELOG v3.2.0 #7",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/scenarios.test.ts",
+        "name": "3c. a read-only collaborator's revise never reaches the agent, before or after a maintainer's",
+        "mutation": "watch: the thread keeps only writers' comments"
+      }
     },
     {
       "id": "ports-landed",
