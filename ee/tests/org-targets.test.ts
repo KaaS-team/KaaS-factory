@@ -19,8 +19,8 @@ const call = (p: ReturnType<typeof plane>, label: string, cookie: string, body?:
   );
 };
 
-async function twoOrgs() {
-  const p = plane([orgsExtension("acme/widgets")]);
+async function twoOrgs(planeRepo = "acme/widgets") {
+  const p = plane([orgsExtension("acme/widgets")], { repo: planeRepo });
   p.store.setMember("boss", "owner", "test");
   const owner = cookieFor(p, "boss");
   for (const body of [
@@ -80,5 +80,25 @@ describe("org mode targets", () => {
     expect(await repos("GET /api/line", bob)).toEqual(["blue/app"]);
     expect(await repos("GET /api/inbox", owner)).toEqual(["acme/widgets", "blue/app"]);
     expect(await repos("GET /api/line", owner)).toEqual(["acme/widgets", "blue/app"]);
+  });
+
+  test("on a plane with no repo of its own, analytics counts only the runs of the caller's org repos", async () => {
+    const { p, owner, bob } = await twoOrgs("");
+    for (const [issue, repo] of [
+      [1, "acme/widgets"],
+      [2, "blue/app"],
+      [3, "loose/repo"],
+    ] as const)
+      p.state.upsertRun({ issue, repo, title: "t", stage: "triage", status: "running" });
+    const runs = async (cookie: string) => {
+      const res = await call(p, "GET /api/analytics", cookie);
+      return res.status === 200 ? ((await res.json()) as { runs: number }).runs : res.status;
+    };
+    expect(await runs(owner)).toBe(3);
+    // bob's org owns blue/app alone; the plane's gate repo is red's, where he has no role.
+    expect(await runs(bob)).toBe(403);
+    const member = { org: "red", login: "bob", role: "viewer" };
+    expect((await call(p, "POST /api/orgs/members", owner, member)).status).toBe(200);
+    expect(await runs(bob)).toBe(2);
   });
 });

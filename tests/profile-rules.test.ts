@@ -75,12 +75,18 @@ describe("scaleup and enterprise profile rules", () => {
     expect(capsFor(mergeConfig({ repo: "a/b", profile: "scaleup", caps: { perTeam: 5 } }))).toEqual({ perTeam: 5 });
   });
 
-  test("a trailing /* owns a directory's direct children only, so a deeper path keeps an earlier rule's owner", () => {
+  test("`dir/*` owns a directory's direct children only, and any other match owns everything under it", () => {
     const rules = parseCodeowners("*  @lead\n/docs/sub/  @sub\ndocs/*  @writer\n/src/*.ts @ts\n");
     expect(ownersOf(rules, "docs/a.md")).toEqual(["@writer"]);
     expect(ownersOf(rules, "docs/sub/b.md")).toEqual(["@sub"]);
     expect(ownersOf(rules, "src/a.ts")).toEqual(["@ts"]);
     expect(ownersOf(rules, "src/lib/a.ts")).toEqual(["@lead"]);
+    // Any other wildcard that matches a directory owns the files inside it.
+    const nested = parseCodeowners("config*  @ops\n*.d  @ops\n");
+    expect(ownersOf(nested, "configs/prod.yml")).toEqual(["@ops"]);
+    expect(ownersOf(nested, "conf.d/a.conf")).toEqual(["@ops"]);
+    expect(ownersOf(parseCodeowners("docs/*  @writer\n"), "docs/a/b.md")).toEqual([]);
+    expect(ownersOf(parseCodeowners("docs/*  @writer\n"), "docs/a.md")).toEqual(["@writer"]);
   });
 
   test("a code owner's approval of an older commit does not satisfy the owner wait", async () => {
@@ -91,12 +97,20 @@ describe("scaleup and enterprise profile rules", () => {
       headRefOid: "new",
       mergeable: "MERGEABLE",
       reviewDecision: "APPROVED",
+      // What gh really returns: latestReviews with commit.oid never filled in.
       latestReviews: [
+        { author: { login: "dba" }, state: "APPROVED", commit: { oid: "" } },
+        { author: { login: "lead" }, state: "APPROVED", commit: { oid: "" } },
+      ],
+    };
+    const latestReviews = {
+      nodes: [
         { author: { login: "dba" }, state: "APPROVED", commit: { oid: "old" } },
         { author: { login: "lead" }, state: "APPROVED", commit: { oid: "new" } },
       ],
     };
-    const graphql = { data: { repository: { pullRequest: { reviewThreads: { nodes: [] }, reviews: { nodes: [] } } } } };
+    const pullRequest = { reviewThreads: { nodes: [] }, reviews: { nodes: [] }, latestReviews };
+    const graphql = { data: { repository: { pullRequest } } };
     const gh = new GitHub({
       run: async (args: string[]) => ({
         code: 0,

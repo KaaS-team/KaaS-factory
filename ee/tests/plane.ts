@@ -34,8 +34,9 @@ export function plane(
 ) {
   const store = new PlaneStore(":memory:");
   const access = createAccess({ token: TOKEN, store, env: opts.env ?? {}, fetch: opts.fetch, extensions });
+  const state = new FactoryState(":memory:");
   const dashboard = createDashboard(
-    new FactoryState(":memory:"),
+    state,
     new QuietGitHub(),
     opts.repo ?? "acme/widgets",
     false,
@@ -46,7 +47,7 @@ export function plane(
     access,
   );
   const handle = (req: Request, address = "10.0.0.9") => dashboard.handle(req, address);
-  return { store, handle, dashboard };
+  return { store, handle, dashboard, state };
 }
 
 export const sessionOf = (res: Response) => {

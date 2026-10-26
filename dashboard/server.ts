@@ -1,10 +1,6 @@
-// The cockpit (plan section 2). Bun.serve, one static page, JSON API + SSE
-// read from state.ts. No second source of truth: this server never invents
-// state, it reads what watch.ts wrote and posts replies through github.ts as
-// the signed-in `gh` user. /api/board is the exception on purpose — it
-// reads GitHub labels directly (dashboard/board.ts), so the board still
-// works with no local SQLite at all (a CI/VM run with no watcher on this
-// machine).
+// The cockpit (plan section 2): one static page, a JSON API and SSE, read from what watch.ts wrote;
+// replies go out through github.ts as the signed-in `gh` user. /api/board alone reads GitHub labels
+// (dashboard/board.ts), so the board works on a CI or VM run with no local SQLite at all.
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
@@ -240,6 +236,9 @@ export function createDashboard(
   // Every repo the multi-repo inbox reads from (v2.9.0 item 2): an explicit
   // FACTORY_REPOS list, else the single configured repo, else whatever repos
   // have ever run under FACTORY_HOME.
+  // With no repo of its own the plane lists every repo's runs, so tenancy narrows them to the caller's.
+  const visibleRuns = (req: Request) =>
+    state.listRuns(repo || undefined).filter((r) => access.visibleRepos(req, [r.repo]).length);
   function inboxRepos(): string[] {
     const fromEnv = (process.env.FACTORY_REPOS ?? "")
       .split(",")
@@ -647,9 +646,9 @@ export function createDashboard(
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
       role: "viewer",
-      handler: () =>
+      handler: (req) =>
         json(
-          analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [], new Date(), (agent) => {
+          analytics(visibleRuns(req), repo ? allStageRuns() : [], new Date(), (agent) => {
             const a = project?.config.agents[agent];
             return a?.models?.large ?? a?.model;
           }),

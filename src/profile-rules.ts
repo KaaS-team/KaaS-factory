@@ -63,9 +63,10 @@ function globToRegex(glob: string): RegExp {
       return part.replace(/[.+^${}()|[\]\\]/g, "\\$&");
     })
     .join("");
-  // A literal last segment also owns what sits under it; `docs/*` owns docs' direct children only.
-  const literal = !/[*?]/.test(p.slice(p.lastIndexOf("/") + 1));
-  return new RegExp(`${anchored ? "^" : "^(?:.*/)?"}${body}${dirOnly ? "/.*" : literal ? "(?:/.*)?" : ""}$`);
+  // A match owns everything under it (`config*` owns configs/prod.yml), except that `dir/*` owns
+  // only dir's direct children, as GitHub documents.
+  const childrenOnly = p.endsWith("/*") && p.length > 2;
+  return new RegExp(`${anchored ? "^" : "^(?:.*/)?"}${body}${dirOnly ? "/.*" : childrenOnly ? "" : "(?:/.*)?"}$`);
 }
 
 export function ownersOf(rules: readonly CodeownersRule[], path: string): readonly string[] {
