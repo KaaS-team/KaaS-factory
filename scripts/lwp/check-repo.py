@@ -188,12 +188,37 @@ def hook_errors(root: Path) -> list[str]:
 RUNNERS = {"github": "ubuntu-", "ubicloud": "ubicloud-"}
 
 
+# Runners that bill per started minute, per job. A paid job never runs on every commit, and is capped: per-run
+# (a pull request, by hand) at 3 minutes, scheduled at 9. 25 Oct 2026: shards on every push spent 464 minutes.
+PAID = ("ubicloud-", "self-hosted")
+CAP = {"run": 3, "schedule": 9}
+
+
+def spend_errors(flows: dict[str, str]) -> list[str]:
+    errs = []
+    for name, text in flows.items():
+        head, _, body = text.partition("\njobs:\n")
+        scheduled = bool(re.search(r"(?m)^  schedule:", head))
+        cap = CAP["schedule" if scheduled else "run"]
+        jobs = re.findall(r"(?m)^  ([\w-]+):\n((?:    .*\n|[ \t]*\n)*)", body + "\n")
+        paid = [
+            (j, b) for j, b in jobs if any(k in (re.search(r"(?m)^    runs-on:(.*)$", b) or ["", " "])[1] for k in PAID)
+        ]
+        if paid and re.search(r"(?m)^  push:", head):
+            errs.append(f"{name}: runs on a paid runner on every push; trigger it on pull_request or schedule")
+        for job, b in paid:
+            t = re.search(r"(?m)^    timeout-minutes:\s*(\d+)\s*$", b)
+            if not t or int(t.group(1)) > cap:
+                errs.append(f"{name}: job {job} needs timeout-minutes of {cap} or less on a paid runner")
+    return errs
+
+
 def ci_errors(root: Path, cfg: dict) -> list[str]:
     """Branch protection requires the `push` job, so exactly one workflow has it, on ci.runner's machine, capped;
     each schedule cron in repo.json is a cron some workflow runs on, so the two cannot drift."""
     flows = {f.name: f.read_text() for f in sorted((root / ".github/workflows").glob("*.y*ml"))}
     crons = {m for t in flows.values() for m in re.findall(r"(?m)^\s*-\s*cron:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", t)}
-    errs = [
+    errs = spend_errors(flows) + [
         f"schedule.{stage} is {cron!r}, but no workflow runs on that cron; repo.json and the workflow must agree"
         for stage, cron in sorted((cfg.get("schedule") or {}).items())
         if cron not in crons
