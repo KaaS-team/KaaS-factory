@@ -46,6 +46,31 @@ jobs:
       # The runner's own Rust toolchain stays reachable: make lint and the relay and verify tests need cargo.
       - name: make check
         run: RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make check
+      # The stop-stage security checks run here too, so the scanners are installed, never skipped: gitleaks
+      # and OSV-Scanner as pinned release binaries checked against their sha256, Semgrep pinned through uv.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lwp-scanners
+          key: scanners-gitleaks-8.30.1-osv-2.6.0
+      - name: Install security scanners
+        run: |
+          d=~/.cache/lwp-scanners
+          mkdir -p "$d"
+          if [ ! -x "$d/gitleaks" ]; then
+            curl -sfLo /tmp/gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+            echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gl.tgz" | sha256sum -c -
+            tar -xzf /tmp/gl.tgz -C "$d" gitleaks
+          fi
+          if [ ! -x "$d/osv-scanner" ]; then
+            curl -sfLo /tmp/osv https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+            echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  /tmp/osv" | sha256sum -c -
+            install -m 755 /tmp/osv "$d/osv-scanner"
+          fi
+          echo "$d" >> "$GITHUB_PATH"
+          uv tool install semgrep==1.182.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Security scan of what this change adds
+        run: LWP_SECURITY_BASE=origin/${{ github.base_ref || 'main' }} python3 scripts/lwp/check-security.py gitleaks,semgrep,osv-scanner
 
       # Flags a flaky test from the last runs' reports; name it @quarantine and it moves to the job below.
       - uses: ctrf-io/github-test-reporter@93ff46b55aefe633bde6d13e61a7f533303233e6 # v1.3.2

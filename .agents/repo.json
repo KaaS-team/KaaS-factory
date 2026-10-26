@@ -3,10 +3,21 @@
   "name": "factory",
   "gate": "make check",
   "test": "make test",
-  "ci": { "runner": "github" },
+  "ci": {
+    "runner": "github"
+  },
   "formatters": {
     ".ts": "bun x biome format --write",
     ".js": "bun x biome format --write",
     ".mjs": "bun x biome format --write"
-  }
+  },
+  "stageGates": {
+    "stop": "make check && python3 scripts/lwp/check-security.py gitleaks,semgrep,osv-scanner",
+    "push": "make check && python3 scripts/lwp/check-security.py gitleaks,semgrep,osv-scanner"
+  },
+  "$stageGates": "push matches stop so the scanners run before every push, not the gate alone; CI runs the same scan.",
+  "kitExtras": [
+    "scripts/lwp/check-security.py",
+    "scripts/lwp/semgrep.yml"
+  ]
 }
