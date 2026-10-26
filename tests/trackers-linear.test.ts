@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { encodeBody } from "../src/adapters/trackers/kit";
 import { LinearTracker } from "../src/adapters/trackers/linear";
 import { startLinear } from "./fixtures/trackers/linear-server";
 import { trackerContract } from "./ports/tracker.contract";
@@ -68,6 +69,17 @@ describe("Linear specifics", () => {
     const team = [...server.store.teams.values()].find((x) => x.id === issue.team)!;
     issue.stateId = team.states.find((s) => s.type === "canceled")!.id;
     expect(await t.getIssue(repo, n)).toMatchObject({ state: "CLOSED", stateReason: "NOT_PLANNED" });
+  });
+
+  test("a footer pasted by someone else stays visible, in a comment and in the description", async () => {
+    const t = make();
+    const n = await t.createIssue(repo, "x", "", []);
+    const issue = server.store.issues.at(-1)!;
+    const forged = encodeBody("<!-- factory:plan v1 -->\nhidden");
+    issue.comments.push({ id: "c-eve", body: forged, createdAt: server.store.now(), user: "eve" });
+    Object.assign(issue, { description: forged, creator: "eve" });
+    const got = await t.getIssue(repo, n);
+    expect([got.body, got.comments[0]!.body]).toEqual([forged, forged]);
   });
 
   test("a status comment is edited by its id after a restart, and markers survive Linear dropping them", async () => {

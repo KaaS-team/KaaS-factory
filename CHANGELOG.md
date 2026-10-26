@@ -74,6 +74,13 @@ GitHub stays the default tracker, `claude` the default agent and `local` the def
   stage bars, repo cards and recent activity. The Line marks only the stage waiting on you in yellow.
   The theme switch, Inter, Inconsolata and `make tokens` are gone.
 - Fix: a `?repo=` value from the dashboard URL can no longer name a path outside `FACTORY_HOME`.
+- Fix: an agent no longer sees a tracker token. Every `tokenEnv` named in the config or the machine
+  config is dropped from the agent's environment, whatever its preset keeps.
+- Fix: an ACP agent in a read-only stage can no longer edit by mislabelling the tool. The bridge also
+  compares the worktree before and after, and fails the stage if a file changed.
+- Fix: a `factory-data:` footer is decoded only on a comment or issue the runner's own tracker user
+  wrote. Anyone else's footer reaches the agent as written, so it cannot hide text from the humans.
+- CI: `make check` keeps the runner's Rust toolchain reachable under its throwaway `HOME`.
 
 Not in this release:
 

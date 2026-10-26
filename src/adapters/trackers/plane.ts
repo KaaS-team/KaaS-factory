@@ -3,7 +3,16 @@
 // developers.plane.so; tests/trackers-plane.test.ts runs the contract against a fixture of it.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, IdMap, VendorClient, VendorHttpError, workspaceRole } from "./kit";
+import {
+  association,
+  decodeBody,
+  encodeBody,
+  IdMap,
+  memoOnce,
+  VendorClient,
+  VendorHttpError,
+  workspaceRole,
+} from "./kit";
 
 export interface PlaneSpec {
   readonly kind: "plane";
@@ -47,7 +56,7 @@ const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 export function toHtml(text: string): string {
   return `<pre>${escapeHtml(encodeBody(text))}</pre>`;
 }
-export function fromHtml(html: string): string {
+export function fromHtml(html: string, ours: boolean): string {
   const pre = /^<pre>([\s\S]*)<\/pre>$/.exec(html.trim());
   const text = pre
     ? pre[1]!
@@ -56,7 +65,10 @@ export function fromHtml(html: string): string {
         .replace(/<\/(p|div|li|h\d)>/gi, "\n")
         .replace(/<[^>]+>/g, "")
         .replace(/\n+$/, "");
-  return decodeBody(text.replace(/&(lt|gt|quot|#39|nbsp|amp);/g, (e) => ENTITIES[e]!));
+  return decodeBody(
+    text.replace(/&(lt|gt|quot|#39|nbsp|amp);/g, (e) => ENTITIES[e]!),
+    ours,
+  );
 }
 
 export class PlaneTracker implements TrackerPort {
@@ -125,7 +137,10 @@ export class PlaneTracker implements TrackerPort {
     return this.client.request<WorkItem>("GET", `${this.base}/work-items/${id}/`);
   }
 
+  private readonly me = memoOnce(() => this.currentLogin());
+
   private async toIssue(raw: WorkItem, labelNames: Map<string, string>): Promise<GhIssue> {
+    const self = await this.me();
     const states = await this.states();
     const group = states.find((s) => s.id === raw.state_id)?.group ?? "backlog";
     const rows = await this.all<{ id: string; comment_html: string; created_at: string; actor_id: string }>(
@@ -138,7 +153,7 @@ export class PlaneTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author: c.actor_id,
         authorAssociation: association(await this.roleOf("", c.actor_id)),
-        body: fromHtml(c.comment_html),
+        body: fromHtml(c.comment_html, c.actor_id === self),
         createdAt: c.created_at,
       });
     }
@@ -147,7 +162,7 @@ export class PlaneTracker implements TrackerPort {
     return {
       number: raw.sequence_id,
       title: raw.name,
-      body: fromHtml(raw.description_html ?? ""),
+      body: fromHtml(raw.description_html ?? "", raw.created_by_id === self),
       labels: raw.label_ids.flatMap((id) => (labelNames.has(id) ? [{ name: labelNames.get(id)! }] : [])),
       comments,
       state: closed ? "CLOSED" : "OPEN",

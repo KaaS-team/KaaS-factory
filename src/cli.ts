@@ -9,6 +9,7 @@ import type { ScmPort } from "./github";
 import { makeScm } from "./scm";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
+import { tokenEnvNames } from "./agents/env";
 import { CommandExecutor } from "./agents/executor";
 import { DEFAULT_CONFIG, loadConfig, type FactoryConfig } from "./config";
 import { EXIT, UsageError, failureJson, successJson } from "./cli-output";
@@ -158,6 +159,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
       undefined,
       agentVm(machineConfig),
       machineGateway(machineConfig),
+      tokenEnvNames(config, machineConfig),
     ),
     gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
     holdoutRunner: new ShellHoldoutRunner(),

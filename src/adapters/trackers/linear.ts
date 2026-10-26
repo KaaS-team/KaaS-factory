@@ -3,7 +3,16 @@
 // schema; tests/trackers-linear.test.ts runs the contract against a fixture of it.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, IdMap, VendorClient, VendorHttpError, workspaceRole } from "./kit";
+import {
+  association,
+  decodeBody,
+  encodeBody,
+  IdMap,
+  memoOnce,
+  VendorClient,
+  VendorHttpError,
+  workspaceRole,
+} from "./kit";
 
 export interface LinearSpec {
   readonly kind: "linear";
@@ -109,7 +118,10 @@ export class LinearTracker implements TrackerPort {
 
   private key = (n: number) => `${this.spec.team}-${n}`;
 
+  private readonly me = memoOnce(() => this.currentLogin());
+
   private async toIssue(raw: LinearIssue): Promise<GhIssue> {
+    const self = await this.me();
     const comments: GhComment[] = [];
     for (const c of raw.comments.nodes) {
       const author = c.user?.id ?? "";
@@ -117,7 +129,7 @@ export class LinearTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author,
         authorAssociation: association(author ? await this.roleOf("", author) : "none"),
-        body: decodeBody(c.body),
+        body: decodeBody(c.body, author === self),
         createdAt: c.createdAt,
       });
     }
@@ -126,7 +138,7 @@ export class LinearTracker implements TrackerPort {
     return {
       number: raw.number,
       title: raw.title,
-      body: decodeBody(raw.description ?? ""),
+      body: decodeBody(raw.description ?? "", raw.creator?.id === self),
       labels: raw.labels.nodes.map((l) => ({ name: l.name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",

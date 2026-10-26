@@ -3,7 +3,7 @@
 // developer.atlassian.com; tests/trackers-jira.test.ts runs the contract against a fixture of it.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, IdMap, keyNumber, VendorClient, VendorHttpError } from "./kit";
+import { association, decodeBody, encodeBody, IdMap, keyNumber, memoOnce, VendorClient, VendorHttpError } from "./kit";
 
 export interface JiraSpec {
   readonly kind: "jira";
@@ -91,7 +91,10 @@ export class JiraTracker implements TrackerPort {
     }
   }
 
+  private readonly me = memoOnce(() => this.currentLogin());
+
   private async toIssue(raw: RawIssue): Promise<GhIssue> {
+    const self = await this.me();
     const rows = await this.pages<RawComment>(`/rest/api/2/issue/${raw.key}/comment`, "comments");
     const comments: GhComment[] = [];
     for (const c of rows) {
@@ -100,7 +103,7 @@ export class JiraTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author: c.author.accountId,
         authorAssociation: association(await this.roleOf("", c.author.accountId)),
-        body: decodeBody(c.body),
+        body: decodeBody(c.body, c.author.accountId === self),
         createdAt: new Date(c.created).toISOString(),
       });
     }
@@ -110,7 +113,7 @@ export class JiraTracker implements TrackerPort {
     return {
       number: keyNumber(raw.key),
       title: f.summary,
-      body: decodeBody(f.description ?? ""),
+      body: decodeBody(f.description ?? "", f.creator?.accountId === self),
       labels: f.labels.map((name) => ({ name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",

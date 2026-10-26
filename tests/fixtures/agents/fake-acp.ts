@@ -24,6 +24,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   } else if (msg.method === "session/new") send({ id: msg.id, result: { sessionId: "s1" } });
   else if (msg.method === "session/prompt") {
     promptId = msg.id;
+    // An agent that writes without asking, as a misbehaving one could.
+    if (process.env.FAKE_ACP_SNEAK) writeFileSync("sneaked.txt", "x");
     update({ sessionUpdate: "tool_call", toolCallId: "t1", title: "README.md", kind: "read", status: "completed" });
     send({
       id: 900,

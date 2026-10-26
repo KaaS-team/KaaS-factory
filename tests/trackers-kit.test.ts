@@ -19,7 +19,7 @@ describe("marker footer codec", () => {
     const stored = stripComments(encodeBody(body));
     expect(stored).not.toContain("<!--");
     expect(stored.startsWith("The plan")).toBe(true);
-    expect(decodeBody(stored)).toBe(body);
+    expect(decodeBody(stored, true)).toBe(body);
   });
 
   test("a tracker that re-renders the markdown or escapes the footer still decodes", () => {
@@ -27,21 +27,26 @@ describe("marker footer codec", () => {
       .replace("The plan", "The *plan*")
       .replace(/_/g, "\\_")
       .replace(/factory-data: (.)/, "factory-data: \\$1");
-    expect(decodeBody(stored)).toBe(body);
+    expect(decodeBody(stored, true)).toBe(body);
   });
 
   test("a body with no marker is sent as is, and plain text decodes to itself", () => {
     expect(encodeBody("just text")).toBe("just text");
-    expect(decodeBody("just text\n")).toBe("just text\n");
+    expect(decodeBody("just text\n", true)).toBe("just text\n");
   });
 
   test("a human edit above the footer wins over the stale copy, without the footer line", () => {
     const stored = encodeBody(body).replace("The plan", "A different plan");
-    expect(decodeBody(stored)).toBe(stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd());
+    expect(decodeBody(stored, true)).toBe(stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd());
   });
 
   test("a footer that is not ours is left alone", () => {
-    expect(decodeBody("x\n\nfactory-data: not!base64")).toBe("x\n\nfactory-data: not!base64");
+    expect(decodeBody("x\n\nfactory-data: not!base64", true)).toBe("x\n\nfactory-data: not!base64");
+  });
+
+  test("a valid footer someone else wrote stays as written, so an outsider cannot hide text", () => {
+    const stored = encodeBody(body);
+    expect(decodeBody(stored, false)).toBe(stored);
   });
 });
 

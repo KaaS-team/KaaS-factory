@@ -36,8 +36,9 @@ jobs:
         run: make install
 
       # An empty HOME, so a check that passes only with one machine's ~/.claude or caches fails here.
+      # The runner's own Rust toolchain stays reachable: make lint and the relay and verify tests need cargo.
       - name: make check
-        run: HOME="$(mktemp -d)" make check
+        run: RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make check
 
       # Flags a flaky test from the last runs' reports; name it @quarantine and it moves to the job below.
       - uses: ctrf-io/github-test-reporter@93ff46b55aefe633bde6d13e61a7f533303233e6 # v1.3.2

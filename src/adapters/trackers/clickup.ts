@@ -3,7 +3,7 @@
 // closed unless labelTrust opts in. Modeled on developer.clickup.com; tests/trackers-clickup.test.ts.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, VendorClient, VendorHttpError, workspaceRole } from "./kit";
+import { association, decodeBody, encodeBody, memoOnce, VendorClient, VendorHttpError, workspaceRole } from "./kit";
 
 export interface ClickUpSpec {
   readonly kind: "clickup";
@@ -91,7 +91,10 @@ export class ClickUpTracker implements TrackerPort {
     return id;
   }
 
+  private readonly me = memoOnce(() => this.currentLogin());
+
   private async toIssue(raw: RawTask): Promise<GhIssue> {
+    const self = await this.me();
     const { comments: rows } = await this.client.request<{
       comments: { id: string; comment_text: string; date: string; user: { id: number } }[];
     }>("GET", `/api/v2/task/${raw.id}/comment`);
@@ -102,7 +105,7 @@ export class ClickUpTracker implements TrackerPort {
         id: this.saw(commentNumber(c.id)),
         author,
         authorAssociation: association(await this.roleOf("", author)),
-        body: decodeBody(c.comment_text),
+        body: decodeBody(c.comment_text, author === self),
         createdAt: new Date(Number(c.date)).toISOString(),
       });
     }
@@ -111,7 +114,7 @@ export class ClickUpTracker implements TrackerPort {
     return {
       number: taskNumber(raw.id),
       title: raw.name,
-      body: decodeBody(raw.markdown_description ?? raw.description ?? ""),
+      body: decodeBody(raw.markdown_description ?? raw.description ?? "", String(raw.creator?.id) === self),
       labels: raw.tags.map((t) => ({ name: t.name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",

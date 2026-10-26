@@ -72,9 +72,11 @@ export function encodeBody(body: string): string {
   return `${visible}\n\n${FOOTER}${data}`;
 }
 
-// The original body when the footer is intact and the text above it is unchanged. A human who edited
-// the text gets their edit back, without the markers, rather than the factory's stale copy.
-export function decodeBody(text: string): string {
+// The original body when the runner wrote it (`ours`), the footer is intact and the text above it is
+// unchanged. Anyone else's footer stays as written, so an agent reads exactly what the humans see.
+// A human who edited the runner's text gets their edit back, without the markers.
+export function decodeBody(text: string, ours: boolean): string {
+  if (!ours) return text;
   const at = text.lastIndexOf(FOOTER);
   if (at === -1 || (at > 0 && text[at - 1] !== "\n")) return text;
   const token = text
@@ -90,6 +92,16 @@ export function decodeBody(text: string): string {
     // not ours
   }
   return visible;
+}
+
+// The tracker's own user id, fetched once; a failed lookup is retried on the next call.
+export function memoOnce(load: () => Promise<string>): () => Promise<string> {
+  let pending: Promise<string> | undefined;
+  return () =>
+    (pending ??= load().catch((err) => {
+      pending = undefined;
+      throw err;
+    }));
 }
 
 // Vendor ids are UUIDs or long strings; the runner keeps comment ids as numbers. A 48-bit hash fits a

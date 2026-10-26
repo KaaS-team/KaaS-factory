@@ -3,6 +3,8 @@
 // <agent argv>`, prompt on stdin. Notes on the protocol: docs/agent-research/acp/protocol.md.
 
 import { spawn } from "node:child_process";
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { StageEvent } from "../executor";
 
@@ -65,8 +67,30 @@ export function usageEvent(usage: Record<string, unknown> | undefined): StageEve
   return { kind: "usage", tokensIn, tokensOut, tokensCached: n("cachedReadTokens") ?? 0, total: true };
 }
 
+// Tool kinds are the agent's own claim, so a read-only stage also checks that no file in the
+// worktree moved. node_modules is skipped: walking it twice per stage costs more than it guards.
+export function treeStamp(root: string, rel = ""): Map<string, string> {
+  const stamp = new Map<string, string>();
+  for (const e of readdirSync(join(root, rel), { withFileTypes: true })) {
+    const p = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory()) {
+      if (e.name !== "node_modules") for (const [k, v] of treeStamp(root, p)) stamp.set(k, v);
+    } else {
+      const s = statSync(join(root, p), { throwIfNoEntry: false });
+      stamp.set(p, s ? `${s.size}:${s.mtimeMs}` : "gone");
+    }
+  }
+  return stamp;
+}
+
+export function changedPaths(before: Map<string, string>, after: Map<string, string>): string[] {
+  const keys = new Set([...before.keys(), ...after.keys()]);
+  return [...keys].filter((k) => before.get(k) !== after.get(k)).sort();
+}
+
 export async function runBridge(write: boolean, cwd: string, argv: string[], prompt: string): Promise<number> {
   const out = (e: StageEvent) => process.stdout.write(`${JSON.stringify(e)}\n`);
+  const before = write ? undefined : treeStamp(cwd);
   const child = spawn(argv[0]!, argv.slice(1), { cwd, stdio: ["pipe", "pipe", "inherit"] });
   const pending = new Map<number, { resolve: (v: Rpc["result"]) => void; reject: (e: Error) => void }>();
   let next = 0;
@@ -123,9 +147,14 @@ export async function runBridge(write: boolean, cwd: string, argv: string[], pro
     const sessionId = (await call("session/new", { cwd, mcpServers: [] }))?.sessionId;
     const res = await call("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] });
     out(usageEvent(res?.usage));
-    out({ kind: "result", finalText: message, denials });
     child.stdin.end();
     child.kill();
+    const moved = before ? changedPaths(before, treeStamp(cwd)) : [];
+    if (moved.length) {
+      process.stderr.write(`acp: a read-only stage changed ${moved.slice(0, 5).join(", ")}\n`);
+      return 1;
+    }
+    out({ kind: "result", finalText: message, denials });
     return res?.stopReason === "end_turn" ? 0 : 1;
   } catch (err) {
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);

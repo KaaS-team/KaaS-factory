@@ -511,5 +511,17 @@
   {"name": "relay follower: only a line with items reaches the page", "file": "dashboard/public/lib/relay-follow.js", "find": "if (Array.isArray(p?.items)) onPayload(p);", "replace": "onPayload(p);", "test": "tests/relay.test.ts"},
   {"name": "relay publisher: factory dashboard starts it", "file": "src/cli.ts", "find": "  startRelay(dashboard.handle);\n", "replace": "", "test": "tests/relay.test.ts"},
   {"name": "release: CI template runner repo moved to KaaS-team", "file": "template-ci/factory.yml.example", "find": "FACTORY_RUNNER_REPO: KaaS-team/software-factory", "replace": "FACTORY_RUNNER_REPO: learnwithparam/software-factory", "test": "tests/release.test.ts"},
-  {"name": "release: README clone line matches the runner repo", "file": "README.md", "find": "git@github.com:KaaS-team/software-factory.git", "replace": "git@github.com:learnwithparam/software-factory.git", "test": "tests/release.test.ts"}
+  {"name": "release: README clone line matches the runner repo", "file": "README.md", "find": "git@github.com:KaaS-team/software-factory.git", "replace": "git@github.com:learnwithparam/software-factory.git", "test": "tests/release.test.ts"},
+  {"name": "env: a configured tokenEnv is dropped from the agent env", "file": "src/agents/env.ts", "find": "if (value === undefined || drop.includes(key)) continue;", "replace": "if (value === undefined) continue;", "test": "tests/presets.test.ts"},
+  {"name": "env: tokenEnvNames walks nested pool members", "file": "src/agents/env.ts", "find": "        else walk(x);\n", "replace": "", "test": "tests/presets.test.ts"},
+  {"name": "env: the CLI passes tokenEnv names to the executor", "file": "src/cli.ts", "find": "      tokenEnvNames(config, machineConfig),\n", "replace": "", "test": "tests/presets.test.ts"},
+  {"name": "footer: outsider decode", "file": "src/adapters/trackers/kit.ts", "find": "  if (!ours) return text;\n", "replace": "", "test": "tests/trackers-kit.test.ts"},
+  {"name": "footer: linear comment author", "file": "src/adapters/trackers/linear.ts", "find": "decodeBody(c.body, author === self)", "replace": "decodeBody(c.body, true)", "test": "tests/trackers-linear.test.ts"},
+  {"name": "footer: linear description creator", "file": "src/adapters/trackers/linear.ts", "find": "raw.creator?.id === self)", "replace": "true)", "test": "tests/trackers-linear.test.ts"},
+  {"name": "footer: plane comment author", "file": "src/adapters/trackers/plane.ts", "find": "c.actor_id === self)", "replace": "true)", "test": "tests/adapters.test.ts"},
+  {"name": "footer: jira description creator", "file": "src/adapters/trackers/jira.ts", "find": "f.creator?.accountId === self)", "replace": "true)", "test": "tests/adapters.test.ts"},
+  {"name": "footer: clickup comment author", "file": "src/adapters/trackers/clickup.ts", "find": "decodeBody(c.comment_text, author === self)", "replace": "decodeBody(c.comment_text, true)", "test": "tests/adapters.test.ts"},
+  {"name": "footer: asana description creator", "file": "src/adapters/trackers/asana.ts", "find": "raw.created_by?.gid === self)", "replace": "true)", "test": "tests/adapters.test.ts"},
+  {"name": "acp: read-only tree check", "file": "src/agents/acp-bridge.ts", "find": "    if (moved.length) {\n", "replace": "    if (moved.length < 0) {\n", "test": "tests/agents-acp.test.ts"},
+  {"name": "acp: tree check sees new files", "file": "src/agents/acp-bridge.ts", "find": "const keys = new Set([...before.keys(), ...after.keys()]);", "replace": "const keys = new Set([...before.keys()]);", "test": "tests/agents-acp.test.ts"}
 ]

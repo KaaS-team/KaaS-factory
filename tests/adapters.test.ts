@@ -142,6 +142,17 @@ function nativeTrackers(): void {
       });
     }
   });
+
+  // An outsider who pastes a valid footer must not hide text from the humans reading the issue.
+  test("every native tracker decodes a footer only on content its own user wrote", () => {
+    const dir = join(import.meta.dir, "..", "src", "adapters", "trackers");
+    for (const f of readdirSync(dir).filter((x) => x.endsWith(".ts") && x !== "kit.ts")) {
+      const calls = [...readFileSync(join(dir, f), "utf8").matchAll(/\b(?:decodeBody|fromHtml)\(([^;]*?)\),?\n/g)]
+        .map((m) => m[1]!)
+        .filter((args) => !args.startsWith("\n") && !args.includes(": string"));
+      expect({ f, calls: calls.length > 0 && calls.every((a) => /=== self\s*$/.test(a)) }).toEqual({ f, calls: true });
+    }
+  });
 }
 
 const REGISTRY: Record<string, () => void> = {

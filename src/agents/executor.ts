@@ -151,6 +151,8 @@ export class CommandExecutor implements Executor {
     private readonly vm?: MicrosandboxSpec,
     // machine.json `llmGateway`: every stage run gets its own key, capped at its maxBudgetUsd.
     private readonly gateway?: LlmGateway,
+    // The env vars the runner's own tracker and runtime keys live in (tokenEnvNames); no agent sees them.
+    private readonly secretEnv: readonly string[] = [],
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
@@ -303,7 +305,9 @@ export class CommandExecutor implements Executor {
         stderr: "pipe",
         detached: true, // its own process group, so a kill reaches the agent's children too
         env: {
-          ...(via ? gatewaySanitizedEnv(process.env) : sanitizeEnv(process.env, agent.preset?.envKeys)),
+          ...(via
+            ? gatewaySanitizedEnv(process.env, this.secretEnv)
+            : sanitizeEnv(process.env, agent.preset?.envKeys, this.secretEnv)),
           ...stageEnv,
           ...gatewayUrl,
           ...(via && key ? { [via.key]: key } : {}),

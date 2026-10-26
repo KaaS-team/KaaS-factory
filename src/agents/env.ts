@@ -74,17 +74,37 @@ export function isProviderCredential(key: string): boolean {
   );
 }
 
+// Every env var a config names as a `tokenEnv` (tracker, runtimes, pool members): the runner's
+// keys, which no agent may read. Walked, not listed, so a new adapter's key is dropped too.
+export function tokenEnvNames(...configs: unknown[]): string[] {
+  const names = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === "object")
+      for (const [k, x] of Object.entries(v)) {
+        if (k === "tokenEnv" && typeof x === "string") names.add(x);
+        else walk(x);
+      }
+  };
+  configs.forEach(walk);
+  return [...names];
+}
+
 // The env of an agent that calls through a gateway: no provider key or credential of any kind.
-export function gatewaySanitizedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
-  const out = sanitizeEnv(env, []);
+export function gatewaySanitizedEnv(env: NodeJS.ProcessEnv, drop: readonly string[] = []): Record<string, string> {
+  const out = sanitizeEnv(env, [], drop);
   for (const key of Object.keys(out)) if (isProviderCredential(key)) delete out[key];
   return out;
 }
 
-export function sanitizeEnv(env: NodeJS.ProcessEnv, keep?: readonly string[]): Record<string, string> {
+export function sanitizeEnv(
+  env: NodeJS.ProcessEnv,
+  keep?: readonly string[],
+  drop: readonly string[] = [],
+): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
-    if (value === undefined) continue;
+    if (value === undefined || drop.includes(key)) continue;
     if (keep && (PROVIDER_KEYS as readonly string[]).includes(key) && !keep.includes(key)) continue;
     if (REPOSITORY_GIT_ENV.has(key) || STRIPPED_ENV_PREFIXES.some((p) => key === p || key.startsWith(p))) continue;
     out[key] = value;

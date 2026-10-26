@@ -3,7 +3,7 @@
 // developers.asana.com; tests/trackers-asana.test.ts runs the contract against a fixture of it.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, VendorClient, workspaceRole } from "./kit";
+import { association, decodeBody, encodeBody, memoOnce, VendorClient, workspaceRole } from "./kit";
 
 export interface AsanaSpec {
   readonly kind: "asana";
@@ -101,7 +101,10 @@ export class AsanaTracker implements TrackerPort {
     return this.all<Story>(`/tasks/${gid}/stories`, { opt_fields: STORY_FIELDS });
   }
 
+  private readonly me = memoOnce(() => this.currentLogin());
+
   private async toIssue(raw: RawTask): Promise<GhIssue> {
+    const self = await this.me();
     const comments: GhComment[] = [];
     for (const s of await this.stories(raw.gid)) {
       if (s.resource_subtype !== "comment_added") continue;
@@ -110,7 +113,7 @@ export class AsanaTracker implements TrackerPort {
         id: this.saw(gidNumber(s.gid)),
         author,
         authorAssociation: association(author ? await this.roleOf("", author) : "none"),
-        body: decodeBody(s.text),
+        body: decodeBody(s.text, author !== "" && author === self),
         createdAt: new Date(s.created_at).toISOString(),
       });
     }
@@ -119,7 +122,7 @@ export class AsanaTracker implements TrackerPort {
     return {
       number: gidNumber(raw.gid),
       title: raw.name,
-      body: decodeBody(raw.notes),
+      body: decodeBody(raw.notes, raw.created_by?.gid === self),
       labels: raw.tags.map((t) => ({ name: t.name })),
       comments,
       state: raw.completed ? "CLOSED" : "OPEN",

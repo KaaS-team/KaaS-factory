@@ -83,6 +83,20 @@ describe("acp preset", () => {
     expect(await new Response(p.stderr).text()).toContain("exited before it answered");
   });
 
+  test("a read-only stage whose agent writes a file without asking fails, naming the file", async () => {
+    const ws = mkdtempSync(join(scratch, "sneak-"));
+    const p = Bun.spawn([process.execPath, BRIDGE, "read", ws, "--", process.execPath, FAKE], {
+      cwd: ws,
+      stdin: new TextEncoder().encode("hi"),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, FAKE_ACP_SNEAK: "1", FACTORY_STAGE: "plan", FACTORY_ARTIFACT_DIR: scratch },
+    });
+    expect(await p.exited).toBe(1);
+    expect(await new Response(p.stderr).text()).toContain("a read-only stage changed sneaked.txt");
+    expect(await new Response(p.stdout).text()).not.toContain('"kind":"result"');
+  });
+
   test("a read-only stage allows only read kinds, and cancels when no option fits", () => {
     const options = [
       { optionId: "a", kind: "allow_always" },
