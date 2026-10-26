@@ -83,6 +83,9 @@ jobs:
           fail-rate-report: true
           upload-artifact: true
           fetch-previous-results: true
+          # The defaults (scan 400 runs, fetch 100) cost 50s on main and pushed this job past 3 minutes.
+          max-workflow-runs-to-check: 50
+          max-previous-runs-to-fetch: 20
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
