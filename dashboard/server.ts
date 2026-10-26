@@ -27,6 +27,7 @@ import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
 import { startRelay } from "./relay";
+import { HEALTH_ROUTE, healthRoute } from "./health";
 import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
@@ -56,10 +57,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FACTORY_DASHBOARD_PORT ?? 4100);
 const DB_PATH = process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH;
 const REPO = process.env.FACTORY_REPO ?? "";
-// Audit finding #16: the dashboard binds 127.0.0.1 by default (see the bottom
-// of this file) and refuses a non-loopback caller unless this token is set.
-// Read at module scope so createDashboard and bin/factory's cmdDashboard
-// both pick it up from the process env.
+// Audit finding #16: bound to 127.0.0.1 by default, and a non-loopback caller is refused unless this
+// is set. Module scope, so createDashboard and the CLI's dashboard both read it from the process env.
 const DASHBOARD_TOKEN = process.env.FACTORY_DASHBOARD_TOKEN ?? "";
 const BOARD_CACHE_MS = 10_000;
 
@@ -77,6 +76,7 @@ export const PUBLIC_ROUTES: readonly string[] = [
   "GET /auth/github/callback",
   WEBHOOK_ROUTE,
   EVENTS_ROUTE,
+  HEALTH_ROUTE,
 ];
 
 const ASSET_TYPES: Record<string, string> = {
@@ -340,6 +340,7 @@ export function createDashboard(
   // The routing table is the only place a route exists, so the route-walk test
   // (tests/dashboard-routes.test.ts) sees every one of them.
   const routes: readonly Route[] = [
+    healthRoute,
     {
       method: "GET",
       pattern: /^\/(index\.html)?$/,
@@ -862,10 +863,8 @@ if (import.meta.main) {
     undefined,
     servingAccess(),
   );
-  // 127.0.0.1 by default (audit finding #16): reach it over the network only
-  // by explicitly setting FACTORY_DASHBOARD_HOST=0.0.0.0 (the Docker image
-  // does this and relies on FACTORY_DASHBOARD_TOKEN instead) or an SSH
-  // tunnel, never by accident.
+  // 127.0.0.1 by default (audit finding #16): off the box only by setting FACTORY_DASHBOARD_HOST=0.0.0.0
+  // (docker-compose.yml does, with FACTORY_DASHBOARD_TOKEN) or through an SSH tunnel, never by accident.
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
   const server = Bun.serve({
     port: PORT,

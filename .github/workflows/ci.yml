@@ -89,4 +89,19 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: kaas-factory:ci
+      # The image's default command must serve /health with the relay beside it, and stay under the
+      # idle memory budget (src/deploy/rss.ts measures every process in the container).
+      - name: Smoke the image and assert idle RSS
+        run: |
+          docker run -d --name factory kaas-factory:ci
+          for _ in $(seq 1 30); do docker exec factory curl -fsS http://127.0.0.1:4100/health && break; sleep 1; done
+          docker exec factory curl -fsS http://127.0.0.1:4100/health
+          docker exec factory curl -fsS http://127.0.0.1:4200/healthz
+          docker exec factory test -x /usr/local/bin/kaas-verify
+          sleep 5
+          docker exec factory bun src/deploy/rss.ts 1
+      - name: Container log on failure
+        if: failure()
+        run: docker logs factory || true

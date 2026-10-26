@@ -1,14 +1,22 @@
-# VM run mode (plan "Run anywhere"): `docker build -t kaas-factory .`,
-# then `docker run -d --env-file factory.env -v factory-data:/data
-# -p 127.0.0.1:4100:4100 kaas-factory up --repo owner/name`.
+# One image for the control plane, the relay and the receipt checker (goal one-image).
+# `docker compose up` runs the plane and relay (docker-compose.yml); a runner is the same image
+# with `up --repo owner/name`; `kaas-verify` checks a receipt offline.
 #
 # Every tool the loop shells out to is pinned here, not resolved from
 # whatever the base image happens to carry: git (worktrees, claim/push), gh
 # (issues/PRs, and `gh auth setup-git` in the entrypoint), jq (skills read
 # artifact json with it), python3 (guard-paths.sh fails closed without it —
-# audit finding #13), uv/uvx (`make check`'s skills-ref validate), and
-# node+npm (Claude Code's own npm package needs a node runtime; bun does not
-# run its postinstall).
+# audit finding #13), uv/uvx (`make check`'s skills-ref validate), curl
+# (the compose and Coolify health probes), and node+npm (Claude Code's own
+# npm package needs a node runtime; bun does not run its postinstall).
+# relay/ and verify/ are std-only and pinned-crate Rust, built here so the final image holds no toolchain.
+FROM rust:1.86-slim-bookworm AS rust
+WORKDIR /src
+COPY relay ./relay
+COPY verify ./verify
+RUN cargo build --release --locked --manifest-path relay/Cargo.toml --target-dir /out \
+    && cargo build --release --locked --manifest-path verify/Cargo.toml --target-dir /out
+
 FROM oven/bun:1.3.4-slim
 
 ARG GH_CLI_VERSION=2.63.2
@@ -38,7 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && tar -xzf /tmp/uv.tar.gz -C /tmp \
     && mv /tmp/uv-*/uv /tmp/uv-*/uvx /usr/local/bin/ \
     && rm -rf /tmp/gh* /tmp/uv* \
-    && apt-get purge -y curl gnupg xz-utils && apt-get autoremove -y \
+    && apt-get purge -y gnupg xz-utils && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -e; for agent in $AGENTS; do \
@@ -64,6 +72,7 @@ COPY dashboard ./dashboard
 COPY template ./template
 COPY template-ci ./template-ci
 COPY install.sh ./install.sh
+COPY --from=rust /out/release/kaas-relay /out/release/kaas-verify /usr/local/bin/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
@@ -72,7 +81,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # durability story (audit finding #1: no more relative-path ambiguity).
 ENV FACTORY_HOME=/data
 VOLUME ["/data"]
-EXPOSE 4100
+EXPOSE 4100 4200
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["--help"]
+CMD ["up"]
