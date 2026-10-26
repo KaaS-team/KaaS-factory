@@ -12,13 +12,14 @@ import { plain } from "../src/display";
 import { harnessReport } from "../src/harness";
 import type { Actor, Route } from "./plane/access";
 import { senderName } from "./plane/commands";
-import { NO_PROJECT, type DashboardProject, workflowsView } from "./project";
+import { NO_PROJECT, READ_ONLY, type DashboardProject, settingsWithHealth, workflowsView } from "./project";
 
 export interface WorkflowRouteDeps {
-  readonly state: FactoryState;
   readonly github: ScmPort;
-  readonly workspacesDir: string;
-  readonly project?: DashboardProject;
+  readonly projectFor: (repo: string) => Promise<DashboardProject | undefined>;
+  readonly stateFor: (repo: string, create?: boolean) => FactoryState | null;
+  readonly workspacesFor: (repo: string) => string;
+  readonly repoOf: (req: Request) => string;
   readonly actorOf: (req: Request) => Actor | undefined;
 }
 
@@ -57,10 +58,10 @@ export function eventsView(state: Pick<FactoryState, "busEvents" | "busDeliverie
 }
 
 // Each minion with its trigger and the newest completed run the outbox remembers.
-export function minionsView(state: Pick<FactoryState, "busEvents">, project: DashboardProject) {
+export function minionsView(state: Pick<FactoryState, "busEvents"> | null, project: DashboardProject) {
   const loaded = loadMinions(project.cloneDir, project.config);
   const last = new Map<string, { time: string; ok: boolean; reason?: string; costUsd?: number | null }>();
-  for (const r of state.busEvents(MAX_EVENTS)) {
+  for (const r of state?.busEvents(MAX_EVENTS) ?? []) {
     if (r.type !== "factory.minion.completed") continue;
     const d = parse(r.data) as { minion?: string; ok?: boolean; reason?: string; costUsd?: number | null };
     if (d.minion) last.set(d.minion, { time: r.time, ok: Boolean(d.ok), reason: d.reason, costUsd: d.costUsd });
@@ -80,41 +81,74 @@ export function minionsView(state: Pick<FactoryState, "busEvents">, project: Das
 }
 
 export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
-  const project = deps.project;
+  const { projectFor, repoOf } = deps;
+  const settings = settingsWithHealth();
+  // Listing leases asks the remote, so the Settings page shares one answer per repo for 15 s.
+  const leasesCache = new Map<string, { at: number; value: Awaited<ReturnType<DashboardProject["leases"]>> | Error }>();
+  async function heldLeases(r: string, p: DashboardProject) {
+    const hit = leasesCache.get(r);
+    if (hit && Date.now() - hit.at < 15_000) return hit.value;
+    const value = await p.leases().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    leasesCache.set(r, { at: Date.now(), value });
+    return value;
+  }
   return [
     {
       method: "GET",
       pattern: /^\/api\/workflows$/,
       label: "GET /api/workflows",
       role: "viewer",
-      handler: async () =>
-        project
+      repo: "query",
+      handler: async (req) => {
+        const project = await projectFor(repoOf(req));
+        return project
           ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) })
-          : json({ available: false, reason: NO_PROJECT }),
+          : json({ available: false, reason: NO_PROJECT });
+      },
+    },
+    {
+      method: "GET",
+      pattern: /^\/api\/settings$/,
+      label: "GET /api/settings",
+      role: "viewer",
+      repo: "query",
+      handler: async (req) => {
+        const r = repoOf(req);
+        const project = await projectFor(r);
+        if (!project) return json({ available: false, reason: NO_PROJECT });
+        const [report, leases] = await Promise.all([
+          harnessReport(project.cloneDir, project.config),
+          heldLeases(r, project),
+        ]);
+        return json({ available: true, ...(await settings(project, report, leases, Date.now())) });
+      },
     },
     {
       method: "GET",
       pattern: /^\/api\/events$/,
       label: "GET /api/events",
       role: "operator",
-      handler: (_req, url) =>
-        json({
-          events: eventsView(
-            deps.state,
-            Number(url.searchParams.get("limit") ?? 100),
-            Number(url.searchParams.get("after") ?? 0),
-          ),
-        }),
+      repo: "query",
+      handler: (req, url) => {
+        const state = deps.stateFor(repoOf(req));
+        const limit = Number(url.searchParams.get("limit") ?? 100);
+        return json({ events: state ? eventsView(state, limit, Number(url.searchParams.get("after") ?? 0)) : [] });
+      },
     },
     {
       method: "POST",
       pattern: /^\/api\/events\/([\w.:-]+)\/replay$/,
       label: "POST /api/events/:event/replay",
       role: "operator",
-      handler: async (_req, _url, m) => {
+      repo: "body",
+      handler: async (req, _url, m) => {
+        const r = repoOf(req);
+        const project = await projectFor(r);
         if (!project) return json({ error: NO_PROJECT }, 409);
+        // A shipped config came through the bucket, so its sink URLs are not trusted to receive events.
+        if (project.readOnly) return json({ error: READ_ONLY }, 409);
         const bus = new EventBus({
-          store: deps.state,
+          store: deps.stateFor(r, true)!,
           sinks: project.config.events.sinks,
           source: `factory/${project.config.repo}`,
           autoDeliver: false,
@@ -130,17 +164,22 @@ export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
       pattern: /^\/api\/minions$/,
       label: "GET /api/minions",
       role: "operator",
-      handler: () =>
-        project
-          ? json({ available: true, ...minionsView(deps.state, project) })
-          : json({ available: false, reason: NO_PROJECT }),
+      repo: "query",
+      handler: async (req) => {
+        const project = await projectFor(repoOf(req));
+        return project
+          ? json({ available: true, ...minionsView(deps.stateFor(repoOf(req)), project) })
+          : json({ available: false, reason: NO_PROJECT });
+      },
     },
     {
       method: "GET",
       pattern: /^\/api\/workflow-source$/,
       label: "GET /api/workflow-source",
       role: "viewer",
-      handler: (_req, url) => {
+      repo: "query",
+      handler: async (req, url) => {
+        const project = await projectFor(repoOf(req));
         const src = project ? workflowSource(project.cloneDir, url.searchParams.get("name") ?? "") : undefined;
         return json(
           src ? { available: true, ...src, text: plain(src.text) } : { available: false, reason: "no such workflow" },
@@ -152,15 +191,19 @@ export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
       pattern: /^\/api\/workflow-edit$/,
       label: "POST /api/workflow-edit",
       role: "operator",
+      repo: "body",
       handler: async (req) => {
+        const r = repoOf(req);
+        const project = await projectFor(r);
         if (!project) return json({ error: NO_PROJECT }, 409);
+        if (project.readOnly) return json({ error: READ_ONLY }, 409);
         const body = (await req.json().catch(() => ({}))) as { name?: unknown; form?: WorkflowForm };
         if (typeof body.name !== "string") return json({ error: "name the workflow" }, 400);
         if (!body.form || typeof body.form !== "object")
           return json({ error: "a form of step fields is required" }, 400);
         const git = project.git ?? new Git(new GitCommandRunner());
         const out = await proposeWorkflowEdit(
-          { github: deps.github, git, cloneDir: project.cloneDir, workspacesDir: deps.workspacesDir },
+          { github: deps.github, git, cloneDir: project.cloneDir, workspacesDir: deps.workspacesFor(r) },
           {
             repo: project.config.repo,
             base: project.config.base,

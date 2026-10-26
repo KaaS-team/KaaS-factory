@@ -51,6 +51,7 @@ import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
+import { shipRunState } from "./engine/blobs";
 import { TRUSTED_ROLES } from "./ports/scm";
 import { cachedRole, isWriter, writersOnly } from "./trust";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
@@ -512,7 +513,18 @@ export async function reconcileClosed(
 // The single entry point every mode drives through: the pool (watch), a
 // one-off CLI call (`factory run --issue N`, for CI), and crash recovery all
 // call this with nothing but the issue's current GitHub state.
+// A run's final status lands after its last stage shipped, so changed rows ship once more here.
 export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, listed: GhIssue): Promise<Outcome> {
+  const before = deps.state.getRun(config.repo, listed.number)?.updated_at;
+  try {
+    return await advanceListed(deps, config, listed);
+  } finally {
+    if (deps.state.getRun(config.repo, listed.number)?.updated_at !== before)
+      await shipRunState(deps.blobs, deps.state, config.repo, listed.number);
+  }
+}
+
+async function advanceListed(deps: WatchDeps, config: FactoryConfig, listed: GhIssue): Promise<Outcome> {
   const names = labelsOf(listed);
   // A fresh claim reads the live thread as stages post to it; nothing in it is a human command yet.
   if (names.includes(LABEL.ready)) return processReadyIssue(listed, deps, config);
@@ -528,20 +540,13 @@ export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, liste
   return "waiting";
 }
 
-// This process's own cap, narrowed to the machine's cap when one is
-// configured (plan v2.7.0 item 5: "repo concurrency becomes a cap for that
-// repo, the limit is the smaller of the two").
+// This process's own cap, narrowed to the machine's cap when one is configured (plan v2.7.0 item 5).
 function dispatchConcurrency(deps: WatchDeps, config: FactoryConfig): number {
   return deps.machine ? effectiveSlots(config.concurrency, deps.machine.config) : config.concurrency;
 }
 
-// A lease is required before an issue actually advances, so two watcher
-// processes (splitbill-demo and lwp-website, say) sharing one FACTORY_HOME
-// never together run more than the machine's own slot count, even though
-// each has already capped its own pool at that same number (belt and
-// suspenders: the pool cap alone would still let a second process
-// oversubscribe). No lease available this poll just means "waiting" — the
-// next poll tries again, exactly like a candidate that wasn't picked yet.
+// A lease before an issue advances keeps two watchers sharing one FACTORY_HOME under the machine's
+// slot count, which each pool's own cap alone would not. No lease just means "waiting" until next poll.
 async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome> {
   if (!deps.machine) return advanceIssue(deps, config, issue);
   const leaseId = deps.machine.leases.acquire(`${config.repo}#${issue.number}`, dispatchConcurrency(deps, config));
@@ -553,14 +558,9 @@ async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue):
   }
 }
 
-// `inFlight` is shared across overlapping poll cycles (startWatch no longer
-// waits for one poll's whole batch before starting the next — plan v2.7.0
-// item 6), so an issue this poll is still working on is never handed to a
-// second, concurrent runPool call. Absent, every poll is self-contained, the
-// pre-v2.6.2 behaviour that the scenario and pool tests already exercise.
-// An issue leaves inFlight when its own dispatch ends, so a poll that listed
-// issues before that release holds a stale copy of it (still "ready", say)
-// and must skip it: `releasedAt` records when, in `releaseSeq` order.
+// `inFlight` spans overlapping polls (plan v2.7.0 item 6), so a busy issue never reaches a second
+// runPool. A poll that listed issues before one was released holds a stale copy and must skip it:
+// `releasedAt` records when, in `releaseSeq` order. Absent, every poll is self-contained.
 const releasedAt = new WeakMap<Set<number>, Map<number, number>>();
 let releaseSeq = 0;
 
