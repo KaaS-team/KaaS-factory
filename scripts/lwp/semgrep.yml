@@ -1,0 +1,108 @@
+# The kit's Semgrep CE rules, local so the gate needs no registry and gives the same verdict offline.
+# check-security.py semgrep runs them on changed files. Why: docs/decisions/scripts.md#check-securitypy
+rules:
+  - id: js-eval
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: eval or new Function on a value that is not a literal runs whatever reaches it.
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: new Function(..., $X)
+      - pattern-not: eval("...")
+  - id: js-shell-exec-interpolated
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: A shell command built from a template or concatenation lets its input run commands; use execFile or spawn with an argument array.
+    pattern-either:
+      - pattern: $CP.exec(`...${$X}...`, ...)
+      - pattern: $CP.execSync(`...${$X}...`, ...)
+      - pattern: exec(`...${$X}...`, ...)
+      - pattern: execSync(`...${$X}...`, ...)
+      - pattern: $CP.exec("..." + $X, ...)
+      - pattern: $CP.execSync("..." + $X, ...)
+      - pattern: exec("..." + $X, ...)
+      - pattern: execSync("..." + $X, ...)
+  - id: js-sql-raw-interpolated
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Raw SQL built with string interpolation is an injection; use the driver's placeholders or the sql`` tag.
+    pattern-either:
+      - pattern: sql.raw(`...${$X}...`)
+      - pattern: sql.raw("..." + $X)
+      - pattern: $DB.$queryRawUnsafe(`...${$X}...`, ...)
+      - pattern: $DB.$executeRawUnsafe(`...${$X}...`, ...)
+      - pattern: $DB.unsafe(`...${$X}...`, ...)
+      - pattern: $DB.raw(`...${$X}...`, ...)
+  - id: js-inner-html
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Assigning HTML from a variable is an XSS sink; set textContent or sanitise first.
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $X
+          - pattern: $EL.outerHTML = $X
+          - pattern: $EL.insertAdjacentHTML($POS, $X)
+      - pattern-not: $EL.innerHTML = "..."
+      - pattern-not: $EL.outerHTML = "..."
+  - id: jsx-dangerous-html
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: dangerouslySetInnerHTML with a value that is not a literal is an XSS sink unless the HTML is sanitised or built here.
+    patterns:
+      - pattern: "<$T dangerouslySetInnerHTML={{__html: $X}} />"
+      - pattern-not: '<$T dangerouslySetInnerHTML={{__html: "..."}} />'
+  - id: tls-verify-off
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Turning TLS verification off accepts any certificate, so any network hop can read and rewrite the traffic.
+    pattern-either:
+      - pattern: "{..., rejectUnauthorized: false, ...}"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+  - id: jwt-none-algorithm
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: A JWT check that allows the none algorithm accepts unsigned tokens.
+    pattern: '$JWT.verify(..., {..., algorithms: [..., "none", ...], ...})'
+  - id: py-shell-true
+    languages: [python]
+    severity: ERROR
+    message: shell=True with a command that is not a literal lets its input run commands; pass an argument list.
+    patterns:
+      - pattern: subprocess.$F($CMD, ..., shell=True, ...)
+      - pattern-not: subprocess.$F("...", ..., shell=True, ...)
+  - id: py-eval
+    languages: [python]
+    severity: ERROR
+    message: eval or exec on a value that is not a literal runs whatever reaches it.
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: exec($X)
+      - pattern-not: eval("...")
+      - pattern-not: exec("...")
+  - id: py-unsafe-deserialise
+    languages: [python]
+    severity: ERROR
+    message: pickle and yaml.load without SafeLoader run code from the data they read.
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: yaml.load($X)
+      - pattern: yaml.load($X, Loader=yaml.Loader)
+      - pattern: yaml.load($X, Loader=yaml.UnsafeLoader)
+  - id: py-tls-verify-off
+    languages: [python]
+    severity: ERROR
+    message: verify=False accepts any certificate.
+    pattern-either:
+      - pattern: requests.$F(..., verify=False, ...)
+      - pattern: httpx.$F(..., verify=False, ...)
+  - id: py-sql-fstring
+    languages: [python]
+    severity: ERROR
+    message: SQL built with an f-string or format is an injection; pass parameters to execute.
+    pattern-either:
+      - pattern: $CUR.execute(f"...", ...)
+      - pattern: $CUR.execute("..." % $X, ...)
+      - pattern: $CUR.execute("...".format(...), ...)
