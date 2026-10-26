@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
+import { signedBy } from "../src/chatops";
 import { OPERATOR_TAKEOVER, type StageName, type StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
@@ -370,6 +371,18 @@ describe("needs-info paths", () => {
     c.push("triage", triage({ risk: "medium" }));
     c.push("plan", plan("medium"));
     c.github.say(1, "staging");
+    expect(await c.step()).toBe("awaiting-approval");
+    expect(readFileSync(join(c.workspacesDir, "issue-1", runDir(1), "answer.md"), "utf8")).toBe("staging");
+    done(c);
+  });
+
+  test("5b. an answer sent from the control plane reaches the agent without its signature", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", { ...triage({ disposition: "needs-info" }), ...question() });
+    expect(await c.step()).toBe("needs-info");
+    c.push("triage", triage({ risk: "medium" }));
+    c.push("plan", plan("medium"));
+    c.github.say(1, signedBy("staging", "@qa-lead"));
     expect(await c.step()).toBe("awaiting-approval");
     expect(readFileSync(join(c.workspacesDir, "issue-1", runDir(1), "answer.md"), "utf8")).toBe("staging");
     done(c);

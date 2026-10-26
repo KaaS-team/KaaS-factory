@@ -3,7 +3,7 @@
 // would type, so the CLI, the dashboard and a later chat channel all go
 // through chatops.ts and its trust rule instead of a second command path.
 
-import { parseChatOps } from "./chatops";
+import { parseChatOps, signedBy } from "./chatops";
 import { parseDataMarkers } from "./derive";
 import { plain } from "./display";
 import type { GhComment, GhIssue, GhPr, GitHub } from "./github";
@@ -148,11 +148,13 @@ export async function act(
   item: Pick<InboxItem, "issue" | "actions" | "kind">,
   action: InboxAction,
   text = "",
+  // Who sent it, when the runner's account posts on their behalf (the control plane).
+  by?: string,
 ): Promise<string> {
   if (!item.actions.includes(action)) throw new InboxError(`${action} is not available for a ${item.kind} item`);
   const words = text.trim();
   if (ACTIONS_WITH_TEXT.includes(action) && !words) throw new InboxError(`${action} needs text`);
-  const body = commandText(action, words);
+  const body = by ? signedBy(commandText(action, words), by) : commandText(action, words);
   // Round-trip through the parser so a UI command fails exactly like a typed one would.
   if (action !== "answer" && parseChatOps(body).type !== action)
     throw new InboxError(`not a recognized /factory command: ${body}`);

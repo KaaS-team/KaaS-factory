@@ -4,7 +4,7 @@
   },
   "lines": {
     "dashboard/public/app.js": 1644,
-    "dashboard/server.ts": 923,
+    "dashboard/server.ts": 877,
     "src/agents/executor.ts": 477,
     "src/agents/structured.ts": 401,
     "src/cli.ts": 1123,

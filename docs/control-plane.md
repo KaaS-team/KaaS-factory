@@ -10,12 +10,34 @@ Each role can do everything the role below it can.
 | Role | Can |
 |---|---|
 | viewer | read every page: runs, inbox, board, proof, analytics, settings |
-| approver | merge a verified pull request |
-| operator | mark issues ready, act on the inbox, reply, send `/factory` commands |
+| approver | merge a verified pull request, approve a plan |
+| operator | start a task, mark issues ready, act on the inbox, send every command below |
 | owner | change the toggles, add and remove members, read the audit log |
 
 Every route names the least role it needs. A route with no role needs owner, and
 `tests/plane-access.test.ts` walks every route against every role.
+
+## Commands
+
+Each command is a comment on the issue, posted before the route answers. A runner that only polls
+the tracker obeys it, and the tracker stays the one record of who asked for what.
+
+| Route | Role | Posts |
+|---|---|---|
+| `POST /api/tasks` | operator | a new issue labelled ready, from `{"title", "body", "type"}` |
+| `POST /api/issues/<n>/approve-plan` | approver | `/factory approve` |
+| `POST /api/issues/<n>/revise` | operator | `/factory revise <text>` |
+| `POST /api/issues/<n>/answer` | operator | the answer text |
+| `POST /api/issues/<n>/retry` | operator | `/factory retry` |
+| `POST /api/issues/<n>/cancel` | operator | `/factory cancel` |
+
+The route reads the issue fresh and answers 409 when the issue is not waiting for that command, so
+nothing is posted. The comment goes out under the runner's tracker account and ends with a line
+naming who sent it. The runner strips that line before it reads the command or hands an answer to
+the agent.
+
+A message sent while a stage runs, taking over a run and cancelling a running stage need the runner
+signal channel, and come later.
 
 ## Turning on GitHub sign-in
 
@@ -39,8 +61,8 @@ to keep them somewhere else. The database stores a digest of each session id, ne
 ## The break-glass token
 
 `FACTORY_DASHBOARD_TOKEN` still works. Sent as `Authorization: Bearer`, or traded for a cookie on
-the sign-in page, it acts as an owner. Changing or removing the token ends every session it opened. Use it to add the first owner and when GitHub is down. Read it
-from a file, never type it on a command line:
+the sign-in page, it acts as an owner. Changing or removing the token ends every session it opened. Use it to add
+the first owner and when GitHub is down. Read it from a file, never type it on a command line:
 
 ```sh
 curl -H @"$HOME/.config/factory/bearer-header" -H 'content-type: application/json' \

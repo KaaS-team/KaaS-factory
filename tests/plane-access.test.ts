@@ -23,6 +23,9 @@ class QuietGitHub extends GitHub {
   override async listPrs() {
     return [];
   }
+  override async getIssue(_repo: string, number: number) {
+    return { number, title: "t", body: "", labels: [], comments: [] };
+  }
   override async commentIssue() {
     return 1;
   }

@@ -12,7 +12,6 @@ import { fileURLToPath } from "node:url";
 import type { ScmPort } from "../src/github";
 import { makeScm } from "../src/scm";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
-import { parseChatOps } from "../src/chatops";
 import { buildBoard } from "./board";
 import { LABEL } from "../src/labels";
 import { InboxError, act, buildInbox, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
@@ -32,6 +31,7 @@ import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
+import { commandRoutes, senderName } from "./plane/commands";
 import {
   readCapped,
   readDelivery,
@@ -725,7 +725,8 @@ export function createDashboard(
         const item = await inboxItem(r, Number(m[1]));
         if (!item) return json({ error: "nothing is waiting on that issue" }, { status: 404 });
         try {
-          const posted = await act(github, r, item, body.action as InboxAction, body.text ?? "");
+          const by = senderName(access.actorOf(req));
+          const posted = await act(github, r, item, body.action as InboxAction, body.text ?? "", by);
           invalidateIssuesCache(r);
           return json({ ok: true, posted });
         } catch (err) {
@@ -758,43 +759,8 @@ export function createDashboard(
         return json({ ok: true });
       },
     },
-    // Reply box and the action buttons post the same text a human would type in
-    // the issue thread, so untrusted-input handling stays in one place (watch.ts).
-    {
-      method: "POST",
-      pattern: /^\/api\/reply$/,
-      label: "POST /api/reply",
-      role: "operator",
-      handler: async (req) => {
-        const body = (await req.json()) as { issue: number; text: string };
-        const missing = needRepo();
-        if (missing) return missing;
-        await github.commentIssue(repo, body.issue, body.text);
-        return json({ ok: true });
-      },
-    },
-    {
-      method: "POST",
-      pattern: /^\/api\/command$/,
-      label: "POST /api/command",
-      role: "operator",
-      handler: async (req) => {
-        const body = (await req.json()) as {
-          issue: number;
-          command: "approve" | "revise" | "retry" | "cancel";
-          text?: string;
-        };
-        const missing = needRepo();
-        if (missing) return missing;
-        const text = body.command === "revise" ? `/factory revise ${body.text ?? ""}` : `/factory ${body.command}`;
-        // Round-trip through parseChatOps so a malformed command from the UI
-        // fails the same way an equivalent typed comment would.
-        if (parseChatOps(text).type === "answer")
-          return json({ error: "not a recognized /factory command" }, { status: 400 });
-        await github.commentIssue(repo, body.issue, text);
-        return json({ ok: true });
-      },
-    },
+    // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
+    ...commandRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
     {
       method: "GET",
       pattern: /^\/api\/stream$/,

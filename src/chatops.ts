@@ -22,12 +22,20 @@ export type Command =
   | { type: "cancel" }
   | { type: "answer"; text: string };
 
+// The control plane posts under the runner's account, so each comment names who sent it. The line is
+// stripped before parsing, so it never becomes part of a revision or an answer.
+const SIGNATURE_RE = /\n*<sub>Sent from the factory control plane by [^<\n]+<\/sub>\s*$/;
+export const signedBy = (body: string, who: string) =>
+  `${body}${body ? "\n\n" : ""}<sub>Sent from the factory control plane by ${who}</sub>`;
+export const unsigned = (body: string) => body.replace(SIGNATURE_RE, "");
+
 const COMMAND_RE = /^\s*\/factory\s+(approve|revise|retry|cancel)\b\s*(.*)$/is;
 
 // A trusted comment is either a `/factory <cmd>` line or, failing that, a
 // plain-text answer to the latest open question. Untrusted comments are never
 // parsed as commands or answers (prompt-injection lesson, plan section 2).
-export function parseChatOps(body: string): Command {
+export function parseChatOps(signed: string): Command {
+  const body = unsigned(signed);
   const match = body.match(COMMAND_RE);
   if (match) {
     const verb = match[1]!.toLowerCase();

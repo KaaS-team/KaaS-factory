@@ -14,7 +14,7 @@ import { resolveBlockers } from "./blockers";
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
-import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
+import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
@@ -265,7 +265,7 @@ export async function resumeNeedsInfo(
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.needsInfo))) return "needs-human";
-  await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, reply.body);
+  await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, unsigned(reply.body));
   await deps.github.setStateLabel(
     config.repo,
     issue.number,

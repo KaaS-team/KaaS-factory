@@ -300,9 +300,14 @@
     {
       "id": "command-routes",
       "phase": "P2",
-      "ask": "start, approve plan, message, answer, cancel, takeover and set mode from the web, each written to the tracker first",
+      "ask": "start a task, approve plan, revise, answer, retry and cancel from the web, each written to the tracker first",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/plane-commands.test.ts",
+        "name": "each command is a signed comment on the issue before the route answers",
+        "mutation": "commands: each one is signed with its sender"
+      }
     },
     {
       "id": "issue-bound-seal",
@@ -365,6 +370,13 @@
       "phase": "P3",
       "ask": "End to end from a phone: PWA trigger, board, factory, summary, human merge, public dashboard",
       "source": "spec 10 phone-intake",
+      "owner": "agent"
+    },
+    {
+      "id": "mid-run-commands",
+      "phase": "P3",
+      "ask": "a message sent mid-run, queued and undoable until a runner reads it; takeover from the web; cancelling a stage that is running (cut from command-routes: they need the runner signal channel)",
+      "source": "plan approved 26 Oct 2026",
       "owner": "agent"
     },
     {
@@ -538,6 +550,13 @@
       "phase": "P5",
       "ask": "A deterministic tool step in a workflow",
       "source": "CHANGELOG v4.0.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "set-mode-web",
+      "phase": "P6",
+      "ask": "set a repo's autonomy mode from the web, written to the tracker first (cut from command-routes: the tiers land in P6)",
+      "source": "plan approved 26 Oct 2026",
       "owner": "agent"
     },
     {
