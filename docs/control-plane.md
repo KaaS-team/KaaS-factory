@@ -36,6 +36,18 @@ nothing is posted. The comment goes out under the runner's tracker account and e
 naming who sent it. The runner strips that line before it reads the command or hands an answer to
 the agent.
 
+## Events, minions and workflows
+
+The Events and Minions pages need operator, since event data and minion runs carry spend and agent
+names. Events lists the outbox and inbox with each delivery's status, and Replay
+(`POST /api/events/<id>/replay`) sends one event to its sinks again, like `factory events replay`.
+Minions lists each minion, what starts it, whether it runs in a clone of the repo, and its last run.
+
+The Workflows page is read-only. Its "Propose a change" form sets a step's agent, timeout or retries
+and posts to `POST /api/workflow-edit` (operator). The runner rewrites the file, checks it with the
+watcher's own parser, and opens a PR on a `factory/workflow-<name>-<hash>` branch. A form the
+parser refuses answers 422, and nothing is pushed. The rewrite drops comments in the file.
+
 A message sent while a stage runs, taking over a run and cancelling a running stage need the runner
 signal channel, and come later.
 

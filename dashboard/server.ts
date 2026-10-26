@@ -27,7 +27,8 @@ import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
 import { startRelay } from "./relay";
-import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
+import { NO_PROJECT, settingsView, type DashboardProject } from "./project";
+import { workflowRoutes } from "./workflow-routes";
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
@@ -662,16 +663,8 @@ export function createDashboard(
       role: "viewer",
       handler: async () => json({ agents: await probedAgents() }),
     },
-    {
-      method: "GET",
-      pattern: /^\/api\/workflows$/,
-      label: "GET /api/workflows",
-      role: "viewer",
-      handler: async () =>
-        project
-          ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) })
-          : json({ available: false, reason: NO_PROJECT }),
-    },
+    // Workflows, Events, Minions and the workflow form: dashboard/workflow-routes.ts.
+    ...workflowRoutes({ state, github, workspacesDir: workspaces, project, actorOf: access.actorOf }),
     {
       method: "GET",
       pattern: /^\/api\/settings$/,

@@ -8,6 +8,7 @@ import { ACTIVE, stationStates, WAITING } from "/lib/stations.js";
 import { markdownText, renderMarkdown } from "/lib/markdown.js";
 import { feedCard, proofPanel } from "/lib/run-page.js";
 import { execSummary } from "/lib/exec-summary.js";
+import { EXTRA_ICONS, EXTRA_LOADERS, EXTRA_NAV, ROUTED, extraViews, workflowEditor } from "/lib/workflow-pages.js";
 import { followRelay, readRelay, saveRelay } from "/lib/relay-follow.js";
 
 const ACTION_LABEL = {
@@ -43,6 +44,7 @@ const ICONS = {
   analytics: "M5 20V10M12 20V4M19 20v-7",
   agents: "M8 8h8v8H8zM4 10v4M20 10v4M10 4h4M10 20h4",
   workflows: "M4 5h6v4H4zM14 15h6v4h-6zM7 9v3h10v3",
+  ...EXTRA_ICONS,
   settings:
     "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1",
 };
@@ -51,6 +53,7 @@ const NAV = [
   ["line", "Line"],
   ["runs", "Runs"],
   ["workflows", "Workflows"],
+  ...EXTRA_NAV,
   ["analytics", "Analytics"],
   ["agents", "Agents"],
   ["settings", "Settings"],
@@ -1200,13 +1203,6 @@ function agentsView() {
 }
 
 /* ---- Workflows: factory harness inventory and validate ---- */
-const ROUTED = (w) =>
-  w.routedTypes.includes("*")
-    ? "The repo's workflow"
-    : w.routedTypes.length
-      ? `Issue types: ${w.routedTypes.join(", ")}`
-      : "Not routed";
-
 function workflowsView() {
   return h(
     "section",
@@ -1264,6 +1260,7 @@ function workflowsView() {
                         null,
                         h("span", { class: "status", "data-tone": w.problems.length ? "bad" : "ok" }, w.name),
                         w.problems.length ? h("div", { class: "muted" }, w.problems.join("; ")) : null,
+                        workflowEditor({ h, post }, w),
                       ),
                       h("td", null, w.source === "repo" ? ".factory/workflows" : "Runner"),
                       h("td", null, ROUTED(w)),
@@ -1419,6 +1416,7 @@ const VIEWS = {
   runs: runsView,
   task: runView,
   workflows: workflowsView,
+  ...extraViews({ h, heading, stateOr, quiet, post }),
   analytics: analyticsView,
   agents: agentsView,
   settings: settingsView,
@@ -1429,6 +1427,7 @@ const LOADERS = {
   runs: ["runs", "/api/runs"],
   task: ["line", "/api/line"],
   workflows: ["workflows", "/api/workflows"],
+  ...EXTRA_LOADERS,
   analytics: ["analytics", "/api/analytics"],
   agents: ["agents", "/api/agents"],
   settings: ["settings", "/api/settings"],

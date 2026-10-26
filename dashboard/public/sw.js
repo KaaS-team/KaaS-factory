@@ -20,6 +20,7 @@ const SHELL = [
   "/lib/stations.js",
   "/lib/status-loader.js",
   "/lib/task-presentation.js",
+  "/lib/workflow-pages.js",
 ];
 
 self.addEventListener("install", (event) => {

@@ -542,14 +542,24 @@
       "phase": "P5",
       "ask": "A form editor that writes a workflow's YAML through a PR; the Workflows page is read-only.",
       "source": "CHANGELOG v3.5.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-pages.test.ts",
+        "name": "the workflow form opens a PR with the edited file and never writes the repo's own workflow",
+        "mutation": "workflow editor: an edit is a PR, never a write to the repo"
+      }
     },
     {
       "id": "events-page-replay",
       "phase": "P5",
       "ask": "An Events page with replay.",
       "source": "CHANGELOG v3.5.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-pages.test.ts",
+        "name": "the Events page lists each event with its deliveries, and Replay sends one event to its sinks again",
+        "mutation": "events page: replay sends the event again"
+      }
     },
     {
       "id": "events-tail-follow",
@@ -568,7 +578,12 @@
       "phase": "P5",
       "ask": "Minions run locally only, in an empty workspace (no repo checkout). No dashboard view for minions or events.",
       "source": "CHANGELOG v4.0.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-pages.test.ts",
+        "name": "the Minions page lists every minion, what starts it, its workspace and its last run",
+        "mutation": "minions page: each minion shows its last run"
+      }
     },
     {
       "id": "deterministic-tool-step",

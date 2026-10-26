@@ -4,6 +4,7 @@
 // CLI uses, so the page and the terminal cannot disagree.
 
 import type { FactoryConfig } from "../src/config";
+import type { Git } from "../src/git";
 import { plain } from "../src/display";
 import type { HarnessReport } from "../src/harness";
 import type { MachineConfig } from "../src/machine";
@@ -17,6 +18,8 @@ export interface DashboardProject {
   readonly machine: MachineConfig;
   // Every lease ref on the remote; GitLeases.held in production.
   readonly leases: () => Promise<ReadonlyArray<{ key: string; holder: string; expiresAt: number }>>;
+  // The git a workflow edit branches with; a real one when absent.
+  readonly git?: Git;
 }
 
 export const NO_PROJECT =

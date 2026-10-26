@@ -66,7 +66,6 @@ function workflowOf(deps: WatchDeps, issue?: GhIssue): Workflow {
   return (chosen && deps.routeWorkflows?.[chosen]) || deps.workflow || defaultWorkflow();
 }
 
-
 // An issue a route's trigger filed runs that workflow, not the repo's, so pickup reads it back (recordedWorkflow).
 async function recordTriggered(deps: WatchDeps, config: FactoryConfig, n: number, workflow: Workflow, via: string) {
   if (workflow.name === workflowOf(deps).name) return;
