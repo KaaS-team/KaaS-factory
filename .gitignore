@@ -9,3 +9,4 @@ artifacts/
 .factory-wt.env
 reports/
 verify/target/
+.playwright-cli/

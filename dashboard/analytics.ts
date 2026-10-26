@@ -25,6 +25,15 @@ export interface Analytics {
   readonly byAgent: readonly Bucket[];
   readonly byModel: readonly Bucket[];
   readonly savings: Savings;
+  readonly week: Week;
+}
+
+// The inbox brief's last seven days: runs that started, and runs that ended shipped or failed,
+// by their last update. A run still going is counted as started only.
+export interface Week {
+  readonly started: number;
+  readonly shipped: number;
+  readonly failed: number;
 }
 
 // What model routing saved: each run's cost against the same tokens at its agent's strongest
@@ -81,6 +90,8 @@ export function analytics(
 ): Analytics {
   const finished = runs.filter((r) => FINISHED.has(r.status));
   const shipped = runs.filter((r) => r.status === "shipped").length;
+  const recent = (iso: string) => now.getTime() - Date.parse(iso) <= 7 * DAY_MS;
+  const endedAs = (status: string) => runs.filter((r) => r.status === status && recent(r.updated_at)).length;
   const spendSince = (days: number) =>
     stageRuns
       .filter((r) => now.getTime() - Date.parse(r.finished_at) <= days * DAY_MS)
@@ -98,5 +109,10 @@ export function analytics(
     // (plan v2.7.0 item 7: spend per model, visible even when incomplete).
     byModel: bucketBy(stageRuns, (r) => r.model ?? "unknown"),
     savings: savings(stageRuns, baselineFor),
+    week: {
+      started: runs.filter((r) => recent(r.started_at)).length,
+      shipped: endedAs("shipped"),
+      failed: endedAs("failed"),
+    },
   };
 }

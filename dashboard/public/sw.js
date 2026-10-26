@@ -10,6 +10,7 @@ const SHELL = [
   "/icon.svg",
   "/fonts/geist.woff2",
   "/lib/analytics-state.js",
+  "/lib/exec-summary.js",
   "/lib/markdown.js",
   "/lib/routes.js",
   "/lib/run-metrics.js",

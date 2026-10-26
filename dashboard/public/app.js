@@ -7,6 +7,7 @@ import { formatElapsed } from "/lib/run-metrics.js";
 import { ACTIVE, stationStates, WAITING } from "/lib/stations.js";
 import { markdownText, renderMarkdown } from "/lib/markdown.js";
 import { feedCard, proofPanel } from "/lib/run-page.js";
+import { execSummary } from "/lib/exec-summary.js";
 
 const ACTION_LABEL = {
   approve: "Approve plan",
@@ -662,7 +663,7 @@ function inboxView() {
   return h(
     "section",
     null,
-    heading("Inbox", "Everything the factory is waiting on you for."),
+    heading("Inbox", execSummary(state.data.analytics, items)),
     !items.length
       ? quiet("Nothing is waiting on you", "The factory will list plans to approve and questions to answer here.")
       : h(
@@ -1341,6 +1342,7 @@ const VIEWS = {
   settings: settingsView,
 };
 const LOADERS = {
+  inbox: ["analytics", "/api/analytics"],
   line: ["line", "/api/line"],
   runs: ["runs", "/api/runs"],
   task: ["line", "/api/line"],

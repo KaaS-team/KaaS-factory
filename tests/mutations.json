@@ -498,5 +498,8 @@
   {"name": "pwa: the worker answers for the API", "file": "dashboard/public/sw.js", "find": "  if (!SHELL.includes(path)) return;\n", "replace": "", "test": "tests/dashboard-routes.test.ts"},
   {"name": "pwa: a page module is missing from the precache", "file": "dashboard/public/sw.js", "find": "  \"/lib/stations.js\",\n", "replace": "", "test": "tests/dashboard-routes.test.ts"},
   {"name": "pwa: the manifest is not a public asset", "file": "dashboard/server.ts", "find": "|manifest\\.webmanifest", "replace": "", "test": "tests/dashboard-routes.test.ts"},
-  {"name": "pwa: the icon uses a colour that is not a token", "file": "dashboard/public/icon.svg", "find": "fill=\"#171717\"", "replace": "fill=\"#123456\"", "test": "tests/tokens.test.ts"}
+  {"name": "pwa: the icon uses a colour that is not a token", "file": "dashboard/public/icon.svg", "find": "fill=\"#171717\"", "replace": "fill=\"#123456\"", "test": "tests/tokens.test.ts"},
+  {"name": "inbox brief: week window is seven days", "file": "dashboard/analytics.ts", "find": "<= 7 * DAY_MS", "replace": "<= 70 * DAY_MS", "test": "tests/exec-summary.test.ts"},
+  {"name": "inbox brief: oldest item is the earliest waitingSince", "file": "dashboard/public/lib/exec-summary.js", "find": "Date.parse(b.waitingSince) < Date.parse(a.waitingSince)", "replace": "Date.parse(b.waitingSince) > Date.parse(a.waitingSince)", "test": "tests/exec-summary.test.ts"},
+  {"name": "inbox brief: inbox view loads analytics", "file": "dashboard/public/app.js", "find": "  inbox: [\"analytics\", \"/api/analytics\"],\n", "replace": "", "test": "tests/exec-summary.test.ts"}
 ]
