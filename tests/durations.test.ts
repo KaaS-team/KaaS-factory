@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { formatElapsed } from "../dashboard/public/lib/run-metrics.js";
 
 test("the cockpit shows whole seconds, not milliseconds", () => {
@@ -9,6 +9,9 @@ test("the cockpit shows whole seconds, not milliseconds", () => {
   expect(formatElapsed(undefined as unknown as number)).toBe("Unavailable");
 });
 
-test("app.js formats every duration through formatElapsed", () => {
-  expect(readFileSync("dashboard/public/app.js", "utf8")).not.toContain("formatDurationMillis");
+test("the page code formats every duration through formatElapsed", () => {
+  const views = readdirSync("dashboard/public/lib").filter((f) => f.startsWith("view-"));
+  expect(views.length).toBeGreaterThan(0);
+  for (const f of ["app.js", ...views.map((v) => `lib/${v}`)])
+    expect(readFileSync(`dashboard/public/${f}`, "utf8"), f).not.toContain("formatDurationMillis");
 });

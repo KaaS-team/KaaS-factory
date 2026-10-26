@@ -1,10 +1,8 @@
-// The cockpit (plan section 2). Bun.serve, one static page, JSON API + SSE
-// read from state.ts. No second source of truth: this server never invents
-// state, it reads what watch.ts wrote and posts replies through github.ts as
-// the signed-in `gh` user. /api/board is the exception on purpose — it
-// reads GitHub labels directly (dashboard/board.ts), so the board still
-// works with no local SQLite at all (a CI/VM run with no watcher on this
-// machine).
+// The cockpit (plan section 2). Bun.serve, one static page, JSON API + SSE read from state.ts. No second
+// source of truth: this server never invents state, it reads what watch.ts wrote and posts replies through
+// github.ts as the signed-in `gh` user. /api/board is the exception on purpose: it reads GitHub labels
+// directly (dashboard/board.ts), so the board still works with no local SQLite
+// (a CI/VM run with no watcher on this machine).
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
@@ -13,6 +11,7 @@ import type { ScmPort } from "../src/github";
 import { makeScm } from "../src/scm";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { buildBoard } from "./board";
+import { paneRoutes } from "./pane";
 import { LABEL } from "../src/labels";
 import { InboxError, act, buildInbox, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
 import { plain } from "../src/display";
@@ -761,6 +760,7 @@ export function createDashboard(
     },
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
     ...commandRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
+    ...paneRoutes({ repo, workspacesFor, actorOf: access.actorOf, stagesFor: (r, n) => state.listStageRuns(r, { issue: n }).map(plainStage), prUrlFor: (r, n) => state.listRuns(r).find((x) => x.issue === n)?.pr_url ?? null }),
     {
       method: "GET",
       pattern: /^\/api\/stream$/,

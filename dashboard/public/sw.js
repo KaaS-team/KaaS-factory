@@ -1,6 +1,6 @@
 // The cockpit's service worker: the shell opens offline, and nothing behind the token is ever stored,
 // so a lost phone's cache holds the page and no run data. A new SHELL list ships with a new CACHE name.
-const CACHE = "factory-shell-v1";
+const CACHE = "factory-shell-v2";
 const SHELL = [
   "/",
   "/tokens.css",
@@ -9,9 +9,13 @@ const SHELL = [
   "/manifest.webmanifest",
   "/icon.svg",
   "/fonts/geist.woff2",
+  "/lib/actions.js",
   "/lib/analytics-state.js",
+  "/lib/core.js",
   "/lib/exec-summary.js",
   "/lib/markdown.js",
+  "/lib/pane.js",
+  "/lib/rail.js",
   "/lib/relay-follow.js",
   "/lib/routes.js",
   "/lib/run-metrics.js",
@@ -20,6 +24,15 @@ const SHELL = [
   "/lib/stations.js",
   "/lib/status-loader.js",
   "/lib/task-presentation.js",
+  "/lib/view-analytics.js",
+  "/lib/view-board.js",
+  "/lib/view-fleet.js",
+  "/lib/view-inbox.js",
+  "/lib/view-line.js",
+  "/lib/view-run.js",
+  "/lib/view-runs.js",
+  "/lib/view-settings.js",
+  "/lib/view-workflows.js",
 ];
 
 self.addEventListener("install", (event) => {

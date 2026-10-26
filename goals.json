@@ -653,49 +653,84 @@
       "phase": "P7",
       "ask": "configurable workflows, monitorable by non-technical QA and PMs",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "a workflow reads as plain steps for a PM, and its automation switches are one click away",
+        "mutation": "p7: workflows link to the automation switches"
+      }
     },
     {
       "id": "ui-claude-codex",
       "phase": "P7",
       "ask": "a UI/UX following /frontend-design that borrows Claude/Codex app patterns without reinventing wheel",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "a run reads as a conversation: stages fold like tool calls, the plan card approves, and a sent message can be undone",
+        "mutation": "p7: undo takes a queued message back"
+      }
     },
     {
       "id": "ui-right-pane",
       "phase": "P7",
       "ask": "Outcome, Changes, Checks, Preview, Risk and Cost tabs beside the timeline",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "the run page puts Outcome, Changes, Checks, Preview and Risk beside the timeline, and Cost only for an operator",
+        "mutation": "p7: the pane keeps cost from anyone below operator"
+      }
     },
     {
       "id": "ui-mobile",
       "phase": "P7",
       "ask": "One column, bottom tabs, approve or answer in one tap",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "on a phone the cockpit is one column with bottom tabs, and an inbox row approves or answers in one tap",
+        "mutation": "p7: a listed question answers in one tap"
+      }
     },
     {
       "id": "settings-tabs",
       "phase": "P7",
       "ask": "Settings tabs; the page is one section per topic.",
       "source": "CHANGELOG v3.5.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "Settings is tabs, one panel per topic",
+        "mutation": "p7: settings hides operator tabs from a viewer"
+      }
     },
     {
       "id": "kaas-look",
       "phase": "P7",
       "ask": "kaas.team look for the dashboard",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "the dashboard wears the kaas.team look: Geist, the kaas tokens, the inset frame and pill tabs",
+        "mutation": "p7: a selected tab is the kaas.team pill"
+      }
     },
     {
       "id": "board-custom-step",
       "phase": "P7",
       "ask": "The dashboard board has no column for a custom step label; such an issue shows in the list only.",
       "source": "CHANGELOG v3.1.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dashboard-ui.test.ts",
+        "name": "an issue on a custom workflow step gets its own board column, not only the list",
+        "mutation": "p7: a custom step label gets a board column"
+      }
     },
     {
       "id": "integration-manifests",

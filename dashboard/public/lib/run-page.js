@@ -2,7 +2,7 @@
 // Items come from /api/issues/:n/live, the same parse `factory view` draws in the
 // terminal, so the page and the tmux window never disagree.
 
-import { inline, renderMarkdown, toDom } from "/lib/markdown.js";
+import { inline, renderMarkdown, toDom } from "./markdown.js";
 
 const VERB = {
   Read: "Read",

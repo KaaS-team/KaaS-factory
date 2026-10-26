@@ -3,7 +3,9 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const app = readFileSync(join(import.meta.dir, "..", "..", "..", "dashboard", "public", "app.js"), "utf8");
+// The views moved out of app.js into lib/, so the copy is read from the Fleet view and the shared loader.
+const lib = join(import.meta.dir, "..", "..", "..", "dashboard", "public", "lib");
+const app = ["view-fleet.js", "core.js"].map((f) => readFileSync(join(lib, f), "utf8")).join("\n");
 
 test("agents use live status copy and an empty state that says what to do", () => {
   expect(app).toContain("Reading the factory's state.");
