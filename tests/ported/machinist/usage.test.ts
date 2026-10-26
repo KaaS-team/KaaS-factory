@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { aggregateStageEvents, type StageEvent } from "../../../src/executor";
 import { claudePreset } from "../../../src/agents/presets/claude";
-import { codexPreset } from "../../../src/agents/presets/codex";
+import { codexPreset } from "../../../contrib/agents/codex";
 import type { AgentPreset } from "../../../src/agents/types";
 
 // Feeds text in arbitrary chunks the way a pipe would, splitting on newlines.

@@ -262,7 +262,7 @@ describe("names", () => {
       'runtimes.local: "local" is built in',
       "runtimes.a b: a name is letters, digits, _ and -",
       "runtimes.d.image: required for docker",
-      "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude)",
+      "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude, image)",
       "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, microsandbox, codespaces, pool",
     ]);
   });
@@ -278,6 +278,7 @@ describe("names", () => {
       JSON.stringify({ slots: 1, runtimes: { box: { kind: "ssh", host: "h", dir: "/d" } } }),
     );
     expect(Object.keys(runtimesFrom(loadMachineConfig({ FACTORY_HOME: home }).runtimes))).toEqual([
+      "default",
       "local",
       "lwpr",
       "box",

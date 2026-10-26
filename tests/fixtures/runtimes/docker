@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Stand-in docker for the contract suite: honours -w and runs the trailing `bash -c <cmd>` here.
+# Stand-in docker for the contract suite: honours -w and runs what follows the image here.
 set -u
+[[ $1 == rm ]] && exit 0
 [[ $1 == run ]] || exit 2
+[[ -n ${DOCKER_ARGV_FILE:-} ]] && { printf '%s\n' "$@"; echo ---; } >> "$DOCKER_ARGV_FILE" # lets a test read each argv
 shift
 wd=.
 while [[ $# -gt 0 ]]; do
@@ -12,4 +14,5 @@ while [[ $# -gt 0 ]]; do
     *) shift; break ;; # the image
   esac
 done
+export DOCKER_STAND_IN=1 # lets a test see the command went through docker
 cd "$wd" && exec "$@"

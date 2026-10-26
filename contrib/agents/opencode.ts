@@ -1,11 +1,10 @@
-// OpenCode: `opencode run --format json --auto --dir <cwd>` with the prompt on stdin.
-// Events are `{type, part}`: `tool_use` parts name the tool, `step_finish` parts carry
-// `tokens {input, output, cache {read, write}}`. Read-only stages use `--agent plan`, whose
-// edit permission is deny-all, and return the artifact as the final message.
+// OpenCode: `opencode run --format json --auto --dir <cwd>`, prompt on stdin. `tool_use` parts name the
+// tool, `step_finish` parts carry `tokens {input, output, cache {read, write}}`. Read-only stages use
+// `--agent plan` (edit permission deny-all) and return the artifact as the final message.
 
-import type { StageEvent } from "../../executor";
-import { type AgentPreset, stagePolicy } from "../types";
-import { isUsageResultCandidate } from "../usage";
+import type { StageEvent } from "../../src/executor";
+import { type AgentPreset, stagePolicy } from "../../src/agents/types";
+import { isUsageResultCandidate } from "../../src/agents/usage";
 
 interface OpenCodeLine {
   type?: string;

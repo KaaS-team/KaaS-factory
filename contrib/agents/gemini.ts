@@ -2,9 +2,9 @@
 // Shapes read from gemini-cli 0.61.0's docs and bundle (docs/agent-research/gemini/docs.md).
 // Read-only stages run in `plan` mode and return their artifacts as the final message.
 
-import type { StageEvent } from "../../executor";
-import { type AgentPreset, stagePolicy } from "../types";
-import { isUsageResultCandidate } from "../usage";
+import type { StageEvent } from "../../src/executor";
+import { type AgentPreset, stagePolicy } from "../../src/agents/types";
+import { isUsageResultCandidate } from "../../src/agents/usage";
 
 interface GeminiLine {
   type?: string;

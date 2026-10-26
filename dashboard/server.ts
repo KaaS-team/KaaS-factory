@@ -26,7 +26,7 @@ import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from ".
 import { analytics } from "./analytics";
 import { startRelay } from "./relay";
 import { HEALTH_ROUTE, healthRoute } from "./health";
-import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
+import { NO_PROJECT, settingsWithHealth, workflowsView, type DashboardProject } from "./project";
 import { harnessReport } from "../src/harness";
 import { createAccess, type Route } from "./plane/access";
 import { PlaneStore } from "./plane/store";
@@ -136,7 +136,7 @@ export function createDashboard(
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
   const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
   const prsInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listPrs"]>>>>();
-
+  const settings = settingsWithHealth();
   // Listing leases asks the remote, so the Settings page shares one answer for 15 s.
   let leasesCache: { at: number; value: Awaited<ReturnType<DashboardProject["leases"]>> | Error } | null = null;
   async function heldLeases(p: DashboardProject) {
@@ -692,7 +692,7 @@ export function createDashboard(
           harnessReport(project.cloneDir, project.config),
           heldLeases(project),
         ]);
-        return json({ available: true, ...settingsView(project, report, leases, Date.now()) });
+        return json({ available: true, ...(await settings(project, report, leases, Date.now())) });
       },
     },
     {

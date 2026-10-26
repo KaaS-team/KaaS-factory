@@ -24,6 +24,7 @@ const SHELL = [
   "/lib/run-metrics.js",
   "/lib/run-page.js",
   "/lib/runs-board.js",
+  "/lib/settings.js",
   "/lib/stations.js",
   "/lib/status-loader.js",
   "/lib/task-presentation.js",

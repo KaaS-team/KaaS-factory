@@ -21,7 +21,7 @@ Source: https://github.com/owainlewis/machinist (MIT, Copyright (c) 2026 Owain L
 - `src/event-budget.ts` from `internal/runner/events.go` [tested by `tests/ported/machinist/events.test.ts`]
 - `src/agents/structured.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/structured.test.ts`]
 - `src/agents/final-message.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/final-message.test.ts`]
-- `src/agents/presets/codex.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
+- `contrib/agents/codex.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
 - `src/agents/usage.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
 - `src/artifacts.ts` from `internal/protocol/workflow.go` [tested by `tests/ported/machinist/workflow.test.ts`]
 - `template/.claude/skills/factory-operator/SKILL.md` from `skills/machinist/SKILL.md` [no upstream test]
@@ -89,4 +89,4 @@ text ships beside it as `LICENSE-geist.txt`.
 
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
-- `src/agents/presets/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+- `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]

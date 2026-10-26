@@ -1,12 +1,11 @@
 // Ported from owainlewis/assembler@7cac671 src/index.ts:64-90 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: validateConfig's harness rules (executable not a {prompt} placeholder, a command must be non-empty) live in agentProblems; the codex/claude providers are presets; errors are collected, not thrown one at a time; the key table, boot refusal and defaults are the factory's own.
-// Shape of the target repo's `.factory/config.json`. Built by the repo-specific
-// side (splitbill) or by whoever installs this template elsewhere; the runner
-// only reads it, and `factory doctor` checks it exists. Missing fields fall
-// back to DEFAULT_CONFIG so a minimal config.json still works.
+// Shape of the target repo's `.factory/config.json`: the runner only reads it, `factory doctor`
+// checks it exists, and a missing field falls back to DEFAULT_CONFIG, so a minimal one works.
 
 import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
 import { githubHost } from "./repo";
+import { type Toolchain, toolchainProblems } from "./images";
 import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { LABEL } from "./labels";
@@ -29,10 +28,9 @@ export interface StageBudgets {
   readonly retro: number;
 }
 
-// Extra Bash patterns the repo grants its agents, on top of the read-only
-// git and shell basics in stage-permissions.ts. `read` applies to every
-// stage; `build` and `verify` add to that stage only. Each entry is a bare
-// pattern such as "make *" or "npm test *", never a compound command.
+// Extra Bash patterns the repo grants its agents, on top of the read-only git and shell basics in
+// stage-permissions.ts. `read` applies to every stage; `build` and `verify` add to that stage only.
+// Each entry is a bare pattern such as "make *" or "npm test *", never a compound command.
 export interface AgentCommands {
   readonly read: readonly string[];
   readonly build: readonly string[];
@@ -77,10 +75,9 @@ export function testGate(gates: readonly GateSpec[]): GateSpec | undefined {
   return gates.find((g) => g.role === "test") ?? gates.find((g) => g.name === "test");
 }
 
-// A route for one issue type (a label: the five in TYPE_LABELS, or one a repo
-// adds, e.g. lwp's "content"). `resolveRoute` (src/agents/executor.ts) checks
-// `stages[stage]` here before falling back to the repo-wide `stages`. Triage
-// runs before the type is known, so it never consults a route.
+// A route for one issue type (a label: the five in TYPE_LABELS, or one a repo adds, e.g. "content").
+// `resolveRoute` (src/agents/executor.ts) checks `stages[stage]` here before the repo-wide `stages`.
+// Triage runs before the type is known, so it never consults a route.
 export interface RouteConfig {
   readonly stages?: Partial<StageAgents>;
   readonly skills?: readonly string[];
@@ -138,6 +135,7 @@ export interface FactoryConfig {
   // Defaults for a company size (PROFILES); any key set explicitly still wins.
   readonly profile?: Profile;
   readonly caps?: import("./org-caps").OrgCaps; // per-team and org back-pressure (src/org-caps.ts)
+  readonly toolchain?: Toolchain; // the image an "auto" docker or ssh runtime uses (src/images.ts)
   // Where gates and check steps run, by runtime name (src/runtimes.ts); unset is "local".
   readonly runtime?: RuntimeConfig;
   // Where issues live. GitHub by default; "http" speaks Tracker API v1 (docs/tracker-api.md).
@@ -381,6 +379,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   workflow: "string",
   profile: "string",
   caps: "object",
+  toolchain: "string",
   runtime: "object",
   tracker: "object",
   labels: "object",
@@ -437,6 +436,7 @@ export function configProblems(raw: unknown): string[] {
   if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))
     problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
   problems.push(...profileProblems(cfg));
+  problems.push(...toolchainProblems(cfg.toolchain));
   nested("maxBudgetUsd", {
     triage: "positive",
     plan: "positive",

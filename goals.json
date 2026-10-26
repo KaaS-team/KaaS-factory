@@ -446,84 +446,144 @@
       "phase": "P4",
       "ask": "The sandbox contract: create, exec, files, snapshot, pause and resume, expose, status, destroy, with capability flags",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "every runtime kind reports its flags, and a sandbox does each verb",
+        "mutation": "sandbox: a paused sandbox refuses commands"
+      }
     },
     {
       "id": "runtime-verify-kit",
       "phase": "P4",
       "ask": "factory runtime verify <name> runs one shared suite against any adapter",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "the kit passes a working runtime and names what a broken one gets wrong",
+        "mutation": "runtime kit: the exit code check bites"
+      }
     },
     {
       "id": "microsandbox-default",
       "phase": "P4",
       "ask": "local microsandbox supported by default",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "is microsandbox with msb and a hypervisor, otherwise local with a warning",
+        "mutation": "runtimes: no hypervisor means the default runs locally"
+      }
     },
     {
       "id": "any-sandbox",
       "phase": "P4",
       "ask": "also able to connect any sandboxes too not just microsandbox",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "any sandbox passes the same kit: an http sandbox and a wrap launcher, not only microsandbox",
+        "mutation": "http sandbox: the command reaches the sandbox"
+      }
     },
     {
       "id": "egress-proxy",
       "phase": "P4",
       "ask": "Deny-by-default egress on every runtime, keys injected by a proxy the guest cannot read",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/egress.test.ts",
+        "name": "denies every host off the list, and swaps a key in only toward that key's hosts",
+        "mutation": "egress: a key goes only to its own hosts"
+      }
     },
     {
       "id": "acp-readonly-mount",
       "phase": "P4",
       "ask": "A read-only mount for ACP stages. An agent process that leaves its process group can still write after the check; run read-only stages in a sandbox runtime where that matters.",
       "source": "CHANGELOG v5.0.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/acp-readonly-mount.test.ts",
+        "name": "a read-only ACP stage mounts the worktree read-only in the VM, a build stage does not",
+        "mutation": "microsandbox: a read-only stage mounts its worktree read-only"
+      }
     },
     {
       "id": "fleet-view",
       "phase": "P4",
       "ask": "Machines, tags, slots in use, last heartbeat and current task in one view",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/fleet.test.ts",
+        "name": "every machine, its tags, slots in use, last heartbeat and current task, in one view",
+        "mutation": "fleet: a poll writes this machine's heartbeat"
+      }
     },
     {
       "id": "slot-usage",
       "phase": "P4",
       "ask": "Machine slot usage on the Settings page (slots are local; only issue leases are shown).",
       "source": "CHANGELOG v3.5.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/fleet.test.ts",
+        "name": "the Settings page says how many slots are in use and whether each runtime the repo uses answers",
+        "mutation": "settings: slots in use come from the machine's leases"
+      }
     },
     {
       "id": "runtime-health-probe",
       "phase": "P4",
       "ask": "A live health probe per runtime; the Runtimes table shows configuration only.",
       "source": "CHANGELOG v3.5.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/sandbox-contract.test.ts",
+        "name": "a live runtime answers, an unreachable one says why, a hung one times out",
+        "mutation": "runtime probe: a down runtime says why"
+      }
     },
     {
       "id": "doctor-reachability",
       "phase": "P4",
       "ask": "A health probe per runtime in `factory doctor`; it checks names, not reachability.",
       "source": "CHANGELOG v3.3.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/doctor.test.ts",
+        "name": "each runtime the repo names is probed: a live one answers, a down one fails with why",
+        "mutation": "doctor: a runtime that does not answer fails"
+      }
     },
     {
       "id": "any-agent",
       "phase": "P4",
       "ask": "make sure that any coding agent can be connected",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/any-agent.test.ts",
+        "name": "the same ticket ships with a bare command, a preset CLI and an ACP server",
+        "mutation": "any agent: a bare command runs as its own argv"
+      }
     },
     {
       "id": "acp-seam",
       "phase": "P4",
       "ask": "Any coding agent runs the factory: one ACP seam, proven by the same ticket passing with two agents",
       "source": "spec 10 acp-seam",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/any-agent.test.ts",
+        "name": "one ACP seam: two unrelated ACP servers ship the same ticket the same way",
+        "mutation": "acp: a reply split across chunks is joined"
+      }
     },
     {
       "id": "mission-control",
@@ -542,14 +602,24 @@
       "phase": "P4",
       "ask": "make sure that it can be run on local or server too",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/local-or-server.test.ts",
+        "name": "the image copies every file the CLI and dashboard load, and runs from that copy alone",
+        "mutation": "server: the image copies the dashboard"
+      }
     },
     {
       "id": "lean-resources",
       "phase": "P4",
       "ask": "very lean on resources to run these",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/lean-resources.test.ts",
+        "name": "the CLI and the dashboard start under 100 MB, and the default sandbox is one CPU and 1 GB",
+        "mutation": "lean: the default sandbox asks for 1 GB"
+      }
     },
     {
       "id": "workflow-md",
@@ -1036,28 +1106,48 @@
       "phase": "P4",
       "ask": "Per-language Docker images and devcontainer support for the docker and ssh runtimes.",
       "source": "CHANGELOG v3.4.0 #6",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/language-images.test.ts",
+        "name": "an auto image follows the devcontainer, then the toolchain key, then the stack, for docker and ssh",
+        "mutation": "images: a devcontainer's image wins"
+      }
     },
     {
       "id": "toolchain-key",
       "phase": "P4",
       "ask": "A `toolchain` config key, and `factory init` writing `charter.md`.",
       "source": "CHANGELOG v3.4.0 #8",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/stack.test.ts",
+        "name": "init writes the toolchain key and a charter that names the stack, and leaves an edited charter",
+        "mutation": "init: the charter names the detected stack"
+      }
     },
     {
       "id": "remote-agent-steps",
       "phase": "P4",
       "ask": "Agent steps (triage, plan, build, verify, pr) on a remote runtime; they run where the factory runs. Only gates and `check` steps move.",
       "source": "CHANGELOG v3.3.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/remote-agent-steps.test.ts",
+        "name": "every agent step runs in the docker agentRuntime, and the ticket still ships",
+        "mutation": "agent runtime: an agent step runs in the docker container"
+      }
     },
     {
       "id": "cloud-routine-tick",
       "phase": "P4",
       "ask": "A Claude Code cloud routine that runs `factory tick` on a schedule, and `factory dispatch` driving the Actions template one step per job.",
       "source": "CHANGELOG v3.3.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/dispatch.test.ts",
+        "name": "dispatch names the issues one tick would advance, and a routine runs factory tick on its cron",
+        "mutation": "routine: the cloud routine runs factory tick"
+      }
     },
     {
       "id": "blob-store",
@@ -1121,7 +1211,12 @@
       "phase": "P4",
       "ask": "`src/state.ts` and `src/agents/` stay where they are; the non-Claude presets move to `contrib/agents` later.",
       "source": "CHANGELOG v3.1.0 #2",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/contrib-agents.test.ts",
+        "name": "every non-Claude, non-ACP preset lives in contrib/agents, and the core stays in place",
+        "mutation": "contrib: only the registry reaches a vendor preset"
+      }
     },
     {
       "id": "json-schema-hook",

@@ -620,6 +620,8 @@ function project(over: Partial<DashboardProject> = {}): DashboardProject {
     cloneDir,
     config,
     machine: { slots: 3, runtimes: { box: { kind: "ssh", host: "build-1", dir: "/w" } } },
+    // Never dial build-1: the Settings route probes each runtime the repo uses.
+    probe: async () => ({ ok: true, ms: 1, detail: "factory-probe-ok" }),
     leases: async () => [
       { key: "issue-4", holder: "laptop", expiresAt: Date.now() + 20_000 },
       { key: "issue-5", holder: "ci", expiresAt: 0 },
@@ -669,7 +671,7 @@ describe("workflows and settings", () => {
       leasesError: string | null;
     };
     expect(body.slots).toBe(3);
-    expect(body.runtimes.map((r) => r.name)).toEqual(["local", "lwpr", "box"]);
+    expect(body.runtimes.map((r) => r.name)).toEqual(["default", "local", "lwpr", "box"]);
     expect(body.runtimes.find((r) => r.name === "box")).toMatchObject({
       kind: "ssh",
       builtin: false,

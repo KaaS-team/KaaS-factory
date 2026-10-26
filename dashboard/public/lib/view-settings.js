@@ -4,6 +4,7 @@
 import { api, h, heading, isOperator, money, post, quiet, shell, state, stateOr, table } from "./core.js";
 import { readRelay, saveRelay } from "./relay-follow.js";
 import { remotePanel } from "./remote.js";
+import { healthCell, leasesPanel, machinesPanel, slotsText } from "./settings.js";
 
 const isOwner = () => state.me?.role === "owner";
 
@@ -36,7 +37,7 @@ function general(d) {
     "dl",
     { class: "kv" },
     h("dt", null, "Runs at once"),
-    h("dd", null, String(d.slots)),
+    h("dd", null, slotsText(d)),
     isOperator()
       ? [h("dt", null, "Daily spend cap"), h("dd", null, d.dailyUsd == null ? "None set" : money(d.dailyUsd))]
       : null,
@@ -82,7 +83,7 @@ function automation() {
 
 function runtimes(d) {
   return table(
-    ["Runtime", "Kind", "Target", "Used by"],
+    ["Runtime", "Kind", "Target", "Used by", "Health"],
     d.runtimes.map((r) =>
       h(
         "tr",
@@ -96,31 +97,20 @@ function runtimes(d) {
         h("td", null, r.kind),
         h("td", null, h("code", null, r.target)),
         h("td", null, r.usedBy.length ? r.usedBy.join(", ") : "Nothing in this project"),
+        healthCell(d.health[r.name], h),
       ),
     ),
   );
 }
 
 function leases(d) {
-  if (d.leasesError) return h("p", { class: "error" }, `Could not read the lease refs: ${d.leasesError}`);
-  if (!d.leases.length) return quiet("No leases", "A worker takes refs/factory/lease/<issue> while it runs an issue.");
-  const held = (l) =>
-    l.live
-      ? `Held, expires in ${Math.max(1, Math.round((l.expiresAt - Date.now()) / 1000))}s`
-      : l.expiresAt === 0
-        ? "Released"
-        : "Expired";
-  return table(
-    ["Issue", "Holder", "State"],
-    d.leases.map((l) =>
-      h(
-        "tr",
-        null,
-        h("td", null, l.key),
-        h("td", null, l.holder),
-        h("td", null, h("span", { class: "status", "data-tone": l.live ? "live" : "" }, held(l))),
-      ),
-    ),
+  return h(
+    "div",
+    null,
+    h("h3", null, "Machines"),
+    machinesPanel(d, h),
+    h("h3", null, "Issue leases"),
+    leasesPanel(d, h, quiet),
   );
 }
 
