@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { detectStack, diskFiles } from "../src/stack";
+import { detectStack, diskFiles, readCommands } from "../src/stack";
+import { refusal } from "../src/safe-outputs";
 import { configProblems } from "../src/config";
 import { isFilledIn } from "../src/init";
 
@@ -52,6 +53,31 @@ describe("detectStack reads each stack's own files", () => {
   });
 });
 
+// #87: init wrote `read: []`, so plan's `npm ls` was refused and a dependency issue failed plan three times.
+describe("readCommands: what every stage may run to inspect dependencies", () => {
+  test("node stacks read npm's installed tree; uv reads its own; every stack gets git ls-tree", () => {
+    expect(readCommands(stackOf("bun"))).toEqual(["npm ls", "npm ls --all", "npm ls --depth *", "git ls-tree *"]);
+    expect(readCommands(stackOf("pnpm"))).toContain("npm ls");
+    expect(readCommands(stackOf("uv"))).toEqual(["uv pip list", "uv tree --frozen --offline", "git ls-tree *"]);
+    expect(readCommands(stackOf("go"))).toEqual(["git ls-tree *"]);
+  });
+
+  // A pattern refusal() rejects is dropped from the allow list in silence, so init must never write one.
+  test("every read command for every stack fixture survives the allow-list filter", () => {
+    for (const name of readdirSync(FIXTURES))
+      for (const p of readCommands(stackOf(name))) expect([name, p, refusal(p)]).toEqual([name, p, undefined]);
+  });
+
+  // Plan runs on untrusted issue text, so a default must not fetch from a registry or take a free argument
+  // that could point one at an attacker's host.
+  test("no default read command reaches the network", () => {
+    const online =
+      /^(npm (view|info|show|outdated|install|i|ci|update|exec|pack|audit)|npx|uv (tree(?!.*--offline)|sync|add|run|lock|pip install))\b|^npm ls \*|^uv pip list \*|--registry|--index/;
+    for (const name of readdirSync(FIXTURES))
+      for (const p of readCommands(stackOf(name))) expect([name, p, online.test(p)]).toEqual([name, p, false]);
+  });
+});
+
 // End to end on a copy: install the template, write the config, and run the
 // repo's own gates.sh, which must go green on what init wrote.
 describe("factory init", () => {
@@ -83,6 +109,8 @@ describe("factory init", () => {
       expect(configProblems(config)).toEqual([]);
       expect(isFilledIn(text)).toBe(true);
       expect(config.repo).toBe("acme/widgets");
+      expect(config.agentCommands.read).toEqual(readCommands(stackOf(name)));
+      expect(config.agentCommands.read).toContain("npm ls");
       const gate = Bun.spawnSync(["bash", ".factory/gates.sh"], { cwd: dir, stdout: "pipe" });
       expect(gate.stdout.toString()).toContain("FACTORY_GATES: status=GREEN");
       // init and the gate each spawn a process (npm for no-tests); on a loaded CI runner that took ~10s
