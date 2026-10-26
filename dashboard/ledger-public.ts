@@ -22,15 +22,22 @@ export interface PublicLedger {
 
 export const ENTRY_KEYS: readonly (keyof ShippedEntry)[] = ["title", "repo", "mergedOn", "cycleHours", "dollars"];
 
-// Text a title may carry that is operator detail: model names, hosts and addresses, token counts and
-// stack frames. No trailing \b on model names, so "claudex" or "opus5x" is caught too.
+const MODELS =
+  "claude|anthropic|openai|gpt|chatgpt|gemini|llama|mistral|mixtral|qwen|deepseek|nemotron|haiku|sonnet|opus|codex|grok|kimi|openrouter|ollama";
+const TLDS =
+  "com|net|org|io|dev|ai|app|co|cloud|team|xyz|me|info|biz|tech|site|online|eu|uk|de|in|us|local|internal|lan|localdomain|test|example|invalid";
+
+// What the scrubber redacts from a title: any word holding a model name ("opus5x" too), URLs,
+// hosts and addresses, token counts and stack frames.
 export const FORBIDDEN_TEXT: readonly RegExp[] = [
-  /\b(claude|anthropic|openai|gpt|chatgpt|gemini|llama|mistral|mixtral|qwen|deepseek|nemotron|haiku|sonnet|opus|codex|grok|kimi|openrouter|ollama)[\w.:/-]*/gi,
+  /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi,
+  new RegExp(`[\\w.:/-]*(${MODELS})[\\w.:/-]*`, "gi"),
   /\bo\d(-mini|-pro)?\b/gi,
-  /\b[\w-]+(\.[\w-]+)*\.(local|internal|lan|localdomain)\b/gi,
+  new RegExp(`\\b[\\w-]+(\\.[\\w-]+)*\\.(${TLDS})\\b(:\\d+)?`, "gi"),
   /\blocalhost(:\d+)?\b/gi,
   /\b\d{1,3}(\.\d{1,3}){3}(:\d+)?\b/g,
-  /\b\d[\d,.]*\s*k?\s*tokens?\b/gi,
+  /\[?[0-9a-f]{0,4}(:[0-9a-f]{0,4}){2,7}\]?/gi,
+  /\b(\d[\d,.]*\s*k?\s*)?tokens?\b/gi,
   /\bat\s+\S+\s+\(?\S+:\d+:\d+\)?/g,
   /\b\w*Error:\s.*$/g,
 ];
@@ -43,17 +50,35 @@ export function scrubText(text: string): string {
   return out.replace(/\s+/g, " ").trim();
 }
 
-// Every leak in a ledger: a key outside the allow-list or among the plane's operator keys, and any
-// string that still matches FORBIDDEN_TEXT. The export refuses to write a ledger with one.
+// The leak check's own patterns, stricter than the scrubber's and never shared with it, so a hole in
+// one is not a hole in both: a model name anywhere in a word, any URL, FQDN, IPv4 or IPv6 address.
+export const LEAK_TEXT: readonly RegExp[] = [
+  new RegExp(`(${MODELS})`, "i"),
+  /\bo\d(-mini|-pro)?\b/i,
+  /:\/\//,
+  new RegExp(`[a-z0-9-]\\.(${TLDS})\\b`, "i"),
+  /localhost/i,
+  /\d{1,3}(\.\d{1,3}){3}/,
+  /[0-9a-f]{0,4}:[0-9a-f]{0,4}:[0-9a-f]{0,4}/i,
+  /tokens?\b/i,
+  /:\d+:\d+/,
+  /Error:/,
+];
+const REPO = /^[\w-]+\/[\w.-]+$/;
+
+// Every leak in a ledger: a key outside the allow-list or among the plane's operator keys, a repo that
+// is not owner/name, and any other string that is not printable ASCII or matches LEAK_TEXT.
 export function publicLeaks(ledger: unknown): string[] {
   const out: string[] = [];
   const walk = (v: unknown, at: string) => {
     if (typeof v === "string") {
-      if (/[^\x20-\x7e]/.test(v)) out.push(`${at}: not printable ASCII`);
-      for (const re of FORBIDDEN_TEXT) {
-        re.lastIndex = 0;
-        if (re.test(v.normalize("NFKC"))) out.push(`${at}: ${JSON.stringify(v)}`);
+      if (at.endsWith(".repo")) {
+        if (!REPO.test(v)) out.push(`${at}: not owner/name`);
+        return;
       }
+      if (/[^\x20-\x7e]/.test(v)) out.push(`${at}: not printable ASCII`);
+      const folded = v.normalize("NFKC");
+      for (const re of LEAK_TEXT) if (re.test(folded)) out.push(`${at}: ${JSON.stringify(v)} matches ${re.source}`);
     } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${at}[${i}]`));
     else if (v && typeof v === "object")
       for (const [k, x] of Object.entries(v)) {

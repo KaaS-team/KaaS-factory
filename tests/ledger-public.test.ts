@@ -122,6 +122,11 @@ test("publicLeaks fails a ledger that carries a forbidden field or a model-like 
     { ...ok, title: "Bump claudex-5 and opus5x" },
     { ...ok, title: "Swap \uff43\uff4c\uff41\uff55\uff44\uff45 in" },
     { ...ok, title: "Swap \u043epus-5 in" },
+    { ...ok, title: "Deploy to build-7.example.com" },
+    { ...ok, title: "Point it at https://10.0.0.5/admin" },
+    { ...ok, title: "Bind fe80::1ff:fe23:4567 not ::1" },
+    { ...ok, title: "Open grafana at db.kaas.team" },
+    { ...ok, repo: "acme/widgets on 10.0.0.5" },
   ])
     expect(publicLeaks(doc(bad)).length, JSON.stringify(bad)).toBeGreaterThan(0);
   expect(publicLeaks(doc(ok, { worker_name: "w1" })).length).toBeGreaterThan(0);
@@ -129,6 +134,23 @@ test("publicLeaks fails a ledger that carries a forbidden field or a model-like 
   expect(scrubText("Use claude-opus-5-5x and opus5x")).toBe("Use [redacted] and [redacted]");
   expect(scrubText("Use \uff43\uff4c\uff41\uff55\uff44\uff45-5 now")).toBe("Use [redacted] now");
   expect(scrubText("Use \u043epus-5 now")).toBe("Use pus-5 now");
+});
+
+// The leak check runs on its own patterns, so a host the scrubber misses still stops the export.
+test("a leaked host, URL, IPv4 or IPv6 address is caught by the leak check and scrubbed from titles", () => {
+  for (const title of [
+    "Deploy to build-7.example.com",
+    "Fetch https://api.acme.io/v1",
+    "Pin 192.168.1.20:5432",
+    "Bind fe80::1ff:fe23:4567",
+    "Serve on [::1]:8080",
+    "Read file:///srv/app/run",
+  ]) {
+    const entry = { title, repo: REPO, mergedOn: "2026-10-02", cycleHours: 1, dollars: 1 };
+    expect(publicLeaks({ generatedOn: "2026-10-26", shipped: [entry] }).length, title).toBeGreaterThan(0);
+    const scrubbed = { ...entry, title: scrubText(title) };
+    expect(publicLeaks({ generatedOn: "2026-10-26", shipped: [scrubbed] }), scrubbed.title).toEqual([]);
+  }
 });
 
 test("the export script writes the ledger from a state DB and leaves no operator detail in the file", async () => {
@@ -149,6 +171,28 @@ test("the export script writes the ledger from a state DB and leaves no operator
     const ledger = await Bun.file(out).json();
     expect(ledger.shipped).toHaveLength(1);
     expect(publicLeaks(ledger)).toEqual([]);
+    // A repo with merges that is not named stays private: none of its titles reach the file.
+    const other = join(home, "acme", "secret");
+    await Bun.$`mkdir -p ${other}`.quiet();
+    const priv = new FactoryState(join(other, "factory.db"));
+    priv.upsertRun({ issue: 9, repo: "acme/secret", title: "Private roadmap item", stage: "pr", status: "shipped" });
+    priv.recordBusEvent({
+      id: "secret-9",
+      direction: "out",
+      type: "factory.pr.merged",
+      source: "s",
+      subject: null,
+      time: "2026-10-03T00:00:00Z",
+      data: JSON.stringify({ repo: "acme/secret", issue: 9 }),
+      handled_at: null,
+    });
+    priv.close();
+    const named = Bun.spawnSync(["bun", "scripts/ledger-public.ts", "--repo", REPO], {
+      env: { ...process.env, FACTORY_HOME: home },
+    });
+    expect(named.exitCode).toBe(0);
+    expect(named.stdout.toString()).not.toContain("acme/secret");
+    expect(named.stdout.toString()).not.toContain("Private roadmap");
     // With no --repo it publishes nothing: a repo's titles go public only when it is named.
     const none = Bun.spawnSync(["bun", "scripts/ledger-public.ts"], { env: { ...process.env, FACTORY_HOME: home } });
     expect(none.exitCode).toBe(2);
