@@ -546,6 +546,7 @@
   {"name": "release: the old name is gone", "file": "dashboard/public/manifest.webmanifest", "find": "What KaaS Factory is doing", "replace": "What the software factory is doing", "test": "tests/release.test.ts"},
   {"name": "release: teaching material stays out", "file": "Makefile", "find": ".PHONY: agent-matrix install", "replace": ".PHONY: agent-matrix install\n# make demo runs teach/demo/up.sh", "test": "tests/release.test.ts"},
   {"name": "quality: a line baseline cannot keep slack", "file": "quality-baseline.json", "find": "\"src/cli.ts\": 1086", "replace": "\"src/cli.ts\": 1087", "test": "tests/quality.test.ts"},
+  {"name": "dashboard: a throwing route leaks nothing", "file": "dashboard/plane/access.ts", "find": "await handler().catch(failed(route?.label))", "replace": "await handler()", "test": "tests/dashboard-routes.test.ts"},
   {"name": "quality: an over-limit file cannot grow", "file": "src/cli.ts", "find": "import { homedir, hostname } from \"node:os\";", "replace": "import { homedir, hostname } from \"node:os\";\n\n", "test": "tests/quality.test.ts"},
   {"name": "plane: a role gates every route", "file": "dashboard/plane/store.ts", "find": "return ROLES.indexOf(have) >= ROLES.indexOf(need);", "replace": "return ROLES.indexOf(have) >= 0;", "test": "tests/plane-access.test.ts"},
   {"name": "plane: an unclassified route fails closed", "file": "dashboard/server.ts", "find": "      label: \"POST /api/toggles\",\n      role: \"owner\",", "replace": "      label: \"POST /api/toggles\",", "test": "tests/plane-access.test.ts"},

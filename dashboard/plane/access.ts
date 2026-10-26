@@ -320,10 +320,16 @@ export function createAccess(opts: AccessOptions) {
     return json({ error: `needs the ${need} role` }, 403);
   }
 
+  // Unset NODE_ENV makes Bun answer a throw with its dev page: a stack trace and server paths.
+  const failed = (label: string | undefined) => (err: unknown) => {
+    console.error(`${label ?? "route"} failed:`, err);
+    return json({ error: "internal error" }, 500);
+  };
+
   // Every write a person could make is kept with who made it and how it ended.
   async function audited(req: Request, route: Route | undefined, handler: () => Promise<Response>): Promise<Response> {
     const who = actorOf(req);
-    const run = async () => withheld(who, await handler());
+    const run = async () => withheld(who, await handler().catch(failed(route?.label)));
     if (req.method === "GET" || !who || !route) return run();
     const fromPath = new URL(req.url).pathname.match(/\/(\d+)(?:\/|$)/)?.[1];
     const fromBody = fromPath

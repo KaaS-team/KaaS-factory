@@ -253,6 +253,16 @@ describe("review and merge routes", () => {
     expect(body.stages).toEqual([]);
   });
 
+  test("a route that throws answers a plain 500, never a stack trace or a server path", async () => {
+    const { dashboard, github } = await make("", [waiting(5, LABEL.inReview)]);
+    github.prForIssue = async () => {
+      throw new Error("gh failed in /srv/factory/secret");
+    };
+    const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/5/review"), "127.0.0.1");
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe(JSON.stringify({ error: "internal error" }));
+  });
+
   test("the review route 404s when no open PR closes the issue", async () => {
     const { dashboard } = await make("", []);
     const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/9/review"), "127.0.0.1");
