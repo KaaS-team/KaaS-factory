@@ -1,0 +1,12 @@
+{
+  "name": "github-checks",
+  "kind": "notifier",
+  "summary": "One GitHub check run per step on the issue branch.",
+  "env": [
+    "FACTORY_CHECKS_TOKEN"
+  ],
+  "enable": "set `FACTORY_CHECKS_TOKEN` (a token with checks:write) on the watcher",
+  "module": "src/integrations/checks.ts",
+  "contract": "tests/checks-progress.test.ts",
+  "default": false
+}

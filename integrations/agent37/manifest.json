@@ -1,0 +1,12 @@
+{
+  "name": "agent37",
+  "kind": "runtime",
+  "summary": "Runs on an Agent37 instance.",
+  "env": [
+    "AGENT37_API_KEY"
+  ],
+  "enable": "`{\"kind\": \"agent37\", \"instance\": \"...\", \"tokenEnv\": \"AGENT37_API_KEY\"}` in machine.json",
+  "module": "src/adapters/agent37/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false
+}

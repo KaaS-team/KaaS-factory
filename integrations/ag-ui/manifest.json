@@ -1,0 +1,12 @@
+{
+  "name": "ag-ui",
+  "kind": "notifier",
+  "summary": "Streams a run as AG-UI events for an agent front end.",
+  "env": [
+    "FACTORY_AGUI"
+  ],
+  "enable": "set `FACTORY_AGUI=1` on the plane",
+  "module": "src/integrations/agui.ts",
+  "contract": "tests/a2a-agui.test.ts",
+  "default": false
+}

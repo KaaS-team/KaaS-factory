@@ -1,0 +1,12 @@
+{
+  "name": "http",
+  "kind": "tracker",
+  "summary": "Any tracker behind Tracker API v1, public or private (docs/tracker-api.md).",
+  "env": [
+    "TRACKER_TOKEN"
+  ],
+  "enable": "`\"tracker\": {\"kind\": \"http\", \"url\": \"...\", \"tokenEnv\": \"TRACKER_TOKEN\"}`",
+  "module": "src/adapters/http-tracker.ts",
+  "contract": "tests/tracker-contract.test.ts",
+  "default": false
+}

@@ -807,12 +807,14 @@ describe("text is plain()-ed on every read route", () => {
       (l) => l.startsWith("GET ") && !mod.PUBLIC_ROUTES.includes(l) && l !== "GET /api/stream",
     );
     expect(gets.length).toBeGreaterThan(8);
+    process.env.FACTORY_AGUI = "1";
     for (const label of gets) {
       const url = `http://localhost:4100${samplePath(label).replace(/\/artifacts$/, "/artifacts?file=plan.md")}`;
       const res = await dashboard.handle(new Request(url.replace(/^(.*\/runs\/)1/, `$1${run.id}`)), "127.0.0.1");
       expect(res.status, label).toBe(200);
       expect(dirty(await res.text()), label).toBe(false);
     }
+    delete process.env.FACTORY_AGUI;
   });
 });
 

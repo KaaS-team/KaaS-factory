@@ -15,7 +15,7 @@ import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
-import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
+import { DEFAULT_CONFIG, eventsInboundSecretEnv, type FactoryConfig } from "../src/config";
 import { defaultStatePath, discoverRepos, factoryHome, streamPath, transcriptPath, workspacesDir } from "../src/paths";
 import { liveItems, proofView } from "./run-page";
 import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
@@ -38,7 +38,7 @@ import {
   WEBHOOK_SECRET_ENV,
 } from "../src/webhook";
 import { EVENT_SIGNATURE_HEADER, isExternalEventType, parseEvent, verifyEvent } from "../src/core/event";
-import { eventsInboundSecretEnv } from "../src/config";
+import { INTEGRATION_PUBLIC_ROUTES, integrationRoutes, type Secrets } from "./plane/integrations";
 
 // GitHub cannot hold a dashboard token, so this route authenticates by HMAC
 // instead (src/webhook.ts), and is the one public route reachable from off
@@ -73,6 +73,7 @@ export const PUBLIC_ROUTES: readonly string[] = [
   WEBHOOK_ROUTE,
   EVENTS_ROUTE,
   HEALTH_ROUTE,
+  ...INTEGRATION_PUBLIC_ROUTES,
 ];
 
 const ASSET_TYPES: Record<string, string> = {
@@ -124,7 +125,8 @@ export function createDashboard(
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
   // Read by name on every request; the value is never logged or returned.
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
-
+  const integrations = integrationRoutes({ state, tracker: github, repo, project, store: access.store });
+  const signed: Secrets = { ...integrations.secrets, [WEBHOOK_ROUTE]: webhookSecret, [EVENTS_ROUTE]: eventsSecret };
   const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<ScmPort["listOpenIssues"]>> }>();
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
   const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
@@ -761,6 +763,7 @@ export function createDashboard(
     },
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
     ...commandRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
+    ...integrations.routes,
     {
       method: "GET",
       pattern: /^\/api\/stream$/,
@@ -797,11 +800,8 @@ export function createDashboard(
     const loopback = isLoopback(remoteAddress);
     const route = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
     const isPublic = route !== undefined && (PUBLIC_ROUTES.includes(route.label) || route.public === true);
-
-    // The webhook carries its own HMAC, so GitHub may reach it with no dashboard token set.
-    const signedWebhook =
-      (route?.label === WEBHOOK_ROUTE && webhookSecret() !== "") ||
-      (route?.label === EVENTS_ROUTE && eventsSecret() !== "");
+    // A webhook carries its own signature, so its sender may reach it with no dashboard token set.
+    const signedWebhook = route !== undefined && (signed[route.label]?.() ?? "") !== "";
     if (!loopback && !access.guarded() && !signedWebhook) {
       return json(
         {

@@ -1,0 +1,10 @@
+{
+  "name": "local",
+  "kind": "runtime",
+  "summary": "Runs gates and checks in the worktree on this machine.",
+  "env": [],
+  "enable": "the default",
+  "module": "src/adapters/local/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": true
+}

@@ -1,0 +1,20 @@
+{
+  "name": "plane",
+  "kind": "tracker",
+  "summary": "Plane work items in one project, cloud or self-hosted.",
+  "env": [
+    "PLANE_API_KEY"
+  ],
+  "enable": "`\"tracker\": {\"kind\": \"plane\", \"workspace\": \"...\", \"project\": \"...\", \"tokenEnv\": \"PLANE_API_KEY\"}`",
+  "module": "src/adapters/trackers/plane.ts",
+  "contract": "tests/trackers-plane.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-trackers.test.ts",
+    "env": [
+      "FACTORY_LIVE_PLANE_WORKSPACE",
+      "FACTORY_LIVE_PLANE_PROJECT",
+      "FACTORY_LIVE_PLANE_KEY"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "wrap",
+  "kind": "runtime",
+  "summary": "Runs under any launcher argv, such as a Firecracker or gVisor wrapper.",
+  "env": [],
+  "enable": "`{\"kind\": \"wrap\", \"argv\": [\"...\", \"{cmd}\"]}` in machine.json",
+  "module": "src/adapters/wrap/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false,
+  "live": {
+    "test": "tests/live-runtimes.test.ts",
+    "env": [
+      "FACTORY_LIVE_WRAP_ARGV"
+    ]
+  }
+}

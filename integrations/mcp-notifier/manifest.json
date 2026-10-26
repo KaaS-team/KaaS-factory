@@ -1,0 +1,14 @@
+{
+  "name": "mcp-notifier",
+  "kind": "notifier",
+  "summary": "Calls a tool on an MCP server with each progress note.",
+  "env": [
+    "FACTORY_MCP_NOTIFY_URL",
+    "FACTORY_MCP_NOTIFY_TOOL",
+    "FACTORY_MCP_TOKEN"
+  ],
+  "enable": "set `FACTORY_MCP_NOTIFY_URL` and `FACTORY_MCP_NOTIFY_TOOL` on the watcher",
+  "module": "src/integrations/mcp-client.ts",
+  "contract": "tests/mcp-notifier.test.ts",
+  "default": false
+}

@@ -1,0 +1,10 @@
+{
+  "name": "pool",
+  "kind": "runtime",
+  "summary": "Spreads commands over named runtimes within their minute budgets.",
+  "env": [],
+  "enable": "`{\"kind\": \"pool\", \"members\": [...]}` in machine.json",
+  "module": "src/adapters/pool/execution.ts",
+  "contract": "tests/adapters.test.ts",
+  "default": false
+}

@@ -1,0 +1,14 @@
+{
+  "name": "slack",
+  "kind": "intake",
+  "summary": "Start and steer a task from a Slack assistant thread.",
+  "env": [
+    "SLACK_BOT_TOKEN",
+    "SLACK_SIGNING_SECRET",
+    "FACTORY_SLACK_USERS"
+  ],
+  "enable": "a Slack app with the assistant view; set the keys on the plane and the watcher, with `FACTORY_SLACK_USERS=U01ABC:login` mapping each Slack user to a plane member",
+  "module": "src/integrations/slack.ts",
+  "contract": "tests/slack.test.ts",
+  "default": false
+}
