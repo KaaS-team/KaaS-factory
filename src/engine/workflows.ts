@@ -5,8 +5,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../config";
-import { parseWorkflow, type Workflow, type WorkflowResult } from "../core/workflow";
-import { STEP_TYPES } from "./steps";
+import type { Workflow, WorkflowResult } from "../core/workflow";
+import { parseWorkflowFull } from "../core/workflow-extras";
+import { isWorkflowMd, workflowMdToRaw } from "../core/workflow-md";
+import { ALL_STEP_TYPES } from "./registry";
 
 export const DEFAULT_WORKFLOW = DEFAULT_CONFIG.workflow;
 // What an edge's `if:` may read besides the step ids.
@@ -14,14 +16,24 @@ export const EXPR_ROOTS = ["toggles", "config"] as const;
 
 export const BUNDLED_DIR = join(import.meta.dir, "..", "..", "template", ".factory", "workflows");
 
+// A .md file (frontmatter `stages:`) or a .yml one; either way the result carries the text's sha,
+// which every run's events and receipt pin, so a resume never replays steps of an edited file.
 export function parseWorkflowText(text: string): WorkflowResult {
   let raw: unknown;
-  try {
-    raw = Bun.YAML.parse(text);
-  } catch (e) {
-    return { ok: false, problems: [`not valid YAML: ${(e as Error).message}`] };
-  }
-  return parseWorkflow(raw, STEP_TYPES, EXPR_ROOTS);
+  if (isWorkflowMd(text)) {
+    const md = workflowMdToRaw(text, (s) => Bun.YAML.parse(s));
+    if (!md.ok) return md;
+    raw = md.raw;
+  } else
+    try {
+      raw = Bun.YAML.parse(text);
+    } catch (e) {
+      return { ok: false, problems: [`not valid YAML: ${(e as Error).message}`] };
+    }
+  const parsed = parseWorkflowFull(raw, ALL_STEP_TYPES, EXPR_ROOTS);
+  if (!parsed.ok) return parsed;
+  const sha = new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 12);
+  return { ok: true, workflow: { ...parsed.workflow, sha } };
 }
 
 let bundled: Workflow | undefined;
@@ -51,10 +63,15 @@ export async function loadWorkflow(
 ): Promise<WorkflowResult> {
   if (!/^[\w-]+$/.test(name)) return { ok: false, problems: [`workflow "${name}": letters, digits, - and _ only`] };
   for (const dir of [join(cloneDir, ".factory", "workflows"), BUNDLED_DIR]) {
-    const text = await read(join(dir, `${name}.yml`));
-    if (text !== undefined) return parseWorkflowText(text);
+    for (const ext of [".yml", ".md"]) {
+      const text = await read(join(dir, `${name}${ext}`));
+      if (text !== undefined) return parseWorkflowText(text);
+    }
   }
-  return { ok: false, problems: [`workflow "${name}": no .factory/workflows/${name}.yml in the repo or the runner`] };
+  return {
+    ok: false,
+    problems: [`workflow "${name}": no .factory/workflows/${name}.yml or .md in the repo or the runner`],
+  };
 }
 
 // The workflow a watcher runs for this repo; a broken one stops it at boot with every problem.

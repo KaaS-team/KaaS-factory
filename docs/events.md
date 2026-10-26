@@ -32,6 +32,9 @@ missing from it, or when a factory type is never emitted.
 | `factory.pr.merged` | the PR merges; `by` is `factory`, `operator` (dashboard) or `human` (merged on GitHub, seen on the next poll) |
 | `factory.run.completed` | a run ends, with its outcome |
 | `factory.minion.completed` | a minion finishes, `ok` true or false |
+| `factory.approval.requested` | a step parks for approval; `token` is what resolves it |
+| `factory.approval.resolved` | that `token` is approved or revised (`POST /api/approvals/:token` on the dashboard) |
+| `factory.workflow.emitted` | a run of a workflow with `emit:` ships; workflows whose `on: emitted:` lists the name file an issue |
 
 Other apps' types, the only ones `POST /events` accepts: `tasks.task.ready`, `tasks.task.updated`,
 `wiki.page.updated`, `wiki.question.unanswered`, `decisions.decision.proposed`,

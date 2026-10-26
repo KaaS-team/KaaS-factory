@@ -16,7 +16,7 @@ import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
-import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
+import { deriveIssueState, parkWindowStart } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
@@ -39,10 +39,11 @@ import {
   withDataMarker,
 } from "./engine/common";
 import { parkEdgeOf, runWorkflow } from "./engine/runner";
-import { STEP_TYPES } from "./engine/steps";
+import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { defaultWorkflow } from "./engine/workflows";
 
-import { fireCron, fireEvent } from "./engine/triggers";
+import { cronStore, fireCron, fireEvent } from "./engine/triggers";
+import { recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
@@ -65,15 +66,6 @@ function workflowOf(deps: WatchDeps, issue?: GhIssue): Workflow {
   return (chosen && deps.routeWorkflows?.[chosen]) || deps.workflow || defaultWorkflow();
 }
 
-// The first choice a trusted comment recorded. Anyone can paste a marker into a comment, so an
-// outsider's is ignored, and a later one never switches an issue (say, off a workflow that parks
-// every plan) mid-run.
-function recordedWorkflow(issue: GhIssue): string | undefined {
-  const marker = parseDataMarkers(issue.comments.filter(isTrusted)).find((m) => m.stage === WORKFLOW_MARKER);
-  return (marker?.json as { name?: string } | undefined)?.name;
-}
-
-const WORKFLOW_MARKER = "workflow";
 
 // An issue a route's trigger filed runs that workflow, not the repo's, so pickup reads it back (recordedWorkflow).
 async function recordTriggered(deps: WatchDeps, config: FactoryConfig, n: number, workflow: Workflow, via: string) {
@@ -595,7 +587,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const intakeGated = autoStart && !stopIf && !budgetPaused;
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {
-    const filed = await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch(
+    const filed = await fireCron(deps.github, cronStore(deps), config.repo, workflow, deps.now?.() ?? new Date()).catch(
       (err) => (console.error("factory watch: cron trigger failed", err), [] as number[]),
     );
     for (const n of filed) await recordTriggered(deps, config, n, workflow, "on: cron:");

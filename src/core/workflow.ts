@@ -36,6 +36,13 @@ export interface Step {
   readonly mcp?: readonly string[];
   // A `check` step's runtime by name, over config.runtime.check.
   readonly runtime?: string;
+  // Set by workflow-extras.ts: the agent and timeout an agent step runs with, a check or tool
+  // step's extra attempts, and a tool step's `server/tool` and its arguments.
+  readonly agent?: string;
+  readonly timeoutMinutes?: number;
+  readonly retries?: number;
+  readonly tool?: string;
+  readonly with?: Readonly<Record<string, unknown>>;
 }
 
 // `on: cron:` files an issue labelled factory:ready on a schedule, which the
@@ -50,7 +57,15 @@ export interface CronTrigger {
 export interface Workflow {
   readonly name: string;
   // `on: event:` files an issue the same way when one of these event types arrives (docs/events.md).
-  readonly triggers: { readonly cron: readonly CronTrigger[]; readonly event: readonly string[] };
+  readonly triggers: {
+    readonly cron: readonly CronTrigger[];
+    readonly event: readonly string[];
+    // `on: emitted:`: another workflow's `emit:` name files an issue for this one.
+    readonly emitted?: readonly string[];
+  };
+  // The name a shipped run announces (factory.workflow.emitted), and the file's sha, pinned into every run.
+  readonly emit?: string;
+  readonly sha?: string;
   readonly limits: { readonly questions: number; readonly rejects: number };
   readonly start: string;
   readonly steps: Readonly<Record<string, Step>>;
@@ -66,6 +81,8 @@ export interface StepKind {
   readonly command?: boolean;
   // Runs an agent, so it may name `mcp:` servers.
   readonly agent?: boolean;
+  // Calls one MCP tool with no agent, so it needs `tool:`.
+  readonly tool?: boolean;
 }
 
 const STEP_KEYS = new Set(["uses", "label", "next", "reject", "revise", "run", "mcp", "runtime"]);
@@ -347,6 +364,15 @@ function reachable(steps: Readonly<Record<string, Step>>, start: string): Set<st
   while (queue.length)
     for (const [, t] of targets(steps[queue.shift()!]!)) if (!seen.has(t)) seen.add(t), queue.push(t);
   return seen;
+}
+
+// What an agent step hands runStage: its MCP servers, and the agent and timeout a workflow pinned.
+export function stepOpts(step: Step): { mcp?: readonly string[]; agent?: string; timeoutMinutes?: number } {
+  return {
+    mcp: step.mcp,
+    ...(step.agent ? { agent: step.agent } : {}),
+    ...(step.timeoutMinutes ? { timeoutMinutes: step.timeoutMinutes } : {}),
+  };
 }
 
 // The step holding `label`, if any: how a resumed issue finds where it is.

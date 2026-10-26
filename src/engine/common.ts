@@ -325,7 +325,7 @@ export async function runStage(
   issue: GhIssue,
   stage: StageName,
   worktree: string,
-  extra: Pick<StageRunOptions, "resume" | "rejects"> & { readonly mcp?: readonly string[] } = {},
+  extra: Omit<Partial<StageRunOptions>, "mcp"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
   // Read from the clone of the base branch, never the worktree: an earlier step's agent can write

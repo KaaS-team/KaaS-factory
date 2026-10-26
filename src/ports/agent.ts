@@ -54,8 +54,8 @@ export interface StageRunOptions {
   readonly resume?: { readonly sessionId: string; readonly failure: string };
   // The MCP servers this run starts with, in .mcp.json's server shape. Absent: none.
   readonly mcp?: Readonly<Record<string, unknown>>;
-  // A minion's whole prompt (src/engine/minion.ts), in place of the stage skill and the
-  // context pack; with it, `agent` names the agent directly instead of the stage routing.
+  // A minion's whole prompt (src/engine/minion.ts), in place of the stage skill and the context
+  // pack. `agent` (a minion's, or a workflow step's `agent:`) names the agent over the stage routing.
   readonly prompt?: string;
   // The issue's risk and size once triage or plan has judged them; picks the agent's model tier.
   readonly scope?: IssueScope;

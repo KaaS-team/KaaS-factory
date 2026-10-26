@@ -41,7 +41,7 @@ import {
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
-import type { Step, StepKind, Workflow } from "../core/workflow";
+import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
 import {
   failureTail,
@@ -119,7 +119,7 @@ const triage: StepType = {
       finish(deps, config, issueNumber, "needs-human", `open PR #${taken.number} already closes this issue`);
       return stop("needs-human");
     }
-    const result = await runStage(deps, config, issue, "triage", worktree, { mcp: step.mcp });
+    const result = await runStage(deps, config, issue, "triage", worktree, stepOpts(step));
     const art = await readStageArtifacts(worktree, issueNumber, "triage");
     const { json, problem } = stageJson<TriageArtifact>("triage", art.json, typesFor(config.routes));
     if (result.exitCode !== 0 || !json) {
@@ -151,7 +151,7 @@ const plan: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
-    const result = await runStage(deps, config, issue, "plan", worktree, { mcp: step.mcp });
+    const result = await runStage(deps, config, issue, "plan", worktree, stepOpts(step));
     const art = await readStageArtifacts(worktree, issueNumber, "plan");
     const { json, problem } = stageJson<PlanArtifact>("plan", art.json);
     // A plan stage that crashes (or writes nothing) used to fall through
@@ -196,7 +196,7 @@ const build: StepType = {
     const result = await runStage(deps, config, issue, "build", worktree, {
       ...rebuildFrom(sc),
       ...(sc.ctx.rejectRound ? { rejects: sc.ctx.rejectRound } : {}),
-      mcp: step.mcp,
+      ...stepOpts(step),
     });
     const art = await readStageArtifacts(worktree, issueNumber, "build");
     const built = stageJson<BuildArtifact>("build", art.json);
@@ -374,7 +374,7 @@ const verify: StepType = {
       }
       return { kind: "reject" };
     }
-    const result = await runStage(deps, config, issue, "verify", worktree, { mcp: step.mcp });
+    const result = await runStage(deps, config, issue, "verify", worktree, stepOpts(step));
     const art = await readStageArtifacts(worktree, issueNumber, "verify");
     const checked = art.json === undefined ? undefined : validateVerdict(art.json);
     let json = checked?.ok ? { ...checked.verdict, rounds: ctx.rejectRound + 1 } : undefined;
@@ -445,7 +445,7 @@ const pr: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, ctx } = sc;
     const issueNumber = issue.number;
-    await runStage(deps, config, issue, "pr", worktree, { mcp: sc.step.mcp });
+    await runStage(deps, config, issue, "pr", worktree, stepOpts(sc.step));
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
     // A revise from in-review re-enters here with the PR already open;
     // the push in build already updated its branch.

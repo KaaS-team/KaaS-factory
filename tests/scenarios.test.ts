@@ -178,7 +178,14 @@ describe("approval paths", () => {
     c.push("plan", plan("medium"));
     expect(await c.step()).toBe("awaiting-approval");
     expect(parked).toEqual([
-      { repo: "acme/widgets", issue: 1, workflow: "feature-to-pr", step: "plan", outcome: "awaiting-approval" },
+      {
+        repo: "acme/widgets",
+        issue: 1,
+        workflow: "feature-to-pr",
+        sha: expect.any(String),
+        step: "plan",
+        outcome: "awaiting-approval",
+      },
     ]);
     done(c);
   });

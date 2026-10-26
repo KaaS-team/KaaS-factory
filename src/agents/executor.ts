@@ -156,10 +156,9 @@ export class CommandExecutor implements Executor {
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
-    const agent =
-      opts.prompt !== undefined && opts.agent
-        ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts);
+    const agent = opts.agent
+      ? resolveAgentByName(this.agents, opts.agent, opts.stage)
+      : withTier(resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type), opts);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)
