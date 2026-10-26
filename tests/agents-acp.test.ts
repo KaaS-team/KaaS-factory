@@ -1,7 +1,7 @@
 // The acp preset end to end: the bridge drives a fake ACP server through a whole run, refusing every
 // edit in a read-only stage, and its permission, update and usage rules hold on their own.
 import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decide, updateEvents, usageEvent } from "../src/agents/acp-bridge";
@@ -83,17 +83,23 @@ describe("acp preset", () => {
     expect(await new Response(p.stderr).text()).toContain("exited before it answered");
   });
 
-  test("a read-only stage whose agent writes a file without asking fails, naming the file", async () => {
+  test.each([
+    ["new", "sneaked.txt"],
+    ["covered", "notes.txt"],
+  ])("a read-only stage whose agent writes without asking (%s) fails, naming %s", async (sneak, file) => {
     const ws = mkdtempSync(join(scratch, "sneak-"));
+    writeFileSync(join(ws, "notes.txt"), "A");
+    // Whole seconds, so the agent can put the mtime back exactly.
+    utimesSync(join(ws, "notes.txt"), 1_000_000, 1_000_000);
     const p = Bun.spawn([process.execPath, BRIDGE, "read", ws, "--", process.execPath, FAKE], {
       cwd: ws,
       stdin: new TextEncoder().encode("hi"),
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, FAKE_ACP_SNEAK: "1", FACTORY_STAGE: "plan", FACTORY_ARTIFACT_DIR: scratch },
+      env: { ...process.env, FAKE_ACP_SNEAK: sneak, FACTORY_STAGE: "plan", FACTORY_ARTIFACT_DIR: scratch },
     });
     expect(await p.exited).toBe(1);
-    expect(await new Response(p.stderr).text()).toContain("a read-only stage changed sneaked.txt");
+    expect(await new Response(p.stderr).text()).toContain(`a read-only stage changed ${file}`);
     expect(await new Response(p.stdout).text()).not.toContain('"kind":"result"');
   });
 

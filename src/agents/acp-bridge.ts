@@ -3,7 +3,8 @@
 // <agent argv>`, prompt on stdin. Notes on the protocol: docs/agent-research/acp/protocol.md.
 
 import { spawn } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { lstatSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { StageEvent } from "../executor";
@@ -68,17 +69,20 @@ export function usageEvent(usage: Record<string, unknown> | undefined): StageEve
 }
 
 // Tool kinds are the agent's own claim, so a read-only stage also checks that no file in the
-// worktree moved. node_modules is skipped: walking it twice per stage costs more than it guards.
-export function treeStamp(root: string, rel = ""): Map<string, string> {
+// worktree changed: by content hash, since size and mtime can be put back. Under node_modules,
+// too big to hash twice per stage, size, mode and change time count (ctime cannot be set back).
+export function treeStamp(root: string, rel = "", deps = false): Map<string, string> {
   const stamp = new Map<string, string>();
   for (const e of readdirSync(join(root, rel), { withFileTypes: true })) {
     const p = rel ? `${rel}/${e.name}` : e.name;
+    const full = join(root, p);
     if (e.isDirectory()) {
-      if (e.name !== "node_modules") for (const [k, v] of treeStamp(root, p)) stamp.set(k, v);
-    } else {
-      const s = statSync(join(root, p), { throwIfNoEntry: false });
-      stamp.set(p, s ? `${s.size}:${s.mtimeMs}` : "gone");
-    }
+      for (const [k, v] of treeStamp(root, p, deps || e.name === "node_modules")) stamp.set(k, v);
+    } else if (e.isSymbolicLink()) stamp.set(p, `link:${readlinkSync(full)}`);
+    else if (deps) {
+      const s = lstatSync(full);
+      stamp.set(p, `${s.size}:${s.mode}:${s.ctimeMs}`);
+    } else stamp.set(p, createHash("sha256").update(readFileSync(full)).digest("hex"));
   }
   return stamp;
 }
@@ -91,7 +95,15 @@ export function changedPaths(before: Map<string, string>, after: Map<string, str
 export async function runBridge(write: boolean, cwd: string, argv: string[], prompt: string): Promise<number> {
   const out = (e: StageEvent) => process.stdout.write(`${JSON.stringify(e)}\n`);
   const before = write ? undefined : treeStamp(cwd);
-  const child = spawn(argv[0]!, argv.slice(1), { cwd, stdio: ["pipe", "pipe", "inherit"] });
+  // Its own process group, so the agent and anything it started stop before the second stamp.
+  const child = spawn(argv[0]!, argv.slice(1), { cwd, stdio: ["pipe", "pipe", "inherit"], detached: true });
+  const stop = () => {
+    try {
+      process.kill(-child.pid!, "SIGKILL");
+    } catch {
+      child.kill("SIGKILL");
+    }
+  };
   const pending = new Map<number, { resolve: (v: Rpc["result"]) => void; reject: (e: Error) => void }>();
   let next = 0;
   const send = (msg: object) => child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...msg })}\n`);
@@ -148,7 +160,8 @@ export async function runBridge(write: boolean, cwd: string, argv: string[], pro
     const res = await call("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] });
     out(usageEvent(res?.usage));
     child.stdin.end();
-    child.kill();
+    stop();
+    await exited;
     const moved = before ? changedPaths(before, treeStamp(cwd)) : [];
     if (moved.length) {
       process.stderr.write(`acp: a read-only stage changed ${moved.slice(0, 5).join(", ")}\n`);
@@ -158,7 +171,7 @@ export async function runBridge(write: boolean, cwd: string, argv: string[], pro
     return res?.stopReason === "end_turn" ? 0 : 1;
   } catch (err) {
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
-    child.kill();
+    stop();
     await exited;
     return 1;
   }

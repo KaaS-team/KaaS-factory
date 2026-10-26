@@ -217,6 +217,9 @@ describe("the executor applies the env allow-list", () => {
     const machine = { runtimes: { box: { kind: "pool", members: [{ kind: "http", tokenEnv: "SANDBOX_TOKEN" }] } } };
     const names = tokenEnvNames(config, machine);
     expect(names.sort()).toEqual(["LINEAR_API_KEY", "SANDBOX_TOKEN"]);
+    expect(
+      tokenEnvNames({ events: { inboundSecretEnv: "HOOK_SECRET" }, x: { apiKeyEnv: "K", tokenEnvs: "no" } }).sort(),
+    ).toEqual(["HOOK_SECRET", "K"]);
     const cwd = realpathSync(mkdtempSync(join(tmpdir(), "factory-tokenenv-")));
     Bun.spawnSync(["git", "init", "-q"], { cwd });
     mkdirSync(join(cwd, ".claude/skills/factory-plan"), { recursive: true });

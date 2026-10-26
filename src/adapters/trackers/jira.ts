@@ -3,7 +3,17 @@
 // developer.atlassian.com; tests/trackers-jira.test.ts runs the contract against a fixture of it.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, IdMap, keyNumber, memoOnce, VendorClient, VendorHttpError } from "./kit";
+import {
+  association,
+  decodeBody,
+  encodeBody,
+  IdMap,
+  keyNumber,
+  memoOnce,
+  type Seal,
+  VendorClient,
+  VendorHttpError,
+} from "./kit";
 
 export interface JiraSpec {
   readonly kind: "jira";
@@ -45,6 +55,7 @@ export function jiraAuth(token: string): Record<string, string> {
 
 export class JiraTracker implements TrackerPort {
   private readonly client: VendorClient;
+  private readonly seal: Seal = (s) => this.client.seal(s);
   private readonly comments = new IdMap();
   // Each comment's issue key, since Jira's comment routes sit under the issue.
   private readonly commentKey = new Map<string, string>();
@@ -103,7 +114,7 @@ export class JiraTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author: c.author.accountId,
         authorAssociation: association(await this.roleOf("", c.author.accountId)),
-        body: decodeBody(c.body, c.author.accountId === self),
+        body: decodeBody(c.body, c.author.accountId === self, this.seal),
         createdAt: new Date(c.created).toISOString(),
       });
     }
@@ -113,7 +124,7 @@ export class JiraTracker implements TrackerPort {
     return {
       number: keyNumber(raw.key),
       title: f.summary,
-      body: decodeBody(f.description ?? "", f.creator?.accountId === self),
+      body: decodeBody(f.description ?? "", f.creator?.accountId === self, this.seal),
       labels: f.labels.map((name) => ({ name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -169,7 +180,7 @@ export class JiraTracker implements TrackerPort {
   async commentIssue(_repo: string, n: number, body: string): Promise<number> {
     const key = this.key(n);
     const c = await this.client.request<{ id: string }>("POST", `/rest/api/2/issue/${key}/comment`, {
-      body: { body: encodeBody(body) },
+      body: { body: encodeBody(body, this.seal) },
     });
     this.commentKey.set(c.id, key);
     return this.comments.number(c.id);
@@ -180,7 +191,7 @@ export class JiraTracker implements TrackerPort {
     const key = vendorId && this.commentKey.get(vendorId);
     if (!vendorId || !key) throw new Error(`jira: no comment ${id} on an open issue`);
     await this.client.request("PUT", `/rest/api/2/issue/${key}/comment/${vendorId}`, {
-      body: { body: encodeBody(body) },
+      body: { body: encodeBody(body, this.seal) },
     });
   }
   addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
@@ -205,7 +216,7 @@ export class JiraTracker implements TrackerPort {
           project: { key: this.spec.project },
           issuetype: { name: this.spec.issueType ?? "Task" },
           summary: title,
-          description: encodeBody(body),
+          description: encodeBody(body, this.seal),
           labels,
         },
       },

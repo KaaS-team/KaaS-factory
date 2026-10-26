@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createHmac } from "node:crypto";
 import {
   association,
   decodeBody,
@@ -9,6 +10,8 @@ import {
   workspaceRole,
 } from "../src/adapters/trackers/kit";
 
+// The runner's seal; adapters key it with the tracker token.
+const seal = (s: string) => createHmac("sha256", "tracker-token").update(s).digest("hex").slice(0, 32);
 const stripComments = (s: string) => s.replace(/<!--[\s\S]*?-->/g, "");
 
 describe("marker footer codec", () => {
@@ -16,37 +19,52 @@ describe("marker footer codec", () => {
     '<!-- factory:plan v1 rev=2 -->\nThe plan\n\n<!-- factory:data v1 -->\n```json\n{"a": 1}\n```\nnaïve ✓\n';
 
   test("a body round-trips byte for byte through a tracker that drops HTML comments", () => {
-    const stored = stripComments(encodeBody(body));
+    const stored = stripComments(encodeBody(body, seal));
     expect(stored).not.toContain("<!--");
     expect(stored.startsWith("The plan")).toBe(true);
-    expect(decodeBody(stored, true)).toBe(body);
+    expect(decodeBody(stored, true, seal)).toBe(body);
   });
 
   test("a tracker that re-renders the markdown or escapes the footer still decodes", () => {
-    const stored = encodeBody(body)
+    const stored = encodeBody(body, seal)
       .replace("The plan", "The *plan*")
       .replace(/_/g, "\\_")
       .replace(/factory-data: (.)/, "factory-data: \\$1");
-    expect(decodeBody(stored, true)).toBe(body);
+    expect(decodeBody(stored, true, seal)).toBe(body);
   });
 
   test("a body with no marker is sent as is, and plain text decodes to itself", () => {
-    expect(encodeBody("just text")).toBe("just text");
-    expect(decodeBody("just text\n", true)).toBe("just text\n");
+    expect(encodeBody("just text", seal)).toBe("just text");
+    expect(decodeBody("just text\n", true, seal)).toBe("just text\n");
   });
 
   test("a human edit above the footer wins over the stale copy, without the footer line", () => {
-    const stored = encodeBody(body).replace("The plan", "A different plan");
-    expect(decodeBody(stored, true)).toBe(stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd());
+    const stored = encodeBody(body, seal).replace("The plan", "A different plan");
+    expect(decodeBody(stored, true, seal)).toBe(stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd());
   });
 
   test("a footer that is not ours is left alone", () => {
-    expect(decodeBody("x\n\nfactory-data: not!base64", true)).toBe("x\n\nfactory-data: not!base64");
+    expect(decodeBody("x\n\nfactory-data: not!base64", true, seal)).toBe("x\n\nfactory-data: not!base64");
+  });
+
+  test("a footer sealed with another key reads as its visible text, even on the runner's own content", () => {
+    const other = (s: string) => createHmac("sha256", "not-the-token").update(s).digest("hex").slice(0, 32);
+    const forged = encodeBody(body, other);
+    expect(decodeBody(forged, true, seal)).toBe(forged.slice(0, forged.lastIndexOf("factory-data: ")).trimEnd());
   });
 
   test("a valid footer someone else wrote stays as written, so an outsider cannot hide text", () => {
-    const stored = encodeBody(body);
-    expect(decodeBody(stored, false)).toBe(stored);
+    const stored = encodeBody(body, seal);
+    expect(decodeBody(stored, false, seal)).toBe(stored);
+  });
+});
+
+describe("the footer seal", () => {
+  test("is keyed by the tracker token, so a different token gives a different seal", () => {
+    const client = (token: string) => new VendorClient("x", "http://x", "T", () => ({}), { T: token });
+    expect(client("a").seal("body")).toBe(client("a").seal("body"));
+    expect(client("a").seal("body")).not.toBe(client("b").seal("body"));
+    expect(() => client("").seal("body")).toThrow("env var T is not set");
   });
 });
 

@@ -3,7 +3,16 @@
 // closed unless labelTrust opts in. Modeled on developer.clickup.com; tests/trackers-clickup.test.ts.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, memoOnce, VendorClient, VendorHttpError, workspaceRole } from "./kit";
+import {
+  association,
+  decodeBody,
+  encodeBody,
+  memoOnce,
+  type Seal,
+  VendorClient,
+  VendorHttpError,
+  workspaceRole,
+} from "./kit";
 
 export interface ClickUpSpec {
   readonly kind: "clickup";
@@ -40,6 +49,7 @@ export function taskNumber(id: string): number {
 
 export class ClickUpTracker implements TrackerPort {
   private readonly client: VendorClient;
+  private readonly seal: Seal = (s) => this.client.seal(s);
   private readonly seen = new Set<number>();
   private listCache?: Promise<{ space: string; statuses: { status: string; type: string }[] }>;
 
@@ -105,7 +115,7 @@ export class ClickUpTracker implements TrackerPort {
         id: this.saw(commentNumber(c.id)),
         author,
         authorAssociation: association(await this.roleOf("", author)),
-        body: decodeBody(c.comment_text, author === self),
+        body: decodeBody(c.comment_text, author === self, this.seal),
         createdAt: new Date(Number(c.date)).toISOString(),
       });
     }
@@ -114,7 +124,7 @@ export class ClickUpTracker implements TrackerPort {
     return {
       number: taskNumber(raw.id),
       title: raw.name,
-      body: decodeBody(raw.markdown_description ?? raw.description ?? "", String(raw.creator?.id) === self),
+      body: decodeBody(raw.markdown_description ?? raw.description ?? "", String(raw.creator?.id) === self, this.seal),
       labels: raw.tags.map((t) => ({ name: t.name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -171,7 +181,7 @@ export class ClickUpTracker implements TrackerPort {
       "POST",
       `/api/v2/task/${await this.scoped(n)}/comment`,
       {
-        body: { comment_text: encodeBody(body), notify_all: false },
+        body: { comment_text: encodeBody(body, this.seal), notify_all: false },
       },
     );
     return this.saw(commentNumber(String(c.id)));
@@ -180,7 +190,7 @@ export class ClickUpTracker implements TrackerPort {
   async editComment(_repo: string, id: number, body: string): Promise<void> {
     if (!this.seen.has(id)) await this.listOpenIssues();
     if (!this.seen.has(id)) throw new Error(`clickup: no comment ${id} on an open task in list ${this.spec.list}`);
-    await this.client.request("PUT", `/api/v2/comment/${id}`, { body: { comment_text: encodeBody(body) } });
+    await this.client.request("PUT", `/api/v2/comment/${id}`, { body: { comment_text: encodeBody(body, this.seal) } });
   }
   async addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
     const id = await this.scoped(n);
@@ -215,7 +225,7 @@ export class ClickUpTracker implements TrackerPort {
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     await this.ensureTags(labels);
     const t = await this.client.request<{ id: string }>("POST", `/api/v2/list/${this.spec.list}/task`, {
-      body: { name: title, markdown_content: encodeBody(body), tags: labels },
+      body: { name: title, markdown_content: encodeBody(body, this.seal), tags: labels },
     });
     return taskNumber(t.id);
   }

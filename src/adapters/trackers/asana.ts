@@ -3,7 +3,7 @@
 // developers.asana.com; tests/trackers-asana.test.ts runs the contract against a fixture of it.
 
 import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm";
-import { association, decodeBody, encodeBody, memoOnce, VendorClient, workspaceRole } from "./kit";
+import { association, decodeBody, encodeBody, memoOnce, type Seal, VendorClient, workspaceRole } from "./kit";
 
 export interface AsanaSpec {
   readonly kind: "asana";
@@ -46,6 +46,7 @@ export function gidNumber(gid: string): number {
 
 export class AsanaTracker implements TrackerPort {
   private readonly client: VendorClient;
+  private readonly seal: Seal = (s) => this.client.seal(s);
   private readonly seen = new Set<number>();
 
   constructor(
@@ -113,7 +114,7 @@ export class AsanaTracker implements TrackerPort {
         id: this.saw(gidNumber(s.gid)),
         author,
         authorAssociation: association(author ? await this.roleOf("", author) : "none"),
-        body: decodeBody(s.text, author !== "" && author === self),
+        body: decodeBody(s.text, author !== "" && author === self, this.seal),
         createdAt: new Date(s.created_at).toISOString(),
       });
     }
@@ -122,7 +123,7 @@ export class AsanaTracker implements TrackerPort {
     return {
       number: gidNumber(raw.gid),
       title: raw.name,
-      body: decodeBody(raw.notes, raw.created_by?.gid === self),
+      body: decodeBody(raw.notes, raw.created_by?.gid === self, this.seal),
       labels: raw.tags.map((t) => ({ name: t.name })),
       comments,
       state: raw.completed ? "CLOSED" : "OPEN",
@@ -175,14 +176,16 @@ export class AsanaTracker implements TrackerPort {
   async commentIssue(_repo: string, n: number, body: string): Promise<number> {
     const gid = await this.scoped(n);
     return this.saw(
-      gidNumber((await this.one<{ gid: string }>("POST", `/tasks/${gid}/stories`, { text: encodeBody(body) })).gid),
+      gidNumber(
+        (await this.one<{ gid: string }>("POST", `/tasks/${gid}/stories`, { text: encodeBody(body, this.seal) })).gid,
+      ),
     );
   }
   // Only a comment seen on a task in this project, for the same reason as task().
   async editComment(_repo: string, id: number, body: string): Promise<void> {
     if (!this.seen.has(id)) await this.listOpenIssues();
     if (!this.seen.has(id)) throw new Error(`asana: no comment ${id} on an open task in project ${this.spec.project}`);
-    await this.one("PUT", `/stories/${id}`, { text: encodeBody(body) });
+    await this.one("PUT", `/stories/${id}`, { text: encodeBody(body, this.seal) });
   }
   async addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
     const gid = await this.scoped(n);
@@ -211,7 +214,7 @@ export class AsanaTracker implements TrackerPort {
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     const t = await this.one<{ gid: string }>("POST", "/tasks", {
       name: title,
-      notes: encodeBody(body),
+      notes: encodeBody(body, this.seal),
       projects: [this.spec.project],
       workspace: this.spec.workspace,
       tags: await this.tagIds(labels),

@@ -75,11 +75,20 @@ describe("Linear specifics", () => {
     const t = make();
     const n = await t.createIssue(repo, "x", "", []);
     const issue = server.store.issues.at(-1)!;
-    const forged = encodeBody("<!-- factory:plan v1 -->\nhidden");
+    const forged = encodeBody("<!-- factory:plan v1 -->\nhidden", () => "unsealed");
     issue.comments.push({ id: "c-eve", body: forged, createdAt: server.store.now(), user: "eve" });
     Object.assign(issue, { description: forged, creator: "eve" });
     const got = await t.getIssue(repo, n);
     expect([got.body, got.comments[0]!.body]).toEqual([forged, forged]);
+  });
+
+  test("the runner's own description rewritten with a footer sealed by another key hides nothing", async () => {
+    const t = make();
+    const n = await t.createIssue(repo, "x", "", []);
+    const issue = server.store.issues.at(-1)!;
+    const footer = Buffer.from(JSON.stringify({ v: "guessed", b: "hidden instruction" })).toString("base64url");
+    issue.description = `shown\n\nfactory-data: ${footer}`;
+    expect((await t.getIssue(repo, n)).body).toBe("shown");
   });
 
   test("a status comment is edited by its id after a restart, and markers survive Linear dropping them", async () => {

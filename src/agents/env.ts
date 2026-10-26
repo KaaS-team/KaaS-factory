@@ -74,15 +74,16 @@ export function isProviderCredential(key: string): boolean {
   );
 }
 
-// Every env var a config names as a `tokenEnv` (tracker, runtimes, pool members): the runner's
-// keys, which no agent may read. Walked, not listed, so a new adapter's key is dropped too.
+// Every env var a config names in a `tokenEnv`, `inboundSecretEnv` or other `...SecretEnv`/`...KeyEnv`
+// key (tracker, runtimes, pool members, events): the runner's keys, which no agent may read. Walked,
+// not listed, so a new adapter's key is dropped too.
 export function tokenEnvNames(...configs: unknown[]): string[] {
   const names = new Set<string>();
   const walk = (v: unknown): void => {
     if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === "object")
       for (const [k, x] of Object.entries(v)) {
-        if (k === "tokenEnv" && typeof x === "string") names.add(x);
+        if (/(token|secret|key)Env$/i.test(k) && typeof x === "string") names.add(x);
         else walk(x);
       }
   };

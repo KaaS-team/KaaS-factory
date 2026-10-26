@@ -9,6 +9,7 @@ import {
   encodeBody,
   IdMap,
   memoOnce,
+  type Seal,
   VendorClient,
   VendorHttpError,
   workspaceRole,
@@ -76,6 +77,7 @@ interface Label {
 
 export class LinearTracker implements TrackerPort {
   private readonly client: VendorClient;
+  private readonly seal: Seal = (s) => this.client.seal(s);
   private readonly comments = new IdMap();
   private teamCache?: Promise<{ id: string; done: string; open: string }>;
 
@@ -129,7 +131,7 @@ export class LinearTracker implements TrackerPort {
         id: this.comments.number(c.id),
         author,
         authorAssociation: association(author ? await this.roleOf("", author) : "none"),
-        body: decodeBody(c.body, author === self),
+        body: decodeBody(c.body, author === self, this.seal),
         createdAt: c.createdAt,
       });
     }
@@ -138,7 +140,7 @@ export class LinearTracker implements TrackerPort {
     return {
       number: raw.number,
       title: raw.title,
-      body: decodeBody(raw.description ?? "", raw.creator?.id === self),
+      body: decodeBody(raw.description ?? "", raw.creator?.id === self, this.seal),
       labels: raw.labels.nodes.map((l) => ({ name: l.name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -221,7 +223,7 @@ export class LinearTracker implements TrackerPort {
   }
   async commentIssue(_repo: string, n: number, body: string): Promise<number> {
     const d = await this.gql<{ commentCreate: { comment: Node } }>(Q.commentCreate, {
-      input: { issueId: (await this.raw(n)).id, body: encodeBody(body) },
+      input: { issueId: (await this.raw(n)).id, body: encodeBody(body, this.seal) },
     });
     return this.comments.number(d.commentCreate.comment.id);
   }
@@ -229,7 +231,7 @@ export class LinearTracker implements TrackerPort {
     if (!this.comments.vendorId(id)) await this.listOpenIssues();
     const vendorId = this.comments.vendorId(id);
     if (!vendorId) throw new Error(`linear: no comment ${id} on an open issue of ${this.spec.team}`);
-    await this.gql(Q.commentUpdate, { id: vendorId, input: { body: encodeBody(body) } });
+    await this.gql(Q.commentUpdate, { id: vendorId, input: { body: encodeBody(body, this.seal) } });
   }
   addLabels(_repo: string, n: number, labels: string[]): Promise<void> {
     return this.labels(n, labels, []);
@@ -256,7 +258,7 @@ export class LinearTracker implements TrackerPort {
       input: {
         teamId: (await this.team()).id,
         title,
-        description: encodeBody(body),
+        description: encodeBody(body, this.seal),
         labelIds: await this.labelIds(labels),
       },
     });

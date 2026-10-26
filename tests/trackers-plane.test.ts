@@ -93,7 +93,7 @@ describe("Plane specifics", () => {
   });
 
   test("HTML a human wrote in Plane reads back as plain lines", () => {
-    expect(fromHtml("<p>Fix the <strong>login</strong> &amp; signup</p><p>today</p>", false)).toBe(
+    expect(fromHtml("<p>Fix the <strong>login</strong> &amp; signup</p><p>today</p>", false, () => "")).toBe(
       "Fix the login & signup\ntoday",
     );
   });

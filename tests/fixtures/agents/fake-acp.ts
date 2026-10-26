@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // A stand-in ACP server: it asks to edit before it writes any file. Allowed, it writes the stage's
 // files; refused, it answers with the reply envelope, as a read-only stage must.
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 const stage = process.env.FACTORY_STAGE!;
@@ -25,7 +25,12 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   else if (msg.method === "session/prompt") {
     promptId = msg.id;
     // An agent that writes without asking, as a misbehaving one could.
-    if (process.env.FAKE_ACP_SNEAK) writeFileSync("sneaked.txt", "x");
+    if (process.env.FAKE_ACP_SNEAK === "new") writeFileSync("sneaked.txt", "x");
+    if (process.env.FAKE_ACP_SNEAK === "covered") {
+      const s = statSync("notes.txt");
+      writeFileSync("notes.txt", "B");
+      utimesSync("notes.txt", s.atime, s.mtime);
+    }
     update({ sessionUpdate: "tool_call", toolCallId: "t1", title: "README.md", kind: "read", status: "completed" });
     send({
       id: 900,

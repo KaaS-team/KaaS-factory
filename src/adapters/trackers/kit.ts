@@ -2,7 +2,7 @@
 // call, a codec that keeps the runner's <!-- factory --> markers through trackers that strip HTML
 // comments, and the numeric ids the TrackerPort speaks. Why: docs/decisions/native-trackers.md.
 
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { RepoRole } from "../../ports/scm";
 
 export interface VendorSpec {
@@ -34,6 +34,14 @@ export class VendorClient {
     private readonly env: Readonly<Record<string, string | undefined>> = process.env,
   ) {}
 
+  // A footer seal keyed by the tracker token, which every machine on this tracker holds and no
+  // outsider does. Rotating the token unseals old footers: they then read as their visible text.
+  seal(s: string): string {
+    const token = this.env[this.tokenEnv];
+    if (!token) throw new VendorHttpError(`${this.vendor}: env var ${this.tokenEnv} is not set`, 0);
+    return createHmac("sha256", token).update(s).digest("hex").slice(0, 32);
+  }
+
   async request<T>(method: string, path: string, opts: VendorRequest = {}): Promise<T> {
     const token = this.env[this.tokenEnv];
     if (!token) throw new VendorHttpError(`${this.vendor}: env var ${this.tokenEnv} is not set`, 0);
@@ -61,21 +69,22 @@ export class VendorClient {
 const FOOTER = "factory-data: ";
 // Only letters and digits count, so a tracker that re-renders markdown (escapes, bullets) still matches.
 const norm = (s: string) => s.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
-const digest = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
+export type Seal = (s: string) => string;
+const sealed = (seal: Seal, visible: string, body: string) => seal(JSON.stringify([norm(visible), body]));
 
 // Bodies with a marker carry the original in a last visible line, since Linear, Plane, Jira, ClickUp and
 // Asana may each drop an HTML comment. The visible text stays readable for the humans in the tracker.
-export function encodeBody(body: string): string {
+export function encodeBody(body: string, seal: Seal): string {
   if (!body.includes("<!--")) return body;
   const visible = body.replace(/<!--[\s\S]*?-->\n?/g, "").trimEnd();
-  const data = Buffer.from(JSON.stringify({ v: digest(norm(visible)), b: body })).toString("base64url");
+  const data = Buffer.from(JSON.stringify({ v: sealed(seal, visible, body), b: body })).toString("base64url");
   return `${visible}\n\n${FOOTER}${data}`;
 }
 
-// The original body when the runner wrote it (`ours`), the footer is intact and the text above it is
-// unchanged. Anyone else's footer stays as written, so an agent reads exactly what the humans see.
-// A human who edited the runner's text gets their edit back, without the markers.
-export function decodeBody(text: string, ours: boolean): string {
+// The original body when the runner wrote it (`ours`), its seal holds and the text above it is
+// unchanged. Anyone else's footer stays as written, so an agent reads exactly what the humans see;
+// a human who edited the runner's text gets their edit back, without the markers.
+export function decodeBody(text: string, ours: boolean, seal: Seal): string {
   if (!ours) return text;
   const at = text.lastIndexOf(FOOTER);
   if (at === -1 || (at > 0 && text[at - 1] !== "\n")) return text;
@@ -87,7 +96,11 @@ export function decodeBody(text: string, ours: boolean): string {
   const visible = text.slice(0, at).trimEnd();
   try {
     const data = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as { v?: string; b?: string };
-    if (typeof data.b === "string" && data.v === digest(norm(visible))) return data.b;
+    if (typeof data.b === "string" && typeof data.v === "string") {
+      const want = Buffer.from(sealed(seal, visible, data.b));
+      const got = Buffer.from(data.v);
+      if (got.length === want.length && timingSafeEqual(got, want)) return data.b;
+    }
   } catch {
     // not ours
   }
