@@ -773,5 +773,11 @@
   {"name": "runner routes: a stop acts on the issue in the plane's default repo", "file": "dashboard/plane/runner-routes.ts", "find": "({ repo: deps.repoOf(req), issue: Number(m[1]) })", "replace": "({ repo: \"acme/a\", issue: Number(m[1]) })", "test": "tests/multi-repo.test.ts"},
   {"name": "runner routes: a runner holds a repo the plane does not serve", "file": "dashboard/plane/runner-routes.ts", "find": "b.repos.filter((r): r is string => served.includes(r))", "replace": "b.repos.filter((r): r is string => typeof r === \"string\")", "test": "tests/multi-repo.test.ts"},
   {"name": "runner routes: the fleet view shows a lease in another org's repo", "file": "dashboard/plane/runner-routes.ts", "find": "leases: r.leases.filter((j) => seen.has(j.repo)),", "replace": "leases: r.leases,", "test": "ee/tests/org-mode.test.ts"},
-  {"name": "runner routes: the fleet view shows another org's repos", "file": "dashboard/plane/runner-routes.ts", "find": "repos: r.repos.filter((x) => seen.has(x)),", "replace": "repos: r.repos,", "test": "ee/tests/org-mode.test.ts"}
+  {"name": "runner routes: the fleet view shows another org's repos", "file": "dashboard/plane/runner-routes.ts", "find": "repos: r.repos.filter((x) => seen.has(x)),", "replace": "repos: r.repos,", "test": "ee/tests/org-mode.test.ts"},
+  {"name": "stack: default read commands stay offline", "file": "src/stack.ts", "find": "\"npm ls --depth *\"]", "replace": "\"npm ls --depth *\", \"npm view *\"]", "test": "tests/stack.test.ts"},
+  {"name": "init: read commands written", "file": "src/init.ts", "find": "read: readCommands(stack), ", "replace": "", "test": "tests/stack.test.ts"},
+  {"name": "doctor: empty read list on a dependency route", "file": "src/config-health.ts", "find": "      ok: kept.length > 0,", "replace": "      ok: true,", "test": "tests/doctor.test.ts"},
+  {"name": "config: a newer config.json is stale", "file": "src/config-health.ts", "find": "now !== undefined && now > loaded", "replace": "now !== undefined && false", "test": "tests/config.test.ts"},
+  {"name": "stage: a stale config is said on the run", "file": "src/config-health.ts", "find": "events: [{ kind: \"text\", text: warning }, ...result.events]", "replace": "events: result.events", "test": "tests/config.test.ts"},
+  {"name": "doctor: read commands check wired", "file": "src/doctor.ts", "find": "  checks.push(...readCommandsCheck(ctx.routes, config));\n", "replace": "", "test": "tests/doctor.test.ts"}
 ]

@@ -300,6 +300,39 @@ describe("tmux check", () => {
   });
 });
 
+// #87: init wrote `read: []`, plan's `npm ls` was refused, and a dependency issue failed plan three times.
+describe("read commands check", () => {
+  const NAME = "agentCommands.read lets plan inspect dependencies";
+  const readCheck = async (routes: Record<string, { workflow?: string }>, read: string[]) => {
+    const text = JSON.stringify({ gates: [{ name: "test", cmd: "true", required: true }], agentCommands: { read } });
+    return (await runDoctor({ ...deps(), readFile: async () => text }, { ...ctx, routes })).find(
+      (c) => c.name === NAME,
+    );
+  };
+
+  test("fails on an empty read list when a dependency route exists, and names the fix", async () => {
+    const check = (await readCheck({ dependency: {} }, []))!;
+    expect(check.ok).toBe(false);
+    expect(check.detail).toContain('"npm ls"');
+    expect(check.detail).toContain("restart `factory watch`");
+  });
+
+  test("a route running the dependency-update workflow counts too", async () => {
+    expect((await readCheck({ upgrades: { workflow: "dependency-update" } }, []))!.ok).toBe(false);
+  });
+
+  test("a list of only refused patterns is empty in practice and says which were dropped", async () => {
+    const check = (await readCheck({ dependency: {} }, ["node *"]))!;
+    expect(check.ok).toBe(false);
+    expect(check.detail).toContain("node *");
+  });
+
+  test("passes with a read command, and is absent without a dependency route", async () => {
+    expect((await readCheck({ dependency: {} }, ["npm ls"]))!.ok).toBe(true);
+    expect(await readCheck({ docs: {} }, [])).toBeUndefined();
+  });
+});
+
 // Plan v2.11.0 item A: `factory install` calls this right after a real
 // install instead of leaving it to a separate `doctor --fix`. This is the
 // only place that exercises it: `bin/factory` builds its ScmPort with `makeScm(config)`,

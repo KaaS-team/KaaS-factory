@@ -13,6 +13,7 @@ import { runtimeRefs, unknownRuntimes } from "./runtimes";
 import { type Health, probeChecks } from "./runtime-kit";
 import type { Workflow } from "./core/workflow";
 import { createHash } from "node:crypto";
+import { readCommandsCheck } from "./config-health";
 
 export interface DoctorCheck {
   readonly name: string;
@@ -244,10 +245,11 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       fixable: false,
     });
   }
+  checks.push(...readCommandsCheck(ctx.routes, config));
+  const overridden = (path: string) =>
+    (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
   if (ctx.templateSkills) {
     const stale: string[] = [];
-    const overridden = (path: string) =>
-      (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
     for (const [path, want] of Object.entries(ctx.templateSkills)) {
       if (overridden(path)) continue;
       if ((await deps.readFile(`${ctx.cloneDir}/${path}`)) !== want) stale.push(path);
@@ -267,8 +269,6 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   const manifest = parseManifest(await deps.readFile(`${ctx.cloneDir}/.factory/manifest.json`));
   if (manifest) {
     const edited: string[] = [];
-    const overridden = (path: string) =>
-      (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
     for (const [path, sha] of Object.entries(manifest)) {
       if (overridden(path)) continue;
       const text = await deps.readFile(`${ctx.cloneDir}/${path}`);

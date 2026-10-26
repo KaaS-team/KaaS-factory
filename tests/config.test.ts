@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
@@ -16,9 +16,16 @@ import {
 import { makeTracker } from "../src/scm";
 import { hasNoGates } from "../src/gates";
 import { isFilledIn } from "../src/init";
+import { configStaleness, warnWhenStale } from "../src/config-health";
+import { loadWorkflow } from "../src/engine/workflows";
+import { advanceIssue } from "../src/watch";
+import { engine, removeEngineDirs } from "./engine-harness";
 
 const dir = mkdtempSync(join(tmpdir(), "factory-cfg-"));
-afterAll(() => rmSync(dir, { recursive: true, force: true }));
+afterAll(() => {
+  rmSync(dir, { recursive: true, force: true });
+  removeEngineDirs();
+});
 
 function repoWith(config?: object): string {
   const d = mkdtempSync(join(dir, "r-"));
@@ -332,5 +339,49 @@ describe("gate roles", () => {
     expect(testGate([named, roled])?.cmd).toBe("roled");
     expect(testGate([named])?.cmd).toBe("named");
     expect(testGate([{ name: "lint", cmd: "x", required: true, role: "lint" }])).toBeUndefined();
+  });
+});
+
+// #87: the operator fixed agentCommands.read while the watcher ran, and the retry still used the
+// old list with no word about it. The watcher keeps the config it started with, and now says so.
+describe("configStaleness and warnWhenStale", () => {
+  test("quiet while config.json is as read, names the restart once it is newer", () => {
+    let mtime: number | undefined = 1000;
+    const stale = configStaleness("/r/.factory/config.json", () => mtime);
+    expect(stale()).toBeUndefined();
+    mtime = 2000;
+    expect(stale()).toContain("Restart factory watch");
+    expect(stale()).toContain("/r/.factory/config.json");
+    mtime = undefined; // deleted mid-run: nothing to compare
+    expect(stale()).toBeUndefined();
+  });
+
+  test("reads the real file's mtime by default", () => {
+    const d = repoWith({ repo: "acme/widgets" });
+    const path = join(d, ".factory/config.json");
+    const stale = configStaleness(path);
+    expect(stale()).toBeUndefined();
+    utimesSync(path, new Date(), new Date(Date.now() + 60_000));
+    expect(stale()).toContain("changed after factory watch started");
+  });
+
+  test("a stage that starts on a stale config logs the warning on its run", async () => {
+    const empty = mkdtempSync(join(dir, "wf-"));
+    const loaded = await loadWorkflow(empty, "spec-to-plan");
+    if (!loaded.ok) throw new Error(loaded.problems.join("; "));
+    const plan = {
+      "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",
+      "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["a"], autoApproveEligible: true }),
+    };
+    const e = engine(loaded.workflow, 0, {}, {}, {}, { outputs: { plan: [plan] } });
+    await advanceIssue(
+      warnWhenStale(e.deps, () => "config.json is stale"),
+      e.config,
+      e.github.issues.get(1)!,
+    );
+    const run = e.deps.state.getRun("acme/widgets", 1)!;
+    const events = e.deps.state.listEvents(run.id).filter((x) => x.text === "config.json is stale");
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]!.kind).toBe("text");
   });
 });
