@@ -83,6 +83,11 @@ export interface MergeReadiness {
 }
 
 // A user's role on the repo, highest first. "none" when they are not a collaborator.
+export interface RateBudget {
+  readonly remaining: number;
+  readonly limit: number;
+}
+
 export type RepoRole = "admin" | "maintain" | "write" | "triage" | "read" | "none";
 export const TRUSTED_ROLES: readonly RepoRole[] = ["admin", "maintain", "write"];
 
@@ -128,6 +133,8 @@ export interface CodeHostPort {
   // The open PR for this issue: by "Closes #n" when the tracker is GitHub, by head branch otherwise.
   prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }): Promise<GhPr | undefined>;
   mergePr(repo: string, number: number, headSha: string): Promise<void>;
+  // Optional: a fake has no budget to read, and the plane then keeps its pace.
+  rateLimit?(repo: string): Promise<RateBudget>;
   authStatus(): Promise<{ ok: boolean; detail: string }>;
 }
 

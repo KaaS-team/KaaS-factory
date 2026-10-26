@@ -10,6 +10,7 @@
 
 import type { FactoryConfig, TrackerConfig } from "./config";
 import { GitHub } from "./github";
+import { appFromEnv, ghRunner, rateBudget } from "./github-app";
 import { issueBranch, issueOfBranch } from "./git";
 import type {
   CodeHostPort,
@@ -19,6 +20,7 @@ import type {
   GhPr,
   MergeReadiness,
   PrStatus,
+  RateBudget,
   RepoRole,
   ScmPort,
   TrackerPort,
@@ -117,6 +119,7 @@ export class ComposedScm implements ScmPort {
     readonly codeHost: CodeHostPort,
     readonly link: IssueLink,
     readonly trackerKind: TrackerConfig["kind"] = link === "closes" ? "github" : "http",
+    private readonly rate?: (repo: string) => Promise<RateBudget>,
   ) {}
 
   // ---- tracker
@@ -167,6 +170,9 @@ export class ComposedScm implements ScmPort {
   }
   roleOf(repo: string, login: string): Promise<RepoRole> {
     return this.tracker.roleOf(repo, login);
+  }
+  rateLimit(repo: string) {
+    return this.rate ? this.rate(repo) : Promise.reject(new Error("no rate budget"));
   }
   // gh's auth: PRs need it whatever the tracker is. Doctor checks the tracker's own separately.
   authStatus() {
@@ -268,8 +274,9 @@ export function makeScm(
   config: Pick<FactoryConfig, "tracker" | "labels">,
   env: NodeJS.ProcessEnv = process.env,
 ): ComposedScm {
-  const github = new GitHub();
+  const github = new GitHub(ghRunner(env));
   const base = makeTracker(config.tracker, env, github);
   const tracker = Object.keys(config.labels).length ? new LabelMappedTracker(base, config.labels) : base;
-  return new ComposedScm(tracker, github, config.tracker.kind === "github" ? "closes" : "branch", config.tracker.kind);
+  const link = config.tracker.kind === "github" ? "closes" : "branch";
+  return new ComposedScm(tracker, github, link, config.tracker.kind, (repo) => rateBudget(repo, appFromEnv(env)));
 }

@@ -1,22 +1,7 @@
 {
-  "lines": {
-    "dashboard/server.ts": 777,
-    "src/agents/executor.ts": 476,
-    "src/agents/structured.ts": 401,
-    "src/cli.ts": 1086,
-    "src/config.ts": 770,
-    "src/doctor.ts": 445,
-    "src/engine/common.ts": 669,
-    "src/engine/steps.ts": 524,
-    "src/github.ts": 488,
-    "src/receipt.ts": 459,
-    "src/state.ts": 726,
-    "src/watch.ts": 769
-  },
   "comments": {
     "dashboard/board.ts": 1,
     "dashboard/project.ts": 1,
-    "dashboard/server.ts": 1,
     "docker-entrypoint.sh": 1,
     "install.sh": 1,
     "scripts/dco.ts": 1,
@@ -137,6 +122,20 @@
     "tests/tokens.test.ts": 1,
     "tests/tracker-comments.test.ts": 1,
     "tests/visual-system.test.ts": 1
+  },
+  "lines": {
+    "dashboard/server.ts": 736,
+    "src/agents/executor.ts": 476,
+    "src/agents/structured.ts": 401,
+    "src/cli.ts": 1086,
+    "src/config.ts": 770,
+    "src/doctor.ts": 445,
+    "src/engine/common.ts": 669,
+    "src/engine/steps.ts": 524,
+    "src/github.ts": 488,
+    "src/receipt.ts": 459,
+    "src/state.ts": 726,
+    "src/watch.ts": 769
   },
   "names": {
     "src/engine/common.ts": 1
