@@ -1,6 +1,6 @@
 import type { AgentCommands } from "./config";
 import type { StageName } from "./executor";
-import { safeRules } from "./safe-outputs";
+import { safeCommands } from "./safe-outputs";
 
 // Passed to `claude --settings`, which is not gated by workspace trust (the
 // repo's own .claude/settings.json allow list is ignored under `-p`). Deny
@@ -87,13 +87,9 @@ const bash = (patterns: readonly string[]): string[] => patterns.map((p) => `Bas
 // The repo's own commands (its test runner, its make targets) come from
 // config.agentCommands, so nothing here assumes bun or make.
 export function stageAllowRules(stage: StageName, issue: number, extra?: AgentCommands): string[] {
-  return safeRules(stageRules(stage, issue, extra));
-}
-
-function stageRules(stage: StageName, issue: number, extra?: AgentCommands): string[] {
-  const rules = [`Edit(.factory/runs/issue-${issue}/**)`, ...READ_ONLY_BASH, ...bash(extra?.read ?? [])];
-  if (stage === "build") return [...rules, ...BUILD_EXTRA, ...bash(extra?.build ?? [])];
-  if (stage === "verify") return [...rules, ...VERIFY_EXTRA, ...bash(extra?.verify ?? [])];
+  const rules = [`Edit(.factory/runs/issue-${issue}/**)`, ...READ_ONLY_BASH, ...bash(safeCommands(extra?.read))];
+  if (stage === "build") return [...rules, ...BUILD_EXTRA, ...bash(safeCommands(extra?.build))];
+  if (stage === "verify") return [...rules, ...VERIFY_EXTRA, ...bash(safeCommands(extra?.verify))];
   return rules;
 }
 
