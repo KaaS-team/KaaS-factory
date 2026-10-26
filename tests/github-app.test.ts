@@ -31,6 +31,9 @@ function fakeGitHub(clock: { t: number }) {
   };
   const calls: string[] = [];
   const minted: string[] = [];
+  // acme/b never ran install.sh; a new push date is a new commit to look at.
+  const withFactory = new Set(["acme/a", "beta/x", "stranger/q"]);
+  const pushed: Record<string, string> = {};
   const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetch: typeof globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -58,11 +61,15 @@ function fakeGitHub(clock: { t: number }) {
       return reply(Object.entries(installs).map(([login, i]) => ({ id: i.id, account: { login } })));
     if (path === "/installation/repositories") {
       const i = Object.values(installs).find((x) => minted.some((m) => m === auth && m.includes(`_${x.id}_`)));
-      return i ? reply({ repositories: i.repos.map((full_name) => ({ full_name })) }) : reply({}, 401);
+      return i
+        ? reply({ repositories: i.repos.map((full_name) => ({ full_name, pushed_at: pushed[full_name] ?? "d0" })) })
+        : reply({}, 401);
     }
+    const config = path.match(/^\/repos\/([^/]+\/[^/]+)\/contents\/\.factory\/config\.json$/);
+    if (config) return withFactory.has(config[1]!) ? reply({}) : reply({}, 404);
     return reply({}, 404);
   }) as typeof globalThis.fetch;
-  return { fetch, calls, minted };
+  return { fetch, calls, minted, withFactory, pushed };
 }
 
 function app() {
@@ -111,7 +118,7 @@ describe("GitHub App installation tokens", () => {
 
   test("an installation outside the named owners is never served or minted for", async () => {
     const { gh, app: a } = app();
-    expect(await a.installedRepos()).toEqual(["acme/a", "acme/b", "beta/x"]);
+    expect(await a.installedRepos()).toEqual(["acme/a", "beta/x"]);
     expect(await a.tokenFor("stranger/q")).toBeNull();
     expect(gh.calls.filter((c) => c.includes("/3/") || c.includes("stranger"))).toEqual([]);
     const env = { FACTORY_GITHUB_APP_ID: "7", FACTORY_GITHUB_APP_PRIVATE_KEY: PEM };
@@ -182,7 +189,20 @@ describe("the App's repos in the served list", () => {
     const env = { FACTORY_REPOS: "own/one", FACTORY_HOME: "/nonexistent" };
     expect(servedRepos(env)).toEqual(["own/one"]);
     await feedInstalledRepos(a).refresh();
-    expect(servedRepos(env)).toEqual(["own/one", "acme/a", "acme/b", "beta/x"]);
+    expect(servedRepos(env)).toEqual(["own/one", "acme/a", "beta/x"]);
+  });
+
+  test("only repos holding .factory/config.json are served, and a repo is asked again only after a push", async () => {
+    const { gh, app: a } = app();
+    const asked = () => gh.calls.filter((c) => c.endsWith("/contents/.factory/config.json")).length;
+    expect(await a.installedRepos()).toEqual(["acme/a", "beta/x"]);
+    expect(asked()).toBe(3);
+    expect(await a.installedRepos()).toEqual(["acme/a", "beta/x"]);
+    expect(asked()).toBe(3);
+    gh.withFactory.add("acme/b");
+    gh.pushed["acme/b"] = "d1";
+    expect(await a.installedRepos()).toEqual(["acme/a", "acme/b", "beta/x"]);
+    expect(asked()).toBe(4);
   });
 
   test("the list is read again only once it is older than its TTL", async () => {

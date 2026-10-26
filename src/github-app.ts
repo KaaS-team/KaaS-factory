@@ -50,6 +50,8 @@ export class GitHubApp {
   private readonly minting = new Map<string, Promise<string | null>>();
   private readonly installs = new Map<string, number | null>();
   private readonly owners: ReadonlySet<string>;
+  // Whether a repo holds .factory/config.json, per push, so an unchanged repo is never asked again.
+  private readonly factoryAt = new Map<string, { pushed: string; has: boolean }>();
 
   constructor(private readonly opts: AppOptions) {
     // Checked at boot, and the error never echoes the key.
@@ -106,7 +108,8 @@ export class GitHubApp {
     return token;
   }
 
-  // Every repo any installation of the App can reach, for the plane's served list.
+  // Every repo with the factory installed that an allowed installation reaches. An App installed on
+  // all of an account's repos would otherwise put each of them on the board, two lists apiece per poll.
   async installedRepos(): Promise<string[]> {
     const repos: string[] = [];
     for (let page = 1; ; page++) {
@@ -129,10 +132,24 @@ export class GitHubApp {
     const out: string[] = [];
     for (let page = 1; ; page++) {
       const res = await this.call(`/installation/repositories?per_page=100&page=${page}`, token);
-      const { repositories } = await this.body<{ repositories: { full_name: string }[] }>(res, "listing repos");
-      out.push(...repositories.map((r) => r.full_name).filter(isRepoName));
+      const { repositories } = await this.body<{ repositories: { full_name: string; pushed_at?: string }[] }>(
+        res,
+        "listing repos",
+      );
+      for (const r of repositories)
+        if (isRepoName(r.full_name) && (await this.hasFactory(token, r.full_name, r.pushed_at ?? "")))
+          out.push(r.full_name);
       if (repositories.length < 100) return out;
     }
+  }
+
+  private async hasFactory(token: string, repo: string, pushed: string): Promise<boolean> {
+    const seen = this.factoryAt.get(repo);
+    if (seen && seen.pushed === pushed) return seen.has;
+    const res = await this.call(`/repos/${repo}/contents/.factory/config.json`, token);
+    if (!res.ok && res.status !== 404) throw new Error(`GitHub App: reading ${repo}'s config answered ${res.status}`);
+    this.factoryAt.set(repo, { pushed, has: res.ok });
+    return res.ok;
   }
 }
 

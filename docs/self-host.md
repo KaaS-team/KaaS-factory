@@ -33,7 +33,8 @@ Every SQLite file lives under `FACTORY_HOME` (`/data` in the image).
 With an App set, each `gh` call that names a repo runs with that owner's installation token, so each
 owner spends its own rate limit. A token is minted per owner and minted again 5 minutes before it
 expires. A repo the App is not installed on keeps `GH_TOKEN`. The plane also serves every repo the
-App is installed on, read again every 5 minutes, and a signed-in member sees a repo only when GitHub
+App is installed on that holds `.factory/config.json`, read again every 5 minutes (a repo is checked
+again only after a push), and a signed-in member sees a repo only when GitHub
 gives them at least read on it, asked again every 10 minutes. Their plane role still decides what
 they may do. The break-glass token and callers on the box see every repo.
 
