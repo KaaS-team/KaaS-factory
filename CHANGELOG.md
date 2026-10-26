@@ -6,9 +6,9 @@ Software Factory is now KaaS Factory, an open-core product. Upgraders: point `FA
 and any clone at `KaaS-team/KaaS-factory`; the `factory` command and `FACTORY_*` variables keep
 their names.
 
-- Name: the package is `kaas-factory`, the Rust crates `kaas-factory-verify` and
-  `kaas-factory-relay`, and the docs, CI and dashboard say KaaS Factory. A test fails on the old
-  name anywhere outside history, recorded transcripts and the vendored kit.
+- Name: the package is `kaas-factory`, and the docs, CI, dashboard, service unit and fallback git
+  identity say KaaS Factory; the Rust crates were already `kaas-verify` and `kaas-relay`. A test
+  fails on the old name anywhere outside history, recorded transcripts and the vendored kit.
 - Licence: the core is Apache-2.0, copyright Secret SaaS OÜ. `ee/` is under the KaaS Factory
   Enterprise License, the name and icon are reserved (`TRADEMARKS.md`), the Geist font stays
   OFL-1.1 and ported files keep their MIT or Apache notice. `REUSE.toml` states each file's licence,
