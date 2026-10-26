@@ -11,3 +11,4 @@ reports/
 verify/target/
 relay/target/
 .playwright-cli/
+.claude/.gate-ran
