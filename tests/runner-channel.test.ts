@@ -107,6 +107,25 @@ describe("runner dial-out", () => {
     expect(db.query("SELECT repo, issue FROM plane_jobs").all()).toEqual([{ repo: "acme/a", issue: 7 }]);
   });
 
+  test("a hub from before multi-repo keeps every old job and message, given the plane's default repo", () => {
+    const db = new Database(":memory:");
+    db.exec("CREATE TABLE plane_jobs (issue INTEGER PRIMARY KEY, state TEXT NOT NULL, runner TEXT, leased_at INTEGER)");
+    db.exec("INSERT INTO plane_jobs VALUES (7, 'queued', NULL, NULL), (8, 'leased', 'r1', 5)");
+    db.exec(
+      "CREATE TABLE plane_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, issue INTEGER NOT NULL, text TEXT NOT NULL, by TEXT NOT NULL, state TEXT NOT NULL, at TEXT NOT NULL)",
+    );
+    db.exec("INSERT INTO plane_messages VALUES (3, 7, 'use the v2 API', 'ann', 'queued', '2026-10-01')");
+    new RunnerHub(db, Date.now, "acme/a");
+    expect(db.query("SELECT repo, issue, state, runner, leased_at FROM plane_jobs ORDER BY issue").all()).toEqual([
+      { repo: "acme/a", issue: 7, state: "queued", runner: null, leased_at: null },
+      { repo: "acme/a", issue: 8, state: "leased", runner: "r1", leased_at: 5 },
+    ]);
+    expect(db.query("SELECT id, repo, issue, text FROM plane_messages").all()).toEqual([
+      { id: 3, repo: "acme/a", issue: 7, text: "use the v2 API" },
+    ]);
+    expect(db.query("SELECT name FROM sqlite_master WHERE name LIKE '%by_issue'").all()).toEqual([]);
+  });
+
   test("a runner ignores work for a repo it holds no checkout of, even if the plane sends it", async () => {
     const ran: string[] = [];
     const abort = new AbortController();

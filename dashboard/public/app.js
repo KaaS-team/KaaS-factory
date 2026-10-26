@@ -163,7 +163,7 @@ async function loadInbox() {
     }
   }
   document.getElementById("repo-label").textContent =
-    state.repos.length > 1 ? plural(state.repos.length, "project") : short(state.repo);
+    state.repos.length > 1 ? plural(state.repos.length, "project") : short(state.repos[0] || state.repo);
   renderNav();
 }
 

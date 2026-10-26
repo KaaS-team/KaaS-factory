@@ -32,15 +32,17 @@ export class RunnerHub {
   constructor(
     private readonly db: Database,
     readonly now = Date.now,
+    defaultRepo = "",
   ) {
-    // Jobs and messages keyed by issue alone predate multi-repo planes. They are transient (a job is
-    // dispatched again from the board), so an old table is dropped rather than guessed into a repo.
+    // Jobs and messages keyed by issue alone predate multi-repo planes, when every row was the
+    // default repo's. With no default there is no repo to give them, and a job is dispatched again.
     const keyedByIssue = (t: string) => {
       const cols = (db.query("SELECT name FROM pragma_table_info(?)").all(t) as { name: string }[]).map((c) => c.name);
       return cols.length > 0 && !cols.includes("repo");
     };
-    if (keyedByIssue("plane_jobs")) db.exec("DROP TABLE plane_jobs");
-    if (keyedByIssue("plane_messages")) db.exec("DROP TABLE plane_messages");
+    const legacy = ["plane_jobs", "plane_messages"].filter(keyedByIssue);
+    if (legacy.includes("plane_jobs")) db.exec("ALTER TABLE plane_jobs RENAME TO plane_jobs_by_issue");
+    if (legacy.includes("plane_messages")) db.exec("ALTER TABLE plane_messages RENAME TO plane_messages_by_issue");
     db.exec(`
       CREATE TABLE IF NOT EXISTS plane_runner_tokens (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS plane_runners (
@@ -63,6 +65,17 @@ export class RunnerHub {
         by TEXT NOT NULL, state TEXT NOT NULL, at TEXT NOT NULL
       );
     `);
+    db.transaction(() => {
+      if (defaultRepo && legacy.includes("plane_jobs"))
+        db.query(
+          "INSERT INTO plane_jobs (repo, issue, state, runner, leased_at) SELECT ?, issue, state, runner, leased_at FROM plane_jobs_by_issue",
+        ).run(defaultRepo);
+      if (defaultRepo && legacy.includes("plane_messages"))
+        db.query(
+          "INSERT INTO plane_messages (id, repo, issue, text, by, state, at) SELECT id, ?, issue, text, by, state, at FROM plane_messages_by_issue",
+        ).run(defaultRepo);
+      db.exec("DROP TABLE IF EXISTS plane_jobs_by_issue; DROP TABLE IF EXISTS plane_messages_by_issue");
+    })();
   }
 
   issueToken(): string {

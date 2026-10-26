@@ -1,5 +1,22 @@
 # Changelog
 
+## v6.1.1
+
+Fixes from an independent check of the multi-repo release.
+
+- A write that names no repo while the plane serves two or more now gets 400 "pick a repo"; the
+  plane's default repo no longer stands in for it.
+- The task composer requires a project and preselects none unless the board is filtered to one.
+- Linear, Slack, A2A and AG-UI answer 409 when the plane has no default repo, and Settings shows
+  which repo they act on.
+- Runner jobs and messages from before v6.1.0 keep their rows: they move to the default repo
+  instead of being dropped.
+- `FACTORY_REPO` is read in one place, `defaultRepo()` in `src/paths.ts`.
+- A hosted member who may not read the plane's default repo is never told its name: the runs,
+  Line, inbox and Settings answers leave it out.
+- Kept on purpose: the hosted plane still sets `FACTORY_REPO`, because the integrations carry no
+  repo field yet and act on that default.
+
 ## v6.1.0
 
 One hosted plane now serves every repo it is installed on. Upgraders: `FACTORY_BLOB_REPOS` is gone;
