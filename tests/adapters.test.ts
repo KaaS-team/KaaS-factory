@@ -152,7 +152,8 @@ function nativeTrackers(): void {
         .filter((args) => !args.startsWith("\n") && !args.includes(": string"));
       expect({
         f,
-        calls: calls.length > 0 && calls.every((a) => /=== self, this\.seal, "(comment|description)"\s*$/.test(a)),
+        calls:
+          calls.length > 0 && calls.every((a) => /=== self, this\.seal, (?:"comment"|description\(.+\))\s*$/.test(a)),
       }).toEqual({
         f,
         calls: true,

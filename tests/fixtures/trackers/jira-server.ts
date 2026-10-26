@@ -99,6 +99,7 @@ export class JiraStore {
     const [, , sub, subId] = m;
     if (!sub && method === "GET") return Response.json(this.view(i));
     if (!sub && method === "PUT") {
+      if (typeof body.fields?.description === "string") i.description = strip(body.fields.description);
       let next = [...i.labels];
       for (const op of body.update?.labels ?? []) {
         if (op.add && !next.includes(op.add)) next.push(op.add);

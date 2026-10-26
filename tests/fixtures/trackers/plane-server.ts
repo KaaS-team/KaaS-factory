@@ -87,6 +87,7 @@ export class PlaneStore {
     if (!sub && method === "GET") return Response.json(view(w));
     if (!sub && method === "PATCH") {
       if (body.state_id) w.state_id = body.state_id;
+      if (typeof body.description_html === "string") w.description_html = strip(body.description_html);
       if (body.label_ids) {
         const next: string[] = body.label_ids;
         for (const l of next.filter((x) => !w.label_ids.includes(x))) this.applyLabel(w, l, this.me);

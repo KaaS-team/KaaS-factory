@@ -6,10 +6,12 @@ import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm"
 import {
   association,
   decodeBody,
+  description,
   encodeBody,
   memoOnce,
   type Seal,
   VendorClient,
+  visibleOf,
   VendorHttpError,
   workspaceRole,
 } from "./kit";
@@ -128,7 +130,7 @@ export class ClickUpTracker implements TrackerPort {
         raw.markdown_description ?? raw.description ?? "",
         String(raw.creator?.id) === self,
         this.seal,
-        "description",
+        description(taskNumber(raw.id)),
       ),
       labels: raw.tags.map((t) => ({ name: t.name })),
       comments,
@@ -232,9 +234,14 @@ export class ClickUpTracker implements TrackerPort {
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     await this.ensureTags(labels);
     const t = await this.client.request<{ id: string }>("POST", `/api/v2/list/${this.spec.list}/task`, {
-      body: { name: title, markdown_content: encodeBody(body, this.seal, "description"), tags: labels },
+      body: { name: title, markdown_content: visibleOf(body), tags: labels },
     });
-    return taskNumber(t.id);
+    const n = taskNumber(t.id);
+    if (visibleOf(body) !== body)
+      await this.client.request("PUT", `/api/v2/task/${t.id}`, {
+        body: { markdown_content: encodeBody(body, this.seal, description(n)) },
+      });
+    return n;
   }
   listLabels(): Promise<string[]> {
     return this.spaceTags();

@@ -96,6 +96,7 @@ export class ClickUpStore {
     if (!sub && method === "GET") return Response.json(this.view(t));
     if (!sub && method === "PUT") {
       if (body.status) t.status = body.status;
+      if (typeof body.markdown_content === "string") t.markdown_description = strip(body.markdown_content);
       return Response.json(this.view(t));
     }
     if (sub === "tag") {

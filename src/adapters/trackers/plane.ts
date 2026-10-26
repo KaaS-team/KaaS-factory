@@ -6,12 +6,14 @@ import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm"
 import {
   association,
   decodeBody,
+  description,
   encodeBody,
   IdMap,
   memoOnce,
   type Field,
   type Seal,
   VendorClient,
+  visibleOf,
   VendorHttpError,
   workspaceRole,
 } from "./kit";
@@ -55,8 +57,9 @@ const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 
 // Plane stores rich text as HTML. The runner's text goes in a <pre>, and anything a human wrote comes
 // back as plain lines.
+const pre = (text: string) => `<pre>${escapeHtml(text)}</pre>`;
 export function toHtml(text: string, seal: Seal, field: Field): string {
-  return `<pre>${escapeHtml(encodeBody(text, seal, field))}</pre>`;
+  return pre(encodeBody(text, seal, field));
 }
 export function fromHtml(html: string, ours: boolean, seal: Seal, field: Field): string {
   const pre = /^<pre>([\s\S]*)<\/pre>$/.exec(html.trim());
@@ -167,7 +170,7 @@ export class PlaneTracker implements TrackerPort {
     return {
       number: raw.sequence_id,
       title: raw.name,
-      body: fromHtml(raw.description_html ?? "", raw.created_by_id === self, this.seal, "description"),
+      body: fromHtml(raw.description_html ?? "", raw.created_by_id === self, this.seal, description(raw.sequence_id)),
       labels: raw.label_ids.flatMap((id) => (labelNames.has(id) ? [{ name: labelNames.get(id)! }] : [])),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -279,11 +282,15 @@ export class PlaneTracker implements TrackerPort {
     const w = await this.client.request<WorkItem>("POST", `${this.base}/work-items/`, {
       body: {
         name: title,
-        description_html: toHtml(body, this.seal, "description"),
+        description_html: pre(visibleOf(body)),
         label_ids: await this.labelIds(labels),
       },
     });
     this.bySequence.set(w.sequence_id, w.id);
+    if (visibleOf(body) !== body)
+      await this.client.request("PATCH", `${this.base}/work-items/${w.id}/`, {
+        body: { description_html: toHtml(body, this.seal, description(w.sequence_id)) },
+      });
     return w.sequence_id;
   }
   async listLabels(): Promise<string[]> {

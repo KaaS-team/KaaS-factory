@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { description } from "../src/adapters/trackers/kit";
 import { fromHtml, PlaneTracker } from "../src/adapters/trackers/plane";
 import { startPlane } from "./fixtures/trackers/plane-server";
 import { trackerContract } from "./ports/tracker.contract";
@@ -94,7 +95,7 @@ describe("Plane specifics", () => {
 
   test("HTML a human wrote in Plane reads back as plain lines", () => {
     expect(
-      fromHtml("<p>Fix the <strong>login</strong> &amp; signup</p><p>today</p>", false, () => "", "description"),
+      fromHtml("<p>Fix the <strong>login</strong> &amp; signup</p><p>today</p>", false, () => "", description(1)),
     ).toBe("Fix the login & signup\ntoday");
   });
 

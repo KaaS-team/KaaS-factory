@@ -70,8 +70,10 @@ const FOOTER = "factory-data: ";
 // Only letters and digits count, so a tracker that re-renders markdown (escapes, bullets) still matches.
 const norm = (s: string) => s.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
 export type Seal = (s: string) => string;
-// The field is sealed too, so a runner comment pasted into an issue description does not decode there.
-export type Field = "comment" | "description";
+// The field is sealed too, so a runner comment pasted into a description does not decode there, and a
+// description names its issue, so one pasted into another issue's description does not either.
+export type Field = "comment" | `description #${number}`;
+export const description = (issue: number): Field => `description #${issue}`;
 const sealed = (seal: Seal, field: Field, visible: string, body: string) =>
   seal(JSON.stringify([field, norm(visible), body]));
 
@@ -79,10 +81,15 @@ const sealed = (seal: Seal, field: Field, visible: string, body: string) =>
 // Asana may each drop an HTML comment. The visible text stays readable for the humans in the tracker.
 export function encodeBody(body: string, seal: Seal, field: Field): string {
   if (!body.includes("<!--")) return body;
-  const visible = body.replace(/<!--[\s\S]*?-->\n?/g, "").trimEnd();
+  const visible = visibleOf(body);
   const data = Buffer.from(JSON.stringify({ v: sealed(seal, field, visible, body), b: body })).toString("base64url");
   return `${visible}\n\n${FOOTER}${data}`;
 }
+
+// What the humans see. A new issue is created with this first, since its description can be sealed
+// only once the tracker has given it a number.
+export const visibleOf = (body: string) =>
+  body.includes("<!--") ? body.replace(/<!--[\s\S]*?-->\n?/g, "").trimEnd() : body;
 
 // The original body when the runner wrote it (`ours`), its seal holds and the text above it is
 // unchanged. Anyone else's footer stays as written, so an agent reads exactly what the humans see;

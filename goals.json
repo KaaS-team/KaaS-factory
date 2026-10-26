@@ -314,7 +314,12 @@
       "phase": "P2",
       "ask": "A footer seal bound to the issue. One runner-written description pasted into another still decodes, since a description is sealed before the tracker gives it an id.",
       "source": "CHANGELOG v5.0.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/trackers-kit.test.ts",
+        "name": "a sealed description pasted into another issue's description reads as its visible text there",
+        "mutation": "tracker kit: a description seal names its issue"
+      }
     },
     {
       "id": "factory-mcp-server",
