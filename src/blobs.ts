@@ -61,8 +61,8 @@ const RUN_COLS = {
   gate_line: "str?",
   pr_url: "str?",
   reason: "str?",
-  status_comment_id: "int?",
-} as const satisfies Record<keyof Omit<Run, "id">, Col>;
+  // The runner's status comment id steers the plane's own edits, so it is never taken from a file.
+} as const satisfies Record<keyof Omit<Run, "id" | "status_comment_id">, Col>;
 const STAGE_COLS = {
   repo: "str",
   issue: "int",
@@ -97,6 +97,7 @@ const STATUSES: Record<RunStatus, true> = {
   cancelled: true,
 };
 
+const MAX_STAGE_ROWS = 1000;
 type Bound = Record<string, string | number | null>;
 function bind(row: unknown, cols: Record<string, Col>, repo: string, issue: number): Bound | undefined {
   if (!row || typeof row !== "object") return undefined;
@@ -123,20 +124,18 @@ function bind(row: unknown, cols: Record<string, Col>, repo: string, issue: numb
 // The plane's own ids differ from the runner's, so a stage attempt is known by (repo, issue, stage,
 // started_at). Each write skips a row that already matches, so a replay changes nothing.
 const UPSERT_RUN = `INSERT INTO runs (issue, repo, title, stage, status, started_at, updated_at,
-    tool_calls, tokens_in, tokens_out, cost_usd, gate_line, pr_url, reason, status_comment_id)
+    tool_calls, tokens_in, tokens_out, cost_usd, gate_line, pr_url, reason)
   VALUES ($issue, $repo, $title, $stage, $status, $started_at, $updated_at, $tool_calls, $tokens_in,
-      $tokens_out, $cost_usd, $gate_line, $pr_url, $reason, $status_comment_id)
+      $tokens_out, $cost_usd, $gate_line, $pr_url, $reason)
   ON CONFLICT(repo, issue) DO UPDATE SET title = excluded.title, stage = excluded.stage, status =
       excluded.status, started_at = excluded.started_at, updated_at = excluded.updated_at, tool_calls =
       excluded.tool_calls, tokens_in = excluded.tokens_in, tokens_out = excluded.tokens_out, cost_usd =
-      excluded.cost_usd, gate_line = excluded.gate_line, pr_url = excluded.pr_url, reason = excluded.reason,
-      status_comment_id = excluded.status_comment_id
+      excluded.cost_usd, gate_line = excluded.gate_line, pr_url = excluded.pr_url, reason = excluded.reason
   WHERE (runs.title, runs.stage, runs.status, runs.started_at, runs.updated_at, runs.tool_calls,
-      runs.tokens_in, runs.tokens_out, runs.cost_usd, runs.gate_line, runs.pr_url, runs.reason,
-      runs.status_comment_id)
+      runs.tokens_in, runs.tokens_out, runs.cost_usd, runs.gate_line, runs.pr_url, runs.reason)
     IS NOT (excluded.title, excluded.stage, excluded.status, excluded.started_at, excluded.updated_at,
         excluded.tool_calls, excluded.tokens_in, excluded.tokens_out, excluded.cost_usd, excluded.gate_line,
-        excluded.pr_url, excluded.reason, excluded.status_comment_id)`;
+        excluded.pr_url, excluded.reason)`;
 const UPDATE_STAGE = `UPDATE stage_runs SET agent = $agent, model = $model, finished_at = $finished_at,
     duration_ms = $duration_ms, tool_calls = $tool_calls, tokens_in = $tokens_in, tokens_out = $tokens_out,
     tokens_cached = $tokens_cached, cost_usd = $cost_usd, usage_complete = $usage_complete, exit_code =
@@ -160,7 +159,10 @@ const INSERT_STAGE = `INSERT INTO stage_runs (repo, issue, stage, agent, model, 
 export function importRunState(state: FactoryState, repo: string, issue: number, body: Uint8Array): number {
   const file = JSON.parse(new TextDecoder().decode(body)) as { run?: unknown; stages?: unknown };
   const run = bind(file?.run, RUN_COLS, repo, issue);
-  const stages = Array.isArray(file?.stages) ? file.stages.map((s) => bind(s, STAGE_COLS, repo, issue)) : [undefined];
+  const stages =
+    Array.isArray(file?.stages) && file.stages.length <= MAX_STAGE_ROWS
+      ? file.stages.map((s) => bind(s, STAGE_COLS, repo, issue))
+      : [undefined];
   if (!run || stages.some((s) => !s)) throw new Error(`state for ${repo}#${issue} is not a run of that issue`);
   return state.write((db) => {
     let changed = db.query(UPSERT_RUN).run(run).changes;
@@ -195,7 +197,8 @@ export async function mirrorDown(
           }
           if (path && (await stat(path).catch(() => undefined))?.size === size) continue;
           const body = await store.get(key);
-          if (!body) continue;
+          // The listed size is the store's word; the body read is the one that counts.
+          if (!body || (!path && body.byteLength > MAX_BLOB_BYTES)) continue;
           if (!path) {
             db ??= new FactoryState(defaultStatePath(env, repo));
             wrote += Number(importRunState(db, repo, mine.issue, body) > 0);

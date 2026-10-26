@@ -10,7 +10,7 @@ import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
 import { S3BlobStore } from "../src/adapters/blob-s3/blob";
 import { blobStoreFromEnv, importRunState, localPathFor, mirroredRepos, mirrorDown } from "../src/blobs";
 import { mergeConfig } from "../src/config";
-import { blobKeys, parseBlobKey, shipStage } from "../src/engine/blobs";
+import { blobKeys, MAX_BLOB_BYTES, parseBlobKey, shipStage } from "../src/engine/blobs";
 import { LABEL } from "../src/labels";
 import { defaultStatePath } from "../src/paths";
 import type { BlobEntry, BlobStore } from "../src/ports/blob";
@@ -312,12 +312,30 @@ describe("the plane writes a runner's run rows into that repo's own DB", () => {
       { ...good, stages: [{ ...stage0, tokens_in: "3" }] },
       { ...good, run: { ...good.run, status: "pwned" } },
       { ...good, stages: "x" },
+      { ...good, stages: Array.from({ length: 1001 }, (_, i) => ({ ...stage0, started_at: `${i}` })) },
     ])
       expect(() => importRunState(st, "acme/widgets", 5, body(bad))).toThrow("is not a run of that issue");
     expect(() => importRunState(st, "acme/b", 5, body(good))).toThrow("is not a run of that issue");
     expect(st.listRuns()).toEqual([]);
     expect(importRunState(st, "acme/widgets", 5, body(good))).toBe(3);
     expect(importRunState(st, "acme/widgets", 5, body(good))).toBe(0);
+    // The status comment id steers the plane's own edits, so a file never sets it.
+    importRunState(st, "acme/widgets", 5, body({ ...good, run: { ...good.run, status_comment_id: 99 } }));
+    expect(st.getRun("acme/widgets", 5)?.status_comment_id ?? null).toBeNull();
     st.close();
+  });
+
+  test("a state file larger than the cap is skipped even when the store lists it small", async () => {
+    const disk = new DiskBlobStore(tmp("blobs-rows-big-"));
+    await shipRows(disk, "acme/b", 4);
+    const key = blobKeys.state("acme/b", 4);
+    await disk.put(key, bytes(text(await disk.get(key))! + " ".repeat(MAX_BLOB_BYTES)));
+    const store: BlobStore = {
+      put: (k, b) => disk.put(k, b),
+      get: (k) => disk.get(k),
+      list: async (p) => (await disk.list(p)).map((o) => ({ ...o, size: 1 })),
+    };
+    const plane = { FACTORY_HOME: tmp("blobs-rows-big-plane-"), FACTORY_REPO: "acme/widgets", FACTORY_REPOS: "acme/b" };
+    expect(await mirrorDown(store, plane)).toBe(0);
   });
 });
