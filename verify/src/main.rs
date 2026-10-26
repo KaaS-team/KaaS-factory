@@ -163,7 +163,9 @@ fn check_predicate(p: &Value, artifacts_dir: Option<&str>) -> Result<(), Tampere
 
 // The signed merge decision must judge this head, and a "merge" carries no refusal reason.
 fn check_merge(p: &Value, head: &str) -> Result<(), Tampered> {
-    let Some(m) = p.get("merge") else { return Ok(()) };
+    let Some(m) = p.get("merge") else {
+        return Ok(());
+    };
     if text(m, "headSha")? != head {
         return tampered("merge.headSha", "does not name run.head.sha");
     }
