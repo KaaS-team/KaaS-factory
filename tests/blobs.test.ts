@@ -1,18 +1,34 @@
 // Transcripts and artifacts reach a shared blob store when a stage ends, and the plane mirrors them
 // back onto the paths its run page reads, so a run on another machine shows on the plane.
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { S3Client } from "bun";
 import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
 import { S3BlobStore } from "../src/adapters/blob-s3/blob";
-import { blobStoreFromEnv, importRunState, localPathFor, mirroredRepos, mirrorDown } from "../src/blobs";
+import {
+  blobStoreFromEnv,
+  importRunState,
+  localPathFor,
+  mirroredRepos,
+  mirrorDown,
+  runnerBlobStore,
+} from "../src/blobs";
 import { mergeConfig } from "../src/config";
-import { blobKeys, MAX_BLOB_BYTES, parseBlobKey, shipStage } from "../src/engine/blobs";
+import { blobKeys, MAX_BLOB_BYTES, parseBlobKey, shipConfig, shipStage } from "../src/engine/blobs";
 import { LABEL } from "../src/labels";
-import { defaultStatePath } from "../src/paths";
+import { configMirrorDir, defaultStatePath } from "../src/paths";
 import type { BlobEntry, BlobStore } from "../src/ports/blob";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
@@ -347,5 +363,69 @@ describe("the plane writes a runner's run rows into that repo's own DB", () => {
     };
     const plane = { FACTORY_HOME: tmp("blobs-rows-big-plane-"), FACTORY_REPO: "acme/widgets", FACTORY_REPOS: "acme/b" };
     expect(await mirrorDown(store, plane)).toBe(0);
+  });
+});
+
+describe("a repo's config reaches the plane", () => {
+  test("the runner ships only .factory config, workflow and minion files, never a link or a dotfile", async () => {
+    const store = new DiskBlobStore(tmp("blobs-cfg-store-"));
+    const clone = tmp("blobs-cfg-clone-");
+    for (const d of ["workflows", "minions"]) mkdirSync(join(clone, ".factory", d), { recursive: true });
+    const secret = join(tmp("blobs-cfg-secret-"), "factory.env");
+    writeFileSync(secret, "GH_TOKEN=leak");
+    writeFileSync(join(clone, ".factory", "config.json"), "{}");
+    writeFileSync(join(clone, ".factory", "workflows", "ship.yml"), "name: ship");
+    writeFileSync(join(clone, ".factory", "workflows", ".hidden.yml"), "x");
+    writeFileSync(join(clone, ".factory", "workflows", "notes.txt"), "x");
+    writeFileSync(join(clone, ".factory", "minions", "m.yaml"), "name: m");
+    symlinkSync(secret, join(clone, ".factory", "workflows", "evil.yml"));
+    expect(await shipConfig(store, clone, "acme/widgets")).toBe(3);
+    expect((await store.list("runs/")).map((e) => e.key).sort()).toEqual([
+      blobKeys.config("acme/widgets", "config.json"),
+      blobKeys.config("acme/widgets", "minions/m.yaml"),
+      blobKeys.config("acme/widgets", "workflows/ship.yml"),
+    ]);
+    // The watcher's store sends the same files on its own, in the background.
+    const runner = runnerBlobStore(clone, "acme/other", { FACTORY_BLOB_DIR: tmp("blobs-cfg-runner-") })!;
+    for (let i = 0; i < 100 && (await runner.list("runs/")).length < 3; i++) await Bun.sleep(50);
+    expect((await runner.list("runs/acme/other/config/")).length).toBe(3);
+  });
+
+  test("the mirror writes a config file under the repo's config dir and refuses traversal, odd names and oversize", async () => {
+    const good = blobKeys.config("acme/widgets", "workflows/ok.yml");
+    const objects = new Map<string, number>([
+      [good, 2],
+      ["runs/acme/widgets/config/workflows/../config.json", 2],
+      ["runs/acme/widgets/config/workflows/..yml", 2],
+      ["runs/acme/widgets/config/workflows/sub/x.yml", 2],
+      ["runs/acme/widgets/config/secrets.env", 2],
+      ["runs/acme/widgets/config/.factory/config.json", 2],
+      [blobKeys.config("acme/widgets", "workflows/big.yml"), MAX_BLOB_BYTES + 1],
+      [blobKeys.config("evil/other", "config.json"), 2],
+    ]);
+    // Lists whatever a runner wrote with no key check, so the mirror's own checks are what refuse.
+    const store: BlobStore = {
+      put: async () => {},
+      get: async (k) => (objects.has(k) ? bytes("x".repeat(objects.get(k)!)) : undefined),
+      list: async (): Promise<BlobEntry[]> => [...objects].map(([key, size]) => ({ key, size })),
+    };
+    const plane = { FACTORY_HOME: tmp("blobs-cfg-plane-"), FACTORY_REPO: "acme/widgets" };
+    expect(await mirrorDown(store, plane)).toBe(1);
+    const dir = configMirrorDir("acme/widgets", plane);
+    expect(localPathFor(good, plane)).toBe(join(dir, ".factory", "workflows", "ok.yml"));
+    expect(readdirSync(plane.FACTORY_HOME, { recursive: true }).sort()).toEqual([
+      "acme",
+      "acme/widgets",
+      "acme/widgets/config",
+      "acme/widgets/config/.factory",
+      "acme/widgets/config/.factory/workflows",
+      "acme/widgets/config/.factory/workflows/ok.yml",
+    ]);
+    const named = [...objects.keys()].filter((k) => parseBlobKey(k));
+    expect(named).toEqual([
+      good,
+      blobKeys.config("acme/widgets", "workflows/big.yml"),
+      blobKeys.config("evil/other", "config.json"),
+    ]);
   });
 });

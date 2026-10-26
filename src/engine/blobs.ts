@@ -18,15 +18,24 @@ export const blobKeys = {
   stream: (repo: string, issue: number) => `${RUNS_PREFIX}${repo}/issue-${issue}/transcript.stream.jsonl`,
   artifact: (repo: string, issue: number, name: string) => `${RUNS_PREFIX}${repo}/issue-${issue}/files/${name}`,
   state: (repo: string, issue: number) => `${RUNS_PREFIX}${repo}/issue-${issue}/state.json`,
+  // `file` is a path under the clone's .factory/ that CONFIG_FILE accepts.
+  config: (repo: string, file: string) => `${RUNS_PREFIX}${repo}/config/${file}`,
 };
+
+// The files the Settings, Workflows and Minions pages read. One plain name per directory level and
+// no leading dot, so no key names a file outside .factory/ on either side.
+const CONFIG_FILE = /^(config\.json|mcp\.json|workflows\/\w[\w.-]*\.(?:yml|md)|minions\/\w[\w.-]*\.ya?ml)$/;
 
 export type BlobKind =
   | { kind: "transcript"; repo: string; issue: number }
   | { kind: "stream"; repo: string; issue: number }
   | { kind: "state"; repo: string; issue: number }
+  | { kind: "config"; repo: string; file: string }
   | { kind: "artifact"; repo: string; issue: number; name: string };
 
 export function parseBlobKey(key: string): BlobKind | undefined {
+  const c = key.match(/^runs\/([\w.-]+\/[\w.-]+)\/config\/(.+)$/);
+  if (c) return CONFIG_FILE.test(c[2]!) ? { kind: "config", repo: c[1]!, file: c[2]! } : undefined;
   const m = key.match(
     /^runs\/([\w.-]+\/[\w.-]+)\/issue-(\d+)\/(transcript\.log|transcript\.stream\.jsonl|state\.json|files\/([\w.-]+))$/,
   );
@@ -105,6 +114,22 @@ export async function shipStage(
     }
   } catch (err) {
     console.error(`[blobs] #${issue}: ${err instanceof Error ? err.message : err}`);
+  }
+  return sent;
+}
+
+// The repo's config, workflows and minions from the runner's own clone, never an agent's worktree,
+// so the plane shows what this runner runs. Never throws, like shipStage.
+export async function shipConfig(store: BlobStore | undefined, cloneDir: string, repo: string): Promise<number> {
+  if (!store) return 0;
+  const root = join(cloneDir, ".factory");
+  const sub = async (d: string) => (await readdir(join(root, d)).catch(() => [] as string[])).map((f) => `${d}/${f}`);
+  let sent = 0;
+  try {
+    for (const file of ["config.json", "mcp.json", ...(await sub("workflows")), ...(await sub("minions"))])
+      if (CONFIG_FILE.test(file)) sent += Number(await upload(store, blobKeys.config(repo, file), join(root, file)));
+  } catch (err) {
+    console.error(`[blobs] config: ${err instanceof Error ? err.message : err}`);
   }
   return sent;
 }

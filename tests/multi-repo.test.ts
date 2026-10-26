@@ -3,12 +3,18 @@
 // so a handler that reads a repo its route never declared fails here instead of acting on a guess.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { type DashboardProject, projectResolver, READ_ONLY } from "../dashboard/project";
 import { createDashboard, PUBLIC_ROUTES } from "../dashboard/server";
+import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
+import { mirrorDown } from "../src/blobs";
+import { mergeConfig } from "../src/config";
+import { shipConfig } from "../src/engine/blobs";
 import type { GhIssue } from "../src/github";
-import { defaultStatePath } from "../src/paths";
+import { configMirrorDir, defaultStatePath } from "../src/paths";
+import { cloneDirFor } from "../src/repo";
 import { FactoryState } from "../src/state";
 import { signatureOf, WEBHOOK_SECRET_ENV } from "../src/webhook";
 
@@ -243,6 +249,110 @@ describe("one plane, many repos", () => {
     } finally {
       delete process.env[WEBHOOK_SECRET_ENV];
     }
+  });
+});
+
+// A clone-shaped .factory/ whose workflow, minion, runtime ref and stage agent all carry the repo's tag.
+const WORKFLOW = readFileSync(
+  join(import.meta.dir, "..", "template", ".factory", "workflows", "feature-to-pr.yml"),
+  "utf8",
+);
+function cloneOf(repo: string, tag: string, extra: Record<string, unknown>, dir = mkdtempSync(join(home, "clone-"))) {
+  for (const d of ["workflows", "minions"]) mkdirSync(join(dir, ".factory", d), { recursive: true });
+  writeFileSync(join(dir, ".factory", "config.json"), JSON.stringify({ repo, base: "main", ...extra }));
+  writeFileSync(
+    join(dir, ".factory", "workflows", `${tag}-flow.yml`),
+    WORKFLOW.replace("name: feature-to-pr", `name: ${tag}-flow`),
+  );
+  writeFileSync(
+    join(dir, ".factory", "minions", `${tag}-min.yml`),
+    `name: ${tag}-min\ndescription: d\non:\n  event: tasks.task.updated\nprompt: p\n`,
+  );
+  return dir;
+}
+
+describe("each repo's own config", () => {
+  test("?repo=B shows the settings, workflows and minions B's runner shipped, never A's, and B is read only", async () => {
+    const cloneA = cloneOf(A, "a", { runtime: { check: "local" } });
+    const project: DashboardProject = {
+      cloneDir: cloneA,
+      config: mergeConfig({ repo: A, runtime: { check: "local" } }),
+      machine: { slots: 1, runtimes: {} } as never,
+      leases: async () => [],
+    };
+    const store = new DiskBlobStore(mkdtempSync(join(home, "store-")));
+    expect(
+      await shipConfig(
+        store,
+        cloneOf(B, "b", {
+          runtime: { gates: "local" },
+          stages: { default: "codex" },
+          agents: { codex: { preset: "codex" } },
+        }),
+        B,
+      ),
+    ).toBe(3);
+    expect(await mirrorDown(store, process.env, [B])).toBe(3);
+    const probes = { which: () => null, versionOf: async () => null };
+    const dash = createDashboard(
+      states[A]!,
+      fakeGitHub() as never,
+      A,
+      false,
+      join(home, "ws"),
+      undefined,
+      probes as never,
+      project,
+    );
+    const get = async (path: string, repo: string) =>
+      (await hit(dash, new Request(`${BASE}${path}${path.includes("?") ? "&" : "?"}repo=${repo}`))).text;
+    const view = async (repo: string) => ({
+      workflows: (JSON.parse(await get("/api/workflows", repo)).workflows as { name: string }[]).map((w) => w.name),
+      minions: (JSON.parse(await get("/api/minions", repo)).minions as { name: string }[]).map((m) => m.name),
+      usedBy: (JSON.parse(await get("/api/settings", repo)).runtimes as { name: string; usedBy: string[] }[])
+        .find((r) => r.name === "local")!
+        .usedBy.filter((w) => w.startsWith("runtime.")),
+      leasesError: JSON.parse(await get("/api/settings", repo)).leasesError as string | null,
+      codex: (JSON.parse(await get("/api/agents", repo)).agents as { name: string; stages: string[] }[]).find(
+        (a) => a.name === "codex",
+      )?.stages.length,
+    });
+    expect(await view(A)).toMatchObject({
+      workflows: expect.arrayContaining(["a-flow"]),
+      minions: ["a-min"],
+      usedBy: ["runtime.check"],
+      leasesError: null,
+      codex: 0,
+    });
+    const b = await view(B);
+    expect(b.workflows).not.toContain("a-flow");
+    expect(b).toMatchObject({
+      workflows: expect.arrayContaining(["b-flow"]),
+      minions: ["b-min"],
+      usedBy: ["runtime.gates"],
+      leasesError: "leases are listed on the repo's runner, not this plane",
+      codex: 6,
+    });
+    expect(JSON.parse(await get("/api/workflow-source?name=b-flow", B)).text).toContain("name: b-flow");
+    expect(JSON.parse(await get("/api/workflow-source?name=a-flow", B)).available).toBe(false);
+    expect(JSON.parse(await get("/api/workflow-source?name=..%2Fconfig", B)).available).toBe(false);
+    expect((await hit(dash, new Request(`${BASE}/api/settings?repo=acme/elsewhere`))).status).toBe(404);
+    for (const label of ["POST /api/workflow-edit", "POST /api/events/e1/replay"]) {
+      const res = await hit(dash, request(label, B, { name: "b-flow", form: { build: { timeout: 5 } } }));
+      expect([res.status, JSON.parse(res.text).error]).toEqual([409, READ_ONLY]);
+    }
+  });
+
+  test("the plane's own clone of a repo wins over the shipped copy, and a config naming another repo is refused", async () => {
+    const r = "acme/cloned";
+    cloneOf(r, "own", {}, cloneDirFor(r, process.env));
+    cloneOf(r, "shipped", {}, configMirrorDir(r, process.env));
+    const resolve = projectResolver(A);
+    const own = await resolve(r);
+    expect([own?.cloneDir, own?.readOnly]).toEqual([cloneDirFor(r, process.env), undefined]);
+    cloneOf(A, "planted", {}, configMirrorDir("acme/planted", process.env));
+    expect(await resolve("acme/planted")).toBeUndefined();
+    expect((await resolve("acme/nothing")) ?? "none").toBe("none");
   });
 });
 

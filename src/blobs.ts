@@ -7,8 +7,8 @@ import { S3Client } from "bun";
 import { DiskBlobStore } from "./adapters/blob-disk/blob";
 import { S3BlobStore } from "./adapters/blob-s3/blob";
 import { runDir } from "./artifacts";
-import { MAX_BLOB_BYTES, parseBlobKey, RUNS_PREFIX } from "./engine/blobs";
-import { defaultStatePath, servedRepos, streamPath, transcriptPath, workspacesDir } from "./paths";
+import { MAX_BLOB_BYTES, parseBlobKey, RUNS_PREFIX, shipConfig } from "./engine/blobs";
+import { configMirrorDir, defaultStatePath, servedRepos, streamPath, transcriptPath, workspacesDir } from "./paths";
 import { type BlobStore, validBlobKey } from "./ports/blob";
 import { FactoryState, type Run, type RunStatus, type Stage, type StageRun } from "./state";
 
@@ -27,10 +27,18 @@ export function blobStoreFromEnv(env: NodeJS.ProcessEnv = process.env): BlobStor
   return env.FACTORY_BLOB_DIR ? new DiskBlobStore(env.FACTORY_BLOB_DIR) : undefined;
 }
 
+// A runner's store, which first sends the plane the config this runner started with.
+export function runnerBlobStore(cloneDir: string, repo: string, env = process.env): BlobStore | undefined {
+  const store = blobStoreFromEnv(env);
+  void shipConfig(store, cloneDir, repo);
+  return store;
+}
+
 // Where a key lives on this machine: the paths the dashboard's run page and proof routes read.
 export function localPathFor(key: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
   const k = validBlobKey(key) ? parseBlobKey(key) : undefined;
   if (!k || k.kind === "state") return undefined;
+  if (k.kind === "config") return join(configMirrorDir(k.repo, env), ".factory", k.file);
   const transcript = transcriptPath(k.repo, k.issue, env);
   if (k.kind === "transcript") return transcript;
   if (k.kind === "stream") return streamPath(transcript);
@@ -197,21 +205,21 @@ export async function mirrorDown(
           const k = parseBlobKey(key);
           const mine = k?.repo === repo ? k : undefined;
           const path = mine && localPathFor(key, env);
-          if (!mine || (mine.kind === "state" ? size > MAX_BLOB_BYTES : !path)) {
+          if (!mine || size > MAX_BLOB_BYTES || (mine.kind !== "state" && !path)) {
             console.error(`[blobs] mirror: skipped ${JSON.stringify(key)}`);
             continue;
           }
           if (path && (await stat(path).catch(() => undefined))?.size === size) continue;
           const body = await store.get(key);
           // The listed size is the store's word; the body read is the one that counts.
-          if (!body || (!path && body.byteLength > MAX_BLOB_BYTES)) continue;
-          if (!path) {
+          if (!body || body.byteLength > MAX_BLOB_BYTES) continue;
+          if (mine.kind === "state") {
             db ??= new FactoryState(defaultStatePath(env, repo));
             wrote += Number(importRunState(db, repo, mine.issue, body) > 0);
             continue;
           }
-          await mkdir(dirname(path), { recursive: true });
-          await Bun.write(path, body);
+          await mkdir(dirname(path!), { recursive: true });
+          await Bun.write(path!, body);
           wrote++;
         } catch (err) {
           console.error(`[blobs] mirror: ${JSON.stringify(key)}: ${err instanceof Error ? err.message : err}`);
