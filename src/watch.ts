@@ -14,7 +14,7 @@ import { resolveBlockers } from "./blockers";
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
-import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
+import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
@@ -47,7 +47,8 @@ import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
-import { TRUSTED_ROLES, type RepoRole } from "./ports/scm";
+import { TRUSTED_ROLES } from "./ports/scm";
+import { cachedRole, isWriter, writersOnly } from "./trust";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
 export interface PollResult {
@@ -128,26 +129,13 @@ function runFromStage(
 // Intake trust (P36): a label is a request to spend tokens and push a branch,
 // so it counts only from someone who could push that branch themselves.
 // Anyone else's factory:ready is taken off with a comment saying why.
-// One trust rule for labels and commands: write access or higher. A comment's
-// authorAssociation alone is not enough, since a read-only collaborator is a
-// COLLABORATOR too. Roles are cached for ROLE_CACHE_MS per SCM so a waiting
-// issue does not cost an API call every poll.
-export const ROLE_CACHE_MS = 5 * 60_000;
-const roleCache = new WeakMap<object, Map<string, { role: RepoRole; at: number }>>();
-async function roleOf(deps: WatchDeps, config: FactoryConfig, login: string): Promise<RepoRole> {
-  const cache = roleCache.get(deps.github) ?? new Map();
-  roleCache.set(deps.github, cache);
-  const key = `${config.repo}:${login}`;
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < ROLE_CACHE_MS) return hit.role;
-  const role = await deps.github.roleOf(config.repo, login);
-  cache.set(key, { role, at: Date.now() });
-  return role;
-}
-
-async function commandIsTrusted(deps: WatchDeps, config: FactoryConfig, comment: GhComment): Promise<boolean> {
-  return TRUSTED_ROLES.includes(await roleOf(deps, config, comment.author));
-}
+const roleOf = (deps: WatchDeps, config: FactoryConfig, login: string) => cachedRole(deps.github, config.repo, login);
+const commandIsTrusted = (deps: WatchDeps, config: FactoryConfig, c: GhComment) =>
+  isWriter(deps.github, config.repo, c);
+const keepTrusted = (deps: WatchDeps, config: FactoryConfig, comments: readonly GhComment[]) =>
+  writersOnly(deps.github, config.repo, comments);
+const trustedThread = async (deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<GhIssue> =>
+  Object.assign({}, issue, { comments: await keepTrusted(deps, config, issue.comments) });
 
 async function readyIsTrusted(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<boolean> {
   const by = await deps.github.labeledBy(config.repo, issue.number, LABEL.ready);
@@ -265,7 +253,7 @@ export async function resumeNeedsInfo(
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.needsInfo))) return "needs-human";
-  await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, reply.body);
+  await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, unsigned(reply.body));
   await deps.github.setStateLabel(
     config.repo,
     issue.number,
@@ -329,8 +317,8 @@ export async function resumeParked(
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
   if (!latest) return undefined;
   const verb = parseChatOps(latest.body).type;
+  // The caller hands over a writers-only thread (trustedThread), so this verb is a writer's.
   if (verb !== "cancel" && verb !== "retry") return undefined;
-  if (!(await commandIsTrusted(deps, config, latest))) return undefined;
   if (verb === "cancel") return cancelRun(issue, deps, config);
   // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
   const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
@@ -465,7 +453,11 @@ export async function resumeInReview(
   // is never picked up twice. The draft PR's comments and reviews count too.
   const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
   const since = lastRunner ? Date.parse(lastRunner.createdAt) : 0;
-  const prFeedback = await deps.github.prFeedback(config.repo, deps.git.branchName(issue.number));
+  const prFeedback = await keepTrusted(
+    deps,
+    config,
+    await deps.github.prFeedback(config.repo, deps.git.branchName(issue.number)),
+  );
   const latest = [...issue.comments, ...prFeedback]
     .filter((c) => isHumanComment(c) && Date.parse(c.createdAt) > since)
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
@@ -529,9 +521,11 @@ export async function reconcileClosed(
 // The single entry point every mode drives through: the pool (watch), a
 // one-off CLI call (`factory run --issue N`, for CI), and crash recovery all
 // call this with nothing but the issue's current GitHub state.
-export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome> {
-  const names = labelsOf(issue);
-  if (names.includes(LABEL.ready)) return processReadyIssue(issue, deps, config);
+export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, listed: GhIssue): Promise<Outcome> {
+  const names = labelsOf(listed);
+  // A fresh claim reads the live thread as stages post to it; nothing in it is a human command yet.
+  if (names.includes(LABEL.ready)) return processReadyIssue(listed, deps, config);
+  const issue = await trustedThread(deps, config, listed);
   // A parked run's PR merged by hand ships it; nothing else would, since only in-review checks.
   if (WAITING_LABELS.some((l) => names.includes(l)) && (await shipIfMerged(deps, config, issue)) === "shipped")
     return "shipped";
@@ -697,7 +691,8 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
   const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()].filter((i) =>
     canServe(deps.machine?.config.capabilities, i.labels),
   );
-  await runPool(issues, dispatchConcurrency(deps, config), async (issue) => {
+  await runPool(issues, dispatchConcurrency(deps, config), async (listed) => {
+    const issue = await trustedThread(deps, config, listed);
     const derived = deriveIssueState(issue, workflowOf(deps, issue));
     const worktree = worktreeFor(deps, issue.number);
     if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, labelOf(deps, issue, derived.resumeStage))))

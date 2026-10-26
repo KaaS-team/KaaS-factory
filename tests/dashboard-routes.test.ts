@@ -217,7 +217,10 @@ describe("inbox routes", () => {
         "127.0.0.1",
       );
     expect((await act(3, { action: "approve" })).status).toBe(200);
-    expect(github.posted).toEqual([{ issue: 3, body: "/factory approve" }]);
+    // The runner's account posts it, so the comment names who sent it.
+    expect(github.posted).toEqual([
+      { issue: 3, body: "/factory approve\n\n<sub>Sent from the factory control plane by the local owner</sub>" },
+    ]);
     expect((await act(3, { action: "retry" })).status).toBe(400);
     expect((await act(3, { action: "revise", text: " " })).status).toBe(400);
     expect((await act(4, { action: "cancel" })).status).toBe(404);
@@ -348,7 +351,10 @@ describe("multi-repo inbox", () => {
       "127.0.0.1",
     );
     expect(res.status).toBe(200);
-    expect(github.posted).toEqual([{ issue: 3, body: "/factory approve" }]);
+    // The runner's account posts it, so the comment names who sent it.
+    expect(github.posted).toEqual([
+      { issue: 3, body: "/factory approve\n\n<sub>Sent from the factory control plane by the local owner</sub>" },
+    ]);
   });
 });
 
@@ -761,7 +767,7 @@ describe("text is plain()-ed on every read route", () => {
         },
       ],
     };
-    const { dashboard, state } = await make(
+    const { mod, dashboard, state } = await make(
       "",
       [issue],
       project({
@@ -798,7 +804,7 @@ describe("text is plain()-ed on every read route", () => {
     writeFileSync(join(dir, "plan.md"), `plan${ESC}`);
 
     const gets = (dashboard.routeLabels as string[]).filter(
-      (l) => l.startsWith("GET ") && !["GET /", "GET /assets", "GET /api/stream"].includes(l),
+      (l) => l.startsWith("GET ") && !mod.PUBLIC_ROUTES.includes(l) && l !== "GET /api/stream",
     );
     expect(gets.length).toBeGreaterThan(8);
     for (const label of gets) {

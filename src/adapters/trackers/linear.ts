@@ -6,11 +6,13 @@ import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm"
 import {
   association,
   decodeBody,
+  description,
   encodeBody,
   IdMap,
   memoOnce,
   type Seal,
   VendorClient,
+  visibleOf,
   VendorHttpError,
   workspaceRole,
 } from "./kit";
@@ -140,7 +142,7 @@ export class LinearTracker implements TrackerPort {
     return {
       number: raw.number,
       title: raw.title,
-      body: decodeBody(raw.description ?? "", raw.creator?.id === self, this.seal, "description"),
+      body: decodeBody(raw.description ?? "", raw.creator?.id === self, this.seal, description(raw.number)),
       labels: raw.labels.nodes.map((l) => ({ name: l.name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -258,11 +260,13 @@ export class LinearTracker implements TrackerPort {
       input: {
         teamId: (await this.team()).id,
         title,
-        description: encodeBody(body, this.seal, "description"),
+        description: visibleOf(body),
         labelIds: await this.labelIds(labels),
       },
     });
-    return d.issueCreate.issue.number;
+    const n = d.issueCreate.issue.number;
+    if (visibleOf(body) !== body) await this.update(n, { description: encodeBody(body, this.seal, description(n)) });
+    return n;
   }
   async listLabels(): Promise<string[]> {
     return (await this.allLabels()).map((l) => l.name);

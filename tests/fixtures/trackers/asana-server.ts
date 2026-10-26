@@ -93,6 +93,7 @@ export class AsanaStore {
     if (!sub && method === "GET") return ok(this.view(t));
     if (!sub && method === "PUT") {
       if (typeof data.completed === "boolean") t.completed = data.completed;
+      if (typeof data.notes === "string") t.notes = strip(data.notes);
       return ok(this.view(t));
     }
     if (sub === "addTag") {

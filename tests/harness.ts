@@ -142,12 +142,9 @@ export class FakeGitHub extends GitHub {
   }
 
   // A human comment on the issue, from any association (default: the owner).
-  say(issue: number, body: string, authorAssociation = "OWNER"): void {
+  say(issue: number, body: string, authorAssociation = "OWNER", author = "human"): void {
     const i = this.issues.get(issue)!;
-    i.comments = [
-      ...i.comments,
-      { id: this.nextCommentId++, author: "human", authorAssociation, body, createdAt: nextIso() },
-    ];
+    i.comments = [...i.comments, { id: this.nextCommentId++, author, authorAssociation, body, createdAt: nextIso() }];
   }
 
   sayOnPr(body: string, authorAssociation = "OWNER"): void {

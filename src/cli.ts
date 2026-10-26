@@ -25,7 +25,7 @@ import { act, buildInbox, inboxPositionals, learningPrItems, parkReasons, type I
 import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
-import { createDashboard } from "../dashboard/server";
+import { createDashboard, servingAccess as plane } from "../dashboard/server";
 import { startRelay } from "../dashboard/relay";
 import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
@@ -507,14 +507,14 @@ function serveDashboard(
 ): number {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
-  const dashboard = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet, undefined, project);
+  const app = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet, undefined, project, plane());
   const server = Bun.serve({
     port,
     hostname,
-    fetch: (req: Request): Promise<Response> => dashboard.handle(req, server.requestIP(req)?.address),
+    fetch: (req: Request): Promise<Response> => app.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${port} (repo=${repo || "unset"})`);
-  startRelay(dashboard.handle);
+  startRelay(app.readInProcess);
   return port;
 }
 

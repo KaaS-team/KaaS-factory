@@ -6,12 +6,14 @@ import type { GhComment, GhIssue, RepoRole, TrackerPort } from "../../ports/scm"
 import {
   association,
   decodeBody,
+  description,
   encodeBody,
   IdMap,
   keyNumber,
   memoOnce,
   type Seal,
   VendorClient,
+  visibleOf,
   VendorHttpError,
 } from "./kit";
 
@@ -124,7 +126,7 @@ export class JiraTracker implements TrackerPort {
     return {
       number: keyNumber(raw.key),
       title: f.summary,
-      body: decodeBody(f.description ?? "", f.creator?.accountId === self, this.seal, "description"),
+      body: decodeBody(f.description ?? "", f.creator?.accountId === self, this.seal, description(keyNumber(raw.key))),
       labels: f.labels.map((name) => ({ name })),
       comments,
       state: closed ? "CLOSED" : "OPEN",
@@ -216,12 +218,17 @@ export class JiraTracker implements TrackerPort {
           project: { key: this.spec.project },
           issuetype: { name: this.spec.issueType ?? "Task" },
           summary: title,
-          description: encodeBody(body, this.seal, "description"),
+          description: visibleOf(body),
           labels,
         },
       },
     });
-    return keyNumber(key);
+    const n = keyNumber(key);
+    if (visibleOf(body) !== body)
+      await this.client.request("PUT", `/rest/api/2/issue/${key}`, {
+        body: { fields: { description: encodeBody(body, this.seal, description(n)) } },
+      });
+    return n;
   }
   async listLabels(): Promise<string[]> {
     const used = await this.pages<string>("/rest/api/2/label", "values");

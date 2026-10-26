@@ -1,5 +1,33 @@
 # Changelog
 
+## v5.2.0
+
+The dashboard becomes a control plane: people sign in, each has a role, and every command from the
+web is written to the tracker first. Upgraders: `FACTORY_DASHBOARD_TOKEN` keeps working as the
+break-glass owner; set `FACTORY_GITHUB_CLIENT_ID` and `FACTORY_GITHUB_CLIENT_SECRET` to turn on
+GitHub sign-in. See [docs/control-plane.md](docs/control-plane.md).
+
+- Sign-in and roles: GitHub sign-in, with viewer, approver, operator and owner roles kept in
+  `plane.db`. Every route names the least role it needs, and a test walks every route against every
+  role. A member is pinned to their GitHub account id, so a renamed login cannot be taken over.
+- Audit: every write from a signed-in caller is a row, refusals included, and owners read it at
+  `GET /api/audit`.
+- Commands: start a task, approve a plan, revise, answer, retry and cancel from the web. Each is a
+  comment on the issue, posted before the route answers and signed with who sent it, so a runner
+  that only polls still obeys it. A command the issue is not waiting for is refused with 409.
+- Tracker footers are sealed to the issue they live in, so a runner-written description pasted
+  into another issue reads as plain text there. A created issue with markers is written twice; see
+  docs/decisions/native-trackers.md.
+- Only comments from people with write access or higher are read when a run resumes. A read-only
+  collaborator's revise text no longer reaches the agent, and their comment no longer holds a
+  maintainer's reply. A comment carrying a `factory` marker is read as the runner's only when the
+  runner or a writer wrote it, so pasted markers no longer steer a run.
+- Not in this release: the factory as an MCP server (goal: factory-mcp-server), messages sent while
+  a stage runs and taking over a run (goal: mid-run-commands), and setting the autonomy mode from
+  the web (goal: set-mode-web). The audit row of a refused request does not record its issue yet.
+  One timing test in `tests/continuous-dispatch.test.ts` is known to fail now and then on a busy
+  machine; it passes on rerun.
+
 ## v5.1.0
 
 Software Factory is now KaaS Factory, an open-core product. Upgraders: point `FACTORY_RUNNER_REF`

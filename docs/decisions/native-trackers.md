@@ -9,6 +9,11 @@ are adapters under `src/adapters/trackers/`, each implementing the same `Tracker
   or a log, and errors name the path but never the query or more than 200 characters of a reply.
 - **Markers survive editors that strip HTML comments.** The runner keeps state in `<!-- factory -->`
   markers; the codec adds a `factory-data:` footer line and restores them on read.
+- **A footer is sealed to where it lives.** The seal covers whether it sits in a comment or in the
+  description of one issue, so a footer pasted elsewhere reads as plain text. A description can name
+  its issue only once the tracker has numbered it, so a created issue is written twice: its visible
+  text, then the sealed body. Until the second write lands its markers are absent, and if that write
+  fails the issue keeps only the visible text. Descriptions sealed before v5.2.0 read as visible text.
 - **Numbers, not strings.** The port speaks numeric issue and comment ids. Keys like `ENG-42` give their
   number; ClickUp ids are read as base 36; anything past a safe integer is refused rather than rounded,
   and vendor-wide UUIDs go through a 48-bit hash map that refills itself after a restart.

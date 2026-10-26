@@ -125,7 +125,7 @@ describe("a retro row is queued and run after each of the four final-outcome tri
     waiting.comments = [
       {
         id: 5,
-        author: "bot",
+        author: "factory-bot",
         authorAssociation: "OWNER",
         body: "<!-- factory:plan v1 rev=1 -->",
         createdAt: "2026-01-01T00:00:00Z",

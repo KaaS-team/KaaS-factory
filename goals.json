@@ -290,25 +290,40 @@
       "phase": "P2",
       "ask": "GitHub sign-in with users, memberships (owner, operator, approver, viewer), sessions and audit; the token is break-glass",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/plane-access.test.ts",
+        "name": "each role reaches exactly the routes its rank allows",
+        "mutation": "plane: a role gates every route"
+      }
     },
     {
       "id": "command-routes",
       "phase": "P2",
-      "ask": "start, approve plan, message, answer, cancel, takeover and set mode from the web, each written to the tracker first",
+      "ask": "start a task, approve plan, revise, answer, retry and cancel from the web, each written to the tracker first",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/plane-commands.test.ts",
+        "name": "each command is a signed comment on the issue before the route answers",
+        "mutation": "commands: each one is signed with its sender"
+      }
     },
     {
       "id": "issue-bound-seal",
       "phase": "P2",
       "ask": "A footer seal bound to the issue. One runner-written description pasted into another still decodes, since a description is sealed before the tracker gives it an id.",
       "source": "CHANGELOG v5.0.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/trackers-kit.test.ts",
+        "name": "a sealed description pasted into another issue's description reads as its visible text there",
+        "mutation": "tracker kit: a description seal names its issue"
+      }
     },
     {
       "id": "factory-mcp-server",
-      "phase": "P2",
+      "phase": "P3",
       "ask": "The factory is an MCP server, so any agent or IDE can start, read and approve tasks",
       "source": "plan approved 26 Oct 2026",
       "owner": "agent"
@@ -360,6 +375,13 @@
       "phase": "P3",
       "ask": "End to end from a phone: PWA trigger, board, factory, summary, human merge, public dashboard",
       "source": "spec 10 phone-intake",
+      "owner": "agent"
+    },
+    {
+      "id": "mid-run-commands",
+      "phase": "P3",
+      "ask": "a message sent mid-run, queued and undoable until a runner reads it; takeover from the web; cancelling a stage that is running (cut from command-routes: they need the runner signal channel)",
+      "source": "plan approved 26 Oct 2026",
       "owner": "agent"
     },
     {
@@ -533,6 +555,13 @@
       "phase": "P5",
       "ask": "A deterministic tool step in a workflow",
       "source": "CHANGELOG v4.0.0 #1",
+      "owner": "agent"
+    },
+    {
+      "id": "set-mode-web",
+      "phase": "P6",
+      "ask": "set a repo's autonomy mode from the web, written to the tracker first (cut from command-routes: the tiers land in P6)",
+      "source": "plan approved 26 Oct 2026",
       "owner": "agent"
     },
     {
@@ -918,11 +947,16 @@
       "phase": "P2",
       "ask": "`src/revision.ts` and `src/derive.ts` still take a revision's or answer's text from any `COLLABORATOR` comment; only the command itself is role-checked.",
       "source": "CHANGELOG v3.2.0 #7",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/scenarios.test.ts",
+        "name": "3c. a read-only collaborator's revise never reaches the agent, before or after a maintainer's",
+        "mutation": "watch: the thread keeps only writers' comments"
+      }
     },
     {
       "id": "ports-landed",
-      "phase": "P2",
+      "phase": "P3",
       "ask": "`StorePort`, `SecretsPort`, `NotifierPort` and `EventSourcePort` land with their adapters in v3.2 and v3.3; `ExecutionPort` is a single `run` until the remote runtimes need prepare, collect and teardown (v3.3).",
       "source": "CHANGELOG v3.1.0 #1",
       "owner": "agent"

@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import {
   association,
   decodeBody,
+  description,
   encodeBody,
   IdMap,
   keyNumber,
@@ -60,7 +61,15 @@ describe("marker footer codec", () => {
   test("a sealed comment pasted into a description reads as its visible text there", () => {
     const stored = encodeBody(body, seal, "comment");
     expect(decodeBody(stored, true, seal, "comment")).toBe(body);
-    expect(decodeBody(stored, true, seal, "description")).toBe(
+    expect(decodeBody(stored, true, seal, description(1))).toBe(
+      stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd(),
+    );
+  });
+
+  test("a sealed description pasted into another issue's description reads as its visible text there", () => {
+    const stored = encodeBody(body, seal, description(1));
+    expect(decodeBody(stored, true, seal, description(1))).toBe(body);
+    expect(decodeBody(stored, true, seal, description(2))).toBe(
       stored.slice(0, stored.lastIndexOf("factory-data: ")).trimEnd(),
     );
   });

@@ -147,6 +147,10 @@ body ends with a "Factory run" section (stage, agent, duration, tool calls, cost
 what needed help, takeovers included); `"prRunSummary": false` leaves it out, for a public repo
 that should not show models and spend.
 
+Your team signs in to the dashboard with GitHub, and an owner gives each person a role: viewer,
+approver, operator or owner. Every write is kept in an audit log. See
+[docs/control-plane.md](docs/control-plane.md).
+
 The dashboard installs as an app on a phone or desktop (Add to Home Screen, or the browser's
 install button) when it is served over https or from localhost. Its service worker keeps only the
 page itself, so without a relay the cockpit opens offline and shows nothing until it reaches the
