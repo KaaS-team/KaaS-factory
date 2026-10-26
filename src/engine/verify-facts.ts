@@ -1,8 +1,23 @@
 // The P6 pieces of the plan and verify steps, kept out of steps.ts: the plan's risk floor, the
 // monorepo proof command, and the PR facts a tiered merge reads.
-import { readStageArtifacts, type Risk } from "../artifacts";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  BLOCKING_CONFIDENCE,
+  COMMENT_FILENAMES,
+  JSON_FILENAMES,
+  readStageArtifacts,
+  runDir,
+  type Risk,
+} from "../artifacts";
+import { resolveRoute } from "../agents/executor";
 import type { FactoryConfig } from "../config";
-import { collectVerifyFacts, writeVerifyFacts } from "../pr-facts-collect";
+import type { GhIssue } from "../github";
+import { issueType } from "../labels";
+import { collectVerifyFacts, readVerifyFacts, writeVerifyFacts } from "../pr-facts-collect";
+import { isChecked } from "../recheck";
+import { crossModel } from "../review-models";
+import { labelsOf, runStage } from "./common";
 import { type ProofGit, type ProofResult, proofCommand } from "../proof";
 import { floorPlanRisk } from "../risk";
 
@@ -37,4 +52,53 @@ export async function recordVerifyFacts(
   } catch (err) {
     console.error(`verify facts for #${issue} were not collected:`, err);
   }
+}
+
+// High risk adds a second review session on a third model, neither the builder's nor the first
+// reviewer's. Its verdict joins the PR facts the receipt signs, and anything but a pass blocks the
+// merge. The first reviewer's files are put back, so the PR and the receipt still read its verdict.
+export async function secondReview(
+  deps: Parameters<typeof runStage>[0],
+  config: FactoryConfig,
+  issue: GhIssue,
+  worktree: string,
+  mcp?: readonly string[],
+  run = runStage,
+): Promise<void> {
+  const facts = await readVerifyFacts(worktree, issue.number);
+  const plan = (await readStageArtifacts(worktree, issue.number, "plan")).json as { risk?: unknown } | undefined;
+  if (!facts?.review || plan?.risk !== "high") return;
+  const type = issueType(config.routes, labelsOf(issue));
+  const route = (s: "build" | "verify") => resolveRoute(config.agents, config.stages, config.routes, s, type);
+  const [builder, verify] = [route("build"), route("verify")];
+  const model = crossModel(verify, builder, 1).config.model;
+  if (!model || model === builder.config.model || model === crossModel(verify, builder).config.model) return;
+  const dir = join(worktree, runDir(issue.number));
+  const names = [JSON_FILENAMES.verify, COMMENT_FILENAMES.verify, "question-comment.md"];
+  const kept = names.map((n) => (existsSync(join(dir, n)) ? readFileSync(join(dir, n)) : undefined));
+  let reviewer: { model: string; blockers: number; verdict: string };
+  try {
+    const result = await run(deps, config, issue, "verify", worktree, { mcp, reviewer: 1 });
+    const v = (await readStageArtifacts(worktree, issue.number, "verify")).json as
+      | { result?: string; findings?: unknown[] }
+      | undefined;
+    const blockers = (v?.findings ?? []).filter(
+      (f) => isChecked(f as never) && (f as { confidence: number }).confidence >= BLOCKING_CONFIDENCE,
+    ).length;
+    reviewer = {
+      model: result.model ?? model,
+      blockers,
+      verdict: result.exitCode === 0 ? (v?.result ?? "none") : "failed",
+    };
+  } finally {
+    names.forEach((n, i) => {
+      const body = kept[i];
+      if (body) writeFileSync(join(dir, n), body);
+      else rmSync(join(dir, n), { force: true });
+    });
+  }
+  await writeVerifyFacts(worktree, issue.number, {
+    ...facts,
+    review: { ...facts.review, reviewers: [...facts.review.reviewers, reviewer] },
+  });
 }

@@ -13,6 +13,7 @@ import { changeFailureRate, revertBranch, tightenThresholds, watchAfterMerge } f
 import { type PrFacts, mergeRecord, withMerge } from "./pr-facts";
 import { readVerifyFacts } from "./pr-facts-collect";
 import type { ScmPort } from "./ports/scm";
+import type { FactoryState } from "./state";
 import { buildStatement, receiptKey, renderReceipt, signStatement } from "./receipt";
 import { isChecked } from "./recheck";
 import { BLOCKING_CONFIDENCE, type Risk } from "./artifacts";
@@ -20,15 +21,18 @@ import { riskObject } from "./risk";
 import { uiFacts, smoke } from "./visual";
 
 const STATE = join(tmpdir(), "factory-merge");
-const historyFile = (repo: string) => join(STATE, `${repo.replaceAll("/", "__")}.history.json`);
 
-async function history(repo: string): Promise<{ reverted: boolean }[]> {
-  const f = Bun.file(historyFile(repo));
-  return (await f.exists()) ? ((await f.json()) as { reverted: boolean }[]) : [];
+// The merge history lives in the state DB beside the runs, so a reboot or another process on the
+// same DB keeps the change failure rate, and the limits it tightened stay tight.
+type History = Pick<FactoryState, "getSetting" | "setSetting">;
+const historyKey = (repo: string) => `merge-history:${repo}`;
+
+export function mergeHistory(state: History, repo: string): { reverted: boolean }[] {
+  return JSON.parse(state.getSetting(historyKey(repo)) || "[]") as { reverted: boolean }[];
 }
 
-async function remember(repo: string, reverted: boolean): Promise<void> {
-  await Bun.write(historyFile(repo), JSON.stringify([...(await history(repo)), { reverted }].slice(-50)));
+export function rememberMerge(state: History, repo: string, reverted: boolean): void {
+  state.setSetting(historyKey(repo), JSON.stringify([...mergeHistory(state, repo), { reverted }].slice(-50)));
 }
 
 export interface MergeContext {
@@ -41,16 +45,16 @@ type Github = Pick<ScmPort, "listIssuesByLabel" | "currentLogin" | "roleOf">;
 
 // Undefined when neither the web nor config set a tier: the merge then runs on merge.policy alone.
 export async function mergeContext(
-  github: Github,
+  deps: { github: Github; state: History },
   config: FactoryConfig,
   worktree: string,
   issue: number,
   changed: readonly ChangedFile[],
   pr: number,
 ): Promise<MergeContext | undefined> {
-  const set = (await webMode(github, config.repo).catch(() => undefined)) ?? config.merge.autonomy;
+  const set = (await webMode(deps.github, config.repo).catch(() => undefined)) ?? config.merge.autonomy;
   if (!set) return undefined;
-  const t = tightenThresholds(config.merge, set, changeFailureRate(await history(config.repo)));
+  const t = tightenThresholds(config.merge, set, changeFailureRate(mergeHistory(deps.state, config.repo)));
   const verify = await readVerifyFacts(worktree, issue);
   if (!verify) return { mode: t.mode, merge: { ...config.merge, ...t.limits } };
   const paths = changed.map((f) => f.path);
@@ -63,7 +67,10 @@ export async function mergeContext(
   ).length;
   const facts: PrFacts = {
     ...verify,
-    review: verify.review && { ...verify.review, reviewers: verify.review.reviewers.map((r) => ({ ...r, blockers })) },
+    review: verify.review && {
+      ...verify.review,
+      reviewers: verify.review.reviewers.map((r, i) => (i ? r : { ...r, blockers })),
+    },
     risk: riskObject(
       triage,
       { risk: plan?.risk, files: paths },
@@ -102,6 +109,7 @@ export async function rebaseOnBase(worktree: string, base: string, branch: strin
 
 export interface AutonomousMergeDeps {
   readonly github: Pick<ScmPort, "mergePr" | "createPr">;
+  readonly state: History;
   readonly lease?: Lease;
   readonly rebase?: () => Promise<string>;
   readonly smoke?: (url: string) => Promise<boolean>;
@@ -163,7 +171,7 @@ async function autonomousMerge(
           });
         },
       });
-      await remember(config.repo, !watched.ok);
+      rememberMerge(deps.state, config.repo, !watched.ok);
     },
   });
   return outcome === "merged";

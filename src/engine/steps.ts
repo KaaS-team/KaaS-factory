@@ -43,7 +43,7 @@ import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
 import type { Step, StepKind, Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
-import { flooredPlan, proofInputs, recordVerifyFacts } from "./verify-facts";
+import { flooredPlan, proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
 import {
   failureTail,
   finish,
@@ -348,7 +348,6 @@ const verify: StepType = {
         };
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
-      // After proof.json, since the facts' fail-to-pass is this run's proof status.
       await recordVerifyFacts(worktree, config, issueNumber, testCmd, proof);
     }
     const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
@@ -419,6 +418,7 @@ const verify: StepType = {
       }
       return { kind: "reject" };
     }
+    await secondReview(deps, config, issue, worktree, step.mcp);
     return { kind: "next", facts: json };
   },
 };

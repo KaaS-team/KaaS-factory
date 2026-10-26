@@ -61,6 +61,8 @@ export interface StageRunOptions {
   readonly scope?: IssueScope;
   // Verify rejects so far on this issue; each one moves the build a model tier up.
   readonly rejects?: number;
+  // Which verify reviewer this session is: 0 (unset) the first, 1 the high-risk second on a third model.
+  readonly reviewer?: number;
 }
 
 // The killedReason a `factory takeover` stop gets. watch.ts parks on it

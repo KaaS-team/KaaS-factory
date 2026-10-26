@@ -6,8 +6,7 @@ import { reviewerCount } from "./autonomy";
 
 export function reviewerModels(builder: string, risk: Risk, pool: readonly string[]): string[] {
   const others = [...new Set(pool)].filter((m) => m !== builder);
-  if (!others.length) return [];
-  return Array.from({ length: reviewerCount(risk) }, (_, i) => others[i % others.length]!);
+  return others.slice(0, reviewerCount(risk));
 }
 
 // The model the verify stage runs on: its own, unless that is the builder's, then the first other
@@ -32,9 +31,11 @@ interface ModelAgent {
 }
 
 // Verify never grades the build on the builder's own model; `builder` is the build route's agent.
-export function crossModel<A extends ModelAgent>(agent: A, builder: ModelAgent | undefined): A {
+// Reviewer `n` past the first takes the pool's n-th model other than the builder's, if it has one.
+export function crossModel<A extends ModelAgent>(agent: A, builder: ModelAgent | undefined, n = 0): A {
   if (!builder) return agent;
   const pool = [agent.config.model, ...Object.values(agent.config.models ?? {})];
-  const model = reviewModel(agent.config.model, builder.config.model, pool);
+  const others = [...new Set(pool)].filter((m): m is string => !!m && m !== builder.config.model);
+  const model = n ? (others[n] ?? agent.config.model) : reviewModel(agent.config.model, builder.config.model, pool);
   return model === agent.config.model ? agent : { ...agent, config: { ...agent.config, model } };
 }

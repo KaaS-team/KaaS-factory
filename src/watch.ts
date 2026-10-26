@@ -367,7 +367,7 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
     // The PR head, not the worktree's: the policy judges the commit --match-head-commit merges.
     const changedFiles = await deps.git.diffStat(worktree, config.base, readiness.headRefOid);
     const plan = await readStageArtifacts(worktree, issueNumber, "plan");
-    const auto = await mergeContext(deps.github, config, worktree, issueNumber, changedFiles, pr.number);
+    const auto = await mergeContext(deps, config, worktree, issueNumber, changedFiles, pr.number);
     const decision = decideMerge({
       readiness,
       ci,

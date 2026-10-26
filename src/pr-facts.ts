@@ -26,7 +26,7 @@ export interface PrFacts {
   // 7. reviewers on another model than the builder, with their unresolved blockers
   readonly review: {
     readonly builderModel: string;
-    readonly reviewers: readonly { readonly model: string; readonly blockers: number }[];
+    readonly reviewers: readonly { readonly model: string; readonly blockers: number; readonly verdict?: string }[];
   } | null;
   // 8. UI paths: preview, smoke and visual diffs nobody reviewed
   readonly ui: {
@@ -81,8 +81,11 @@ function reviewRefusals(facts: PrFacts, mode: Autonomy): MergeRefusal[] {
   if (!review) return [fail(7, "no review ran")];
   const others = review.reviewers.filter((r) => r.model !== review.builderModel);
   const need = STEERING[mode].reviewers(facts.risk.level);
+  const models = new Set(others.map((r) => r.model)).size;
   const out: MergeRefusal[] = [];
-  if (others.length < need) out.push(fail(7, `${others.length} reviewers on another model, ${need} needed`));
+  if (models < need) out.push(fail(7, `${models} reviewers on another model, ${need} needed`));
+  const red = others.filter((r) => r.verdict !== undefined && r.verdict !== "pass").length;
+  if (red) out.push(fail(7, `${red} review sessions did not pass`));
   const blockers = others.reduce((n, r) => n + r.blockers, 0);
   if (blockers) out.push(fail(7, `${blockers} unresolved blockers`));
   return out;

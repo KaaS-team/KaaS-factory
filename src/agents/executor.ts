@@ -162,7 +162,7 @@ export class CommandExecutor implements Executor {
     const agent =
       opts.prompt !== undefined && opts.agent
         ? resolveAgentByName(this.agents, opts.agent, opts.stage)
-        : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined);
+        : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined, opts.reviewer);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)
