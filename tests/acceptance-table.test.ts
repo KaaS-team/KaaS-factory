@@ -17,7 +17,8 @@ import {
 } from "../src/acceptance";
 import { CommandExecutor } from "../src/agents/executor";
 import { mergeConfig } from "../src/config";
-import { prBody, type WatchDeps } from "../src/engine/common";
+import type { WatchDeps } from "../src/engine/common";
+import { prBody, renderWhatChanged } from "../src/engine/pr-body";
 import type { StageName } from "../src/executor";
 import { LABEL } from "../src/labels";
 import type { ExecutionPort } from "../src/ports/execution";
@@ -113,7 +114,8 @@ describe("runAcceptance", () => {
 describe("prBody", () => {
   test("carries the table even when prRunSummary hides models and spend", () => {
     const config = mergeConfig({ repo: "o/r", prRunSummary: false });
-    const body = prBody({} as WatchDeps, config, {} as never, "Closes #1", {} as never, undefined, fixture);
+    const acceptance = renderAcceptanceTable(fixture);
+    const body = prBody({} as WatchDeps, config, {} as never, "Closes #1", {} as never, { acceptance });
     expect(body.startsWith("Closes #1\n\n## Acceptance")).toBe(true);
     expect(prBody({} as WatchDeps, config, {} as never, "Closes #1", {} as never)).toBe("Closes #1");
   });
@@ -166,26 +168,24 @@ describe("an unproven acceptance verdict rejects verify", () => {
     for (const d of dirs2) rmSync(d, { recursive: true, force: true });
   });
 
-  test("the build is sent back with the table, and a proven retry ships", async () => {
+  // Drives one issue from ready to a shipped PR, check-acceptance.py answering with each verdict in turn.
+  async function ship(verdicts: AcceptanceVerdict[], plan: Record<string, unknown>, changed: string[] = []) {
     const n = 1;
     const workspacesDir = mkdtempSync(join(tmpdir(), "factory-accept-ws-"));
     const cloneDir = mkdtempSync(join(tmpdir(), "factory-accept-clone-"));
     dirs2.push(workspacesDir, cloneDir);
     mkdirSync(join(workspacesDir, `issue-${n}`, "scripts/kaas"), { recursive: true });
     writeFileSync(join(workspacesDir, `issue-${n}`, ACCEPTANCE_SCRIPT), "");
-    const unproven = {
-      ...fixture,
-      acs: fixture.acs.map((r) => (r.new ? { ...r, head: "fail" as const, ok: false } : r)),
-    };
-    const verdicts = [unproven, fixture];
     const setupRunner = scripted({ "--json": () => JSON.stringify(verdicts.shift()) });
     const github = new FakeGitHub([baseIssue(n, [LABEL.ready])]);
     const state = new FactoryState(":memory:");
     state.setToggle("auto_approve_low_risk", true);
     const executor = new MultiStageExecutor();
+    const git = new FakeGit();
+    git.changed = changed;
     const deps = {
       github,
-      git: new FakeGit(),
+      git,
       state,
       executor,
       gateRunner: new FakeGateRunner(),
@@ -211,21 +211,81 @@ describe("an unproven acceptance verdict rejects verify", () => {
     });
     push("plan", {
       "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",
-      "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true }),
+      "plan.json": JSON.stringify({
+        risk: "low",
+        revision: 1,
+        files: ["src/a.ts"],
+        autoApproveEligible: true,
+        ...plan,
+      }),
     });
     const built = { "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) };
-    push("build", built);
-    push("build", built);
+    for (const _ of verdicts) push("build", built);
     push("verify", {
       "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
-      "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+      "verdict.json": JSON.stringify({
+        result: "pass",
+        rounds: 1,
+        findings: [],
+        criteria: [{ id: "AC-1", status: "pass" }],
+      }),
     });
     push("pr", { "pr-body.md": "Did it.\nCloses #1" });
-
     expect(await advanceIssue(deps, config, github.issues.get(n)!)).toBe("shipped");
-    const comments = github.issues.get(n)!.comments.map((c) => c.body);
+    return { github, setupRunner, body: github.createdPrs[0]!.body };
+  }
+
+  test("the build is sent back with the table, and a proven retry ships", async () => {
+    const unproven = {
+      ...fixture,
+      acs: fixture.acs.map((r) => (r.new ? { ...r, head: "fail" as const, ok: false } : r)),
+    };
+    const { github, setupRunner } = await ship([unproven, fixture], {});
+    const comments = github.issues.get(1)!.comments.map((c) => c.body);
     expect(comments.some((b) => b.includes("## Acceptance") && b.includes("Not proven: 1 of 2"))).toBe(true);
     expect(setupRunner.cmds.filter((c) => c.includes("--json"))).toHaveLength(2);
+  });
+
+  // #90: the kit checks every spec in the repo, and its whole table once became a PR's Acceptance.
+  test("the PR body names only this issue's own criteria, never another spec's", async () => {
+    const other = {
+      ...fixture.acs[0]!,
+      spec: "03-presigned-downloads",
+      text: "A presigned GET reproduces the signature.",
+    };
+    const plan = {
+      goal: "Monthly plan shows its price.",
+      spec: "07-pricing",
+      criteria: [{ id: "AC-1", text: "The pricing page shows 49 a month." }],
+    };
+    const { body } = await ship([{ ...fixture, acs: [...fixture.acs, other] }], plan, ["src/a.ts"]);
+    const acceptance = body.slice(body.indexOf("## Acceptance"));
+    expect(acceptance).toContain("| AC-1: The pricing page shows 49 a month. | pass |");
+    expect(acceptance).toContain("### Holdouts for 07-pricing");
+    expect(acceptance).toContain("| 07-pricing | AC-2: The monthly plan costs 49");
+    expect(body).not.toContain("presigned");
+    expect(acceptance).toContain("All 2 criteria proven.");
+  });
+
+  test("the PR body opens with What changed, built from the plan and the diff", async () => {
+    const plan = { goal: "Monthly plan shows its price.", criteria: [{ id: "AC-1", text: "Shows 49." }] };
+    const { body } = await ship([fixture], plan, ["src/a.ts", "tests/a.test.ts"]);
+    expect(body.startsWith("## What changed\n\nMonthly plan shows its price.\n")).toBe(true);
+    expect(body).toContain("- Files: `src/a.ts`, `tests/a.test.ts`");
+    expect(body.indexOf("Did it.")).toBeGreaterThan(body.indexOf("- Fails without it:"));
+    // A plan that names no spec shows none of the kit's rows.
+    expect(body).not.toContain("| 07-pricing |");
+    expect(body.lastIndexOf("## ")).toBe(body.indexOf("## Factory run"));
+  });
+
+  test("What changed names the test that fails without the change, or says none was shown", () => {
+    const proof = { status: "bites" as const, reverted: ["src/a.ts"], tests: ["tests/a.test.ts"], cmd: "x", tail: "" };
+    expect(renderWhatChanged("Goal.", ["src/a.ts"], proof)).toBe(
+      "## What changed\n\nGoal.\n\n- Files: `src/a.ts`\n- Fails without it: `tests/a.test.ts`, red with `src/a.ts` reverted",
+    );
+    expect(renderWhatChanged("Goal.", [], { ...proof, status: "passes-without" })).toContain(
+      "- Fails without it: no test shown (proof passes-without)",
+    );
   });
 
   test("proven means every row ok, no errors, and at least one criterion", () => {

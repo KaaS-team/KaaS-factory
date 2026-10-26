@@ -46,7 +46,10 @@ Closes #{{issue_number}}
 
 Keep it factual and short: what changed, how each AC was checked, what was
 deliberately left out (the non-goals). Do not restate the whole verdict
-comment; link to it instead of copying it.
+comment; link to it instead of copying it. The runner puts a `## What
+changed` section above your body (the plan's goal, the files in the diff,
+the test that fails without the change) and an `## Acceptance` section
+below it (`plan.json`'s criteria with verify's status), so write neither.
 
 ## 3. UI route: embed the screenshots
 

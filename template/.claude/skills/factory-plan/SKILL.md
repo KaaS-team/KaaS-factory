@@ -72,9 +72,14 @@ plan, or the previous revision + 1 when `revise.md` is present. Then write
   "revision": 1,
   "files": ["src/…"],
   "autoApproveEligible": true,
-  "proof": "test"
+  "proof": "test",
+  "goal": "the one-line goal, as the plan comment states it",
+  "criteria": [{ "id": "AC-1", "text": "the criterion, as the plan comment states it" }]
 }
 ```
+
+The PR body's What changed and Acceptance come from `goal` and `criteria` alone. Add
+`"spec": "<stem>"` only when the issue implements a `specs/` file, to show its holdouts.
 
 `outcome` is optional: `complete` (the default), `blocked` (you cannot go on and a human must
 look; put the reason in `summary`), or `failed`. No other fields are allowed [enforced: stop-artifact.sh].
