@@ -3,6 +3,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { S3Client } from "bun";
 import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
@@ -183,6 +184,8 @@ describe("a stage ships only files inside its worktree", () => {
     mkdirSync(run, { recursive: true });
     writeFileSync(join(run, "plan.json"), "{}");
     symlinkSync(secret, join(run, "secrets.txt"));
+    // A FIFO with no writer would block a plain open forever.
+    expect(spawnSync("mkfifo", [join(run, "pipe.log")]).status).toBe(0);
     expect(await shipStage(store, "acme/widgets", 1, wt)).toBe(1);
     expect(await store.get(blobKeys.artifact("acme/widgets", 1, "secrets.txt"))).toBeUndefined();
 

@@ -35,9 +35,10 @@ export function parseBlobKey(key: string): BlobKind | undefined {
 }
 
 // The agent writes the run directory, so a symlink there could point at the runner's secrets.
-// O_NOFOLLOW refuses a link, and reading the opened handle means the file cannot be swapped after the check.
+// O_NOFOLLOW refuses a link, O_NONBLOCK keeps a planted FIFO from hanging the open, and reading the
+// opened handle means the file cannot be swapped after the check.
 async function upload(store: BlobStore, key: string, path: string): Promise<boolean> {
-  const fh = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => undefined);
+  const fh = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK).catch(() => undefined);
   if (!fh) return false;
   try {
     const s = await fh.stat();
