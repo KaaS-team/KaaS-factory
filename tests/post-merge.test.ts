@@ -28,8 +28,8 @@ test("a failing live smoke after merge opens a revert PR, and the change failure
   writeFileSync(join(repo, "a.txt"), "bad");
   git(repo, "commit", "-qam", "bad");
   const bad = git(repo, "rev-parse", "HEAD");
-  process.env.GIT_AUTHOR_NAME = process.env.GIT_COMMITTER_NAME = "t";
-  process.env.GIT_AUTHOR_EMAIL = process.env.GIT_COMMITTER_EMAIL = "t@t";
+  git(repo, "config", "user.name", "t");
+  git(repo, "config", "user.email", "t@t");
   expect(await revertBranch(repo, bad)).toBe(`factory/revert-${bad.slice(0, 7)}`);
   expect(readFileSync(join(repo, "a.txt"), "utf8")).toBe("good");
 
