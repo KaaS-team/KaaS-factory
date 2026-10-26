@@ -1,5 +1,20 @@
 # Changelog
 
+## v5.0.1
+
+The goals ledger, so planned work is never dropped silently again. Upgraders: nothing to change.
+
+- `goals.json` lists every ask in the asker's words, with its phase and the proof that it is done:
+  a named test plus a mutation that turns it red, or a probe under `scripts/probes/`. Every deferral
+  in this changelog from v3.1.0 to v5.0.0 is a row.
+- `bun scripts/goals.ts` lints the ledger in `make check`. It refuses probes that only check a
+  file exists, echo or call `--help`; it lets only Param drop a goal, with a quote and a date; it
+  fails a release whose phase still has an unproven goal; and every deferral after v5.0.0 must cite
+  `(goal: id)`.
+- `--run` prints each goal red or green. `--next` prints the first unproven goal and runs at
+  SessionStart, so the next step survives a context reset.
+- Spec 10's factory rows now run this ledger instead of their own stubs.
+
 ## v5.0.0
 
 Any tracker, any agent, any sandbox, and a cockpit you can carry. Upgraders: nothing to change;

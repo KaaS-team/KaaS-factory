@@ -93,7 +93,7 @@
   {"name": "skills lint: description is plain YAML", "file": "template/.claude/skills/factory-plan/SKILL.md", "find": "marked proceed, with", "replace": "marked proceed: with", "test": "tests/skills.test.ts"},
   {"name": "skills lint: agent frontmatter keys", "file": "template/.claude/agents/factory-reviewer.md", "find": "color: purple\n", "replace": "color: purple\npermissionMode: default\n", "test": "tests/skills.test.ts"},
   {"name": "skills lint: checker agents cannot write", "file": "template/.claude/agents/factory-reviewer.md", "find": "tools: Read, Grep, Glob, Bash", "replace": "tools: Read, Grep, Glob, Bash, Edit", "test": "tests/skills.test.ts"},
-  {"name": "skills lint: no em dash", "file": "template/.claude/skills/factory-build/SKILL.md", "find": "No push, no `gh` access;", "replace": "No push, no `gh` access \u2014", "test": "tests/skills.test.ts"},
+  {"name": "skills lint: no em dash", "file": "template/.claude/skills/factory-build/SKILL.md", "find": "No push, no `gh` access;", "replace": "No push, no `gh` access —", "test": "tests/skills.test.ts"},
   {"name": "skills lint: no machine path", "file": "template/.factory/config.example.json", "find": "\"postEditCommand\": [],", "replace": "\"postEditCommand\": [\"~/.claude/x\"],", "test": "tests/skills.test.ts"},
   {"name": "skills lint: references are reachable", "file": "template/.claude/skills/factory-verify/SKILL.md", "find": "`.claude/skills/factory-verify/references/ui-route.md` and", "replace": "read the UI reference and", "test": "tests/skills.test.ts"},
   {"name": "skills lint: enforced tags name a shipped hook", "file": "template/.claude/skills/factory-verify/SKILL.md", "find": "[enforced: stop-artifact.sh]", "replace": "[enforced: stop-schema.sh]", "test": "tests/skills.test.ts"},
@@ -530,5 +530,17 @@
   {"name": "footer: seal binds the field", "file": "src/adapters/trackers/kit.ts", "find": "seal(JSON.stringify([field, norm(visible), body]));", "replace": "seal(JSON.stringify([norm(visible), body]));", "test": "tests/trackers-kit.test.ts"},
   {"name": "footer: linear description field", "file": "src/adapters/trackers/linear.ts", "find": "raw.creator?.id === self, this.seal, \"description\")", "replace": "raw.creator?.id === self, this.seal, \"comment\")", "test": "tests/trackers-linear.test.ts"},
   {"name": "relay publisher: each publish opens a fresh connection", "file": "dashboard/relay.ts", "find": "        keepalive: false,\n", "replace": "", "test": "tests/relay.test.ts"},
-  {"name": "repo: relay build output is ignored", "file": ".gitignore", "find": "relay/target/\n", "replace": "", "test": "tests/repo-setup.test.ts"}
+  {"name": "repo: relay build output is ignored", "file": ".gitignore", "find": "relay/target/\n", "replace": "", "test": "tests/repo-setup.test.ts"},
+  {"name": "goals: the ledger lints", "file": "goals.json", "find": "\"id\": \"goals-ledger\"", "replace": "\"id\": \"spec10-delegates\"", "test": "tests/goals.test.ts"},
+  {"name": "goals: weak probes are refused", "file": "scripts/goals.ts", "find": "if (/--help\\b/.test(body)) return \"calls --help\";", "replace": "", "test": "tests/goals.test.ts"},
+  {"name": "goals: a test proof needs its mutation", "file": "scripts/goals.ts", "find": "if (mutations.get(p.mutation) !== p.test)", "replace": "if (false)", "test": "tests/goals.test.ts"},
+  {"name": "goals: out needs Param's words", "file": "scripts/goals.ts", "find": "if (g.out && (g.out.by !== \"param\"", "replace": "if (false && g.out && (g.out.by !== \"param\"", "test": "tests/goals.test.ts"},
+  {"name": "goals: deferrals name a goal", "file": "scripts/goals.ts", "find": "if (!id) errs.push(", "replace": "if (false) errs.push(", "test": "tests/goals.test.ts"},
+  {"name": "goals: the release gate", "file": "scripts/goals.ts", "find": "&& !p && !g.out)", "replace": "&& false)", "test": "tests/goals.test.ts"},
+  {"name": "goals: SessionStart runs --next", "file": ".claude/settings.json", "find": "bun scripts/goals.ts --next", "replace": "true", "test": "tests/goals.test.ts"},
+  {"name": "goals: backfill covers every bullet", "file": "goals.json", "find": "\"source\": \"CHANGELOG v3.1.0 #5\"", "replace": "\"source\": \"CHANGELOG v3.1.0 #4\"", "test": "tests/goals.test.ts"},
+  {"name": "pool: the report shows minutes left", "file": "src/core/sandbox-pool.ts", "find": "left: tenth(minutesLeft(m, u)),", "replace": "left: tenth(m.minutes),", "test": "tests/sandbox-pool.test.ts"},
+  {"name": "goals: || true is a weak probe", "file": "scripts/goals.ts", "find": "if (/\\|\\|\\s*(true|:)\\s*(;|$)/m.test(body))", "replace": "if (false)", "test": "tests/goals.test.ts"},
+  {"name": "goals: a probe stays in scripts/probes", "file": "scripts/goals.ts", "find": "if (!/^scripts\\/probes\\/[\\w-]+\\.sh$/.test(p.probe))", "replace": "if (!p.probe.startsWith(\"scripts/probes/\"))", "test": "tests/goals.test.ts"},
+  {"name": "goals: a test proof names a real test call", "file": "scripts/goals.ts", "find": "`(^|\\\\n)\\\\s*(test|it)", "replace": "`(test|it)", "test": "tests/goals.test.ts"}
 ]
