@@ -782,5 +782,7 @@
   {"name": "blobs: a state field of the wrong type is refused", "file": "src/blobs.ts", "find": "? Number.isSafeInteger(v)", "replace": "? true", "test": "tests/blobs.test.ts"},
   {"name": "blobs: a run status outside the schema is refused", "file": "src/blobs.ts", "find": "if (cols === RUN_COLS && !Object.hasOwn(STATUSES, String(r.status))) return undefined;", "replace": "", "test": "tests/blobs.test.ts"},
   {"name": "blobs: a state file with too many stage rows is imported", "file": "src/blobs.ts", "find": "file.stages.length <= MAX_STAGE_ROWS", "replace": "true", "test": "tests/blobs.test.ts"},
-  {"name": "blobs: a state body over the cap is imported when listed small", "file": "src/blobs.ts", "find": "(!path && body.byteLength > MAX_BLOB_BYTES)", "replace": "false", "test": "tests/blobs.test.ts"}
+  {"name": "blobs: a state body over the cap is imported when listed small", "file": "src/blobs.ts", "find": "(!path && body.byteLength > MAX_BLOB_BYTES)", "replace": "false", "test": "tests/blobs.test.ts"},
+  {"name": "blobs: a state file's pr_url may point anywhere", "file": "src/blobs.ts", "find": "!isPrOf(String(out.$pr_url), repo)", "replace": "false", "test": "tests/blobs.test.ts"},
+  {"name": "blobs: a pr_url of another repo's PR or a trailing path is imported", "file": "src/blobs.ts", "find": "/^\\d+$/.test(", "replace": "/^\\d+/.test(", "test": "tests/blobs.test.ts"}
 ]

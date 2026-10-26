@@ -312,6 +312,9 @@ describe("the plane writes a runner's run rows into that repo's own DB", () => {
       { ...good, stages: [{ ...stage0, tokens_in: "3" }] },
       { ...good, run: { ...good.run, status: "pwned" } },
       { ...good, stages: "x" },
+      { ...good, run: { ...good.run, pr_url: "javascript:alert(1)" } },
+      { ...good, run: { ...good.run, pr_url: "https://github.com/acme/b/pull/1" } },
+      { ...good, run: { ...good.run, pr_url: "https://github.com/acme/widgets/pull/1/../../x" } },
       { ...good, stages: Array.from({ length: 1001 }, (_, i) => ({ ...stage0, started_at: `${i}` })) },
     ])
       expect(() => importRunState(st, "acme/widgets", 5, body(bad))).toThrow("is not a run of that issue");
@@ -319,6 +322,13 @@ describe("the plane writes a runner's run rows into that repo's own DB", () => {
     expect(st.listRuns()).toEqual([]);
     expect(importRunState(st, "acme/widgets", 5, body(good))).toBe(3);
     expect(importRunState(st, "acme/widgets", 5, body(good))).toBe(0);
+    importRunState(
+      st,
+      "acme/widgets",
+      5,
+      body({ ...good, run: { ...good.run, pr_url: "https://github.com/acme/widgets/pull/12" } }),
+    );
+    expect(st.getRun("acme/widgets", 5)?.pr_url).toBe("https://github.com/acme/widgets/pull/12");
     // The status comment id steers the plane's own edits, so a file never sets it.
     importRunState(st, "acme/widgets", 5, body({ ...good, run: { ...good.run, status_comment_id: 99 } }));
     expect(st.getRun("acme/widgets", 5)?.status_comment_id ?? null).toBeNull();

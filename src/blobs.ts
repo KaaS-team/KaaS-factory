@@ -118,8 +118,14 @@ function bind(row: unknown, cols: Record<string, Col>, repo: string, issue: numb
     if (!ok) return undefined;
     out[`$${k}`] = v as string | number | null;
   }
+  // The run page links pr_url, so a planted javascript: or foreign URL would be one click away.
+  if (cols === RUN_COLS && out.$pr_url !== null && !isPrOf(String(out.$pr_url), repo)) return undefined;
   return out;
 }
+
+const isPrOf = (url: string, repo: string) =>
+  url.toLowerCase().startsWith(`https://github.com/${repo.toLowerCase()}/pull/`) &&
+  /^\d+$/.test(url.slice(`https://github.com/${repo}/pull/`.length));
 
 // The plane's own ids differ from the runner's, so a stage attempt is known by (repo, issue, stage,
 // started_at). Each write skips a row that already matches, so a replay changes nothing.
