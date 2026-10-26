@@ -24,12 +24,13 @@ Every SQLite file lives under `FACTORY_HOME` (`/data` in the image).
 | `KAAS_RELAY_PUBLISH_TOKEN`, `KAAS_RELAY_SUBSCRIBE_TOKEN` | Relay tokens, 16 characters or more and different. Unset, `up` makes a pair and writes the subscribe token to `$FACTORY_HOME/relay-subscribe-token`. |
 | `FACTORY_BLOB_BUCKET`, `FACTORY_BLOB_ENDPOINT`, `FACTORY_BLOB_ACCESS_KEY_ID`, `FACTORY_BLOB_SECRET_ACCESS_KEY`, `FACTORY_BLOB_REGION` | An S3-compatible bucket (Cloudflare R2 works). |
 | `FACTORY_BLOB_DIR` | A shared directory instead of a bucket. |
+| `FACTORY_BLOB_REPOS` | Comma-separated `owner/name` list the plane mirrors. Defaults to `FACTORY_REPO`; with neither, nothing is mirrored. |
 
 ## The blob store
 
 A runner on another machine uploads each stage's transcript and artifacts when the stage ends,
-under `runs/<owner>/<name>/issue-N/`. The plane copies new keys onto its own run paths every 30
-seconds, so its run page shows them. Set the same blob variables on the plane and on every runner.
+under `runs/<owner>/<name>/issue-N/`. Every 30 seconds the plane copies new keys onto its own run
+paths, for the repos it serves only, so its run page shows them. It skips and logs any other key. Set the same blob variables on the plane and on every runner.
 Agents never see them: the executor strips every `FACTORY_` variable.
 
 ## Memory

@@ -7,11 +7,11 @@ import { join } from "node:path";
 import { S3Client } from "bun";
 import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
 import { S3BlobStore } from "../src/adapters/blob-s3/blob";
-import { blobStoreFromEnv, localPathFor, mirrorDown } from "../src/blobs";
+import { blobStoreFromEnv, localPathFor, mirroredRepos, mirrorDown } from "../src/blobs";
 import { mergeConfig } from "../src/config";
 import { blobKeys, parseBlobKey } from "../src/engine/blobs";
 import { LABEL } from "../src/labels";
-import type { BlobStore } from "../src/ports/blob";
+import type { BlobEntry, BlobStore } from "../src/ports/blob";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
 import {
@@ -164,11 +164,38 @@ describe("a stage ships its run to the blob store", () => {
     const shipped = text(await store.get(key))!;
     expect(JSON.parse(shipped)).toEqual(JSON.parse(triage));
 
-    const plane = { FACTORY_HOME: tmp("blobs-plane-") };
+    const plane = { FACTORY_HOME: tmp("blobs-plane-"), FACTORY_REPO: "acme/widgets" };
     expect(await mirrorDown(store, plane)).toBeGreaterThan(0);
     const local = localPathFor(key, plane)!;
     expect(existsSync(local)).toBe(true);
     expect(readFileSync(local, "utf8")).toBe(shipped);
     expect(await mirrorDown(store, plane)).toBe(0);
+  });
+});
+
+describe("the plane mirrors only what it serves", () => {
+  test("a key for an unlisted repo and a malformed key are skipped while a valid one mirrors", async () => {
+    const good = blobKeys.artifact("acme/widgets", 2, "plan.json");
+    const objects = new Map<string, string>([
+      [good, "{}"],
+      [blobKeys.artifact("evil/other", 2, "plan.json"), "planted"],
+      ["runs/acme/widgets/../../evil/x/issue-1/files/a.md", "climb"],
+      ["runs/acme/widgets/issue-2/files/sub/deep.md", "nested"],
+    ]);
+    // Serves whatever a runner wrote with no key check, and ignores the prefix, so the mirror's
+    // own repo check is what keeps another repo's keys off the plane.
+    const store: BlobStore = {
+      put: async () => {},
+      get: async (k) => (objects.has(k) ? bytes(objects.get(k)!) : undefined),
+      list: async (): Promise<BlobEntry[]> => [...objects].map(([key, v]) => ({ key, size: v.length })),
+    };
+    const plane = { FACTORY_HOME: tmp("blobs-allow-"), FACTORY_REPO: "acme/widgets" };
+    expect(mirroredRepos(plane)).toEqual(["acme/widgets"]);
+    expect(mirroredRepos({ FACTORY_BLOB_REPOS: "a/b, ../x ,c" })).toEqual(["a/b"]);
+    expect(await mirrorDown(store, plane)).toBe(1);
+    expect(readFileSync(localPathFor(good, plane)!, "utf8")).toBe("{}");
+    expect(localPathFor("runs/acme/widgets/../../evil/x/issue-1/files/a.md", plane)).toBeUndefined();
+    expect(existsSync(localPathFor(blobKeys.artifact("evil/other", 2, "plan.json"), plane)!)).toBe(false);
+    expect(await mirrorDown(store, { FACTORY_HOME: plane.FACTORY_HOME })).toBe(0);
   });
 });
