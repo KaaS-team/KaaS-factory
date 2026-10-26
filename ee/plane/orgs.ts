@@ -10,42 +10,14 @@ import { json } from "./http";
 const PLANE_WIDE = new Set(["GET /api/me", "POST /api/logout"]);
 // Lists the core narrows to the caller's repos through visibleRepos, so the gate lets them through.
 const LISTS = new Set(["GET /api/line"]);
-// Where each repo-taking core route reads its repo (dashboard/server.ts); every other route acts on
-// the plane's own repo, whatever the request says. ee/tests/org-mode.test.ts pins both sets.
-export const QUERY_REPO = new Set([
-  "GET /api/issues/:n/thread",
-  "GET /api/issues/:n/review",
-  "GET /api/issues/:n/live",
-  "GET /api/issues/:n/proof",
-  "GET /api/inbox",
-]);
-export const BODY_REPO = new Set(["POST /api/issues/:n/merge", "POST /api/inbox/:n/act"]);
 const NAME = /^[a-z][a-z\d-]{1,38}$/;
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 
-// The repo a route acts on, read the way its handler reads it, or a 400 for a request that names
-// two repos or a repo that is not a string.
-async function targetRepo(req: Request, label: string, defaultRepo: string): Promise<string | Response> {
-  const q = new URL(req.url).searchParams.get("repo") || undefined;
-  let named: unknown;
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    const b = (await req
-      .clone()
-      .json()
-      .catch(() => null)) as { repo?: unknown } | null;
-    named = b && typeof b === "object" ? b.repo : undefined;
-  }
-  if (named !== undefined && typeof named !== "string") return json({ error: "repo must be a string" }, 400);
-  const body = named || undefined;
-  if (q && body && q !== body) return json({ error: "?repo= and the body name different repos" }, 400);
-  if (QUERY_REPO.has(label)) return q ?? defaultRepo;
-  if (BODY_REPO.has(label)) return body ?? defaultRepo;
-  return defaultRepo;
-}
-
 export function orgsExtension(defaultRepo: string): PlaneExtension {
   let roleIn: (login: string, repo: string) => Role | null | undefined = () => undefined;
+  let repoOf: (req: Request) => string = () => "";
   const routes = (ctx: PlaneContext): Route[] => {
+    repoOf = ctx.repoOf;
     const db = ctx.store.database;
     db.exec(`CREATE TABLE IF NOT EXISTS ee_org_repos (repo TEXT PRIMARY KEY, org TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS ee_org_members (org TEXT NOT NULL, login TEXT NOT NULL, role TEXT NOT NULL,
@@ -115,14 +87,13 @@ export function orgsExtension(defaultRepo: string): PlaneExtension {
   return {
     name: "orgs",
     routes,
-    allows: async (who, route, req) => {
+    allows: (who, route, req) => {
       const need = route.role ?? "owner";
       // Plane owners run the fleet; owner-only routes stay with the plane ladder.
       if (atLeast(who.role, "owner") || need === "owner" || PLANE_WIDE.has(route.label)) return undefined;
-      const unfiltered = route.label === "GET /api/inbox" && !new URL(req.url).searchParams.get("repo");
-      if (LISTS.has(route.label) || unfiltered) return undefined;
-      const target = await targetRepo(req, route.label, defaultRepo);
-      if (target instanceof Response) return target;
+      // The plane resolved a scoped route's repo before this runs; an unscoped route acts on the plane's own.
+      const target = route.repo ? repoOf(req) : defaultRepo;
+      if (LISTS.has(route.label) || (route.repo === "filter" && !target)) return undefined;
       const role = roleIn(who.login, target);
       // A repo no org owns is the fleet's, so only plane owners reach it.
       if (!role) return false;

@@ -8,7 +8,7 @@ import { DiskBlobStore } from "./adapters/blob-disk/blob";
 import { S3BlobStore } from "./adapters/blob-s3/blob";
 import { runDir } from "./artifacts";
 import { parseBlobKey, RUNS_PREFIX } from "./engine/blobs";
-import { streamPath, transcriptPath, workspacesDir } from "./paths";
+import { servedRepos, streamPath, transcriptPath, workspacesDir } from "./paths";
 import { type BlobStore, validBlobKey } from "./ports/blob";
 
 export function blobStoreFromEnv(env: NodeJS.ProcessEnv = process.env): BlobStore | undefined {
@@ -39,11 +39,7 @@ export function localPathFor(key: string, env: NodeJS.ProcessEnv = process.env):
 // The repos this plane serves. Any runner holding the bucket key can write any key, so the mirror
 // reads only these prefixes and never plants another repo's files on the plane.
 export function mirroredRepos(env: NodeJS.ProcessEnv = process.env): string[] {
-  const raw = env.FACTORY_BLOB_REPOS ?? env.FACTORY_REPO ?? "";
-  return raw
-    .split(",")
-    .map((r) => r.trim())
-    .filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r) && validBlobKey(r));
+  return servedRepos(env, env.FACTORY_REPO ?? "").filter(validBlobKey);
 }
 
 // Copies every key whose local copy is missing or a different size; returns how many it wrote.

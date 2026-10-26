@@ -4,6 +4,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { planeExtensions, type PlaneContext, type PlaneExtension } from "./extension";
 import { withheld } from "./operator-detail";
+import { type RepoScope, type RepoSource, resolveRepo } from "./repo-scope";
 import { atLeast, isRole, PlaneStore, type Role } from "./store";
 
 export type Handler = (req: Request, url: URL, m: RegExpMatchArray) => Response | Promise<Response>;
@@ -17,6 +18,8 @@ export interface Route {
   // The route checks its own credential (a signed assertion, a SCIM token), so the plane lets the
   // caller through unauthenticated and skips the cookie CSRF check, which only guards cookie auth.
   readonly public?: boolean;
+  // Where the route reads its repo; a route without one acts on no repo or on them all.
+  readonly repo?: RepoSource;
 }
 
 export interface Actor {
@@ -285,6 +288,13 @@ export function createAccess(opts: AccessOptions) {
   // handle() resolves the caller once; handlers read it back here.
   const seenActors = new WeakMap<Request, Actor>();
   const actorOf = (req: Request) => seenActors.get(req);
+  const seenRepos = new WeakMap<Request, string>();
+  // A handler that reads a repo its route never declared would act on a guess, so it fails loudly.
+  const repoOf = (req: Request) => {
+    const repo = seenRepos.get(req);
+    if (repo === undefined) throw new Error("this route reads a repo but declares no repo scope");
+    return repo;
+  };
 
   const ctx: PlaneContext = {
     store,
@@ -292,6 +302,7 @@ export function createAccess(opts: AccessOptions) {
     fetch: doFetch,
     startSession: (req, login, to = "/") => startSession(req, login, { location: to }, 302),
     actorOf,
+    repoOf,
     member,
   };
   for (const e of exts) routes.push(...(e.routes?.(ctx) ?? []));
@@ -306,11 +317,23 @@ export function createAccess(opts: AccessOptions) {
   }
 
   // Returns a refusal, or null when the caller may run the route.
-  async function gate(req: Request, route: Route | undefined, isPublic: boolean, loopback: boolean, inProcess = false) {
+  async function gate(
+    req: Request,
+    route: Route | undefined,
+    isPublic: boolean,
+    loopback: boolean,
+    inProcess = false,
+    scope?: RepoScope,
+  ) {
     if (isPublic) return null;
     const who = inProcess ? IN_PROCESS : actor(req, loopback);
     if (!who) return json({ error: "unauthorized" }, 401);
     seenActors.set(req, who);
+    if (route?.repo && scope) {
+      const repo = await resolveRepo(req, route.repo, scope, (r) => visibleRepos(req, r));
+      if (repo instanceof Response) return repo;
+      seenRepos.set(req, repo);
+    }
     const need = route?.role ?? "owner";
     const verdict = await permitted(who, route, req);
     if (verdict instanceof Response) return verdict;
@@ -363,5 +386,5 @@ export function createAccess(opts: AccessOptions) {
     return exts.reduce((left, e) => (who && e.visibleRepos ? e.visibleRepos(who, left) : left), [...repos]);
   };
 
-  return { routes, guarded, gate, audited, actorOf, visibleRepos, store, startSession };
+  return { routes, guarded, gate, audited, actorOf, repoOf, visibleRepos, store, startSession };
 }

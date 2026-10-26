@@ -9,7 +9,7 @@ import { type CommandDeps, commandRoutes, senderName } from "./commands";
 
 export interface ModeDeps {
   github: Pick<ScmPort, "listIssuesByLabel" | "createIssue" | "commentIssue" | "currentLogin" | "roleOf">;
-  repo: string;
+  repoOf: (req: Request) => string;
   actorOf: (req: Request) => Actor | undefined;
   senderName: (actor: Actor | undefined) => string;
 }
@@ -26,7 +26,8 @@ export function modeRoutes(deps: ModeDeps): Route[] {
       pattern: /^\/api\/mode$/,
       label: "GET /api/mode",
       role: "viewer",
-      handler: async () => json({ mode: (await webMode(deps.github, deps.repo)) ?? null }),
+      repo: "query",
+      handler: async (req) => json({ mode: (await webMode(deps.github, deps.repoOf(req))) ?? null }),
     },
     {
       method: "POST",
@@ -34,20 +35,20 @@ export function modeRoutes(deps: ModeDeps): Route[] {
       label: "POST /api/mode",
       // Autonomy decides whether a person merges at all, so only an owner moves it.
       role: "owner",
+      repo: "body",
       handler: async (req) => {
-        if (!deps.repo) return json({ error: "FACTORY_REPO not set" }, 500);
+        const repo = deps.repoOf(req);
         const body = (await req.json().catch(() => ({}))) as { mode?: unknown };
         if (!AUTONOMY_MODES.includes(body.mode as Autonomy))
           return json({ error: `mode must be one of ${AUTONOMY_MODES.join(", ")}` }, 400);
         const mode = body.mode as Autonomy;
-        const found = (await deps.github.listIssuesByLabel(deps.repo, CONTROL_LABEL))[0]?.number;
-        const issue =
-          found ?? (await deps.github.createIssue(deps.repo, "Factory control", CONTROL_BODY, [CONTROL_LABEL]));
+        const found = (await deps.github.listIssuesByLabel(repo, CONTROL_LABEL))[0]?.number;
+        const issue = found ?? (await deps.github.createIssue(repo, "Factory control", CONTROL_BODY, [CONTROL_LABEL]));
         const text = signedBy(
           `Autonomy is now **${mode}**.\n\n${modeMarker(mode)}`,
           deps.senderName(deps.actorOf(req)),
         );
-        await deps.github.commentIssue(deps.repo, issue, text);
+        await deps.github.commentIssue(repo, issue, text);
         return json({ ok: true, mode, issue });
       },
     },

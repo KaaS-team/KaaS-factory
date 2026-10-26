@@ -11,6 +11,8 @@ export interface PlaneContext {
   // Opens a session for a login and redirects to `to`; the caller has already proved who it is.
   startSession(req: Request, login: string, to?: string): Response;
   actorOf(req: Request): Actor | undefined;
+  // The repo a scoped route acts on, resolved before any extension runs; "" for an unscoped route.
+  repoOf(req: Request): string;
   // The member behind a login, custom roles resolved; null when the plane does not know them.
   member(login: string): Actor | null;
 }

@@ -2,8 +2,8 @@
 // replies go out through github.ts as the signed-in `gh` user. /api/board alone reads GitHub labels
 // (dashboard/board.ts), so the board works on a CI or VM run with no local SQLite at all.
 
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ScmPort } from "../src/github";
 import { makeScm } from "../src/scm";
@@ -18,7 +18,7 @@ import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
 import { DEFAULT_CONFIG, eventsInboundSecretEnv, type FactoryConfig } from "../src/config";
-import { defaultStatePath, discoverRepos, factoryHome, streamPath, transcriptPath, workspacesDir } from "../src/paths";
+import { defaultStatePath, factoryHome, servedRepos, streamPath, transcriptPath, workspacesDir } from "../src/paths";
 import { liveItems, proofView } from "./run-page";
 import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
@@ -28,7 +28,9 @@ import { HEALTH_ROUTE, healthRoute } from "./health";
 import { NO_PROJECT, settingsWithHealth, type DashboardProject } from "./project";
 import { workflowRoutes } from "./workflow-routes";
 import { harnessReport } from "../src/harness";
+import { artifacts } from "./artifacts";
 import { createAccess, type Route } from "./plane/access";
+import { type RepoScope, runIn } from "./plane/repo-scope";
 import { PlaneStore } from "./plane/store";
 import { senderName } from "./plane/commands";
 import { planeRoutes } from "./plane/mode";
@@ -89,8 +91,6 @@ const ASSET_TYPES: Record<string, string> = {
   webmanifest: "application/manifest+json",
   png: "image/png",
 };
-
-export const ARTIFACT_LIMIT = 1024 * 1024;
 
 function plainRun<T extends { title: string; reason?: string | null }>(run: T): T {
   return { ...run, title: plain(run.title), ...(run.reason ? { reason: plain(run.reason) } : {}) };
@@ -237,24 +237,20 @@ export function createDashboard(
     return promise;
   }
 
-  async function cachedIssues() {
-    return cachedIssuesFor(repo);
-  }
-
-  // Every repo the multi-repo inbox reads from (v2.9.0 item 2): an explicit
-  // FACTORY_REPOS list, else the single configured repo, else whatever repos
-  // have ever run under FACTORY_HOME.
-  // With no repo of its own the plane lists every repo's runs, so tenancy narrows them to the caller's.
-  const visibleRuns = (req: Request) =>
-    state.listRuns(repo || undefined).filter((r) => access.visibleRepos(req, [r.repo]).length);
-  function inboxRepos(): string[] {
-    const fromEnv = (process.env.FACTORY_REPOS ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (fromEnv.length > 0) return fromEnv;
-    return repo ? [repo] : discoverRepos();
-  }
+  const inboxRepos = () => servedRepos(process.env, repo);
+  const scope: RepoScope = { served: inboxRepos, primary: repo };
+  const repoOf = access.repoOf;
+  // A list with no ?repo= reads every served repo the caller may see; tenancy narrows it.
+  const reposFor = (req: Request) => (repoOf(req) ? [repoOf(req)] : access.visibleRepos(req, inboxRepos()));
+  const runsOf = (req: Request) =>
+    reposFor(req)
+      .flatMap((r) => stateFor(r)?.listRuns(r) ?? [])
+      .sort((a, b) => b.started_at.localeCompare(a.started_at));
+  const stagesOf = (req: Request) =>
+    reposFor(req).flatMap((r) => {
+      const st = stateFor(r);
+      return st ? allStageRuns(st, r) : [];
+    });
 
   // The primary configured repo's workspaces dir is the injectable
   // `workspaces` param (tests point it at a scratch dir); any other repo in a
@@ -273,15 +269,19 @@ export function createDashboard(
   // Each repo keeps its own state DB; the Line reads every repo the inbox does, and a
   // repo that never ran has no DB to open.
   const otherStates = new Map<string, FactoryState>();
-  function stateFor(r: string): FactoryState | null {
+  function stateFor(r: string, create = false): FactoryState | null {
     if (r === repo) return state;
     const path = defaultStatePath(process.env, r);
-    if (!otherStates.has(r) && existsSync(path)) otherStates.set(r, new FactoryState(path));
-    return otherStates.get(r) ?? null;
+    if (!otherStates.has(r) && (create || existsSync(path))) {
+      mkdirSync(dirname(path), { recursive: true });
+      otherStates.set(r, new FactoryState(path));
+    }
+    // A plane with no repo of its own opened the shared pre-v2.6.2 DB, which holds rows for many repos.
+    return otherStates.get(r) ?? (repo ? null : state);
   }
 
   // Every stage attempt for a repo, paged by keyset so a long history is never one giant read.
-  function allStageRuns(st: FactoryState = state, r: string = repo): ReturnType<FactoryState["listStageRuns"]> {
+  function allStageRuns(st: FactoryState, r: string): ReturnType<FactoryState["listStageRuns"]> {
     const out: ReturnType<FactoryState["listStageRuns"]> = [];
     for (let after = 0; ; ) {
       const page = st.listStageRuns(r, { after, limit: 500 });
@@ -291,62 +291,13 @@ export function createDashboard(
     }
   }
 
-  const needRepo = (): Response | null => (repo ? null : json({ error: "FACTORY_REPO not set" }, { status: 500 }));
-
   async function inboxItem(r: string, number: number) {
     return inboxWithRisk(await cachedIssuesFor(r)).find((i) => i.issue === number);
   }
 
-  // Files a stage left in .factory/runs/issue-N/ of the issue's worktree. The
-  // name must be a plain file name that resolves inside that directory, and it
-  // is only ever sent as text, never as HTML.
-  function artifactRoot(issue: number): string | null {
-    try {
-      return realpathSync(join(workspaces, `issue-${issue}`, runDir(issue)));
-    } catch {
-      return null;
-    }
-  }
-
-  function artifacts(issue: number, url: URL): Response {
-    const root = artifactRoot(issue);
-    const name = url.searchParams.get("file");
-    if (!root) return json({ files: [] });
-    if (!name) {
-      const files = readdirSync(root, { withFileTypes: true })
-        .filter((e) => e.isFile())
-        .map((e) => ({ name: e.name, size: statSync(join(root, e.name)).size }));
-      return json({ files });
-    }
-    let path: string;
-    try {
-      path = realpathSync(join(root, name));
-    } catch {
-      return json({ error: "no such artifact" }, { status: 404 });
-    }
-    if (name.includes("/") || name.includes("\\") || !path.startsWith(root + sep) || !statSync(path).isFile()) {
-      return json({ error: "no such artifact" }, { status: 404 });
-    }
-    const bytes = readFileSync(path);
-    const truncated = bytes.length > ARTIFACT_LIMIT;
-    const body = bytes.subarray(0, ARTIFACT_LIMIT);
-    const headers: Record<string, string> = {
-      "content-type": "text/plain; charset=utf-8",
-      "x-content-type-options": "nosniff",
-      "content-security-policy": "sandbox; default-src 'none'",
-      "x-artifact-truncated": String(truncated),
-    };
-    if (url.searchParams.get("download"))
-      headers["content-disposition"] = `attachment; filename="${name.replace(/[^\w.-]/g, "_")}"`;
-    // A preview is text for a person; a download stays byte for byte.
-    return new Response(url.searchParams.get("download") ? body : plain(Buffer.from(body).toString("utf8")), {
-      headers,
-    });
-  }
-
   // The routing table is the only place a route exists, so the route-walk test
   // (tests/dashboard-routes.test.ts) sees every one of them.
-  const remote = createRemote({ access, github, repo, handle: (req) => readInProcess(req) });
+  const remote = createRemote({ access, github, served: inboxRepos, handle: (req) => readInProcess(req) });
   const routes: readonly Route[] = [
     healthRoute,
     {
@@ -396,9 +347,10 @@ export function createDashboard(
         const d = readDelivery(req.headers, payload);
         if (!d) return json({ error: "missing X-GitHub-Delivery or X-GitHub-Event" }, { status: 400 });
         if (d.event === "ping") return json({ ok: true, pong: true });
-        if (!WAKING_EVENTS.has(d.event) || (repo && d.repo.toLowerCase() !== repo.toLowerCase()))
-          return json({ ok: true, ignored: true }, { status: 202 });
-        const fresh = state.recordDelivery(d);
+        // GitHub sends the name as the repo spells it; a repo this plane does not serve is ignored.
+        const target = inboxRepos().find((r) => r.toLowerCase() === d.repo.toLowerCase());
+        if (!WAKING_EVENTS.has(d.event) || !target) return json({ ok: true, ignored: true }, { status: 202 });
+        const fresh = stateFor(target, true)!.recordDelivery(d);
         return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
       },
     },
@@ -445,27 +397,28 @@ export function createDashboard(
       pattern: /^\/api\/runs$/,
       label: "GET /api/runs",
       role: "viewer",
-      handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }),
+      repo: "filter",
+      handler: (req) => json({ repo, runs: runsOf(req).map(plainRun) }),
     },
     {
       method: "GET",
       pattern: /^\/api\/board$/,
       label: "GET /api/board",
       role: "viewer",
-      handler: async () => needRepo() ?? json({ repo, cards: buildBoard(await cachedIssues()) }),
+      repo: "query",
+      handler: async (req) => json({ repo: repoOf(req), cards: buildBoard(await cachedIssuesFor(repoOf(req))) }),
     },
     {
       method: "POST",
       pattern: /^\/api\/mark-ready$/,
       label: "POST /api/mark-ready",
       role: "operator",
+      repo: "body",
       handler: async (req) => {
         const body = (await req.json()) as { issue?: number };
-        const missing = needRepo();
-        if (missing) return missing;
         if (!Number.isInteger(body.issue)) return json({ error: "issue must be an integer" }, { status: 400 });
-        await github.addLabels(repo, body.issue!, [LABEL.ready]);
-        invalidateIssuesCache(repo); // next /api/board reflects the label immediately
+        await github.addLabels(repoOf(req), body.issue!, [LABEL.ready]);
+        invalidateIssuesCache(repoOf(req)); // next /api/board reflects the label immediately
         return json({ ok: true });
       },
     },
@@ -474,18 +427,16 @@ export function createDashboard(
       pattern: /^\/api\/issues\/(\d+)\/thread$/,
       label: "GET /api/issues/:n/thread",
       role: "viewer",
-      handler: async (_req, url, m) => {
-        const r = url.searchParams.get("repo") || repo;
-        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
-        return json({ issue: plainIssue(await github.getIssue(r, Number(m[1]))) });
-      },
+      repo: "query",
+      handler: async (req, _url, m) => json({ issue: plainIssue(await github.getIssue(repoOf(req), Number(m[1]))) }),
     },
     {
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/artifacts$/,
       label: "GET /api/issues/:n/artifacts",
       role: "viewer",
-      handler: (_req, url, m) => artifacts(Number(m[1]), url),
+      repo: "query",
+      handler: (req, url, m) => artifacts(workspacesFor(repoOf(req)), Number(m[1]), url),
     },
     {
       // The PR review view (v2.9.0 item 1): diff, gate evidence, verify
@@ -495,9 +446,9 @@ export function createDashboard(
       pattern: /^\/api\/issues\/(\d+)\/review$/,
       label: "GET /api/issues/:n/review",
       role: "viewer",
-      handler: async (_req, url, m) => {
-        const r = url.searchParams.get("repo") || repo;
-        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+      repo: "query",
+      handler: async (req, _url, m) => {
+        const r = repoOf(req);
         const issueNumber = Number(m[1]);
         const pr = await github.prForIssue(r, issueNumber);
         if (!pr) return json({ error: "no open PR closes that issue" }, { status: 404 });
@@ -508,7 +459,7 @@ export function createDashboard(
           readGateEvidence(cwd, issueNumber),
           readStageArtifacts(cwd, issueNumber, "verify"),
         ]);
-        const stages = state.listStageRuns(r, { issue: issueNumber }).map(plainStage);
+        const stages = (stateFor(r)?.listStageRuns(r, { issue: issueNumber }) ?? []).map(plainStage);
         return json({
           repo: r,
           issue: issueNumber,
@@ -529,10 +480,9 @@ export function createDashboard(
       pattern: /^\/api\/issues\/(\d+)\/merge$/,
       label: "POST /api/issues/:n/merge",
       role: "approver",
+      repo: "body",
       handler: async (req, _url, m) => {
-        const body = (await req.json().catch(() => ({}))) as { repo?: string };
-        const r = body.repo || repo;
-        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        const r = repoOf(req);
         const issueNumber = Number(m[1]);
         const pr = await github.prForIssue(r, issueNumber);
         if (!pr) return json({ error: "no open PR closes that issue" }, { status: 404 });
@@ -548,7 +498,7 @@ export function createDashboard(
         // (runQueuedRetros) drains it on its next tick.
         if (merged) {
           invalidateIssuesCache(r);
-          state.queueRetro(r, issueNumber, "merged");
+          stateFor(r, true)!.queueRetro(r, issueNumber, "merged");
         }
         return json({ ok: merged, decision });
       },
@@ -559,16 +509,14 @@ export function createDashboard(
       pattern: /^\/api\/issues\/(\d+)\/live$/,
       label: "GET /api/issues/:n/live",
       role: "viewer",
-      handler: (_req, url, m) => {
-        const r = url.searchParams.get("repo") || repo;
-        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
-        return json(
+      repo: "query",
+      handler: (req, url, m) =>
+        json(
           liveItems(
-            streamPath(transcriptPath(r, Number(m[1]), process.env)),
+            streamPath(transcriptPath(repoOf(req), Number(m[1]), process.env)),
             Number(url.searchParams.get("from") ?? "0") || 0,
           ),
-        );
-      },
+        ),
     },
     {
       // The proof a reviewer reads: criteria from the approved plan, the gate, the holdout tests and the revert.
@@ -576,11 +524,10 @@ export function createDashboard(
       pattern: /^\/api\/issues\/(\d+)\/proof$/,
       label: "GET /api/issues/:n/proof",
       role: "viewer",
-      handler: async (_req, url, m) => {
-        const r = url.searchParams.get("repo") || repo;
-        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+      repo: "query",
+      handler: async (req, _url, m) => {
         const n = Number(m[1]);
-        const cwd = join(workspacesFor(r), `issue-${n}`);
+        const cwd = join(workspacesFor(repoOf(req)), `issue-${n}`);
         const [plan, verify, gate] = await Promise.all([
           readStageArtifacts(cwd, n, "plan"),
           readStageArtifacts(cwd, n, "verify"),
@@ -603,8 +550,11 @@ export function createDashboard(
       pattern: /^\/api\/runs\/(\d+)\/events$/,
       label: "GET /api/runs/:id/events",
       role: "viewer",
-      handler: (_req, url, m) => {
-        const events = state.listEvents(Number(m[1]), { after: Number(url.searchParams.get("after") ?? "0") });
+      repo: "query",
+      handler: (req, url, m) => {
+        const hit = runIn(stateFor(repoOf(req)), repoOf(req), Number(m[1]));
+        if (!hit) return json({ error: "no such run" }, { status: 404 });
+        const events = hit.st.listEvents(hit.run.id, { after: Number(url.searchParams.get("after") ?? "0") });
         return json({ events: events.map((e) => ({ ...e, text: plain(e.text) })) });
       },
     },
@@ -613,12 +563,14 @@ export function createDashboard(
       pattern: /^\/api\/runs\/(\d+)\/stages$/,
       label: "GET /api/runs/:id/stages",
       role: "viewer",
-      handler: (_req, _url, m) => {
-        const run = state.listRuns(repo || undefined).find((r) => r.id === Number(m[1]));
-        if (!run) return json({ error: "no such run" }, { status: 404 });
+      repo: "query",
+      handler: (req, _url, m) => {
+        const hit = runIn(stateFor(repoOf(req)), repoOf(req), Number(m[1]));
+        if (!hit) return json({ error: "no such run" }, { status: 404 });
+        const { st, run } = hit;
         return json({
           run: plainRun(run),
-          stages: state.listStageRuns(run.repo, { issue: run.issue }).map(plainStage),
+          stages: st.listStageRuns(run.repo, { issue: run.issue }).map(plainStage),
         });
       },
     },
@@ -627,9 +579,10 @@ export function createDashboard(
       pattern: /^\/api\/line$/,
       label: "GET /api/line",
       role: "viewer",
+      repo: "filter",
       // Each recent run with the stages it went through, across every repo the inbox reads.
       handler: (req) => {
-        const repos = access.visibleRepos(req, repo ? [...new Set([repo, ...inboxRepos()])] : []);
+        const repos = reposFor(req);
         const rows = repos.flatMap((r) => {
           const st = stateFor(r);
           if (!st) return [];
@@ -657,9 +610,10 @@ export function createDashboard(
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
       role: "viewer",
+      repo: "filter",
       handler: (req) =>
         json(
-          analytics(visibleRuns(req), repo ? allStageRuns() : [], new Date(), (agent) => {
+          analytics(runsOf(req), stagesOf(req), new Date(), (agent) => {
             const a = project?.config.agents[agent];
             return a?.models?.large ?? a?.model;
           }),
@@ -693,19 +647,19 @@ export function createDashboard(
       pattern: /^\/api\/inbox$/,
       label: "GET /api/inbox",
       role: "viewer",
+      repo: "filter",
       // Aggregated across every repo under FACTORY_HOME (v2.9.0 item 2), or
       // narrowed to one with ?repo=. Each item carries its own repo so the
       // frontend can render and act on a mixed list.
-      handler: async (req, url) => {
-        const filter = url.searchParams.get("repo");
-        const repos = filter ? [filter] : access.visibleRepos(req, inboxRepos());
+      handler: async (req) => {
+        const repos = reposFor(req);
         if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
         const perRepo = await Promise.all(
           repos.map(async (r) => [
-            // Park reasons live in this dashboard's own DB, so only its repo has them.
-            ...inboxWithRisk(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map(
-              (i) => ({ ...i, repo: r }),
-            ),
+            ...inboxWithRisk(await cachedIssuesFor(r), parkReasons(stateFor(r)?.listRuns(r) ?? [])).map((i) => ({
+              ...i,
+              repo: r,
+            })),
             ...prItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r, risk: null })),
           ]),
         );
@@ -720,10 +674,10 @@ export function createDashboard(
       pattern: /^\/api\/inbox\/(\d+)\/act$/,
       label: "POST /api/inbox/:n/act",
       role: "operator",
+      repo: "body",
       handler: async (req, _url, m) => {
-        const body = (await req.json()) as { action?: InboxAction; text?: string; repo?: string };
-        const r = body.repo || repo;
-        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        const body = (await req.json()) as { action?: InboxAction; text?: string };
+        const r = repoOf(req);
         const item = await inboxItem(r, Number(m[1]));
         if (!item) return json({ error: "nothing is waiting on that issue" }, { status: 404 });
         try {
@@ -742,40 +696,45 @@ export function createDashboard(
       pattern: /^\/api\/toggles$/,
       label: "GET /api/toggles",
       role: "viewer",
-      handler: () =>
-        json({
-          auto_start: state.getToggle("auto_start", true),
-          auto_approve_low_risk: state.getToggle("auto_approve_low_risk", autoApproveDefault),
-        }),
+      repo: "query",
+      handler: (req) => {
+        const st = stateFor(repoOf(req));
+        return json({
+          auto_start: st?.getToggle("auto_start", true) ?? true,
+          auto_approve_low_risk: st?.getToggle("auto_approve_low_risk", autoApproveDefault) ?? autoApproveDefault,
+        });
+      },
     },
     {
       method: "POST",
       pattern: /^\/api\/toggles$/,
       label: "POST /api/toggles",
       role: "owner",
+      repo: "body",
       handler: async (req) => {
         const body = (await req.json()) as { key: string; value: boolean };
         if (body.key !== "auto_start" && body.key !== "auto_approve_low_risk")
           return json({ error: "unknown toggle" }, { status: 400 });
-        state.setToggle(body.key, Boolean(body.value));
+        stateFor(repoOf(req), true)!.setToggle(body.key, Boolean(body.value));
         return json({ ok: true });
       },
     },
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
-    ...planeRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
+    ...planeRoutes({ github, repoOf, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
     ...integrations.routes,
-    ...paneRoutes({ repo, workspacesFor, actorOf: access.actorOf, runs: state }),
+    ...paneRoutes({ repoOf, workspacesFor, actorOf: access.actorOf, runs: (r) => stateFor(r) }),
     {
       method: "GET",
       pattern: /^\/api\/stream$/,
       label: "GET /api/stream",
       role: "viewer",
+      repo: "filter",
       handler: (req) => {
         const stream = new ReadableStream({
           start(controller) {
             const encoder = new TextEncoder();
             const send = () => {
-              const payload = JSON.stringify({ repo, runs: state.listRuns(repo || undefined) });
+              const payload = JSON.stringify({ repo, runs: runsOf(req) });
               controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
             };
             send();
@@ -813,7 +772,7 @@ export function createDashboard(
     }
     // Every non-public route needs a caller with its role, so an unknown path
     // is refused before it can 404 (no route probing).
-    const refused = await access.gate(req, route, isPublic, loopback, inProcess);
+    const refused = await access.gate(req, route, isPublic, loopback, inProcess, scope);
     if (refused) return refused;
 
     // CSRF: a mutating request must be same-origin JSON, never the
@@ -841,11 +800,12 @@ export function createDashboard(
 
   const routeLabels = routes.map((r) => r.label);
   const routeRoles = Object.fromEntries(routes.map((r) => [r.label, r.role]));
+  const routeScopes = Object.fromEntries(routes.map((r) => [r.label, r.repo ?? null]));
 
   // Bun.serve passes two arguments, so only code in this process reaches the third.
   const readInProcess = (req: Request) => handle(req, "127.0.0.1", true);
 
-  return { handle, readInProcess, routeLabels, routeRoles, access, remote };
+  return { handle, readInProcess, routeLabels, routeRoles, routeScopes, access, remote };
 }
 
 if (import.meta.main) {

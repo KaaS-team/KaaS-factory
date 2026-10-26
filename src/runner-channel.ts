@@ -10,16 +10,22 @@ export interface RunnerCreds {
 }
 
 export type StopKind = "cancel" | "takeover";
+export interface RunnerJob {
+  readonly repo: string;
+  readonly issue: number;
+}
 
 // What the runner does with what the plane sends; the CLI wires these to `factory run`.
 export interface RunnerWork {
-  run(issue: number): Promise<void>;
-  deliver(issue: number, text: string): Promise<void>;
-  stop(issue: number, kind: StopKind): Promise<void>;
+  run(job: RunnerJob): Promise<void>;
+  deliver(job: RunnerJob, text: string): Promise<void>;
+  stop(job: RunnerJob, kind: StopKind): Promise<void>;
 }
 
 export interface DialOptions {
   readonly source: EventSourcePort;
+  // The repos this runner holds a checkout of; the plane leases it work in these only.
+  readonly repos: readonly string[];
   readonly fetch?: typeof fetch;
   readonly heartbeatMs?: number;
   readonly retryMs?: number;
@@ -61,20 +67,23 @@ export function dialOut(creds: RunnerCreds, work: RunnerWork, opts: DialOptions)
   let last = opts.after ?? 0;
 
   async function onEvent(e: SourceEvent): Promise<void> {
-    const d = e.data as { issue: number; id?: number; text?: string };
+    const d = e.data as { repo: string; issue: number; id?: number; text?: string };
     last = e.seq;
+    // The plane leases only declared repos; a job for another one would run in the wrong checkout.
+    if (!opts.repos.includes(d.repo)) return;
+    const job = { repo: d.repo, issue: d.issue };
     if (e.type === "lease")
       void work
-        .run(d.issue)
-        .then(() => post({ type: "done", issue: d.issue }))
+        .run(job)
+        .then(() => post({ type: "done", ...job }))
         .catch(() => {});
     // Read before delivering: the plane refuses a message that was undone in the meantime.
     else if (e.type === "message" && (await post({ type: "read", id: d.id }).catch(() => false)))
-      await work.deliver(d.issue, d.text ?? "");
-    else if (e.type === "cancel" || e.type === "takeover") await work.stop(d.issue, e.type);
+      await work.deliver(job, d.text ?? "");
+    else if (e.type === "cancel" || e.type === "takeover") await work.stop(job, e.type);
   }
 
-  const beat = () => void post({ type: "heartbeat" }).catch(() => false);
+  const beat = () => void post({ type: "heartbeat", repos: opts.repos }).catch(() => false);
   beat();
   const timer = setInterval(beat, opts.heartbeatMs ?? 15_000);
 
@@ -89,5 +98,5 @@ export function dialOut(creds: RunnerCreds, work: RunnerWork, opts: DialOptions)
     }
     clearInterval(timer);
   })();
-  return { done, lastSeq: () => last, heartbeat: () => post({ type: "heartbeat" }) };
+  return { done, lastSeq: () => last, heartbeat: () => post({ type: "heartbeat", repos: opts.repos }) };
 }

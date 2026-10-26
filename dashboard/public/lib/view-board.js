@@ -1,7 +1,7 @@
 // The board: open issues by where they sit. A workflow's own step (a factory:linting label) gets its
 // own column after verify, so an issue in a custom step is on the board, not only in the list.
 
-import { h, heading, quiet, runHref, state, stateOr } from "./core.js";
+import { h, heading, quiet, runHref, short, state, stateOr } from "./core.js";
 import { humanize } from "./view-workflows.js";
 
 const BEFORE = [
@@ -30,7 +30,12 @@ export function boardView() {
   return h(
     "section",
     null,
-    heading("Board", "Every open issue, by the step it is on."),
+    heading(
+      "Board",
+      state.repos.length > 1
+        ? `Every open issue in ${short(state.data.board?.repo)}, by the step it is on.`
+        : "Every open issue, by the step it is on.",
+    ),
     stateOr("board", ({ cards, repo }) =>
       !cards.length
         ? quiet("No open issues", "Start a task on the Line, or mark an issue ready.")

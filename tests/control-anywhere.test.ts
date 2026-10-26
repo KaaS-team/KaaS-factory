@@ -73,19 +73,25 @@ describe("control from anywhere", () => {
     const stopped: string[] = [];
     let finish = () => {};
     const work: RunnerWork = {
-      ...runnerWork("acme/widgets", repoDir),
+      ...runnerWork(new Map([["acme/widgets", repoDir]])),
       run: () => new Promise<void>((resolve) => (finish = resolve)),
-      stop: async (n, kind) => void stopped.push(`${n}:${kind}`),
+      stop: async (j, kind) => void stopped.push(`${j.issue}:${kind}`),
     };
     const runnerToken = ((await (await p.call("POST", "/api/runners/token", owner)).json()) as { token: string }).token;
     const creds = await registerRunner(BASE, runnerToken, "far-box", p.net);
     const abort = new AbortController();
     const source = new SseEventSource(`${creds.url}/runner/stream`, () => creds.secret, p.net);
-    const ch = dialOut(creds, work, { source, fetch: p.net, signal: abort.signal, retryMs: 20 });
+    const ch = dialOut(creds, work, {
+      source,
+      repos: ["acme/widgets"],
+      fetch: p.net,
+      signal: abort.signal,
+      retryMs: 20,
+    });
     await until(() => p.remote.hub.list()[0]?.online === true);
 
     expect((await p.call("POST", "/api/issues/41/dispatch", phone)).status).toBe(200);
-    await until(() => p.remote.hub.holder(41) === creds.id);
+    await until(() => p.remote.hub.holder({ repo: "acme/widgets", issue: 41 }) === creds.id);
     expect((await p.call("POST", "/api/issues/41/message", phone, { text: "keep the old palette" })).status).toBe(200);
     const notes = join(repoDir, runDir(41), "messages.md");
     await until(() => existsSync(notes) && readFileSync(notes, "utf8").includes("keep the old palette"));

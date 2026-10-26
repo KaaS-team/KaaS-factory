@@ -215,7 +215,7 @@ describe("the plane mirrors only what it serves", () => {
     };
     const plane = { FACTORY_HOME: tmp("blobs-allow-"), FACTORY_REPO: "acme/widgets" };
     expect(mirroredRepos(plane)).toEqual(["acme/widgets"]);
-    expect(mirroredRepos({ FACTORY_BLOB_REPOS: "a/b, ../x ,c" })).toEqual(["a/b"]);
+    expect(mirroredRepos({ FACTORY_HOME: plane.FACTORY_HOME, FACTORY_REPOS: "a/b, ../x ,c" })).toEqual(["a/b"]);
     expect(await mirrorDown(store, plane)).toBe(1);
     expect(readFileSync(localPathFor(good, plane)!, "utf8")).toBe("{}");
     expect(localPathFor("runs/acme/widgets/../../evil/x/issue-1/files/a.md", plane)).toBeUndefined();

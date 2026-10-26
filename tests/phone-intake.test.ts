@@ -88,9 +88,9 @@ describe("phone intake", () => {
     const runnerToken = ((await (await p.call("POST", "/api/runners/token", owner)).json()) as { token: string }).token;
     const creds = await registerRunner(BASE, runnerToken, "build-box", p.net);
     const work: RunnerWork = {
-      run: async (n) =>
+      run: async (j) =>
         void p.state.upsertRun({
-          issue: n,
+          issue: j.issue,
           repo: "acme/widgets",
           title: "Export invoices as CSV",
           stage: "pr",
@@ -101,7 +101,13 @@ describe("phone intake", () => {
     };
     const abort = new AbortController();
     const source = new SseEventSource(`${creds.url}/runner/stream`, () => creds.secret, p.net);
-    const link2 = dialOut(creds, work, { source, fetch: p.net, signal: abort.signal, retryMs: 20 });
+    const link2 = dialOut(creds, work, {
+      source,
+      repos: ["acme/widgets"],
+      fetch: p.net,
+      signal: abort.signal,
+      retryMs: 20,
+    });
     await until(() => p.remote.hub.list()[0]?.online === true);
     expect((await p.call("POST", `/api/issues/${issue}/dispatch`, phone)).status).toBe(200);
     await until(() => p.state.getRun("acme/widgets", issue)?.status === "shipped");

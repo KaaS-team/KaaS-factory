@@ -43,6 +43,10 @@ A runner on another machine registers once with a one-time token from `POST /api
 dials out to `/runner/stream` and needs no open port. It beats every 15s. A lease whose runner is
 silent for 60s goes back to the queue. `POST /api/issues/<n>/dispatch` (operator) queues an issue.
 
+A job is an issue in one repo, and every route below takes `repo` in its body or query. Pass
+`--repo-dir` once per checkout: `factory runner start --repo-dir ~/src/a --repo-dir ~/src/b`. The runner
+tells the plane those repos, and it is leased work in them only. A job in a repo no runner holds waits.
+
 | Route | Role | Does |
 |---|---|---|
 | `POST /api/issues/<n>/message` | operator | queues a message for the runner, kept in the run's folder |
