@@ -87,7 +87,7 @@ The issue's label is the state. Everything else is derived from the thread.
 | `factory:awaiting-approval` | plan posted, waiting | `/factory approve`, or auto for low risk |
 | `factory:building` / `factory:verifying` | building, or proving the build | gates and verifier finish; a reject goes back to build twice, then `needs-human` |
 | `factory:in-review` | PR ready for review | a human merges, or asks `/factory revise` |
-| `factory:failed` | a stage broke (timeout, red gates, boundary, denied tool) | `/factory retry` |
+| `factory:failed` | a stage broke (timeout, red gates, boundary, denied tool) | `/factory retry`; refused as `cause unchanged` after two identical failures with config.json, the issue body and machine.json unchanged, unless `/factory retry --force` |
 | `factory:needs-human` | refused or out of rounds | `/factory retry` |
 | `factory:monitor` | filed by `factory scan` from a production signal; a provenance label, not a stage | nothing, it stays on the issue |
 | `factory:ledger` | the one issue that holds the spend ledger when spend is kept on GitHub: one comment per worker per UTC day | leave it open; caps read it |

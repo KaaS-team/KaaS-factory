@@ -12,7 +12,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { aggregateStageEvents, ReplayExecutor } from "../src/executor";
-import { claudeArgs, parseStreamJsonLine } from "../src/agents/presets/claude";
+import { claudeArgs, parseStreamJsonLine, refusedBy } from "../src/agents/presets/claude";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
 import { readSeal, sealKey } from "../src/receipt";
@@ -120,6 +120,70 @@ describe("claudeArgs", () => {
     });
     const result = aggregateStageEvents(parseStreamJsonLine(line), 0);
     expect(result.permissionDenials).toEqual(["Write /w/.factory/runs/issue-15/triage.json"]);
+  });
+
+  test("a refused call is attributed to the hook or the allow list that refused it (#91)", () => {
+    // The tool_result shapes kaas.team#5's plan stage logged on 25 Oct 2026.
+    const lines = [
+      {
+        type: "user",
+        message: {
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_hook",
+              is_error: true,
+              content:
+                'PreToolUse:Bash hook error: [[ -n "${FACTORY_STAGE:-}" ]] || exit 0; exec .claude/hooks/guard-paths.sh]: guard-paths: path outside the workspace',
+            },
+          ],
+        },
+      },
+      {
+        type: "user",
+        message: {
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_allow",
+              is_error: true,
+              content: [
+                {
+                  type: "text",
+                  text: "Permission to use Bash has been denied because Claude Code is running in don't ask mode.",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        type: "result",
+        subtype: "success",
+        total_cost_usd: 0.3,
+        permission_denials: [
+          { tool_name: "Bash", tool_use_id: "toolu_hook", tool_input: { command: "cat /etc/hosts" } },
+          { tool_name: "Bash", tool_use_id: "toolu_allow", tool_input: { command: "git status; npm ls zod 2>&1" } },
+        ],
+      },
+    ];
+    const result = aggregateStageEvents(
+      lines.flatMap((l) => parseStreamJsonLine(JSON.stringify(l))),
+      0,
+    );
+    expect(result.refusals).toEqual([
+      { tool: "Bash", target: "cat /etc/hosts", by: "hook:guard-paths" },
+      { tool: "Bash", target: "git status; npm ls zod 2>&1", by: "allowlist" },
+    ]);
+    expect(result.permissionDenials).toEqual(["Bash cat /etc/hosts", "Bash git status; npm ls zod 2>&1"]);
+  });
+
+  test("a hook with no script path is named by its event", () => {
+    expect(refusedBy("PreToolUse:Write hook error: /w/a.ts has uncommitted changes")).toBe("hook:PreToolUse");
+    expect(refusedBy("Permission to use Edit has been denied because Claude Code is running in don't ask mode.")).toBe(
+      "allowlist",
+    );
+    expect(refusedBy("file not found")).toBeUndefined();
   });
 });
 

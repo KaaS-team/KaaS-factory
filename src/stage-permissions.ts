@@ -124,3 +124,34 @@ export function stageSettings(
     ...(plugins.length ? { enabledPlugins: Object.fromEntries(plugins.map((p) => [p, false])) } : {}),
   });
 }
+
+// A compound command's parts, split on ;, &&, ||, | and newlines outside quotes, as dontAsk checks each one.
+export function commandParts(command: string): string[] {
+  const parts: string[] = [];
+  let quote = "";
+  let part = "";
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i]!;
+    if (quote) quote = ch === quote ? "" : quote;
+    else if (ch === "'" || ch === '"') quote = ch;
+    else if (ch === ";" || ch === "\n" || ch === "|" || (ch === "&" && command[i + 1] === "&")) {
+      if (command[i + 1] === ch) i++;
+      parts.push(part);
+      part = "";
+      continue;
+    }
+    part += ch;
+  }
+  return [...parts, part].map((p) => p.trim()).filter(Boolean);
+}
+
+const covers = (rule: string, part: string): boolean => {
+  const pat = /^Bash\((.*)\)$/.exec(rule)?.[1];
+  if (pat === undefined) return false;
+  return pat.endsWith("*") ? part.startsWith(pat.slice(0, -1)) || part === pat.slice(0, -1).trimEnd() : part === pat;
+};
+
+// The first part of a Bash command no allow rule covers: the part dontAsk refused, or undefined when every part is allowed.
+export function uncoveredPart(command: string, allow: readonly string[]): string | undefined {
+  return commandParts(command).find((part) => !allow.some((rule) => covers(rule, part)));
+}
