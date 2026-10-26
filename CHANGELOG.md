@@ -16,6 +16,12 @@ that holds `.factory/config.json`. See [docs/control-plane.md](docs/control-plan
   can read.
 - A stage no longer loads the plugins a target repo enables in its own `.claude/settings.json` or
   `settings.local.json`, so a repo's guards cannot block the factory's own writes.
+- A failed stage names the refused call and what refused it (a hook by its script, the allow list,
+  or a gate), and `/factory retry` starts nothing when the last two failures share a cause and the
+  config, issue and machine are unchanged; `--force` runs it anyway (#96).
+- `factory init` writes offline read commands for the detected stack, so plan can inspect
+  dependencies under dontAsk; `factory doctor` fails when a dependency route has none left, and
+  `factory watch` warns when config.json is newer than the copy it loaded (#97).
 - The image's gh is 2.102.0: 2.63.2 had no `closingIssuesReferences`, so the hosted inbox failed on
   every read. The image smoke now runs every `gh --json` field set the code asks for against it.
 - Every Markdown file is checked for prose rules on each gate (`tests/release.test.ts`).
