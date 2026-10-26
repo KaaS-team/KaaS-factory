@@ -580,9 +580,21 @@
       "source": "spec 10 acp-seam",
       "owner": "agent",
       "proof": {
-        "test": "tests/any-agent.test.ts",
-        "name": "one ACP seam: two unrelated ACP servers ship the same ticket the same way",
-        "mutation": "acp: a reply split across chunks is joined"
+        "test": "tests/acp-seam.test.ts",
+        "name": "one ACP seam: the same ticket's build passes its holdout with two different ACP agents",
+        "mutation": "acp seam: only an ended turn passes the build"
+      }
+    },
+    {
+      "id": "intent-to-tickets",
+      "phase": "P4",
+      "ask": "Intent to spec (criteria AC-1, AC-2) to tickets with blocking edges, each stage a different agent, each verified",
+      "source": "spec 10 intent-to-tickets",
+      "owner": "agent",
+      "proof": {
+        "test": "tests/tickets-stage.test.ts",
+        "name": "intent to spec to tickets: two different ACP agents through the factory's executor",
+        "mutation": "intent: the two stages must be different agents"
       }
     },
     {

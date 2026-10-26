@@ -25,6 +25,7 @@ const WRITERS: Record<string, { sites: number; driver: string } | { sites: numbe
   "engine/common.ts": { sites: 3, driver: "tests/spend-caps.test.ts" },
   "engine/triggers.ts": { sites: 2, driver: "tests/triggers.test.ts" },
   "engine/late-route.ts": { sites: 1, driver: "tests/late-route.test.ts" },
+  "intent/tickets.ts": { sites: 1, driver: "tests/tickets-stage.test.ts" },
   "scm.ts": { sites: 7, driver: "tests/tracker-contract.test.ts" },
   "watch.ts": { sites: 3, driver: "tests/scenarios.test.ts" },
   "cli.ts": { sites: 1, echoes: "factory park posts the --reason its caller passed" },

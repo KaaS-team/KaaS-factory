@@ -28,6 +28,10 @@ for line in sys.stdin:
         send({"id": msg["id"], "result": {"protocolVersion": 1, "agentCapabilities": {"loadSession": False}}})
     elif method == "session/new":
         send({"id": msg["id"], "result": {"sessionId": "py"}})
+    elif method == "session/prompt" and len(sys.argv) > 1:
+        # A reply file in argv: answer with it, as a planning agent answers in its message.
+        chunk(open(sys.argv[1]).read())
+        send({"id": msg["id"], "result": {"stopReason": "end_turn"}})
     elif method == "session/prompt":
         art, comment = ARTIFACTS.get(stage, ({}, ""))
         if stage in ("triage", "plan", "verify"):
@@ -38,6 +42,11 @@ for line in sys.stdin:
         elif stage == "pr":
             open(f"{out}/pr-body.md", "w").write(f"## Summary\nDid the thing.\nCloses #{os.environ['FACTORY_ISSUE']}\n")
         else:
+            fix = os.environ.get("FAKE_ACP_FIX")
+            if fix:
+                f = json.load(open(fix))
+                src = open(f["file"]).read()
+                open(f["file"], "w").write(src.replace(f["find"], f["replace"]))
             open(f"{out}/build.json", "w").write(json.dumps(art))
             open(f"{out}/status-comment.md", "w").write(comment)
         send({"id": msg["id"], "result": {"stopReason": "end_turn"}})
