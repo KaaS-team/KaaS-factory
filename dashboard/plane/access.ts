@@ -329,6 +329,7 @@ export function createAccess(opts: AccessOptions) {
     const who = inProcess ? IN_PROCESS : actor(req, loopback);
     if (!who) return json({ error: "unauthorized" }, 401);
     seenActors.set(req, who);
+    if (scope) await Promise.all(exts.map((e) => e.prepare?.(who, scope.served())));
     if (route?.repo && scope) {
       const repo = await resolveRepo(req, route.repo, scope, (r) => visibleRepos(req, r));
       if (repo instanceof Response) return repo;
