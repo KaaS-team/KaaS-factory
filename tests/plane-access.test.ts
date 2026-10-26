@@ -193,7 +193,11 @@ describe("operator detail", () => {
     for (const label of reads) {
       const body = await read(label, "viewer");
       expect(body, label).not.toContain("model-only-operators-see");
-      if (body) expect(keysOf(JSON.parse(body)).filter((k) => OPERATOR_KEYS.has(k)), label).toEqual([]);
+      if (body)
+        expect(
+          keysOf(JSON.parse(body)).filter((k) => OPERATOR_KEYS.has(k)),
+          label,
+        ).toEqual([]);
       if ((await read(label, "operator")).includes("model-only-operators-see")) operatorSaw++;
     }
     // The seeded run reaches the routes an operator reads, so the viewer's clean bodies are not empty ones.

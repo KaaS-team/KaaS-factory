@@ -8,9 +8,9 @@ import { daemonPlatform } from "../src/daemon";
 
 const root = resolve(import.meta.dir, "..");
 // `COPY a b ./` copies several sources at once, so every word before the `./` target counts.
-const copied = [...readFileSync(join(root, "Dockerfile"), "utf8").matchAll(/^COPY ((?:[^-\s]\S* )+)\.\/\S*$/gm)].flatMap(
-  (m) => m[1]!.trim().split(" "),
-);
+const copied = [
+  ...readFileSync(join(root, "Dockerfile"), "utf8").matchAll(/^COPY ((?:[^-\s]\S* )+)\.\/\S*$/gm),
+].flatMap((m) => m[1]!.trim().split(" "));
 
 // Every repo file reachable from the entrypoints, dynamic imports included.
 function reachable(entries: string[]): Set<string> {

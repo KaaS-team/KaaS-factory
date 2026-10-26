@@ -12,7 +12,12 @@ const css = readFileSync(join(dir, "styles.css"), "utf8");
 const tokensCss = readFileSync(join(dir, "tokens.css"), "utf8");
 const html = readFileSync(join(dir, "index.html"), "utf8");
 // The page code is the shell plus one module per view, so every rule below reads all of it.
-const app = [join(dir, "app.js"), ...readdirSync(join(dir, "lib")).filter((f) => f.endsWith(".js")).map((f) => join(dir, "lib", f))]
+const app = [
+  join(dir, "app.js"),
+  ...readdirSync(join(dir, "lib"))
+    .filter((f) => f.endsWith(".js"))
+    .map((f) => join(dir, "lib", f)),
+]
   .map((f) => readFileSync(f, "utf8"))
   .join("\n");
 

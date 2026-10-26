@@ -1,5 +1,16 @@
 // Ported from owainlewis/machinist@3943516 internal/controlplane/web/src/routes.js:1-end (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the page set is the factory's views (inbox, line, board, runs, workflows, events, minions, analytics, agents, settings) and a run detail route is #/runs/<issue number>.
-const pages = new Set(["inbox", "line", "board", "runs", "workflows", "events", "minions", "analytics", "agents", "settings"]);
+const pages = new Set([
+  "inbox",
+  "line",
+  "board",
+  "runs",
+  "workflows",
+  "events",
+  "minions",
+  "analytics",
+  "agents",
+  "settings",
+]);
 
 export function routeFromHash(hash) {
   const value = hash.replace(/^#\//, "");

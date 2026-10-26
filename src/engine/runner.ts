@@ -92,7 +92,12 @@ async function walk(
     toggles: {
       autoApproveLowRisk: deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk),
       ...(at.uses === "plan"
-        ? await tierToggles(deps.github, config.repo, config.merge, (facts.plan as { risk?: unknown } | undefined)?.risk)
+        ? await tierToggles(
+            deps.github,
+            config.repo,
+            config.merge,
+            (facts.plan as { risk?: unknown } | undefined)?.risk,
+          )
         : { tiered: false, tierApproves: false }),
     },
     config,

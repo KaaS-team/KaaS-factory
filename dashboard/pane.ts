@@ -3,7 +3,8 @@
 import { join } from "node:path";
 import { plain } from "../src/display";
 import { readGateEvidence, readStageArtifacts } from "../src/artifacts";
-import { type Actor, type Route } from "./plane/access";
+import type { FactoryState } from "../src/state";
+import type { Actor, Route } from "./plane/access";
 import { atLeast } from "./plane/store";
 
 export interface PaneInput {
@@ -94,8 +95,7 @@ export function paneView(input: PaneInput, operator: boolean): Pane {
 export interface PaneDeps {
   repo: string;
   workspacesFor: (repo: string) => string;
-  stagesFor: (repo: string, issue: number) => PaneInput["stages"];
-  prUrlFor: (repo: string, issue: number) => string | null;
+  runs: Pick<FactoryState, "listStageRuns" | "listRuns">;
   actorOf: (req: Request) => Actor | undefined;
 }
 
@@ -115,9 +115,19 @@ export function paneRoutes(deps: PaneDeps): Route[] {
       handler: async (_req, url) => {
         const r = repoOf(url);
         if (!r) return Response.json({ error: "no repo configured or specified" }, { status: 400 });
-        const issues = (url.searchParams.get("issues") ?? "").split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, MAX_RISKS);
+        const issues = (url.searchParams.get("issues") ?? "")
+          .split(",")
+          .map(Number)
+          .filter((n) => Number.isInteger(n) && n > 0)
+          .slice(0, MAX_RISKS);
         const levels = await Promise.all(
-          issues.map(async (n) => [n, riskLevel({ triage: await artifact(r, n, "triage"), plan: await artifact(r, n, "plan") } as PaneInput)] as const),
+          issues.map(
+            async (n) =>
+              [
+                n,
+                riskLevel({ triage: await artifact(r, n, "triage"), plan: await artifact(r, n, "plan") } as PaneInput),
+              ] as const,
+          ),
         );
         return Response.json({ repo: r, levels: Object.fromEntries(levels) });
       },
@@ -144,8 +154,8 @@ export function paneRoutes(deps: PaneDeps): Route[] {
               build,
               verify,
               gate,
-              stages: deps.stagesFor(r, n),
-              prUrl: deps.prUrlFor(r, n),
+              stages: deps.runs.listStageRuns(r, { issue: n }).map((s) => ({ ...s, agent: plain(s.agent) })),
+              prUrl: deps.runs.listRuns(r).find((x) => x.issue === n)?.pr_url ?? null,
             } as PaneInput,
             operator,
           ),

@@ -19,7 +19,7 @@ import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart } from "./derive";
-import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
+import { decideMerge, mergePolicyMarker } from "./merge-policy";
 import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";

@@ -103,33 +103,31 @@ export function renderNav() {
         : null,
     );
   const repos = state.repos.length ? state.repos : state.repo ? [state.repo] : [];
-  document
-    .getElementById("nav")
-    .replaceChildren(
-      ...nav.slice(0, PRIMARY).map(item),
-      ...taskLists(),
-      ...(repos.length > 1
-        ? [
-            h("div", { class: "nav-heading" }, "Projects"),
-            ...repos.map((r) =>
-              h(
-                "button",
-                {
-                  class: "nav-item repo-item",
-                  type: "button",
-                  "aria-pressed": String(state.repoFilter === r),
-                  title: r,
-                  onclick: () => shell.setRepo(r),
-                },
-                svg(REPO_ICON),
-                h("span", { class: "label" }, short(r)),
-              ),
+  document.getElementById("nav").replaceChildren(
+    ...nav.slice(0, PRIMARY).map(item),
+    ...taskLists(),
+    ...(repos.length > 1
+      ? [
+          h("div", { class: "nav-heading" }, "Projects"),
+          ...repos.map((r) =>
+            h(
+              "button",
+              {
+                class: "nav-item repo-item",
+                type: "button",
+                "aria-pressed": String(state.repoFilter === r),
+                title: r,
+                onclick: () => shell.setRepo(r),
+              },
+              svg(REPO_ICON),
+              h("span", { class: "label" }, short(r)),
             ),
-          ]
-        : []),
-      h("div", { class: "nav-spacer" }),
-      ...nav.slice(PRIMARY).map(item),
-    );
+          ),
+        ]
+      : []),
+    h("div", { class: "nav-spacer" }),
+    ...nav.slice(PRIMARY).map(item),
+  );
   const here = state.route.view === "task" ? runKey(state.route.jobID) : null;
   const crumbs = [
     h("a", { href: "#/line" }, "factory"),

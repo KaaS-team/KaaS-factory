@@ -146,8 +146,17 @@ describe("cockpit for QA and PMs", () => {
     expect(viewer.byClass("run-grid")[0]!.kids.length).toBe(2);
     expect(tabsOf(viewer)).toEqual(["Outcome", "Changes", "Checks", "Preview", "Risk"]);
     live.proof = { criteria: [{ status: "pass", what: "Given a 10% code, When I pay, Then the total is 90" }] };
-    const terms = openRun().byClass("gwt")[0]!.all((e) => e.tag === "dt" || e.tag === "dd");
-    expect(terms.map((e) => e.textContent)).toEqual(["Given", "a 10% code", "When", "I pay", "Then", "the total is 90"]);
+    const terms = openRun()
+      .byClass("gwt")[0]!
+      .all((e) => e.tag === "dt" || e.tag === "dd");
+    expect(terms.map((e) => e.textContent)).toEqual([
+      "Given",
+      "a 10% code",
+      "When",
+      "I pay",
+      "Then",
+      "the total is 90",
+    ]);
     live.proof = null;
     as("operator");
     expect(tabsOf(openRun())).toEqual(["Outcome", "Changes", "Checks", "Preview", "Risk", "Cost"]);

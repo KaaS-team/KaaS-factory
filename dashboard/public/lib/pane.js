@@ -85,22 +85,20 @@ function changes(review, onComment) {
     h(
       "pre",
       { class: "diff pane-diff", "aria-label": "Changes. Pick a line to comment on it." },
-      (review.diff || "")
-        .split("\n")
-        .map((line, i) =>
-          h(
-            "button",
-            {
-              class: "diff-line",
-              type: "button",
-              "data-sign": /^(\+\+\+|---) /.test(line) ? "" : line[0] === "+" ? "add" : line[0] === "-" ? "del" : "",
-              title: "Comment on this line",
-              onclick: () => onComment(`> ${line}\n\n`),
-              "data-n": i,
-            },
-            line || " ",
-          ),
+      (review.diff || "").split("\n").map((line, i) =>
+        h(
+          "button",
+          {
+            class: "diff-line",
+            type: "button",
+            "data-sign": /^(\+\+\+|---) /.test(line) ? "" : line[0] === "+" ? "add" : line[0] === "-" ? "del" : "",
+            title: "Comment on this line",
+            onclick: () => onComment(`> ${line}\n\n`),
+            "data-n": i,
+          },
+          line || " ",
         ),
+      ),
     ),
   );
 }

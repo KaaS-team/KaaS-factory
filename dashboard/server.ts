@@ -24,7 +24,6 @@ import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
-import { startRelay } from "./relay";
 import { HEALTH_ROUTE, healthRoute } from "./health";
 import { NO_PROJECT, settingsWithHealth, type DashboardProject } from "./project";
 import { workflowRoutes } from "./workflow-routes";
@@ -765,7 +764,7 @@ export function createDashboard(
     // Start, approve, revise, answer, retry and cancel: each one a signed comment on the issue first.
     ...planeRoutes({ github, repo, actorOf: access.actorOf, invalidate: invalidateIssuesCache }),
     ...integrations.routes,
-    ...paneRoutes({ repo, workspacesFor, actorOf: access.actorOf, stagesFor: (r, n) => state.listStageRuns(r, { issue: n }).map(plainStage), prUrlFor: (r, n) => state.listRuns(r).find((x) => x.issue === n)?.pr_url ?? null }),
+    ...paneRoutes({ repo, workspacesFor, actorOf: access.actorOf, runs: state }),
     {
       method: "GET",
       pattern: /^\/api\/stream$/,
