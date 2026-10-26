@@ -599,6 +599,8 @@
   {"name": "harness eval: cost comes from the workflow's issues", "file": "src/harness.ts", "find": "costUsd: issues.reduce((sum, i) => sum + costOf(i), 0),", "replace": "costUsd: 0,", "test": "tests/harness-scaffold.test.ts"},
   {"name": "teach: every proposed file is checked before a PR", "file": "src/teach.ts", "find": "if (problems.length > 0) return { problems };", "replace": "", "test": "tests/teach.test.ts"},
   {"name": "teach: the agent reads a fresh clone of the repo", "file": "src/teach.ts", "find": "checkout: true,", "replace": "checkout: false,", "test": "tests/teach.test.ts"},
+  {"name": "library: spec-to-plan ends on a report, never a PR", "file": "template/.factory/workflows/spec-to-plan.md", "find": "uses: report", "replace": "uses: pr", "test": "tests/library-workflows.test.ts"},
+  {"name": "library: ci-cd-authoring parks every plan", "file": "template/.factory/workflows/ci-cd-authoring.md", "find": "approval: always", "replace": "approval: none", "test": "tests/library-workflows.test.ts"},
   {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},

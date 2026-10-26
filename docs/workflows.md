@@ -19,8 +19,20 @@ The runner ships these. Each one stops a bad output at a different rung:
 | `dependency-update` | triage, build, verify, pr | verify rejects a bump the tests do not cover; files itself weekly |
 | `security-audit` | triage, plan, build, verify, pr | every plan parks for a person; files itself daily |
 | `flaky-tests` | triage, build, verify, pr | verify rejects a fix that is not stable; files itself weekly |
+| `pr-review` | triage, review (plan), report | no PR: findings go on the issue, filed per `factory.pr.opened` event |
+| `test-authoring` | triage, plan, build, verify, pr | the unit gate on build; verify rejects a test that covers nothing |
+| `coverage-gap` | triage, build, verify, pr | the unit gate; files itself weekly |
+| `ci-fix` | triage, build, verify, pr | lint and unit gates on build, then verify |
+| `ci-cd-authoring` | triage, plan, build, verify, pr | every plan parks for a person; the lint gate |
+| `release-notes` | triage, build, pr | a person merges the notes; files itself weekly |
+| `harness-learn` | triage, plan, build, pr | every plan parks for a person; files itself weekly |
+| `ui-component` | triage, plan, build, verify, pr | a medium or high risk plan parks; lint and unit gates |
+| `spec-to-plan` | triage, plan, report | no PR: the plan comment is the output |
+| `backlog-triage` | triage, report | no PR: findings as comments; files itself daily |
 
-The last three carry their own `on: cron:` schedule. A schedule fires only for `config.workflow` and
+The rows from `pr-review` down are `.md` files. A `report` step closes the issue with no PR, and
+`gates:` holds a stage to the named gates. `dependency-update`, `security-audit`, `flaky-tests`,
+`coverage-gap`, `release-notes`, `harness-learn` and `backlog-triage` carry their own `on: cron:` schedule. A schedule fires only for `config.workflow` and
 the workflows a route names, so route a type to one to turn it on. The issue it files records that
 workflow, so pickup runs it and not `config.workflow`. Each one's body tells triage to refuse when
 there is nothing to do: the issue parks as `factory:needs-human` with no PR, and the schedule files no

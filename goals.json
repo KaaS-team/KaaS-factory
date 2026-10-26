@@ -932,7 +932,12 @@
       "phase": "P5",
       "ask": "Library workflows that need new step types: pr-review, test-authoring, coverage-gap, flaky-test, dependency-update, ci-fix, ci-cd-authoring, release-notes, harness-learn, ui-component, spec-to-plan and backlog-triage.",
       "source": "CHANGELOG v3.4.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/library-workflows.test.ts",
+        "name": "every library workflow ships with the runner, loads clean and is listed by harness validate",
+        "mutation": "library: spec-to-plan ends on a report, never a PR"
+      }
     },
     {
       "id": "harness-scaffold",
