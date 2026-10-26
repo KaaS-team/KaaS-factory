@@ -85,6 +85,8 @@ describe("profile validation", () => {
     expect(p).toMatch(/riskPolicy\.autoApproveMaxRisk: expected "low" or "medium"/);
   });
   test("every profile is accepted", () => {
-    for (const profile of Object.keys(PROFILES)) expect(configProblems({ repo: "a/b", profile })).toEqual([]);
+    // enterprise also names a sandbox runtime (src/profile-rules.ts), which every profile accepts.
+    const runtime = { gates: "docker", check: "docker" };
+    for (const profile of Object.keys(PROFILES)) expect(configProblems({ repo: "a/b", profile, runtime })).toEqual([]);
   });
 });

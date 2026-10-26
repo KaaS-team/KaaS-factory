@@ -10,6 +10,7 @@ import { githubHost } from "./repo";
 import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { LABEL } from "./labels";
+import { profileProblems } from "./profile-rules";
 
 export interface RiskPolicy {
   // Low risk (docs, test-only, a single non-protected module) is eligible for
@@ -108,9 +109,8 @@ export interface FactoryConfig {
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
   // Monorepo packages, each with its own gates; see PackageSpec.
   readonly packages?: readonly PackageSpec[];
-  // Opt-in: `reset`/`rebaseline` refuse on any repo where this is false (the
-  // default), so a live repo (lwp-website) can never be force-pushed back to
-  // a baseline tag by a stray `factory reset` (plan v2.6.2 item 2).
+  // Opt-in: `reset`/`rebaseline` refuse unless true, so a stray `factory reset` never force-pushes
+  // a live repo (lwp-website) back to a baseline tag (plan v2.6.2 item 2).
   readonly resettable: boolean;
   // Commands run once per fresh worktree, before any stage (e.g. "npm ci").
   // Idempotent via a marker file in the worktree; a failure parks the issue.
@@ -121,12 +121,9 @@ export interface FactoryConfig {
   readonly stages: StageAgents;
   // Per-type overrides, keyed by the type label. See RouteConfig.
   readonly routes: Readonly<Record<string, RouteConfig>>;
-  // Checked before every stage (plan v2.7.0 item 7). perIssueUsd is that
-  // issue's own lifetime spend; dailyUsd is this repo's spend since 00:00 UTC
-  // today. Either breached parks the issue with a "budget" inbox item.
-  // maxUnreportedRuns caps the count of stage runs with unknown cost (no
-  // price, no self-reported total) on one issue — a separate cap from the
-  // dollar ones, since an unpriced run can't be summed into them.
+  // Checked before every stage (plan v2.7.0 item 7): an issue's lifetime spend, the repo's since 00:00
+  // UTC, and the issue's runs with unknown cost, which no dollar sum can hold. A breach parks the
+  // issue with a "budget" inbox item.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
   readonly holdout: HoldoutConfig;
@@ -140,6 +137,7 @@ export interface FactoryConfig {
   readonly workflow: string;
   // Defaults for a company size (PROFILES); any key set explicitly still wins.
   readonly profile?: Profile;
+  readonly caps?: import("./org-caps").OrgCaps; // per-team and org back-pressure (src/org-caps.ts)
   // Where gates and check steps run, by runtime name (src/runtimes.ts); unset is "local".
   readonly runtime?: RuntimeConfig;
   // Where issues live. GitHub by default; "http" speaks Tracker API v1 (docs/tracker-api.md).
@@ -382,6 +380,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   templateOverrides: "strings",
   workflow: "string",
   profile: "string",
+  caps: "object",
   runtime: "object",
   tracker: "object",
   labels: "object",
@@ -437,6 +436,7 @@ export function configProblems(raw: unknown): string[] {
     problems.push(`riskPolicy.autoApproveMaxRisk: expected "low" or "medium", got ${JSON.stringify(maxRisk)}`);
   if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))
     problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
+  problems.push(...profileProblems(cfg));
   nested("maxBudgetUsd", {
     triage: "positive",
     plan: "positive",

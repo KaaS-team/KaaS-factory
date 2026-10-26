@@ -5,6 +5,7 @@ import { touchesProtectedPath } from "./boundary";
 import type { CiResult } from "./ci";
 import type { MergeConfig } from "./config";
 import type { GitHub, MergeReadiness } from "./github";
+import { type CodeownersRule, codeownerRefusals } from "./profile-rules";
 
 export interface ChangedFile {
   readonly path: string;
@@ -33,7 +34,8 @@ export type MergeRefusalReason =
   | "unresolved-threads"
   | "risk-not-low"
   | "not-auto-eligible"
-  | "policy-not-auto";
+  | "policy-not-auto"
+  | "codeowner-approval";
 
 export interface MergeRefusal {
   readonly reason: MergeRefusalReason;
@@ -154,6 +156,8 @@ export interface DecideMergeInput {
   readonly merge: MergeConfig;
   readonly protectedPaths: readonly string[];
   readonly expectedBaseRefName: string;
+  // Set when the profile asks a code owner to approve each touched file (src/profile-rules.ts).
+  readonly codeowners?: { readonly rules: readonly CodeownersRule[]; readonly approvedBy: readonly string[] };
 }
 
 // Authority is explicit only (herdr SKILL.md:18-23): "merge" is returned only
@@ -164,7 +168,9 @@ export function decideMerge(input: DecideMergeInput): MergeDecision {
   const headSha = input.readiness.headRefOid;
   const readinessRefusals = checkReadiness(input.readiness, input.ci, input.expectedBaseRefName);
   const eligibilityRefusals = autoEligible(input.risk, input.changedFiles, input.merge, input.protectedPaths);
-  const refusals = [...readinessRefusals, ...eligibilityRefusals];
+  const owners = input.codeowners;
+  const ownerRefusals = owners ? codeownerRefusals(owners.rules, input.changedFiles, owners.approvedBy) : [];
+  const refusals = [...readinessRefusals, ...eligibilityRefusals, ...ownerRefusals];
 
   if (input.merge.policy === "dry-run") {
     return { outcome: "dry-run", headSha, eligible: refusals.length === 0, refusals };

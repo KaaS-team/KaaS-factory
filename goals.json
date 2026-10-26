@@ -765,49 +765,84 @@
       "phase": "P9",
       "ask": "SSO through SAML and OIDC, then SCIM",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/sso.test.ts",
+        "name": "SCIM provisions a person, OIDC and SAML sign them in, and SCIM deprovisioning ends their access",
+        "mutation": "sso: SCIM deprovisioning ends plane access"
+      }
     },
     {
       "id": "ee-roles",
       "phase": "P9",
       "ask": "Custom roles",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/roles.test.ts",
+        "name": "a custom role grants and denies single routes on top of its base, and never grants an owner route",
+        "mutation": "roles: a custom role never grants an owner route"
+      }
     },
     {
       "id": "ee-audit-export",
       "phase": "P9",
       "ask": "Audit-log export",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/audit-export.test.ts",
+        "name": "an owner exports every audit row, oldest first, as JSON lines or CSV, and resumes after an id",
+        "mutation": "audit export: resumes after the id it is given"
+      }
     },
     {
       "id": "org-mode",
       "phase": "P9",
       "ask": "org mode / multi-tenant",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/org-mode.test.ts",
+        "name": "a role in one org reaches that org's repos only, and org settings stay with plane owners",
+        "mutation": "org mode: no role in a repo's org, no access to it"
+      }
     },
     {
       "id": "ee-spend-policy",
       "phase": "P9",
       "ask": "Fleet-wide spend policy",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "ee/tests/spend-policy.test.ts",
+        "name": "an org's repos together, and the whole fleet, hold back work no single repo cap would",
+        "mutation": "spend policy: an org's repos share one daily cap"
+      }
     },
     {
       "id": "profile-rules",
       "phase": "P9",
       "ask": "Concrete `scaleup` and `enterprise` profile rules (CODEOWNERS approvers, org caps, forced sandbox).",
       "source": "CHANGELOG v3.4.0 #7",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/profile-rules.test.ts",
+        "name": "a merge waits for each touched file's code owner, enterprise forces a sandbox, and both cap teams",
+        "mutation": "profile rules: a touched file waits for its code owner"
+      }
     },
     {
       "id": "org-caps",
       "phase": "P9",
       "ask": "Per-team back-pressure and org caps for `scaleup` and `enterprise` (v3.4).",
       "source": "CHANGELOG v3.2.0 #5",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/org-caps.test.ts",
+        "name": "a team at its cap of work waiting on people gets no new pickups, other teams do, and the org cap holds all",
+        "mutation": "org caps: a team at its cap gets no new pickups"
+      }
     },
     {
       "id": "one-image",

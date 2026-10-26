@@ -25,3 +25,16 @@ export interface SpendStore {
   // The repo's spend since `sinceIso`, which is 00:00 UTC of some day.
   since(sinceIso: string): Promise<SpendTotal>;
 }
+
+// A cap above one repo (an org's repos, the whole fleet), so no single repo's cap can hold it.
+// ee/ implements and registers it; without one, only the repo and machine caps apply.
+export interface SpendPolicy {
+  // Why new work must wait, or undefined.
+  breached(repo: string, sinceIso: string): Promise<string | undefined>;
+}
+
+let registered: SpendPolicy | undefined;
+export const registerSpendPolicy = (p: SpendPolicy | undefined): void => {
+  registered = p;
+};
+export const spendPolicy = (): SpendPolicy | undefined => registered;

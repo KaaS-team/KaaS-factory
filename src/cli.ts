@@ -11,7 +11,7 @@ import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { tokenEnvNames } from "./agents/env";
 import { CommandExecutor } from "./agents/executor";
-import { DEFAULT_CONFIG, loadConfig, type FactoryConfig } from "./config";
+import { DEFAULT_CONFIG, loadConfig, repoFromRemoteUrl, type FactoryConfig } from "./config";
 import { EXIT, UsageError, failureJson, successJson } from "./cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "./watch";
 import { ShellGateRunner } from "./gates";
@@ -53,12 +53,12 @@ import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
 import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
+import { spendPolicy } from "./ports/spend";
 import { poolDbPath, runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { SqliteUsageStore } from "./adapters/pool/execution";
 import { monthKey, poolReport } from "./core/sandbox-pool";
 import { detectStack, diskFiles } from "./stack";
 import { describeStack, initConfig, isFilledIn } from "./init";
-import { repoFromRemoteUrl } from "./config";
 import { EventBus } from "./engine/bus";
 import { loadMinions, runMinion } from "./engine/minion";
 import { parseEvent } from "./core/event";
@@ -177,6 +177,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     leases: { port: new GitLeases(cloneDir), holder, held: new Map() },
     // Spend on the issue and the ledger issue, so caps hold across all of them too.
     spend: new GitHubSpend(github, config.repo, holder),
+    spendPolicy: spendPolicy(),
   };
 }
 

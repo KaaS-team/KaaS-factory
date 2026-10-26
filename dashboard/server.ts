@@ -1,10 +1,6 @@
-// The cockpit (plan section 2). Bun.serve, one static page, JSON API + SSE
-// read from state.ts. No second source of truth: this server never invents
-// state, it reads what watch.ts wrote and posts replies through github.ts as
-// the signed-in `gh` user. /api/board is the exception on purpose — it
-// reads GitHub labels directly (dashboard/board.ts), so the board still
-// works with no local SQLite at all (a CI/VM run with no watcher on this
-// machine).
+// The cockpit (plan section 2): one static page, a JSON API and SSE, read from what watch.ts wrote;
+// replies go out through github.ts as the signed-in `gh` user. /api/board alone reads GitHub labels
+// (dashboard/board.ts), so the board works on a CI or VM run with no local SQLite at all.
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
@@ -240,6 +236,9 @@ export function createDashboard(
   // Every repo the multi-repo inbox reads from (v2.9.0 item 2): an explicit
   // FACTORY_REPOS list, else the single configured repo, else whatever repos
   // have ever run under FACTORY_HOME.
+  // With no repo of its own the plane lists every repo's runs, so tenancy narrows them to the caller's.
+  const visibleRuns = (req: Request) =>
+    state.listRuns(repo || undefined).filter((r) => access.visibleRepos(req, [r.repo]).length);
   function inboxRepos(): string[] {
     const fromEnv = (process.env.FACTORY_REPOS ?? "")
       .split(",")
@@ -619,8 +618,8 @@ export function createDashboard(
       label: "GET /api/line",
       role: "viewer",
       // Each recent run with the stages it went through, across every repo the inbox reads.
-      handler: () => {
-        const repos = repo ? [...new Set([repo, ...inboxRepos()])] : [];
+      handler: (req) => {
+        const repos = access.visibleRepos(req, repo ? [...new Set([repo, ...inboxRepos()])] : []);
         const rows = repos.flatMap((r) => {
           const st = stateFor(r);
           if (!st) return [];
@@ -648,9 +647,9 @@ export function createDashboard(
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
       role: "viewer",
-      handler: () =>
+      handler: (req) =>
         json(
-          analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [], new Date(), (agent) => {
+          analytics(visibleRuns(req), repo ? allStageRuns() : [], new Date(), (agent) => {
             const a = project?.config.agents[agent];
             return a?.models?.large ?? a?.model;
           }),
@@ -695,9 +694,9 @@ export function createDashboard(
       // Aggregated across every repo under FACTORY_HOME (v2.9.0 item 2), or
       // narrowed to one with ?repo=. Each item carries its own repo so the
       // frontend can render and act on a mixed list.
-      handler: async (_req, url) => {
+      handler: async (req, url) => {
         const filter = url.searchParams.get("repo");
-        const repos = filter ? [filter] : inboxRepos();
+        const repos = filter ? [filter] : access.visibleRepos(req, inboxRepos());
         if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
         const perRepo = await Promise.all(
           repos.map(async (r) => [
@@ -711,7 +710,7 @@ export function createDashboard(
         const items = perRepo
           .flat()
           .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
-        return json({ repos: inboxRepos(), repo, items });
+        return json({ repos: access.visibleRepos(req, inboxRepos()), repo, items });
       },
     },
     {
@@ -797,7 +796,7 @@ export function createDashboard(
     const url = new URL(req.url);
     const loopback = isLoopback(remoteAddress);
     const route = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
-    const isPublic = route !== undefined && PUBLIC_ROUTES.includes(route.label);
+    const isPublic = route !== undefined && (PUBLIC_ROUTES.includes(route.label) || route.public === true);
 
     // The webhook carries its own HMAC, so GitHub may reach it with no dashboard token set.
     const signedWebhook =
@@ -813,12 +812,12 @@ export function createDashboard(
     }
     // Every non-public route needs a caller with its role, so an unknown path
     // is refused before it can 404 (no route probing).
-    const refused = access.gate(req, route, isPublic, loopback, inProcess);
+    const refused = await access.gate(req, route, isPublic, loopback, inProcess);
     if (refused) return refused;
 
     // CSRF: a mutating request must be same-origin JSON, never the
     // `text/plain` a plain HTML form can send cross-site without a preflight.
-    if (req.method === "POST") {
+    if (req.method !== "GET" && !route?.public) {
       const contentType = (req.headers.get("content-type") ?? "").toLowerCase();
       const cloudEvent = route?.label === EVENTS_ROUTE && contentType.startsWith("application/cloudevents+json");
       if (!contentType.startsWith("application/json") && !cloudEvent)
