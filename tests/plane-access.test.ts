@@ -29,7 +29,7 @@ class QuietGitHub extends GitHub {
   override async addLabels() {}
 }
 
-// GitHub's two OAuth calls: the code is the login, so a test signs in as anyone.
+// GitHub's two OAuth calls: the code is `login` or `login.id`, so a test signs in as anyone.
 const fakeGitHub = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input);
   if (url === "https://github.com/login/oauth/access_token") {
@@ -37,14 +37,15 @@ const fakeGitHub = (async (input: string | URL | Request, init?: RequestInit) =>
     return Response.json(code === "refused" ? { error: "bad_verification_code" } : { access_token: `gho_${code}` });
   }
   if (url === "https://api.github.com/user") {
-    const login = new Headers(init?.headers).get("authorization")!.replace("Bearer gho_", "");
-    return Response.json({ login, id: 7, name: null });
+    const code = new Headers(init?.headers).get("authorization")!.replace("Bearer gho_", "");
+    const [login, id = "7"] = code.split(".");
+    return Response.json({ login, id: Number(id), name: null });
   }
   return new Response("unexpected", { status: 500 });
 }) as typeof fetch;
 
-function make(opts: { token?: string; github?: boolean } = {}) {
-  const dbPath = join(scratch, `${crypto.randomUUID()}.db`);
+function make(opts: { token?: string; github?: boolean; dbPath?: string } = {}) {
+  const dbPath = opts.dbPath ?? join(scratch, `${crypto.randomUUID()}.db`);
   const store = new PlaneStore(dbPath);
   const env = opts.github === false ? {} : { FACTORY_GITHUB_CLIENT_ID: "id", FACTORY_GITHUB_CLIENT_SECRET: "secret" };
   const access = createAccess({ token: opts.token ?? TOKEN, store, env, fetch: fakeGitHub });
@@ -235,6 +236,16 @@ describe("GitHub sign-in", () => {
     expect(rows[0]!.id_hash).toHaveLength(64);
   });
 
+  test("a login renamed and then registered by another GitHub account is refused", async () => {
+    const p = make();
+    p.store.setMember("alice", "owner", "test");
+    expect((await signIn(p, "alice.100")).res.status).toBe(302);
+    const { res, cookie } = await signIn(p, "alice.200");
+    expect(res.status).toBe(403);
+    expect(cookie).toBe("");
+    expect(p.store.audit()[0]).toMatchObject({ actor: "alice", route: "sign-in", status: 403 });
+  });
+
   test("sign-in is off when no GitHub app is set up", async () => {
     const p = make({ github: false });
     expect((await p.dashboard.handle(new Request(`${BASE}/auth/github`), "127.0.0.1")).status).toBe(404);
@@ -254,6 +265,20 @@ describe("break-glass and local use", () => {
     expect(await status(p, request("GET /api/members", { cookie }))).toBe(200);
   });
 
+  test("rotating or removing the token ends the sessions it opened", async () => {
+    const p = make();
+    const res = await p.dashboard.handle(
+      request("POST /api/session", {}, JSON.stringify({ token: TOKEN })),
+      "127.0.0.1",
+    );
+    const cookie = `factory_session=${setCookies(res).factory_session}`;
+    expect(await status(make({ dbPath: p.dbPath }), request("GET /api/members", { cookie }))).toBe(200);
+    expect(await status(make({ token: "rotated", dbPath: p.dbPath }), request("GET /api/members", { cookie }))).toBe(
+      401,
+    );
+    expect(await status(make({ token: "", dbPath: p.dbPath }), request("GET /api/members", { cookie }))).toBe(401);
+  });
+
   test("the in-process relay reader may read the inbox with a token set, and never write", async () => {
     const p = make();
     expect((await p.dashboard.readInProcess(request("GET /api/inbox"))).status).toBe(200);
@@ -271,5 +296,21 @@ describe("break-glass and local use", () => {
     const p = make({ token: "" });
     expect(await status(p, request("GET /api/runs"), "10.0.0.5")).toBe(401);
     expect(await status(p, request("GET /api/runs"))).toBe(401);
+  });
+});
+
+describe("audit retention", () => {
+  test("refusals roll in their own budget, so spammed 403s never push out real writes", () => {
+    const store = new PlaneStore(":memory:", { rows: 10, refusals: 5, every: 1 });
+    for (let i = 0; i < 3; i++)
+      store.record({ actor: "op", role: "operator", route: "POST /x", issue: i, status: 200 });
+    for (let i = 0; i < 100; i++)
+      store.record({ actor: "v", role: "viewer", route: "POST /x", issue: null, status: 403 });
+    const rows = store.audit();
+    expect(rows.filter((r) => r.status === 200)).toHaveLength(3);
+    expect(rows.filter((r) => r.status === 403)).toHaveLength(5);
+    for (let i = 0; i < 20; i++)
+      store.record({ actor: "op", role: "operator", route: "POST /x", issue: i, status: 200 });
+    expect(store.audit().filter((r) => r.status === 200)).toHaveLength(10);
   });
 });

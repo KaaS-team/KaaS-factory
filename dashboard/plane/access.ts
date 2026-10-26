@@ -75,16 +75,23 @@ export function createAccess(opts: AccessOptions) {
   const github = () => clientId() !== "" && clientSecret() !== "";
   // The plane may face a network only when something guards it.
   const guarded = () => opts.token !== "" || github();
+  // A break-glass session names the token that opened it, so rotating or removing the token ends it.
+  const glass = opts.token
+    ? `${BREAK_GLASS}:${createHash("sha256").update(opts.token).digest("hex").slice(0, 16)}`
+    : "";
 
   function actor(req: Request, loopback: boolean): Actor | null {
     const header = req.headers.get("authorization") ?? "";
     if (header.startsWith("Bearer "))
       return opts.token && tokenMatches(header.slice(7), opts.token) ? { login: BREAK_GLASS, role: "owner" } : null;
-    const login = store.sessionLogin(cookie(req, SESSION_COOKIE));
-    if (login === BREAK_GLASS) return { login, role: "owner" };
-    // The role is read on every request, so removing a member ends their access at once.
-    const role = login ? store.roleOf(login) : null;
-    if (login && role) return { login, role };
+    const login = store.sessionLogin(cookie(req, SESSION_COOKIE)) ?? "";
+    if (login.startsWith(BREAK_GLASS)) {
+      if (glass !== "" && login === glass) return { login: BREAK_GLASS, role: "owner" };
+    } else if (login) {
+      // The role is read on every request, so removing a member ends their access at once.
+      const role = store.roleOf(login);
+      if (role) return { login, role };
+    }
     return !guarded() && loopback ? { login: LOCAL, role: "owner" } : null;
   }
 
@@ -125,8 +132,9 @@ export function createAccess(opts: AccessOptions) {
       headers: { accept: "application/vnd.github+json", authorization: `Bearer ${access_token}` },
     });
     const user = (await userRes.json()) as { login?: string; id?: number; name?: string | null };
-    if (!userRes.ok || typeof user.login !== "string") throw new Error("GitHub did not return a user");
-    return { login: user.login, id: user.id ?? 0, name: user.name ?? null };
+    if (!userRes.ok || typeof user.login !== "string" || !Number.isInteger(user.id))
+      throw new Error("GitHub did not return a user");
+    return { login: user.login, id: user.id as number, name: user.name ?? null };
   }
 
   const routes: Route[] = [
@@ -139,7 +147,7 @@ export function createAccess(opts: AccessOptions) {
         const body = (await req.json().catch(() => ({}))) as { token?: string };
         if (!opts.token || typeof body.token !== "string" || !tokenMatches(body.token, opts.token))
           return json({ error: "unauthorized" }, 401);
-        return startSession(req, BREAK_GLASS);
+        return startSession(req, glass);
       },
     },
     {
@@ -177,7 +185,8 @@ export function createAccess(opts: AccessOptions) {
           return json({ error: (e as Error).message }, 502);
         }
         store.seen(user.login, user.id, user.name);
-        const role = store.roleOf(user.login);
+        const member = store.roleOf(user.login);
+        const role = member && store.claim(user.login, user.id) ? member : null;
         store.record({
           actor: user.login,
           role: role ?? "none",

@@ -32,8 +32,14 @@ export interface AuditRow {
 }
 
 const MAX_SESSIONS = 1000;
-// Enough for months of clicks on one plane; ee/ exports the log before it rolls.
-const MAX_AUDIT = 50_000;
+export interface AuditLimits {
+  rows: number;
+  refusals: number;
+  every: number;
+}
+// Enough for months of clicks on one plane; ee/ exports the log before it rolls. Refusals roll in
+// their own budget, so a caller spamming 403s cannot push members' real writes out of the log.
+const LIMITS: AuditLimits = { rows: 50_000, refusals: 5_000, every: 1000 };
 const PAGE = 200;
 
 // A leaked database must not hand out live sessions, so only the digest is kept.
@@ -42,7 +48,10 @@ const digest = (id: string) => createHash("sha256").update(id).digest("hex");
 export class PlaneStore {
   private readonly db: Database;
 
-  constructor(path = ":memory:") {
+  constructor(
+    path = ":memory:",
+    private readonly limits = LIMITS,
+  ) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     this.db.exec("PRAGMA busy_timeout = 5000;");
@@ -56,6 +65,7 @@ export class PlaneStore {
       );
       CREATE TABLE IF NOT EXISTS plane_memberships (
         login TEXT PRIMARY KEY,
+        github_id INTEGER,
         role TEXT NOT NULL,
         added_by TEXT NOT NULL,
         added_at TEXT NOT NULL
@@ -75,6 +85,7 @@ export class PlaneStore {
         issue INTEGER,
         status INTEGER NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS plane_audit_status ON plane_audit (status, id);
     `);
   }
 
@@ -97,6 +108,18 @@ export class PlaneStore {
          ON CONFLICT (login) DO UPDATE SET role = excluded.role, added_by = excluded.added_by`,
       )
       .run(login, role, by, new Date().toISOString());
+  }
+
+  // A login can be renamed and then registered by someone else, so the first sign-in pins the
+  // GitHub account id and a later sign-in from another account is refused.
+  claim(login: string, githubId: number): boolean {
+    this.db
+      .query("UPDATE plane_memberships SET github_id = ? WHERE login = ? AND github_id IS NULL")
+      .run(githubId, login);
+    const row = this.db.query("SELECT github_id FROM plane_memberships WHERE login = ?").get(login) as {
+      github_id: number | null;
+    } | null;
+    return row?.github_id === githubId;
   }
 
   members(): Member[] {
@@ -142,8 +165,17 @@ export class PlaneStore {
     const r = this.db
       .query("INSERT INTO plane_audit (at, actor, role, route, issue, status) VALUES (?, ?, ?, ?, ?, ?)")
       .run(new Date().toISOString(), row.actor, row.role, row.route, row.issue, row.status);
-    if (Number(r.lastInsertRowid) % 1000 === 0)
-      this.db.query("DELETE FROM plane_audit WHERE id <= ?").run(Number(r.lastInsertRowid) - MAX_AUDIT);
+    if (Number(r.lastInsertRowid) % this.limits.every !== 0) return;
+    for (const [refused, keep] of [
+      [1, this.limits.refusals],
+      [0, this.limits.rows],
+    ] as const)
+      this.db
+        .query(
+          `DELETE FROM plane_audit WHERE (status = 403) = ? AND id <
+           (SELECT id FROM plane_audit WHERE (status = 403) = ? ORDER BY id DESC LIMIT 1 OFFSET ?)`,
+        )
+        .run(refused, refused, keep - 1);
   }
 
   // Keyset paging: newest first, `before` is the last id the caller saw.
