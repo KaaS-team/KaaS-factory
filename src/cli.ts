@@ -37,6 +37,7 @@ import {
   transcriptPath,
 } from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
+import { tailEvents } from "./events-tail";
 import { followStream } from "./view";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
 import { LABEL } from "./labels";
@@ -956,24 +957,17 @@ async function cmdMinion(): Promise<void> {
 async function cmdEvents(): Promise<void> {
   const sub = args[1];
   if (sub !== "tail" && sub !== "replay")
-    throw new UsageError("usage: factory events (tail [--limit N] | replay <id>) --repo-dir <path> [--json]");
+    throw new UsageError(
+      "usage: factory events (tail [--limit N] [--follow] | replay <id>) --repo-dir <path> [--json]",
+    );
   const cloneDir = resolve(flag("repo-dir") ?? ".");
   const config = await loadConfig(cloneDir);
   const state = new FactoryState(stateDbPath(config.repo));
   if (sub === "tail") {
-    const rows = state.busEvents(Number(flag("limit") ?? 50));
-    for (const r of rows) {
-      if (has("json"))
-        console.log(JSON.stringify({ ...r, data: JSON.parse(r.data), deliveries: state.busDeliveries(r.id) }));
-      else
-        console.log(
-          `${r.time}  ${r.direction === "in" ? "<-" : "->"}  ${r.type}  ${r.id}${r.subject ? `  ${r.subject}` : ""}${state
-            .busDeliveries(r.id)
-            .map((d) => `  [${d.status} ${d.sink}]`)
-            .join("")}`,
-        );
-    }
-    return;
+    const controller = new AbortController();
+    process.on("SIGINT", () => controller.abort());
+    const opts = { limit: Number(flag("limit") ?? 50), follow: has("follow"), json: has("json") };
+    return tailEvents(state, { ...opts, signal: controller.signal });
   }
   const id = args[2];
   if (!id || id.startsWith("--")) throw new UsageError("events replay: an event id is required");

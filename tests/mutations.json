@@ -582,6 +582,8 @@
   {"name": "safe outputs: a path in argv0 is refused", "file": "src/safe-outputs.ts", "find": "if (argv0.includes(\"/\")) return", "replace": "if (false) return", "test": "tests/safe-outputs.test.ts"},
   {"name": "rebuild: every agent's prompt carries the failure tail", "file": "src/agents/prompt.ts", "find": "...(opts.resume ?", "replace": "...(false ?", "test": "tests/rebuild-resume.test.ts"},
   {"name": "rebuild: a sessionless agent is still told why it came back", "file": "src/engine/steps.ts", "find": "return failure !== undefined ? { resume: { ...(id ? { sessionId: id } : {}), failure } } : {};", "replace": "return id ? { resume: { sessionId: id, failure: failure! } } : {};", "test": "tests/scenarios.test.ts"},
+  {"name": "events tail --follow: each event prints once", "file": "src/events-tail.ts", "find": "after = Math.max(after, r.seq ?? after);", "replace": "", "test": "tests/events-tail.test.ts"},
+  {"name": "events tail --follow: it keeps polling", "file": "src/events-tail.ts", "find": "if (!opts.follow || opts.signal?.aborted) return;", "replace": "return;", "test": "tests/events-tail.test.ts"},
   {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
   {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},

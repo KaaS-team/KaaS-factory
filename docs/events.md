@@ -124,5 +124,5 @@ workspace, not a checkout. The triggering event goes into the prompt between
 
 - `factory minion list --repo-dir .` lists and checks the minions.
 - `factory minion run <name> [--event <file.json>]` runs one now.
-- `factory events tail [--limit N] [--json]` shows recent events in and out, with delivery status.
+- `factory events tail [--limit N] [--follow] [--json]` shows recent events in and out, with delivery status; `--follow` keeps printing new ones as the watcher records them, until Ctrl-C.
 - `factory events replay <id>` sends one event to its sinks again.

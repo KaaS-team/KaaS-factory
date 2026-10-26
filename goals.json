@@ -556,7 +556,12 @@
       "phase": "P5",
       "ask": "`factory events tail --follow`.",
       "source": "CHANGELOG v4.0.0 #3",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/events-tail.test.ts",
+        "name": "tail --follow prints events recorded after it started, once each, until stopped",
+        "mutation": "events tail --follow: it keeps polling"
+      }
     },
     {
       "id": "minions-view",
