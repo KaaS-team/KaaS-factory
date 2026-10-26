@@ -444,7 +444,12 @@
       "phase": "P4",
       "ask": "Deny-by-default egress on every runtime, keys injected by a proxy the guest cannot read",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/egress.test.ts",
+        "name": "denies every host off the list, and swaps a key in only toward that key's hosts",
+        "mutation": "egress: a key goes only to its own hosts"
+      }
     },
     {
       "id": "acp-readonly-mount",
