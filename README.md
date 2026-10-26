@@ -233,7 +233,7 @@ session in `teach/sessions.json`, which is the single list of them. The older `0
 ## Quickstart
 
 ```bash
-git clone git@github.com:learnwithparam/software-factory.git
+git clone git@github.com:KaaS-team/software-factory.git
 cd software-factory
 make install                    # bun install
 make check                      # typecheck + test + skills validation

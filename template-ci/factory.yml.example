@@ -43,7 +43,7 @@ on:
 
 env:
   FACTORY_RUNNER_REF: v5.0.0 # pinned software-factory release; bump deliberately
-  FACTORY_RUNNER_REPO: learnwithparam/software-factory
+  FACTORY_RUNNER_REPO: KaaS-team/software-factory
   CLAUDE_CODE_VERSION: "2.1.286" # pinned claude, same version the Dockerfile installs
   # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE
   # FACTORY_AGENTS (space separated, default "claude"); add a repo secret for each one's key

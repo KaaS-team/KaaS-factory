@@ -13,6 +13,13 @@ test("template-ci FACTORY_RUNNER_REF is v<package.json version>", () => {
   expect(ref).toBe(`v${version}`);
 });
 
+// The repo moved to KaaS-team in v5.0.0; a stale owner would send every adopter's CI to a redirect.
+test("the CI template and the README clone line name the same KaaS-team runner repo", () => {
+  const repo = /FACTORY_RUNNER_REPO: (\S+)/.exec(read("template-ci/factory.yml.example"))?.[1];
+  expect(repo).toBe("KaaS-team/software-factory");
+  expect(read("README.md")).toContain(`git clone git@github.com:${repo}.git`);
+});
+
 test("the README describes only what exists: every label is listed and no monitor stage is claimed", () => {
   const readme = read("README.md");
   for (const label of Object.values(LABEL)) expect(readme).toContain(`\`${label}\``);
