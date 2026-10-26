@@ -12,6 +12,7 @@ const SHELL = [
   "/lib/analytics-state.js",
   "/lib/exec-summary.js",
   "/lib/markdown.js",
+  "/lib/relay-follow.js",
   "/lib/routes.js",
   "/lib/run-metrics.js",
   "/lib/run-page.js",

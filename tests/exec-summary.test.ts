@@ -44,6 +44,8 @@ describe("inbox brief", () => {
   test("the inbox loads analytics and leads with the brief", () => {
     const app = readFileSync("dashboard/public/app.js", "utf8");
     expect(app).toContain('inbox: ["analytics", "/api/analytics"]');
-    expect(app).toContain('heading("Inbox", execSummary(state.data.analytics, items))');
+    expect(app).toContain(
+      'heading("Inbox", execSummary(state.offline ? state.relay.analytics : state.data.analytics, items))',
+    );
   });
 });

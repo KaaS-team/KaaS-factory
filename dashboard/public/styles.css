@@ -58,6 +58,9 @@ h1 { font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -.02e
 h2 { font-size: 15px; line-height: 22px; font-weight: 600; margin-bottom: 10px; }
 h3 { font-size: 13.5px; font-weight: 600; }
 .lede { margin-top: 2px; color: var(--muted); font-size: 13.5px; max-width: 72ch; }
+.notice { margin: -8px 0 20px; padding: 8px 12px; border-radius: 7px; background: var(--surface); box-shadow: var(--lift); font-size: 13px; max-width: 72ch; }
+.relay-form { display: grid; gap: 6px; max-width: 420px; }
+.relay-form .btn { justify-self: start; margin-top: 4px; }
 .muted { color: var(--muted); }
 .plain-list { padding: 0; list-style: none; }
 .plain-list li { color: var(--muted); }

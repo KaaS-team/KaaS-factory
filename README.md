@@ -149,8 +149,18 @@ that should not show models and spend.
 
 The dashboard installs as an app on a phone or desktop (Add to Home Screen, or the browser's
 install button) when it is served over https or from localhost. Its service worker keeps only the
-page itself, so the cockpit opens offline and shows nothing until it reaches the dashboard again;
-inbox, runs and every other `/api` answer are never stored on the device.
+page itself, so without a relay the cockpit opens offline and shows nothing until it reaches the
+dashboard again; inbox, runs and every other `/api` answer are never stored on the device.
+
+To follow the inbox when the dashboard is out of reach, run `kaas-relay` (`relay/`, `cargo build
+--release`) where both sides can reach it, behind https. It takes `KAAS_RELAY_PUBLISH_TOKEN` and
+`KAAS_RELAY_SUBSCRIBE_TOKEN` (16 characters or more, different) and `KAAS_RELAY_ADDR` (default
+`127.0.0.1:4200`). Start the dashboard with `FACTORY_RELAY_URL` and `FACTORY_RELAY_TOKEN` (the
+publish token) and it sends the inbox and the week every 10 seconds when they change. On the phone,
+Settings, Follow from your phone, takes the relay address and the read token. The relay keeps only
+the last inbox, in memory, and carries nothing back: the list is read-only, and you act on the
+issue in your tracker. The read token travels in the URL, because a browser's event stream cannot
+send a header.
 
 ## Scripting the CLI
 

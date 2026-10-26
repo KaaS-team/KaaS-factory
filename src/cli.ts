@@ -25,6 +25,7 @@ import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard } from "../dashboard/server";
+import { startRelay } from "../dashboard/relay";
 import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
 import {
@@ -511,6 +512,7 @@ function serveDashboard(
     fetch: (req: Request): Promise<Response> => dashboard.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${port} (repo=${repo || "unset"})`);
+  startRelay(dashboard.handle);
   return port;
 }
 

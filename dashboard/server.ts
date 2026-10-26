@@ -28,6 +28,7 @@ import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
+import { startRelay } from "./relay";
 import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
 import { harnessReport } from "../src/harness";
 import {
@@ -918,4 +919,5 @@ if (import.meta.main) {
     fetch: (req: Request): Promise<Response> => dashboard.handle(req, server.requestIP(req)?.address),
   });
   console.log(`factory dashboard: http://${hostname}:${PORT} (repo=${REPO || "unset"})`);
+  startRelay(dashboard.handle);
 }

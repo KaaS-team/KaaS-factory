@@ -501,5 +501,13 @@
   {"name": "pwa: the icon uses a colour that is not a token", "file": "dashboard/public/icon.svg", "find": "fill=\"#171717\"", "replace": "fill=\"#123456\"", "test": "tests/tokens.test.ts"},
   {"name": "inbox brief: week window is seven days", "file": "dashboard/analytics.ts", "find": "<= 7 * DAY_MS", "replace": "<= 70 * DAY_MS", "test": "tests/exec-summary.test.ts"},
   {"name": "inbox brief: oldest item is the earliest waitingSince", "file": "dashboard/public/lib/exec-summary.js", "find": "Date.parse(b.waitingSince) < Date.parse(a.waitingSince)", "replace": "Date.parse(b.waitingSince) > Date.parse(a.waitingSince)", "test": "tests/exec-summary.test.ts"},
-  {"name": "inbox brief: inbox view loads analytics", "file": "dashboard/public/app.js", "find": "  inbox: [\"analytics\", \"/api/analytics\"],\n", "replace": "", "test": "tests/exec-summary.test.ts"}
+  {"name": "inbox brief: inbox view loads analytics", "file": "dashboard/public/app.js", "find": "  inbox: [\"analytics\", \"/api/analytics\"],\n", "replace": "", "test": "tests/exec-summary.test.ts"},
+  {"name": "relay: the publish token cannot subscribe", "file": "relay/src/main.rs", "find": "if !same(token.unwrap_or(\"\"), &tokens.subscribe) {", "replace": "if !same(token.unwrap_or(\"\"), &tokens.publish) {", "test": "tests/relay.test.ts"},
+  {"name": "relay: a multi-line body is refused", "file": "relay/src/main.rs", "find": "line.contains(['\\n', '\\r'])", "replace": "line.contains(['\\0'])", "test": "tests/relay.test.ts"},
+  {"name": "relay: a late subscriber gets the last line", "file": "relay/src/main.rs", "find": "Some(frame) => stream.write_all(frame.as_bytes()),", "replace": "Some(_) => stream.write_all(b\": open\\n\\n\"),", "test": "tests/relay.test.ts"},
+  {"name": "relay: an oversized body is answered 413", "file": "relay/src/main.rs", "find": "if length > MAX_BODY {", "replace": "if length > 4 * MAX_BODY {", "test": "tests/relay.test.ts"},
+  {"name": "relay publisher: an unchanged inbox is not resent", "file": "dashboard/relay.ts", "find": "      if (body === last) return false;\n", "replace": "", "test": "tests/relay.test.ts"},
+  {"name": "relay publisher: each ask is trimmed", "file": "dashboard/relay.ts", "find": "ask: String(i.ask ?? \"\").slice(0, MAX_ASK),", "replace": "ask: String(i.ask ?? \"\"),", "test": "tests/relay.test.ts"},
+  {"name": "relay follower: only a line with items reaches the page", "file": "dashboard/public/lib/relay-follow.js", "find": "if (Array.isArray(p?.items)) onPayload(p);", "replace": "onPayload(p);", "test": "tests/relay.test.ts"},
+  {"name": "relay publisher: factory dashboard starts it", "file": "src/cli.ts", "find": "  startRelay(dashboard.handle);\n", "replace": "", "test": "tests/relay.test.ts"}
 ]

@@ -8,6 +8,7 @@ import { ACTIVE, stationStates, WAITING } from "/lib/stations.js";
 import { markdownText, renderMarkdown } from "/lib/markdown.js";
 import { feedCard, proofPanel } from "/lib/run-page.js";
 import { execSummary } from "/lib/exec-summary.js";
+import { followRelay, readRelay, saveRelay } from "/lib/relay-follow.js";
 
 const ACTION_LABEL = {
   approve: "Approve plan",
@@ -70,6 +71,9 @@ const state = {
   filter: "all",
   data: {},
   error: {},
+  // The relay's last inbox, shown read-only while the dashboard is out of reach.
+  relay: null,
+  offline: false,
 };
 
 function h(tag, attrs, ...kids) {
@@ -663,7 +667,14 @@ function inboxView() {
   return h(
     "section",
     null,
-    heading("Inbox", execSummary(state.data.analytics, items)),
+    heading("Inbox", execSummary(state.offline ? state.relay.analytics : state.data.analytics, items)),
+    state.offline
+      ? h(
+          "p",
+          { class: "notice", role: "status" },
+          "The dashboard is out of reach, so this list comes from the relay and is read-only. Act on the issue in your tracker.",
+        )
+      : null,
     !items.length
       ? quiet("Nothing is waiting on you", "The factory will list plans to approve and questions to answer here.")
       : h(
@@ -682,6 +693,7 @@ function inboxView() {
                     class: "list-item",
                     type: "button",
                     "aria-current": String(isSelected(i)),
+                    disabled: state.offline,
                     onclick: () => selectItem(i),
                   },
                   glyph(["failed", "budget"].includes(i.kind) ? "failed" : "waiting", KIND_LABEL[i.kind]),
@@ -721,9 +733,78 @@ function inboxView() {
                   ),
                   conversation(item),
                 ]
-              : h("div", { class: "empty-detail" }, svg(ICONS.inbox), h("p", null, "Select an item to read it")),
+              : h(
+                  "div",
+                  { class: "empty-detail" },
+                  svg(ICONS.inbox),
+                  h(
+                    "p",
+                    null,
+                    state.offline ? "Items open again when the dashboard is back" : "Select an item to read it",
+                  ),
+                ),
           ),
         ),
+  );
+}
+
+/* ---- Relay ---- */
+let stopRelay = () => {};
+function startFollowing() {
+  stopRelay();
+  const cfg = readRelay(localStorage);
+  stopRelay = cfg
+    ? followRelay(cfg, (p) => {
+        state.relay = p;
+        // The first line can land after the dashboard already failed, so its error counts too.
+        if (state.offline || state.error.inbox) {
+          state.offline = true;
+          state.inbox = p.items;
+          render();
+        }
+      })
+    : () => {};
+}
+
+function relaySettings() {
+  const cfg = readRelay(localStorage);
+  return h(
+    "form",
+    {
+      class: "section relay-form",
+      onsubmit: (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const url = f.relayUrl.value.trim();
+        const token = f.relayToken.value.trim();
+        const saved = saveRelay(localStorage, url && token ? { url, token, channel: "inbox" } : null);
+        f.querySelector(".hint").textContent = !saved
+          ? "This browser does not keep settings, so the relay is off."
+          : url && token
+            ? "Saved. This browser now follows the relay."
+            : "Cleared. This browser no longer follows a relay.";
+        startFollowing();
+      },
+    },
+    h("h2", null, "Follow from your phone"),
+    h(
+      "p",
+      { class: "muted" },
+      "With a relay set, this browser keeps the inbox up to date when the dashboard is out of reach. Saved in this browser only.",
+    ),
+    h("label", { class: "muted", for: "relayUrl" }, "Relay address"),
+    h("input", { class: "field-control", id: "relayUrl", name: "relayUrl", type: "url", value: cfg?.url ?? "" }),
+    h("label", { class: "muted", for: "relayToken" }, "Read token"),
+    h("input", {
+      class: "field-control",
+      id: "relayToken",
+      name: "relayToken",
+      type: "password",
+      autocomplete: "off",
+      value: cfg?.token ?? "",
+    }),
+    h("p", { class: "hint muted", role: "status" }),
+    h("button", { class: "btn", type: "submit" }, "Save relay"),
   );
 }
 
@@ -1327,6 +1408,7 @@ function settingsView() {
                   ),
           ),
     ),
+    relaySettings(),
   );
 }
 
@@ -1493,8 +1575,13 @@ async function loadInbox() {
     state.repo = r.repo;
     state.repos = r.repos || [];
     state.error.inbox = null;
+    state.offline = false;
   } catch (e) {
     state.error.inbox = e.message;
+    if (state.relay) {
+      state.inbox = state.relay.items;
+      state.offline = true;
+    }
   }
   document.getElementById("repo-label").textContent =
     state.repos.length > 1 ? plural(state.repos.length, "repo") : short(state.repo);
@@ -1548,6 +1635,7 @@ async function toggles() {
 navigator.serviceWorker?.register("/sw.js").catch(() => {});
 window.addEventListener("hashchange", onRoute);
 onRoute();
+startFollowing();
 loadInbox().then(render);
 toggles();
 setInterval(() => {
