@@ -43,6 +43,7 @@ export interface Step {
   readonly retries?: number;
   readonly tool?: string;
   readonly with?: Readonly<Record<string, unknown>>;
+  readonly env?: readonly string[];
 }
 
 // `on: cron:` files an issue labelled factory:ready on a schedule, which the

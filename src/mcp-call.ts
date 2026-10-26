@@ -1,7 +1,9 @@
 // One MCP tool call over stdio, with no agent in the loop: a workflow's `tool` step. JSON-RPC 2.0,
 // one message per line (the MCP stdio transport): initialize, initialized, tools/call, then the
-// server is stopped. `${VAR}` in the server's args and env expands from the runner's env.
+// server is stopped. The server is third-party code, so it gets only toolEnv below, never the
+// runner's tokens.
 
+import { gatewaySanitizedEnv } from "./agents/env";
 import { McpError, mcpServersFor } from "./mcp";
 
 export interface ToolCallResult {
@@ -10,14 +12,31 @@ export interface ToolCallResult {
   readonly content: unknown;
 }
 
+const BASE_ENV = ["PATH", "HOME", "TMPDIR", "LANG"];
 const expand = (s: string, env: Record<string, string | undefined>): string =>
   s.replace(/\$\{(\w+)\}/g, (_, k: string) => env[k] ?? "");
+
+// What a tool's server sees: PATH, HOME, TMPDIR, LANG and the keys its mcp.json `env` names.
+// `${VAR}` expands only from the names the step's `env:` declares, and never to a runner token,
+// provider key or other credential, even when declared.
+export function toolEnv(
+  env: Record<string, string | undefined>,
+  declared: readonly string[],
+  entryEnv: Readonly<Record<string, string>> = {},
+): { vars: Record<string, string>; child: Record<string, string> } {
+  const safe = gatewaySanitizedEnv(env);
+  const vars = Object.fromEntries(declared.filter((k) => safe[k] !== undefined).map((k) => [k, safe[k]!]));
+  const child = Object.fromEntries(BASE_ENV.filter((k) => env[k] !== undefined).map((k) => [k, env[k]!]));
+  for (const [k, v] of Object.entries(entryEnv)) child[k] = expand(v, vars);
+  return { vars, child };
+}
 
 export async function callMcpTool(
   dir: string,
   spec: string,
   args: Readonly<Record<string, unknown>>,
   timeoutMs = 60_000,
+  declared: readonly string[] = [],
   env: Record<string, string | undefined> = process.env,
 ): Promise<ToolCallResult> {
   const [server, tool] = spec.split("/") as [string, string];
@@ -27,12 +46,13 @@ export async function callMcpTool(
     env?: Record<string, string>;
   };
   if (typeof entry?.command !== "string") throw new McpError(`"${server}" in .factory/mcp.json has no stdio command`);
-  const proc = Bun.spawn([entry.command, ...(entry.args ?? []).map((a) => expand(a, env))], {
+  const { vars, child } = toolEnv(env, declared, entry.env);
+  const proc = Bun.spawn([entry.command, ...(entry.args ?? []).map((a) => expand(a, vars))], {
     cwd: dir,
     stdin: "pipe",
     stdout: "pipe",
     stderr: "ignore",
-    env: { ...env, ...Object.fromEntries(Object.entries(entry.env ?? {}).map(([k, v]) => [k, expand(v, env)])) },
+    env: child,
   });
   const send = (msg: object) => proc.stdin.write(`${JSON.stringify(msg)}\n`);
   const timer = setTimeout(() => proc.kill(), timeoutMs);

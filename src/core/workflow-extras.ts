@@ -4,11 +4,11 @@
 
 import { parseWorkflow, type Step, type StepKind, type WorkflowResult } from "./workflow";
 
-const STEP_EXTRAS = ["agent", "timeout", "retries", "tool", "with"] as const;
+const STEP_EXTRAS = ["agent", "timeout", "retries", "tool", "with", "env"] as const;
 const NAME = /^[\w.-]{1,64}$/;
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 
-type Extras = Partial<Pick<Step, "agent" | "timeoutMinutes" | "retries" | "tool" | "with">>;
+type Extras = Partial<Pick<Step, "agent" | "timeoutMinutes" | "retries" | "tool" | "with" | "env">>;
 
 export function parseWorkflowFull(
   raw: unknown,
@@ -93,6 +93,12 @@ function stepExtras(where: string, s: Record<string, unknown>, kind: StepKind | 
     if (!isObj(s.with)) problems.push(`${where}.with: a mapping, the tool's arguments`);
     else if (kind && !kind.tool) problems.push(`${where}.with: only a tool step takes arguments`);
     else out.with = s.with;
+  }
+  if (s.env !== undefined) {
+    if (!Array.isArray(s.env) || !s.env.every((n) => typeof n === "string" && /^[A-Z_][A-Z0-9_]*$/.test(n)))
+      problems.push(`${where}.env: a list of env var names the tool's server may read`);
+    else if (kind && !kind.tool) problems.push(`${where}.env: only a tool step passes env to its server`);
+    else out.env = s.env as string[];
   }
   return out;
 }

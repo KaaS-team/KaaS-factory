@@ -44,7 +44,13 @@ const tool: StepType = {
     const { step, deps } = sc;
     let last = { ok: false, text: "" };
     for (let attempt = 0; attempt <= (step.retries ?? 0); attempt++) {
-      last = await callMcpTool(deps.cloneDir, step.tool!, fill(step.with ?? {}, sc) as Record<string, unknown>);
+      last = await callMcpTool(
+        deps.cloneDir,
+        step.tool!,
+        fill(step.with ?? {}, sc) as Record<string, unknown>,
+        60_000,
+        step.env,
+      );
       if (last.ok) return { kind: "next", facts: { ok: true, text: last.text } };
     }
     return failStep(sc, `\`${step.tool}\` returned an error`, last.text);

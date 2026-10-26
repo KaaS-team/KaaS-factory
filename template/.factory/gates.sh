@@ -42,6 +42,10 @@ optional_failed_names=()
 # run_gate <dir> <label> <cmd> <required>
 run_gate() {
   local dir=$1 name=$2 cmd=$3 required=$4 gate_log
+  # A workflow stage's `gates: [names]` runs only those (FACTORY_GATES_ONLY=a,b), by name or package suffix.
+  if [ -n "${FACTORY_GATES_ONLY:-}" ] && [[ ",$FACTORY_GATES_ONLY," != *",$name,"* && ",$FACTORY_GATES_ONLY," != *",${name##*:},"* ]]; then
+    return 0
+  fi
   echo "--- gate: $name ($cmd) ---"
   gate_log=$(mktemp "${TMPDIR:-/tmp}/factory-gate.XXXXXX")
   if (cd "$dir" && eval "$cmd") > "$gate_log" 2>&1; then

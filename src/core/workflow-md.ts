@@ -19,9 +19,10 @@ const STAGE_KEYS = new Set([
   "revise",
   "tool",
   "with",
+  "env",
 ]);
 const TOP_KEYS = new Set(["name", "description", "on", "limits", "emit", "stages"]);
-const PASS = ["agent", "retries", "timeout", "run", "runtime", "reject", "revise", "tool", "with"] as const;
+const PASS = ["agent", "retries", "timeout", "run", "runtime", "reject", "revise", "tool", "with", "env"] as const;
 const RISKS = ["low", "medium", "high"] as const;
 // The labels the factory has always used for its five stages; any other stage gets factory:<id>.
 const LABELS: Record<string, string> = {

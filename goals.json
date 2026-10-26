@@ -506,7 +506,12 @@
       "phase": "P5",
       "ask": "configurable workflows: .factory/workflows/*.md with stages, needs, agent, tools, gates and approval",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/workflow-md.test.ts",
+        "name": "a .md workflow's stages, needs, agent, tools, gates and approval drive an issue",
+        "mutation": "workflow-md: a stage's tools become its MCP servers"
+      }
     },
     {
       "id": "safe-outputs",
@@ -555,7 +560,12 @@
       "phase": "P5",
       "ask": "A deterministic tool step in a workflow",
       "source": "CHANGELOG v4.0.0 #1",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/tool-step.test.ts",
+        "name": "a tool step calls one MCP tool with its arguments and no agent, then report closes the issue",
+        "mutation": "tool step: a passing tool call moves on"
+      }
     },
     {
       "id": "set-mode-web",
