@@ -20,11 +20,18 @@ jobs:
       contents: read
       actions: read
     steps:
+      # Full history, so the DCO step below can read every commit in the pull request.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3"
+
+      - name: Every commit is signed off (DCO, CONTRIBUTING.md)
+        if: github.event_name == 'pull_request'
+        run: bun scripts/dco.ts "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
 
       - name: Install uv (for skills-ref validate)
         uses: astral-sh/setup-uv@v3
@@ -82,4 +89,4 @@ jobs:
         with:
           context: .
           push: false
-          tags: software-factory:ci
+          tags: kaas-factory:ci

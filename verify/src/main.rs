@@ -1,4 +1,4 @@
-// kaas-verify: re-checks a software-factory acceptance receipt offline. It shares no code with the
+// kaas-verify: re-checks a KaaS Factory acceptance receipt offline. It shares no code with the
 // engine (src/receipt.ts): it re-derives every criterion's proof, the counts, the verdict and the
 // "not proven" list from the rows, so a receipt that claims more than it proves is refused even when
 // its signature is good. Exit codes: 0 VERIFIED, 1 TAMPERED, 2 UNCHECKED (no trusted key), 3 UNSIGNED.

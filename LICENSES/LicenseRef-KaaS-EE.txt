@@ -1,0 +1,27 @@
+KaaS Factory Enterprise License
+
+Copyright (c) 2026 Secret SaaS OÜ
+
+This license covers every file under the ee/ directory of KaaS Factory (the "Software").
+
+1. Production use. You may use the Software in production only while you, or the organisation
+   you act for, hold a valid KaaS Factory subscription from Secret SaaS OÜ that covers the number
+   of seats and machines you use it on.
+
+2. Development and testing. Without a subscription you may copy, run and modify the Software
+   for development and testing only, never for production or for work done for a customer.
+
+3. Changes. You may publish patches to the Software. Secret SaaS OÜ and its licensors keep all
+   rights, title and interest in the Software and in every change made to it, and you assign to
+   Secret SaaS OÜ any rights you hold in a change you submit back.
+
+4. No redistribution. You may not sell, sublicense, rent, host for third parties or otherwise
+   distribute the Software or any change to it, except as this license allows.
+
+5. Other files. Files outside ee/ are licensed under the Apache License 2.0 (LICENSE). This
+   license does not limit what that license grants for them.
+
+6. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+   PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL SECRET SAAS OÜ BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE.

@@ -1,4 +1,4 @@
-# Software Factory
+# KaaS Factory
 
 A GitHub-native SDLC loop for coding agents: triage, plan, build, verify, PR. You watch
 it happen in issues, comments, and a dashboard, instead of an agent's private terminal.
@@ -52,7 +52,7 @@ runs; [docs/workflows.md](docs/workflows.md) has the format.
 | Mode | Start | Auth | State lives in | Cockpit |
 |---|---|---|---|---|
 | **Local** | `make up REPO_DIR=../repo` (or `factory up --repo-dir ../repo`) | `gh auth login`, `claude` login (interactive) | `~/.factory` (`FACTORY_HOME`) | `http://localhost:4100` |
-| **VM (Docker)** | `docker build -t software-factory .`, then `docker run -d --env-file factory.env -v factory-data:/data -p 127.0.0.1:4100:4100 software-factory up --repo owner/name` | `GH_TOKEN` + `ANTHROPIC_API_KEY` (or `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`) in an env file, mode `600`, never on a command line | the `/data` named volume (clone, worktrees, the SQLite cache) | `ssh -L 4100:localhost:4100 vm`, then open `localhost:4100` |
+| **VM (Docker)** | `docker build -t kaas-factory .`, then `docker run -d --env-file factory.env -v factory-data:/data -p 127.0.0.1:4100:4100 kaas-factory up --repo owner/name` | `GH_TOKEN` + `ANTHROPIC_API_KEY` (or `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`) in an env file, mode `600`, never on a command line | the `/data` named volume (clone, worktrees, the SQLite cache) | `ssh -L 4100:localhost:4100 vm`, then open `localhost:4100` |
 | **CI (GitHub Actions)** | `factory install <target-dir> --ci`, rename the written `factory.yml.example` to `factory.yml`, set repo variable `FACTORY_MODE=actions` | repo secrets `FACTORY_GH_TOKEN` (fine-grained PAT or GitHub App token, a plain `GITHUB_TOKEN`-authored PR never re-triggers this repo's own CI) and `ANTHROPIC_API_KEY` | none, every run starts from nothing and rebuilds from the issue thread | the issue thread itself, or point a local `factory dashboard --repo owner/name` at it as a cockpit |
 
 Every mode drives `advanceIssue()` (`src/watch.ts`) through the same three entry points:
@@ -216,9 +216,8 @@ layer actually lives in this repo:
 | **Verification** | What proof exists before a human looks? | runner-run `gates.sh` (`src/gates.ts`), the verify stage (reverts the fix, proves the new test actually catches it), `factory-reviewer`, the CI required check |
 | **Delivery** | How does work reach a person, and who ships it? | a PR from the target repo's own PR template, a human merges it, branch protection, `factory scan` feeding new issues into intake |
 
-Teaching checkpoints are `checkpoint/<name>` tags in `learnwithparam/splitbill-demo`, one per
-session in `teach/sessions.json`, which is the single list of them. The older `01-boundary` to
-`06-delivery` branches in `learnwithparam/splitbill` are legacy and no longer move.
+The lessons, demo scripts and research notes that used to live here are in the `factory/` folder of
+`learnwithparam/agentic-ai-lightning-sessions`.
 
 ## Requirements
 
@@ -233,8 +232,8 @@ session in `teach/sessions.json`, which is the single list of them. The older `0
 ## Quickstart
 
 ```bash
-git clone git@github.com:KaaS-team/software-factory.git
-cd software-factory
+git clone git@github.com:KaaS-team/KaaS-factory.git
+cd KaaS-factory
 make install                    # bun install
 make check                      # typecheck + test + skills validation
 ```
@@ -408,7 +407,15 @@ output (a factory PR) and leave the tag alone, and reset drops it.
 
 ## Checks
 
-`make check` runs typecheck, `bun test`, and `skills-ref validate` against every skill in
+`make check` runs biome and `reuse lint`, typecheck, `bun test`, and `skills-ref validate` against every skill in
 `template/.claude/skills`. It fails loudly if `uvx` isn't installed rather than skipping the
 skills check, an unwired or silently-skipped check didn't ship. CI additionally runs `docker
 build` on every push so the VM image can't silently rot.
+
+## Licence
+
+The core is Apache-2.0 (`LICENSE`). Code under `ee/` is under the KaaS Factory Enterprise License
+(`ee/LICENSE`): free for development and testing, a subscription for production. Ported files keep
+their upstream licence (`REUSE.toml`, `THIRD_PARTY_NOTICES.md`). The KaaS name, logo and icon are
+not licensed; a fork rebrands (`TRADEMARKS.md`). Pull requests carry a DCO sign-off
+(`CONTRIBUTING.md`).

@@ -510,8 +510,8 @@
   {"name": "relay publisher: each ask is trimmed", "file": "dashboard/relay.ts", "find": "ask: String(i.ask ?? \"\").slice(0, MAX_ASK),", "replace": "ask: String(i.ask ?? \"\"),", "test": "tests/relay.test.ts"},
   {"name": "relay follower: only a line with items reaches the page", "file": "dashboard/public/lib/relay-follow.js", "find": "if (Array.isArray(p?.items)) onPayload(p);", "replace": "onPayload(p);", "test": "tests/relay.test.ts"},
   {"name": "relay publisher: factory dashboard starts it", "file": "src/cli.ts", "find": "  startRelay(dashboard.handle);\n", "replace": "", "test": "tests/relay.test.ts"},
-  {"name": "release: CI template runner repo moved to KaaS-team", "file": "template-ci/factory.yml.example", "find": "FACTORY_RUNNER_REPO: KaaS-team/software-factory", "replace": "FACTORY_RUNNER_REPO: learnwithparam/software-factory", "test": "tests/release.test.ts"},
-  {"name": "release: README clone line matches the runner repo", "file": "README.md", "find": "git@github.com:KaaS-team/software-factory.git", "replace": "git@github.com:learnwithparam/software-factory.git", "test": "tests/release.test.ts"},
+  {"name": "release: CI template runner repo moved to KaaS-team", "file": "template-ci/factory.yml.example", "find": "FACTORY_RUNNER_REPO: KaaS-team/KaaS-factory", "replace": "FACTORY_RUNNER_REPO: learnwithparam/KaaS-factory", "test": "tests/release.test.ts"},
+  {"name": "release: README clone line matches the runner repo", "file": "README.md", "find": "git@github.com:KaaS-team/KaaS-factory.git", "replace": "git@github.com:learnwithparam/KaaS-factory.git", "test": "tests/release.test.ts"},
   {"name": "env: a configured tokenEnv is dropped from the agent env", "file": "src/agents/env.ts", "find": "if (value === undefined || drop.includes(key)) continue;", "replace": "if (value === undefined) continue;", "test": "tests/presets.test.ts"},
   {"name": "env: tokenEnvNames walks nested pool members", "file": "src/agents/env.ts", "find": "        else walk(x);\n", "replace": "", "test": "tests/presets.test.ts"},
   {"name": "env: the CLI passes tokenEnv names to the executor", "file": "src/cli.ts", "find": "      tokenEnvNames(config, machineConfig),\n", "replace": "", "test": "tests/presets.test.ts"},
@@ -542,5 +542,16 @@
   {"name": "pool: the report shows minutes left", "file": "src/core/sandbox-pool.ts", "find": "left: tenth(minutesLeft(m, u)),", "replace": "left: tenth(m.minutes),", "test": "tests/sandbox-pool.test.ts"},
   {"name": "goals: || true is a weak probe", "file": "scripts/goals.ts", "find": "if (/\\|\\|\\s*(true|:)\\s*(;|$)/m.test(body))", "replace": "if (false)", "test": "tests/goals.test.ts"},
   {"name": "goals: a probe stays in scripts/probes", "file": "scripts/goals.ts", "find": "if (!/^scripts\\/probes\\/[\\w-]+\\.sh$/.test(p.probe))", "replace": "if (!p.probe.startsWith(\"scripts/probes/\"))", "test": "tests/goals.test.ts"},
-  {"name": "goals: a test proof names a real test call", "file": "scripts/goals.ts", "find": "`(^|\\\\n)\\\\s*(test|it)", "replace": "`(test|it)", "test": "tests/goals.test.ts"}
+  {"name": "goals: a test proof names a real test call", "file": "scripts/goals.ts", "find": "`(^|\\\\n)\\\\s*(test|it)", "replace": "`(test|it)", "test": "tests/goals.test.ts"},
+  {"name": "release: the old name is gone", "file": "dashboard/public/manifest.webmanifest", "find": "What KaaS Factory is doing", "replace": "What the software factory is doing", "test": "tests/release.test.ts"},
+  {"name": "release: teaching material stays out", "file": "Makefile", "find": ".PHONY: agent-matrix install", "replace": ".PHONY: agent-matrix install\n# make demo runs teach/demo/up.sh", "test": "tests/release.test.ts"},
+  {"name": "quality: an over-limit file cannot grow", "file": "src/cli.ts", "find": "import { homedir, hostname } from \"node:os\";", "replace": "import { homedir, hostname } from \"node:os\";\n\n", "test": "tests/quality.test.ts"},
+  {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: tokens are ours", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "  \"src/revision.ts\",\n  \"dashboard/public/tokens.css\",\n", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: the brand is not licensed", "file": "REUSE.toml", "find": "\"LicenseRef-KaaS-Brand\"", "replace": "\"Apache-2.0\"", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: the core never imports ee/", "file": "src/cli.ts", "find": "import { accessSync, constants, existsSync, readdirSync, readFileSync, writeFileSync } from \"node:fs\";", "replace": "import { accessSync, constants, existsSync, readdirSync, readFileSync, writeFileSync } from \"node:fs\";\nimport { sso } from \"../ee/sso\";", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: a sign-off must be the author's", "file": "scripts/dco.ts", "find": "return !trailers.includes(c.email.toLowerCase());", "replace": "return trailers.length === 0;", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: no runtime npm package", "file": "package.json", "find": "\"devDependencies\": {", "replace": "\"dependencies\": { \"left-pad\": \"1.3.0\" },\n  \"devDependencies\": {", "test": "tests/licensing.test.ts"}
 ]

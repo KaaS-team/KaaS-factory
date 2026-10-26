@@ -31,7 +31,7 @@ function walk(dir: string): string[] {
 
 describe("runtime code does not name the demo app", () => {
   // A comment may say where a fact was found; a string or identifier may not depend on it.
-  const APP = /splitbill|learnwithparam\/(?!software-factory)/i;
+  const APP = /splitbill|learnwithparam\/(?!KaaS-factory)/i;
   const files = ["src", "bin", "template", "dashboard", "scripts"]
     .flatMap((d) => walk(join(ROOT, d)))
     .concat(join(ROOT, "install.sh"));

@@ -1,0 +1,5 @@
+Copyright (c) 2026 Secret SaaS OÜ. All rights reserved.
+
+The KaaS name, logo and icon are trademarks of Secret SaaS OÜ. No license to use them is granted,
+under the Apache License 2.0 or otherwise. A fork or redistribution must replace them; see
+TRADEMARKS.md.

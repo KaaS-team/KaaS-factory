@@ -1,0 +1,95 @@
+version = 1
+SPDX-PackageName = "KaaS Factory"
+SPDX-PackageSupplier = "Secret SaaS OÜ"
+SPDX-PackageDownloadLocation = "https://github.com/KaaS-team/KaaS-factory"
+
+# The core: everything not matched below. LICENSE says which parts differ.
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Secret SaaS OÜ"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = "ee/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Secret SaaS OÜ"
+SPDX-License-Identifier = "LicenseRef-KaaS-EE"
+
+[[annotations]]
+path = ["dashboard/public/icon.svg"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Secret SaaS OÜ"
+SPDX-License-Identifier = "LicenseRef-KaaS-Brand"
+
+[[annotations]]
+path = ["dashboard/public/fonts/geist.woff2", "dashboard/public/fonts/LICENSE-geist.txt"]
+precedence = "override"
+SPDX-FileCopyrightText = "2024 The Geist Project Authors"
+SPDX-License-Identifier = "OFL-1.1"
+
+# Ported files keep their upstream licence; each one's Ported-from header names it, and
+# tests/licensing.test.ts keeps these lists equal to those headers.
+[[annotations]]
+path = [
+  "dashboard/public/lib/analytics-state.js",
+  "dashboard/public/lib/routes.js",
+  "dashboard/public/lib/run-metrics.js",
+  "dashboard/public/lib/runs-board.js",
+  "dashboard/public/lib/status-loader.js",
+  "dashboard/public/lib/task-presentation.js",
+  "dashboard/public/styles.css",
+  "src/agent-dirs.ts",
+  "src/agents/env.ts",
+  "src/agents/executor.ts",
+  "src/agents/final-message.ts",
+  "src/agents/presets/codex.ts",
+  "src/agents/reply.ts",
+  "src/agents/structured.ts",
+  "src/agents/usage.ts",
+  "src/artifacts.ts",
+  "src/ci.ts",
+  "src/config.ts",
+  "src/display.ts",
+  "src/docs-links.ts",
+  "src/event-budget.ts",
+  "src/logs.ts",
+  "src/merge-policy.ts",
+  "src/revision.ts",
+  "template/.claude/skills/factory-operator/SKILL.md",
+  "tests/ported/assembler/config.test.ts",
+  "tests/ported/assembler/display.test.ts",
+  "tests/ported/assembler/logs.test.ts",
+  "tests/ported/assembler/outputs.test.ts",
+  "tests/ported/assembler/runtime.test.ts",
+  "tests/ported/blueprint/check_repo.test.ts",
+  "tests/ported/machinist/catalog-copy.test.ts",
+  "tests/ported/machinist/ci.test.ts",
+  "tests/ported/machinist/events.test.ts",
+  "tests/ported/machinist/final-message.test.ts",
+  "tests/ported/machinist/merge-policy.test.ts",
+  "tests/ported/machinist/revision.test.ts",
+  "tests/ported/machinist/routes.test.ts",
+  "tests/ported/machinist/run-metrics.test.ts",
+  "tests/ported/machinist/runner.test.ts",
+  "tests/ported/machinist/runs-board.test.ts",
+  "tests/ported/machinist/status-ui.test.ts",
+  "tests/ported/machinist/structured.test.ts",
+  "tests/ported/machinist/task-presentation.test.ts",
+  "tests/ported/machinist/usage-metrics.test.ts",
+  "tests/ported/machinist/usage.test.ts",
+  "tests/ported/machinist/workflow.test.ts",
+  "tests/ported/skills/agents.test.ts",
+]
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 Owain Lewis", "2026 Secret SaaS OÜ"]
+SPDX-License-Identifier = "MIT AND Apache-2.0"
+
+[[annotations]]
+path = [
+  "src/agents/presets/mastracode-flags.ts",
+  "tests/ported/mastra/flags.test.ts",
+]
+precedence = "override"
+SPDX-FileCopyrightText = ["2025 Kepler Software, Inc.", "2026 Secret SaaS OÜ"]
+SPDX-License-Identifier = "Apache-2.0"

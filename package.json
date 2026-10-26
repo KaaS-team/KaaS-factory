@@ -1,7 +1,8 @@
 {
-  "name": "software-factory",
-  "version": "5.0.1",
+  "name": "kaas-factory",
+  "version": "5.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "description": "GitHub-native SDLC loop for coding agents: triage, plan, build, verify, PR.",
   "engines": {

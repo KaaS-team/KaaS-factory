@@ -1,4 +1,4 @@
-.PHONY: agent-matrix demo install check check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix install check check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
@@ -9,10 +9,12 @@ install:
 check: lint typecheck test skills-check
 	@echo "make check: ok"
 
+# reuse lint checks every file's licence against REUSE.toml (tests/licensing.test.ts checks what it says).
 # Biome is the one formatter and linter. The rules biome.json turns off are house idioms
 # (`!` in tests, comma and forEach shorthand, literal `${}` in test strings).
 lint:
 	bun x biome ci .
+	uvx reuse==6.2.0 lint --quiet
 	@command -v cargo >/dev/null 2>&1 || { echo "make check: cargo is required for verify/ and relay/, not skipping them" >&2; exit 1; }
 	cargo fmt --manifest-path verify/Cargo.toml --check
 	cargo clippy --quiet --locked --manifest-path verify/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-verify-target} -- -D warnings
@@ -81,7 +83,3 @@ scan:
 agent-matrix:
 	bun scripts/agent-matrix.ts
 
-# The lesson's tmux layout, then attach; RECORD=1 records the attach with asciinema.
-demo:
-	teach/demo/$${SESSION:-lightning-2}.sh up
-	teach/demo/$${SESSION:-lightning-2}.sh $(if $(RECORD),--record,) attach

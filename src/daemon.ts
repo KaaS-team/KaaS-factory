@@ -70,7 +70,7 @@ const unitPath = (s: string): string => s.replace(/%/g, "%%");
 
 export function systemdUnit(spec: DaemonSpec): string {
   return `[Unit]
-Description=software-factory loop for ${spec.repo}
+Description=kaas-factory loop for ${spec.repo}
 After=network-online.target
 
 [Service]

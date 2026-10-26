@@ -1,7 +1,7 @@
 {
   "name": "KaaS Factory cockpit",
   "short_name": "Factory",
-  "description": "What the software factory is doing, and what it needs from you.",
+  "description": "What KaaS Factory is doing, and what it needs from you.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -1,6 +1,6 @@
-# VM run mode (plan "Run anywhere"): `docker build -t software-factory .`,
+# VM run mode (plan "Run anywhere"): `docker build -t kaas-factory .`,
 # then `docker run -d --env-file factory.env -v factory-data:/data
-# -p 127.0.0.1:4100:4100 software-factory up --repo owner/name`.
+# -p 127.0.0.1:4100:4100 kaas-factory up --repo owner/name`.
 #
 # Every tool the loop shells out to is pinned here, not resolved from
 # whatever the base image happens to carry: git (worktrees, claim/push), gh
