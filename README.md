@@ -408,7 +408,15 @@ output (a factory PR) and leave the tag alone, and reset drops it.
 
 ## Checks
 
-`make check` runs typecheck, `bun test`, and `skills-ref validate` against every skill in
+`make check` runs biome and `reuse lint`, typecheck, `bun test`, and `skills-ref validate` against every skill in
 `template/.claude/skills`. It fails loudly if `uvx` isn't installed rather than skipping the
 skills check, an unwired or silently-skipped check didn't ship. CI additionally runs `docker
 build` on every push so the VM image can't silently rot.
+
+## Licence
+
+The core is Apache-2.0 (`LICENSE`). Code under `ee/` is under the KaaS Factory Enterprise License
+(`ee/LICENSE`): free for development and testing, a subscription for production. Ported files keep
+their upstream licence (`REUSE.toml`, `THIRD_PARTY_NOTICES.md`). The KaaS name, logo and icon are
+not licensed; a fork rebrands (`TRADEMARKS.md`). Pull requests carry a DCO sign-off
+(`CONTRIBUTING.md`).

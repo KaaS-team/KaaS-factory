@@ -2,7 +2,7 @@
 name = "kaas-relay"
 version = "5.0.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 description = "Read-only real-time relay for the KaaS Factory cockpit: one publisher, many subscribers, per channel."
 publish = false
 

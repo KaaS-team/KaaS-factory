@@ -194,42 +194,72 @@
       "phase": "P1",
       "ask": "Apache-2.0 core plus a commercial ee/, copyright Secret SaaS OÜ",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/licensing.test.ts",
+        "name": "the core is Apache-2.0 and ee/ is under the enterprise licence",
+        "mutation": "licensing: the core is Apache-2.0"
+      }
     },
     {
       "id": "licence-brand",
       "phase": "P1",
-      "ask": "Logo and icon under brand/, all rights reserved; forks rebrand (TRADEMARKS.md)",
+      "ask": "Logo and icon are all rights reserved (LicenseRef-KaaS-Brand); forks rebrand (TRADEMARKS.md)",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/licensing.test.ts",
+        "name": "the brand is not licensed, and forks are told to replace it",
+        "mutation": "licensing: the brand is not licensed"
+      }
     },
     {
       "id": "licence-design",
       "phase": "P1",
       "ask": "licensing including design components",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/licensing.test.ts",
+        "name": "design components: tokens are ours, ported CSS stays MIT, Geist stays OFL",
+        "mutation": "licensing: tokens are ours"
+      }
     },
     {
       "id": "reuse-lint",
       "phase": "P1",
       "ask": "Every file's licence is machine-checked (REUSE.toml, reuse lint in make check)",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/licensing.test.ts",
+        "name": "every licence REUSE.toml names has its text, and no text goes unused",
+        "mutation": "licensing: every licence has its text"
+      }
     },
     {
       "id": "dco",
       "phase": "P1",
       "ask": "Contributions to the core carry a DCO sign-off, checked in CI",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/licensing.test.ts",
+        "name": "a commit needs a sign-off from its own author",
+        "mutation": "licensing: a sign-off must be the author's"
+      }
     },
     {
       "id": "ee-boundary",
       "phase": "P1",
       "ask": "Nothing outside ee/ imports ee/, so the core builds without it",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/licensing.test.ts",
+        "name": "nothing outside ee/ imports from ee/",
+        "mutation": "licensing: the core never imports ee/"
+      }
     },
     {
       "id": "teach-moved",
@@ -962,7 +992,12 @@
       "phase": "P1",
       "ask": "we have the default of all open sources and lean core which primarily runs coding agents anywhere",
       "source": "user, 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/licensing.test.ts",
+        "name": "the core runs on open source only, with no runtime npm package",
+        "mutation": "licensing: no runtime npm package"
+      }
     }
   ]
 }

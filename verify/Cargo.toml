@@ -2,7 +2,7 @@
 name = "kaas-verify"
 version = "5.0.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 description = "Offline checker for KaaS Factory acceptance receipts; shares no code with the engine."
 publish = false
 

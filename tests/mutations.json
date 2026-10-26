@@ -543,5 +543,13 @@
   {"name": "goals: || true is a weak probe", "file": "scripts/goals.ts", "find": "if (/\\|\\|\\s*(true|:)\\s*(;|$)/m.test(body))", "replace": "if (false)", "test": "tests/goals.test.ts"},
   {"name": "goals: a probe stays in scripts/probes", "file": "scripts/goals.ts", "find": "if (!/^scripts\\/probes\\/[\\w-]+\\.sh$/.test(p.probe))", "replace": "if (!p.probe.startsWith(\"scripts/probes/\"))", "test": "tests/goals.test.ts"},
   {"name": "goals: a test proof names a real test call", "file": "scripts/goals.ts", "find": "`(^|\\\\n)\\\\s*(test|it)", "replace": "`(test|it)", "test": "tests/goals.test.ts"},
-  {"name": "release: the old name is gone", "file": "dashboard/public/manifest.webmanifest", "find": "What KaaS Factory is doing", "replace": "What the software factory is doing", "test": "tests/release.test.ts"}
+  {"name": "release: the old name is gone", "file": "dashboard/public/manifest.webmanifest", "find": "What KaaS Factory is doing", "replace": "What the software factory is doing", "test": "tests/release.test.ts"},
+  {"name": "licensing: the core is Apache-2.0", "file": "package.json", "find": "\"license\": \"Apache-2.0\"", "replace": "\"license\": \"MIT\"", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: every licence has its text", "file": "REUSE.toml", "find": "\"OFL-1.1\"", "replace": "\"OFL-1.0\"", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: ported files keep their licence", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: tokens are ours", "file": "REUSE.toml", "find": "  \"src/revision.ts\",\n", "replace": "  \"src/revision.ts\",\n  \"dashboard/public/tokens.css\",\n", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: the brand is not licensed", "file": "REUSE.toml", "find": "\"LicenseRef-KaaS-Brand\"", "replace": "\"Apache-2.0\"", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: the core never imports ee/", "file": "src/cli.ts", "find": "import { accessSync, constants, existsSync, readdirSync, readFileSync, writeFileSync } from \"node:fs\";", "replace": "import { accessSync, constants, existsSync, readdirSync, readFileSync, writeFileSync } from \"node:fs\";\nimport { sso } from \"../ee/sso\";", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: a sign-off must be the author's", "file": "scripts/dco.ts", "find": "return !trailers.includes(c.email.toLowerCase());", "replace": "return trailers.length === 0;", "test": "tests/licensing.test.ts"},
+  {"name": "licensing: no runtime npm package", "file": "package.json", "find": "\"devDependencies\": {", "replace": "\"dependencies\": { \"left-pad\": \"1.3.0\" },\n  \"devDependencies\": {", "test": "tests/licensing.test.ts"}
 ]

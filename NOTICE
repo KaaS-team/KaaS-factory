@@ -1,0 +1,9 @@
+KaaS Factory
+Copyright (c) 2026 Secret SaaS OÜ
+
+This product includes software ported from:
+- owainlewis/machinist, assembler, skills, blueprint and agent-skills (MIT, Copyright (c) 2026 Owain Lewis)
+- mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.)
+- Geist font (SIL OFL 1.1, Copyright 2024 The Geist Project Authors)
+
+THIRD_PARTY_NOTICES.md lists each ported file.
