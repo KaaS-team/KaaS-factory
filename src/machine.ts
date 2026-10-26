@@ -8,7 +8,7 @@
 
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { cpus, freemem } from "node:os";
+import { cpus, freemem, hostname } from "node:os";
 import { dirname } from "node:path";
 import { factoryHome } from "./paths";
 import type { MicrosandboxSpec } from "./adapters/microsandbox/execution";
@@ -149,6 +149,23 @@ function alive(pid: number): boolean {
   }
 }
 
+export interface MachineBeat {
+  readonly name: string;
+  readonly tags: readonly string[];
+  readonly slots: number;
+  readonly used: number;
+  readonly tasks: readonly string[];
+}
+
+// This machine's heartbeat: its capabilities as tags, its slots, and the issues its leases hold now.
+export function machineBeat(
+  m: { leases: MachineLeases; config: MachineConfig },
+  name: string = hostname(),
+): MachineBeat {
+  const tasks = m.leases.holders();
+  return { name, tags: m.config.capabilities ?? [], slots: m.config.slots, used: tasks.length, tasks };
+}
+
 // Machine-wide slot leases, shared by every watcher process that points
 // FACTORY_HOME at the same place. A lease is a row; holding one means having
 // its id. A process that dies without releasing leaves an orphan row, which
@@ -167,6 +184,11 @@ export class MachineLeases {
         holder TEXT NOT NULL,
         pid INTEGER NOT NULL,
         acquired_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS machines (
+        name TEXT PRIMARY KEY,
+        beat TEXT NOT NULL,
+        heartbeat_at INTEGER NOT NULL
       );
     `);
   }
@@ -200,6 +222,27 @@ export class MachineLeases {
         return row.id;
       })
       .immediate();
+  }
+
+  // What each lease is running (`owner/repo#N`), oldest first.
+  holders(): string[] {
+    this.reclaimDead();
+    return (this.db.query("SELECT holder FROM leases ORDER BY id").all() as { holder: string }[]).map((r) => r.holder);
+  }
+
+  // One row per machine, overwritten each poll: a row whose heartbeat stops is a machine that went away.
+  beat(b: MachineBeat, now: number = Date.now()): void {
+    this.db
+      .query("INSERT OR REPLACE INTO machines (name, beat, heartbeat_at) VALUES ($name, $beat, $at)")
+      .run({ $name: b.name, $beat: JSON.stringify(b), $at: now });
+  }
+
+  machines(): (MachineBeat & { heartbeatAt: number })[] {
+    const rows = this.db.query("SELECT beat, heartbeat_at FROM machines ORDER BY name").all() as {
+      beat: string;
+      heartbeat_at: number;
+    }[];
+    return rows.map((r) => ({ ...(JSON.parse(r.beat) as MachineBeat), heartbeatAt: r.heartbeat_at }));
   }
 
   release(leaseId: number): void {

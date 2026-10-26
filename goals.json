@@ -468,14 +468,24 @@
       "phase": "P4",
       "ask": "Machines, tags, slots in use, last heartbeat and current task in one view",
       "source": "plan approved 26 Oct 2026",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/fleet.test.ts",
+        "name": "every machine, its tags, slots in use, last heartbeat and current task, in one view",
+        "mutation": "fleet: a poll writes this machine's heartbeat"
+      }
     },
     {
       "id": "slot-usage",
       "phase": "P4",
       "ask": "Machine slot usage on the Settings page (slots are local; only issue leases are shown).",
       "source": "CHANGELOG v3.5.0 #4",
-      "owner": "agent"
+      "owner": "agent",
+      "proof": {
+        "test": "tests/fleet.test.ts",
+        "name": "the Settings page says how many slots are in use and whether each runtime the repo uses answers",
+        "mutation": "settings: slots in use come from the machine's leases"
+      }
     },
     {
       "id": "runtime-health-probe",

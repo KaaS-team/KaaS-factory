@@ -73,12 +73,17 @@ describe("dispatch and routine", () => {
     const state = new FactoryState(":memory:");
     expect((await dispatchJobs({ github, state }, config)).jobs.map((j) => j.issue)).toEqual([2, 5]);
     state.setToggle("auto_start", false);
-    expect(await dispatchJobs({ github, state }, config)).toEqual({ jobs: [{ issue: 5, label: LABEL.awaitingApproval }] });
+    expect(await dispatchJobs({ github, state }, config)).toEqual({
+      jobs: [{ issue: 5, label: LABEL.awaitingApproval }],
+    });
     state.setToggle("auto_start", true);
     const capped = await dispatchJobs({ github, state, machine: machine({ dailyUsd: 10 }, 12) }, config);
     expect(capped.jobs.map((j) => j.issue)).toEqual([5]);
     expect(capped.paused).toContain("spend cap");
-    const repoCapped = await dispatchJobs({ github, state }, mergeConfig({ repo: "acme/widgets", spend: { dailyUsd: 0 } }));
+    const repoCapped = await dispatchJobs(
+      { github, state },
+      mergeConfig({ repo: "acme/widgets", spend: { dailyUsd: 0 } }),
+    );
     expect(repoCapped.jobs.map((j) => j.issue)).toEqual([5]);
   });
 

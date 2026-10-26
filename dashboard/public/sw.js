@@ -1,6 +1,6 @@
 // The cockpit's service worker: the shell opens offline, and nothing behind the token is ever stored,
 // so a lost phone's cache holds the page and no run data. A new SHELL list ships with a new CACHE name.
-const CACHE = "factory-shell-v1";
+const CACHE = "factory-shell-v2";
 const SHELL = [
   "/",
   "/tokens.css",
@@ -17,6 +17,7 @@ const SHELL = [
   "/lib/run-metrics.js",
   "/lib/run-page.js",
   "/lib/runs-board.js",
+  "/lib/settings.js",
   "/lib/stations.js",
   "/lib/status-loader.js",
   "/lib/task-presentation.js",

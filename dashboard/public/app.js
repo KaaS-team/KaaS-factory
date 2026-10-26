@@ -9,6 +9,7 @@ import { markdownText, renderMarkdown } from "/lib/markdown.js";
 import { feedCard, proofPanel } from "/lib/run-page.js";
 import { execSummary } from "/lib/exec-summary.js";
 import { followRelay, readRelay, saveRelay } from "/lib/relay-follow.js";
+import { healthCell, leasesPanel, machinesPanel, slotsText } from "/lib/settings.js";
 
 const ACTION_LABEL = {
   approve: "Approve plan",
@@ -1318,7 +1319,7 @@ function settingsView() {
               "dl",
               { class: "kv" },
               h("dt", null, "Slots"),
-              h("dd", null, String(d.slots)),
+              h("dd", null, slotsText(d)),
               h("dt", null, "Daily cap"),
               h("dd", null, d.dailyUsd == null ? "None set" : money(d.dailyUsd)),
             ),
@@ -1335,7 +1336,7 @@ function settingsView() {
                   h(
                     "tr",
                     null,
-                    ["Runtime", "Kind", "Target", "Used by"].map((c) => h("th", null, c)),
+                    ["Runtime", "Kind", "Target", "Used by", "Health"].map((c) => h("th", null, c)),
                   ),
                 ),
                 h(
@@ -1354,58 +1355,16 @@ function settingsView() {
                       h("td", null, r.kind),
                       h("td", null, h("code", null, r.target)),
                       h("td", null, r.usedBy.length ? r.usedBy.join(", ") : "Nothing in this repo"),
+                      healthCell(d.health[r.name], h),
                     ),
                   ),
                 ),
               ),
             ),
+            h("h2", { class: "section-gap" }, "Machines"),
+            machinesPanel(d, h),
             h("h2", { class: "section-gap" }, "Issue leases"),
-            d.leasesError
-              ? h("p", { class: "error" }, `Could not read the lease refs: ${d.leasesError}`)
-              : !d.leases.length
-                ? quiet("No leases", "A worker takes refs/factory/lease/<issue> while it runs an issue.")
-                : h(
-                    "div",
-                    { class: "table-wrap" },
-                    h(
-                      "table",
-                      null,
-                      h(
-                        "thead",
-                        null,
-                        h(
-                          "tr",
-                          null,
-                          ["Issue", "Holder", "State"].map((c) => h("th", null, c)),
-                        ),
-                      ),
-                      h(
-                        "tbody",
-                        null,
-                        d.leases.map((l) =>
-                          h(
-                            "tr",
-                            null,
-                            h("td", null, l.key),
-                            h("td", null, l.holder),
-                            h(
-                              "td",
-                              null,
-                              h(
-                                "span",
-                                { class: "status", "data-tone": l.live ? "live" : "" },
-                                l.live
-                                  ? `Held, expires in ${Math.max(1, Math.round((l.expiresAt - Date.now()) / 1000))}s`
-                                  : l.expiresAt === 0
-                                    ? "Released"
-                                    : "Expired",
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+            leasesPanel(d, h, quiet),
           ),
     ),
     relaySettings(),

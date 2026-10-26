@@ -522,7 +522,7 @@ function serveDashboard(
 // The repo the Workflows and Settings pages describe.
 function dashboardProject(cloneDir: string, config: FactoryConfig): DashboardProject {
   const leases = new GitLeases(cloneDir);
-  return { cloneDir, config, machine: loadMachineConfig(), leases: () => leases.held() };
+  return { cloneDir, config, machine: loadMachineConfig(), leases: () => leases.held(), fleet: new MachineLeases() };
 }
 
 async function cmdDashboard(): Promise<void> {

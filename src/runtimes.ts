@@ -55,7 +55,10 @@ export const hostProbe: HostProbe = {
 };
 
 export function defaultRuntime(probe: HostProbe = hostProbe): { spec: RuntimeSpec; warning?: string } {
-  const local = (why: string) => ({ spec: { kind: "local" } as const, warning: `${why}, so \`default\` runs on this machine unsandboxed` });
+  const local = (why: string) => ({
+    spec: { kind: "local" } as const,
+    warning: `${why}, so \`default\` runs on this machine unsandboxed`,
+  });
   if (!probe.which("msb")) return local("msb is not installed");
   if (!probe.hypervisor()) return local("no hypervisor (KVM or Hypervisor.framework)");
   return { spec: DEFAULT_VM };
@@ -169,7 +172,8 @@ export function runtimeProblems(raw: unknown, where = "runtimes"): string[] {
   for (const [name, spec] of Object.entries(raw as Record<string, unknown>)) {
     const at = `${where}.${name}`;
     if (!NAME.test(name)) problems.push(`${at}: a name is letters, digits, _ and -`);
-    if (Object.hasOwn(BUILTIN_RUNTIMES, name) || name === DEFAULT_RUNTIME) problems.push(`${at}: "${name}" is built in`);
+    if (Object.hasOwn(BUILTIN_RUNTIMES, name) || name === DEFAULT_RUNTIME)
+      problems.push(`${at}: "${name}" is built in`);
     const s = (spec ?? {}) as Record<string, unknown>;
     const shape = SHAPES[s.kind as RuntimeSpec["kind"]];
     if (!shape) {

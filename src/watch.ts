@@ -22,7 +22,7 @@ import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
 import { issueType, LABEL, PARKED_LABELS } from "./labels";
-import { canServe, effectiveSlots } from "./machine";
+import { canServe, effectiveSlots, machineBeat } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
   ensureWorktreeReady,
@@ -587,6 +587,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // approvals, answers, retries and revises keep flowing so a human can clear the backlog.
   const gate = await intakeGate(deps, config, openPrs);
   const intakeGated = gate.open;
+  if (deps.machine) deps.machine.leases.beat(machineBeat(deps.machine));
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {
     const filed = await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch(

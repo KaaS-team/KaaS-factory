@@ -6,7 +6,7 @@ import { appendFileSync } from "node:fs";
 import { resolveBlockers } from "./blockers";
 import { parseCron } from "./core/cron";
 import type { FactoryConfig } from "./config";
-import { spendCapHit, type WatchDeps } from "./engine/common";
+import { type SpendDeps, spendCapHit, type WatchDeps } from "./engine/common";
 import type { GhPr } from "./github";
 import { LABEL } from "./labels";
 import { canServe } from "./machine";
@@ -31,25 +31,33 @@ export interface Dispatch {
   readonly paused?: string;
 }
 
-type SpendDeps = Pick<WatchDeps, "state" | "spend" | "machine">;
-
 export interface IntakeGate {
   readonly open: boolean;
   readonly paused?: string;
 }
 
 // The one place that decides whether new factory:ready issues are picked up, for a tick and a dispatch.
-export async function intakeGate(deps: SpendDeps, config: FactoryConfig, openPrs: readonly GhPr[]): Promise<IntakeGate> {
+export async function intakeGate(
+  deps: SpendDeps,
+  config: FactoryConfig,
+  openPrs: readonly GhPr[],
+): Promise<IntakeGate> {
   const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/")).length;
   if (factoryPrs >= config.maxOpenFactoryPrs)
-    return { open: false, paused: `STOP_IF: ${factoryPrs} factory PRs open in review (limit ${config.maxOpenFactoryPrs})` };
+    return {
+      open: false,
+      paused: `STOP_IF: ${factoryPrs} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`,
+    };
   // An issue already in flight keeps going: checkSpendCap parks it on its own next stage (plan v2.7.0 item 7).
   if ((await spendCapHit(deps, config)) !== undefined)
     return { open: false, paused: "budget: today's spend cap is hit, new pickups are paused" };
   return { open: deps.state.getToggle("auto_start", true) };
 }
 
-export async function dispatchJobs(deps: SpendDeps & Pick<WatchDeps, "github">, config: FactoryConfig): Promise<Dispatch> {
+export async function dispatchJobs(
+  deps: SpendDeps & Pick<WatchDeps, "github">,
+  config: FactoryConfig,
+): Promise<Dispatch> {
   const { github } = deps;
   const repo = config.repo;
   const gate = await intakeGate(deps, config, await github.listPrs(repo, { state: "open" }));
