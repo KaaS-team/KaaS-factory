@@ -7,6 +7,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ScmPort } from "../src/github";
 import { makeScm } from "../src/scm";
+import { GitHub } from "../src/github";
+import { appFromEnv, feedInstalledRepos, ghRunner } from "../src/github-app";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { buildBoard } from "./board";
 import { paneRoutes } from "./pane";
@@ -14,8 +16,6 @@ import { LABEL } from "../src/labels";
 import { InboxError, act, inboxWithRisk, parkReasons, type InboxAction } from "../src/inbox";
 import { prItems } from "../src/stale-pr";
 import { plain } from "../src/display";
-import { agentCatalog } from "../src/agents/docs";
-import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
 import { DEFAULT_CONFIG, eventsInboundSecretEnv, type FactoryConfig } from "../src/config";
 import { defaultStatePath, factoryHome, servedRepos, streamPath, transcriptPath, workspacesDir } from "../src/paths";
@@ -25,12 +25,13 @@ import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
 import { HEALTH_ROUTE, healthRoute } from "./health";
-import { NO_PROJECT, settingsWithHealth, type DashboardProject } from "./project";
+import { agentsProbe, type DashboardProject, projectResolver } from "./project";
 import { workflowRoutes } from "./workflow-routes";
-import { harnessReport } from "../src/harness";
 import { artifacts } from "./artifacts";
 import { createAccess, type Route } from "./plane/access";
-import { type RepoScope, runIn } from "./plane/repo-scope";
+import { planeExtensions } from "./plane/extension";
+import { boardCache } from "./plane/board-cache";
+import { readAccess, type RepoScope, runIn } from "./plane/repo-scope";
 import { PlaneStore } from "./plane/store";
 import { senderName } from "./plane/commands";
 import { planeRoutes } from "./plane/mode";
@@ -62,7 +63,6 @@ const REPO = process.env.FACTORY_REPO ?? "";
 // Audit finding #16: bound to 127.0.0.1 by default, and a non-loopback caller is refused unless this
 // is set. Module scope, so createDashboard and the CLI's dashboard both read it from the process env.
 const DASHBOARD_TOKEN = process.env.FACTORY_DASHBOARD_TOKEN ?? "";
-const BOARD_CACHE_MS = 10_000;
 
 function isLoopback(address: string | undefined): boolean {
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
@@ -111,11 +111,18 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
 }
 
 // One members file per factory home: a plane serves every repo its inbox does.
-export const servingAccess = () =>
-  createAccess({
+// With a GitHub App the plane is hosted: it serves the App's repos, and a member sees only those
+// GitHub lets them read.
+export function servingAccess() {
+  const app = appFromEnv();
+  const github = new GitHub(ghRunner());
+  if (app) feedInstalledRepos(app);
+  return createAccess({
     token: DASHBOARD_TOKEN,
     store: new PlaneStore(process.env.FACTORY_PLANE_DB ?? join(factoryHome(), "plane.db")),
+    extensions: app ? [...planeExtensions(), readAccess((r, l) => github.roleOf(r, l))] : undefined,
   });
+}
 
 export function createDashboard(
   state: FactoryState,
@@ -133,109 +140,14 @@ export function createDashboard(
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
   const integrations = integrationRoutes({ state, tracker: github, repo, project, store: access.store });
   const signed: Secrets = { ...integrations.secrets, [WEBHOOK_ROUTE]: webhookSecret, [EVENTS_ROUTE]: eventsSecret };
-  const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<ScmPort["listOpenIssues"]>> }>();
-  const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
-  const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
-  const prsInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listPrs"]>>>>();
-  const settings = settingsWithHealth();
-  // Listing leases asks the remote, so the Settings page shares one answer for 15 s.
-  let leasesCache: { at: number; value: Awaited<ReturnType<DashboardProject["leases"]>> | Error } | null = null;
-  async function heldLeases(p: DashboardProject) {
-    if (leasesCache && Date.now() - leasesCache.at < 15_000) return leasesCache.value;
-    const value = await p.leases().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
-    leasesCache = { at: Date.now(), value };
-    return value;
-  }
+  const projectFor = projectResolver(repo, project);
+  const agents = agentsProbe(probes);
 
-  // The Agents page shows each configured agent's installed version and doctor rows.
-  // Probing spawns `--version`, so it is cached for a minute and shared by concurrent requests.
-  let agentsCache: { at: number; rows: unknown[] } | null = null;
-  let agentsInflight: Promise<unknown[]> | null = null;
-  async function probedAgents(): Promise<unknown[]> {
-    if (agentsCache && Date.now() - agentsCache.at < 60_000) return agentsCache.rows;
-    agentsInflight ??= Promise.all(
-      agentCatalog(fleet.agents, fleet.stages).map(async (a) => {
-        const row = { ...a, name: plain(a.name), binary: plain(a.binary) };
-        if (!a.configured) return { ...row, installed: null, version: null, checks: [] };
-        const checks = await agentChecks(a.name, fleet.agents, probes);
-        const installed = await probes.which(a.binary);
-        const version = installed ? ((await probes.versionOf(a.binary)) ?? "").split("\n")[0]!.trim() || null : null;
-        return {
-          ...row,
-          installed,
-          version: version === null ? null : plain(version),
-          checks: checks.map((c) => ({
-            name: plain(c.name),
-            ok: c.ok,
-            warn: c.warn === true,
-            detail: plain(c.detail),
-          })),
-        };
-      }),
-    )
-      .then((rows) => {
-        agentsCache = { at: Date.now(), rows };
-        return rows;
-      })
-      .finally(() => {
-        agentsInflight = null;
-      });
-    return agentsInflight;
-  }
-
-  // Single-flight + 10s cache in front of `gh issue list` (plan: "cached gh
-  // listing, single-flight, 10s") so a browser polling every few seconds,
-  // times any number of open tabs, doesn't turn into one `gh` call per poll.
-  // Keyed per repo so the multi-repo inbox (v2.9.0 item 2) never lets one
-  // repo's cache serve another's issues.
-  async function cachedIssuesFor(r: string) {
-    const now = Date.now();
-    const cached = issuesCache.get(r);
-    if (cached && now - cached.at < BOARD_CACHE_MS) return cached.issues;
-    const inflight = issuesInflight.get(r);
-    if (inflight) return inflight;
-    const promise = github
-      .listOpenIssues(r)
-      .then((issues) => {
-        issuesCache.set(r, { at: Date.now(), issues });
-        issuesInflight.delete(r);
-        return issues;
-      })
-      .catch((err) => {
-        issuesInflight.delete(r);
-        throw err;
-      });
-    issuesInflight.set(r, promise);
-    return promise;
-  }
-
-  function invalidateIssuesCache(r: string): void {
-    issuesCache.delete(r);
-  }
-
-  // Same single-flight + cache pattern as cachedIssuesFor, for the inbox's
-  // learning-PR items (plan v2.10.0 item 4), which come from `gh pr list`,
-  // not issues.
-  async function cachedPrsFor(r: string) {
-    const now = Date.now();
-    const cached = prsCache.get(r);
-    if (cached && now - cached.at < BOARD_CACHE_MS) return cached.prs;
-    const inflight = prsInflight.get(r);
-    if (inflight) return inflight;
-    const promise = github
-      .listPrs(r, { state: "open" })
-      .then((prs) => {
-        prsCache.set(r, { at: Date.now(), prs });
-        prsInflight.delete(r);
-        return prs;
-      })
-      .catch((err) => {
-        prsInflight.delete(r);
-        throw err;
-      });
-    prsInflight.set(r, promise);
-    return promise;
-  }
+  // Issue and PR lists go through the gh budget (dashboard/plane/board-cache.ts), keyed per repo.
+  const board = boardCache({ rate: github.rateLimit ? (r) => github.rateLimit!(r) : undefined });
+  const cachedIssuesFor = (r: string) => board.read("issues", r, () => github.listOpenIssues(r));
+  const cachedPrsFor = (r: string) => board.read("prs", r, () => github.listPrs(r, { state: "open" }));
+  const invalidateIssuesCache = (r: string) => void board.invalidate(r);
 
   const inboxRepos = () => servedRepos(process.env, repo);
   const scope: RepoScope = { served: inboxRepos, primary: repo };
@@ -349,6 +261,7 @@ export function createDashboard(
         if (d.event === "ping") return json({ ok: true, pong: true });
         // GitHub sends the name as the repo spells it; a repo this plane does not serve is ignored.
         const target = inboxRepos().find((r) => r.toLowerCase() === d.repo.toLowerCase());
+        if (target) board.heard(target);
         if (!WAKING_EVENTS.has(d.event) || !target) return json({ ok: true, ignored: true }, { status: 202 });
         const fresh = stateFor(target, true)!.recordDelivery(d);
         return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
@@ -624,24 +537,11 @@ export function createDashboard(
       pattern: /^\/api\/agents$/,
       label: "GET /api/agents",
       role: "viewer",
-      handler: async () => json({ agents: await probedAgents() }),
+      repo: "query",
+      handler: async (req) => json({ agents: await agents(repoOf(req), await projectFor(repoOf(req)), fleet) }),
     },
     // Workflows, Events, Minions and the workflow form: dashboard/workflow-routes.ts.
-    ...workflowRoutes({ state, github, workspacesDir: workspaces, project, actorOf: access.actorOf }),
-    {
-      method: "GET",
-      pattern: /^\/api\/settings$/,
-      label: "GET /api/settings",
-      role: "viewer",
-      handler: async () => {
-        if (!project) return json({ available: false, reason: NO_PROJECT });
-        const [report, leases] = await Promise.all([
-          harnessReport(project.cloneDir, project.config),
-          heldLeases(project),
-        ]);
-        return json({ available: true, ...(await settings(project, report, leases, Date.now())) });
-      },
-    },
+    ...workflowRoutes({ github, projectFor, stateFor, workspacesFor, repoOf, actorOf: access.actorOf }),
     {
       method: "GET",
       pattern: /^\/api\/inbox$/,

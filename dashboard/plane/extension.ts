@@ -29,6 +29,8 @@ export interface PlaneExtension {
   allows?(who: Actor, route: Route, req: Request): Verdict | Promise<Verdict>;
   // Narrows a list route's repos to those the caller may see.
   visibleRepos?(who: Actor, repos: readonly string[]): string[];
+  // Runs before the gate resolves a repo, so a visibleRepos that needs an async answer has it cached.
+  prepare?(who: Actor, repos: readonly string[]): Promise<void>;
 }
 
 type Verdict = boolean | undefined | Response;

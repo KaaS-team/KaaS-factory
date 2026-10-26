@@ -3,12 +3,21 @@
 // so a handler that reads a repo its route never declared fails here instead of acting on a guess.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { type DashboardProject, projectResolver, READ_ONLY } from "../dashboard/project";
+import { createAccess } from "../dashboard/plane/access";
+import { readAccess } from "../dashboard/plane/repo-scope";
+import { PlaneStore } from "../dashboard/plane/store";
 import { createDashboard, PUBLIC_ROUTES } from "../dashboard/server";
+import { DiskBlobStore } from "../src/adapters/blob-disk/blob";
+import { mirrorDown } from "../src/blobs";
+import { mergeConfig } from "../src/config";
+import { shipConfig } from "../src/engine/blobs";
 import type { GhIssue } from "../src/github";
-import { defaultStatePath } from "../src/paths";
+import { configMirrorDir, defaultStatePath } from "../src/paths";
+import { cloneDirFor } from "../src/repo";
 import { FactoryState } from "../src/state";
 import { signatureOf, WEBHOOK_SECRET_ENV } from "../src/webhook";
 
@@ -42,9 +51,14 @@ const issue = (repo: string): GhIssue => ({ number: 1, title: `issue in ${repo}`
 // Anything the walk reaches that this fake does not answer fails as offline, never as a real `gh` call.
 function fakeGitHub() {
   const created: { repo: string; title: string }[] = [];
+  const listed: string[] = [];
   const known = {
     created,
-    listOpenIssues: async (repo: string) => [issue(repo)],
+    listed,
+    listOpenIssues: async (repo: string) => {
+      listed.push(repo);
+      return [issue(repo)];
+    },
     listIssuesByLabel: async () => [],
     listPrs: async () => [],
     getIssue: async (repo: string) => issue(repo),
@@ -240,6 +254,201 @@ describe("one plane, many repos", () => {
       expect((await deliver("d-b", "ACME/B")).status).toBe(201);
       expect((await deliver("d-x", "evil/fork")).status).toBe(202);
       expect([states[A]!.latestDelivery(), states[B]!.latestDelivery()]).toEqual([0, 1]);
+    } finally {
+      delete process.env[WEBHOOK_SECRET_ENV];
+    }
+  });
+});
+
+// A clone-shaped .factory/ whose workflow, minion, runtime ref and stage agent all carry the repo's tag.
+const WORKFLOW = readFileSync(
+  join(import.meta.dir, "..", "template", ".factory", "workflows", "feature-to-pr.yml"),
+  "utf8",
+);
+function cloneOf(repo: string, tag: string, extra: Record<string, unknown>, dir = mkdtempSync(join(home, "clone-"))) {
+  for (const d of ["workflows", "minions"]) mkdirSync(join(dir, ".factory", d), { recursive: true });
+  writeFileSync(join(dir, ".factory", "config.json"), JSON.stringify({ repo, base: "main", ...extra }));
+  writeFileSync(
+    join(dir, ".factory", "workflows", `${tag}-flow.yml`),
+    WORKFLOW.replace("name: feature-to-pr", `name: ${tag}-flow`),
+  );
+  writeFileSync(
+    join(dir, ".factory", "minions", `${tag}-min.yml`),
+    `name: ${tag}-min\ndescription: d\non:\n  event: tasks.task.updated\nprompt: p\n`,
+  );
+  return dir;
+}
+
+describe("each repo's own config", () => {
+  test("?repo=B shows the settings, workflows and minions B's runner shipped, never A's, and B is read only", async () => {
+    const cloneA = cloneOf(A, "a", { runtime: { check: "local" } });
+    const project: DashboardProject = {
+      cloneDir: cloneA,
+      config: mergeConfig({ repo: A, runtime: { check: "local" } }),
+      machine: { slots: 1, runtimes: {} } as never,
+      leases: async () => [],
+    };
+    const store = new DiskBlobStore(mkdtempSync(join(home, "store-")));
+    expect(
+      await shipConfig(
+        store,
+        cloneOf(B, "b", {
+          runtime: { gates: "local" },
+          stages: { default: "codex" },
+          agents: { codex: { preset: "codex" } },
+        }),
+        B,
+      ),
+    ).toBe(3);
+    expect(await mirrorDown(store, process.env, [B])).toBe(3);
+    const asked: string[] = [];
+    const probes = { which: (b: string) => (asked.push(b), null), versionOf: async () => null };
+    const dash = createDashboard(
+      states[A]!,
+      fakeGitHub() as never,
+      A,
+      false,
+      join(home, "ws"),
+      undefined,
+      probes as never,
+      project,
+    );
+    const get = async (path: string, repo: string) =>
+      (await hit(dash, new Request(`${BASE}${path}${path.includes("?") ? "&" : "?"}repo=${repo}`))).text;
+    const view = async (repo: string) => ({
+      workflows: (JSON.parse(await get("/api/workflows", repo)).workflows as { name: string }[]).map((w) => w.name),
+      minions: (JSON.parse(await get("/api/minions", repo)).minions as { name: string }[]).map((m) => m.name),
+      usedBy: (JSON.parse(await get("/api/settings", repo)).runtimes as { name: string; usedBy: string[] }[])
+        .find((r) => r.name === "local")!
+        .usedBy.filter((w) => w.startsWith("runtime.")),
+      leasesError: JSON.parse(await get("/api/settings", repo)).leasesError as string | null,
+      codex: (JSON.parse(await get("/api/agents", repo)).agents as { name: string; stages: string[] }[]).find(
+        (a) => a.name === "codex",
+      )?.stages.length,
+    });
+    expect(await view(A)).toMatchObject({
+      workflows: expect.arrayContaining(["a-flow"]),
+      minions: ["a-min"],
+      usedBy: ["runtime.check"],
+      leasesError: null,
+      codex: 0,
+    });
+    expect(asked.length).toBeGreaterThan(0);
+    asked.length = 0;
+    const b = await view(B);
+    // B's config came through the bucket, so the plane runs none of the binaries it names.
+    expect(asked).toEqual([]);
+    expect(b.workflows).not.toContain("a-flow");
+    expect(b).toMatchObject({
+      workflows: expect.arrayContaining(["b-flow"]),
+      minions: ["b-min"],
+      usedBy: ["runtime.gates"],
+      leasesError: "leases are listed on the repo's runner, not this plane",
+      codex: 6,
+    });
+    expect(JSON.parse(await get("/api/workflow-source?name=b-flow", B)).text).toContain("name: b-flow");
+    expect(JSON.parse(await get("/api/workflow-source?name=a-flow", B)).available).toBe(false);
+    expect(JSON.parse(await get("/api/workflow-source?name=..%2Fconfig", B)).available).toBe(false);
+    expect((await hit(dash, new Request(`${BASE}/api/settings?repo=acme/elsewhere`))).status).toBe(404);
+    for (const label of ["POST /api/workflow-edit", "POST /api/events/e1/replay"]) {
+      const res = await hit(dash, request(label, B, { name: "b-flow", form: { build: { timeout: 5 } } }));
+      expect([res.status, JSON.parse(res.text).error]).toEqual([409, READ_ONLY]);
+    }
+  });
+
+  test("the plane's own clone of a repo wins over the shipped copy, and a config naming another repo is refused", async () => {
+    const r = "acme/cloned";
+    cloneOf(r, "own", {}, cloneDirFor(r, process.env));
+    cloneOf(r, "shipped", {}, configMirrorDir(r, process.env));
+    const resolve = projectResolver(A);
+    const own = await resolve(r);
+    expect([own?.cloneDir, own?.readOnly]).toEqual([cloneDirFor(r, process.env), undefined]);
+    cloneOf(A, "planted", {}, configMirrorDir("acme/planted", process.env));
+    expect(await resolve("acme/planted")).toBeUndefined();
+    expect((await resolve("acme/nothing")) ?? "none").toBe("none");
+  });
+});
+
+// A hosted plane: alice is a member, and GitHub says she can read A but not B.
+function hostedPlane() {
+  const github = fakeGitHub();
+  const store = new PlaneStore();
+  store.setMember("alice", "owner", "test");
+  store.openSession("alice-session", "alice", 60_000);
+  const filter = readAccess(async (r) => (r === B ? "none" : "read"));
+  const access = createAccess({ token: "", store, extensions: [filter] });
+  const probes = { which: () => null, versionOf: async () => null };
+  const st = new FactoryState(":memory:");
+  const ws = join(home, "ws");
+  const dashboard = createDashboard(st, github as never, "", false, ws, undefined, probes as never, undefined, access);
+  const as = (req: Request) => {
+    const h = new Headers(req.headers);
+    h.set("cookie", "factory_session=alice-session");
+    return new Request(req, { headers: h });
+  };
+  return { dashboard, as };
+}
+
+describe("a hosted plane shows a member only the repos GitHub lets them read", () => {
+  test("B is in no list, and every route that names B answers 404 for it", async () => {
+    const { dashboard, as } = hostedPlane();
+    const scopes = dashboard.routeScopes as Record<string, "query" | "body" | "filter" | null>;
+    let lists = 0;
+    for (const label of dashboard.routeLabels as string[]) {
+      if (PUBLIC_ROUTES.includes(label) || label.startsWith("POST /webhook") || label.includes("/runner/")) continue;
+      const scope = scopes[label];
+      if (label.startsWith("GET ") && scope !== "query" && scope !== "body") {
+        const all = await hit(dashboard, as(request(label)));
+        expect(all.text, label).not.toContain(B);
+        lists++;
+      }
+      if (!scope) continue;
+      const named = await hit(dashboard, as(request(label, B)));
+      expect([named.status, named.text.includes("unknown repo")], label).toEqual([404, true]);
+      const readable = await hit(dashboard, as(request(label, A)));
+      expect(readable.text, label).not.toContain("unknown repo");
+    }
+    expect(lists).toBeGreaterThan(10);
+    const inbox = (await (await dashboard.handle(as(request("GET /api/inbox")), "127.0.0.1")).json()) as {
+      repos: string[];
+    };
+    expect(inbox.repos).toEqual([A]);
+  }, 120_000);
+
+  test("break-glass and loopback still see every repo", async () => {
+    const { dashboard } = hostedPlane();
+    const res = await dashboard.handle(request("GET /api/runs"), "127.0.0.1");
+    const runs = ((await res.json()) as { runs: { repo: string }[] }).runs.map((r) => r.repo).sort();
+    expect(runs).toEqual([A, B]);
+  });
+});
+
+describe("the board's gh budget on a plane", () => {
+  test("a webhook for B reads B's issues again and leaves A's cached", async () => {
+    process.env[WEBHOOK_SECRET_ENV] = SECRET;
+    try {
+      const { dashboard, github } = plane();
+      const board = (r: string) => dashboard.handle(request("GET /api/board", r), "127.0.0.1");
+      await board(A);
+      await board(B);
+      await board(A);
+      await board(B);
+      expect(github.listed).toEqual([A, B]);
+      const raw = JSON.stringify({ action: "labeled", repository: { full_name: B }, label: { name: "x" } });
+      const hook = new Request(`${BASE}/webhook/github`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-github-delivery": "d-cache",
+          "x-github-event": "issues",
+          "x-hub-signature-256": signatureOf(SECRET, raw),
+        },
+        body: raw,
+      });
+      expect((await dashboard.handle(hook, "127.0.0.1")).status).toBeLessThan(300);
+      await board(A);
+      await board(B);
+      expect(github.listed).toEqual([A, B, B]);
     } finally {
       delete process.env[WEBHOOK_SECRET_ENV];
     }

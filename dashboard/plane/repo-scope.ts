@@ -1,7 +1,9 @@
 // Where a route reads the repo it acts on, checked once before any handler or extension sees it,
 // so a handler, the tenancy check and the audit row can never disagree about the target.
 import { isRepoName } from "../../src/paths";
+import type { RepoRole } from "../../src/ports/scm";
 import type { FactoryState } from "../../src/state";
+import type { PlaneExtension } from "./extension";
 
 // query: `?repo=`; body: the JSON body's `repo`; filter: an optional `?repo=` that narrows a list.
 export type RepoSource = "query" | "body" | "filter";
@@ -57,4 +59,35 @@ export async function resolveRepo(
 export function runIn(st: FactoryState | null, repo: string, id: number) {
   const run = st?.listRuns(repo).find((r) => r.id === id);
   return st && run ? { st, run } : null;
+}
+
+export const READ_TTL_MS = 10 * 60_000;
+
+// A hosted plane shows a signed-in member only the repos GitHub lets them read; plane roles still
+// decide what they may do there. Logins starting with ~ (break-glass, loopback, relay) are not
+// GitHub accounts, so they keep every repo. An unanswered lookup hides the repo until it answers.
+export function readAccess(
+  roleOf: (repo: string, login: string) => Promise<RepoRole>,
+  now: () => number = Date.now,
+): PlaneExtension {
+  const seen = new Map<string, { at: number; read: boolean }>();
+  const key = (login: string, repo: string) => `${login}\n${repo}`;
+  const fresh = (login: string, repo: string) => now() - (seen.get(key(login, repo))?.at ?? -Infinity) < READ_TTL_MS;
+  return {
+    name: "github-read",
+    prepare: async (who, repos) => {
+      if (who.login.startsWith("~")) return;
+      const stale = repos.filter((r) => !fresh(who.login, r));
+      await Promise.all(
+        stale.map(async (r) => {
+          const role = await roleOf(r, who.login).catch(() => null);
+          if (role !== null) seen.set(key(who.login, r), { at: now(), read: role !== "none" });
+        }),
+      );
+    },
+    visibleRepos: (who, repos) =>
+      who.login.startsWith("~")
+        ? [...repos]
+        : repos.filter((r) => fresh(who.login, r) && seen.get(key(who.login, r))!.read),
+  };
 }

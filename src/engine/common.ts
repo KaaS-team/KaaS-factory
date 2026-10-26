@@ -285,17 +285,6 @@ export async function writeIssueSnapshot(worktree: string, issue: GhIssue): Prom
   await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(issue, null, 2));
 }
 
-// Why a stage produced nothing: a kill, then a refused tool call (named, so a
-// permission gap reads as one), then anything `claude` printed to stderr.
-export function stageFailure(result: StageRunResult, fallback: string): string;
-export function stageFailure(result: StageRunResult): string | undefined;
-export function stageFailure(result: StageRunResult, fallback?: string): string | undefined {
-  const denied = result.permissionDenials.length
-    ? `permission denied: ${result.permissionDenials.join("; ")}`
-    : undefined;
-  return result.killedReason ?? denied ?? result.stderrTail ?? fallback;
-}
-
 // The agent's own cost wins; otherwise price the tokens. No price means the
 // cost is unknown, which is stored as NULL with usage_complete = 0, never as $0.
 export function priceResult(result: StageRunResult): {
@@ -409,7 +398,7 @@ export async function runStage(
     tokens_out: run.tokens_out + result.tokensOut,
     cost_usd: run.cost_usd + (costUsd ?? 0),
   });
-  await shipStage(deps.blobs, config.repo, issueNumber, worktree, files.transcriptFile);
+  await shipStage(deps.blobs, config.repo, issueNumber, worktree, files.transcriptFile, deps.state);
   if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
   return result;
 }
