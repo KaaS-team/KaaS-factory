@@ -5,8 +5,12 @@
 import { readStageArtifacts, stepStop, type PlanArtifact } from "../artifacts";
 import type { FactoryConfig } from "../config";
 import type { GhIssue } from "../github";
+import { costFor } from "../pricing";
+import { schemaProblem } from "../schemas";
 import { bashAllowed, stageAllowRules } from "../stage-permissions";
 import { runStage, stageJson, type WatchDeps } from "./common";
+import type { PlannedTask } from "./import-plan";
+import { pathProblem } from "./import-plan-step";
 import { flooredPlan } from "./verify-facts";
 
 const AC_LINE = /^\s*-\s*\*\*(AC-\d+):\*\*(.*)$/;
@@ -81,6 +85,82 @@ function sendBack(items: readonly string[], allow: readonly string[]): string {
   ].join("\n");
 }
 
+// What the model-free checks read: the plan.json fields, the comment (for which files are marked new), and the worktree.
+export interface PlanCheck {
+  readonly plan: object;
+  readonly comment: string;
+  readonly worktree: string;
+  readonly config: FactoryConfig;
+}
+
+// Tokens one build run is assumed to use. An estimate for the budget check, not a meter.
+const RUN_USAGE = { tokensIn: 150_000, tokensOut: 15_000 };
+
+// The model an alias names through config.agents, else the build stage's agent (the model is undefined when none is set).
+function runModel(alias: string | undefined, config: FactoryConfig): string | undefined {
+  const build = config.stages.build ?? config.stages.default ?? "claude";
+  return (alias && config.agents[alias]?.model) ?? config.agents[build]?.model;
+}
+
+// One build run per task, or one run when the plan has no tasks. Undefined when any run's model has no price.
+export function estimateCost(plan: object, config: FactoryConfig): number | undefined {
+  const fields = plan as Record<string, unknown>;
+  const tasks = Array.isArray(fields.tasks) ? (fields.tasks as PlannedTask[]) : [];
+  const aliases = tasks.length ? tasks.map((t) => t.model) : [fields.model as string | undefined];
+  let total = 0;
+  for (const alias of aliases) {
+    const usd = costFor(runModel(alias, config), RUN_USAGE);
+    if (usd === undefined) return undefined;
+    total += usd;
+  }
+  return total;
+}
+
+// `(new)` is read from the comment's Files to touch lines, the form planFromIssue writes.
+function fileProblemsFor({ plan, comment, worktree }: PlanCheck): string[] {
+  const fields = plan as Record<string, unknown>;
+  const filesBody = section(comment, "Files to touch") ?? "";
+  const marked = new Set([...filesBody.matchAll(/^\s*-\s*`([^`]+)`\s*\(new\)/gm)].map((m) => m[1]!));
+  // Only issue-written plans mark (new); a planner plan's files are checked for the outside-the-repo rule alone.
+  const checkDisk = fields.source === "issue";
+  const files = Array.isArray(fields.files) ? (fields.files as string[]) : [];
+  return files.flatMap((p) => pathProblem(worktree, p, marked.has(p), checkDisk));
+}
+
+function taskProblems(plan: object): string[] {
+  const fields = plan as Record<string, unknown>;
+  const tasks = Array.isArray(fields.tasks) ? (fields.tasks as { id: string }[]) : [];
+  if (!tasks.length) return [];
+  const ids = new Set(tasks.map((t) => t.id));
+  const criteria = Array.isArray(fields.criteria) ? (fields.criteria as { id: string; task?: string }[]) : [];
+  return criteria.flatMap((c) =>
+    c.task && ids.has(c.task) ? [] : [`${c.id} maps to ${c.task || "no task"}, which is not a task in Change.`],
+  );
+}
+
+function budgetProblems(input: PlanCheck): string[] {
+  const estimate = estimateCost(input.plan, input.config);
+  const budget = input.config.maxBudgetUsd.build;
+  if (estimate === undefined || estimate <= budget) return [];
+  return [`The estimated build cost is $${estimate.toFixed(2)}, over the $${budget.toFixed(2)} maxBudgetUsd.build.`];
+}
+
+// Model-free checks, run before any critic model. A schema failure stops here, because the other
+// checks read fields the schema guarantees.
+export function deterministicCritique(input: PlanCheck): string[] {
+  const schema = schemaProblem("plan", input.plan as Record<string, unknown>);
+  if (schema) return [`The plan JSON fails its schema: ${schema}.`];
+  return [...fileProblemsFor(input), ...taskProblems(input.plan), ...budgetProblems(input)];
+}
+
+// The deterministic problems, and the model critic only when they find nothing. The runner passes no
+// model critic today; Part 2 supplies one.
+export function critiquePlan(input: PlanCheck, modelCritic?: (input: PlanCheck) => string[]): string[] {
+  const problems = deterministicCritique(input);
+  if (problems.length || !modelCritic) return problems;
+  return modelCritic(input);
+}
+
 export interface CheckedPlan {
   readonly result: Awaited<ReturnType<typeof runStage>>;
   readonly comment?: string;
@@ -100,7 +180,12 @@ async function attempt(
   const parsed = flooredPlan(stageJson<PlanArtifact>("plan", art.json), config);
   const json = parsed.json;
   const checkable = result.exitCode === 0 && json && !stepStop(json) && json.status !== "needs-info" && art.comment;
-  const mustFix = checkable ? planMustFix(art.comment!, json, proofAllowRules(config, issue.number)) : [];
+  const mustFix = checkable
+    ? [
+        ...planMustFix(art.comment!, json, proofAllowRules(config, issue.number)),
+        ...critiquePlan({ plan: json, comment: art.comment!, worktree, config }),
+      ]
+    : [];
   return { result, comment: art.comment, question: art.question, parsed, mustFix };
 }
 

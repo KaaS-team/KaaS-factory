@@ -18,15 +18,20 @@ const outside = (worktree: string, p: string): boolean => {
   return isAbsolute(p) || rel.startsWith("..") || isAbsolute(rel);
 };
 
+// One path, the rule fileProblems applies to each file. `checkDisk: false` keeps only the outside-the-repo
+// rule, for a plan whose files are not marked (new) and so cannot be checked against the worktree.
+export function pathProblem(worktree: string, path: string, isNew: boolean, checkDisk = true): string[] {
+  if (outside(worktree, path)) return [`\`${path}\` is outside the repo.`];
+  if (!checkDisk) return [];
+  const there = existsSync(join(worktree, path));
+  if (isNew && there) return [`\`${path}\` is marked (new) but already exists.`];
+  if (!isNew && !there) return [`\`${path}\` does not exist; mark it (new) or fix the path.`];
+  return [];
+}
+
 // Existing paths must exist and `(new)` ones must not, so a plan cannot name a file build cannot find.
 export function fileProblems(plan: PlannedIssue, worktree: string): string[] {
-  return plan.files.flatMap((f) => {
-    if (outside(worktree, f.path)) return [`\`${f.path}\` is outside the repo.`];
-    const there = existsSync(join(worktree, f.path));
-    if (f.isNew && there) return [`\`${f.path}\` is marked (new) but already exists.`];
-    if (!f.isNew && !there) return [`\`${f.path}\` does not exist; mark it (new) or fix the path.`];
-    return [];
-  });
+  return plan.files.flatMap((f) => pathProblem(worktree, f.path, f.isNew));
 }
 
 // A mutation that cannot be applied would make verify reject a correct diff, so its find text must be in the file.
