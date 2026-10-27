@@ -18,13 +18,9 @@
       "git ls-tree *"
     ],
     "build": [
-      "bun *",
-      "bunx *",
       "make *"
     ],
     "verify": [
-      "bun *",
-      "bunx *",
       "make *"
     ]
   },
