@@ -164,14 +164,14 @@ describe("end to end on an http tracker", () => {
         type: "bug",
         risk: "low",
         done_when: "x",
-        files_expected: ["src/a.ts"],
+        files_expected: [`src/a-${n}.ts`],
         gate_level: "make check",
         confidence: 0.9,
       }),
     });
     push("plan", {
       "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",
-      "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true }),
+      "plan.json": JSON.stringify({ risk: "low", revision: 1, files: [`src/a-${n}.ts`], autoApproveEligible: true }),
     });
     push("build", {
       "status-comment.md": "<!-- factory:status v1 -->\nbuilding",

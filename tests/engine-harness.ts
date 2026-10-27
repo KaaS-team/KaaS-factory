@@ -38,6 +38,7 @@ export class FakeShell implements SetupRunner {
 export type Stage = Parameters<MultiStageExecutor["push"]>[0];
 // `opts`: the issue's labels, config keys over the defaults, and each stage's outputs in run order.
 export interface EngineOpts {
+  readonly issue?: number;
   readonly labels?: string[];
   readonly config?: Record<string, unknown>;
   readonly outputs?: Partial<Record<Stage, Array<Record<string, string>>>>;
@@ -58,7 +59,8 @@ export function engine(
     mkdirSync(dirname(join(cloneDir, name)), { recursive: true });
     writeFileSync(join(cloneDir, name), content);
   }
-  const github = new FakeGitHub([baseIssue(1, opts.labels ?? [LABEL.ready])]);
+  const n = opts.issue ?? 1;
+  const github = new FakeGitHub([baseIssue(n, opts.labels ?? [LABEL.ready])]);
   const executor = new MultiStageExecutor();
   const setupRunner = new FakeShell(lintExit);
   const git = new FakeGit();
@@ -79,7 +81,7 @@ export function engine(
   };
   const config = mergeConfig({ repo: "acme/widgets", ...opts.config });
   const push = (stage: Stage, files: Record<string, string>) => {
-    for (const out of opts.outputs?.[stage] ?? [files]) executor.push(stage, 1, fixtureFor(stage, 1), out);
+    for (const out of opts.outputs?.[stage] ?? [files]) executor.push(stage, n, fixtureFor(stage, n), out);
   };
   push("triage", {
     "triage-comment.md": "<!-- factory:triage v1 -->\nt",
@@ -93,7 +95,7 @@ export function engine(
       confidence: 0.9,
     }),
   });
-  for (const out of opts.outputs?.plan ?? []) executor.push("plan", 1, fixtureFor("plan", 1), out);
+  for (const out of opts.outputs?.plan ?? []) executor.push("plan", n, fixtureFor("plan", n), out);
   push("build", {
     "status-comment.md": "<!-- factory:status v1 -->\nb",
     "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
@@ -102,7 +104,7 @@ export function engine(
     "verdict-comment.md": "<!-- factory:verdict v1 -->\nv",
     "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
   });
-  push("pr", { "pr-body.md": "Did it.\nCloses #1" });
+  push("pr", { "pr-body.md": `Did it.\nCloses #${n}` });
   return {
     github,
     git,
@@ -111,6 +113,6 @@ export function engine(
     gateRunner,
     deps,
     config,
-    run: () => advanceIssue(deps, config, github.issues.get(1)!),
+    run: () => advanceIssue(deps, config, github.issues.get(n)!),
   };
 }

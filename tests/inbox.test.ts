@@ -44,6 +44,7 @@ describe("inbox structure", () => {
       LABEL.planning,
       LABEL.building,
       LABEL.verifying,
+      LABEL.overlap,
     ]);
     for (const l of LABELS.filter((x) => x.category === "state" || x.category === "parked")) {
       const items = buildInbox([issue(1, l.name)]);

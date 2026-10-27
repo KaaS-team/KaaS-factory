@@ -16,6 +16,7 @@ export const INTAKE_LABELS = [LABEL.ready] as const;
 export const RESUME_LABELS = [
   LABEL.needsInfo,
   LABEL.awaitingApproval,
+  LABEL.overlap,
   LABEL.failed,
   LABEL.needsHuman,
   LABEL.inReview,

@@ -28,6 +28,7 @@ import { ALL_STEP_TYPES as STEP_TYPES } from "./registry";
 import { emitEvent } from "./bus";
 import { readJournal } from "./journal";
 import { lateRoute } from "./late-route";
+import { holdForOverlap } from "../overlap";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
 const PARKED: ReadonlySet<Outcome> = new Set(["needs-info", "needs-human", "awaiting-approval", "failed"]);
@@ -180,6 +181,10 @@ async function walk(
         return "awaiting-approval";
       }
       const to: Step = workflow.steps[edge.to]!;
+      if (step.uses === "plan" && to.uses === "build") {
+        const files = (facts.plan as { files?: string[] } | undefined)?.files ?? [];
+        if (await holdForOverlap(deps, config, issueNumber, files, from)) return "awaiting-approval";
+      }
       await moveLabel(deps, config, issueNumber, from, to.label);
       step = to;
     }
