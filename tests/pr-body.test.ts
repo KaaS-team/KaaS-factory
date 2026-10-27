@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderPlanAcceptance } from "../src/acceptance";
 import { prBody, renderWhatChanged } from "../src/engine/pr-body";
-import { buildStatement, envelopeFromBody, renderReceipt, unsignedEnvelope } from "../src/receipt";
+import { buildStatement, decodeStatement, envelopeFromBody, renderReceipt, unsignedEnvelope } from "../src/receipt";
 import type { StageRun } from "../src/state";
 import { visibleLeaks } from "./harness";
 
@@ -23,7 +25,11 @@ const run = (stage: string, model: string): StageRun =>
 const runs = [run("build", "claude-opus-5-5"), run("verify", "gpt-5")];
 
 function receipt(criteria = 1): string {
-  const statement = buildStatement({
+  return renderReceipt(unsignedEnvelope(statement(true, criteria)));
+}
+
+function statement(operatorDetail: boolean, criteria = 1) {
+  return buildStatement({
     repo: "o/r",
     issue: 7,
     baseRef: "main",
@@ -49,9 +55,8 @@ function receipt(criteria = 1): string {
     proof,
     runs,
     files: { "proof.json": "{}" },
-    operatorDetail: true,
+    operatorDetail,
   });
-  return renderReceipt(unsignedEnvelope(statement));
 }
 
 function finishedBody(): string {
@@ -101,5 +106,21 @@ describe("the run-details comment", () => {
     expect(text).not.toContain("0 of 0");
     expect(text).toContain("the acceptance table is the record");
     expect(receipt(1)).toContain("Proven: 1 of 1 criteria.");
+  });
+
+  test("the posted receipt drops model and spend even with prRunSummary on", () => {
+    // The pr step's worktree has no git in tests, so the call that builds the envelope is read, not run.
+    const step = readFileSync(join(import.meta.dir, "../src/engine/steps.ts"), "utf8");
+    expect(step).toMatch(/operatorDetail: false/);
+    expect(step).not.toMatch(/operatorDetail: config\.prRunSummary/);
+    const posted = decodeStatement(unsignedEnvelope(statement(false))).predicate.steps;
+    expect(posted.every((s) => s.model === null && s.costUsd === null)).toBe(true);
+  });
+
+  test("the comment is posted before the PR opens, so the body's pointer is true", () => {
+    const step = readFileSync(join(import.meta.dir, "../src/engine/steps.ts"), "utf8");
+    expect(step.indexOf("await postComment(deps, config, issueNumber, receipt)")).toBeLessThan(
+      step.indexOf("await deps.github.createPr("),
+    );
   });
 });

@@ -1,6 +1,6 @@
 # Acceptance receipts
 
-Every PR the factory opens carries a `## Receipt` section: the run's acceptance verdict as an
+Every PR the factory opens gets a run-details comment on its issue with a `## Receipt` section; the PR body links to it. It holds the run's acceptance verdict as an
 [in-toto Statement v1](https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md) in a
 [DSSE](https://github.com/secure-systems-lab/dsse) envelope, signed with Ed25519. The same envelope is
 written to `.factory/runs/issue-<n>/receipt.dsse.json`, beside the files it pins.
@@ -13,7 +13,7 @@ written to `.factory/runs/issue-<n>/receipt.dsse.json`, beside the files it pins
 | `run.base`, `run.head` | `git rev-parse origin/<base>` and `HEAD` in the run's worktree |
 | `criteria[]` | each row of `scripts/kaas/check-acceptance.py --json`, with `proof` and `ok` derived from it |
 | `holdout`, `mutationProof` | `holdout.json` and `proof.json` from verify |
-| `steps[]` | each stage run; `model` and `costUsd` are null when `prRunSummary` is off |
+| `steps[]` | each stage run; `model` and `costUsd` are always null in the posted receipt, because the issue thread is customer-visible |
 | `artifacts` | the sha256 of each run-dir file above |
 | `verdict` | counts, `proven`, and the `notProven` lines the PR shows under "Not proven" |
 

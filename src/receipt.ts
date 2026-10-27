@@ -265,7 +265,7 @@ export function decodeStatement(envelope: Envelope): Statement {
   return JSON.parse(Buffer.from(envelope.payload, "base64").toString("utf8")) as Statement;
 }
 
-// The PR body's section: the verdict, what is not proven, and the envelope a reviewer feeds to kaas-verify.
+// The run-details comment's section: the verdict, what is not proven, and the envelope a reviewer feeds to kaas-verify.
 export function renderReceipt(envelope: Envelope): string {
   const v = decodeStatement(envelope).predicate.verdict;
   const who = envelope.signatures.length
@@ -302,7 +302,7 @@ export function missingReceipt(reason: string): string {
   ].join("\n");
 }
 
-// Reads the receipt envelope back out of a PR body, for `factory receipt verify --pr`.
+// Reads the receipt envelope back out of the run-details comment on the issue.
 export function envelopeFromBody(body: string): Envelope | undefined {
   const m = /## Receipt[\s\S]*?```json\n(.+)\n```/.exec(body);
   return m ? (JSON.parse(m[1]!) as Envelope) : undefined;

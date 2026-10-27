@@ -502,11 +502,12 @@ const pr: StepType = {
       issue: issueNumber,
       base: config.base,
       runs: deps.state.listStageRuns(config.repo, { issue: issueNumber }),
-      operatorDetail: config.prRunSummary,
+      operatorDetail: false, // the issue thread is customer-visible: no model or spend in the envelope
       holdoutRequired: holdoutEnabled(config.holdout),
       seal: readSeal(deps.state.getSetting(sealKey(config.repo, issueNumber))),
     }).then(renderReceipt, (err: Error) => missingReceipt(err.message));
     const existing = await deps.github.findPrByHead(config.repo, head);
+    if (!existing) await postComment(deps, config, issueNumber, receipt);
     const plan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
     const proof = readRunJson<ProofResult>(worktree, issueNumber, "proof.json");
     const prUrl =
@@ -531,15 +532,13 @@ const pr: StepType = {
         }),
         draft: true,
       }));
-    if (!existing) {
-      await postComment(deps, config, issueNumber, receipt);
+    if (!existing)
       emitEvent(
         deps.bus,
         "factory.pr.opened",
         { repo: config.repo, issue: issueNumber, url: prUrl, head },
         `issue/${issueNumber}`,
       );
-    }
     // Opened as a draft while the factory works; ready is the hand-off to a human.
     await deps.github.markReady(config.repo, head, true);
     deps.state.updateRun(config.repo, issueNumber, { pr_url: prUrl });
