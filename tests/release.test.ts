@@ -2,7 +2,17 @@
 // ref; this pins them together so a release cannot bump one and forget the other.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { LABEL } from "../src/labels";
 
@@ -112,13 +122,57 @@ test("the product repo carries no teaching material", () => {
 });
 
 // The prose rules held only where someone ran the script by hand, so eight em dashes sat in
-// CHANGELOG.md until v6.1.0; every tracked Markdown file is now checked on each gate.
-test("every tracked Markdown file passes check-prose", () => {
+// CHANGELOG.md until v6.1.0; every tracked Markdown file is now checked on each gate. Git lists
+// them so untracked runner output cannot turn the gate red; check-mutations copies without .git.
+const markdownFiles = (dir: string): string[] => {
+  if (existsSync(join(dir, ".git"))) {
+    const out = Bun.spawnSync(["git", "ls-files", "*.md"], { cwd: dir });
+    if (out.exitCode !== 0) throw new Error(`git ls-files failed: ${out.stderr}`);
+    return `${out.stdout}`.split("\n").filter(Boolean);
+  }
   const skip =
-    /^(node_modules|\.git|\.worktrees|\.factory-state|workspaces|artifacts|reports)\/|\/target\/|\/node_modules\//;
-  const md = (readdirSync(ROOT, { recursive: true }) as string[]).filter((p) => p.endsWith(".md") && !skip.test(p));
+    /^(node_modules|\.git|\.worktrees|\.factory-state|\.factory\/runs|workspaces|artifacts|reports)\/|\/target\/|\/node_modules\//;
+  return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => p.endsWith(".md") && !skip.test(p));
+};
+const checkProse = (cwd: string, files: string[]) => {
+  const out = Bun.spawnSync(["python3", join(ROOT, "scripts/kaas/check-prose.py"), ...files], { cwd });
+  return { text: `${out.stdout}${out.stderr}`, exitCode: out.exitCode };
+};
+
+test("the Markdown list leaves out untracked files and lists tracked ones", () => {
+  const dir = mkdtempSync(join(tmpdir(), "prose-"));
+  try {
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: dir });
+    git("init", "-q");
+    mkdirSync(join(dir, ".factory/runs/issue-1"), { recursive: true });
+    const note = ".factory/runs/issue-1/plan-comment.md";
+    writeFileSync(join(dir, note), "A plan – with an en dash.\n");
+    expect(markdownFiles(dir)).toEqual([]);
+    expect(checkProse(dir, [note]).exitCode).not.toBe(0);
+    git("add", note);
+    expect(markdownFiles(dir)).toEqual([note]);
+    expect(checkProse(dir, markdownFiles(dir)).exitCode).not.toBe(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("without a .git the Markdown list walks the filesystem and skips .factory/runs", () => {
+  const dir = mkdtempSync(join(tmpdir(), "prose-"));
+  try {
+    mkdirSync(join(dir, ".factory/runs/issue-1"), { recursive: true });
+    writeFileSync(join(dir, ".factory/runs/issue-1/plan-comment.md"), "x\n");
+    writeFileSync(join(dir, "CHANGELOG.md"), "x\n");
+    expect(markdownFiles(dir)).toEqual(["CHANGELOG.md"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("every tracked Markdown file passes check-prose", () => {
+  const md = markdownFiles(ROOT);
   expect(md).toContain("CHANGELOG.md");
-  const out = Bun.spawnSync(["python3", "scripts/kaas/check-prose.py", ...md], { cwd: ROOT });
-  expect(`${out.stdout}${out.stderr}`).toContain("0 violation(s)");
+  const out = checkProse(ROOT, md);
+  expect(out.text).toContain("0 violation(s)");
   expect(out.exitCode).toBe(0);
 });
