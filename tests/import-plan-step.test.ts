@@ -42,6 +42,17 @@ describe("the four deterministic checks", () => {
     );
   });
 
+  test("a path that leaves the worktree is refused before it is read", async () => {
+    const body = (await fixture()).replaceAll("src/derive.ts", "../../etc/hosts");
+    const plan = parsePlannedIssue(body).plan!;
+    const root = tree(EXISTING);
+    expect(fileProblems(plan, root).join("\n")).toContain("`../../etc/hosts` is outside the repo.");
+    expect(mutationProblems(plan, root).join("\n")).toContain("`../../etc/hosts` is outside the repo.");
+    expect(
+      fileProblems(parsePlannedIssue(body.replaceAll("../../etc/hosts", "/etc/hosts")).plan!, root).join("\n"),
+    ).toContain("`/etc/hosts` is outside the repo.");
+  });
+
   test("a mutation whose find text is not in its file is refused", async () => {
     const plan = await planOf();
     expect(mutationProblems(plan, tree(EXISTING))).toEqual([]);

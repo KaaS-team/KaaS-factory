@@ -2,7 +2,7 @@
 // Four deterministic checks come first; a body that fails any of them parks with every problem.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { runDir } from "../artifacts";
 import type { FactoryConfig } from "../config";
 import { LABEL } from "../labels";
@@ -12,9 +12,16 @@ import { parsePlannedIssue, planFromIssue, type PlannedIssue } from "./import-pl
 import { proofAllowRules, planMustFix } from "./plan-critic";
 import type { StepCtx, StepResult, StepType } from "./steps";
 
+// The body is issue text, so a path that leaves the worktree must never reach the filesystem.
+const outside = (worktree: string, p: string): boolean => {
+  const rel = relative(resolve(worktree), resolve(worktree, p));
+  return isAbsolute(p) || rel.startsWith("..") || isAbsolute(rel);
+};
+
 // Existing paths must exist and `(new)` ones must not, so a plan cannot name a file build cannot find.
 export function fileProblems(plan: PlannedIssue, worktree: string): string[] {
   return plan.files.flatMap((f) => {
+    if (outside(worktree, f.path)) return [`\`${f.path}\` is outside the repo.`];
     const there = existsSync(join(worktree, f.path));
     if (f.isNew && there) return [`\`${f.path}\` is marked (new) but already exists.`];
     if (!f.isNew && !there) return [`\`${f.path}\` does not exist; mark it (new) or fix the path.`];
@@ -25,6 +32,7 @@ export function fileProblems(plan: PlannedIssue, worktree: string): string[] {
 // A mutation that cannot be applied would make verify reject a correct diff, so its find text must be in the file.
 export function mutationProblems(plan: PlannedIssue, worktree: string): string[] {
   return plan.mutations.flatMap((m) => {
+    if (outside(worktree, m.file)) return [`Mutation "${m.name}": \`${m.file}\` is outside the repo.`];
     const isNew = plan.files.some((f) => f.path === m.file && f.isNew);
     if (isNew) return [];
     const path = join(worktree, m.file);
