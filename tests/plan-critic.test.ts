@@ -187,6 +187,14 @@ describe("deterministicCritique and critiquePlan", () => {
     expect(deterministicCritique(check(planner, "### Files to touch\n- `src/missing.ts`\n"))).toEqual([]);
   });
 
+  test("a plan with no source that marks any file (new) gets the disk rules too", () => {
+    const plan = { ...TASK_PLAN, source: undefined, files: ["src/missing.ts", "src/exists.ts", "src/other.ts"] };
+    const comment = "### Files to touch\n- `src/missing.ts`\n- `src/exists.ts`\n- `src/other.ts` (new)\n";
+    expect(deterministicCritique(check(plan, comment))).toEqual([
+      "`src/missing.ts` does not exist; mark it (new) or fix the path.",
+    ]);
+  });
+
   test("deterministic: a criterion with no task, or an unknown task, is reported when the plan has tasks", () => {
     const plan = {
       ...TASK_PLAN,

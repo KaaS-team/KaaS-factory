@@ -121,8 +121,8 @@ function fileProblemsFor({ plan, comment, worktree }: PlanCheck): string[] {
   const fields = plan as Record<string, unknown>;
   const filesBody = section(comment, "Files to touch") ?? "";
   const marked = new Set([...filesBody.matchAll(/^\s*-\s*`([^`]+)`\s*\(new\)/gm)].map((m) => m[1]!));
-  // Only issue-written plans mark (new); a planner plan's files are checked for the outside-the-repo rule alone.
-  const checkDisk = fields.source === "issue";
+  // The planner skill does not require (new), so an unmarked planner plan gets the outside-the-repo rule alone; any marker opts it in.
+  const checkDisk = fields.source === "issue" || marked.size > 0;
   const files = Array.isArray(fields.files) ? (fields.files as string[]) : [];
   return files.flatMap((p) => pathProblem(worktree, p, marked.has(p), checkDisk));
 }
