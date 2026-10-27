@@ -87,13 +87,24 @@ export async function mergeContext(
   return { mode: t.mode, merge: { ...config.merge, ...t.limits }, facts };
 }
 
+// A failed git command that keeps its subcommand and stderr, so the caller can quote the refusal.
+export class GitRefused extends Error {
+  constructor(
+    readonly subcommand: string,
+    readonly stderr: string,
+  ) {
+    super(`git ${subcommand}: ${stderr}`);
+  }
+}
+
 async function git(cwd: string, ...args: string[]): Promise<string> {
   const p = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
   const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
-  if (code !== 0) throw new Error(`git ${args[0]}: ${(await new Response(p.stderr).text()).trim()}`);
+  if (code !== 0) throw new GitRefused(args[0] ?? "", (await new Response(p.stderr).text()).trim());
   return out.trim();
 }
 
+// The push skips the repo's pre-push hooks: the factory gate already ran on this head.
 // Rebases the PR branch on the latest base and pushes it when that moved the head.
 export async function rebaseOnBase(worktree: string, base: string, branch: string): Promise<string> {
   await git(worktree, "fetch", "--quiet", "origin", base);
@@ -103,8 +114,15 @@ export async function rebaseOnBase(worktree: string, base: string, branch: strin
     throw err;
   });
   const after = await git(worktree, "rev-parse", "HEAD");
-  if (after !== before) await git(worktree, "push", "--force-with-lease", "origin", `HEAD:${branch}`);
+  if (after !== before) await git(worktree, "push", "--no-verify", "--force-with-lease", "origin", `HEAD:${branch}`);
   return after;
+}
+
+// The last lines of a refused push: git's decisive line sits at the end, under any remote noise.
+const PUSH_TAIL_LINES = 20;
+function refusedPushComment(err: GitRefused): string {
+  const tail = err.stderr.split("\n").slice(-PUSH_TAIL_LINES).join("\n");
+  return `Merge not attempted: the rebased branch push was refused.\n\n\`\`\`\n${tail}\n\`\`\``;
 }
 
 export interface AutonomousMergeDeps {
@@ -143,12 +161,21 @@ export function signedMergeRecord(
 async function autonomousMerge(
   deps: AutonomousMergeDeps,
   config: FactoryConfig,
-  run: { worktree: string; pr: number; branch: string },
+  run: { worktree: string; pr: number; branch: string; post?: (body: string) => Promise<unknown> },
   decision: MergeDecision,
 ): Promise<boolean> {
   if (decision.outcome !== "merge") return false;
+  // A refused push is the one rebase failure a human should see; a conflict stays in the log.
+  const rebase = async () => {
+    try {
+      return await (deps.rebase ?? (() => rebaseOnBase(run.worktree, config.base, run.branch)))();
+    } catch (err) {
+      if (err instanceof GitRefused && err.subcommand === "push" && run.post) await run.post(refusedPushComment(err));
+      throw err;
+    }
+  };
   const outcome = await serialMerge(deps.lease ?? new DirLease(STATE), config.repo, decision.headSha, {
-    rebase: deps.rebase ?? (() => rebaseOnBase(run.worktree, config.base, run.branch)),
+    rebase,
     gated: async (head) => head === decision.headSha,
     merge: async (head) => {
       await deps.github.mergePr(config.repo, run.pr, head);
@@ -161,7 +188,7 @@ async function autonomousMerge(
           const tip = await git(run.worktree, "rev-parse", `origin/${config.base}`);
           await git(run.worktree, "checkout", "--quiet", "--detach", tip);
           const branch = await revertBranch(run.worktree, tip);
-          await git(run.worktree, "push", "origin", `HEAD:${branch}`);
+          await git(run.worktree, "push", "--no-verify", "origin", `HEAD:${branch}`);
           return deps.github.createPr({
             repo: config.repo,
             base: config.base,

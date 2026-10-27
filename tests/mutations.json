@@ -874,5 +874,7 @@
   {"name": "build-model: a red gate is not rerun", "file": "src/engine/steps.ts", "find": "const up = model && gate.status !== \"GREEN\" ? buildEscalation(attempt, family) : undefined;", "replace": "const up = undefined;", "test": "tests/scenarios.test.ts"},
   {"name": "build-model: versions compare as strings", "file": "src/core/model-tier.ts", "find": "const d = (a[i] ?? 0) - (b[i] ?? 0);\n    if (d !== 0) return d > 0;", "replace": "const d = String(a[i] ?? 0).localeCompare(String(b[i] ?? 0));\n    if (d !== 0) return d > 0;", "test": "tests/model-tier.test.ts"},
   {"name": "stage guidance: the make test rewrite is dropped", "file": "src/stage-permissions.ts", "find": "make test FILES=\"<files>\", ", "replace": "", "test": "tests/stage-permissions.test.ts"},
-  {"name": "acceptance: verify lists only the plan's criteria", "file": "src/engine/steps.ts", "find": "planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, \"plan.json\"))", "replace": "acceptance", "test": "tests/acceptance-table.test.ts"}
+  {"name": "acceptance: verify lists only the plan's criteria", "file": "src/engine/steps.ts", "find": "planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, \"plan.json\"))", "replace": "acceptance", "test": "tests/acceptance-table.test.ts"},
+  {"name": "merge push: the rebase push skips --no-verify", "file": "src/merge-autonomy.ts", "find": "\"push\", \"--no-verify\", \"--force-with-lease\"", "replace": "\"push\", \"--force-with-lease\"", "test": "tests/merge-autonomy-push.test.ts"},
+  {"name": "merge push: the refusal comment drops its stderr tail", "file": "src/merge-autonomy.ts", "find": ".slice(-PUSH_TAIL_LINES)", "replace": "", "test": "tests/merge-autonomy-push.test.ts"}
 ]
