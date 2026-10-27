@@ -125,13 +125,13 @@ test("the product repo carries no teaching material", () => {
 // CHANGELOG.md until v6.1.0; every tracked Markdown file is now checked on each gate. Git lists
 // them so untracked runner output cannot turn the gate red; check-mutations copies without .git.
 const markdownFiles = (dir: string): string[] => {
+  const skip =
+    /^(node_modules|\.git|\.worktrees|\.factory-state|\.factory\/runs|workspaces|artifacts|reports)\/|\/target\/|\/node_modules\//;
   if (existsSync(join(dir, ".git"))) {
     const out = Bun.spawnSync(["git", "ls-files", "-z", "*.md"], { cwd: dir });
     if (out.exitCode !== 0) throw new Error(`git ls-files failed: ${out.stderr}`);
-    return `${out.stdout}`.split("\0").filter(Boolean);
+    return `${out.stdout}`.split("\0").filter((p) => p && !skip.test(p) && existsSync(join(dir, p)));
   }
-  const skip =
-    /^(node_modules|\.git|\.worktrees|\.factory-state|\.factory\/runs|workspaces|artifacts|reports)\/|\/target\/|\/node_modules\//;
   return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => p.endsWith(".md") && !skip.test(p));
 };
 const checkProse = (cwd: string, files: string[]) => {
@@ -147,11 +147,34 @@ test("the Markdown list leaves out untracked files and lists tracked ones", () =
     mkdirSync(join(dir, ".factory/runs/issue-1"), { recursive: true });
     const note = ".factory/runs/issue-1/plan-comment.md";
     writeFileSync(join(dir, note), "A plan – with an en dash.\n");
-    expect(markdownFiles(dir)).toEqual([]);
+    writeFileSync(join(dir, "README.md"), "Clean prose.\n");
+    git("add", "README.md");
+    expect(markdownFiles(dir)).toEqual(["README.md"]);
+    const clean = checkProse(dir, markdownFiles(dir));
+    expect(clean.text).toContain("0 violation(s)");
+    expect(clean.exitCode).toBe(0);
     expect(checkProse(dir, [note]).exitCode).not.toBe(0);
-    git("add", note);
-    expect(markdownFiles(dir)).toEqual([note]);
+    writeFileSync(join(dir, "NOTES.md"), "A note – with an en dash.\n");
+    git("add", "NOTES.md");
+    expect(markdownFiles(dir)).toEqual(["NOTES.md", "README.md"]);
     expect(checkProse(dir, markdownFiles(dir)).exitCode).not.toBe(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the Markdown list applies the skip list and drops tracked files deleted from the tree", () => {
+  const dir = mkdtempSync(join(tmpdir(), "prose-"));
+  try {
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: dir });
+    git("init", "-q");
+    mkdirSync(join(dir, "workspaces/w"), { recursive: true });
+    writeFileSync(join(dir, "workspaces/w/A.md"), "x\n");
+    writeFileSync(join(dir, "B.md"), "x\n");
+    writeFileSync(join(dir, "C.md"), "x\n");
+    git("add", "workspaces/w/A.md", "B.md", "C.md");
+    rmSync(join(dir, "C.md"));
+    expect(markdownFiles(dir)).toEqual(["B.md"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
