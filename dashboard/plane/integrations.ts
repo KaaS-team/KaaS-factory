@@ -11,7 +11,7 @@ import { type SteerTracker, surfaceActors } from "../../src/integrations/steer";
 import { EVENT_SIGNATURE_HEADER, isExternalEventType, parseEvent, verifyEvent } from "../../src/core/event";
 import { readCapped, WEBHOOK_MAX_BYTES } from "../../src/webhook";
 import pkg from "../../package.json";
-import type { Route } from "./access";
+import type { createAccess, Route } from "./access";
 import { resolveRepo } from "./repo-scope";
 import type { PlaneStore } from "./store";
 
@@ -58,10 +58,12 @@ export function eventsRoute(deps: EventsDeps): Route {
       // which repos are served.
       const named = (raw as Record<string, Record<string, unknown> | undefined> | null)?.data?.repo;
       const want = typeof named === "string" ? named : "";
-      const served = want === "" || deps.served().includes(want);
-      const target = want === "" ? deps.repo : want;
+      const target = want === "" ? deps.repo : deps.served().find((r) => r.toLowerCase() === want.toLowerCase());
+      const served = target !== undefined;
+      // Off only while no secret is set anywhere; a served repo with none of its own answers 401 like any
+      // other bad signature, so the status never says which repos are served.
       const secret = served ? await deps.secretFor(target) : deps.defaultSecret();
-      if (!secret) return notFound();
+      if (!secret && !deps.defaultSecret()) return notFound();
       if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER)))
         return Response.json({ error: "bad signature" }, { status: 401 });
       if (!served) return Response.json({ error: "unknown repo" }, { status: 404 });
@@ -87,7 +89,9 @@ export function eventsRoute(deps: EventsDeps): Route {
 }
 
 export interface IntegrationDeps {
-  readonly state: Pick<FactoryState, "busEvents">;
+  readonly stateFor: (repo: string) => Pick<FactoryState, "busEvents"> | null;
+  // The AG-UI route's repo scope: what the access gate resolved, and which repos the caller may see.
+  readonly access: Pick<ReturnType<typeof createAccess>, "repoOf" | "visibleRepos">;
   readonly tracker: SteerTracker;
   readonly repo: string;
   // Every repo this plane serves; `?repo=` may name any of them.
@@ -107,14 +111,38 @@ const tooLarge = (req: Request) => Number(req.headers.get("content-length") ?? 0
 const defer = (work: Promise<void>) =>
   void work.catch((e) => console.error(`integration: ${e instanceof Error ? e.message : String(e)}`));
 
-// The repo a request is for: its `?repo=` when served, else the plane's default. An unserved name is
-// a 404. These routes carry no dashboard session, so there is no per-caller visibility to apply.
+// A vendor or A2A body is theirs, never a repo selector, so resolveRepo is shown the URL alone.
 export async function pickRepo(
   req: Request,
   deps: Pick<IntegrationDeps, "repo" | "served">,
 ): Promise<string | Response> {
-  const named = await resolveRepo(req, "filter", { served: deps.served }, (r) => [...r]);
+  const named = await resolveRepo(new Request(req.url), "filter", { served: deps.served }, (r) => [...r]);
   return named === "" ? deps.repo : named;
+}
+
+const inertTracker = new Proxy(
+  {},
+  {
+    get: () => async () => {
+      throw new Error("repo is not served");
+    },
+  },
+) as SteerTracker;
+
+type Io = { tracker: SteerTracker; defer: typeof defer };
+
+// Credentials are judged before a name's 404 can say whether a repo is served: a request for another
+// repo runs the receiver on an inert tracker and only its 401 is passed on, else the refusal is sent.
+async function onRepo(
+  req: Request,
+  deps: Pick<IntegrationDeps, "repo" | "served" | "tracker">,
+  run: (repo: string, io: Io) => Promise<Response>,
+): Promise<Response> {
+  if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
+  const repo = await pickRepo(req, deps);
+  if (!(repo instanceof Response)) return repo ? run(repo, { tracker: deps.tracker, defer }) : unbound();
+  const probe = await run(deps.repo, { tracker: inertTracker, defer: () => {} }).catch(() => repo);
+  return probe.status === 401 ? probe : repo;
 }
 
 export function integrationRoutes(deps: IntegrationDeps) {
@@ -137,22 +165,19 @@ export function integrationRoutes(deps: IntegrationDeps) {
       handler: async (req) => {
         const secret = key(LINEAR_AGENT_ENV.secret);
         if (!secret) return notFound();
-        const repo = await pickRepo(req, deps);
-        if (repo instanceof Response) return repo;
-        if (!repo) return unbound();
-        if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
         const client = new LinearAgentClient(env.LINEAR_AGENT_URL, env);
         const sameBoard = deps.project?.config.tracker.kind === "linear";
-        return linearAgentReceiver({
-          secret,
-          repo,
-          tracker: deps.tracker,
-          links: links(),
-          client,
-          sameBoard,
-          actor: surfaceActors(env[LINEAR_AGENT_ENV.users], (login) => deps.store.roleOf(login)),
-          defer,
-        })(req);
+        return onRepo(req, deps, (repo, io) =>
+          linearAgentReceiver({
+            secret,
+            repo,
+            ...io,
+            links: links(),
+            client,
+            sameBoard,
+            actor: surfaceActors(env[LINEAR_AGENT_ENV.users], (login) => deps.store.roleOf(login)),
+          })(req),
+        );
       },
     },
     {
@@ -162,13 +187,11 @@ export function integrationRoutes(deps: IntegrationDeps) {
       handler: async (req) => {
         const secret = key(SLACK_ENV.secret);
         if (!secret) return notFound();
-        const repo = await pickRepo(req, deps);
-        if (repo instanceof Response) return repo;
-        if (!repo) return unbound();
-        if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
         const client = new SlackClient(env.SLACK_API_URL, env);
         const actor = surfaceActors(env[SLACK_ENV.users], (login) => deps.store.roleOf(login));
-        return slackReceiver({ secret, repo, tracker: deps.tracker, links: links(), client, actor, defer })(req);
+        return onRepo(req, deps, (repo, io) =>
+          slackReceiver({ secret, repo, ...io, links: links(), client, actor })(req),
+        );
       },
     },
     {
@@ -183,11 +206,9 @@ export function integrationRoutes(deps: IntegrationDeps) {
       label: A2A_ROUTE,
       handler: async (req) => {
         if (!key(A2A_ENV.token)) return notFound();
-        const repo = await pickRepo(req, deps);
-        if (repo instanceof Response) return repo;
-        if (!repo) return unbound();
-        if (tooLarge(req)) return Response.json({ error: "too large" }, { status: 413 });
-        return a2aRpc({ token: key(A2A_ENV.token), repo, tracker: deps.tracker, links: links() }, req);
+        return onRepo(req, deps, (repo, io) =>
+          a2aRpc({ token: key(A2A_ENV.token), repo, tracker: io.tracker, links: links() }, req),
+        );
       },
     },
     {
@@ -195,12 +216,13 @@ export function integrationRoutes(deps: IntegrationDeps) {
       pattern: /^\/api\/agui\/(\d+)$/,
       label: "GET /api/agui/:n",
       role: "viewer",
-      handler: async (req, _url, m) => {
+      repo: "filter",
+      handler: (req, _url, m) => {
         if (!key(AGUI_ENV.on)) return notFound();
-        const repo = await pickRepo(req, deps);
-        if (repo instanceof Response) return repo;
+        const repo = deps.access.repoOf(req) || deps.repo;
         if (!repo) return unbound();
-        const events = deps.state.busEvents(500).flatMap((row) => {
+        if (deps.access.visibleRepos(req, [repo]).length === 0) return notFound();
+        const events = (deps.stateFor(repo)?.busEvents(500) ?? []).flatMap((row) => {
           const { subject, ...rest } = row;
           const parsed = parseEvent({
             ...rest,

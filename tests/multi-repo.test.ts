@@ -21,6 +21,7 @@ import { cloneDirFor } from "../src/repo";
 import { FactoryState } from "../src/state";
 import { SLACK_ENV } from "../src/integrations/slack";
 import { A2A_ENV } from "../src/integrations/a2a";
+import { AGUI_ENV } from "../src/integrations/agui";
 import { LinkStore } from "../src/integrations/links";
 import { EVENT_SIGNATURE_HEADER, signEvent } from "../src/core/event";
 import { costFor } from "../src/pricing";
@@ -586,7 +587,8 @@ describe("integrations, events and analytics act on the repo a request is for", 
       expect((await post({ repo: B }, "ev-b")).status).toBe(201);
       expect((await post({}, "ev-default")).status).toBe(201);
       expect((await post({ repo: "acme/elsewhere" }, "ev-none")).status).toBe(404);
-      expect(states[B]!.busEvents().map((e) => e.id)).toEqual(["ev-b"]);
+      expect((await post({ repo: B.toUpperCase() }, "ev-case")).status).toBe(201);
+      expect(states[B]!.busEvents().map((e) => e.id)).toEqual(["ev-b", "ev-case"]);
       expect(states[A]!.busEvents().map((e) => e.id)).toEqual(["ev-default"]);
     } finally {
       if (before === undefined) delete process.env[EVENTS_ENV];
@@ -597,7 +599,8 @@ describe("integrations, events and analytics act on the repo a request is for", 
   test("an integration honours ?repo= and refuses an unserved one", async () => {
     const tracker = new MemoryTracker();
     const { routes } = integrationRoutes({
-      state: { busEvents: () => [] },
+      stateFor: () => ({ busEvents: () => [] }),
+      access: { repoOf: () => "", visibleRepos: (_req, repos) => [...repos] },
       tracker,
       repo: A,
       served: () => [A, B],
@@ -625,6 +628,49 @@ describe("integrations, events and analytics act on the repo a request is for", 
     expect((await tracker.getIssue(B, Number(inB))).title).toContain("Fix the cart");
     expect((await tracker.getIssue(A, Number(inA))).title).toContain("Fix the cart");
     expect((await send("?repo=acme/elsewhere")).status).toBe(404);
+
+    // No credential, no answer about which repos are served; and a body's own `repo` never picks one.
+    const call = (query: string, auth: string, extra: object = {}) => {
+      const req = new Request(`http://plane/a2a${query}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: auth },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tasks/get", params: { id: "1" }, ...extra }),
+      });
+      return route.handler(req, new URL(req.url), new URL(req.url).pathname.match(route.pattern)!);
+    };
+    expect((await call(`?repo=${B}`, "Bearer wrong")).status).toBe(401);
+    expect((await call("?repo=acme/elsewhere", "Bearer wrong")).status).toBe(401);
+    expect((await call("?repo=acme/elsewhere", "Bearer tok")).status).toBe(404);
+    const before = (await tracker.listOpenIssues(B)).length;
+    const message = { parts: [{ kind: "text", text: "Body" }] };
+    await call("", "Bearer tok", { repo: B, method: "message/send", params: { message } });
+    expect((await tracker.listOpenIssues(B)).length).toBe(before);
+  });
+
+  test("the AG-UI stream reads the named repo's events and only if the caller may see it", async () => {
+    const mk = (visible: string[]) => {
+      const { routes } = integrationRoutes({
+        stateFor: (r) => ({ busEvents: () => (r === B ? [] : [{ id: "x" } as never]) }),
+        tracker: new MemoryTracker(),
+        repo: A,
+        served: () => [A, B],
+        env: { [AGUI_ENV.on]: "1" },
+        links: () => new LinkStore(":memory:"),
+        store: { roleOf: () => null },
+        access: {
+          repoOf: (req) => req.headers.get("x-test-repo") ?? "",
+          visibleRepos: (_req, repos) => repos.filter((r) => visible.includes(r)),
+        },
+      });
+      return routes.find((r) => r.label === "GET /api/agui/:n")!;
+    };
+    const get = (route: ReturnType<typeof mk>, repo: string) => {
+      const req = new Request("http://plane/api/agui/6", { headers: { "x-test-repo": repo } });
+      return route.handler(req, new URL(req.url), new URL(req.url).pathname.match(route.pattern)!);
+    };
+    expect((await get(mk([A]), B)).status).toBe(404);
+    expect((await get(mk([A, B]), B)).status).toBe(200);
+    expect((await get(mk([B]), "")).status).toBe(404);
   });
 
   test("the savings baseline resolves per repo", async () => {
