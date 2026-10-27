@@ -45,7 +45,8 @@ export function backupConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Backu
     accessKeyId: pick("ACCESS_KEY_ID"),
     secretAccessKey: pick("SECRET_ACCESS_KEY"),
     region: pick("REGION") ?? "auto",
-    keepDays: env.FACTORY_BACKUP_KEEP_DAYS && Number.isFinite(keepDays) && keepDays >= 0 ? keepDays : 14,
+    // 0 would put the cutoff at the prune call, so `backup now` would delete the backup it just wrote.
+    keepDays: env.FACTORY_BACKUP_KEEP_DAYS && Number.isFinite(keepDays) && keepDays >= 1 ? keepDays : 14,
   };
 }
 
@@ -96,6 +97,8 @@ export async function backupOnce(
   home: string = factoryHome(),
   now: Date = new Date(),
 ): Promise<{ id: string; files: BackupFile[] }> {
+  // An empty backup would still count as a restore point and let prune age out the real ones.
+  if (!sources.length) throw new Error(`no state databases under ${home}; is FACTORY_HOME right?`);
   const client = backupClient(config);
   const id = stampOf(now);
   const scratch = await mkdtemp(join(tmpdir(), "factory-backup-"));

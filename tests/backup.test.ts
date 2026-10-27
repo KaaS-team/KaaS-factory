@@ -84,6 +84,9 @@ describe("backup", () => {
       region: "us",
       keepDays: 3,
     });
+    // KEEP_DAYS=0 would let `backup now` prune the backup it just wrote.
+    for (const bad of ["0", "-1", "abc"])
+      expect(backupConfigFromEnv({ FACTORY_BACKUP_BUCKET: "bak", FACTORY_BACKUP_KEEP_DAYS: bad })?.keepDays).toBe(14);
   });
 
   test("backupSources finds the shared DB and each repo's DB", () => {
@@ -143,6 +146,16 @@ describe("backup", () => {
     const { server, objects } = fakeS3();
     try {
       await expect(backupOnce(configFor(server.port!), [path], home)).rejects.toThrow();
+      expect(objects.size).toBe(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("no sources is an error and uploads nothing", async () => {
+    const { server, objects } = fakeS3();
+    try {
+      await expect(backupOnce(configFor(server.port!), [], tmp())).rejects.toThrow("no state databases");
       expect(objects.size).toBe(0);
     } finally {
       server.stop(true);
