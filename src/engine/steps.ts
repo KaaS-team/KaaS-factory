@@ -10,6 +10,7 @@ import { runHoldout } from "../holdout";
 import {
   acceptanceProven,
   hiddenPaths,
+  planAcceptance,
   renderAcceptanceTable,
   renderPlanAcceptance,
   runAcceptance,
@@ -352,11 +353,13 @@ const verify: StepType = {
     );
     deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : "");
     // Like a failing holdout, an unproven criterion is the build's to fix, not the verifier's to judge.
-    if (acceptance && !acceptanceProven(acceptance)) {
-      const table = renderAcceptanceTable(acceptance);
+    const ownAcceptance =
+      acceptance && planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json"));
+    if (ownAcceptance && !acceptanceProven(ownAcceptance)) {
+      const table = renderAcceptanceTable(ownAcceptance);
       ctx.rejectRound += 1;
       ctx.failure = failureTail(table);
-      await postComment(deps, config, issueNumber, table, { stage: "verify", json: { acceptance } });
+      await postComment(deps, config, issueNumber, table, { stage: "verify", json: { acceptance: ownAcceptance } });
       if (ctx.rejectRound > maxRejects) {
         await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
         await runRetro(deps, config, issue, "gave-up");

@@ -865,5 +865,6 @@
   {"name": "import-plan: a path outside the worktree is read", "file": "src/engine/import-plan-step.ts", "find": "rel.startsWith(\"..\") || ", "replace": "", "test": "tests/import-plan-step.test.ts"},
   {"name": "git: commits are not signed off", "file": "src/git.ts", "find": "[\"commit\", \"-s\", \"-m\", message]", "replace": "[\"commit\", \"-m\", message]", "test": "tests/git.test.ts"},
   {"name": "operator merge: codeowner refusals dropped", "file": "src/merge-policy.ts", "find": "  if (owners) {\n    refusals.push(", "replace": "  if (false as boolean && owners) {\n    refusals.push(", "test": "tests/merge-policy-operator.test.ts"},
-  {"name": "operator merge: CODEOWNERS read at the PR head, not the base", "file": "src/profile-rules.ts", "find": "const text = await read(repo, at, baseRef);", "replace": "const text = await read(repo, at, \"HEAD\");", "test": "tests/profile-rules.test.ts"}
+  {"name": "operator merge: CODEOWNERS read at the PR head, not the base", "file": "src/profile-rules.ts", "find": "const text = await read(repo, at, baseRef);", "replace": "const text = await read(repo, at, \"HEAD\");", "test": "tests/profile-rules.test.ts"},
+  {"name": "acceptance: verify lists only the plan's criteria", "file": "src/engine/steps.ts", "find": "planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, \"plan.json\"))", "replace": "acceptance", "test": "tests/acceptance-table.test.ts"}
 ]
