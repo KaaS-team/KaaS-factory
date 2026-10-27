@@ -351,7 +351,10 @@ export class FakeGit extends Git {
     return this.head;
   }
 
+  remoteHeadError: string | undefined;
+
   override async remoteHeadSha(): Promise<string | undefined> {
+    if (this.remoteHeadError) throw new Error(this.remoteHeadError);
     return this.remoteHead;
   }
 
