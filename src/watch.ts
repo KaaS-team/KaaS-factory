@@ -23,6 +23,7 @@ import { decideMerge, mergePolicyMarker } from "./merge-policy";
 import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
+import { holdForOverlap, overlapsOf, plannedFiles } from "./overlap";
 import type { GhComment, GhIssue } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
 import { canServe, effectiveSlots, machineBeat } from "./machine";
@@ -282,6 +283,12 @@ export async function resumeAwaitingApproval(
   if (command.type === "cancel") return cancelRun(issue, deps, config);
   if (!edge) return "waiting";
   const resumeAt = async (stepId: string): Promise<Outcome> => {
+    if (
+      command.type === "approve" &&
+      workflowOf(deps, issue).steps[stepId]?.uses === "build" &&
+      (await holdForOverlap(deps, config, issue.number, plannedFiles(issue), LABEL.awaitingApproval))
+    )
+      return "awaiting-approval";
     if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval)))
       return "needs-human";
     if (command.type === "revise" && reply) await writeRevision(worktree, issue, reply, command.text);
@@ -299,6 +306,23 @@ export async function resumeAwaitingApproval(
   if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
   // A plain reply that is not a command: nothing to do yet.
   return "waiting";
+}
+
+// A plan held for an overlap goes on to build, with no further comment, the poll the earlier issues leave flight.
+export async function resumeOverlap(
+  issue: GhIssue,
+  deps: WatchDeps,
+  config: FactoryConfig,
+): Promise<Outcome | undefined> {
+  const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
+  if (latest && parseChatOps(latest.body).type === "cancel") return cancelRun(issue, deps, config);
+  if ((await overlapsOf(deps, config, issue.number, plannedFiles(issue))).length > 0) return "waiting";
+  const build = Object.values(workflowOf(deps, issue).steps).find((s) => s.uses === "build");
+  if (!build) return "waiting";
+  const worktree = worktreeFor(deps, issue.number);
+  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.overlap))) return "needs-human";
+  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.overlap], build.label);
+  return runFromStage(deps, config, issue, build.id, worktree, ctxFrom(deps, issue));
 }
 
 // `/factory retry` on a `failed` or `needs-human` issue (audit finding #18): resumes from whichever stage last
@@ -533,6 +557,7 @@ async function advanceListed(deps: WatchDeps, config: FactoryConfig, listed: GhI
     return "shipped";
   if (names.includes(LABEL.needsInfo)) return (await resumeNeedsInfo(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.awaitingApproval)) return (await resumeAwaitingApproval(issue, deps, config)) ?? "waiting";
+  if (names.includes(LABEL.overlap)) return (await resumeOverlap(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.failed) || names.includes(LABEL.needsHuman))
     return (await resumeParked(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.inReview)) return (await resumeInReview(issue, deps, config)) ?? "waiting";
@@ -588,22 +613,24 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // A minion runs for minutes: started here, never awaited by the poll.
   for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date()))
     startMinion(deps, config, minion);
-  const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
-    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
-    deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
-    deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
-    deps.github.listIssuesByLabel(config.repo, LABEL.failed),
-    deps.github.listIssuesByLabel(config.repo, LABEL.needsHuman),
-    deps.github.listIssuesByLabel(config.repo, LABEL.inReview),
-    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
-  ]);
+  const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw, overlapped] =
+    await Promise.all([
+      intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
+      deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
+      deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
+      deps.github.listIssuesByLabel(config.repo, LABEL.failed),
+      deps.github.listIssuesByLabel(config.repo, LABEL.needsHuman),
+      deps.github.listIssuesByLabel(config.repo, LABEL.inReview),
+      intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
+      deps.github.listIssuesByLabel(config.repo, LABEL.overlap),
+    ]);
 
   // The dependency gate (blockers.ts), once per poll before any dispatch: a ready issue with an open
   // "Blocked by" moves to LABEL.blocked, and back to ready the poll its last blocker clears.
   const { clear } = await resolveBlockers(deps.github, config.repo, readyRaw, blockedRaw);
   // Per-team and org caps hold back new pickups while work waits on people (src/org-caps.ts).
   const ready = admitReady(clear, [...awaitingApproval, ...inReview], capsFor(config));
-  const buckets = [ready, needsInfo, awaitingApproval, failed, needsHuman, inReview];
+  const buckets = [ready, needsInfo, awaitingApproval, overlapped, failed, needsHuman, inReview];
 
   const seen = new Set<number>();
   const candidates = buckets
