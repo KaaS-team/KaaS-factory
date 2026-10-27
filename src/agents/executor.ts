@@ -110,7 +110,7 @@ export function resolveAgent(
   return resolveRoute(agents, stages, undefined, stage, undefined);
 }
 
-function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, stage: string): ResolvedAgent {
+export function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, stage: string): ResolvedAgent {
   const config = agents[name];
   if (!config) throw new Error(`stage ${stage} uses agent "${name}", which is not in config.agents`);
   const preset = config.preset ? PRESETS[config.preset] : undefined;
@@ -163,7 +163,7 @@ export class CommandExecutor implements Executor {
     const route = (s: StageRunOptions["stage"]) =>
       withTier(resolveRoute(this.agents, this.stages, this.routes, s, opts.type), opts);
     const agent = opts.agent
-      ? resolveAgentByName(this.agents, opts.agent, opts.stage)
+      ? withTier(resolveAgentByName(this.agents, opts.agent, opts.stage), { model: opts.model })
       : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined, opts.reviewer);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
