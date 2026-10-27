@@ -12,4 +12,7 @@ else
   echo "factory: no GH_TOKEN/GITHUB_TOKEN set — gh operations will fail until one is provided" >&2
 fi
 
+if [[ -f ./ee/register.ts && "${FACTORY_EE:-}" != "0" ]]; then
+  exec bun --preload ./ee/register.ts bin/factory "$@"
+fi
 exec bun bin/factory "$@"
