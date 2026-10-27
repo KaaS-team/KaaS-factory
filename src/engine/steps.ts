@@ -23,6 +23,7 @@ import {
   readStageArtifacts,
   runDir,
   type BuildArtifact,
+  type PlanArtifact,
   type TriageArtifact,
   type VerdictArtifact,
 } from "../artifacts";
