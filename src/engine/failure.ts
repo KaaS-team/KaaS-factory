@@ -95,7 +95,7 @@ export async function failStage(
   finish(deps, config, issue.number, "failed", line);
   await postComment(deps, config, issue.number, `Failed: ${visible}\n\n\`/factory retry\` runs it again.`, {
     stage: FAILURE,
-    json: { fingerprint, inputs: inputsOf(deps, config, issue) },
+    json: { fingerprint, inputs: inputsOf(deps, config, issue), stage },
   });
   return "failed";
 }

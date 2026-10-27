@@ -322,15 +322,14 @@ export async function resumeParked(
   if (await refuseRepeat(deps, config, issue, command.force === true)) return "waiting";
 
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
+  // `/factory retry <step>` overrides the derived stage; a name the workflow lacks is ignored.
+  const resumeAt =
+    command.step && Object.hasOwn(workflowOf(deps, issue).steps, command.step) ? command.step : derived.resumeStage;
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
-  await deps.github.commentIssue(
-    config.repo,
-    issue.number,
-    `Retrying from ${derived.resumeStage}.\n\n<!-- factory:retry v1 -->`,
-  );
-  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, issue, derived.resumeStage));
-  return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
+  await deps.github.commentIssue(config.repo, issue.number, `Retrying from ${resumeAt}.\n\n<!-- factory:retry v1 -->`);
+  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, issue, resumeAt));
+  return runFromStage(deps, config, issue, resumeAt, worktree, {
     rejectRound: derived.rejectRounds,
     questionRound: 0, // a human asked for a retry; give it a fresh round of questions if needed
   });
