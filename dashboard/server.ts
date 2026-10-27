@@ -24,6 +24,7 @@ import { liveItems, proofView } from "./run-page";
 import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
+import { codeownersFromBase, rulesFor } from "../src/profile-rules";
 import { analytics } from "./analytics";
 import { HEALTH_ROUTE, healthRoute } from "./health";
 import { agentsProbe, type DashboardProject, projectResolver } from "./project";
@@ -383,7 +384,22 @@ export function createDashboard(
           github.mergeReadiness(r, pr.number),
           ciStatusNow(github, r, pr.number),
         ]);
-        const decision = decideOperatorMerge(readiness, ci);
+        let owners: Parameters<typeof decideOperatorMerge>[2];
+        if (rulesFor((await projectFor(r))?.config.profile).codeownerApproval) {
+          const files = await github.prFiles?.(r, pr.number).catch(() => undefined);
+          let rules: Awaited<ReturnType<typeof codeownersFromBase>>;
+          try {
+            rules = await codeownersFromBase(github, r, readiness.baseRefName);
+          } catch {
+            return json({ error: "CODEOWNERS could not be read, so the merge is held" }, { status: 502 });
+          }
+          owners = {
+            rules,
+            files,
+            approvedBy: readiness.approvedBy ?? [],
+          };
+        }
+        const decision = decideOperatorMerge(readiness, ci, owners);
         const merged = await attemptMerge(github, r, pr.number, decision);
         await github.commentIssue(r, issueNumber, renderOperatorAuditComment(decision));
         // The dashboard has no Executor to run retro itself (plan v2.10.0 item

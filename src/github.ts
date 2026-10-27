@@ -39,8 +39,10 @@ import type {
   ScmPort,
   TrackerPort,
   CodeHostPort,
+  PrFile,
 } from "./ports/scm";
 export type {
+  PrFile,
   GhIssue,
   GhComment,
   CreatePrOptions,
@@ -445,6 +447,38 @@ export class GitHub implements TrackerPort, CodeHostPort {
   // wrong commit. Never --admin: a branch-protection block is respected.
   async mergePr(repo: string, number: number, headSha: string): Promise<void> {
     await this.exec(["pr", "merge", String(number), "--repo", repo, "--squash", "--match-head-commit", headSha]);
+  }
+
+  async prFiles(repo: string, prNumber: number): Promise<PrFile[]> {
+    const result = await this.exec([
+      "api",
+      "--paginate",
+      `repos/${repo}/pulls/${prNumber}/files`,
+      "--jq",
+      ".[] | ({path: .filename, additions: .additions, deletions: .deletions}, if .previous_filename then {path: .previous_filename, additions: 0, deletions: 0} else empty end) | tojson",
+    ]);
+    const files = result.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as PrFile);
+    // The files API stops at 3000, so a list that long may be missing owned paths: no answer.
+    if (files.length >= 3000) throw new Error(`PR #${prNumber} lists ${files.length}+ files; the list may be cut off`);
+    return files;
+  }
+
+  // The file's text at `ref`, or undefined on a 404. Any other failure throws.
+  async fileAtRef(repo: string, path: string, ref: string): Promise<string | undefined> {
+    const result = await this.runner.run([
+      "api",
+      "-H",
+      "Accept: application/vnd.github.raw+json",
+      `repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+    ]);
+    // A 404 for a bad ref says "No commit found"; that is no answer, not an absent file.
+    if (result.code !== 0 && /HTTP 404/.test(result.stderr) && !/No commit found/i.test(result.stderr))
+      return undefined;
+    if (result.code !== 0) throw new GhError(["api", "contents"], result);
+    return result.stdout;
   }
 
   async listLabels(repo: string): Promise<string[]> {

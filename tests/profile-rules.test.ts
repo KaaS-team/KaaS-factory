@@ -8,7 +8,59 @@ import { join } from "node:path";
 import { configProblems, mergeConfig } from "../src/config";
 import { GitHub } from "../src/github";
 import { decideMerge } from "../src/merge-policy";
-import { capsFor, codeownerCheck, ownersOf, parseCodeowners } from "../src/profile-rules";
+import { capsFor, codeownerCheck, codeownersFromBase, ownersOf, parseCodeowners } from "../src/profile-rules";
+
+describe("codeowners from the base ref", () => {
+  test("reads CODEOWNERS at the base ref", async () => {
+    const urls: string[] = [];
+    const gh = new GitHub({
+      run: async (args: string[]) => {
+        const url = args.find((a) => a.startsWith("repos/")) ?? "";
+        urls.push(url);
+        if (url.includes("/.github/CODEOWNERS?")) return { code: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
+        return { code: 0, stdout: "*.sql @dba\n", stderr: "" };
+      },
+    });
+    const rules = await codeownersFromBase(gh, "o/r", "main");
+    expect(ownersOf(rules, "db/1.sql")).toEqual(["@dba"]);
+    expect(urls).toEqual(["repos/o/r/contents/.github/CODEOWNERS?ref=main", "repos/o/r/contents/CODEOWNERS?ref=main"]);
+    const none = new GitHub({ run: async () => ({ code: 1, stdout: "", stderr: "HTTP 404" }) });
+    expect(await codeownersFromBase(none, "o/r", "main")).toEqual([]);
+    await expect(codeownersFromBase({}, "o/r", "main")).rejects.toThrow("cannot read files");
+  });
+});
+
+describe("prFiles and fileAtRef fail closed", () => {
+  const ghWith = (stdout: string, code = 0, stderr = "") => new GitHub({ run: async () => ({ code, stdout, stderr }) });
+
+  test("a rename lists its previous path too", async () => {
+    const jq = `{"path":"new/1.sql","additions":1,"deletions":0}\n{"path":"db/1.sql","additions":0,"deletions":0}\n`;
+    const files = await ghWith(jq).prFiles("o/r", 1);
+    expect(files.map((f) => f.path)).toEqual(["new/1.sql", "db/1.sql"]);
+    let jqArg = "";
+    const gh = new GitHub({
+      run: async (args: string[]) => {
+        jqArg = args[args.indexOf("--jq") + 1] ?? "";
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    });
+    await gh.prFiles("o/r", 1);
+    expect(jqArg).toContain("previous_filename");
+  });
+
+  test("a list at the API's 3000 cap throws", async () => {
+    const line = `{"path":"a","additions":1,"deletions":0}\n`;
+    await expect(ghWith(line.repeat(3000)).prFiles("o/r", 1)).rejects.toThrow("cut off");
+    expect(await ghWith(line.repeat(2999)).prFiles("o/r", 1)).toHaveLength(2999);
+  });
+
+  test("a 404 for a missing ref is not an absent file", async () => {
+    const notFound = ghWith("", 1, "gh: Not Found (HTTP 404)");
+    expect(await notFound.fileAtRef("o/r", "CODEOWNERS", "main")).toBeUndefined();
+    const badRef = ghWith("", 1, "gh: No commit found for the ref nope (HTTP 404)");
+    await expect(badRef.fileAtRef("o/r", "CODEOWNERS", "nope")).rejects.toThrow();
+  });
+});
 
 const readiness = {
   state: "open" as const,
