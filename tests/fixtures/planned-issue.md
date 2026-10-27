@@ -25,8 +25,8 @@ Model: sonnet
 ```
 
 ## Acceptance
-- AC-1: a build failure resumes at build: checked by `bun test tests/resume.test.ts` (T1)
-- AC-2: retry overrides the stage: checked by `bun test tests/resume.test.ts` (T2)
+- AC-1: a build failure resumes at build: checked by `tests/resume.test.ts` (T1)
+- AC-2: retry overrides the stage: checked by `tests/resume.test.ts` (T2)
 
 ## Non-goals
 - NG-1: no change to the dashboard.

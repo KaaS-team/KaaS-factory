@@ -6,6 +6,7 @@ import { LABEL } from "../labels";
 import { callMcpTool } from "../mcp-call";
 import { ShellSetupRunner } from "../setup";
 import { finish, moveLabel, postComment } from "./common";
+import { importPlanStep } from "./import-plan-step";
 import { STEP_TYPES, type StepCtx, type StepResult, type StepType } from "./steps";
 
 const stop = (outcome: "failed" | "shipped"): StepResult => ({ kind: "stop", outcome });
@@ -92,4 +93,10 @@ const check: StepType = {
   },
 };
 
-export const ALL_STEP_TYPES: Readonly<Record<string, StepType>> = { ...STEP_TYPES, check, tool, report };
+export const ALL_STEP_TYPES: Readonly<Record<string, StepType>> = {
+  ...STEP_TYPES,
+  check,
+  tool,
+  report,
+  "import-plan": importPlanStep,
+};

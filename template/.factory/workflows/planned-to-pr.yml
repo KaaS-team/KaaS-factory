@@ -1,0 +1,30 @@
+# An issue whose body is a planned issue (it starts with <!-- factory:planned v1 -->) carries its own
+# plan, written and approved before it was filed. import-plan checks that plan and takes the plan
+# stage's place, so nothing is planned again: triage -> import-plan -> build -> verify -> pr.
+# watch.ts picks this workflow for such a body; no routes entry is needed.
+name: planned-to-pr
+limits:
+  questions: 2
+  rejects: 2
+steps:
+  triage:
+    uses: triage
+    label: factory:triaging
+    next: import-plan
+  import-plan:
+    uses: import-plan
+    label: factory:planning
+    next: build
+  build:
+    uses: build
+    label: factory:building
+    next: verify
+  verify:
+    uses: verify
+    label: factory:verifying
+    next: pr
+    reject: build
+  pr:
+    uses: pr
+    label: factory:in-review
+    revise: build
