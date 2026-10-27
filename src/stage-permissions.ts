@@ -155,3 +155,9 @@ const covers = (rule: string, part: string): boolean => {
 export function uncoveredPart(command: string, allow: readonly string[]): string | undefined {
   return commandParts(command).find((part) => !allow.some((rule) => covers(rule, part)));
 }
+
+// Whether one plain command (no &&, ; or |) matches a `Bash(...)` rule; the plan critic and the
+// skill-command test read the rules through this.
+export function bashAllowed(rules: readonly string[], cmd: string): boolean {
+  return rules.some((rule) => covers(rule, cmd));
+}

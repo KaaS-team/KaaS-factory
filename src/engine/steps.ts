@@ -22,7 +22,6 @@ import {
   readStageArtifacts,
   runDir,
   type BuildArtifact,
-  type PlanArtifact,
   type TriageArtifact,
 } from "../artifacts";
 import { isChecked } from "../recheck";
@@ -45,7 +44,8 @@ import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workf
 import { emitEvent } from "./bus";
 import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
-import { flooredPlan, proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
+import { checkedPlan } from "./plan-critic";
+import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
 import {
   failureTail,
   finish,
@@ -146,9 +146,9 @@ const plan: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
-    const result = await runStage(deps, config, issue, "plan", worktree, stepOpts(step));
-    const art = await readStageArtifacts(worktree, issueNumber, "plan");
-    const { json, problem } = flooredPlan(stageJson<PlanArtifact>("plan", art.json), config);
+    const art = await checkedPlan(deps, config, issue, worktree, stepOpts(step));
+    const { result, parsed } = art;
+    const { json, problem } = parsed;
     // A plan stage that crashes (or writes nothing) used to fall through
     // to "not eligible" and park as awaiting-approval with no plan comment
     // to approve against — stuck forever (audit finding #10).
