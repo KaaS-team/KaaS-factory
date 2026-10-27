@@ -20,6 +20,12 @@ import { configMirrorDir, defaultStatePath } from "../src/paths";
 import { cloneDirFor } from "../src/repo";
 import { FactoryState } from "../src/state";
 import { SLACK_ENV } from "../src/integrations/slack";
+import { A2A_ENV } from "../src/integrations/a2a";
+import { LinkStore } from "../src/integrations/links";
+import { EVENT_SIGNATURE_HEADER, signEvent } from "../src/core/event";
+import { costFor } from "../src/pricing";
+import { A2A_ROUTE, integrationRoutes } from "../dashboard/plane/integrations";
+import { MemoryTracker } from "./fixtures/tracker-server";
 import { signatureOf, WEBHOOK_SECRET_ENV } from "../src/webhook";
 
 const A = "acme/a";
@@ -532,5 +538,130 @@ describe("one repo resolver", () => {
       "src/paths.ts",
       "src/remote-cli.ts",
     ]);
+  });
+});
+
+describe("integrations, events and analytics act on the repo a request is for", () => {
+  const EVENTS_ENV = "FACTORY_EVENTS_SECRET";
+  const stage = (repo: string, issue: number) => ({
+    repo,
+    issue,
+    stage: "build" as const,
+    agent: "claude",
+    model: "claude-haiku-5-5",
+    started_at: "2026-10-26T00:00:00Z",
+    finished_at: "2026-10-26T00:01:00Z",
+    duration_ms: 60_000,
+    tool_calls: 1,
+    tokens_in: 1_000_000,
+    tokens_out: 100_000,
+    cost_usd: 0.5,
+    exit_code: 0,
+    killed_reason: null,
+  });
+
+  test("an event records in the repo it names", async () => {
+    const before = process.env[EVENTS_ENV];
+    process.env[EVENTS_ENV] = "events-secret";
+    try {
+      const { dashboard } = plane(states[A], A);
+      const post = (data: Record<string, unknown>, id: string) => {
+        const raw = JSON.stringify({
+          specversion: "1.0",
+          id,
+          source: "wiki",
+          type: "wiki.page.updated",
+          time: "2026-10-26T00:00:00Z",
+          data,
+        });
+        return dashboard.handle(
+          new Request(`${BASE}/events`, {
+            method: "POST",
+            headers: { "content-type": "application/json", [EVENT_SIGNATURE_HEADER]: signEvent("events-secret", raw) },
+            body: raw,
+          }),
+          "127.0.0.1",
+        );
+      };
+      expect((await post({ repo: B }, "ev-b")).status).toBe(201);
+      expect((await post({}, "ev-default")).status).toBe(201);
+      expect((await post({ repo: "acme/elsewhere" }, "ev-none")).status).toBe(404);
+      expect(states[B]!.busEvents().map((e) => e.id)).toEqual(["ev-b"]);
+      expect(states[A]!.busEvents().map((e) => e.id)).toEqual(["ev-default"]);
+    } finally {
+      if (before === undefined) delete process.env[EVENTS_ENV];
+      else process.env[EVENTS_ENV] = before;
+    }
+  });
+
+  test("an integration honours ?repo= and refuses an unserved one", async () => {
+    const tracker = new MemoryTracker();
+    const { routes } = integrationRoutes({
+      state: { busEvents: () => [] },
+      tracker,
+      repo: A,
+      served: () => [A, B],
+      env: { [A2A_ENV.token]: "tok" },
+      links: () => new LinkStore(":memory:"),
+      store: { roleOf: () => null },
+    });
+    const route = routes.find((r) => r.label === A2A_ROUTE)!;
+    const send = async (query: string) => {
+      const req = new Request(`http://plane/a2a${query}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer tok" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "message/send",
+          params: { message: { parts: [{ kind: "text", text: "Fix the cart" }] } },
+        }),
+      });
+      return route.handler(req, new URL(req.url), new URL(req.url).pathname.match(route.pattern)!);
+    };
+    const task = async (query: string) => ((await (await send(query)).json()) as { result: { id: string } }).result.id;
+    const inB = await task(`?repo=${B}`);
+    const inA = await task("");
+    expect((await tracker.getIssue(B, Number(inB))).title).toContain("Fix the cart");
+    expect((await tracker.getIssue(A, Number(inA))).title).toContain("Fix the cart");
+    expect((await send("?repo=acme/elsewhere")).status).toBe(404);
+  });
+
+  test("the savings baseline resolves per repo", async () => {
+    const usage = { tokensIn: 1_000_000, tokensOut: 100_000, tokensCached: 0 };
+    const cheap = costFor("claude-haiku-5-5", usage)!;
+    const dear = costFor("claude-opus-5-5", usage)!;
+    expect(cheap).not.toBe(dear);
+
+    const cloneB = cloneDirFor(B, process.env);
+    cloneOf(B, "price", { agents: { claude: { preset: "claude", model: "claude-opus-5-5" } } }, cloneB);
+    const project: DashboardProject = {
+      cloneDir: join(home, "unused"),
+      config: mergeConfig({ repo: A, agents: { claude: { preset: "claude", model: "claude-haiku-5-5" } } }),
+      machine: { slots: 1, runtimes: {} } as never,
+      leases: async () => [],
+    };
+    try {
+      states[A]!.recordStageRun(stage(A, 1));
+      states[B]!.recordStageRun(stage(B, 1));
+      const probes = { which: () => null, versionOf: async () => null };
+      const dash = createDashboard(
+        states[A]!,
+        fakeGitHub() as never,
+        A,
+        false,
+        join(home, "ws"),
+        undefined,
+        probes as never,
+        project,
+      );
+      const body = (await (await dash.handle(request("GET /api/analytics"), "127.0.0.1")).json()) as {
+        savings: { runs: number; baselineUsd: number };
+      };
+      expect(body.savings.runs).toBe(2);
+      expect(body.savings.baselineUsd).toBeCloseTo(cheap + dear, 6);
+    } finally {
+      rmSync(cloneB, { recursive: true, force: true });
+    }
   });
 });

@@ -45,17 +45,19 @@ import {
   WEBHOOK_MAX_BYTES,
   WEBHOOK_SECRET_ENV,
 } from "../src/webhook";
-import { EVENT_SIGNATURE_HEADER, isExternalEventType, parseEvent, verifyEvent } from "../src/core/event";
-import { INTEGRATION_PUBLIC_ROUTES, integrationRoutes, type Secrets } from "./plane/integrations";
+import {
+  EVENTS_ROUTE,
+  eventsRoute,
+  INTEGRATION_PUBLIC_ROUTES,
+  integrationRoutes,
+  type Secrets,
+} from "./plane/integrations";
 
 // GitHub cannot hold a dashboard token, so this route authenticates by HMAC
 // instead (src/webhook.ts), and is the one public route reachable from off
 // the box once FACTORY_WEBHOOK_SECRET is set.
 const WEBHOOK_ROUTE = "POST /webhook/github";
 const webhookSecret = () => process.env[WEBHOOK_SECRET_ENV] ?? "";
-// Other KaaS apps POST CloudEvents here, signed with x-kaas-signature (docs/events.md).
-// Public for the same reason: it authenticates by HMAC, and is off until the secret is set.
-const EVENTS_ROUTE = "POST /events";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FACTORY_DASHBOARD_PORT ?? 4100);
@@ -139,7 +141,16 @@ export function createDashboard(
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
   // Read by name on every request; the value is never logged or returned.
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
-  const integrations = integrationRoutes({ state, tracker: github, repo, project, store: access.store });
+  const eventsSecretFor = async (r: string) =>
+    process.env[eventsInboundSecretEnv((r === repo ? project : await projectFor(r))?.config)] ?? "";
+  const integrations = integrationRoutes({
+    state,
+    tracker: github,
+    repo,
+    served: () => inboxRepos(),
+    project,
+    store: access.store,
+  });
   const signed: Secrets = { ...integrations.secrets, [WEBHOOK_ROUTE]: webhookSecret, [EVENTS_ROUTE]: eventsSecret };
   const projectFor = projectResolver(repo, project);
   const agents = agentsProbe(probes);
@@ -267,44 +278,13 @@ export function createDashboard(
         return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
       },
     },
-    {
-      method: "POST",
-      pattern: /^\/events$/,
-      label: EVENTS_ROUTE,
-      handler: async (req) => {
-        const secret = eventsSecret();
-        if (!secret) return json({ error: "not found" }, { status: 404 });
-        if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES)
-          return json({ error: "too large" }, { status: 413 });
-        const bytes = await readCapped(req.body, WEBHOOK_MAX_BYTES);
-        if (!bytes) return json({ error: "too large" }, { status: 413 });
-        const body = new TextDecoder().decode(bytes);
-        if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER)))
-          return json({ error: "bad signature" }, { status: 401 });
-        let raw: unknown;
-        try {
-          raw = JSON.parse(body);
-        } catch {
-          return json({ error: "body is not JSON" }, { status: 400 });
-        }
-        const parsed = parseEvent(raw);
-        if (!parsed.ok) return json({ error: parsed.problem }, { status: 400 });
-        const e = parsed.event;
-        if (!isExternalEventType(e.type)) return json({ ok: true, ignored: true }, { status: 202 });
-        // Deduped on id: a sender's retry of an event already stored is acknowledged, not re-run.
-        const fresh = state.recordBusEvent({
-          id: e.id,
-          direction: "in",
-          type: e.type,
-          source: e.source,
-          subject: e.subject ?? null,
-          time: e.time,
-          data: JSON.stringify(e.data),
-          handled_at: null,
-        });
-        return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
-      },
-    },
+    eventsRoute({
+      repo,
+      served: inboxRepos,
+      secretFor: eventsSecretFor,
+      defaultSecret: eventsSecret,
+      stateFor: (r) => stateFor(r, true)!,
+    }),
     {
       method: "GET",
       pattern: /^\/api\/runs$/,
@@ -524,13 +504,17 @@ export function createDashboard(
       label: "GET /api/analytics",
       role: "viewer",
       repo: "filter",
-      handler: (req) =>
-        json(
-          analytics(runsOf(req), stagesOf(req), new Date(), (agent) => {
-            const a = project?.config.agents[agent];
+      handler: async (req) => {
+        const configs = new Map(
+          await Promise.all(reposFor(req).map(async (r) => [r, (await projectFor(r))?.config] as const)),
+        );
+        return json(
+          analytics(runsOf(req), stagesOf(req), new Date(), (agent, r) => {
+            const a = configs.get(r)?.agents[agent];
             return a?.models?.large ?? a?.model;
           }),
-        ),
+        );
+      },
     },
     {
       method: "GET",

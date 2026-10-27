@@ -65,7 +65,10 @@ function bucketBy(rows: readonly StageRun[], key: (r: StageRun) => string): Buck
     .sort((a, b) => a.key.localeCompare(b.key));
 }
 
-export function savings(rows: readonly StageRun[], baselineFor: (agent: string) => string | undefined): Savings {
+export function savings(
+  rows: readonly StageRun[],
+  baselineFor: (agent: string, repo: string) => string | undefined,
+): Savings {
   let actualUsd = 0;
   let baselineUsd = 0;
   let runs = 0;
@@ -73,7 +76,7 @@ export function savings(rows: readonly StageRun[], baselineFor: (agent: string) 
     const usage = { tokensIn: r.tokens_in, tokensOut: r.tokens_out, tokensCached: r.tokens_cached };
     // cost_usd is NULL whenever the count was not full, so this one check covers both.
     if (r.cost_usd === null) continue;
-    const base = costFor(baselineFor(r.agent), usage);
+    const base = costFor(baselineFor(r.agent, r.repo), usage);
     if (base === undefined) continue;
     runs++;
     actualUsd += r.cost_usd;
@@ -86,7 +89,7 @@ export function analytics(
   runs: readonly Run[],
   stageRuns: readonly StageRun[],
   now = new Date(),
-  baselineFor: (agent: string) => string | undefined = () => undefined,
+  baselineFor: (agent: string, repo: string) => string | undefined = () => undefined,
 ): Analytics {
   const finished = runs.filter((r) => FINISHED.has(r.status));
   const shipped = runs.filter((r) => r.status === "shipped").length;
