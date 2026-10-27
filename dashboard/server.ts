@@ -407,8 +407,14 @@ export function createDashboard(
         let owners: Parameters<typeof decideOperatorMerge>[2];
         if (rulesFor((await projectFor(r))?.config.profile).codeownerApproval) {
           const files = await github.prFiles?.(r, pr.number).catch(() => undefined);
+          let rules: Awaited<ReturnType<typeof codeownersFromBase>>;
+          try {
+            rules = await codeownersFromBase(github, r, readiness.baseRefName);
+          } catch {
+            return json({ error: "CODEOWNERS could not be read, so the merge is held" }, { status: 502 });
+          }
           owners = {
-            rules: await codeownersFromBase(github, r, readiness.baseRefName),
+            rules,
             files,
             approvedBy: readiness.approvedBy ?? [],
           };
