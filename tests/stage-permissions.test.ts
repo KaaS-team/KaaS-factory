@@ -126,7 +126,7 @@ describe("project plugins stay out of a stage", () => {
 
 describe("STAGE_GUIDANCE", () => {
   test("tells a stage to rewrite a refused test command into make or the gate script", () => {
-    expect(STAGE_GUIDANCE).toContain('make test FILES="tests/x.test.ts"');
+    expect(STAGE_GUIDANCE).toContain('make test FILES="<files>"');
     expect(STAGE_GUIDANCE).toContain(".factory/gates.sh");
   });
 });
