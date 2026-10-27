@@ -313,9 +313,11 @@ export class FakeGit extends Git {
     return this.diffStatOverride ?? this.changed.map((path) => ({ path, additions: 1, deletions: 0 }));
   }
 
+  pushCode = 0;
+  pushStderr = "";
   override async push(_worktreeDir: string, issue: number) {
     this.pushed.push(issue);
-    return { stdout: "", stderr: "", code: 0 };
+    return { stdout: "", stderr: this.pushStderr, code: this.pushCode };
   }
 
   pushedBranches: string[] = [];
@@ -341,8 +343,20 @@ export class FakeGit extends Git {
     return this.diffText;
   }
 
+  head = "abc";
+  remoteHead: string | undefined = "abc";
+  commits = true;
+
+  override async headSha(): Promise<string> {
+    return this.head;
+  }
+
+  override async remoteHeadSha(): Promise<string | undefined> {
+    return this.remoteHead;
+  }
+
   override async hasCommits(): Promise<boolean> {
-    return true;
+    return this.commits;
   }
 
   // Real git would shell out to `git sparse-checkout`; there's no real repo
