@@ -104,8 +104,8 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   },
   {
     name: "learn",
-    usage: "learn (--repo-dir <path> | --repo <owner/name>)",
-    does: "batch pending retro lessons and skill-edit proposals into one factory/learning-<date> PR",
+    usage: "learn (--repo-dir <path> | --repo <owner/name>) [--export <file|-> [--since <date>]]",
+    does: "batch pending retro lessons and skill-edit proposals into one factory/learning-<date> PR; --export writes runs, stages and retros as v1 JSONL instead",
   },
   {
     name: "init",

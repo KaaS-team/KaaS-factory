@@ -51,6 +51,7 @@ import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
+import { runExport } from "./learn-export";
 import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
 import { type CliContext, cmdHarness, cmdTeach } from "./harness-cli";
 import { GitLeases } from "./adapters/git-lease/lease";
@@ -762,12 +763,10 @@ async function cmdVerifyAgent(): Promise<void> {
 async function cmdLearn(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
+  if (has("export")) return runExport(stateDbPath(config.repo), config.repo, flag("export"), flag("since"));
   const deps = await buildWatchDeps(cloneDir, config);
   const result = await runLearn(deps, config.repo, config.base);
-  if (has("json")) {
-    console.log(successJson(result, true));
-    return;
-  }
+  if (has("json")) return console.log(successJson(result, true));
   if (result.batched === 0) {
     console.log("factory learn: nothing pending.");
     return;
