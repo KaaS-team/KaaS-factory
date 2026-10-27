@@ -40,6 +40,12 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       goal: str,
       criteria: { type: "array", items: { type: "object" } },
       spec: str,
+      // Set only when the plan was written in the issue (engine/import-plan.ts), never by the planner.
+      tasks: { type: "array", items: { type: "object" } },
+      mutations: { type: "array", items: { type: "object" } },
+      bodyHash: str,
+      source: { enum: ["issue", "planner"] },
+      model: str,
     },
     build: {
       status: { enum: ["green", "red", "needs-info"] },
