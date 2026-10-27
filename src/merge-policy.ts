@@ -240,9 +240,25 @@ export function mergePolicyMarker(headSha: string): string {
 // it is evaluated fresh, at click time. Readiness refusals (draft, CI,
 // unresolved threads, ...) still apply: a human can approve, but the PR
 // itself must still be mergeable.
-export function decideOperatorMerge(readiness: MergeReadiness, ci: CiResult): MergeDecision {
+export function decideOperatorMerge(
+  readiness: MergeReadiness,
+  ci: CiResult,
+  // A click is no owner approval: approvedBy is what GitHub says. Undefined files fail closed.
+  owners?: {
+    readonly rules: readonly CodeownersRule[];
+    readonly files: readonly ChangedFile[] | undefined;
+    readonly approvedBy: readonly string[];
+  },
+): MergeDecision {
   const headSha = readiness.headRefOid;
   const refusals = checkReadiness(readiness, ci, readiness.baseRefName);
+  if (owners) {
+    refusals.push(
+      ...(owners.files
+        ? codeownerRefusals(owners.rules, owners.files, owners.approvedBy)
+        : [{ reason: "codeowner-approval" as const, detail: "the PR's file list was unavailable" }]),
+    );
+  }
   if (refusals.length > 0) return { outcome: "refuse", headSha, refusals };
   return { outcome: "merge", headSha };
 }

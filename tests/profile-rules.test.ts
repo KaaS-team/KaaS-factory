@@ -8,7 +8,27 @@ import { join } from "node:path";
 import { configProblems, mergeConfig } from "../src/config";
 import { GitHub } from "../src/github";
 import { decideMerge } from "../src/merge-policy";
-import { capsFor, codeownerCheck, ownersOf, parseCodeowners } from "../src/profile-rules";
+import { capsFor, codeownerCheck, codeownersFromBase, ownersOf, parseCodeowners } from "../src/profile-rules";
+
+describe("codeowners from the base ref", () => {
+  test("reads CODEOWNERS at the base ref", async () => {
+    const urls: string[] = [];
+    const gh = new GitHub({
+      run: async (args: string[]) => {
+        const url = args.find((a) => a.startsWith("repos/")) ?? "";
+        urls.push(url);
+        if (url.includes("/.github/CODEOWNERS?")) return { code: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
+        return { code: 0, stdout: "*.sql @dba\n", stderr: "" };
+      },
+    });
+    const rules = await codeownersFromBase(gh, "o/r", "main");
+    expect(ownersOf(rules, "db/1.sql")).toEqual(["@dba"]);
+    expect(urls).toEqual(["repos/o/r/contents/.github/CODEOWNERS?ref=main", "repos/o/r/contents/CODEOWNERS?ref=main"]);
+    const none = new GitHub({ run: async () => ({ code: 1, stdout: "", stderr: "HTTP 404" }) });
+    expect(await codeownersFromBase(none, "o/r", "main")).toEqual([]);
+    await expect(codeownersFromBase({}, "o/r", "main")).rejects.toThrow("cannot read files");
+  });
+});
 
 const readiness = {
   state: "open" as const,

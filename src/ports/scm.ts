@@ -91,6 +91,13 @@ export interface RateBudget {
 export type RepoRole = "admin" | "maintain" | "write" | "triage" | "read" | "none";
 export const TRUSTED_ROLES: readonly RepoRole[] = ["admin", "maintain", "write"];
 
+// One file a PR changes; merge-policy.ts's ChangedFile has the same shape.
+export interface PrFile {
+  readonly path: string;
+  readonly additions: number;
+  readonly deletions: number;
+}
+
 // The issue side: where work is filed, discussed and labelled. GitHub is one
 // tracker; src/adapters/http-tracker.ts speaks Tracker API v1
 // (docs/tracker-api.md) to any other, such as kaas Tasks or a Linear bridge.
@@ -133,6 +140,9 @@ export interface CodeHostPort {
   // The open PR for this issue: by "Closes #n" when the tracker is GitHub, by head branch otherwise.
   prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }): Promise<GhPr | undefined>;
   mergePr(repo: string, number: number, headSha: string): Promise<void>;
+  // Optional: the files a PR changes, and a file's text at a ref (undefined when absent).
+  prFiles?(repo: string, prNumber: number): Promise<PrFile[]>;
+  fileAtRef?(repo: string, path: string, ref: string): Promise<string | undefined>;
   // Optional: a fake has no budget to read, and the plane then keeps its pace.
   rateLimit?(repo: string): Promise<RateBudget>;
   authStatus(): Promise<{ ok: boolean; detail: string }>;

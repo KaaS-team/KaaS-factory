@@ -308,6 +308,40 @@ describe("review and merge routes", () => {
     expect(github.posted[0]!.body).toContain("blocked");
   });
 
+  describe("under a profile that wants code-owner approval", () => {
+    const mergeAs = async (approvedBy: string[]) => {
+      const scaleup = { ...project().config, profile: "scaleup" } as FactoryConfig;
+      const { dashboard, github } = await make("", [waiting(6, LABEL.inReview)], project({ config: scaleup }));
+      const original = github.mergeReadiness.bind(github);
+      github.mergeReadiness = async () => ({ ...(await original()), approvedBy });
+      github.fileAtRef = async (_repo, path, ref) =>
+        path === ".github/CODEOWNERS" && ref === "main" ? "*.sql @dba\n" : undefined;
+      github.prFiles = async () => [{ path: "db/1.sql", additions: 1, deletions: 0 }];
+      const res = await dashboard.handle(
+        new Request("http://localhost:4100/api/issues/6/merge", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}",
+        }),
+        "127.0.0.1",
+      );
+      return { github, body: (await res.json()) as { ok: boolean; decision: { refusals?: { reason: string }[] } } };
+    };
+
+    test("refuses an unapproved owner path", async () => {
+      const { github, body } = await mergeAs([]);
+      expect(body.ok).toBe(false);
+      expect(body.decision.refusals?.map((r) => r.reason)).toContain("codeowner-approval");
+      expect(github.merged).toEqual([]);
+    });
+
+    test("merges when the owner approved on GitHub", async () => {
+      const { github, body } = await mergeAs(["dba"]);
+      expect(body.ok).toBe(true);
+      expect(github.merged).toHaveLength(1);
+    });
+  });
+
   test("the merge route 404s when no open PR closes the issue", async () => {
     const { dashboard } = await make("", []);
     const res = await dashboard.handle(
