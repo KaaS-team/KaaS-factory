@@ -126,9 +126,9 @@ test("the product repo carries no teaching material", () => {
 // them so untracked runner output cannot turn the gate red; check-mutations copies without .git.
 const markdownFiles = (dir: string): string[] => {
   if (existsSync(join(dir, ".git"))) {
-    const out = Bun.spawnSync(["git", "ls-files", "*.md"], { cwd: dir });
+    const out = Bun.spawnSync(["git", "ls-files", "-z", "*.md"], { cwd: dir });
     if (out.exitCode !== 0) throw new Error(`git ls-files failed: ${out.stderr}`);
-    return `${out.stdout}`.split("\n").filter(Boolean);
+    return `${out.stdout}`.split("\0").filter(Boolean);
   }
   const skip =
     /^(node_modules|\.git|\.worktrees|\.factory-state|\.factory\/runs|workspaces|artifacts|reports)\/|\/target\/|\/node_modules\//;
@@ -152,6 +152,19 @@ test("the Markdown list leaves out untracked files and lists tracked ones", () =
     git("add", note);
     expect(markdownFiles(dir)).toEqual([note]);
     expect(checkProse(dir, markdownFiles(dir)).exitCode).not.toBe(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the Markdown list returns a tracked non-ASCII path unquoted", () => {
+  const dir = mkdtempSync(join(tmpdir(), "prose-"));
+  try {
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: dir });
+    git("init", "-q");
+    writeFileSync(join(dir, "café.md"), "x\n");
+    git("add", "café.md");
+    expect(markdownFiles(dir)).toEqual(["café.md"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
