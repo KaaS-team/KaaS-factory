@@ -91,6 +91,14 @@ describe("Git.claim (compare-and-swap)", () => {
     expect(await git.claim(clones[1]!, 7, "main")).toBe(false);
   });
 
+  test("the claim commit is signed off, so a PR's DCO check passes", async () => {
+    const root = tmpRoot();
+    const { clones } = await bareOriginWithClones(root, ["clone-a"]);
+    expect(await new Git(new GitCommandRunner()).claim(clones[0]!, 9, "main")).toBe(true);
+    const body = await run(["git", "log", "-1", "--format=%B", "origin/factory/issue-9"], clones[0]!);
+    expect(body).toMatch(/^Signed-off-by: .+ <.+>$/m);
+  });
+
   test("claiming against a base that doesn't exist on origin fails cleanly", async () => {
     const root = tmpRoot();
     const { clones } = await bareOriginWithClones(root, ["clone-a"]);
@@ -116,6 +124,7 @@ describe("Git.commitAll", () => {
 
     const files = (await run(["git", "show", "--name-only", "--pretty=", "HEAD"], repo)).split("\n").filter(Boolean);
     expect(files).toContain("src/a.ts");
+    expect(await run(["git", "log", "-1", "--format=%B"], repo)).toMatch(/^Signed-off-by: .+ <.+>$/m);
     expect(files).not.toContain(".factory/runs/issue-1/triage.json");
 
     // The runs directory is still on disk for the stage that wrote it — just
