@@ -15,8 +15,7 @@ import {
   type StageRunOptions,
   type StageRunResult,
 } from "../executor";
-import { renderRunSummary } from "../run-summary";
-import { hiddenPaths, renderAcceptanceTable, type AcceptanceVerdict } from "../acceptance";
+import { hiddenPaths } from "../acceptance";
 import type { IssueView } from "../tmux";
 import {
   clearStageArtifacts,
@@ -27,13 +26,13 @@ import {
   type VerdictArtifact,
 } from "../artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
-import { isHumanComment, isTrusted, parseChatOps } from "../chatops";
+import { isTrusted } from "../chatops";
 import { mcpServersFor } from "../mcp";
 import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
 import { type IssueScope, scopeFrom } from "../core/model-tier";
 import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
-import type { ProofGit, ProofStatus } from "../proof";
+import type { ProofGit } from "../proof";
 import type { GhIssue } from "../github";
 import { withLease, type Held, type LeaseOpts } from "./lease";
 import type { LeasePort } from "../ports/lease";
@@ -634,25 +633,4 @@ export async function checkSpendCap(
   if (machineDailyUsd !== undefined && machineToday >= machineDailyUsd)
     return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
   return deps.spendPolicy?.breached(config.repo, startOfTodayUtc());
-}
-// The PR body, then the Acceptance table when the repo has check-acceptance.py, then the signed Receipt,
-// then the "Factory run" summary unless config.prRunSummary is off.
-export function prBody(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issue: GhIssue,
-  body: string,
-  ctx: RunCtx,
-  proof?: ProofStatus,
-  acceptance?: AcceptanceVerdict,
-  receipt?: string,
-): string {
-  // The acceptance table carries no model or spend, so prRunSummary does not hide it; the receipt
-  // drops both itself when prRunSummary is off.
-  if (acceptance) body = `${body}\n\n${renderAcceptanceTable(acceptance)}`;
-  if (receipt) body = `${body}\n\n${receipt}`;
-  if (!config.prRunSummary) return body;
-  const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
-  const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;
-  return `${body}\n\n${renderRunSummary(runs, { rejectRounds: ctx.rejectRound, retries, proof })}`;
 }

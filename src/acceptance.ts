@@ -56,7 +56,11 @@ function proof(row: AcceptanceRow): string {
 }
 
 export function renderAcceptanceTable(v: AcceptanceVerdict): string {
-  const lines = ["## Acceptance", ""];
+  return `## Acceptance\n\n${acceptanceRows(v)}`;
+}
+
+function acceptanceRows(v: AcceptanceVerdict): string {
+  const lines: string[] = [];
   if (v.acs.length) {
     lines.push(
       "| Spec | Criterion | Holdout | Proof | |",
@@ -75,6 +79,45 @@ export function renderAcceptanceTable(v: AcceptanceVerdict): string {
       ? `Not proven: ${failed} of ${v.acs.length} criteria failed, ${v.errors.length} problem(s).`
       : `All ${v.acs.length} criteria proven.`,
   );
+  return lines.join("\n").replace(/^\n/, "");
+}
+
+// The PR body's Acceptance section. The criteria are this issue's own, from its plan.json, each with
+// verify's status for it. The kit checks every spec in the repo, so its rows join only for the one spec
+// plan.json names; an unrelated spec's criteria once filled a PR's table on their own (#90).
+export function renderPlanAcceptance(
+  plan: { readonly criteria?: unknown; readonly spec?: unknown } | undefined,
+  verified: readonly { readonly id: string; readonly status: string }[] | undefined,
+  kit: AcceptanceVerdict | undefined,
+): string {
+  const criteria = Array.isArray(plan?.criteria)
+    ? (plan.criteria as unknown[]).filter(
+        (c): c is { id: string; text: string } =>
+          typeof c === "object" &&
+          c !== null &&
+          typeof (c as { id?: unknown }).id === "string" &&
+          typeof (c as { text?: unknown }).text === "string",
+      )
+    : [];
+  const lines = ["## Acceptance", ""];
+  if (criteria.length) {
+    const status = new Map((verified ?? []).map((c) => [c.id, c.status]));
+    lines.push(
+      "| Criterion | Verify |",
+      "|---|---|",
+      ...criteria.map((c) => `| ${c.id}: ${cell(c.text)} | ${status.get(c.id) ?? "not checked"} |`),
+    );
+  } else lines.push("This issue's plan.json names no criteria.");
+  const spec = typeof plan?.spec === "string" ? plan.spec : undefined;
+  if (spec && kit) {
+    const others = new Set(kit.acs.map((r) => r.spec).filter((s) => s !== spec));
+    const own: AcceptanceVerdict = {
+      ...kit,
+      acs: kit.acs.filter((r) => r.spec === spec),
+      errors: kit.errors.filter((e) => ![...others].some((o) => e.includes(o))),
+    };
+    lines.push("", `### Holdouts for ${cell(spec)}`, "", acceptanceRows(own));
+  }
   return lines.join("\n");
 }
 

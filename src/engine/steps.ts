@@ -11,6 +11,7 @@ import {
   acceptanceProven,
   hiddenPaths,
   renderAcceptanceTable,
+  renderPlanAcceptance,
   runAcceptance,
   type AcceptanceVerdict,
 } from "../acceptance";
@@ -23,10 +24,11 @@ import {
   runDir,
   type BuildArtifact,
   type TriageArtifact,
+  type VerdictArtifact,
 } from "../artifacts";
 import { isChecked } from "../recheck";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
-import { runProof, type ProofResult, type ProofStatus } from "../proof";
+import { runProof, type ProofResult } from "../proof";
 import { touchesProtectedPath } from "../boundary";
 import {
   clearRunFiles,
@@ -42,6 +44,7 @@ import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
 import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
+import { prBody, renderWhatChanged } from "./pr-body";
 import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
@@ -51,7 +54,6 @@ import {
   finish,
   moveLabel,
   postComment,
-  prBody,
   recheckFindings,
   runRetro,
   runStage,
@@ -414,19 +416,11 @@ const verify: StepType = {
   },
 };
 
-function readAcceptance(worktree: string, issueNumber: number): AcceptanceVerdict | undefined {
+function readRunJson<T>(worktree: string, issueNumber: number, name: string): T | undefined {
   try {
-    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/acceptance.json`, "utf8")) as AcceptanceVerdict;
+    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/${name}`, "utf8")) as T;
   } catch {
-    return undefined; // the repo has no check-acceptance.py
-  }
-}
-
-function readProofStatus(worktree: string, issueNumber: number): ProofStatus | undefined {
-  try {
-    return (JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/proof.json`, "utf8")) as ProofResult).status;
-  } catch {
-    return undefined; // the proof did not run
+    return undefined; // the stage that writes it did not run
   }
 }
 
@@ -453,6 +447,8 @@ const pr: StepType = {
       seal: readSeal(deps.state.getSetting(sealKey(config.repo, issueNumber))),
     }).then(renderReceipt, (err: Error) => missingReceipt(err.message));
     const existing = await deps.github.findPrByHead(config.repo, head);
+    const plan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
+    const proof = readRunJson<ProofResult>(worktree, issueNumber, "proof.json");
     const prUrl =
       existing?.url ??
       (await deps.github.createPr({
@@ -460,16 +456,20 @@ const pr: StepType = {
         base: config.base,
         head,
         title: `${issue.title} (#${issueNumber})`,
-        body: prBody(
-          deps,
-          config,
-          issue,
-          art.comment ?? `Closes #${issueNumber}`,
-          ctx,
-          readProofStatus(worktree, issueNumber),
-          readAcceptance(worktree, issueNumber),
+        body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx, {
+          whatChanged: renderWhatChanged(
+            plan?.goal ?? issue.title,
+            await deps.git.changedFiles(worktree, config.base),
+            proof,
+          ),
+          acceptance: renderPlanAcceptance(
+            plan,
+            readRunJson<VerdictArtifact>(worktree, issueNumber, "verdict.json")?.criteria,
+            readRunJson<AcceptanceVerdict>(worktree, issueNumber, "acceptance.json"),
+          ),
           receipt,
-        ),
+          proof: proof?.status,
+        }),
         draft: true,
       }));
     if (!existing)

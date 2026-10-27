@@ -44,6 +44,11 @@ export interface PlanArtifact {
   // "test" (build writes a failing test first) or "check" (build runs named
   // commands instead). Absent means "test" (plan v2.7.0 item 8).
   readonly proof?: "test" | "check";
+  // The one-line goal and AC-n criteria of this revision, and the specs/ stem the issue implements,
+  // if any. The PR body's What changed and Acceptance read them, never another spec (#90).
+  readonly goal?: string;
+  readonly criteria?: readonly { readonly id: string; readonly text: string }[];
+  readonly spec?: string;
 }
 
 export interface BuildArtifact {
@@ -126,7 +131,20 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
     "outcome",
     "summary",
   ],
-  plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "proof", "outcome", "summary"],
+  plan: [
+    "status",
+    "risk",
+    "revision",
+    "files",
+    "autoApproveEligible",
+    "commentId",
+    "proof",
+    "goal",
+    "criteria",
+    "spec",
+    "outcome",
+    "summary",
+  ],
   build: ["status", "gate_line", "rounds", "screenshots", "outcome", "summary"],
   pr: ["outcome", "summary"],
   retro: ["lesson", "skill_name", "skill_edit", "outcome", "summary"],

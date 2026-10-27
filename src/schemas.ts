@@ -36,6 +36,10 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       // Read by factory-build/factory-verify, never inferred from the type
       // name (plan v2.7.0 item 8). Absent means "test", today's behavior.
       proof: { enum: ["test", "check"] },
+      // The PR body's What changed and Acceptance come from these, so they are this issue's own (#90).
+      goal: str,
+      criteria: { type: "array", items: { type: "object" } },
+      spec: str,
     },
     build: {
       status: { enum: ["green", "red", "needs-info"] },
