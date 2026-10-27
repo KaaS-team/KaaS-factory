@@ -4,7 +4,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { withDataMarker } from "../src/engine/common";
 import { LABEL } from "../src/labels";
-import { overlapping } from "../src/overlap";
+import { overlapping, overlapsOf } from "../src/overlap";
 import { defaultWorkflow } from "../src/engine/workflows";
 import { advanceIssue } from "../src/watch";
 import { engine, removeEngineDirs } from "./engine-harness";
@@ -56,7 +56,7 @@ function setup(earlier: string[], mine: string[], autoApproveEligible = true) {
 
 describe("overlapping()", () => {
   test("equal paths overlap, disjoint lists do not", () => {
-    const inFlight = [{ issue: 1, files: ["src/a.ts", "src/b.ts"] }];
+    const inFlight = [{ issue: 1, files: ["src/a.ts", "src/b.ts"], started: true }];
     expect(overlapping({ issue: 2, files: ["src/b.ts", "src/c.ts"] }, inFlight)).toEqual([
       { issue: 1, shared: ["src/b.ts"] },
     ]);
@@ -64,8 +64,13 @@ describe("overlapping()", () => {
     expect(overlapping({ issue: 2, files: ["src"] }, inFlight)).toEqual([]);
   });
 
-  test("only an earlier issue blocks", () => {
-    expect(overlapping({ issue: 1, files: ["a"] }, [{ issue: 2, files: ["a"] }])).toEqual([]);
+  test("a waiting issue blocks only a higher number, a started one blocks any", () => {
+    const waiting = { issue: 2, files: ["a"], started: false };
+    expect(overlapping({ issue: 1, files: ["a"] }, [waiting])).toEqual([]);
+    expect(overlapping({ issue: 3, files: ["a"] }, [waiting])).toEqual([{ issue: 2, shared: ["a"] }]);
+    expect(overlapping({ issue: 1, files: ["a"] }, [{ ...waiting, started: true }])).toEqual([
+      { issue: 2, shared: ["a"] },
+    ]);
   });
 });
 
@@ -99,6 +104,23 @@ describe("overlap", () => {
     expect(t.github.seenLabels.has(LABEL.overlap)).toBe(false);
     expect(t.overlapComments()).toHaveLength(0);
     expect(t.built()).toBe(true);
+  });
+
+  test("a building issue with a higher number still holds its files", async () => {
+    const t = setup(["src/a.ts"], ["src/z.ts"]);
+    t.github.issues.set(9, { ...t.github.issues.get(1)!, number: 9 });
+    t.github.issues.delete(1);
+    const blockers = await overlapsOf(t.deps, t.config, 5, ["src/a.ts"]);
+    expect(blockers.map((b) => b.issue)).toEqual([9]);
+  });
+
+  test("two issues checked in the same poll cannot both pass", async () => {
+    const t = setup([], []);
+    const results = await Promise.all([
+      overlapsOf(t.deps, t.config, 3, ["src/a.ts"]),
+      overlapsOf(t.deps, t.config, 4, ["src/a.ts"]),
+    ]);
+    expect(results.filter((r) => r.length > 0)).toHaveLength(1);
   });
 
   test("wait lifts once the earlier issue's PR merges or closes, with no second comment", async () => {

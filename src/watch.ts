@@ -23,7 +23,7 @@ import { decideMerge, mergePolicyMarker } from "./merge-policy";
 import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
-import { holdForOverlap, overlapsOf, plannedFiles } from "./overlap";
+import { holdApproved, resumeOverlap } from "./overlap";
 import type { GhComment, GhIssue } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
 import { canServe, effectiveSlots, machineBeat } from "./machine";
@@ -47,7 +47,7 @@ import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { defaultWorkflow } from "./engine/workflows";
 
 import { cronStore, fireCron, fireEvent } from "./engine/triggers";
-import { chosenWorkflow, recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
+import { chooseWorkflow, recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
 import { refuseRepeat } from "./engine/failure";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
@@ -84,22 +84,6 @@ async function recordTriggered(deps: WatchDeps, config: FactoryConfig, n: number
 // The repo's workflow and every one a route names: what cron fires and recovery scans.
 function allWorkflows(deps: WatchDeps): Workflow[] {
   return [workflowOf(deps), ...Object.values(deps.routeWorkflows ?? {})];
-}
-
-// At pickup: the workflow its type's route names (routes.<type>.workflow), recorded on the issue so
-// every later step reads the same one. An issue whose type has none runs the repo's, and gets no comment.
-async function chooseWorkflow(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<GhIssue> {
-  const { name, via } = chosenWorkflow(config, issue);
-  if (!name || !deps.routeWorkflows?.[name] || name === workflowOf(deps).name || recordedWorkflow(issue)) return issue;
-  const body = withDataMarker(`Running workflow \`${name}\` (${via}).`, WORKFLOW_MARKER, { name });
-  const id = await deps.github.commentIssue(config.repo, issue.number, body);
-  return {
-    ...issue,
-    comments: [
-      ...issue.comments,
-      { id: id ?? 0, author: "factory", authorAssociation: "OWNER", body, createdAt: new Date().toISOString() },
-    ],
-  };
 }
 
 function labelOf(deps: WatchDeps, issue: GhIssue, stepId: string): string {
@@ -170,7 +154,7 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
   }
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.ready))) return "needs-human";
-  issue = await chooseWorkflow(deps, config, issue);
+  issue = await chooseWorkflow(deps, config, issue, workflowOf(deps).name);
   emitEvent(
     deps.bus,
     "factory.issue.ready",
@@ -231,6 +215,22 @@ function ctxFrom(deps: WatchDeps, issue: GhIssue): RunCtx {
   return { rejectRound: derived.rejectRounds, questionRound: derived.questionRounds };
 }
 
+// A waiting issue goes on at `stepId`; `prep` writes what that step reads once the worktree exists.
+async function resumeStep(
+  issue: GhIssue,
+  deps: WatchDeps,
+  config: FactoryConfig,
+  from: string,
+  stepId: string,
+  prep?: (worktree: string) => Promise<unknown>,
+): Promise<Outcome> {
+  const worktree = worktreeFor(deps, issue.number);
+  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, from))) return "needs-human";
+  await prep?.(worktree);
+  await deps.github.setStateLabel(config.repo, issue.number, [from], labelOf(deps, issue, stepId));
+  return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
+}
+
 // A trusted reply newer than the open question resumes the same stage, with
 // the reply appended as context (plan section 3). The stage to resume comes
 // from deriveIssueState, not SQLite, so this works after a restart with an
@@ -246,17 +246,10 @@ export async function resumeNeedsInfo(
   if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
   if (parseChatOps(reply.body).type === "cancel") return cancelRun(issue, deps, config);
 
-  const derived = deriveIssueState(issue, workflowOf(deps, issue));
-  const worktree = worktreeFor(deps, issue.number);
-  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.needsInfo))) return "needs-human";
-  await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, unsigned(reply.body));
-  await deps.github.setStateLabel(
-    config.repo,
-    issue.number,
-    [LABEL.needsInfo],
-    labelOf(deps, issue, derived.resumeStage),
-  );
-  return runFromStage(deps, config, issue, derived.resumeStage, worktree, ctxFrom(deps, issue));
+  const stage = deriveIssueState(issue, workflowOf(deps, issue)).resumeStage;
+  return resumeStep(issue, deps, config, LABEL.needsInfo, stage, async (worktree) => {
+    await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, unsigned(reply.body));
+  });
 }
 
 // `/factory approve|revise|retry|cancel` on a plan awaiting approval (plan
@@ -278,22 +271,15 @@ export async function resumeAwaitingApproval(
   const lapsed = !reply && start !== undefined && (deps.now?.() ?? new Date()).getTime() - start >= edge!.after!;
   if (!lapsed && (!reply || !(await commandIsTrusted(deps, config, reply)))) return "waiting";
   const command = reply ? parseChatOps(reply.body) : ({ type: "approve" } as const);
-  const worktree = worktreeFor(deps, issue.number);
 
   if (command.type === "cancel") return cancelRun(issue, deps, config);
   if (!edge) return "waiting";
   const resumeAt = async (stepId: string): Promise<Outcome> => {
-    if (
-      command.type === "approve" &&
-      workflowOf(deps, issue).steps[stepId]?.uses === "build" &&
-      (await holdForOverlap(deps, config, issue.number, plannedFiles(issue), LABEL.awaitingApproval))
-    )
+    if (command.type === "approve" && (await holdApproved(deps, config, workflowOf(deps, issue), issue, stepId)))
       return "awaiting-approval";
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval)))
-      return "needs-human";
-    if (command.type === "revise" && reply) await writeRevision(worktree, issue, reply, command.text);
-    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, issue, stepId));
-    return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
+    return resumeStep(issue, deps, config, LABEL.awaitingApproval, stepId, async (worktree) => {
+      if (command.type === "revise" && reply) await writeRevision(worktree, issue, reply, command.text);
+    });
   };
   if (lapsed)
     await postComment(
@@ -306,23 +292,6 @@ export async function resumeAwaitingApproval(
   if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
   // A plain reply that is not a command: nothing to do yet.
   return "waiting";
-}
-
-// A plan held for an overlap goes on to build, with no further comment, the poll the earlier issues leave flight.
-export async function resumeOverlap(
-  issue: GhIssue,
-  deps: WatchDeps,
-  config: FactoryConfig,
-): Promise<Outcome | undefined> {
-  const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
-  if (latest && parseChatOps(latest.body).type === "cancel") return cancelRun(issue, deps, config);
-  if ((await overlapsOf(deps, config, issue.number, plannedFiles(issue))).length > 0) return "waiting";
-  const build = Object.values(workflowOf(deps, issue).steps).find((s) => s.uses === "build");
-  if (!build) return "waiting";
-  const worktree = worktreeFor(deps, issue.number);
-  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.overlap))) return "needs-human";
-  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.overlap], build.label);
-  return runFromStage(deps, config, issue, build.id, worktree, ctxFrom(deps, issue));
 }
 
 // `/factory retry` on a `failed` or `needs-human` issue (audit finding #18): resumes from whichever stage last
@@ -557,7 +526,11 @@ async function advanceListed(deps: WatchDeps, config: FactoryConfig, listed: GhI
     return "shipped";
   if (names.includes(LABEL.needsInfo)) return (await resumeNeedsInfo(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.awaitingApproval)) return (await resumeAwaitingApproval(issue, deps, config)) ?? "waiting";
-  if (names.includes(LABEL.overlap)) return (await resumeOverlap(issue, deps, config)) ?? "waiting";
+  if (names.includes(LABEL.overlap))
+    return resumeOverlap(deps, config, workflowOf(deps, issue), issue, {
+      cancel: () => cancelRun(issue, deps, config),
+      build: (s) => resumeStep(issue, deps, config, LABEL.overlap, s.id),
+    });
   if (names.includes(LABEL.failed) || names.includes(LABEL.needsHuman))
     return (await resumeParked(issue, deps, config)) ?? "waiting";
   if (names.includes(LABEL.inReview)) return (await resumeInReview(issue, deps, config)) ?? "waiting";
@@ -613,17 +586,16 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // A minion runs for minutes: started here, never awaited by the poll.
   for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date()))
     startMinion(deps, config, minion);
-  const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw, overlapped] =
-    await Promise.all([
-      intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
-      deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
-      deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
-      deps.github.listIssuesByLabel(config.repo, LABEL.failed),
-      deps.github.listIssuesByLabel(config.repo, LABEL.needsHuman),
-      deps.github.listIssuesByLabel(config.repo, LABEL.inReview),
-      intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
-      deps.github.listIssuesByLabel(config.repo, LABEL.overlap),
-    ]);
+  const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
+    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
+    deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
+    deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
+    deps.github.listIssuesByLabel(config.repo, LABEL.failed),
+    deps.github.listIssuesByLabel(config.repo, LABEL.needsHuman),
+    deps.github.listIssuesByLabel(config.repo, LABEL.inReview),
+    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
+  ]);
+  const overlapped = await deps.github.listIssuesByLabel(config.repo, LABEL.overlap);
 
   // The dependency gate (blockers.ts), once per poll before any dispatch: a ready issue with an open
   // "Blocked by" moves to LABEL.blocked, and back to ready the poll its last blocker clears.

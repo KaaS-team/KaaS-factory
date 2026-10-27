@@ -28,6 +28,27 @@ export function chosenWorkflow(config: FactoryConfig, issue: GhIssue): { name?: 
   return { name: type ? config.routes[type]?.workflow : undefined, via: `\`routes.${type}.workflow\`` };
 }
 
+// At pickup: the workflow its type's route names (routes.<type>.workflow), recorded on the issue so
+// every later step reads the same one. An issue whose type has none runs `current`, and gets no comment.
+export async function chooseWorkflow(
+  deps: Pick<WatchDeps, "github" | "routeWorkflows">,
+  config: FactoryConfig,
+  issue: GhIssue,
+  current: string,
+): Promise<GhIssue> {
+  const { name, via } = chosenWorkflow(config, issue);
+  if (!name || !deps.routeWorkflows?.[name] || name === current || recordedWorkflow(issue)) return issue;
+  const body = withDataMarker(`Running workflow \`${name}\` (${via}).`, WORKFLOW_MARKER, { name });
+  const id = await deps.github.commentIssue(config.repo, issue.number, body);
+  return {
+    ...issue,
+    comments: [
+      ...issue.comments,
+      { id: id ?? 0, author: "factory", authorAssociation: "OWNER", body, createdAt: new Date().toISOString() },
+    ],
+  };
+}
+
 // The workflow triage's type routes to, and the step in it that stands where triage did.
 export async function lateRoute(
   deps: Pick<WatchDeps, "github" | "routeWorkflows">,
