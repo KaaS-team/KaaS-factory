@@ -3,5 +3,7 @@
 .factory-state
 node_modules
 tests
+ee/tests
+ee/fixtures
 *.md
 .DS_Store

@@ -2,7 +2,7 @@
 // `kaas-factory up` on a laptop running the same stack, idle under the memory budget.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { IDLE_RSS_BUDGET_MB, treeRssKb } from "../src/deploy/rss";
@@ -49,6 +49,39 @@ describe("one image", () => {
 
     const pkg = JSON.parse(read("package.json")) as { name: string; bin: Record<string, string> };
     expect(pkg.bin[pkg.name]).toBe("./bin/factory");
+  });
+});
+
+describe("one image carries ee", () => {
+  test("the image carries ee/ without its tests and fixtures", () => {
+    expect(read("Dockerfile")).toContain("COPY template-ci ./template-ci\nCOPY ee ./ee\n");
+    const ignored = read(".dockerignore").split("\n");
+    expect(ignored).toContain("ee/tests");
+    expect(ignored).toContain("ee/fixtures");
+  });
+
+  // Runs the real entrypoint with a stub `bun` that prints its argv.
+  function entrypoint(opts: { ee: boolean; env?: Record<string, string> }, ...args: string[]): string {
+    const dir = mkdtempSync(join(tmpdir(), "factory-entry-"));
+    const stubs = join(dir, "stubs");
+    mkdirSync(stubs);
+    writeFileSync(join(stubs, "bun"), '#!/bin/sh\necho "bun $*"\n');
+    chmodSync(join(stubs, "bun"), 0o755);
+    const cwd = join(dir, "app");
+    mkdirSync(join(cwd, "ee"), { recursive: true });
+    if (opts.ee) writeFileSync(join(cwd, "ee/register.ts"), "");
+    const run = Bun.spawnSync(["bash", join(ROOT, "docker-entrypoint.sh"), ...args], {
+      cwd,
+      env: { PATH: `${stubs}:${process.env.PATH ?? ""}`, ...opts.env },
+    });
+    expect(run.exitCode).toBe(0);
+    return run.stdout.toString().trim();
+  }
+
+  test("the entrypoint preloads ee/register.ts unless FACTORY_EE=0 or ee is absent", () => {
+    expect(entrypoint({ ee: true }, "up", "--x")).toBe("bun --preload ./ee/register.ts bin/factory up --x");
+    expect(entrypoint({ ee: true, env: { FACTORY_EE: "0" } }, "up")).toBe("bun bin/factory up");
+    expect(entrypoint({ ee: false }, "up")).toBe("bun bin/factory up");
   });
 });
 
