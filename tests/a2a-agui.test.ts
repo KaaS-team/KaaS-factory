@@ -47,6 +47,7 @@ function plane(env: Record<string, string>, repo = REPO) {
     state: { busEvents: () => rows },
     tracker,
     repo,
+    served: () => [REPO],
     env,
     links: () => links,
     store: { roleOf: () => null },
