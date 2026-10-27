@@ -41,13 +41,25 @@ export function sparseCheckoutPatterns(holdoutPaths: readonly string[]): string[
   return ["/*", ...holdoutPaths.map((p) => `!/${p.replace(/^\/+/, "")}`)];
 }
 
+const FALLBACK_SIGNER = { name: "kaas-factory", email: "factory@users.noreply.github.com" };
+
+export function withSignoff(args: string[], who: { name: string; email: string }): string[] {
+  const i = args.indexOf("-m");
+  if (i < 0 || args[i + 1] === undefined) return args;
+  const out = [...args];
+  out[i + 1] = `${args[i + 1]}\n\nSigned-off-by: ${who.name} <${who.email}>`;
+  return out;
+}
+
 export class GitCommandRunner implements CommandRunner {
   async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     if (args[0] === "commit" || args[0] === "commit-tree") {
-      const name = await spawnGit(["config", "user.name"], opts?.cwd);
-      const email = await spawnGit(["config", "user.email"], opts?.cwd);
-      if (name.stdout.trim() === "" || email.stdout.trim() === "")
-        return spawnGit([...FALLBACK_IDENTITY, ...args], opts?.cwd, opts?.env);
+      const name = (await spawnGit(["config", "user.name"], opts?.cwd)).stdout.trim();
+      const email = (await spawnGit(["config", "user.email"], opts?.cwd)).stdout.trim();
+      const known = name !== "" && email !== "";
+      // commit-tree has no -s, and the claim commit is in the PR, so CI's DCO check reads it.
+      const signed = args[0] === "commit-tree" ? withSignoff(args, known ? { name, email } : FALLBACK_SIGNER) : args;
+      return spawnGit(known ? signed : [...FALLBACK_IDENTITY, ...signed], opts?.cwd, opts?.env);
     }
     return spawnGit(args, opts?.cwd, opts?.env);
   }
@@ -163,7 +175,7 @@ export class Git {
     await this.runner.run(["add", "-A", "--", ".", ":!.factory/runs"], { cwd: worktreeDir });
     const status = await this.runner.run(["status", "--porcelain", "--", ".", ":!.factory/runs"], { cwd: worktreeDir });
     if (!status.stdout.trim()) return false;
-    const result = await this.runner.run(["commit", "-m", message], { cwd: worktreeDir });
+    const result = await this.runner.run(["commit", "-s", "-m", message], { cwd: worktreeDir });
     return result.code === 0;
   }
 
