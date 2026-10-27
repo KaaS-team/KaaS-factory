@@ -258,8 +258,9 @@ const build: StepType = {
     });
     const pushed = await deps.git.push(worktree, issueNumber);
     if (pushed.code !== 0) {
-      const tail = pushed.stderr.trim().split("\n").slice(-20).join("\n");
-      return stop(await failStage(deps, config, issue, step.label, "build", `push_refused: ${tail}`));
+      // The failure line keeps one line, and a hook or lease refusal ends on the decisive one.
+      const last = pushed.stderr.trim().split("\n").at(-1) ?? "";
+      return stop(await failStage(deps, config, issue, step.label, "build", `push_refused: ${last}`));
     }
     return { kind: "next", facts: json };
   },
@@ -435,7 +436,13 @@ async function unshippedBranch(
   worktree: string,
   issueNumber: number,
 ): Promise<string | undefined> {
-  if ((await deps.git.headSha(worktree)) !== (await deps.git.remoteHeadSha(worktree, issueNumber)))
+  let remote: string | undefined;
+  try {
+    remote = await deps.git.remoteHeadSha(worktree, issueNumber);
+  } catch (err) {
+    return `pr_remote_unreachable: ${(err as Error).message}`;
+  }
+  if ((await deps.git.headSha(worktree)) !== remote)
     return "pr_head_mismatch: the remote branch is not the verified commit";
   if (!(await deps.git.hasCommits(worktree, config.base))) return "pr_empty: the branch has no commits over base";
   return undefined;
@@ -447,6 +454,10 @@ const pr: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, ctx } = sc;
     const issueNumber = issue.number;
+    // The PR must point at the commit verify saw: a refused or stale push leaves the remote behind.
+    // Checked before the paid pr agent runs.
+    const unshipped = await unshippedBranch(deps, config, worktree, issueNumber);
+    if (unshipped) return stop(await failStage(deps, config, issue, sc.step.label, "pr", unshipped));
     await runStage(deps, config, issue, "pr", worktree, stepOpts(sc.step));
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
     // A revise from in-review re-enters here with the PR already open;
@@ -463,9 +474,6 @@ const pr: StepType = {
       holdoutRequired: holdoutEnabled(config.holdout),
       seal: readSeal(deps.state.getSetting(sealKey(config.repo, issueNumber))),
     }).then(renderReceipt, (err: Error) => missingReceipt(err.message));
-    // The PR must point at the commit verify saw: a refused or stale push leaves the remote behind.
-    const unshipped = await unshippedBranch(deps, config, worktree, issueNumber);
-    if (unshipped) return stop(await failStage(deps, config, issue, sc.step.label, "pr", unshipped));
     const existing = await deps.github.findPrByHead(config.repo, head);
     const plan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
     const proof = readRunJson<ProofResult>(worktree, issueNumber, "proof.json");

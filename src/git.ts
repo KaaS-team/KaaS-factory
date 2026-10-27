@@ -207,6 +207,7 @@ export class Git {
     const out = await this.runner.run(["ls-remote", "origin", `refs/heads/${this.branchName(issue)}`], {
       cwd: worktreeDir,
     });
+    if (out.code !== 0) throw new Error(`git ls-remote failed: ${out.stderr.trim().split("\n").at(-1) ?? ""}`);
     return out.stdout.trim().split(/\s+/)[0] || undefined;
   }
 
