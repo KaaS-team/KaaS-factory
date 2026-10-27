@@ -19,7 +19,21 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { TEST_PATH } from "../src/proof";
+import { mergeConfig } from "../src/config";
+import { type MutationIO, type ProofGit, runMutations, TEST_PATH } from "../src/proof";
+import { FactoryState } from "../src/state";
+import { advanceIssue } from "../src/watch";
+import { LABEL } from "../src/labels";
+import { workflowFor } from "../src/engine/workflows";
+import {
+  baseIssue,
+  FakeGateRunner,
+  FakeGit,
+  FakeGitHub,
+  FakeHoldoutRunner,
+  fixtureFor,
+  MultiStageExecutor,
+} from "./harness";
 
 const SCRIPT = join(import.meta.dir, "..", "template", ".factory", "mutate.sh");
 const GUARD = '[ "$1" != evil ]';
@@ -280,5 +294,167 @@ describe("mutate.sh", () => {
   test("knows the same test paths as the runner's proof", () => {
     const text = readFileSync(SCRIPT, "utf8");
     for (const re of TEST_PATH) expect(text).toContain(`r"${re.source.replace(/\\\//g, "/")}"`);
+  });
+});
+
+// The runner's own pass over plan.mutations (#139): an in-memory file, a fake test runner.
+function memoryIO(file: string, code: number | "throw") {
+  const files = new Map<string, Buffer>([[file, Buffer.from("keep(1)\né\n")]]);
+  const seen: string[] = [];
+  const io: MutationIO = {
+    async read(_w, f) {
+      return files.get(f)!;
+    },
+    async write(_w, f, content) {
+      files.set(f, content);
+    },
+    async test(_w, cmd) {
+      seen.push(`${cmd}: ${files.get(file)!.toString()}`);
+      if (code === "throw") throw new Error("runner crashed");
+      return { stdout: "", stderr: "", code };
+    },
+  };
+  return { io, files, seen };
+}
+const mutation = { name: "guard", file: "src/a.ts", find: "keep(1)", replace: "keep(0)", test: "tests/a.test.ts" };
+
+describe("runMutations", () => {
+  test("a surviving mutant is reported as survives with its name", async () => {
+    const { io, seen } = memoryIO("src/a.ts", 0);
+    const [r] = await runMutations(io, "/w", [mutation]);
+    expect(r).toMatchObject({ name: "guard", status: "survives", exitCode: 0 });
+    expect(seen).toEqual(["tests/a.test.ts: keep(0)\né\n"]);
+  });
+
+  test("a failing test means bites", async () => {
+    const { io } = memoryIO("src/a.ts", 1);
+    expect((await runMutations(io, "/w", [mutation]))[0]).toMatchObject({ name: "guard", status: "bites" });
+  });
+
+  test("the file is restored byte-identical even when the test throws", async () => {
+    const { io, files } = memoryIO("src/a.ts", "throw");
+    const before = Buffer.from(files.get("src/a.ts")!);
+    await expect(runMutations(io, "/w", [mutation])).rejects.toThrow("runner crashed");
+    expect(files.get("src/a.ts")!.equals(before)).toBe(true);
+  });
+});
+
+describe("verify with plan mutations", () => {
+  // A planned issue: its own plan is imported, so its Mutation section reaches plan.json. The
+  // plan stage's agent cannot write mutations (its artifact is checked against STEP_KEYS).
+  function plannedBody(mutationSection: string) {
+    return [
+      "<!-- factory:planned v1 -->",
+      "## Why",
+      "Verify rejects a surviving mutation.",
+      "## Today",
+      "- `src/a.ts` keeps the value.",
+      "## Change",
+      "### T1: Keep the value",
+      "Files: `src/a.ts`",
+      "Model: sonnet",
+      "1. Keep it.",
+      "## Tests",
+      "- `tests/a.test.ts`: the value is kept.",
+      "## Mutation",
+      mutationSection,
+      "## Acceptance",
+      "- AC-1: the value is kept: checked by `tests/a.test.ts` (T1)",
+      "## Non-goals",
+      "- NG-1: no change to the dashboard.",
+      "## Files",
+      "- `src/a.ts`",
+      "- `tests/a.test.ts` (new)",
+      "## Risk: low",
+      "## Model: sonnet",
+    ].join("\n");
+  }
+
+  async function setup(mutationSection: string) {
+    const workspacesDir = mkdtempSync(join(tmpdir(), "mut-ws-"));
+    const cloneDir = mkdtempSync(join(tmpdir(), "mut-clone-"));
+    dirs.push(workspacesDir, cloneDir);
+    const issue = { ...baseIssue(1, [LABEL.ready]), body: plannedBody(mutationSection) };
+    const github = new FakeGitHub([issue]);
+    const executor = new MultiStageExecutor();
+    const { io, files } = memoryIO("src/a.ts", 0);
+    const proofGit: ProofGit = {
+      async changes() {
+        return [];
+      },
+      async restoreFromBase() {},
+      async remove() {},
+      async restoreHead() {},
+      async dirty() {
+        return [];
+      },
+      async test() {
+        return { stdout: "", stderr: "", code: 1 };
+      },
+      mutations: io,
+    };
+    const state = new FactoryState(":memory:");
+    state.setToggle("auto_approve_low_risk", true);
+    const config = mergeConfig({ repo: "acme/widgets", gates: [{ name: "test", cmd: "make test", required: true }] });
+    const stageFiles = {
+      triage: {
+        "triage-comment.md": "<!-- factory:triage v1 -->\nt",
+        "triage.json": JSON.stringify({
+          disposition: "proceed",
+          type: "feature",
+          risk: "low",
+          done_when: "x",
+          files_expected: ["src/a.ts"],
+          gate_level: "make check",
+          confidence: 0.9,
+        }),
+      },
+      build: {
+        "status-comment.md": "<!-- factory:status v1 -->\nb",
+        "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+      },
+      verify: {
+        "verdict-comment.md": "<!-- factory:verdict v1 -->\nv",
+        "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+      },
+      pr: { "pr-body.md": "Did it.\nCloses #1" },
+    } as const;
+    for (const stage of ["triage", "build", "build", "build", "build", "verify", "pr"] as const)
+      executor.push(stage, 1, fixtureFor(stage, 1), stageFiles[stage]);
+    // The mutation's find text must be in the file the import checks on disk.
+    const git = new FakeGit();
+    git.seed = { "src/a.ts": "keep(1)\né\n" };
+    const deps = {
+      github,
+      git,
+      state,
+      executor,
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      proofGit,
+      cloneDir,
+      workspacesDir,
+      routeWorkflows: { "planned-to-pr": await workflowFor(import.meta.dir, { workflow: "planned-to-pr" }) },
+    };
+    return { deps, config, github, files };
+  }
+
+  test("a surviving plan mutation rejects verify with the mutation name in the comment", async () => {
+    const { deps, config, github, files } = await setup(`\`\`\`json\n${JSON.stringify(mutation)}\n\`\`\``);
+    const before = Buffer.from(files.get("src/a.ts")!);
+    const outcome = await advanceIssue(deps, config, github.issues.get(1)!);
+    expect(outcome).not.toBe("shipped");
+    const bodies = github.issues.get(1)!.comments.map((c) => c.body);
+    expect(bodies.some((b) => b.includes("Plan mutations whose test still passed") && b.includes("`guard`"))).toBe(
+      true,
+    );
+    expect(files.get("src/a.ts")!.equals(before)).toBe(true);
+  });
+
+  test("a plan without mutations does not reject from this path", async () => {
+    const { deps, config, github } = await setup("none: no mutation fits this change");
+    expect(await advanceIssue(deps, config, github.issues.get(1)!)).toBe("shipped");
+    const bodies = github.issues.get(1)!.comments.map((c) => c.body);
+    expect(bodies.some((b) => b.includes("Plan mutations whose test still passed"))).toBe(false);
   });
 });

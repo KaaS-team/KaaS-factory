@@ -52,6 +52,8 @@ export interface ProofGit {
   restoreHead(worktree: string): Promise<void>;
   dirty(worktree: string): Promise<string[]>;
   test(worktree: string, cmd: string): Promise<CommandResult>;
+  // Where plan mutations are applied and run; absent means the plan's mutations are not run.
+  readonly mutations?: MutationIO;
 }
 
 // The factory's own files never count as the change under test.
@@ -120,6 +122,7 @@ async function git(args: string[], cwd: string): Promise<CommandResult> {
 }
 
 export class ShellProofGit implements ProofGit {
+  readonly mutations = new ShellMutationIO();
   async changes(worktree: string, base: string) {
     const out = (await git(["diff", "--name-status", "--no-renames", `origin/${base}...HEAD`], worktree)).stdout;
     return out
@@ -169,4 +172,75 @@ export function proofCommand(
   });
   const all = [testGate(gates)?.cmd, ...pkg].filter((c): c is string => !!c);
   return all.length ? all.join(" && ") : undefined;
+}
+
+export interface PlanMutation {
+  readonly name: string;
+  readonly file: string;
+  readonly find: string;
+  readonly replace: string;
+  readonly test: string;
+}
+
+// "unapplied": the find text is no longer in the file, which says nothing about the tests.
+export interface MutationResult {
+  readonly name: string;
+  readonly status: "bites" | "survives" | "unapplied";
+  readonly exitCode?: number;
+  readonly tail: string;
+}
+
+export interface MutationIO {
+  read(worktree: string, file: string): Promise<Buffer>;
+  write(worktree: string, file: string, content: Buffer): Promise<void>;
+  test(worktree: string, cmd: string): Promise<CommandResult>;
+}
+
+export function isMutation(m: unknown): m is PlanMutation {
+  const o = m as Record<string, unknown> | null;
+  return !!o && ["name", "file", "find", "replace", "test"].every((k) => typeof o[k] === "string");
+}
+
+// The file is put back from the bytes read, so a runner that throws still leaves the worktree
+// as it found it. `cmdFor` turns a mutation's named test into the command to run.
+export async function runMutations(
+  io: MutationIO,
+  worktree: string,
+  mutations: readonly PlanMutation[],
+  cmdFor: (test: string) => string = (test) => test,
+): Promise<MutationResult[]> {
+  const results: MutationResult[] = [];
+  for (const m of mutations) {
+    if (m.file.startsWith("/") || m.file.split("/").includes(".."))
+      throw new Error(`mutation "${m.name}": ${m.file} is outside the repo`);
+    const original = await io.read(worktree, m.file);
+    const text = original.toString("utf8");
+    const at = text.indexOf(m.find);
+    if (at < 0) {
+      results.push({ name: m.name, status: "unapplied", tail: `the find text is not in ${m.file}` });
+      continue;
+    }
+    const mutated = text.slice(0, at) + m.replace + text.slice(at + m.find.length);
+    try {
+      await io.write(worktree, m.file, Buffer.from(mutated, "utf8"));
+      const r = await io.test(worktree, cmdFor(m.test));
+      const tail = `${r.stdout}\n${r.stderr}`.trim().slice(-2000);
+      results.push({ name: m.name, status: r.code === 0 ? "survives" : "bites", exitCode: r.code, tail });
+    } finally {
+      await io.write(worktree, m.file, original);
+    }
+  }
+  return results;
+}
+
+export class ShellMutationIO implements MutationIO {
+  async read(worktree: string, file: string) {
+    return Buffer.from(await Bun.file(`${worktree}/${file}`).arrayBuffer());
+  }
+  async write(worktree: string, file: string, content: Buffer) {
+    await Bun.write(`${worktree}/${file}`, content);
+  }
+  test(worktree: string, cmd: string) {
+    return sh(["bash", "-c", cmd], worktree);
+  }
 }

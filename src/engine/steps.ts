@@ -49,7 +49,7 @@ import { prBody, renderWhatChanged } from "./pr-body";
 import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
-import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
+import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
 import {
   failureTail,
   finish,
@@ -326,7 +326,7 @@ const verify: StepType = {
       }
     }
     if (deps.proofGit) {
-      const { planProof, testCmd } = await proofInputs(deps.proofGit, worktree, config, issueNumber);
+      const { planProof, testCmd, mutations } = await proofInputs(deps.proofGit, worktree, config, issueNumber);
       let proof: ProofResult;
       try {
         proof = await runProof(deps.proofGit, worktree, config.base, planProof, testCmd);
@@ -341,6 +341,22 @@ const verify: StepType = {
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
       await recordVerifyFacts(worktree, config, issueNumber, testCmd, proof);
+      const survived = await survivingMutations(deps.proofGit, worktree, config, mutations);
+      if (survived) {
+        ctx.rejectRound += 1;
+        ctx.failure = failureTail(survived.body);
+        await postComment(deps, config, issueNumber, survived.body, {
+          stage: "verify",
+          json: { survivingMutations: survived.names },
+        });
+        if (ctx.rejectRound > maxRejects) {
+          await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
+          await runRetro(deps, config, issue, "gave-up");
+          finish(deps, config, issueNumber, "needs-human", `mutations survived ${ctx.rejectRound} times`);
+          return stop("needs-human");
+        }
+        return { kind: "reject" };
+      }
     }
     const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
     if (acceptance)
