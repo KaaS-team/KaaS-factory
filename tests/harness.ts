@@ -452,6 +452,8 @@ export class MultiStageExecutor {
   readonly mcp: Array<[StageName, StageRunOptions["mcp"]]> = [];
   // The issue scope each run was handed, by stage: what picks the agent's model tier.
   readonly scopes: Array<[StageName, StageRunOptions["scope"]]> = [];
+  // The model the runner picked for each run, by stage.
+  readonly models: Array<[StageName, string | undefined]> = [];
   // The verify rejects each run was told of, by stage: what climbs the build a tier.
   readonly rejects: Array<[StageName, StageRunOptions["rejects"]]> = [];
   // The agent and timeout a workflow step pinned, by stage.
@@ -467,8 +469,10 @@ export class MultiStageExecutor {
     scope?: StageRunOptions["scope"];
     rejects?: StageRunOptions["rejects"];
     agent?: string;
+    model?: string;
     timeoutMinutes?: number;
   }) {
+    this.models.push([opts.stage, opts.model]);
     this.pinned.push([opts.stage, opts.agent, opts.timeoutMinutes]);
     this.resumed.push(opts.resume);
     this.rejects.push([opts.stage, opts.rejects]);

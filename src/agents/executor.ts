@@ -110,7 +110,7 @@ export function resolveAgent(
   return resolveRoute(agents, stages, undefined, stage, undefined);
 }
 
-function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, stage: string): ResolvedAgent {
+export function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, stage: string): ResolvedAgent {
   const config = agents[name];
   if (!config) throw new Error(`stage ${stage} uses agent "${name}", which is not in config.agents`);
   const preset = config.preset ? PRESETS[config.preset] : undefined;
@@ -122,7 +122,9 @@ function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, s
 }
 
 // The agent with `model` swapped for its tier's, so every preset and {{model}} see one model.
-function withTier(agent: ResolvedAgent, opts: Pick<StageRunOptions, "scope" | "rejects">): ResolvedAgent {
+function withTier(agent: ResolvedAgent, opts: Pick<StageRunOptions, "scope" | "rejects" | "model">): ResolvedAgent {
+  if (opts.model && agent.preset?.name === "claude")
+    return { ...agent, config: { ...agent.config, model: opts.model } };
   const tier = tierFor(opts.scope, opts.rejects);
   const model = tier && agent.config.models?.[tier];
   return model ? { ...agent, config: { ...agent.config, model } } : agent;
@@ -161,7 +163,7 @@ export class CommandExecutor implements Executor {
     const route = (s: StageRunOptions["stage"]) =>
       withTier(resolveRoute(this.agents, this.stages, this.routes, s, opts.type), opts);
     const agent = opts.agent
-      ? resolveAgentByName(this.agents, opts.agent, opts.stage)
+      ? withTier(resolveAgentByName(this.agents, opts.agent, opts.stage), { model: opts.model })
       : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined, opts.reviewer);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
