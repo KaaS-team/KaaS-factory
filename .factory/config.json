@@ -6,6 +6,7 @@
     {
       "name": "check",
       "cmd": "make check",
+      "fileCmd": "bun test",
       "required": true,
       "role": "test"
     }
