@@ -1,0 +1,32 @@
+# Weekly flaky-test hunt: build reruns the suite to find a test that both passes and fails, then fixes
+# it or quarantines it with the reason. Turn it on with routes.<type>.workflow: "flaky-tests".
+name: flaky-tests
+on:
+  cron:
+    - schedule: "0 3 * * 3"
+      title: Weekly flaky test hunt
+      body: |
+        Run the test suite several times and find a test that both passes and fails on the same code.
+        Fix its cause, or quarantine it with a comment that says why and what would make it stable.
+        If every run agrees, triage refuses with "no flaky test found".
+limits:
+  questions: 1
+  rejects: 2
+steps:
+  triage:
+    uses: triage
+    label: factory:triaging
+    next: build
+  build:
+    uses: build
+    label: factory:building
+    next: verify
+  verify:
+    uses: verify
+    label: factory:verifying
+    next: pr
+    reject: build
+  pr:
+    uses: pr
+    label: factory:in-review
+    revise: build
