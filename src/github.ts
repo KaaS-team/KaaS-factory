@@ -455,12 +455,15 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--paginate",
       `repos/${repo}/pulls/${prNumber}/files`,
       "--jq",
-      ".[] | {path: .filename, additions: .additions, deletions: .deletions} | tojson",
+      ".[] | ({path: .filename, additions: .additions, deletions: .deletions}, if .previous_filename then {path: .previous_filename, additions: 0, deletions: 0} else empty end) | tojson",
     ]);
-    return result.stdout
+    const files = result.stdout
       .split("\n")
       .filter(Boolean)
       .map((line) => JSON.parse(line) as PrFile);
+    // The files API stops at 3000, so a list that long may be missing owned paths: no answer.
+    if (files.length >= 3000) throw new Error(`PR #${prNumber} lists ${files.length}+ files; the list may be cut off`);
+    return files;
   }
 
   // The file's text at `ref`, or undefined on a 404. Any other failure throws.
@@ -471,7 +474,9 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "Accept: application/vnd.github.raw+json",
       `repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
     ]);
-    if (result.code !== 0 && /HTTP 404/.test(result.stderr)) return undefined;
+    // A 404 for a bad ref says "No commit found"; that is no answer, not an absent file.
+    if (result.code !== 0 && /HTTP 404/.test(result.stderr) && !/No commit found/i.test(result.stderr))
+      return undefined;
     if (result.code !== 0) throw new GhError(["api", "contents"], result);
     return result.stdout;
   }
