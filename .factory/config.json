@@ -85,5 +85,7 @@
   "toolchain": "bun",
   "setup": [
     "bun install --frozen-lockfile"
-  ]
+  ],
+  "stageTimeoutMinutes": 30,
+  "maxToolCalls": 120
 }
