@@ -13,7 +13,7 @@ every command is one build may run, so leave those out.
 
 ## Shell rules
 
-Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>.
+Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Run tests and checks only through the repo's agentCommands (make test FILES="tests/x.test.ts", make check, .factory/gates.sh); bun is refused, so a refused test command is rewritten into one of those, never abandoned.
 
 ## The checklist
 
