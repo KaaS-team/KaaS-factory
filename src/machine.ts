@@ -152,6 +152,17 @@ function alive(pid: number): boolean {
   }
 }
 
+export interface LeaseCap {
+  readonly repo: string;
+  readonly repoCap: number;
+  readonly machineSlots: number;
+}
+
+// A holder is `owner/repo#N`; `\`, `%` and `_` in a repo name must not act as LIKE wildcards.
+export function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, "\\$&");
+}
+
 export interface MachineBeat {
   readonly name: string;
   readonly tags: readonly string[];
@@ -212,13 +223,19 @@ export class MachineLeases {
   // Count-then-insert inside one BEGIN IMMEDIATE transaction, so two
   // processes racing for the last slot never both succeed (the same shape as
   // git.ts's compare-and-swap push). Returns the lease id to release later,
-  // or undefined when every slot is already held.
-  acquire(holder: string, slots: number, pid: number = process.pid): number | undefined {
+  // or undefined when every machine slot is held or `repo` already holds its `repoCap`.
+  acquire(holder: string, cap: LeaseCap, pid: number = process.pid): number | undefined {
     return this.db
       .transaction(() => {
         this.reclaimDead();
         const n = (this.db.query("SELECT COUNT(*) AS n FROM leases").get() as { n: number }).n;
-        if (n >= slots) return undefined;
+        if (n >= cap.machineSlots) return undefined;
+        const mine = (
+          this.db
+            .query("SELECT COUNT(*) AS n FROM leases WHERE holder LIKE $prefix ESCAPE '\\'")
+            .get({ $prefix: `${escapeLike(cap.repo)}#%` }) as { n: number }
+        ).n;
+        if (mine >= cap.repoCap) return undefined;
         const row = this.db
           .query("INSERT INTO leases (holder, pid, acquired_at) VALUES ($holder, $pid, $now) RETURNING id")
           .get({ $holder: holder, $pid: pid, $now: new Date().toISOString() }) as { id: number };
@@ -255,12 +272,6 @@ export class MachineLeases {
   close(): void {
     this.db.close();
   }
-}
-
-// The smaller of the machine's own cap and this repo's own config.concurrency
-// (plan v2.7.0 item 5: "repo concurrency becomes a cap for that repo").
-export function effectiveSlots(repoConcurrency: number, machine: MachineConfig): number {
-  return Math.min(repoConcurrency, machine.slots);
 }
 
 // The machine's own dailyUsd cap (plan v2.7.0 item 7) is a cap on every
