@@ -198,6 +198,18 @@ export class Git {
     }
   }
 
+  async headSha(worktreeDir: string): Promise<string> {
+    return (await this.runner.run(["rev-parse", "HEAD"], { cwd: worktreeDir })).stdout.trim();
+  }
+
+  // The commit the remote holds for this issue's branch, or undefined when it has none.
+  async remoteHeadSha(worktreeDir: string, issue: number): Promise<string | undefined> {
+    const out = await this.runner.run(["ls-remote", "origin", `refs/heads/${this.branchName(issue)}`], {
+      cwd: worktreeDir,
+    });
+    return out.stdout.trim().split(/\s+/)[0] || undefined;
+  }
+
   async hasCommits(worktreeDir: string, base: string): Promise<boolean> {
     const result = await this.runner.run(["rev-list", `origin/${base}..HEAD`, "--count"], { cwd: worktreeDir });
     return Number(result.stdout.trim() || "0") > 0;

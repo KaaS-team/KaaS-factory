@@ -105,6 +105,7 @@ export function engine(
   push("pr", { "pr-body.md": "Did it.\nCloses #1" });
   return {
     github,
+    git,
     executor,
     setupRunner,
     gateRunner,
