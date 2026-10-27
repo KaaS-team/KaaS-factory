@@ -44,6 +44,8 @@ describe("build model", () => {
 
   test("buildEscalation escalates to sonnet once, never higher", () => {
     expect(buildEscalation(0)).toBe("sonnet");
+    expect(buildEscalation(0, "haiku")).toBe("sonnet");
+    expect(buildEscalation(0, "opus")).toBeUndefined();
     expect(buildEscalation(1)).toBeUndefined();
     expect(buildEscalation(2)).toBeUndefined();
   });
