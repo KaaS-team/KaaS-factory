@@ -863,5 +863,6 @@
   {"name": "import-plan: an AC that maps to no task passes", "file": "src/engine/import-plan.ts", "find": "if (!task || !taskIds.has(task))", "replace": "if (false)", "test": "tests/import-plan.test.ts"},
   {"name": "import-plan: a planned body is not recognised", "file": "src/engine/import-plan.ts", "find": "return body.trimStart().startsWith(PLANNED_MARKER);", "replace": "return false;", "test": "tests/import-plan-step.test.ts"},
   {"name": "import-plan: a path outside the worktree is read", "file": "src/engine/import-plan-step.ts", "find": "rel.startsWith(\"..\") || ", "replace": "", "test": "tests/import-plan-step.test.ts"},
+  {"name": "pr body: run summary returns to the body", "file": "src/engine/pr-body.ts", "find": "  if (parts.runDetails) body = `${body}\\n\\nThe receipt is in the run-details comment on the issue.`;\n  return body;", "replace": "  if (parts.runDetails) body = `${body}\\n\\n## Factory run\\n\\n| build | claude-opus-5-5 |`;\n  return body;", "test": "tests/pr-body.test.ts"},
   {"name": "git: commits are not signed off", "file": "src/git.ts", "find": "[\"commit\", \"-s\", \"-m\", message]", "replace": "[\"commit\", \"-m\", message]", "test": "tests/git.test.ts"}
 ]

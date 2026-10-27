@@ -45,7 +45,7 @@ export async function runAcceptance(
 }
 
 function cell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\s+/g, " ").slice(0, 160);
+  return text.replace(/\|/g, "\\|").replace(/\s+/g, " ");
 }
 
 function proof(row: AcceptanceRow): string {

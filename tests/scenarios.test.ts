@@ -575,10 +575,8 @@ describe("failure paths", () => {
     build_to_pr(c);
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("shipped");
-    const body = c.github.createdPrs[0]!.body;
-    expect(body).toContain("## Factory run");
-    expect(body).toContain("- build: taken over by an operator");
-    expect(body).toContain("- 1 `/factory retry`");
+    expect(c.github.createdPrs[0]!.body).not.toContain("## Factory run");
+    expect(c.github.issues.get(1)!.comments.some((x) => x.body.includes("## Factory run"))).toBe(false);
     done(c);
   });
 
@@ -605,12 +603,15 @@ describe("failure paths", () => {
     done(c);
   });
 
-  test("10c. config prRunSummary false leaves the PR body as the agent wrote it", async () => {
-    const c = setup([LABEL.ready], { prRunSummary: false });
+  test("10c. the Factory run table never reaches the PR or the issue, and the receipt is posted once", async () => {
+    const c = setup([LABEL.ready], { prRunSummary: true });
     c.state.setToggle("auto_approve_low_risk", true);
     happy(c);
     expect(await c.step()).toBe("shipped");
     expect(c.github.createdPrs[0]!.body).not.toContain("## Factory run");
+    const comments = c.github.issues.get(1)!.comments.map((x) => x.body);
+    expect(comments.some((b) => b.includes("## Factory run"))).toBe(false);
+    expect(comments.filter((b) => b.startsWith("## Receipt")).length).toBe(1);
     done(c);
   });
 
