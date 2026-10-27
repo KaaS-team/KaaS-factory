@@ -38,8 +38,10 @@ export function nextIso(): string {
 // `.local` host, a dollar amount or a model. Only the text outside HTML
 // comments is visible; the factory's hidden data markers may carry anything.
 const HOST = hostname().toLowerCase();
+// Built from a string: semgrep's TypeScript parser cannot read this pattern as a regex literal.
+const HIDDEN_MARKERS = new RegExp("<!--[\\s\\S]*?-->", "g");
 export function visibleLeaks(body: string): string[] {
-  const visible = body.replace(/<!--[\s\S]*?-->/g, "").toLowerCase();
+  const visible = body.replace(HIDDEN_MARKERS, "").toLowerCase();
   const out: string[] = [];
   if (HOST && visible.includes(HOST)) out.push(`hostname ${HOST}`);
   if (/[\w-]\.local\b/.test(visible)) out.push(".local host");
@@ -313,9 +315,11 @@ export class FakeGit extends Git {
     return this.diffStatOverride ?? this.changed.map((path) => ({ path, additions: 1, deletions: 0 }));
   }
 
+  pushCode = 0;
+  pushStderr = "";
   override async push(_worktreeDir: string, issue: number) {
     this.pushed.push(issue);
-    return { stdout: "", stderr: "", code: 0 };
+    return { stdout: "", stderr: this.pushStderr, code: this.pushCode };
   }
 
   pushedBranches: string[] = [];
@@ -341,8 +345,23 @@ export class FakeGit extends Git {
     return this.diffText;
   }
 
+  head = "abc";
+  remoteHead: string | undefined = "abc";
+  commits = true;
+
+  override async headSha(): Promise<string> {
+    return this.head;
+  }
+
+  remoteHeadError: string | undefined;
+
+  override async remoteHeadSha(): Promise<string | undefined> {
+    if (this.remoteHeadError) throw new Error(this.remoteHeadError);
+    return this.remoteHead;
+  }
+
   override async hasCommits(): Promise<boolean> {
-    return true;
+    return this.commits;
   }
 
   // Real git would shell out to `git sparse-checkout`; there's no real repo
