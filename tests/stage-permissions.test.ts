@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claudeArgs } from "../src/agents/presets/claude";
 import type { StageName } from "../src/executor";
-import { STAGE_GUIDANCE, bashAllowed, commandParts, projectPlugins, stageSettings, uncoveredPart } from "../src/stage-permissions";
+import {
+  STAGE_GUIDANCE,
+  bashAllowed,
+  commandParts,
+  projectPlugins,
+  stageSettings,
+  uncoveredPart,
+} from "../src/stage-permissions";
 
 const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr"];
 
