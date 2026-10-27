@@ -56,6 +56,11 @@
       "release": "6.0.0"
     },
     {
+      "id": "v6-planned",
+      "title": "Planned issues: Opus plans, the swarm types",
+      "release": "6.2.0"
+    },
+    {
       "id": "later",
       "title": "Later, for production use"
     }
@@ -1501,6 +1506,14 @@
       "source": "engineering standard, review 26 Oct 2026",
       "owner": "agent",
       "proof": {"test": "tests/plane-access.test.ts", "name": "no route a viewer can read returns a model, a cost, tokens or a host", "mutation": "plane: a viewer's JSON never carries a model, cost, tokens or host"}
+    },
+    {
+      "id": "planned-issue-parses",
+      "phase": "v6-planned",
+      "ask": "the factory skips the replanning, and directly feeds the plan to each ticket",
+      "source": "user, 27 Oct 2026",
+      "owner": "agent",
+      "proof": {"test": "tests/import-plan.test.ts", "name": "an AC that maps to no task is a problem", "mutation": "import-plan: an AC that maps to no task passes"}
     }
   ]
 }
