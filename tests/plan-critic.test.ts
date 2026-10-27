@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mergeConfig } from "../src/config";
+import { planFromIssue, type PlannedIssue } from "../src/engine/import-plan";
 import { parseWorkflowText } from "../src/engine/workflows";
 import {
   critiquePlan,
@@ -242,6 +243,25 @@ describe("deterministicCritique and critiquePlan", () => {
     expect(critiquePlan(check(TASK_PLAN), critic)).toEqual([]);
     expect(critic).toHaveBeenCalledTimes(1);
   });
+});
+
+// Without `task` in plan.json the AC-to-task check never sees a real plan's tasks.
+test("planFromIssue keeps task on each plan.json criterion, and the check accepts the result", () => {
+  const planned: PlannedIssue = {
+    goal: "g",
+    tasks: [{ id: "T1", title: "t", files: ["src/exists.ts"], model: "sonnet", steps: ["do it"] }],
+    tests: ["t.test.ts"],
+    mutations: [],
+    criteria: [{ id: "AC-1", text: "x", commands: ["make check"], task: "T1" }],
+    nonGoals: [],
+    files: [{ path: "src/exists.ts", isNew: false }],
+    risk: "low",
+    model: "sonnet",
+  };
+  const { plan, comment } = planFromIssue(planned, { body: "b" });
+  expect(plan.criteria).toEqual([{ id: "AC-1", text: "x", task: "T1" }]);
+  const config = mergeConfig({ repo: "acme/widgets" });
+  expect(deterministicCritique({ plan, comment, worktree: SCRATCH, config })).toEqual([]);
 });
 
 // The judgment half: the plan skill dispatches one Sonnet critic with a fixed checklist, and it reads only.

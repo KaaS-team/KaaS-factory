@@ -795,6 +795,7 @@
   {"name": "plan critic: a must-fix plan goes back once", "file": "src/engine/plan-critic.ts", "find": "  if (!run.mustFix.length) return run;", "replace": "  return run;", "test": "tests/plan-critic.test.ts"},
   {"name": "plan critic: a plan still wrong waits for a human", "file": "src/engine/plan-critic.ts", "find": "json: { ...run.parsed.json, autoApproveEligible: false } },", "replace": "json: { ...run.parsed.json } },", "test": "tests/plan-critic.test.ts"},
   {"name": "plan critic: skip the deterministic step", "file": "src/engine/plan-critic.ts", "find": "  const problems = deterministicCritique(input);", "replace": "  const problems: string[] = [];", "test": "tests/plan-critic.test.ts"},
+  {"name": "plan critic: planFromIssue keeps task on each criterion", "file": "src/engine/import-plan.ts", "find": "text: c.text, task: c.task }))", "replace": "text: c.text }))", "test": "tests/plan-critic.test.ts"},
   {"name": "stack: default read commands stay offline", "file": "src/stack.ts", "find": "\"npm ls --depth *\"]", "replace": "\"npm ls --depth *\", \"npm view *\"]", "test": "tests/stack.test.ts"},
   {"name": "init: read commands written", "file": "src/init.ts", "find": "read: readCommands(stack), ", "replace": "", "test": "tests/stack.test.ts"},
   {"name": "doctor: empty read list on a dependency route", "file": "src/config-health.ts", "find": "      ok: kept.length > 0,", "replace": "      ok: true,", "test": "tests/doctor.test.ts"},
