@@ -858,5 +858,6 @@
   {"name": "gh-fields: the scan misses pr calls", "file": "src/deploy/gh-fields.ts", "find": "\"(pr|issue|label|run|release|repo|workflow)\"", "replace": "\"(issue|label|run|release|repo|workflow)\"", "test": "tests/gh-fields.test.ts"},
   {"name": "gh-fields: an unknown field is never reported", "file": "src/deploy/gh-fields.ts", "find": "return line ? [{ call, error: line }] : [];", "replace": "return [];", "test": "tests/gh-fields.test.ts"},
   {"name": "gh-fields: the image smoke skips the field check", "file": ".github/workflows/ci.yml", "find": "          docker exec factory bun src/deploy/gh-fields.ts\n", "replace": "", "test": "tests/gh-fields.test.ts"},
-  {"name": "import-plan: an AC that maps to no task passes", "file": "src/engine/import-plan.ts", "find": "if (!task || !taskIds.has(task))", "replace": "if (false)", "test": "tests/import-plan.test.ts"}
+  {"name": "import-plan: an AC that maps to no task passes", "file": "src/engine/import-plan.ts", "find": "if (!task || !taskIds.has(task))", "replace": "if (false)", "test": "tests/import-plan.test.ts"},
+  {"name": "import-plan: a planned body is not recognised", "file": "src/engine/import-plan.ts", "find": "return body.trimStart().startsWith(PLANNED_MARKER);", "replace": "return false;", "test": "tests/import-plan-step.test.ts"}
 ]

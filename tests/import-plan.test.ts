@@ -15,9 +15,7 @@ test("a planned issue round-trips into a plan and a plan comment", async () => {
   expect(out.plan.tasks).toHaveLength(2);
   expect(out.plan.criteria.map((c) => c.id)).toEqual(["AC-1", "AC-2"]);
   expect(out.plan.source).toBe("issue");
-  expect(out.comment).toContain(
-    "- **AC-1:** a build failure resumes at build: checked by `bun test tests/resume.test.ts`",
-  );
+  expect(out.comment).toContain("- **AC-1:** a build failure resumes at build: checked by `tests/resume.test.ts`");
   expect(out.comment).toContain("`tests/resume.test.ts` (new)");
   expect(schemaProblem("plan", out.plan as unknown as Record<string, unknown>)).toBeUndefined();
 });

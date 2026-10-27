@@ -9,6 +9,7 @@ import { parseDataMarkers } from "../derive";
 import type { GhIssue } from "../github";
 import { issueType } from "../labels";
 import { labelsOf, withDataMarker, type WatchDeps } from "./common";
+import { isPlannedBody, PLANNED_WORKFLOW } from "./import-plan";
 
 export const WORKFLOW_MARKER = "workflow";
 
@@ -18,6 +19,13 @@ export const WORKFLOW_MARKER = "workflow";
 export function recordedWorkflow(issue: GhIssue): string | undefined {
   const marker = parseDataMarkers(issue.comments.filter(isTrusted)).find((m) => m.stage === WORKFLOW_MARKER);
   return (marker?.json as { name?: string } | undefined)?.name;
+}
+
+// A planned body carries its own plan, so it runs planned-to-pr whatever its type label says.
+export function chosenWorkflow(config: FactoryConfig, issue: GhIssue): { name?: string; via: string } {
+  if (isPlannedBody(issue.body ?? "")) return { name: PLANNED_WORKFLOW, via: "a planned issue" };
+  const type = issueType(config.routes, labelsOf(issue));
+  return { name: type ? config.routes[type]?.workflow : undefined, via: `\`routes.${type}.workflow\`` };
 }
 
 // The workflow triage's type routes to, and the step in it that stands where triage did.

@@ -16,6 +16,7 @@ The runner ships these. Each one stops a bad output at a different rung:
 | `bug-to-pr` | triage, build, verify, pr | verify rejects back to build; no plan step |
 | `docs-to-pr` | triage, build, pr | the gates only (a lint or link check); red gates park it |
 | `approved-plan-to-pr` | triage, plan, build, verify, pr | every plan parks for a person, whatever its risk |
+| `planned-to-pr` | triage, import-plan, build, verify, pr | an issue whose body is a planned issue (`<!-- factory:planned v1 -->`) brings its own plan, checked but never replanned |
 | `dependency-update` | triage, build, verify, pr | verify rejects a bump the tests do not cover; files itself weekly |
 | `security-audit` | triage, plan, build, verify, pr | every plan parks for a person; files itself daily |
 | `flaky-tests` | triage, build, verify, pr | verify rejects a fix that is not stable; files itself weekly |

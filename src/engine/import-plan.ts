@@ -3,6 +3,8 @@
 
 import type { Risk } from "../artifacts";
 
+// The bundled workflow a planned issue runs; watch.ts picks it from the body, not from a route.
+export const PLANNED_WORKFLOW = "planned-to-pr";
 export const PLANNED_MARKER = "<!-- factory:planned v1 -->";
 
 export interface PlannedTask {
