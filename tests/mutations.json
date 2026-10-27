@@ -867,5 +867,8 @@
   {"name": "operator merge: codeowner refusals dropped", "file": "src/merge-policy.ts", "find": "  if (owners) {\n    refusals.push(", "replace": "  if (false as boolean && owners) {\n    refusals.push(", "test": "tests/merge-policy-operator.test.ts"},
   {"name": "operator merge: CODEOWNERS read at the PR head, not the base", "file": "src/profile-rules.ts", "find": "const text = await read(repo, at, baseRef);", "replace": "const text = await read(repo, at, \"HEAD\");", "test": "tests/profile-rules.test.ts"},
   {"name": "build: a refused push is ignored", "file": "src/engine/steps.ts", "find": "if (pushed.code !== 0) {", "replace": "if (false) {", "test": "tests/push-refused.test.ts"},
-  {"name": "pr: an unshipped branch still opens a PR", "file": "src/engine/steps.ts", "find": "if (unshipped) return stop(", "replace": "if (false) return stop(", "test": "tests/push-refused.test.ts"}
+  {"name": "pr: an unshipped branch still opens a PR", "file": "src/engine/steps.ts", "find": "if (unshipped) return stop(", "replace": "if (false) return stop(", "test": "tests/push-refused.test.ts"},
+  {"name": "build-model: escalation twice", "file": "src/core/model-tier.ts", "find": "return attempt === 0 ? \"sonnet\" : undefined;", "replace": "return attempt <= 1 ? \"sonnet\" : undefined;", "test": "tests/model-tier.test.ts"},
+  {"name": "build-model: a red gate is not rerun", "file": "src/engine/steps.ts", "find": "const up = model && gate.status !== \"GREEN\" ? buildEscalation(attempt) : undefined;", "replace": "const up = undefined;", "test": "tests/scenarios.test.ts"},
+  {"name": "build-model: versions compare as strings", "file": "src/core/model-tier.ts", "find": "const d = (a[i] ?? 0) - (b[i] ?? 0);\n    if (d !== 0) return d > 0;", "replace": "const d = String(a[i] ?? 0).localeCompare(String(b[i] ?? 0));\n    if (d !== 0) return d > 0;", "test": "tests/model-tier.test.ts"}
 ]

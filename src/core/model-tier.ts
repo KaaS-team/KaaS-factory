@@ -36,3 +36,44 @@ export function scopeFrom(plan: unknown, triage: unknown): IssueScope | undefine
   };
   return read(plan, "files") ?? read(triage, "files_expected");
 }
+
+export type Family = "haiku" | "sonnet" | "opus";
+const FAMILIES: readonly Family[] = ["haiku", "sonnet", "opus"];
+
+// A dated snapshot (-YYYYMMDD) is not matched: it is the same model as its family row.
+export function latestModel(family: string, ids: readonly string[]): string | undefined {
+  const re = new RegExp(`^claude-${family}-(\\d{1,2}(?:-\\d{1,2})*)$`);
+  let best: { id: string; version: number[] } | undefined;
+  for (const id of ids) {
+    const m = re.exec(id);
+    if (!m) continue;
+    const version = m[1]!.split("-").map(Number);
+    if (!best || newer(version, best.version)) best = { id, version };
+  }
+  return best?.id;
+}
+
+// Numeric per part, so 5-5 beats 5 and 5 beats 4-5; a string compare would put 4-5 first.
+function newer(a: readonly number[], b: readonly number[]): boolean {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
+const familyOf = (v: unknown): Family | undefined => FAMILIES.find((f) => f === v);
+
+export function buildFamily(plan: unknown): Family {
+  const p = plan as { model?: unknown; tasks?: unknown } | undefined;
+  const own = familyOf(p?.model);
+  if (own) return own;
+  const tasks = Array.isArray(p?.tasks) ? (p.tasks as { model?: unknown }[]) : [];
+  const ranks = tasks.map((t) => FAMILIES.indexOf(familyOf(t?.model) as Family)).filter((i) => i >= 0);
+  return FAMILIES[Math.max(0, ...ranks)]!;
+}
+
+// One climb to sonnet after a red gate, never to opus: a model that failed twice is a plan problem.
+export function buildEscalation(attempt: number): Family | undefined {
+  return attempt === 0 ? "sonnet" : undefined;
+}

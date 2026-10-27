@@ -42,7 +42,11 @@ import {
 } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
-import { LABEL, typesFor } from "../labels";
+import { LABEL, issueType, typesFor } from "../labels";
+import { resolveRoute } from "../agents/executor";
+import { buildEscalation, buildFamily } from "../core/model-tier";
+import { latestPricedModel } from "../pricing";
+import type { StageRunResult } from "../ports/agent";
 import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
 import { prBody, renderWhatChanged } from "./pr-body";
@@ -53,6 +57,8 @@ import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
 import {
   failureTail,
   finish,
+  labelsOf,
+  planOf,
   moveLabel,
   postComment,
   recheckFindings,
@@ -191,34 +197,55 @@ const build: StepType = {
         }),
       );
     }
-    const result = await runStage(deps, config, issue, "build", worktree, {
-      ...rebuildFrom(sc),
-      ...(sc.ctx.rejectRound ? { rejects: sc.ctx.rejectRound } : {}),
-      ...stepOpts(step),
-    });
-    const art = await readStageArtifacts(worktree, issueNumber, "build");
-    const built = stageJson<BuildArtifact>("build", art.json);
-    const problem = built.problem;
-    // The runner owns the attempt count: the agent's copy of the file is cleared every round.
-    const json = built.json && {
-      ...built.json,
-      rounds: deps.state.listStageRuns(config.repo, { issue: issueNumber }).filter((r) => r.stage === "build").length,
-    };
-    const buildStop = stepStop(json);
-    if (buildStop) return stop(await stopStep(deps, config, issueNumber, step.label, buildStop));
+    // Only a first-round claude build picks its own model; a verify reject keeps the tier ladder.
+    const claude =
+      sc.ctx.rejectRound === 0 &&
+      resolveRoute(config.agents, config.stages, config.routes, "build", issueType(config.routes, labelsOf(issue)))
+        .preset?.name === "claude";
+    let model = claude ? latestPricedModel(buildFamily(planOf(issue))) : undefined;
+    let attempt = 0;
+    let result: StageRunResult;
+    let art: Awaited<ReturnType<typeof readStageArtifacts>>;
+    let built: ReturnType<typeof stageJson<BuildArtifact>>;
+    let json: (BuildArtifact & { rounds: number }) | undefined;
+    let gate: Awaited<ReturnType<typeof runGates>>;
+    for (;;) {
+      result = await runStage(deps, config, issue, "build", worktree, {
+        ...rebuildFrom(sc),
+        ...(sc.ctx.rejectRound ? { rejects: sc.ctx.rejectRound } : {}),
+        ...(model ? { model } : {}),
+        ...stepOpts(step),
+      });
+      art = await readStageArtifacts(worktree, issueNumber, "build");
+      built = stageJson<BuildArtifact>("build", art.json);
+      // The runner owns the attempt count: the agent's copy of the file is cleared every round.
+      json = built.json && {
+        ...built.json,
+        rounds: deps.state.listStageRuns(config.repo, { issue: issueNumber }).filter((r) => r.stage === "build").length,
+      };
+      const buildStop = stepStop(json);
+      if (buildStop) return stop(await stopStep(deps, config, issueNumber, step.label, buildStop));
 
-    // The agent's own "needs-info" is a legitimate escape hatch (not a
-    // crash), matched to the runner's exact spelling (audit finding #5:
-    // the skill used to say `needs_info`).
-    if (json?.status === "needs-info") {
-      if (sc.ctx.questionRound < sc.workflow.limits.questions && art.comment)
-        await upsertStatusComment(deps, config, issue, art.comment, json);
-      return askOrHandOver(sc, art.question);
+      // The agent's own "needs-info" is a legitimate escape hatch (not a
+      // crash), matched to the runner's exact spelling (audit finding #5:
+      // the skill used to say `needs_info`).
+      if (json?.status === "needs-info") {
+        if (sc.ctx.questionRound < sc.workflow.limits.questions && art.comment)
+          await upsertStatusComment(deps, config, issue, art.comment, json);
+        return askOrHandOver(sc, art.question);
+      }
+
+      // The runner grades the build, not the agent (audit finding #11): run
+      // the target's own gates.sh here and trust only its FACTORY_GATES line.
+      gate = await runGates(deps.gateRunner, worktree);
+      const up = model && gate.status !== "GREEN" ? buildEscalation(attempt) : undefined;
+      const next = up && latestPricedModel(up);
+      if (!next) break;
+      sc.ctx.failure = failureTail(gate.raw);
+      model = next;
+      attempt += 1;
     }
-
-    // The runner grades the build, not the agent (audit finding #11): run
-    // the target's own gates.sh here and trust only its FACTORY_GATES line.
-    const gate = await runGates(deps.gateRunner, worktree);
+    const problem = built.problem;
     if (art.comment) await upsertStatusComment(deps, config, issue, art.comment, { build: json ?? null, gate });
 
     if (result.exitCode !== 0 || !json || gate.status !== "GREEN") {
