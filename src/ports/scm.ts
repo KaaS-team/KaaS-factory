@@ -88,6 +88,16 @@ export interface RateBudget {
   readonly limit: number;
 }
 
+// The tracker refused a call for rate limiting and said when it lifts (epoch seconds).
+export class RateLimitError extends Error {
+  constructor(
+    readonly status: number,
+    readonly resetAt: number,
+  ) {
+    super(`rate limited (HTTP ${status}), resets at ${new Date(resetAt * 1000).toISOString()}`);
+  }
+}
+
 export type RepoRole = "admin" | "maintain" | "write" | "triage" | "read" | "none";
 export const TRUSTED_ROLES: readonly RepoRole[] = ["admin", "maintain", "write"];
 
@@ -97,6 +107,8 @@ export const TRUSTED_ROLES: readonly RepoRole[] = ["admin", "maintain", "write"]
 export interface TrackerPort {
   listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]>;
   getIssue(repo: string, number: number): Promise<GhIssue>;
+  // Optional: every label's open issues in one request. The watcher falls back to one listIssuesByLabel per label.
+  listIssuesByLabels?(repo: string, labels: readonly string[]): Promise<Map<string, GhIssue[]>>;
   listOpenIssues(repo: string): Promise<GhIssue[]>;
   commentIssue(repo: string, number: number, body: string): Promise<number | undefined>;
   editComment(repo: string, commentId: number, body: string): Promise<void>;

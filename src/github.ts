@@ -27,6 +27,7 @@ export class GhCommandRunner implements CommandRunner {
   }
 }
 
+import { RateLimitError } from "./ports/scm";
 import type {
   GhIssue,
   GhComment,
@@ -105,6 +106,35 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "500",
     ]);
     return (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
+  }
+
+  // One request for every label: gh's --label filter is AND, so list the open issues once and split by label here.
+  // A 403/429 is a rate limit when the response says when it lifts; gh prints no headers for `issue list`, so the
+  // reset time comes from the rate_limit endpoint's headers.
+  async listIssuesByLabels(repo: string, labels: readonly string[]): Promise<Map<string, GhIssue[]>> {
+    const result = await this.runner.run([
+      "issue",
+      "list",
+      "--repo",
+      repo,
+      "--state",
+      "open",
+      "--json",
+      "number,title,body,labels,comments",
+      "--limit",
+      "500",
+    ]);
+    if (result.code !== 0) {
+      const status = /HTTP (403|429)/.exec(result.stderr)?.[1];
+      if (status) {
+        const probe = await this.runner.run(["api", "--include", "rate_limit"]);
+        const reset = /^x-ratelimit-reset:\s*(\d+)/im.exec(probe.stdout)?.[1];
+        if (reset) throw new RateLimitError(Number(status), Number(reset));
+      }
+      throw new GhError(["issue", "list"], result);
+    }
+    const issues = (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
+    return new Map(labels.map((l) => [l, issues.filter((i) => i.labels.some((x) => x.name === l))]));
   }
 
   // Includes state/stateReason (blockers.ts's only reader of either field) so

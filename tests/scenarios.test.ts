@@ -15,7 +15,10 @@ import { FactoryState } from "../src/state";
 import { LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { EPOCH, startOfTodayUtc } from "../src/engine/common";
-import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
+import { advanceIssue, pollOnce, recoverInFlight, tickDelay, tickDue } from "../src/watch";
+import { GitHub } from "../src/github";
+import { RateLimitError } from "../src/ports/scm";
+import { LabelMappedTracker } from "../src/scm";
 import { EventBus } from "../src/engine/bus";
 import {
   baseIssue,
@@ -1351,5 +1354,86 @@ describe("parked runs ended outside the factory", () => {
     expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(true);
     expect(closedViews).toEqual([]);
     done(c);
+  });
+});
+
+describe("one labels call per tick, and rate-limit backoff", () => {
+  const T0 = Date.parse("2026-06-01T00:00:00Z");
+  const at = (c: Ctx) => ({ ...c.deps, now: () => new Date(T0) });
+
+  test("one tick makes one labels call", async () => {
+    const c = setup([LABEL.needsHuman]);
+    await pollOnce(c.deps, c.config);
+    expect(c.github.labelsCalls).toBe(1);
+    expect(c.github.labelCalls).toBe(0);
+    done(c);
+  });
+
+  test("tracker without listIssuesByLabels falls back to per-label calls", async () => {
+    const c = setup([LABEL.needsHuman]);
+    const bare = Object.create(c.github, { listIssuesByLabels: { value: undefined } });
+    await pollOnce({ ...c.deps, github: bare }, c.config);
+    expect(bare.labelsCalls).toBe(0);
+    expect(bare.labelCalls).toBe(7);
+    done(c);
+  });
+
+  test("LabelMappedTracker maps labels through listIssuesByLabels", async () => {
+    const c = setup(["team-ready"]);
+    const mapped = new LabelMappedTracker(c.github, { [LABEL.ready]: "team-ready" });
+    const found = await mapped.listIssuesByLabels!("acme/widgets", [LABEL.ready, LABEL.failed]);
+    expect(found.get(LABEL.ready)!.map((i) => i.labels[0]!.name)).toEqual([LABEL.ready]);
+    expect(found.get(LABEL.failed)).toEqual([]);
+    expect(c.github.labelsCalls).toBe(1);
+    done(c);
+  });
+
+  test("rate-limit fixture sets nextTickAt to the reset time", async () => {
+    const c = setup([LABEL.ready]);
+    c.github.rateLimited = new RateLimitError(429, (T0 + 60_000) / 1000);
+    const r = await pollOnce(at(c), c.config);
+    expect(r.nextTickAt).toBe(T0 + 60_000);
+    expect(r.processed).toEqual([]);
+    done(c);
+  });
+
+  test("rate-limit backoff is capped at 900s", async () => {
+    const c = setup([LABEL.ready]);
+    c.github.rateLimited = new RateLimitError(403, (T0 + 3_600_000) / 1000);
+    expect((await pollOnce(at(c), c.config)).nextTickAt).toBe(T0 + 900_000);
+    done(c);
+  });
+
+  const failing = (stderr: string, header: string) =>
+    new GitHub({
+      run: async (args) =>
+        args[0] === "api"
+          ? { stdout: `HTTP/2.0 200 OK\n${header}\n\n{}`, stderr: "", code: 0 }
+          : { stdout: "", stderr, code: 1 },
+    });
+
+  test("GitHub.listIssuesByLabels parses the rate-limit status and header", async () => {
+    const gh = failing("HTTP 403: API rate limit exceeded", "X-Ratelimit-Reset: 1780000000");
+    const err = await gh.listIssuesByLabels("a/b", ["x"]).catch((e) => e);
+    expect(err).toBeInstanceOf(RateLimitError);
+    expect([err.status, err.resetAt]).toEqual([403, 1780000000]);
+  });
+
+  test("403 without x-ratelimit-reset is not treated as a rate limit", async () => {
+    const err = await failing("HTTP 403: forbidden", "")
+      .listIssuesByLabels("a/b", ["x"])
+      .catch((e) => e);
+    expect(err).not.toBeInstanceOf(RateLimitError);
+    expect(String(err)).toContain("403");
+  });
+
+  test("tick waits for nextTickAt, and webhook ticks before it are skipped", () => {
+    const next = T0 + 600_000;
+    expect(tickDue(next, T0 + 599_999)).toBe(false);
+    expect(tickDue(next, T0 + 600_000)).toBe(true);
+    expect(tickDue(undefined, T0)).toBe(true);
+    expect(tickDelay(30_000, next, T0)).toBe(600_000);
+    expect(tickDelay(30_000, T0 + 1000, T0)).toBe(30_000);
+    expect(tickDelay(30_000, undefined, T0)).toBe(30_000);
   });
 });

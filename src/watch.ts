@@ -53,7 +53,7 @@ import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
 import { shipRunState } from "./engine/blobs";
-import { TRUSTED_ROLES } from "./ports/scm";
+import { RateLimitError, TRUSTED_ROLES } from "./ports/scm";
 import { cachedRole, isWriter, writersOnly } from "./trust";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
@@ -61,6 +61,31 @@ export interface PollResult {
   readonly paused: boolean;
   readonly reason?: string;
   readonly processed: number[];
+  // Epoch ms before which the tracker must not be called again (it rate limited this tick).
+  readonly nextTickAt?: number;
+}
+
+export const MAX_BACKOFF_MS = 900_000;
+
+// How long to wait before the next tick, and whether a tick may call the tracker now.
+export const tickDelay = (intervalMs: number, nextTickAt: number | undefined, now: number): number =>
+  Math.max(intervalMs, (nextTickAt ?? 0) - now);
+export const tickDue = (nextTickAt: number | undefined, now: number): boolean => (nextTickAt ?? 0) <= now;
+
+// The labels pollOnce watches: one request when the tracker can, else one per label.
+async function listWatched(deps: WatchDeps, config: FactoryConfig): Promise<Map<string, GhIssue[]>> {
+  const labels = [
+    LABEL.ready,
+    LABEL.needsInfo,
+    LABEL.awaitingApproval,
+    LABEL.failed,
+    LABEL.needsHuman,
+    LABEL.inReview,
+    LABEL.blocked,
+  ];
+  if (deps.github.listIssuesByLabels) return deps.github.listIssuesByLabels(config.repo, labels);
+  const lists = await Promise.all(labels.map((l) => deps.github.listIssuesByLabel(config.repo, l)));
+  return new Map(labels.map((l, i) => [l, lists[i]!]));
 }
 
 // The workflow an issue runs: the one its pickup recorded (a route's, see
@@ -588,15 +613,22 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // A minion runs for minutes: started here, never awaited by the poll.
   for (const minion of dueCronMinions(deps.state, config.repo, deps.minions ?? [], deps.now?.() ?? new Date()))
     startMinion(deps, config, minion);
-  const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
-    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
-    deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
-    deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
-    deps.github.listIssuesByLabel(config.repo, LABEL.failed),
-    deps.github.listIssuesByLabel(config.repo, LABEL.needsHuman),
-    deps.github.listIssuesByLabel(config.repo, LABEL.inReview),
-    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
-  ]);
+  let found: Map<string, GhIssue[]>;
+  try {
+    found = await listWatched(deps, config);
+  } catch (err) {
+    if (!(err instanceof RateLimitError)) throw err;
+    const now = (deps.now?.() ?? new Date()).getTime();
+    return { paused: false, processed: [], nextTickAt: Math.min(err.resetAt * 1000, now + MAX_BACKOFF_MS) };
+  }
+  const labelled = (label: string) => found.get(label) ?? [];
+  const readyRaw = intakeGated ? labelled(LABEL.ready) : [];
+  const blockedRaw = intakeGated ? labelled(LABEL.blocked) : [];
+  const needsInfo = labelled(LABEL.needsInfo);
+  const awaitingApproval = labelled(LABEL.awaitingApproval);
+  const failed = labelled(LABEL.failed);
+  const needsHuman = labelled(LABEL.needsHuman);
+  const inReview = labelled(LABEL.inReview);
 
   // The dependency gate (blockers.ts), once per poll before any dispatch: a ready issue with an open
   // "Blocked by" moves to LABEL.blocked, and back to ready the poll its last blocker clears.
@@ -710,13 +742,32 @@ export function startWatch(
     handleEvent(deps, config, e).then((filed) => void ((filed > 0 || isExternalEventType(e.type)) && tick())),
   );
 
+  const intervalMs = config.pollIntervalSeconds * 1000;
+  let nextTickAt: number | undefined;
+  const now = () => (deps.now?.() ?? new Date()).getTime();
+  const arm = (ms: number) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = undefined;
+      tick();
+    }, ms);
+  };
+
   function tick(): void {
     if (stopped) return;
-    if (timer) clearTimeout(timer);
+    // A webhook tick inside the backoff leaves the pending timer to fire it.
+    if (!tickDue(nextTickAt, now())) {
+      if (!timer) arm(tickDelay(intervalMs, nextTickAt, now()));
+      return;
+    }
     pollOnce(deps, config, inFlight)
-      .then((result) => onTick?.(result))
+      .then((result) => {
+        nextTickAt = result.nextTickAt;
+        if (nextTickAt !== undefined && !stopped) arm(tickDelay(intervalMs, nextTickAt, now()));
+        onTick?.(result);
+      })
       .catch((err) => console.error("factory watch: poll failed", err));
-    timer = setTimeout(tick, config.pollIntervalSeconds * 1000);
+    arm(intervalMs);
   }
 
   const webhooks = setInterval(() => {

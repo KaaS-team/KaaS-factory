@@ -20,6 +20,7 @@ import {
   type PrStatus,
   type RepoRole,
 } from "../src/github";
+import type { RateLimitError } from "../src/ports/scm";
 import { Git } from "../src/git";
 import type { ChangedFile } from "../src/merge-policy";
 import type { GateRunner } from "../src/gates";
@@ -69,8 +70,24 @@ export class FakeGitHub extends GitHub {
     for (const i of issues) this.issues.set(i.number, i);
   }
 
+  labelCalls = 0;
+  labelsCalls = 0;
+  // The next listIssuesByLabels call throws this once.
+  rateLimited?: RateLimitError;
+
   override async listIssuesByLabel(_repo: string, label: string): Promise<GhIssue[]> {
+    this.labelCalls++;
     return [...this.issues.values()].filter((i) => i.labels.some((l) => l.name === label));
+  }
+
+  override async listIssuesByLabels(_repo: string, labels: readonly string[]): Promise<Map<string, GhIssue[]>> {
+    this.labelsCalls++;
+    if (this.rateLimited) {
+      const err = this.rateLimited;
+      this.rateLimited = undefined;
+      throw err;
+    }
+    return new Map(labels.map((l) => [l, [...this.issues.values()].filter((i) => i.labels.some((x) => x.name === l))]));
   }
 
   override async getIssue(_repo: string, number: number): Promise<GhIssue> {
