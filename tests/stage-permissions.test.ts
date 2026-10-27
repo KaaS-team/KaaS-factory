@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claudeArgs } from "../src/agents/presets/claude";
 import type { StageName } from "../src/executor";
-import { bashAllowed, commandParts, projectPlugins, stageSettings, uncoveredPart } from "../src/stage-permissions";
+import {
+  STAGE_GUIDANCE,
+  bashAllowed,
+  commandParts,
+  projectPlugins,
+  stageSettings,
+  uncoveredPart,
+} from "../src/stage-permissions";
 
 const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr"];
 
@@ -114,5 +121,12 @@ describe("project plugins stay out of a stage", () => {
   test("a repo with no settings file adds no enabledPlugins key", () => {
     expect(projectPlugins(mkdtempSync(join(tmpdir(), "plugins-")))).toEqual([]);
     expect(JSON.parse(stageSettings("plan", 1)).enabledPlugins).toBeUndefined();
+  });
+});
+
+describe("STAGE_GUIDANCE", () => {
+  test("tells a stage to rewrite a refused test command into make or the gate script", () => {
+    expect(STAGE_GUIDANCE).toContain('make test FILES="<files>"');
+    expect(STAGE_GUIDANCE).toContain(".factory/gates.sh");
   });
 });
