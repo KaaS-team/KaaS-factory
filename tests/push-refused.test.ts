@@ -51,6 +51,14 @@ describe("a refused push", () => {
     expect(e.executor.mcp.filter(([stage]) => stage === "pr")).toHaveLength(0);
   });
 
+  test("pr does not open when the remote cannot be read", async () => {
+    const e = make();
+    e.git.remoteHeadError = "git ls-remote failed: network down";
+    expect(await e.run()).toBe("failed");
+    expect(e.github.createdPrs).toHaveLength(0);
+    expect(comments(e)).toContain("pr_remote_unreachable");
+  });
+
   test("pr does not open for an empty branch", async () => {
     const e = make();
     e.git.commits = false;
