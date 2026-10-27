@@ -1,6 +1,6 @@
 // Model routing by size and risk: the tier rule, where its inputs come from, and that the
 // executor runs the tier's model, so a cheap change never pays for the strong model.
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +8,9 @@ import { CommandExecutor } from "../src/agents/executor";
 import { configProblems, mergeConfig } from "../src/config";
 import { LARGE_MIN_FILES, SMALL_MAX_FILES, scopeFrom, tierFor } from "../src/core/model-tier";
 import { scopeOf } from "../src/engine/common";
-import { baseIssue } from "./harness";
+import { parseWorkflowText } from "../src/engine/workflows";
+import { engine, removeEngineDirs } from "./engine-harness";
+import { baseIssue, fixtureFor } from "./harness";
 import { PRICES, latestPricedModel } from "../src/pricing";
 import { buildEscalation, buildFamily, latestModel } from "../src/core/model-tier";
 import { readdirSync, readFileSync } from "node:fs";
@@ -54,6 +56,47 @@ describe("build model", () => {
       .filter((f) => !f.endsWith("/src/pricing.ts"))
       .filter((f) => /claude-(haiku|sonnet|opus)-/.test(readFileSync(f, "utf8")));
     expect(hits).toEqual([]);
+  });
+});
+
+describe("build model with a step-pinned agent", () => {
+  afterAll(removeEngineDirs);
+  const planOut = {
+    "plan-comment.md": [
+      "<!-- factory:plan v1 rev=1 -->",
+      "### Acceptance criteria",
+      "- **AC-1:** x: checked by `make test`",
+      "### Tests to write first",
+      "- `tests/x.test.ts`",
+    ].join("\n"),
+    "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["a"], autoApproveEligible: true }),
+  };
+  const pinned = (agent: string, agents: Record<string, unknown>) => {
+    const text = readFileSync(join(import.meta.dir, "..", "template", ".factory", "workflows", "feature-to-pr.yml"));
+    const r = parseWorkflowText(text.toString().replace("    uses: build\n", `    uses: build\n    agent: ${agent}\n`));
+    if (!r.ok) throw new Error(r.problems.join("; "));
+    const config = { agents, toggles: { autoApproveLowRisk: true }, agentCommands: { build: ["make *"] } };
+    const e = engine(r.workflow, 0, {}, {}, {}, { outputs: { plan: [planOut] }, config });
+    e.gateRunner.line = "FACTORY_GATES: status=RED passed=1 failed=1 skipped=0 failed_gates=unit";
+    return e;
+  };
+  const buildModels = (e: ReturnType<typeof pinned>) =>
+    e.executor.models.filter(([s]) => s === "build").map(([, m]) => m);
+
+  test("a pinned non-claude agent builds once, with no Claude id", async () => {
+    const e = pinned("other", { other: { command: ["true"] } });
+    expect(await e.run()).toBe("failed");
+    expect(buildModels(e)).toEqual([undefined]);
+  });
+
+  test("a pinned claude agent gets the model pick and the one rerun", async () => {
+    const e = pinned("pin", { pin: { preset: "claude" } });
+    e.executor.push("build", 1, fixtureFor("build", 1), {
+      "status-comment.md": "<!-- factory:status v1 -->\nb",
+      "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+    });
+    expect(await e.run()).toBe("failed");
+    expect(buildModels(e)).toEqual([latestPricedModel("haiku"), latestPricedModel("sonnet")]);
   });
 });
 
