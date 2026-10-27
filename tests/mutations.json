@@ -261,7 +261,7 @@
   {"name": "port: a port another worktree holds is not handed out again", "file": "src/port.ts", "find": "held.has(port) && tries < 20", "replace": "false && tries < 20", "test": "tests/port.test.ts"},
   {"name": "port: gates.sh runs with FACTORY_PORT", "file": "src/gates.ts", "find": "${port ? `FACTORY_PORT=${port} ` : \"\"}", "replace": "", "test": "tests/port.test.ts"},
   {"name": "port: the stage's environment carries FACTORY_PORT", "file": "src/agents/executor.ts", "find": "      ...portEnv(opts.cwd),\n", "replace": "", "test": "tests/port.test.ts"},
-  {"name": "routes: an issue of a routed type runs its route's workflow", "file": "src/watch.ts", "find": "  const name = type ? config.routes[type]?.workflow : undefined;", "replace": "  const name = undefined as string | undefined;", "test": "tests/workflow.test.ts"},
+  {"name": "routes: an issue of a routed type runs its route's workflow", "file": "src/engine/late-route.ts", "find": "name: type ? config.routes[type]?.workflow : undefined,", "replace": "name: undefined,", "test": "tests/workflow.test.ts"},
   {"name": "routes: the workflow recorded at pickup is the one a resumed issue runs", "file": "src/watch.ts", "find": "  return (chosen && deps.routeWorkflows?.[chosen]) || deps.workflow || defaultWorkflow();", "replace": "  return deps.workflow || defaultWorkflow();", "test": "tests/workflow.test.ts"},
   {"name": "routes: recovery scans every routed workflow's running labels", "file": "src/watch.ts", "find": "const running = new Set(\n    allWorkflows(deps).flatMap(", "replace": "const running = new Set([workflowOf(deps)].flatMap(", "test": "tests/workflow.test.ts"},
   {"name": "config: a route's workflow must be a plain name", "file": "src/config.ts", "find": "if (typeof r.workflow === \"string\" && !/^[\\w-]+$/.test(r.workflow))", "replace": "if (typeof r.workflow === \"string\" && !/./.test(r.workflow))", "test": "tests/workflow.test.ts"},
@@ -858,5 +858,7 @@
   {"name": "gh-fields: the scan misses pr calls", "file": "src/deploy/gh-fields.ts", "find": "\"(pr|issue|label|run|release|repo|workflow)\"", "replace": "\"(issue|label|run|release|repo|workflow)\"", "test": "tests/gh-fields.test.ts"},
   {"name": "gh-fields: an unknown field is never reported", "file": "src/deploy/gh-fields.ts", "find": "return line ? [{ call, error: line }] : [];", "replace": "return [];", "test": "tests/gh-fields.test.ts"},
   {"name": "gh-fields: the image smoke skips the field check", "file": ".github/workflows/ci.yml", "find": "          docker exec factory bun src/deploy/gh-fields.ts\n", "replace": "", "test": "tests/gh-fields.test.ts"},
-  {"name": "import-plan: an AC that maps to no task passes", "file": "src/engine/import-plan.ts", "find": "if (!task || !taskIds.has(task))", "replace": "if (false)", "test": "tests/import-plan.test.ts"}
+  {"name": "import-plan: an AC that maps to no task passes", "file": "src/engine/import-plan.ts", "find": "if (!task || !taskIds.has(task))", "replace": "if (false)", "test": "tests/import-plan.test.ts"},
+  {"name": "import-plan: a planned body is not recognised", "file": "src/engine/import-plan.ts", "find": "return body.trimStart().startsWith(PLANNED_MARKER);", "replace": "return false;", "test": "tests/import-plan-step.test.ts"},
+  {"name": "import-plan: a path outside the worktree is read", "file": "src/engine/import-plan-step.ts", "find": "rel.startsWith(\"..\") || ", "replace": "", "test": "tests/import-plan-step.test.ts"}
 ]

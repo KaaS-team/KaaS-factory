@@ -1514,6 +1514,14 @@
       "source": "user, 27 Oct 2026",
       "owner": "agent",
       "proof": {"test": "tests/import-plan.test.ts", "name": "an AC that maps to no task is a problem", "mutation": "import-plan: an AC that maps to no task passes"}
+    },
+    {
+      "id": "planned-issue-skips-plan",
+      "phase": "v6-planned",
+      "ask": "the factory skips the replanning, and directly feeds the plan to each ticket",
+      "source": "user, 27 Oct 2026",
+      "owner": "agent",
+      "proof": {"test": "tests/import-plan-step.test.ts", "name": "a planned issue reaches a PR with no plan stage run", "mutation": "import-plan: a planned body is not recognised"}
     }
   ]
 }

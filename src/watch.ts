@@ -24,7 +24,7 @@ import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
-import { issueType, LABEL, PARKED_LABELS } from "./labels";
+import { LABEL, PARKED_LABELS } from "./labels";
 import { canServe, effectiveSlots, machineBeat } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
@@ -46,7 +46,7 @@ import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { defaultWorkflow } from "./engine/workflows";
 
 import { cronStore, fireCron, fireEvent } from "./engine/triggers";
-import { recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
+import { chosenWorkflow, recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
 import { refuseRepeat } from "./engine/failure";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
@@ -88,10 +88,9 @@ function allWorkflows(deps: WatchDeps): Workflow[] {
 // At pickup: the workflow its type's route names (routes.<type>.workflow), recorded on the issue so
 // every later step reads the same one. An issue whose type has none runs the repo's, and gets no comment.
 async function chooseWorkflow(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<GhIssue> {
-  const type = issueType(config.routes, labelsOf(issue));
-  const name = type ? config.routes[type]?.workflow : undefined;
+  const { name, via } = chosenWorkflow(config, issue);
   if (!name || !deps.routeWorkflows?.[name] || name === workflowOf(deps).name || recordedWorkflow(issue)) return issue;
-  const body = withDataMarker(`Running workflow \`${name}\` (\`routes.${type}.workflow\`).`, WORKFLOW_MARKER, { name });
+  const body = withDataMarker(`Running workflow \`${name}\` (${via}).`, WORKFLOW_MARKER, { name });
   const id = await deps.github.commentIssue(config.repo, issue.number, body);
   return {
     ...issue,

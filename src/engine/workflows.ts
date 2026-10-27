@@ -9,6 +9,7 @@ import type { Workflow, WorkflowResult } from "../core/workflow";
 import { parseWorkflowFull } from "../core/workflow-extras";
 import { isWorkflowMd, workflowMdToRaw } from "../core/workflow-md";
 import { STEP_LABELS } from "../labels";
+import { PLANNED_WORKFLOW } from "./import-plan";
 import { ALL_STEP_TYPES } from "./registry";
 
 export const DEFAULT_WORKFLOW = DEFAULT_CONFIG.workflow;
@@ -93,6 +94,7 @@ export async function routeWorkflowsFor(
       type.startsWith("_") || !r?.workflow || r.workflow === config.workflow ? [] : [r.workflow],
     ),
   );
+  if (config.workflow !== PLANNED_WORKFLOW) names.add(PLANNED_WORKFLOW);
   const out: Record<string, Workflow> = {};
   for (const name of names) out[name] = await workflowFor(cloneDir, { workflow: name });
   return out;
