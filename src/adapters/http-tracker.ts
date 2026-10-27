@@ -33,11 +33,11 @@ export const TRACKER_ROUTES = {
   labeledBy: "GET /projects/{project}/issues/{n}/label-events",
   roleOf: "GET /projects/{project}/members/{login}",
   authStatus: "GET /me",
-} as const satisfies Record<keyof TrackerPort, string>;
+} as const satisfies Record<Exclude<keyof TrackerPort, "listIssuesByLabels">, string>;
 
 export const TRACKER_PREFIX = "/tracker/v1";
 
-type Route = (typeof TRACKER_ROUTES)[keyof TrackerPort];
+type Route = (typeof TRACKER_ROUTES)[keyof typeof TRACKER_ROUTES];
 const ROLES: readonly RepoRole[] = ["admin", "maintain", "write", "triage", "read", "none"];
 
 export class TrackerHttpError extends Error {

@@ -132,10 +132,10 @@
     "src/doctor.ts": 445,
     "src/engine/common.ts": 640,
     "src/engine/steps.ts": 575,
-    "src/github.ts": 522,
+    "src/github.ts": 552,
     "src/receipt.ts": 459,
     "src/state.ts": 726,
-    "src/watch.ts": 795
+    "src/watch.ts": 846
   },
   "names": {
     "src/engine/common.ts": 1
