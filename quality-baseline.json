@@ -124,7 +124,7 @@
     "tests/visual-system.test.ts": 1
   },
   "lines": {
-    "dashboard/server.ts": 736,
+    "dashboard/server.ts": 720,
     "src/agents/executor.ts": 476,
     "src/agents/structured.ts": 401,
     "src/cli.ts": 1084,

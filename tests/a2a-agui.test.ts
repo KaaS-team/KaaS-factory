@@ -44,9 +44,11 @@ function plane(env: Record<string, string>, repo = REPO) {
   const tracker = new MemoryTracker();
   const links = new LinkStore(":memory:");
   const { routes, bound } = integrationRoutes({
-    state: { busEvents: () => rows },
+    stateFor: () => ({ busEvents: () => rows }),
+    access: { repoOf: () => "", visibleRepos: (_req, repos) => [...repos] },
     tracker,
     repo,
+    served: () => [REPO],
     env,
     links: () => links,
     store: { roleOf: () => null },
