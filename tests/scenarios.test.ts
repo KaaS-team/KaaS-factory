@@ -17,6 +17,7 @@ import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { EPOCH, startOfTodayUtc } from "../src/engine/common";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
 import { EventBus } from "../src/engine/bus";
+import { latestPricedModel } from "../src/pricing";
 import {
   baseIssue,
   FakeGateRunner,
@@ -305,6 +306,7 @@ describe("approval paths", () => {
     c.push("triage", triage());
     c.push("plan", plan("low"));
     c.push("build", build());
+    c.push("build", build()); // the red gate reruns once on sonnet
     expect(await c.step()).toBe("failed");
     c.gateRunner.line = "FACTORY_GATES: status=GREEN passed=2 failed=0 skipped=0 failed_gates=-";
     c.push("build", build());
@@ -315,6 +317,7 @@ describe("approval paths", () => {
     expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual([
       "triage",
       "plan",
+      "build",
       "build",
       "build",
       "verify",
@@ -504,6 +507,7 @@ describe("failure paths", () => {
     c.push("triage", triage());
     c.push("plan", plan("low"));
     c.push("build", build());
+    c.push("build", build()); // the red gate reruns once on sonnet
     expect(await c.step()).toBe("failed");
     expect(c.state.getRun("acme/widgets", 1)!.reason).toContain("unit");
     c.gateRunner.line = "FACTORY_GATES: status=GREEN passed=2 failed=0 skipped=0 failed_gates=-";
@@ -515,6 +519,23 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("10b. a red-gate build reruns once on sonnet, then fails", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.gateRunner.line = "FACTORY_GATES: status=RED passed=1 failed=1 skipped=0 failed_gates=unit";
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    c.push("build", build());
+    c.push("build", build()); // never reached: a second escalation would consume it
+    expect(await c.step()).toBe("failed");
+    expect(c.executor.models.filter(([s]) => s === "build").map(([, m]) => m)).toEqual([
+      latestPricedModel("haiku"),
+      latestPricedModel("sonnet"),
+    ]);
+    expect(c.executor.resumed.at(-1)?.failure).toContain("unit");
+  });
+
   test("10e. a retry into the same failure with nothing changed is refused, and --force runs it (#86)", async () => {
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);
@@ -522,11 +543,13 @@ describe("failure paths", () => {
     c.push("triage", triage());
     c.push("plan", plan("low"));
     c.push("build", build());
+    c.push("build", build()); // the red gate reruns once on sonnet
     expect(await c.step()).toBe("failed");
+    c.push("build", build());
     c.push("build", build());
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("failed");
-    expect(c.state.getRun("acme/widgets", 1)!.reason).toStartWith("build attempt 2: the change refused by gate:unit");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toStartWith("build attempt 4: the change refused by gate:unit");
     const runs = c.state.listStageRuns("acme/widgets", { issue: 1 }).length;
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("waiting");
@@ -1172,6 +1195,7 @@ describe("cancel from every waiting state", () => {
       c.gateRunner.line = "FACTORY_GATES: status=RED passed=1 failed=1 skipped=0 failed_gates=unit";
       c.state.setToggle("auto_approve_low_risk", true);
       happy(c);
+      c.push("build", build());
       await c.step();
     },
     [LABEL.inReview]: async (c) => {

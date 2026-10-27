@@ -1,3 +1,5 @@
+import { latestModel } from "./core/model-tier";
+
 // Per-model list prices in USD per million tokens. An unknown model is
 // undefined, never 0: an invented price is worse than "Not reported".
 export interface Price {
@@ -56,6 +58,11 @@ export interface PricedUsage {
   readonly tokensOut: number;
   // Cache reads, already counted inside tokensIn (Claude adds them there).
   readonly tokensCached?: number;
+}
+
+// The one place the runner learns a model id when it picks the model itself.
+export function latestPricedModel(family: string): string | undefined {
+  return latestModel(family, Object.keys(PRICES));
 }
 
 // Dated snapshots ("claude-haiku-4-5-20251001") price as their family.

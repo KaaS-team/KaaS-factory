@@ -122,7 +122,9 @@ function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, s
 }
 
 // The agent with `model` swapped for its tier's, so every preset and {{model}} see one model.
-function withTier(agent: ResolvedAgent, opts: Pick<StageRunOptions, "scope" | "rejects">): ResolvedAgent {
+function withTier(agent: ResolvedAgent, opts: Pick<StageRunOptions, "scope" | "rejects" | "model">): ResolvedAgent {
+  if (opts.model && agent.preset?.name === "claude")
+    return { ...agent, config: { ...agent.config, model: opts.model } };
   const tier = tierFor(opts.scope, opts.rejects);
   const model = tier && agent.config.models?.[tier];
   return model ? { ...agent, config: { ...agent.config, model } } : agent;

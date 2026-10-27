@@ -310,6 +310,10 @@ export function scopeOf(issue: GhIssue, stage: string): { scope?: IssueScope } {
   return scope ? { scope } : {};
 }
 
+export function planOf(issue: GhIssue): unknown {
+  return latestDataFor(parseDataMarkers(issue.comments.filter(isTrusted)), "plan");
+}
+
 export async function runStage(
   deps: WatchDeps,
   config: FactoryConfig,
