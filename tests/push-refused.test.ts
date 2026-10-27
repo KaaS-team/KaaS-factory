@@ -28,6 +28,14 @@ describe("a refused push", () => {
     expect(comments(e)).toContain("lease stale");
   });
 
+  test("a multi-line refusal keeps its decisive last line", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = "remote: noise\nremote: more noise\n ! [remote rejected] HEAD -> branch (hook declined)";
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("hook declined");
+  });
+
   test("a clean push still reaches verify", async () => {
     const e = make();
     expect(await e.run()).toBe("shipped");
@@ -40,6 +48,7 @@ describe("a refused push", () => {
     expect(await e.run()).toBe("failed");
     expect(e.github.createdPrs).toHaveLength(0);
     expect(comments(e)).toContain("pr_head_mismatch");
+    expect(e.executor.mcp.filter(([stage]) => stage === "pr")).toHaveLength(0);
   });
 
   test("pr does not open for an empty branch", async () => {
