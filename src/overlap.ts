@@ -39,10 +39,13 @@ export function plannedFiles(issue: Pick<GhIssue, "comments">): string[] {
   return Array.isArray(plan?.files) ? plan.files.filter((f): f is string => typeof f === "string") : [];
 }
 
+// Parked issues (failed, needs-human, needs-info) are left out on purpose: they may sit for days,
+// and holding every later plan on the same files behind them would stall the queue.
 const STARTED_LABELS: readonly string[] = [LABEL.building, LABEL.verifying, LABEL.inReview];
 
 // An issue that passed the check but has no building label yet (its worktree is being made) still
 // counts, so two approved in one poll cannot both pass. Dropped once its label shows or after the TTL.
+// It lives in this process only: two runners on one repo can still race, and the later PR then conflicts.
 const CLEARED_TTL_MS = 120_000;
 const cleared = new WeakMap<WatchDeps, Map<number, { files: readonly string[]; at: number }>>();
 
@@ -88,7 +91,7 @@ export async function holdForOverlap(
   if (blockers.length === 0) return false;
   const first = blockers[0]!;
   const others = blockers.length > 1 ? ` (and ${blockers.length - 1} more)` : "";
-  await moveLabel(deps, config, issue, from, LABEL.overlap);
+  // The comment goes first so a failure between the two never leaves the label with no explanation.
   await postComment(
     deps,
     config,
@@ -96,6 +99,7 @@ export async function holdForOverlap(
     `This plan touches ${first.shared.join(", ")}, which #${first.issue} is already changing${others}. The factory will start building once those PRs merge or close.`,
     { stage: "overlap", json: { blockedBy: blockers.map((b) => b.issue) } },
   );
+  await moveLabel(deps, config, issue, from, LABEL.overlap);
   finish(deps, config, issue, "awaiting-approval", "waiting on an earlier issue that changes the same files");
   return true;
 }
