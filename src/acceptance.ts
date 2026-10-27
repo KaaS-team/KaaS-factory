@@ -121,6 +121,27 @@ export function renderPlanAcceptance(
   return lines.join("\n");
 }
 
+// The kit checks every spec in the repo; verify answers only for the criteria this plan names. No
+// criteria in the plan keeps the whole verdict, and a filter that leaves nothing to say returns undefined.
+export function planAcceptance(
+  kit: AcceptanceVerdict,
+  plan: { readonly criteria?: unknown; readonly spec?: unknown } | undefined,
+): AcceptanceVerdict | undefined {
+  const ids = new Set(
+    (Array.isArray(plan?.criteria) ? (plan.criteria as unknown[]) : []).flatMap((c) =>
+      typeof c === "object" && c !== null && typeof (c as { id?: unknown }).id === "string"
+        ? [(c as { id: string }).id]
+        : [],
+    ),
+  );
+  if (!ids.size) return kit;
+  const spec = typeof plan?.spec === "string" ? plan.spec : undefined;
+  const kept = kit.acs.filter((r) => ids.has(r.ac) && (!spec || r.spec === spec));
+  const dropped = kit.acs.filter((r) => !kept.includes(r));
+  const errors = kit.errors.filter((e) => !dropped.some((r) => e.includes(`${r.spec} ${r.ac}`)));
+  return kept.length || errors.length ? { ...kit, acs: kept, errors } : undefined;
+}
+
 export function acceptanceProven(v: AcceptanceVerdict): boolean {
   return v.acs.length > 0 && !v.errors.length && v.acs.every((r) => r.ok);
 }

@@ -11,6 +11,7 @@ import {
   ACCEPTANCE_SCRIPT,
   acceptanceProven,
   hiddenPaths,
+  planAcceptance,
   renderAcceptanceTable,
   runAcceptance,
   type AcceptanceVerdict,
@@ -86,6 +87,33 @@ describe("renderAcceptanceTable", () => {
     const bare = { ...fixture.acs[0]!, holdout: [], head: "fail" as const, ok: false };
     expect(renderAcceptanceTable({ ...fixture, acs: [bare] })).toContain("| none | no holdout | FAIL |");
     expect(renderAcceptanceTable({ base: null, acs: [], errors: [] })).toContain("Not proven: 0 of 0");
+  });
+});
+
+describe("planAcceptance", () => {
+  const row = (spec: string, ac: string) => ({ ...fixture.acs[0]!, spec, ac });
+  const twoAcs = { criteria: [{ id: "AC-1" }, { id: "AC-2" }] };
+
+  test("a plan with two ACs gets exactly those two rows", () => {
+    const kit = { ...fixture, acs: [row("s", "AC-1"), row("s", "AC-2"), row("s", "AC-3")], errors: ["s AC-3: bad"] };
+    const out = planAcceptance(kit, twoAcs)!;
+    expect(out.acs.map((r) => r.ac)).toEqual(["AC-1", "AC-2"]);
+    expect(out.errors).toEqual([]);
+    expect(renderAcceptanceTable(out)).not.toContain("AC-3");
+  });
+
+  test("another spec's AC with the same id is left out", () => {
+    const kit = { ...fixture, acs: [row("07-pricing", "AC-1"), row("03-presigned-downloads", "AC-1")], errors: [] };
+    const out = planAcceptance(kit, { ...twoAcs, spec: "07-pricing" })!;
+    expect(out.acs.map((r) => r.spec)).toEqual(["07-pricing"]);
+  });
+
+  test("no criteria keeps the kit verdict, no match means no verdict", () => {
+    expect(planAcceptance(fixture, {})).toBe(fixture);
+    const other = { ...fixture, acs: [row("s", "AC-9")], errors: [] };
+    expect(planAcceptance(other, twoAcs)).toBeUndefined();
+    const crashed = { base: null, acs: [], errors: ["check-acceptance exited 1 without a verdict: boom"] };
+    expect(planAcceptance(crashed, twoAcs)?.errors).toHaveLength(1);
   });
 });
 
@@ -286,6 +314,29 @@ describe("an unproven acceptance verdict rejects verify", () => {
     expect(renderWhatChanged("Goal.", [], { ...proof, status: "passes-without" })).toContain(
       "- Fails without it: no test shown (proof passes-without)",
     );
+  });
+
+  test("verify's table lists only the plan's criteria", async () => {
+    const stray = { ...fixture.acs[0]!, ac: "AC-3", text: "An unrelated criterion.", head: "fail" as const, ok: false };
+    const failing = { ...fixture.acs[1]!, head: "fail" as const, ok: false };
+    const plan = {
+      criteria: [
+        { id: "AC-1", text: "one" },
+        { id: "AC-2", text: "two" },
+      ],
+    };
+    const first = await ship([{ ...fixture, acs: [fixture.acs[0]!, failing, stray] }, fixture], plan);
+    const tables = first.github.issues
+      .get(1)!
+      .comments.map((c) => c.body)
+      .filter((b) => b.includes("Not proven"));
+    expect(tables).toHaveLength(1);
+    expect(tables[0]).toContain("Not proven: 1 of 2 criteria failed");
+    expect(tables[0]).toContain("AC-2");
+    expect(tables[0]).not.toContain("AC-3");
+    // A failing row outside the plan neither posts a table nor rejects.
+    const second = await ship([{ ...fixture, acs: [...fixture.acs, stray] }], plan);
+    expect(second.setupRunner.cmds.filter((c) => c.includes("--json"))).toHaveLength(1);
   });
 
   test("proven means every row ok, no errors, and at least one criterion", () => {
