@@ -484,7 +484,7 @@ const pr: StepType = {
   agent: true,
   terminal: true,
   async run(sc) {
-    const { deps, config, issue, worktree, ctx } = sc;
+    const { deps, config, issue, worktree } = sc;
     const issueNumber = issue.number;
     // The PR must point at the commit verify saw: a refused or stale push leaves the remote behind.
     // Checked before the paid pr agent runs.
@@ -516,7 +516,7 @@ const pr: StepType = {
         base: config.base,
         head,
         title: `${issue.title} (#${issueNumber})`,
-        body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx, {
+        body: prBody(art.comment ?? `Closes #${issueNumber}`, {
           whatChanged: renderWhatChanged(
             plan?.goal ?? issue.title,
             await deps.git.changedFiles(worktree, config.base),
@@ -527,18 +527,19 @@ const pr: StepType = {
             readRunJson<VerdictArtifact>(worktree, issueNumber, "verdict.json")?.criteria,
             readRunJson<AcceptanceVerdict>(worktree, issueNumber, "acceptance.json"),
           ),
-          receipt,
-          proof: proof?.status,
+          runDetails: true,
         }),
         draft: true,
       }));
-    if (!existing)
+    if (!existing) {
+      await postComment(deps, config, issueNumber, receipt);
       emitEvent(
         deps.bus,
         "factory.pr.opened",
         { repo: config.repo, issue: issueNumber, url: prUrl, head },
         `issue/${issueNumber}`,
       );
+    }
     // Opened as a draft while the factory works; ready is the hand-off to a human.
     await deps.github.markReady(config.repo, head, true);
     deps.state.updateRun(config.repo, issueNumber, { pr_url: prUrl });

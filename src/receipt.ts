@@ -267,14 +267,14 @@ export function decodeStatement(envelope: Envelope): Statement {
 
 // The PR body's section: the verdict, what is not proven, and the envelope a reviewer feeds to kaas-verify.
 export function renderReceipt(envelope: Envelope): string {
-  const { predicate } = decodeStatement(envelope);
-  const v = predicate.verdict;
-  const lines = ["## Receipt", ""];
-  lines.push(
-    envelope.signatures.length
-      ? `Signed by key \`${envelope.signatures[0]!.keyid.slice(0, 16)}\`. ${v.proven ? "Proven" : "Not proven"}: ${v.criteria - v.failed} of ${v.criteria} criteria.`
-      : `Unsigned (no ${RECEIPT_KEY_ENV} on the runner). ${v.proven ? "Proven" : "Not proven"}: ${v.criteria - v.failed} of ${v.criteria} criteria.`,
-  );
+  const v = decodeStatement(envelope).predicate.verdict;
+  const who = envelope.signatures.length
+    ? `Signed by key \`${envelope.signatures[0]!.keyid.slice(0, 16)}\`.`
+    : `Unsigned (no ${RECEIPT_KEY_ENV} on the runner).`;
+  const said = v.criteria
+    ? `${v.proven ? "Proven" : "Not proven"}: ${v.criteria - v.failed} of ${v.criteria} criteria.`
+    : "No criteria were recorded; the acceptance table is the record.";
+  const lines = ["## Receipt", "", `${who} ${said}`];
   if (v.notProven.length) lines.push("", "### Not proven", "", ...v.notProven.map((n) => `- ${n}`));
   lines.push(
     "",
