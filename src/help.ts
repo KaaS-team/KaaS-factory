@@ -158,6 +158,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code)",
   },
   {
+    name: "backup",
+    usage: "backup (now | list)",
+    does: "now: snapshot the state DBs to the FACTORY_BACKUP_BUCKET bucket with a sha256 manifest, then prune past FACTORY_BACKUP_KEEP_DAYS (14); list: the backups there",
+  },
+  {
     name: "install",
     usage: "install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]",
     does: "install or update the template in a repo; --agents links skills into each agent dir",

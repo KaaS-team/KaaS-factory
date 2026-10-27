@@ -56,6 +56,7 @@ import { type CliContext, cmdHarness, cmdTeach } from "./harness-cli";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { spendPolicy } from "./ports/spend";
+import { backupConfigFromEnv, backupOnce, backupSources, listBackups, pruneBackups } from "./backup";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { probeRuntime } from "./runtime-kit";
 import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
@@ -1006,6 +1007,25 @@ async function cmdReceipt(): Promise<void> {
   if (!has("help")) process.exit(EXIT.error);
 }
 
+// `factory backup now|list`: the state DBs in a bucket, past keep-days dropped (src/backup.ts).
+async function cmdBackup(): Promise<void> {
+  const sub = args[1];
+  if (sub !== "now" && sub !== "list") throw new UsageError("usage: factory backup (now | list) [--json]");
+  const config = backupConfigFromEnv();
+  if (!config) throw new Error("backups are off: set FACTORY_BACKUP_BUCKET (or FACTORY_BLOB_BUCKET)");
+  if (sub === "list") {
+    const backups = await listBackups(config);
+    if (has("json")) console.log(successJson({ backups: backups.map((b) => ({ id: b.id, objects: b.keys.length })) }));
+    else if (!backups.length) console.log("factory backup: no backups in the bucket.");
+    else for (const b of backups) console.log(`${b.id}  ${b.keys.length} object(s)`);
+    return;
+  }
+  const done = await backupOnce(config, backupSources());
+  const pruned = await pruneBackups(config);
+  if (has("json")) console.log(successJson({ ...done, pruned }));
+  else console.log(`factory backup: ${done.id}, ${done.files.length} file(s); pruned ${pruned.length} old backup(s)`);
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "up":
@@ -1066,6 +1086,8 @@ async function main(): Promise<void> {
       return cmdRoutine(cli);
     case "receipt":
       return cmdReceipt();
+    case "backup":
+      return cmdBackup();
     case "mcp":
     case "runner":
     case "pair":
