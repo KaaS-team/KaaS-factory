@@ -13,6 +13,10 @@ import {
   renderOperatorAuditComment,
   type DecideMergeInput,
 } from "../src/merge-policy";
+import { parseCodeowners } from "../src/profile-rules";
+
+const dbaRules = parseCodeowners("*.sql @dba\n");
+const sqlFile = [{ path: "db/1.sql", additions: 1, deletions: 0 }];
 
 const passingCheck: CiCheck = { name: "build", status: "COMPLETED", conclusion: "SUCCESS" };
 
@@ -58,6 +62,18 @@ test("a CHANGES_REQUESTED review against a superseded commit no longer blocks", 
     "main",
   );
   expect(fresh.map((r) => r.reason)).toContain("reviews-required");
+});
+
+test("decideOperatorMerge refuses an unapproved owner path", () => {
+  const held = decideOperatorMerge(readiness(), ci(), { rules: dbaRules, files: sqlFile, approvedBy: [] });
+  expect(held.outcome === "refuse" && held.refusals.map((r) => r.reason)).toEqual(["codeowner-approval"]);
+  const ok = decideOperatorMerge(readiness(), ci(), { rules: dbaRules, files: sqlFile, approvedBy: ["dba"] });
+  expect(ok.outcome).toBe("merge");
+});
+
+test("decideOperatorMerge fails closed when the file list is unavailable", () => {
+  const held = decideOperatorMerge(readiness(), ci(), { rules: [], files: undefined, approvedBy: [] });
+  expect(held.outcome === "refuse" && held.refusals[0]?.reason).toBe("codeowner-approval");
 });
 
 test("decideOperatorMerge merges a clean PR without any risk/path/size gate", () => {

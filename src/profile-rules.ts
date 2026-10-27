@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { FactoryConfig, Profile } from "./config";
 import type { ChangedFile, MergeRefusal } from "./merge-policy";
+import type { CodeHostPort } from "./ports/scm";
 import { capsProblems, type OrgCaps } from "./org-caps";
 
 export interface ProfileRules {
@@ -98,6 +99,21 @@ export function codeownersAt(dir: string): CodeownersRule[] {
   for (const at of [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"]) {
     const file = join(dir, at);
     if (existsSync(file)) return parseCodeowners(readFileSync(file, "utf8"));
+  }
+  return [];
+}
+
+// Same lookup as codeownersAt, but from the base ref over the host: the PR head could rewrite its own owners.
+export async function codeownersFromBase(
+  host: Pick<CodeHostPort, "fileAtRef">,
+  repo: string,
+  baseRef: string,
+): Promise<CodeownersRule[]> {
+  const read = host.fileAtRef?.bind(host);
+  if (!read) throw new Error("this code host cannot read files, so CODEOWNERS is unknown");
+  for (const at of [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"]) {
+    const text = await read(repo, at, baseRef);
+    if (text !== undefined) return parseCodeowners(text);
   }
   return [];
 }

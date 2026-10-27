@@ -39,8 +39,10 @@ import type {
   ScmPort,
   TrackerPort,
   CodeHostPort,
+  PrFile,
 } from "./ports/scm";
 export type {
+  PrFile,
   GhIssue,
   GhComment,
   CreatePrOptions,
@@ -445,6 +447,33 @@ export class GitHub implements TrackerPort, CodeHostPort {
   // wrong commit. Never --admin: a branch-protection block is respected.
   async mergePr(repo: string, number: number, headSha: string): Promise<void> {
     await this.exec(["pr", "merge", String(number), "--repo", repo, "--squash", "--match-head-commit", headSha]);
+  }
+
+  async prFiles(repo: string, prNumber: number): Promise<PrFile[]> {
+    const result = await this.exec([
+      "api",
+      "--paginate",
+      `repos/${repo}/pulls/${prNumber}/files`,
+      "--jq",
+      ".[] | {path: .filename, additions: .additions, deletions: .deletions} | tojson",
+    ]);
+    return result.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as PrFile);
+  }
+
+  // The file's text at `ref`, or undefined on a 404. Any other failure throws.
+  async fileAtRef(repo: string, path: string, ref: string): Promise<string | undefined> {
+    const result = await this.runner.run([
+      "api",
+      "-H",
+      "Accept: application/vnd.github.raw+json",
+      `repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+    ]);
+    if (result.code !== 0 && /HTTP 404/.test(result.stderr)) return undefined;
+    if (result.code !== 0) throw new GhError(["api", "contents"], result);
+    return result.stdout;
   }
 
   async listLabels(repo: string): Promise<string[]> {
