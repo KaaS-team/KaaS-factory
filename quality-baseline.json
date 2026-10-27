@@ -139,5 +139,9 @@
   },
   "names": {
     "src/engine/common.ts": 1
-  }
+  },
+  "exclude": [
+    ".claude/hooks/*",
+    ".factory/*.sh"
+  ]
 }
