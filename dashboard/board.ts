@@ -36,6 +36,7 @@ const STATE_TO_COLUMN: Readonly<Record<string, BoardColumn>> = {
   [LABEL.triaging]: "triage",
   [LABEL.planning]: "plan",
   [LABEL.awaitingApproval]: "plan",
+  [LABEL.overlap]: "plan",
   [LABEL.building]: "build",
   [LABEL.verifying]: "verify",
   [LABEL.inReview]: "pr",

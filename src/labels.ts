@@ -17,6 +17,7 @@ export interface FactoryLabel {
 export const LABEL = {
   ready: "factory:ready",
   blocked: "factory:blocked",
+  overlap: "factory:overlap",
   triaging: "factory:triaging",
   planning: "factory:planning",
   awaitingApproval: "factory:awaiting-approval",
@@ -34,6 +35,7 @@ export const LABEL = {
 export const STATE_LABELS = [
   LABEL.ready,
   LABEL.blocked,
+  LABEL.overlap,
   LABEL.triaging,
   LABEL.planning,
   LABEL.awaitingApproval,
@@ -83,6 +85,7 @@ const TYPE_COLOR: Record<TypeLabel, string> = {
 const STATE_DESCRIPTIONS: Record<StateLabel, string> = {
   "factory:ready": "Human marked this ready for the loop to pick up",
   "factory:blocked": 'Waiting on its "Blocked by" issues to close; promotes to ready automatically',
+  "factory:overlap": "Plan approved, but an earlier issue changes the same files; builds once that PR merges or closes",
   "factory:triaging": "factory-triage is classifying this issue",
   "factory:planning": "factory-plan is writing the plan comment",
   "factory:awaiting-approval": "Plan posted, waiting on /factory approve",

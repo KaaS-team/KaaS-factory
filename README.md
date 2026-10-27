@@ -82,6 +82,7 @@ The issue's label is the state. Everything else is derived from the thread.
 |---|---|---|
 | `factory:ready` | a human queued it | the runner claims it, or moves it to `factory:blocked` if its body's `Blocked by:` line names an open issue |
 | `factory:blocked` | waiting on the issues named in `Blocked by:` | every one closes (not as "not planned"); the runner moves it back to `factory:ready` and claims it the same poll |
+| `factory:overlap` | plan approved, but an earlier issue's plan names a file this one also changes | those earlier issues' PRs merge or close; the runner starts the build on the next poll |
 | `factory:triaging` / `factory:planning` | the agent is working | the stage finishes |
 | `factory:needs-info` | the agent asked a question (max two rounds, then `needs-human`) | a trusted comment answers it |
 | `factory:awaiting-approval` | plan posted, waiting | `/factory approve`, or auto for low risk |

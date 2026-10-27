@@ -1275,6 +1275,33 @@ describe("blocker gate", () => {
   });
 });
 
+describe("overlap", () => {
+  test("25. a plan sharing a file with a building issue waits under factory:overlap, then ships once that issue leaves flight", async () => {
+    // Only a lower-numbered issue blocks, so the building issue is #1 and the planned one is #2.
+    const c = setup([LABEL.ready], {}, 2);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.github.issues.set(1, {
+      ...baseIssue(1, [LABEL.building]),
+      comments: [
+        {
+          id: 1,
+          author: "factory-bot",
+          authorAssociation: "OWNER",
+          body: '<!-- factory:data {"stage":"plan","json":{"files":["src/a.ts"]}} -->',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+    happy(c);
+    expect(await c.step()).toBe("awaiting-approval");
+    expect(labels(c.github, 2)).toEqual([LABEL.overlap]);
+    c.github.issues.get(1)!.labels = [];
+    expect(await c.step()).toBe("shipped");
+    expect(labels(c.github, 2)).toEqual([LABEL.inReview]);
+    done(c);
+  });
+});
+
 test("every state and parked label is reached by a scenario", () => {
   const unreached = [...STATE_LABELS, ...PARKED_LABELS].filter((l) => !seen.has(l));
   expect(unreached).toEqual([]);

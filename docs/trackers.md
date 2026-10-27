@@ -21,7 +21,7 @@ team, project or List, and names what is missing without printing the token.
 
 ## Labels
 
-The factory needs 18 labels and no more: 8 states (one at a time), 3 parked (`needs-info`,
+The factory needs 19 labels and no more: 9 states (one at a time), 3 parked (`needs-info`,
 `needs-human`, `failed`), 2 provenance (`monitor`, `ledger`) and 5 types (`bug`, `feature`, `docs`,
 `security`, `dependency`). `src/labels.ts` is the list, and `tests/labels.test.ts` fails on a label
 nothing uses. `factory doctor --fix` creates the set, plus each `config.routes` type and workflow step
