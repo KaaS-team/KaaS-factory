@@ -860,5 +860,8 @@
   {"name": "gh-fields: the image smoke skips the field check", "file": ".github/workflows/ci.yml", "find": "          docker exec factory bun src/deploy/gh-fields.ts\n", "replace": "", "test": "tests/gh-fields.test.ts"},
   {"name": "import-plan: an AC that maps to no task passes", "file": "src/engine/import-plan.ts", "find": "if (!task || !taskIds.has(task))", "replace": "if (false)", "test": "tests/import-plan.test.ts"},
   {"name": "import-plan: a planned body is not recognised", "file": "src/engine/import-plan.ts", "find": "return body.trimStart().startsWith(PLANNED_MARKER);", "replace": "return false;", "test": "tests/import-plan-step.test.ts"},
-  {"name": "import-plan: a path outside the worktree is read", "file": "src/engine/import-plan-step.ts", "find": "rel.startsWith(\"..\") || ", "replace": "", "test": "tests/import-plan-step.test.ts"}
+  {"name": "import-plan: a path outside the worktree is read", "file": "src/engine/import-plan-step.ts", "find": "rel.startsWith(\"..\") || ", "replace": "", "test": "tests/import-plan-step.test.ts"},
+  {"name": "build-model: escalation twice", "file": "src/core/model-tier.ts", "find": "return attempt === 0 ? \"sonnet\" : undefined;", "replace": "return attempt <= 1 ? \"sonnet\" : undefined;", "test": "tests/model-tier.test.ts"},
+  {"name": "build-model: a red gate is not rerun", "file": "src/engine/steps.ts", "find": "const up = model && gate.status !== \"GREEN\" ? buildEscalation(attempt) : undefined;", "replace": "const up = undefined;", "test": "tests/scenarios.test.ts"},
+  {"name": "build-model: versions compare as strings", "file": "src/core/model-tier.ts", "find": "const d = (a[i] ?? 0) - (b[i] ?? 0);\n    if (d !== 0) return d > 0;", "replace": "const d = String(a[i] ?? 0).localeCompare(String(b[i] ?? 0));\n    if (d !== 0) return d > 0;", "test": "tests/model-tier.test.ts"}
 ]

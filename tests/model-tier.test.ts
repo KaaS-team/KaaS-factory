@@ -9,8 +9,53 @@ import { configProblems, mergeConfig } from "../src/config";
 import { LARGE_MIN_FILES, SMALL_MAX_FILES, scopeFrom, tierFor } from "../src/core/model-tier";
 import { scopeOf } from "../src/engine/common";
 import { baseIssue } from "./harness";
+import { PRICES, latestPricedModel } from "../src/pricing";
+import { buildEscalation, buildFamily, latestModel } from "../src/core/model-tier";
+import { readdirSync, readFileSync } from "node:fs";
 
 const files = (n: number) => Array.from({ length: n }, (_, i) => `f${i}.ts`);
+
+describe("build model", () => {
+  test("latestModel picks the newest priced id per family, pinned against PRICES", () => {
+    for (const family of ["haiku", "sonnet", "opus"]) {
+      const ids = Object.keys(PRICES).filter((k) => k.startsWith(`claude-${family}-`));
+      const newest = ids
+        .map((id) => ({ id, v: id.slice(`claude-${family}-`.length).split("-").map(Number) }))
+        .sort((a, b) => b.v[0]! - a.v[0]! || (b.v[1] ?? 0) - (a.v[1] ?? 0))[0]!.id;
+      expect(latestPricedModel(family)).toBe(newest);
+    }
+    expect(latestModel("sonnet", ["claude-sonnet-4-5", "claude-sonnet-5", "claude-sonnet-5-5-20260101"])).toBe(
+      "claude-sonnet-5",
+    );
+    expect(latestModel("opus", ["claude-opus-5", "claude-opus-4-5"])).toBe("claude-opus-5");
+    expect(latestModel("opus", ["claude-opus-9", "claude-opus-10"])).toBe("claude-opus-10");
+    expect(latestModel("mistral", Object.keys(PRICES))).toBeUndefined();
+  });
+
+  test("buildFamily: plan.model, else the highest task model, else haiku", () => {
+    expect(buildFamily({ model: "opus", tasks: [{ model: "haiku" }] })).toBe("opus");
+    expect(buildFamily({ model: "gpt", tasks: [{ model: "sonnet" }, { model: "haiku" }, {}] })).toBe("sonnet");
+    expect(buildFamily({ tasks: [{ model: "haiku" }, { model: "opus" }] })).toBe("opus");
+    expect(buildFamily({})).toBe("haiku");
+    expect(buildFamily(undefined)).toBe("haiku");
+  });
+
+  test("buildEscalation escalates to sonnet once, never higher", () => {
+    expect(buildEscalation(0)).toBe("sonnet");
+    expect(buildEscalation(1)).toBeUndefined();
+    expect(buildEscalation(2)).toBeUndefined();
+  });
+
+  test("no literal Claude model id in src outside pricing.ts", () => {
+    const src = join(import.meta.dir, "../src");
+    const hits = readdirSync(src, { recursive: true, withFileTypes: true })
+      .filter((d) => d.isFile() && d.name.endsWith(".ts"))
+      .map((d) => join(d.parentPath, d.name))
+      .filter((f) => !f.endsWith("/src/pricing.ts"))
+      .filter((f) => /claude-(haiku|sonnet|opus)-/.test(readFileSync(f, "utf8")));
+    expect(hits).toEqual([]);
+  });
+});
 
 describe("model tier", () => {
   test("small only when low risk and few files; large when high risk or many files", () => {
