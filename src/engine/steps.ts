@@ -43,7 +43,7 @@ import {
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
 import { LABEL, issueType, typesFor } from "../labels";
-import { resolveRoute } from "../agents/executor";
+import { resolveAgentByName, resolveRoute } from "../agents/executor";
 import { buildEscalation, buildFamily } from "../core/model-tier";
 import { latestPricedModel } from "../pricing";
 import type { StageRunResult } from "../ports/agent";
@@ -198,10 +198,11 @@ const build: StepType = {
       );
     }
     // Only a first-round claude build picks its own model; a verify reject keeps the tier ladder.
-    const claude =
-      sc.ctx.rejectRound === 0 &&
-      resolveRoute(config.agents, config.stages, config.routes, "build", issueType(config.routes, labelsOf(issue)))
-        .preset?.name === "claude";
+    // A step-pinned agent is the one that runs, so it decides, not the route.
+    const agent = step.agent
+      ? config.agents[step.agent] && resolveAgentByName(config.agents, step.agent, "build")
+      : resolveRoute(config.agents, config.stages, config.routes, "build", issueType(config.routes, labelsOf(issue)));
+    const claude = sc.ctx.rejectRound === 0 && agent?.preset?.name === "claude";
     let model = claude ? latestPricedModel(buildFamily(planOf(issue))) : undefined;
     let attempt = 0;
     let result: StageRunResult;
