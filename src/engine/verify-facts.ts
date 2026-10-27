@@ -53,19 +53,25 @@ export async function survivingMutations(
 ): Promise<{ names: string[]; body: string } | undefined> {
   if (!git.mutations || mutations.length === 0) return undefined;
   const gate = testGate(config.gates);
+  // The plan's test string is never run raw: without a test gate there is nothing safe to run it with.
+  if (!gate)
+    return { names: [], body: "Plan mutations could not run: no gate has role test (or is named test) in config." };
   // A test gate with fileCmd runs only the named test; without one, the whole gate runs.
-  const cmdFor = (test: string) => {
-    if (!gate?.fileCmd) return gate?.cmd ?? test;
-    return `${gate.fileCmd} '${test.replaceAll("'", "'\\''")}'`;
-  };
-  const survivors = (await runMutations(git.mutations, worktree, mutations, cmdFor)).filter(
-    (r) => r.status === "survives",
-  );
-  if (survivors.length === 0) return undefined;
-  const body = `Plan mutations whose test still passed:\n\n${survivors
-    .map((s) => `- \`${s.name}\`\n\n\`\`\`\n${s.tail}\n\`\`\``)
-    .join("\n\n")}`;
-  return { names: survivors.map((s) => s.name), body };
+  const cmdFor = (test: string) => (gate.fileCmd ? `${gate.fileCmd} '${test.replaceAll("'", "'\\''")}'` : gate.cmd);
+  let results: Awaited<ReturnType<typeof runMutations>>;
+  try {
+    results = await runMutations(git.mutations, worktree, mutations, cmdFor);
+  } catch (err) {
+    // A bad path, a missing file or a hung test is a build problem; it rejects like a survivor.
+    return { names: [], body: `Plan mutations could not run: ${(err as Error).message}` };
+  }
+  // An unapplied find text proves nothing, so it rejects too rather than passing silently.
+  const bad = results.filter((r) => r.status !== "bites");
+  if (bad.length === 0) return undefined;
+  const line = (r: (typeof bad)[number]) =>
+    `- \`${r.name}\` (${r.status === "survives" ? "its test still passed" : "not applied"})\n\n\`\`\`\n${r.tail}\n\`\`\``;
+  const body = `Plan mutations whose test still passed or that did not apply:\n\n${bad.map(line).join("\n\n")}`;
+  return { names: bad.map((r) => r.name), body };
 }
 
 // Only a repo that can merge on its own pays for mutants and a clean room. A failed collection

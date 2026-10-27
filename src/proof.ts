@@ -240,7 +240,27 @@ export class ShellMutationIO implements MutationIO {
   async write(worktree: string, file: string, content: Buffer) {
     await Bun.write(`${worktree}/${file}`, content);
   }
-  test(worktree: string, cmd: string) {
-    return sh(["bash", "-c", cmd], worktree);
+  // A hung test must not leave the file mutated: killing it lets runMutations restore, and the
+  // throw keeps a kill from reading as a test that bit.
+  async test(worktree: string, cmd: string) {
+    const proc = Bun.spawn(["bash", "-c", cmd], { cwd: worktree, stdout: "pipe", stderr: "pipe" });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, MUTATION_TEST_TIMEOUT_MS);
+    try {
+      const [stdout, stderr, code] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ]);
+      if (timedOut) throw new Error(`the mutation's test ran past ${MUTATION_TEST_TIMEOUT_MS / 1000}s and was killed`);
+      return { stdout, stderr, code };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
+
+const MUTATION_TEST_TIMEOUT_MS = 300_000;

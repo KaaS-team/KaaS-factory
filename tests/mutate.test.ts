@@ -23,6 +23,7 @@ import { mergeConfig } from "../src/config";
 import { type MutationIO, type ProofGit, runMutations, TEST_PATH } from "../src/proof";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
+import { survivingMutations } from "../src/engine/verify-facts";
 import { LABEL } from "../src/labels";
 import { workflowFor } from "../src/engine/workflows";
 import {
@@ -336,6 +337,36 @@ describe("runMutations", () => {
     const before = Buffer.from(files.get("src/a.ts")!);
     await expect(runMutations(io, "/w", [mutation])).rejects.toThrow("runner crashed");
     expect(files.get("src/a.ts")!.equals(before)).toBe(true);
+  });
+});
+
+// The import checks a plan's mutations on disk, but the tree can move before verify runs them.
+describe("survivingMutations", () => {
+  const config = mergeConfig({ repo: "acme/widgets", gates: [{ name: "test", cmd: "make test", required: true }] });
+  const run = (io: MutationIO, m: typeof mutation, cfg = config) =>
+    survivingMutations({ mutations: io } as ProofGit, "/w", cfg, [m]);
+
+  test("a find text that is gone rejects, naming the mutation", async () => {
+    const r = await run(memoryIO("src/a.ts", 1).io, { ...mutation, find: "no such text" });
+    expect(r?.names).toEqual(["guard"]);
+    expect(r?.body).toContain("not applied");
+  });
+
+  test("a mutation that cannot run rejects instead of throwing, with the file restored", async () => {
+    const { io, files } = memoryIO("src/a.ts", "throw");
+    const before = Buffer.from(files.get("src/a.ts")!);
+    expect((await run(io, mutation))?.body).toContain("Plan mutations could not run: runner crashed");
+    expect(files.get("src/a.ts")!.equals(before)).toBe(true);
+    expect((await run(memoryIO("src/a.ts", 1).io, { ...mutation, file: "../x.ts" }))?.body).toContain(
+      "outside the repo",
+    );
+  });
+
+  test("without a test gate the plan's test string is never run", async () => {
+    const { io, seen } = memoryIO("src/a.ts", 0);
+    const r = await run(io, mutation, mergeConfig({ repo: "acme/widgets", gates: [] }));
+    expect(r?.body).toContain("no gate has role test");
+    expect(seen).toEqual([]);
   });
 });
 
