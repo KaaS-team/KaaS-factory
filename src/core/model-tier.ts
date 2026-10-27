@@ -74,6 +74,7 @@ export function buildFamily(plan: unknown): Family {
 }
 
 // One climb to sonnet after a red gate, never to opus: a model that failed twice is a plan problem.
-export function buildEscalation(attempt: number): Family | undefined {
-  return attempt === 0 ? "sonnet" : undefined;
+// An opus build stays put: sonnet would be a downgrade.
+export function buildEscalation(attempt: number, from?: Family): Family | undefined {
+  return attempt === 0 && from !== "opus" ? "sonnet" : undefined;
 }

@@ -203,7 +203,8 @@ const build: StepType = {
       ? config.agents[step.agent] && resolveAgentByName(config.agents, step.agent, "build")
       : resolveRoute(config.agents, config.stages, config.routes, "build", issueType(config.routes, labelsOf(issue)));
     const claude = sc.ctx.rejectRound === 0 && agent?.preset?.name === "claude";
-    let model = claude ? latestPricedModel(buildFamily(planOf(issue))) : undefined;
+    const family = buildFamily(planOf(issue));
+    let model = claude ? latestPricedModel(family) : undefined;
     let attempt = 0;
     let result: StageRunResult;
     let art: Awaited<ReturnType<typeof readStageArtifacts>>;
@@ -239,7 +240,7 @@ const build: StepType = {
       // The runner grades the build, not the agent (audit finding #11): run
       // the target's own gates.sh here and trust only its FACTORY_GATES line.
       gate = await runGates(deps.gateRunner, worktree);
-      const up = model && gate.status !== "GREEN" ? buildEscalation(attempt) : undefined;
+      const up = model && gate.status !== "GREEN" ? buildEscalation(attempt, family) : undefined;
       const next = up && latestPricedModel(up);
       if (!next) break;
       sc.ctx.failure = failureTail(gate.raw);
