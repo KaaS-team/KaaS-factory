@@ -860,5 +860,6 @@
   {"name": "gh-fields: the image smoke skips the field check", "file": ".github/workflows/ci.yml", "find": "          docker exec factory bun src/deploy/gh-fields.ts\n", "replace": "", "test": "tests/gh-fields.test.ts"},
   {"name": "import-plan: an AC that maps to no task passes", "file": "src/engine/import-plan.ts", "find": "if (!task || !taskIds.has(task))", "replace": "if (false)", "test": "tests/import-plan.test.ts"},
   {"name": "import-plan: a planned body is not recognised", "file": "src/engine/import-plan.ts", "find": "return body.trimStart().startsWith(PLANNED_MARKER);", "replace": "return false;", "test": "tests/import-plan-step.test.ts"},
-  {"name": "import-plan: a path outside the worktree is read", "file": "src/engine/import-plan-step.ts", "find": "rel.startsWith(\"..\") || ", "replace": "", "test": "tests/import-plan-step.test.ts"}
+  {"name": "import-plan: a path outside the worktree is read", "file": "src/engine/import-plan-step.ts", "find": "rel.startsWith(\"..\") || ", "replace": "", "test": "tests/import-plan-step.test.ts"},
+  {"name": "resume: a failure marker never names the stage", "file": "src/derive.ts", "find": "|| m.stage === \"failure\") {", "replace": "|| m.stage === \"failure-x\") {", "test": "tests/resume.test.ts"}
 ]
