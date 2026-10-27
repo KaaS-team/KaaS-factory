@@ -38,8 +38,10 @@ export function nextIso(): string {
 // `.local` host, a dollar amount or a model. Only the text outside HTML
 // comments is visible; the factory's hidden data markers may carry anything.
 const HOST = hostname().toLowerCase();
+// Built from a string: semgrep's TypeScript parser cannot read this pattern as a regex literal.
+const HIDDEN_MARKERS = new RegExp("<!--[\\s\\S]*?-->", "g");
 export function visibleLeaks(body: string): string[] {
-  const visible = body.replace(/<!--[\s\S]*?-->/g, "").toLowerCase();
+  const visible = body.replace(HIDDEN_MARKERS, "").toLowerCase();
   const out: string[] = [];
   if (HOST && visible.includes(HOST)) out.push(`hostname ${HOST}`);
   if (/[\w-]\.local\b/.test(visible)) out.push(".local host");
