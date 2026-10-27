@@ -240,27 +240,25 @@ export class ShellMutationIO implements MutationIO {
   async write(worktree: string, file: string, content: Buffer) {
     await Bun.write(`${worktree}/${file}`, content);
   }
-  // A hung test must not leave the file mutated: killing it lets runMutations restore, and the
-  // throw keeps a kill from reading as a test that bit.
+  constructor(private readonly timeoutMs = 300_000) {}
+  // A hung test must not leave the file mutated, and the throw keeps a kill from reading as bites.
+  // The race matters: killing bash leaves a grandchild holding the pipes, so reading them never ends.
   async test(worktree: string, cmd: string) {
     const proc = Bun.spawn(["bash", "-c", cmd], { cwd: worktree, stdout: "pipe", stderr: "pipe" });
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      proc.kill("SIGKILL");
-    }, MUTATION_TEST_TIMEOUT_MS);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        proc.kill("SIGKILL");
+        reject(new Error(`the mutation's test ran past ${this.timeoutMs / 1000}s and was killed`));
+      }, this.timeoutMs);
+    });
     try {
-      const [stdout, stderr, code] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-        proc.exited,
-      ]);
-      if (timedOut) throw new Error(`the mutation's test ran past ${MUTATION_TEST_TIMEOUT_MS / 1000}s and was killed`);
-      return { stdout, stderr, code };
+      const done = Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]).then(
+        ([stdout, stderr, code]) => ({ stdout, stderr, code }),
+      );
+      return await Promise.race([done, timeout]);
     } finally {
       clearTimeout(timer);
     }
   }
 }
-
-const MUTATION_TEST_TIMEOUT_MS = 300_000;

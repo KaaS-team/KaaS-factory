@@ -343,12 +343,14 @@ const verify: StepType = {
       await recordVerifyFacts(worktree, config, issueNumber, testCmd, proof);
       const survived = await survivingMutations(deps.proofGit, worktree, config, mutations);
       if (survived) {
-        ctx.rejectRound += 1;
-        ctx.failure = failureTail(survived.body);
         await postComment(deps, config, issueNumber, survived.body, {
           stage: "verify",
           json: { survivingMutations: survived.names },
         });
+      }
+      if (survived?.reject) {
+        ctx.rejectRound += 1;
+        ctx.failure = failureTail(survived.body);
         if (ctx.rejectRound > maxRejects) {
           await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
           await runRetro(deps, config, issue, "gave-up");

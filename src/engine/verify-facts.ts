@@ -43,35 +43,55 @@ export async function proofInputs(git: ProofGit, worktree: string, config: Facto
   };
 }
 
-// The names of the plan's mutations whose test still passed, with the test's output tail.
-// Each is applied to the worktree and put back before the next.
+// What the plan's mutations found. Only a survivor, or a pass that could not run, rejects: a
+// find text the build moved or a missing test gate is the builder's to see, not a reason to fail.
+export interface MutationFindings {
+  readonly names: string[];
+  readonly body: string;
+  readonly reject: boolean;
+}
+
+// Each mutation is applied to the worktree and put back before the next.
 export async function survivingMutations(
   git: ProofGit,
   worktree: string,
   config: FactoryConfig,
   mutations: readonly PlanMutation[],
-): Promise<{ names: string[]; body: string } | undefined> {
+): Promise<MutationFindings | undefined> {
   if (!git.mutations || mutations.length === 0) return undefined;
   const gate = testGate(config.gates);
   // The plan's test string is never run raw: without a test gate there is nothing safe to run it with.
   if (!gate)
-    return { names: [], body: "Plan mutations could not run: no gate has role test (or is named test) in config." };
+    return {
+      names: [],
+      body: "Plan mutations were not run: no gate has role test (or is named test) in config.",
+      reject: false,
+    };
   // A test gate with fileCmd runs only the named test; without one, the whole gate runs.
   const cmdFor = (test: string) => (gate.fileCmd ? `${gate.fileCmd} '${test.replaceAll("'", "'\\''")}'` : gate.cmd);
   let results: Awaited<ReturnType<typeof runMutations>>;
   try {
     results = await runMutations(git.mutations, worktree, mutations, cmdFor);
   } catch (err) {
-    // A bad path, a missing file or a hung test is a build problem; it rejects like a survivor.
-    return { names: [], body: `Plan mutations could not run: ${(err as Error).message}` };
+    // A bad path, a missing file or a hung test: the file is back, and the pass proved nothing.
+    return { names: [], body: `Plan mutations could not run: ${(err as Error).message}`, reject: true };
   }
-  // An unapplied find text proves nothing, so it rejects too rather than passing silently.
-  const bad = results.filter((r) => r.status !== "bites");
-  if (bad.length === 0) return undefined;
-  const line = (r: (typeof bad)[number]) =>
-    `- \`${r.name}\` (${r.status === "survives" ? "its test still passed" : "not applied"})\n\n\`\`\`\n${r.tail}\n\`\`\``;
-  const body = `Plan mutations whose test still passed or that did not apply:\n\n${bad.map(line).join("\n\n")}`;
-  return { names: bad.map((r) => r.name), body };
+  const code = (tail: string) => `\n\n\`\`\`\n${tail}\n\`\`\``;
+  const survivors = results.filter((r) => r.status === "survives");
+  const unapplied = results.filter((r) => r.status === "unapplied");
+  const parts = [
+    survivors.length
+      ? `Plan mutations whose test still passed:\n\n${survivors.map((r) => `- \`${r.name}\`${code(r.tail)}`).join("\n\n")}`
+      : "",
+    unapplied.length
+      ? `Plan mutations not applied (update their find text; they prove nothing):\n\n${unapplied.map((r) => `- \`${r.name}\`: ${r.tail}`).join("\n")}`
+      : "",
+    !gate.fileCmd && mutations.length > 1
+      ? `The test gate has no fileCmd, so each of the ${mutations.length} mutations ran the whole gate.`
+      : "",
+  ].filter(Boolean);
+  if (parts.length === 0) return undefined;
+  return { names: survivors.map((r) => r.name), body: parts.join("\n\n"), reject: survivors.length > 0 };
 }
 
 // Only a repo that can merge on its own pays for mutants and a clean room. A failed collection

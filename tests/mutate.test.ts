@@ -20,7 +20,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mergeConfig } from "../src/config";
-import { type MutationIO, type ProofGit, runMutations, TEST_PATH } from "../src/proof";
+import { type MutationIO, type ProofGit, runMutations, ShellMutationIO, TEST_PATH } from "../src/proof";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
 import { survivingMutations } from "../src/engine/verify-facts";
@@ -346,10 +346,23 @@ describe("survivingMutations", () => {
   const run = (io: MutationIO, m: typeof mutation, cfg = config) =>
     survivingMutations({ mutations: io } as ProofGit, "/w", cfg, [m]);
 
-  test("a find text that is gone rejects, naming the mutation", async () => {
+  test("a find text that is gone is reported by name but does not reject", async () => {
     const r = await run(memoryIO("src/a.ts", 1).io, { ...mutation, find: "no such text" });
-    expect(r?.names).toEqual(["guard"]);
+    expect(r).toMatchObject({ reject: false });
+    expect(r?.body).toContain("`guard`");
     expect(r?.body).toContain("not applied");
+  });
+
+  test("a survivor rejects", async () => {
+    expect(await run(memoryIO("src/a.ts", 0).io, mutation)).toMatchObject({ reject: true, names: ["guard"] });
+  });
+
+  test("several mutations without a fileCmd say each ran the whole gate", async () => {
+    const io = memoryIO("src/a.ts", 1).io;
+    const r = await survivingMutations({ mutations: io } as ProofGit, "/w", config, [mutation, mutation]);
+    expect(r).toMatchObject({ reject: false });
+    expect(r?.body).toContain("ran the whole gate");
+    expect(await run(io, mutation)).toBeUndefined();
   });
 
   test("a mutation that cannot run rejects instead of throwing, with the file restored", async () => {
@@ -365,8 +378,25 @@ describe("survivingMutations", () => {
   test("without a test gate the plan's test string is never run", async () => {
     const { io, seen } = memoryIO("src/a.ts", 0);
     const r = await run(io, mutation, mergeConfig({ repo: "acme/widgets", gates: [] }));
+    expect(r).toMatchObject({ reject: false });
     expect(r?.body).toContain("no gate has role test");
     expect(seen).toEqual([]);
+  });
+});
+
+describe("ShellMutationIO", () => {
+  test("a test whose background child holds the pipes still times out", async () => {
+    const started = Date.now();
+    // The subshell's sleep inherits stdout, so killing bash alone would never end the read.
+    await expect(new ShellMutationIO(200).test(tmpdir(), "(sleep 5 &); sleep 5")).rejects.toThrow("was killed");
+    expect(Date.now() - started).toBeLessThan(3000);
+  });
+
+  test("a test that finishes in time returns its exit code", async () => {
+    expect(await new ShellMutationIO(5000).test(tmpdir(), "echo hi; exit 3")).toMatchObject({
+      stdout: "hi\n",
+      code: 3,
+    });
   });
 });
 
