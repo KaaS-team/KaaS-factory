@@ -4,7 +4,6 @@
 // and moves the label), "reject" (the engine follows `reject:`), or "stop"
 // once it has parked or finished the issue itself, from `step.label`.
 
-import { readFileSync } from "node:fs";
 import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
@@ -21,6 +20,7 @@ import {
   readGateEvidence,
   writeGateEvidence,
   readStageArtifacts,
+  readRunJson,
   runDir,
   type BuildArtifact,
   type PlanArtifact,
@@ -42,6 +42,7 @@ import {
 } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
+import { buildCommitMessage } from "../git";
 import { LABEL, typesFor } from "../labels";
 import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
@@ -230,7 +231,14 @@ const build: StepType = {
     // The runner commits — the build skill's own instructions say so, but
     // nothing enforced it before (audit finding #4). `.factory/runs/` is
     // excluded; it's the stage handoff, never meant to land in the repo.
-    await deps.git.commitAll(worktree, `factory: build #${issueNumber}`);
+    await deps.git.commitAll(
+      worktree,
+      buildCommitMessage({
+        type: readRunJson<TriageArtifact>(worktree, issueNumber, "triage.json")?.type,
+        goal: readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json")?.goal,
+        issue,
+      }),
+    );
 
     // Defense in depth behind the guard hook: a Bash-made edit to a
     // protected path never reaches Edit/Write, so the hook never sees it
@@ -416,14 +424,6 @@ const verify: StepType = {
     return { kind: "next", facts: json };
   },
 };
-
-function readRunJson<T>(worktree: string, issueNumber: number, name: string): T | undefined {
-  try {
-    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/${name}`, "utf8")) as T;
-  } catch {
-    return undefined; // the stage that writes it did not run
-  }
-}
 
 const pr: StepType = {
   agent: true,

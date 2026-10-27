@@ -232,8 +232,18 @@ describe("an unproven acceptance verdict rejects verify", () => {
     });
     push("pr", { "pr-body.md": "Did it.\nCloses #1" });
     expect(await advanceIssue(deps, config, github.issues.get(n)!)).toBe("shipped");
-    return { github, setupRunner, body: github.createdPrs[0]!.body };
+    return { github, git, setupRunner, body: github.createdPrs[0]!.body };
   }
+
+  test("a fake build commits with a conventional title, a why and Closes, and no runner id in any title", async () => {
+    const { git } = await ship([fixture], { goal: "Show the price on the monthly plan." });
+    const [title, ...rest] = git.committed[0]!.split("\n");
+    expect(title).toMatch(/^(feat|fix|docs|chore)(\([a-z0-9-]+\))?: .+ \(#\d+\)$/);
+    expect(title).toBe("fix: show the price on the monthly plan (#1)");
+    expect(rest.join("\n")).toContain("do the thing");
+    expect(rest.join("\n")).toContain("Closes #1");
+    expect(git.committed.some((m) => /runner-\d+/.test(m.split("\n")[0]!))).toBe(false);
+  });
 
   test("the build is sent back with the table, and a proven retry ships", async () => {
     const unproven = {

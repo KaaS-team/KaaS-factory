@@ -6,6 +6,7 @@
 // `.factory/runs/issue-<N>/*`, which the guard hook always allows, and the
 // runner is the only thing that turns those files into GitHub API calls.
 
+import { readFileSync } from "node:fs";
 import { mkdir, unlink } from "node:fs/promises";
 import { schemaProblem } from "./schemas";
 
@@ -234,6 +235,14 @@ export type ArtifactStage = "triage" | "plan" | "build" | "verify" | "pr" | "ret
 
 export function runDir(issue: number): string {
   return `.factory/runs/issue-${issue}`;
+}
+
+export function readRunJson<T>(worktree: string, issueNumber: number, name: string): T | undefined {
+  try {
+    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/${name}`, "utf8")) as T;
+  } catch {
+    return undefined; // the stage that writes it did not run
+  }
 }
 
 // The one spelling of each stage's artifact filenames — readStageArtifacts,

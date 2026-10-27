@@ -13,7 +13,7 @@ setDefaultTimeout(30_000);
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Git, GitCommandRunner, issueOfPr, sparseCheckoutPatterns } from "../src/git";
+import { Git, GitCommandRunner, buildCommitMessage, issueOfPr, sparseCheckoutPatterns } from "../src/git";
 
 const roots: string[] = [];
 
@@ -96,6 +96,18 @@ describe("Git.claim (compare-and-swap)", () => {
     const { clones } = await bareOriginWithClones(root, ["clone-a"]);
     expect(await new Git(new GitCommandRunner()).claim(clones[0]!, 9, "main")).toBe(true);
     const body = await run(["git", "log", "-1", "--format=%B", "origin/factory/issue-9"], clones[0]!);
+    expect(body).toMatch(/^Signed-off-by: .+ <.+>$/m);
+  });
+
+  test("the claim commit says the factory claimed the issue, with the runner id only in the body, and is signed off", async () => {
+    const root = tmpRoot();
+    const { clones } = await bareOriginWithClones(root, ["clone-a"]);
+    expect(await new Git(new GitCommandRunner()).claim(clones[0]!, 9, "main")).toBe(true);
+    const log = (fmt: string) => run(["git", "log", "-1", `--format=${fmt}`, "origin/factory/issue-9"], clones[0]!);
+    expect((await log("%s")).trim()).toBe("chore(factory): claim #9 for a build");
+    const body = await log("%b");
+    expect(body).toContain("The factory claimed this issue");
+    expect(body).toMatch(/^Factory-Runner: .+$/m);
     expect(body).toMatch(/^Signed-off-by: .+ <.+>$/m);
   });
 
@@ -282,6 +294,39 @@ describe("Git.excludeFromSparseCheckout", () => {
     await git.excludeFromSparseCheckout(root, []);
     expect(existsSync(join(root, "README.md"))).toBe(true);
     expect(existsSync(join(root, ".git", "info", "sparse-checkout"))).toBe(false);
+  });
+});
+
+describe("buildCommitMessage", () => {
+  const issue = {
+    number: 7,
+    title: "Export runs",
+    body: "## Problem\nRuns cannot be exported. Users copy them by hand. It is slow. Fourth one.\n\n## Wanted\nJSONL.",
+  };
+
+  test("gives a conventional title from the triage type and plan goal, capped at 72 characters", () => {
+    expect(buildCommitMessage({ type: "feature", goal: "Export runs as JSONL.", issue }).split("\n")[0]).toBe(
+      "feat: export runs as JSONL (#7)",
+    );
+    expect(buildCommitMessage({ type: "bug", goal: "x", issue }).startsWith("fix: x (#7)")).toBe(true);
+    expect(buildCommitMessage({ type: "docs", issue }).startsWith("docs: export runs (#7)")).toBe(true);
+    expect(buildCommitMessage({ type: "refactor", issue }).startsWith("chore: ")).toBe(true);
+    const long = buildCommitMessage({ type: "feature", goal: "word ".repeat(40), issue }).split("\n")[0]!;
+    expect(long.length).toBeLessThanOrEqual(72);
+    expect(long.endsWith(" (#7)")).toBe(true);
+  });
+
+  test("body is the issue's Problem paragraph in at most three sentences, then Closes #N", () => {
+    const [, why, closes] = buildCommitMessage({ type: "feature", issue }).split("\n\n");
+    expect(why).toBe("Runs cannot be exported. Users copy them by hand. It is slow.");
+    expect(closes).toBe("Closes #7");
+  });
+
+  test("body falls back to the first paragraph, then the title", () => {
+    expect(buildCommitMessage({ issue: { number: 1, title: "T", body: "Plain text here." } })).toContain(
+      "\n\nPlain text here.\n\nCloses #1",
+    );
+    expect(buildCommitMessage({ issue: { number: 1, title: "T", body: "" } })).toContain("\n\nT\n\nCloses #1");
   });
 });
 

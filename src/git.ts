@@ -51,6 +51,46 @@ export function withSignoff(args: string[], who: { name: string; email: string }
   return out;
 }
 
+const COMMIT_TYPES: Record<string, string> = { feature: "feat", bug: "fix", docs: "docs" };
+
+const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+// The why for a commit body: the Problem paragraph, else the first paragraph, else the title.
+function whyOf(issue: { title: string; body?: string | null }): string {
+  const paragraphs = (issue.body ?? "")
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const problem = paragraphs.findIndex((p) => /^#+\s*problem\s*$/i.test(p.split("\n")[0]!.trim()));
+  let para: string | undefined;
+  if (problem >= 0) {
+    const rest = paragraphs[problem]!.split("\n").slice(1).join("\n");
+    para = rest.trim() ? rest : paragraphs[problem + 1];
+  } else {
+    para = paragraphs.find((p) => !/^#+\s/.test(p));
+  }
+  const text = oneLine(para ?? "");
+  if (!text) return oneLine(issue.title);
+  return (text.match(/.+?(?:[.!?](?=\s|$)|$)/g) ?? [text])
+    .slice(0, 3)
+    .map((x) => x.trim())
+    .join(" ");
+}
+
+// A conventional title with the issue number last, and a body that says why, then closes the issue.
+export function buildCommitMessage(opts: {
+  type?: string;
+  goal?: string;
+  issue: { number: number; title: string; body?: string | null };
+}): string {
+  const { issue } = opts;
+  const prefix = `${COMMIT_TYPES[opts.type ?? ""] ?? "chore"}: `;
+  const suffix = ` (#${issue.number})`;
+  const raw = oneLine(opts.goal || issue.title).replace(/\.$/, "");
+  const summary = (raw.charAt(0).toLowerCase() + raw.slice(1)).slice(0, 72 - prefix.length - suffix.length).trimEnd();
+  return `${prefix}${summary}${suffix}\n\n${whyOf(issue)}\n\nCloses #${issue.number}`;
+}
+
 export class GitCommandRunner implements CommandRunner {
   async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     if (args[0] === "commit" || args[0] === "commit-tree") {
@@ -103,7 +143,14 @@ export class Git {
 
     const runnerId = `${process.env.HOSTNAME ?? "runner"}-${process.pid}-${Date.now()}`;
     const commitTree = await this.runner.run(
-      ["commit-tree", `${baseSha}^{tree}`, "-p", baseSha, "-m", `factory: claim #${issue} by ${runnerId}`],
+      [
+        "commit-tree",
+        `${baseSha}^{tree}`,
+        "-p",
+        baseSha,
+        "-m",
+        `chore(factory): claim #${issue} for a build\n\nThe factory claimed this issue and will build it on this branch.\n\nFactory-Runner: ${runnerId}`,
+      ],
       { cwd: cloneDir },
     );
     const claimSha = commitTree.stdout.trim();
