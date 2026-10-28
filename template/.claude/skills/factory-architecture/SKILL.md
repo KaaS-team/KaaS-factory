@@ -9,7 +9,7 @@ Find where a change costs more than it should, then file one ticket. Never edit 
 
 ## Vocabulary
 
-Use these words and no others for the design: module, interface, depth (behaviour behind a small interface), seam (where behaviour can change without editing in place), adapter, leverage (callers gained per line kept), locality (a change stays in one place).
+Use these words and no others for the design: module, interface, depth (behaviour behind a small interface), seam (where behaviour can change without editing in place), adapter, payoff (callers gained per line kept), locality (a change stays in one place).
 
 ## Steps
 
