@@ -79,6 +79,10 @@ describe("parseChatOps reads an optional --force and step on retry", () => {
     expect(parse("/factory retry --force verify")).toEqual({ type: "retry", force: true, step: "verify" });
   });
 
+  test("--force counts after the step too", () => {
+    expect(parse("/factory retry verify --force")).toEqual({ type: "retry", force: true, step: "verify" });
+  });
+
   test("the step is lowercased", () => {
     expect(parse("/factory retry Verify")).toEqual({ type: "retry", step: "verify" });
   });

@@ -48,7 +48,7 @@ export function parseChatOps(signed: string): Command {
       const step = words.find((w) => w !== "--force")?.toLowerCase();
       return {
         type: "retry",
-        ...(words[0] === "--force" ? { force: true as const } : {}),
+        ...(words.includes("--force") ? { force: true as const } : {}),
         ...(step ? { step } : {}),
       };
     }
