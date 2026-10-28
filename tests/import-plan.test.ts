@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
+import { lintPlanned } from "../scripts/lint-planned";
+import { loadConfig } from "../src/config";
 import { isPlannedBody, parsePlannedIssue, planFromIssue } from "../src/engine/import-plan";
+import { proofAllowRules } from "../src/engine/plan-critic";
 import { schemaProblem } from "../src/schemas";
 
 const read = (n: string) => Bun.file(`${import.meta.dir}/fixtures/${n}`).text();
@@ -30,6 +33,15 @@ test("lint-planned exits 0 on the fixture and 1 on a broken body", async () => {
   await Bun.file(broken).delete();
   expect(r.exitCode).toBe(1);
   expect(r.stderr.toString()).toContain("AC-2 maps to T9");
+});
+
+test("lintPlanned refuses an AC command build may not run, and accepts one it may", async () => {
+  const allow = proofAllowRules(await loadConfig(`${import.meta.dir}/..`), 0);
+  const body = await read("planned-issue.md");
+  const bad = body.replace("checked by `tests/resume.test.ts` (T1)", "checked by `bun test x` (T1)");
+  expect(lintPlanned(bad, allow).join("\n")).toContain("AC-1: `bun test x` is not a command build or verify may run");
+  const good = body.replace("checked by `tests/resume.test.ts` (T1)", 'checked by `make test FILES="x"` (T1)');
+  expect(lintPlanned(good, allow)).toEqual([]);
 });
 
 test("a body without the marker is not planned", async () => {
