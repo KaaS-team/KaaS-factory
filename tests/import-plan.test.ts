@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import { isPlannedBody, parsePlannedIssue, planFromIssue } from "../src/engine/import-plan";
+import { mergeConfig } from "../src/config";
 import { schemaProblem } from "../src/schemas";
+import { lintPlanned } from "../scripts/lint-planned";
 
 const read = (n: string) => Bun.file(`${import.meta.dir}/fixtures/${n}`).text();
 const noMarker = async () => (await read("planned-issue.md")).replace("<!-- factory:planned v1 -->\n", "");
@@ -52,6 +54,15 @@ test("a task file missing from ## Files is a problem", async () => {
 test("every problem is collected, not only the first", async () => {
   const body = (await unmapped()).replace("- `src/derive.ts`\n", "");
   expect(parsePlannedIssue(body).problems.length).toBeGreaterThanOrEqual(2);
+});
+
+test("lint applies the AC command rule import-plan applies", async () => {
+  const config = mergeConfig({ agentCommands: { read: [], build: ["make *"], verify: ["make *"] } });
+  const body = await read("planned-issue.md");
+  expect(lintPlanned(body, config)).toEqual([]);
+  const bad = body.replace("checked by `tests/resume.test.ts` (T1)", "checked by `bun test tests/resume.test.ts` (T1)");
+  expect(bad).not.toBe(body);
+  expect(lintPlanned(bad, config).join("\n")).toContain("AC-1");
 });
 
 test("task deps: an unknown dep and a cycle are problems, and tasks come out dependency first", async () => {

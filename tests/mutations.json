@@ -910,6 +910,7 @@
   {"name": "rest: a not-planned close is lowercase again", "file": "src/github-rest.ts", "find": "i.state_reason.toUpperCase()", "replace": "i.state_reason", "test": "tests/github.test.ts"},
   {"name": "rest: a changed comment count keeps the cached comments", "file": "src/github-rest.ts", "find": "hit.count === i.comments", "replace": "true", "test": "tests/github.test.ts"},
   {"name": "architecture review: drops the deletion test", "file": "template/.claude/skills/factory-architecture/SKILL.md", "find": "Apply the deletion test.", "replace": "Apply a test.", "test": "tests/skills.test.ts"},
+  {"name": "lint-planned: AC commands are not checked", "file": "scripts/lint-planned.ts", "find": "...planMustFix(comment, { proof: \"test\" }, proofAllowRules(config, 0))", "replace": "...[]", "test": "tests/import-plan.test.ts"},
   {"name": "schedule: parallel picks may overlap", "file": "src/core/schedule.ts", "find": "if (node.files.some((f) => taken.has(f))) {", "replace": "if (false) {", "test": "tests/schedule.test.ts"},
   {"name": "schedule: cycles go unreported", "file": "src/core/schedule.ts", "find": "if (state.get(dep) === VISITING) cycles.push(cycleFrom(stack, dep));", "replace": "if (false) cycles.push(cycleFrom(stack, dep));", "test": "tests/schedule.test.ts"}
 ]
