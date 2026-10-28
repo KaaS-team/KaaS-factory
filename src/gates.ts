@@ -39,6 +39,7 @@ export function parseGateLine(output: string): GateResult | undefined {
 export class ShellGateRunner implements GateRunner {
   // `setup` is config.setup. A remote runtime gets a bare copy of the worktree with no installed
   // dependencies, so its setup commands run first, in the same directory as the gates.
+  // Each entry is one simple command: they are joined with `&&`, so `||` or `;` would change precedence.
   constructor(
     private readonly exec: ExecutionPort = new LocalExecution(),
     private readonly setup: readonly string[] = [],

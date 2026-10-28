@@ -554,6 +554,30 @@ describe("doctor: runtime toolchain binaries", () => {
     expect((await row(stocked(["bash", "jq"]), config("rust"))).detail).toBe("cargo not found on runtime a37");
   });
 
+  test("only the gates runtime needs jq and the toolchain; another runtime the workflow names just answers", async () => {
+    const gpuFlow = flow.replace("runtime: a37", "runtime: gpu");
+    const rows = (
+      await runDoctor(
+        {
+          ...reading,
+          readFile: async (path) =>
+            path.endsWith("workflows/m.yml")
+              ? gpuFlow
+              : path.endsWith(".factory/config.json")
+                ? config("bun")
+                : undefined,
+          probeRuntime: (_name, bins) => probeRuntime(stocked([]), 10_000, bins),
+        },
+        { ...ctx, workflow: "m", runtime: { gates: "a37" }, runtimeNames: ["a37", "gpu"] },
+      )
+    ).filter((c) => c.name.startsWith("runtime "));
+    expect(rows.map((c) => [c.name, c.ok])).toEqual([
+      ["runtime a37 answers", false],
+      ["runtime gpu answers", true],
+    ]);
+    expect(rows[0]!.detail).toBe("bash not found on runtime a37");
+  });
+
   test("an unknown toolchain or unreadable config checks only bash and jq", async () => {
     expect((await row(stocked(["bash", "jq"]), config("cobol"))).ok).toBe(true);
     expect((await row(stocked(["bash", "jq"]), "{not json")).ok).toBe(true);

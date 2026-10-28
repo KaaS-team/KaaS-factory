@@ -202,17 +202,19 @@ export function formatKit(name: string, checks: readonly KitCheck[]): string {
 
 // `factory doctor`'s reachability rows: one probe per runtime the config or workflow names and this
 // machine has (an unknown name already fails the check before it), run side by side.
+// Only the runtime that runs the gates must have jq and the toolchain; the others just answer.
 export async function probeChecks(
-  refs: readonly { name: string }[],
+  refs: readonly { where: string; name: string }[],
   known: readonly string[],
   probe: (runtime: string, bins: readonly string[]) => Promise<Health>,
   configText?: string,
 ): Promise<DoctorCheck[]> {
   const names = [...new Set(refs.map((r) => r.name))].filter((n) => known.includes(n));
-  const bins = gateBinaries(configText);
+  const gateRuntimes = new Set(refs.filter((r) => r.where === "runtime.gates").map((r) => r.name));
+  const gateBins = gateBinaries(configText);
   return Promise.all(
     names.map(async (name) => {
-      const h = await probe(name, bins);
+      const h = await probe(name, gateRuntimes.has(name) ? gateBins : []);
       const detail = h.ok
         ? `answered in ${h.ms} ms`
         : h.missing
