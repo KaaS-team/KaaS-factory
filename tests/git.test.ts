@@ -107,6 +107,22 @@ describe("Git.claim (compare-and-swap)", () => {
   });
 });
 
+describe("Git.commitPaths", () => {
+  test("commits only the named paths that changed", async () => {
+    const repo = join(tmpRoot(), "repo");
+    mkdirSync(join(repo, "src"), { recursive: true });
+    await initSeededRepo(repo);
+    writeFileSync(join(repo, "src", "a.ts"), "export const a = 1;\n");
+    writeFileSync(join(repo, "src", "b.ts"), "export const b = 1;\n");
+
+    const git = new Git(new GitCommandRunner());
+    expect(await git.commitPaths(repo, ["src/a.ts", "src/never-written.ts"], "feat: a")).toBe(true);
+    expect((await run(["git", "show", "--name-only", "--pretty=", "HEAD"], repo)).trim()).toBe("src/a.ts");
+    expect(await git.commitPaths(repo, ["src/a.ts"], "feat: again")).toBe(false);
+    expect(await run(["git", "status", "--porcelain"], repo)).toContain("src/b.ts");
+  });
+});
+
 describe("Git.commitAll", () => {
   test("commits everything except .factory/runs", async () => {
     const root = tmpRoot();

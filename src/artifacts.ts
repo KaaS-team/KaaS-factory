@@ -47,7 +47,8 @@ export interface PlanArtifact {
   // The one-line goal and AC-n criteria of this revision, and the specs/ stem the issue implements,
   // if any. The PR body's What changed and Acceptance read them, never another spec (#90).
   readonly goal?: string;
-  readonly criteria?: readonly { readonly id: string; readonly text: string }[];
+  readonly criteria?: readonly { readonly id: string; readonly text: string; readonly task?: string }[];
+  readonly tasks?: readonly { readonly id: string; readonly title: string; readonly files: readonly string[] }[];
   readonly spec?: string;
 }
 

@@ -63,6 +63,9 @@ export async function postRunDetails(
 export interface PrParts {
   readonly whatChanged?: string;
   readonly acceptance?: string;
+  // The per-task table and the closing line naming an epic's children (see epic.ts).
+  readonly tasks?: string;
+  readonly closes?: string;
   // How the body names the issue holding the run-details comment (see issueRef); it then points there.
   readonly runDetails?: string;
 }
@@ -75,8 +78,10 @@ export function issueRef(config: Pick<FactoryConfig, "tracker">, issueNumber: nu
 // The PR body opens with What changed, then the pr stage's text and the Acceptance section. The receipt
 // envelope stays out, in the issue comment, so the body never carries an attestation blob.
 export function prBody(body: string, parts: PrParts = {}): string {
+  if (parts.tasks) body = `${parts.tasks}\n\n${body}`;
   if (parts.whatChanged) body = `${parts.whatChanged}\n\n${body}`;
   if (parts.acceptance) body = `${body}\n\n${parts.acceptance}`;
+  if (parts.closes) body = `${body}\n\n${parts.closes}`;
   if (parts.runDetails) body = `${body}\n\nThe receipt is in the run-details comment on ${parts.runDetails}.`;
   return body;
 }

@@ -58,7 +58,7 @@ import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { spendPolicy } from "./ports/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
-import { probeNamed } from "./runtime-kit";
+import { probeNamed, probeRuntime } from "./runtime-kit";
 import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { detectStack, diskFiles } from "./stack";
 import { warnWhenStale } from "./config-health";
@@ -169,7 +169,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
       machineGateway(machineConfig),
       tokenEnvNames(config, machineConfig),
     ),
-    gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
+    gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"], config.setup),
     holdoutRunner: new ShellHoldoutRunner(),
     rechecker: new DiffAnchorRechecker(),
     proofGit: new ShellProofGit(),
@@ -331,7 +331,11 @@ async function cmdInbox(): Promise<void> {
   }
   if (has("json")) console.log(successJson({ items }, true));
   else if (!items.length) console.log("Nothing is waiting for you.");
-  else for (const i of items) console.log(`#${i.issue} ${i.kind} (${i.actions.join("/")}): ${i.title}`);
+  else
+    for (const i of items)
+      console.log(
+        `#${i.issue} ${i.kind} (${i.actions.join("/")}): ${i.title}${i.progress ? ` [${i.progress.done}/${i.progress.total}]` : ""}`,
+      );
 }
 
 async function cmdScan(): Promise<void> {
@@ -456,7 +460,8 @@ async function cmdDoctor(): Promise<void> {
       versionOf,
       fileExists,
       readFile: async (path) => ((await fileExists(path)) ? await Bun.file(path).text() : undefined),
-      probeRuntime: (name) => probeNamed(loadMachineConfig().runtimes, name, 10_000),
+      probeRuntime: (name, bins) =>
+        probeNamed(loadMachineConfig().runtimes, name, 10_000, (port, ms) => probeRuntime(port, ms, bins)),
       isExecutable: async (path) => {
         try {
           accessSync(path, constants.X_OK);

@@ -128,6 +128,8 @@ export interface Health {
   readonly ok: boolean;
   readonly ms: number;
   readonly detail: string;
+  // The first binary in `bins` the runtime lacks, when that is why it is not ok.
+  readonly missing?: string;
 }
 
 // agent37 wakes a sleeping instance in 5 to 15 s, then writes its checkpoint: 45 s covers both.
@@ -135,20 +137,62 @@ export function probeBudgetMs(kind: string | undefined, other = 15_000): number 
   return kind === "agent37" ? 45_000 : other;
 }
 
+const TOOLCHAIN_BINARY: Readonly<Record<string, string>> = {
+  node: "node",
+  bun: "bun",
+  python: "python3",
+  go: "go",
+  ruby: "ruby",
+  rust: "cargo",
+};
+
+// What a gate run needs on a runtime: gates.sh calls bash and jq, and the repo's toolchain builds and tests.
+function gateBinaries(configText: string | undefined): string[] {
+  let toolchain: unknown;
+  try {
+    toolchain = configText === undefined ? undefined : (JSON.parse(configText) as { toolchain?: unknown }).toolchain;
+  } catch {
+    toolchain = undefined;
+  }
+  const known = typeof toolchain === "string" && Object.hasOwn(TOOLCHAIN_BINARY, toolchain);
+  return ["bash", "jq", ...(known ? [TOOLCHAIN_BINARY[toolchain as string]!] : [])];
+}
+
+const MISSING = "factory-probe-missing ";
+
 // Reachability, not correctness: one trivial command in an empty directory, within `timeoutMs`.
-export async function probeRuntime(port: ExecutionPort, timeoutMs = 15_000): Promise<Health> {
+// `bins` are checked too, so a runtime that answers but lacks jq or the toolchain is not ok.
+export async function probeRuntime(
+  port: ExecutionPort,
+  timeoutMs = 15_000,
+  bins: readonly string[] = [],
+): Promise<Health> {
   const dir = mkdtempSync(join(tmpdir(), "factory-probe-"));
   const start = Date.now();
+  const cmd = [
+    "echo factory-probe-ok",
+    ...bins.map((b) => `command -v ${b} >/dev/null 2>&1 || echo ${MISSING}${b}`),
+  ].join("; ");
   try {
     const r = await within(
       port
-        .run("echo factory-probe-ok", dir, AbortSignal.timeout(timeoutMs))
+        .run(cmd, dir, AbortSignal.timeout(timeoutMs))
         .catch((e: unknown): ExecResult => ({ stdout: "", stderr: "", code: 1, runtimeFailed: String(e) })),
       timeoutMs,
     );
-    const ok = r.code === 0 && r.stdout.includes("factory-probe-ok");
+    const missing = r.stdout
+      .split("\n")
+      .find((l) => l.startsWith(MISSING))
+      ?.slice(MISSING.length)
+      .trim();
+    const ok = r.code === 0 && r.stdout.includes("factory-probe-ok") && missing === undefined;
     const why = r.runtimeFailed ?? (r.stderr.trim().split("\n")[0] || `exit ${r.code}`);
-    return { ok, ms: Date.now() - start, detail: ok ? "answered" : why.slice(0, 200) };
+    return {
+      ok,
+      ms: Date.now() - start,
+      detail: ok ? "answered" : missing ? `${missing} not found` : why.slice(0, 200),
+      ...(missing ? { missing } : {}),
+    };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -175,16 +219,24 @@ export function formatKit(name: string, checks: readonly KitCheck[]): string {
 
 // `factory doctor`'s reachability rows: one probe per runtime the config or workflow names and this
 // machine has (an unknown name already fails the check before it), run side by side.
+// Only the runtime that runs the gates must have jq and the toolchain; the others just answer.
 export async function probeChecks(
-  refs: readonly { name: string }[],
+  refs: readonly { where: string; name: string }[],
   known: readonly string[],
-  probe: (runtime: string) => Promise<Health>,
+  probe: (runtime: string, bins: readonly string[]) => Promise<Health>,
+  configText?: string,
 ): Promise<DoctorCheck[]> {
   const names = [...new Set(refs.map((r) => r.name))].filter((n) => known.includes(n));
+  const gateRuntimes = new Set(refs.filter((r) => r.where === "runtime.gates").map((r) => r.name));
+  const gateBins = gateBinaries(configText);
   return Promise.all(
     names.map(async (name) => {
-      const h = await probe(name);
-      const detail = h.ok ? `answered in ${h.ms} ms` : `did not answer: ${h.detail}`;
+      const h = await probe(name, gateRuntimes.has(name) ? gateBins : []);
+      const detail = h.ok
+        ? `answered in ${h.ms} ms`
+        : h.missing
+          ? `${h.missing} not found on runtime ${name}`
+          : `did not answer: ${h.detail}`;
       return { name: `runtime ${name} answers`, ok: h.ok, detail, fixable: false };
     }),
   );

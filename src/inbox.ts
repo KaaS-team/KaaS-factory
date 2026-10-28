@@ -6,6 +6,7 @@
 import { parseChatOps, signedBy } from "./chatops";
 import { parseDataMarkers } from "./derive";
 import { plain } from "./display";
+import { epicProgress } from "./engine/epic";
 import type { GhComment, GhIssue, GhPr, GitHub } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
 import { riskIndex } from "./risk";
@@ -35,6 +36,8 @@ export interface InboxItem {
   readonly waitingSince: string | undefined;
   readonly ask: string;
   readonly actions: readonly InboxAction[];
+  // An epic's checklist, so the list shows how far it is.
+  readonly progress?: { done: number; total: number };
 }
 
 // Every label that means "a human is needed", and what they can do about it.
@@ -110,7 +113,9 @@ export function buildInbox(issues: readonly GhIssue[], reasons?: ReadonlyMap<num
     const kind = isBudgetPark(label, issue) ? "budget" : isMergeDryRun(label, comment) ? "merge-dry-run" : labelKind;
     const reason = PARKED_KINDS.has(kind) ? reasons?.get(issue.number) : undefined;
     const thread = plain(stripMarkers(comment?.body ?? ""));
+    const progress = epicProgress(issue.body);
     items.push({
+      ...(progress ? { progress } : {}),
       id: `issue-${issue.number}`,
       kind,
       issue: issue.number,

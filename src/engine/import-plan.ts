@@ -2,6 +2,7 @@
 // so an author fixes the body once.
 
 import type { Risk } from "../artifacts";
+import { type IssueMeta, parseMeta, topoOrder } from "../core/schedule";
 
 // The bundled workflow a planned issue runs; watch.ts picks it from the body, not from a route.
 export const PLANNED_WORKFLOW = "planned-to-pr";
@@ -13,6 +14,7 @@ export interface PlannedTask {
   readonly files: string[];
   readonly model: string;
   readonly steps: string[];
+  readonly deps: string[];
 }
 export interface PlannedMutation {
   readonly name: string;
@@ -37,6 +39,7 @@ export interface PlannedIssue {
   readonly files: { path: string; isNew: boolean }[];
   readonly risk: Risk;
   readonly model: string;
+  readonly meta: IssueMeta;
 }
 
 export function isPlannedBody(body: string): boolean {
@@ -80,7 +83,16 @@ function parseTasks(text: string, problems: string[]): PlannedTask[] {
       problems.push(`${head[1]} has no Model of haiku, sonnet or opus.`);
     const steps = lines.filter((l) => /^\d+\.\s/.test(l)).map((l) => l.replace(/^\d+\.\s*/, ""));
     if (!steps.length) problems.push(`${head[1]} has no numbered steps.`);
-    tasks.push({ id: head[1]!, title: head[2]!.trim(), files, model, steps });
+    const deps = (/^Deps:[ \t]*(.+)$/im.exec(chunk)?.[1] ?? "").split(/[\s,]+/).filter((d) => d && d !== "none");
+    for (const d of deps) if (!/^T\d+$/.test(d)) problems.push(`${head[1]} Deps: "${d}" is not a task id.`);
+    tasks.push({
+      id: head[1]!,
+      title: head[2]!.trim(),
+      files,
+      model,
+      steps,
+      deps: deps.filter((d) => /^T\d+$/.test(d)),
+    });
   }
   return tasks;
 }
@@ -135,6 +147,11 @@ export function parsePlannedIssue(body: string): { plan?: PlannedIssue; problems
   for (const k of ["why", "change", "tests", "mutation", "acceptance", "files", "risk"])
     if (!s.has(k)) problems.push(`The body has no "## ${k[0]!.toUpperCase()}${k.slice(1)}" section.`);
   const tasks = parseTasks(s.get("change") ?? "", problems);
+  const graph = topoOrder(tasks.map((t) => ({ id: t.id, deps: t.deps })));
+  for (const m of graph.missing) problems.push(`${m.id} depends on ${m.dep}, which is not a task in Change.`);
+  for (const c of graph.cycles) problems.push(`Tasks ${c.join(" -> ")} form a cycle.`);
+  const meta = parseMeta(body);
+  problems.push(...meta.problems);
   if (s.has("change") && !tasks.length) problems.push("Change holds no `### T<n>:` task.");
   const criteria = parseCriteria(s.get("acceptance"), new Set(tasks.map((t) => t.id)), problems);
   const files = (s.get("files") ?? "").split("\n").flatMap((l) => {
@@ -160,9 +177,16 @@ export function parsePlannedIssue(body: string): { plan?: PlannedIssue; problems
       nonGoals: bullets(s.get("non-goals")),
       files,
       risk: risk as Risk,
+      meta,
       model: /^## Model:\s*(\w+)/im.exec(body)?.[1]?.toLowerCase() ?? "sonnet",
     },
   };
+}
+
+// Build reads dependencies first; with no task deps this is the written order.
+function inDependencyOrder(tasks: PlannedTask[]): PlannedTask[] {
+  const order = topoOrder(tasks.map((t) => ({ id: t.id, deps: t.deps }))).order;
+  return order.map((id) => tasks.find((t) => t.id === id)!);
 }
 
 // The artifact and comment the plan stage writes, so build and verify cannot tell the two apart.
@@ -203,7 +227,7 @@ export function planFromIssue(p: PlannedIssue, issue: { body: string }, revision
     proof: "test" as const,
     goal: p.goal,
     criteria: p.criteria.map((c) => ({ id: c.id, text: c.text, task: c.task })),
-    tasks: p.tasks,
+    tasks: inDependencyOrder(p.tasks),
     mutations: p.mutations,
     bodyHash: sha256(issue.body),
     source: "issue" as const,

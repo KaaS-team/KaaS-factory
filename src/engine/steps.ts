@@ -42,6 +42,15 @@ import { latestPricedModel } from "../pricing";
 import type { StageRunResult } from "../ports/agent";
 import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
+import {
+  childIssues,
+  closingLine,
+  commitByTask,
+  conventionalTitle,
+  conventionalType,
+  renderTaskTable,
+  scopeOf,
+} from "./epic";
 import { issueRef, postRunDetails, prBody, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
@@ -252,7 +261,16 @@ const build: StepType = {
     // The runner commits — the build skill's own instructions say so, but
     // nothing enforced it before (audit finding #4). `.factory/runs/` is
     // excluded; it's the stage handoff, never meant to land in the repo.
-    await deps.git.commitAll(worktree, `factory: build #${issueNumber}`);
+    // One commit per planned task, conventional titles (epic.ts).
+    const builtPlan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
+    await commitByTask(deps.git, worktree, {
+      tasks: builtPlan?.tasks ?? [],
+      goal: builtPlan?.goal ?? issue.title,
+      type: conventionalType(readRunJson<TriageArtifact>(worktree, issueNumber, "triage.json")?.type),
+      ref: `#${issueNumber}`,
+      title: issue.title,
+      files: builtPlan?.files ?? [],
+    });
 
     // Defense in depth behind the guard hook: a Bash-made edit to a
     // protected path never reaches Edit/Write, so the hook never sees it
@@ -498,13 +516,19 @@ const pr: StepType = {
     if (!existing) await postRunDetails(deps, config, issueNumber, receipt);
     const plan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
     const proof = readRunJson<ProofResult>(worktree, issueNumber, "proof.json");
+    const children = childIssues(issue.body, issueNumber);
     const prUrl =
       existing?.url ??
       (await deps.github.createPr({
         repo: config.repo,
         base: config.base,
         head,
-        title: `${issue.title} (#${issueNumber})`,
+        title: conventionalTitle(
+          conventionalType(readRunJson<TriageArtifact>(worktree, issueNumber, "triage.json")?.type),
+          scopeOf(plan?.files ?? []),
+          issue.title,
+          `#${issueNumber}`,
+        ),
         body: prBody(art.comment ?? `Closes #${issueNumber}`, {
           whatChanged: renderWhatChanged(
             plan?.goal ?? issue.title,
@@ -517,6 +541,12 @@ const pr: StepType = {
             readRunJson<AcceptanceVerdict>(worktree, issueNumber, "acceptance.json"),
           ),
           runDetails: issueRef(config, issueNumber),
+          tasks: renderTaskTable(
+            plan?.tasks ?? [],
+            plan?.criteria ?? [],
+            readRunJson<VerdictArtifact>(worktree, issueNumber, "verdict.json")?.criteria,
+          ),
+          closes: config.tracker.kind === "github" && children.length ? closingLine(issueNumber, children) : undefined,
         }),
         draft: true,
       }));

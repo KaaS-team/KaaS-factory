@@ -7,7 +7,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseGateLine, runGates, type GateRunner } from "../src/gates";
+import { parseGateLine, runGates, ShellGateRunner, type GateRunner } from "../src/gates";
+import { LocalExecution } from "../src/adapters/local/execution";
+import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 
 describe("parseGateLine", () => {
   test("parses a well-formed GREEN line", () => {
@@ -37,6 +39,37 @@ describe("parseGateLine", () => {
   test("is case-insensitive on status but normalizes to uppercase", () => {
     const result = parseGateLine("FACTORY_GATES: status=green passed=1 failed=0 skipped=0 failed_gates=-");
     expect(result?.status).toBe("GREEN");
+  });
+});
+
+// Records the command line it is asked to run, instead of running it.
+class RecordingPort implements ExecutionPort {
+  readonly cmds: string[] = [];
+  async run(cmd: string, _cwd: string): Promise<ExecResult> {
+    this.cmds.push(cmd);
+    return { stdout: "", stderr: "", code: 0 };
+  }
+}
+
+describe("ShellGateRunner setup", () => {
+  const setup = ["bun install --frozen-lockfile"];
+
+  test("a remote runtime installs deps in the same directory before the gates", async () => {
+    const remote = new RecordingPort();
+    await new ShellGateRunner(remote, setup).run("/tmp/whatever");
+    expect(remote.cmds).toEqual(["bun install --frozen-lockfile && bash .factory/gates.sh"]);
+  });
+
+  test("a local runtime runs the bare gate command, with no setup", async () => {
+    const local = new (class extends LocalExecution {
+      readonly cmds: string[] = [];
+      override async run(cmd: string, _cwd: string): Promise<ExecResult> {
+        this.cmds.push(cmd);
+        return { stdout: "", stderr: "", code: 0 };
+      }
+    })();
+    await new ShellGateRunner(local, setup).run("/tmp/whatever");
+    expect(local.cmds).toEqual(["bash .factory/gates.sh"]);
   });
 });
 

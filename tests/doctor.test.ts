@@ -5,10 +5,15 @@
 // jq (which gates.sh and the CI workflow assume). Audit findings #13.
 
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fixDoctor, runDoctor, type DoctorDeps } from "../src/doctor";
 import { GitHub, type CommandResult, type CommandRunner } from "../src/github";
 import { LABELS, labelsFor } from "../src/labels";
 import { parseWorkflowText } from "../src/engine/workflows";
+import { probeRuntime } from "../src/runtime-kit";
+import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 
 class FakeGitHub extends GitHub {
   constructor(private readonly auth: { ok: boolean; detail: string }) {
@@ -480,6 +485,103 @@ describe("doctor: mcp: servers", () => {
         cs.find((c) => c.name.startsWith("every mcp:")),
       ),
     ).toBeUndefined();
+  });
+});
+
+// Runs each command in real bash whose PATH holds only bash, so `command -v jq` finds nothing, as on a bare runtime.
+const barePath = mkdtempSync(join(tmpdir(), "factory-bare-"));
+symlinkSync("/bin/bash", join(barePath, "bash"));
+class BarePathPort implements ExecutionPort {
+  async run(cmd: string, cwd: string): Promise<ExecResult> {
+    const proc = Bun.spawn(["/bin/bash", "-c", cmd], {
+      cwd,
+      env: { PATH: barePath },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    return { stdout, stderr, code };
+  }
+}
+
+describe("doctor: runtime toolchain binaries", () => {
+  const flow =
+    "name: m\nsteps:\n  l: { uses: check, label: factory:linting, run: make lint, runtime: a37, next: p }\n  p: { uses: pr, label: factory:in-review }\n";
+  const reading: DoctorDeps = {
+    ...deps(),
+    readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : undefined),
+  };
+  const row = async (port: ExecutionPort, config?: string) =>
+    (
+      await runDoctor(
+        {
+          ...reading,
+          readFile: async (path) => (path.endsWith(".factory/config.json") ? config : reading.readFile(path)),
+          probeRuntime: (_name, bins) => probeRuntime(port, 10_000, bins),
+        },
+        { ...ctx, workflow: "m", runtime: { gates: "a37" }, runtimeNames: ["local", "a37"] },
+      )
+    ).find((c) => c.name === "runtime a37 answers")!;
+  // Answers the probe's `command -v` lines from a fixed set of installed binaries.
+  const stocked = (installed: string[]): ExecutionPort => ({
+    run: async (cmd) => ({
+      stdout: `factory-probe-ok\n${[...cmd.matchAll(/command -v (\S+)/g)]
+        .map((m) => m[1]!)
+        .filter((b) => !installed.includes(b))
+        .map((b) => `factory-probe-missing ${b}\n`)
+        .join("")}`,
+      stderr: "",
+      code: 0,
+    }),
+  });
+  const config = (toolchain: string) => JSON.stringify({ toolchain, gates: [{ name: "t", cmd: "true" }] });
+
+  test("a runtime without jq fails its row, naming the binary", async () => {
+    const check = await row(new BarePathPort());
+    expect(check.ok).toBe(false);
+    expect(check.detail).toBe("jq not found on runtime a37");
+  });
+
+  test("the repo's toolchain binary is checked too", async () => {
+    const check = await row(stocked(["bash", "jq"]), config("bun"));
+    expect(check).toMatchObject({ ok: false, detail: "bun not found on runtime a37" });
+    expect((await row(stocked(["bash", "jq", "bun"]), config("bun"))).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq", "python3"]), config("python"))).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq"]), config("rust"))).detail).toBe("cargo not found on runtime a37");
+  });
+
+  test("only the gates runtime needs jq and the toolchain; another runtime the workflow names just answers", async () => {
+    const gpuFlow = flow.replace("runtime: a37", "runtime: gpu");
+    const rows = (
+      await runDoctor(
+        {
+          ...reading,
+          readFile: async (path) =>
+            path.endsWith("workflows/m.yml")
+              ? gpuFlow
+              : path.endsWith(".factory/config.json")
+                ? config("bun")
+                : undefined,
+          probeRuntime: (_name, bins) => probeRuntime(stocked([]), 10_000, bins),
+        },
+        { ...ctx, workflow: "m", runtime: { gates: "a37" }, runtimeNames: ["a37", "gpu"] },
+      )
+    ).filter((c) => c.name.startsWith("runtime "));
+    expect(rows.map((c) => [c.name, c.ok])).toEqual([
+      ["runtime a37 answers", false],
+      ["runtime gpu answers", true],
+    ]);
+    expect(rows[0]!.detail).toBe("bash not found on runtime a37");
+  });
+
+  test("an unknown toolchain or unreadable config checks only bash and jq", async () => {
+    expect((await row(stocked(["bash", "jq"]), config("cobol"))).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq"]), "{not json")).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq"]))).ok).toBe(true);
   });
 });
 

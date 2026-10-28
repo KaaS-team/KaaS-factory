@@ -53,6 +53,7 @@ import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
+import { settleEpic } from "./engine/epic";
 import { shipRunState } from "./engine/blobs";
 import { RateLimitError, TRUSTED_ROLES } from "./ports/scm";
 import { cachedRole, isWriter, writersOnly } from "./trust";
@@ -372,15 +373,12 @@ export async function resumeParked(
   if (await refuseRepeat(deps, config, issue, command.force === true)) return "waiting";
 
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
+  const stage = Object.hasOwn(workflowOf(deps, issue).steps, command.step ?? "") ? command.step! : derived.resumeStage;
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
-  await deps.github.commentIssue(
-    config.repo,
-    issue.number,
-    `Retrying from ${derived.resumeStage}.\n\n<!-- factory:retry v1 -->`,
-  );
-  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, issue, derived.resumeStage));
-  return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
+  await deps.github.commentIssue(config.repo, issue.number, `Retrying from ${stage}.\n\n<!-- factory:retry v1 -->`);
+  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, issue, stage));
+  return runFromStage(deps, config, issue, stage, worktree, {
     rejectRound: derived.rejectRounds,
     questionRound: 0, // a human asked for a retry; give it a fresh round of questions if needed
   });
@@ -449,6 +447,7 @@ async function recordMerge(
   if (issue.comments.some((c) => isTrusted(c) && c.body.includes(marker))) return "waiting";
   const who = by === "human" ? "by a human on the code host" : "by the merge policy";
   await postComment(deps, config, issue.number, `PR #${prNumber} was merged ${who}.\n\n${marker}`);
+  if (config.tracker.kind === "github") await settleEpic(deps.github, config.repo, issue);
   if (by === "human") {
     await deps.github
       .closeIssue(config.repo, issue.number)

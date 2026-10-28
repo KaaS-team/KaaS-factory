@@ -44,7 +44,7 @@ export async function runAcceptance(
   }
 }
 
-function cell(text: string): string {
+export function cell(text: string): string {
   return text.replace(/\|/g, "\\|").replace(/\s+/g, " ");
 }
 
