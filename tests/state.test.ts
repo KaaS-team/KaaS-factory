@@ -87,6 +87,30 @@ test("a v2.5.0 stage_runs table gains tokens_cached and usage_complete once, kee
   state.close();
 });
 
+test("an older stage_runs table gains tokens_cache_write once, keeping its rows at 0", () => {
+  const path = join(dir, "pre-cache-write.db");
+  const old = new Database(path);
+  old.exec(
+    "CREATE TABLE stage_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, repo TEXT NOT NULL, issue INTEGER NOT NULL, stage TEXT NOT NULL, agent TEXT NOT NULL, model TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL, exit_code INTEGER NOT NULL, killed_reason TEXT, tokens_cached INTEGER NOT NULL DEFAULT 0, usage_complete INTEGER NOT NULL DEFAULT 1, session_id TEXT, verdict TEXT)",
+  );
+  old.exec(
+    "INSERT INTO stage_runs (repo, issue, stage, agent, started_at, finished_at, duration_ms, exit_code) VALUES ('acme/widgets', 7, 'plan', 'claude', 'a', 'b', 1, 0)",
+  );
+  old.close();
+  for (let i = 0; i < 2; i++) new FactoryState(path).close();
+  const state = new FactoryState(path);
+  expect(state.listStageRuns("acme/widgets")[0]!.tokens_cache_write).toBe(0);
+  state.close();
+});
+
+test("recordStageRun stores tokens_cache_write and defaults it to 0", () => {
+  const state = new FactoryState(":memory:");
+  state.recordStageRun(row(1, { tokens_cache_write: 33 }));
+  state.recordStageRun(row(2));
+  expect(state.listStageRuns("acme/widgets").map((r) => r.tokens_cache_write)).toEqual([33, 0]);
+  state.close();
+});
+
 test("an old NOT NULL cost_usd column is rebuilt nullable, twice over, and an unknown cost stays NULL", () => {
   const path = join(dir, "v251.db");
   const old = new Database(path);
