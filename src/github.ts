@@ -27,6 +27,7 @@ export class GhCommandRunner implements CommandRunner {
   }
 }
 
+import { RestIssues } from "./github-rest";
 import { RateLimitError } from "./ports/scm";
 import type {
   GhIssue,
@@ -57,27 +58,10 @@ export type {
   CodeHostPort,
 };
 
-// gh prints a comment's author as {login}; everything past this file trusts a login string, and an
-// object reached roleOf as "[object Object]", a 404, so no /factory approve was ever trusted.
-type RawIssue = Omit<GhIssue, "comments"> & {
-  comments?: (Omit<GhComment, "author"> & { author?: { login?: string } | string })[];
-};
-function issueFrom(raw: RawIssue): GhIssue {
-  return {
-    ...raw,
-    comments: (raw.comments ?? []).map((c) => ({
-      ...c,
-      author: typeof c.author === "string" ? c.author : (c.author?.login ?? ""),
-    })),
-  };
-}
-
-const ISSUE_LIMIT = 500;
-
-// Epoch seconds at which the GraphQL rate-limit bucket refills, from `gh api rate_limit`'s JSON body.
-function graphqlReset(stdout: string): number | undefined {
+// Epoch seconds at which the REST rate-limit bucket refills, from `gh api rate_limit`'s JSON body.
+function coreReset(stdout: string): number | undefined {
   try {
-    const reset = (JSON.parse(stdout) as { resources?: { graphql?: { reset?: number } } }).resources?.graphql?.reset;
+    const reset = (JSON.parse(stdout) as { resources?: { core?: { reset?: number } } }).resources?.core?.reset;
     return typeof reset === "number" ? reset : undefined;
   } catch {
     return undefined;
@@ -94,7 +78,14 @@ class GhError extends Error {
 }
 
 export class GitHub implements TrackerPort, CodeHostPort {
-  constructor(private readonly runner: CommandRunner = new GhCommandRunner()) {}
+  private readonly rest: RestIssues;
+
+  constructor(private readonly runner: CommandRunner = new GhCommandRunner()) {
+    this.rest = new RestIssues(
+      runner,
+      async (args, result) => (await this.rateLimitOf(result)) ?? new GhError(args, result),
+    );
+  }
 
   private async exec(args: string[]): Promise<CommandResult> {
     const result = await this.runner.run(args);
@@ -103,103 +94,38 @@ export class GitHub implements TrackerPort, CodeHostPort {
   }
 
   async listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]> {
-    const result = await this.exec([
-      "issue",
-      "list",
-      "--repo",
-      repo,
-      "--label",
-      label,
-      "--state",
-      "open",
-      "--json",
-      "number,title,body,labels,comments",
-      // gh defaults to 30; a repo can carry far more than 30 ready issues at
-      // once (audit: silently dropped tickets past the default).
-      "--limit",
-      "500",
-    ]);
-    return (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
+    return this.rest.list(repo, label);
   }
 
-  // One request for every label: gh's --label filter is AND, so list the open issues once and split by label here.
-  // gh prints no headers for `issue list`, so a rate limit's reset time comes from the rate_limit endpoint.
+  // One request for every label: the REST label filter is AND, so list the open issues once and split by label here.
   async listIssuesByLabels(repo: string, labels: readonly string[]): Promise<Map<string, GhIssue[]>> {
-    const result = await this.runner.run([
-      "issue",
-      "list",
-      "--repo",
-      repo,
-      "--state",
-      "open",
-      "--json",
-      "number,title,body,labels,comments",
-      "--limit",
-      String(ISSUE_LIMIT),
-    ]);
-    if (result.code !== 0) throw (await this.rateLimitOf(result)) ?? new GhError(["issue", "list"], result);
-    const issues = (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
-    // The limit now caps every open issue, not each label; a full page may hide older ones, so list per label.
-    if (issues.length >= ISSUE_LIMIT) {
-      try {
-        const lists = await Promise.all(labels.map((l) => this.listIssuesByLabel(repo, l)));
-        return new Map(labels.map((l, i) => [l, lists[i]!]));
-      } catch (err) {
-        throw (err instanceof GhError ? await this.rateLimitOf(err.result) : undefined) ?? err;
-      }
-    }
+    const issues = await this.rest.list(repo);
     return new Map(labels.map((l) => [l, issues.filter((i) => i.labels.some((x) => x.name === l))]));
   }
 
-  // `gh issue list` is GraphQL, so its bucket resets at rate_limit's `graphql` entry, not the REST core one.
-  // A 403 is also what a missing scope or SAML returns, so a 403 counts only when it says "rate limit".
-  // If the probe fails there is no reset time to honour, so the caller rethrows the plain error.
+  // REST has its own bucket, so a limit resets at rate_limit's `core` entry. A 403 is also what a missing
+  // scope or SAML returns, so a 403 counts only when it says "rate limit". If the probe fails there is no
+  // reset time to honour, so the caller rethrows the plain error.
   private async rateLimitOf(result: CommandResult): Promise<RateLimitError | undefined> {
     const status = /HTTP (403|429)/.exec(result.stderr)?.[1];
     if (status !== "429" && !/rate limit/i.test(result.stderr)) return undefined;
     const probe = await this.runner.run(["api", "rate_limit"]);
-    const reset = probe.code === 0 ? graphqlReset(probe.stdout) : undefined;
+    const reset = probe.code === 0 ? coreReset(probe.stdout) : undefined;
     return reset ? new RateLimitError(Number(status ?? 403), reset) : undefined;
   }
 
-  // Includes state/stateReason (blockers.ts's only reader of either field) so
-  // a blocker check needs one call, not a separate `gh issue view --json state`.
+  // Includes state/stateReason (blockers.ts's only reader of either field) so a blocker check is one call.
   async getIssue(repo: string, number: number): Promise<GhIssue> {
-    const result = await this.exec([
-      "issue",
-      "view",
-      String(number),
-      "--repo",
-      repo,
-      "--json",
-      "number,title,body,labels,comments,state,stateReason",
-    ]);
-    return issueFrom(JSON.parse(result.stdout));
+    return this.rest.view(repo, number);
   }
 
   async listOpenIssues(repo: string): Promise<GhIssue[]> {
-    const result = await this.exec([
-      "issue",
-      "list",
-      "--repo",
-      repo,
-      "--state",
-      "open",
-      "--json",
-      "number,title,body,labels,comments",
-      "--limit",
-      "200",
-    ]);
-    return (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
+    return this.rest.list(repo);
   }
 
-  // Returns the new comment's id, parsed from the URL `gh` prints
-  // (…#issuecomment-123456), so callers that need to edit it later (status
-  // comments) can hold onto it.
+  // Returns the new comment's id, so callers that edit it later (status comments) can hold onto it.
   async commentIssue(repo: string, number: number, body: string): Promise<number | undefined> {
-    const result = await this.exec(["issue", "comment", String(number), "--repo", repo, "--body", body]);
-    const match = result.stdout.trim().match(/issuecomment-(\d+)/);
-    return match ? Number(match[1]) : undefined;
+    return this.rest.comment(repo, number, body);
   }
 
   async editComment(repo: string, commentId: number, body: string): Promise<void> {
@@ -209,12 +135,12 @@ export class GitHub implements TrackerPort, CodeHostPort {
 
   async addLabels(repo: string, number: number, labels: string[]): Promise<void> {
     if (labels.length === 0) return;
-    await this.exec(["issue", "edit", String(number), "--repo", repo, "--add-label", labels.join(",")]);
+    await this.rest.addLabels(repo, number, labels);
   }
 
   async removeLabels(repo: string, number: number, labels: string[]): Promise<void> {
     if (labels.length === 0) return;
-    await this.exec(["issue", "edit", String(number), "--repo", repo, "--remove-label", labels.join(",")]);
+    await this.rest.removeLabels(repo, number, labels);
   }
 
   async setStateLabel(repo: string, number: number, current: string[], next: string): Promise<void> {
