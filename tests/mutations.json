@@ -906,5 +906,7 @@
   {"name": "build: the builder is told to load the standards file", "file": "template/.claude/skills/factory-build/SKILL.md", "find": " (not `CODING_STANDARDS.md`; the reviewer enforces it)", "replace": "", "test": "tests/skills.test.ts"},
   {"name": "rest: comments are refetched on every read", "file": "src/github-rest.ts", "find": "hit && hit.updatedAt === i.updated_at ? hit.comments : undefined", "replace": "undefined", "test": "tests/github.test.ts"},
   {"name": "rest: a pull request counts as an issue", "file": "src/github-rest.ts", "find": ".filter((i) => !i.pull_request)", "replace": "", "test": "tests/github.test.ts"},
-  {"name": "rest: the rate limit reads the graphql bucket", "file": "src/github.ts", "find": "resources?.core?.reset", "replace": "resources?.graphql?.reset", "test": "tests/scenarios.test.ts"}
+  {"name": "rest: the rate limit reads the graphql bucket", "file": "src/github.ts", "find": "resources?.core?.reset", "replace": "resources?.graphql?.reset", "test": "tests/scenarios.test.ts"},
+  {"name": "rest: a not-planned close is lowercase again", "file": "src/github-rest.ts", "find": "i.state_reason.toUpperCase()", "replace": "i.state_reason", "test": "tests/github.test.ts"},
+  {"name": "rest: a changed comment count keeps the cached comments", "file": "src/github-rest.ts", "find": "hit.count === i.comments", "replace": "true", "test": "tests/github.test.ts"}
 ]

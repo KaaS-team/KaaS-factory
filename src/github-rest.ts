@@ -25,10 +25,11 @@ interface RestComment {
 }
 
 const PER_PAGE = 100;
+const CACHE_MS = 5 * 60_000;
 
 export class RestIssues {
   // Comments change only when updated_at does, so a warm tick costs one list call, not one per issue.
-  private readonly cache = new Map<string, { updatedAt: string; comments: GhComment[] }>();
+  private readonly cache = new Map<string, { updatedAt: string; count: number; at: number; comments: GhComment[] }>();
 
   constructor(
     private readonly runner: CommandRunner,
@@ -58,10 +59,12 @@ export class RestIssues {
   private async shape(repo: string, i: RestIssue): Promise<GhIssue> {
     const key = `${repo}#${i.number}`;
     const hit = this.cache.get(key);
-    let comments = hit && hit.updatedAt === i.updated_at ? hit.comments : undefined;
+    // An edited or deleted comment may not move updated_at, and approvals ride on comments, so the entry also expires.
+    const fresh = hit && hit.updatedAt === i.updated_at && hit.count === i.comments && Date.now() - hit.at < CACHE_MS;
+    let comments = fresh ? hit.comments : undefined;
     if (!comments) {
       comments = i.comments === 0 ? [] : await this.comments(repo, i.number);
-      this.cache.set(key, { updatedAt: i.updated_at, comments });
+      this.cache.set(key, { updatedAt: i.updated_at, count: i.comments, at: Date.now(), comments });
     }
     return {
       number: i.number,
@@ -70,7 +73,8 @@ export class RestIssues {
       labels: i.labels.map((l) => (typeof l === "string" ? { name: l } : { name: l.name })),
       comments,
       state: i.state === "closed" ? "CLOSED" : "OPEN",
-      stateReason: i.state_reason ?? null,
+      // blockers.ts compares the GraphQL spelling.
+      stateReason: i.state_reason ? i.state_reason.toUpperCase() : null,
     };
   }
 

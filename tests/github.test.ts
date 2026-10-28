@@ -128,6 +128,26 @@ describe("GitHub issue reads over REST", () => {
     expect(calls.filter((a) => a.some((x) => x.includes("/comments"))).length).toBe(1);
   });
 
+  test("a changed comment count refetches, and a blocker closed as not planned stays not planned", async () => {
+    const calls: string[][] = [];
+    let n = 1;
+    const gh = new GitHub({
+      run: async (args) => {
+        calls.push(args);
+        const url = args.find((a) => a.startsWith("repos/")) ?? "";
+        const out = url.includes("/comments")
+          ? [[comment]]
+          : [[{ ...issue, comments: n, state: "closed", state_reason: "not_planned" }]];
+        return { code: 0, stdout: JSON.stringify(out), stderr: "" };
+      },
+    });
+    const first = (await gh.listOpenIssues("o/r"))[0]!;
+    n = 2;
+    await gh.listOpenIssues("o/r");
+    expect(calls.filter((a) => a.some((x) => x.includes("/comments"))).length).toBe(2);
+    expect([first.state, first.stateReason]).toEqual(["CLOSED", "NOT_PLANNED"]);
+  });
+
   test("labels and comments are written through the REST API", async () => {
     const { gh, calls } = fake();
     await gh.addLabels("o/r", 7, ["a", "b"]);
