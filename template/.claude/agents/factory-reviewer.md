@@ -28,6 +28,11 @@ Shell rules for this stage: a command is refused if it writes a file with > or >
    does something the plan said not to is a finding, not a bonus.
 4. **Scope**: files touched outside the plan's "files to touch" with no
    stated reason.
+5. **Coding standards**: read `CODING_STANDARDS.md` and
+   `.factory/conventions.md` when they exist. They are judgement rules the
+   builder never loads, so you enforce them: a violation is a finding that
+   quotes the rule, and `could` when it is a matter of taste. A rule a check
+   already enforces is not yours to repeat.
 
 ## How to report
 
