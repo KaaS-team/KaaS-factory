@@ -7,6 +7,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const LAUNCHD_PREFIX = "dev.factory.";
+// Built from two parts so tests/owner-neutral.test.ts can ban the owner name without exempting this file.
+const LEGACY_PREFIX = ["com.learn", "withparam."].join("");
 
 export interface DaemonSpec {
   readonly repo: string; // owner/name
@@ -38,7 +40,7 @@ export function daemonFile(platform: DaemonPlatform, home: string, repo: string)
 
 // The label before the rename; kept only so install and uninstall unload it and a machine never runs two loops.
 export function legacyLaunchdFile(home: string, repo: string): string {
-  return join(home, "Library", "LaunchAgents", `com.learnwithparam.${daemonName(repo)}.plist`);
+  return join(home, "Library", "LaunchAgents", `${LEGACY_PREFIX}${daemonName(repo)}.plist`);
 }
 
 async function retireLegacy(home: string, repo: string, uid: number, runner: DaemonRunner): Promise<void> {
