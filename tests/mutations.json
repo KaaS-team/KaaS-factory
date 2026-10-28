@@ -239,6 +239,8 @@
   {"name": "gates: a repo with no gates parks before the build agent runs", "file": "src/engine/steps.ts", "find": "    if (hasNoGates(worktree)) {", "replace": "    if (false) {", "test": "tests/scenarios.test.ts"},
   {"name": "gates: hasNoGates treats an empty list as no gates", "file": "src/gates.ts", "find": "return gateCount(JSON.parse(readFileSync(file, \"utf8\"))) === 0;", "replace": "return false;", "test": "tests/scenarios.test.ts"},
   {"name": "gates: no remote setup", "file": "src/gates.ts", "find": "bash .factory/gates.sh", "replace": "true", "test": "tests/gates.test.ts"},
+  {"name": "doctor: the toolchain binary is not probed", "file": "src/doctor.ts", "find": "deps.probeRuntime, config)", "replace": "deps.probeRuntime)", "test": "tests/doctor.test.ts"},
+  {"name": "doctor: rust probes cargo", "file": "src/runtime-kit.ts", "find": "rust: \"cargo\"", "replace": "rust: \"rustc\"", "test": "tests/doctor.test.ts"},
   {"name": "config: the test gate prefers role test over the name", "file": "src/config.ts", "find": "gates.find((g) => g.role === \"test\") ?? ", "replace": "", "test": "tests/config.test.ts"},
   {"name": "config: an unknown gate role is refused", "file": "src/config.ts", "find": "if (typeof gate.role === \"string\" && !(GATE_ROLES as readonly string[]).includes(gate.role))", "replace": "if (false)", "test": "tests/config.test.ts"},
   {"name": "proof: no test gate is unavailable, not skipped", "file": "src/proof.ts", "find": "if (!testCmd)\n    return {\n      status: \"unavailable\"", "replace": "if (!testCmd)\n    return {\n      status: \"skipped\"", "test": "tests/proof.test.ts"},

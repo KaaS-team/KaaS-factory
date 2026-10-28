@@ -515,18 +515,49 @@ describe("doctor: runtime toolchain binaries", () => {
     ...deps(),
     readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : undefined),
   };
-  const row = async (port: ExecutionPort) =>
+  const row = async (port: ExecutionPort, config?: string) =>
     (
       await runDoctor(
-        { ...reading, probeRuntime: (_name, bins) => probeRuntime(port, 10_000, bins) },
+        {
+          ...reading,
+          readFile: async (path) => (path.endsWith(".factory/config.json") ? config : reading.readFile(path)),
+          probeRuntime: (_name, bins) => probeRuntime(port, 10_000, bins),
+        },
         { ...ctx, workflow: "m", runtime: { gates: "a37" }, runtimeNames: ["local", "a37"] },
       )
     ).find((c) => c.name === "runtime a37 answers")!;
+  // Answers the probe's `command -v` lines from a fixed set of installed binaries.
+  const stocked = (installed: string[]): ExecutionPort => ({
+    run: async (cmd) => ({
+      stdout: `factory-probe-ok\n${[...cmd.matchAll(/command -v (\S+)/g)]
+        .map((m) => m[1]!)
+        .filter((b) => !installed.includes(b))
+        .map((b) => `factory-probe-missing ${b}\n`)
+        .join("")}`,
+      stderr: "",
+      code: 0,
+    }),
+  });
+  const config = (toolchain: string) => JSON.stringify({ toolchain, gates: [{ name: "t", cmd: "true" }] });
 
   test("a runtime without jq fails its row, naming the binary", async () => {
     const check = await row(new BarePathPort());
     expect(check.ok).toBe(false);
     expect(check.detail).toBe("jq not found on runtime a37");
+  });
+
+  test("the repo's toolchain binary is checked too", async () => {
+    const check = await row(stocked(["bash", "jq"]), config("bun"));
+    expect(check).toMatchObject({ ok: false, detail: "bun not found on runtime a37" });
+    expect((await row(stocked(["bash", "jq", "bun"]), config("bun"))).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq", "python3"]), config("python"))).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq"]), config("rust"))).detail).toBe("cargo not found on runtime a37");
+  });
+
+  test("an unknown toolchain or unreadable config checks only bash and jq", async () => {
+    expect((await row(stocked(["bash", "jq"]), config("cobol"))).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq"]), "{not json")).ok).toBe(true);
+    expect((await row(stocked(["bash", "jq"]))).ok).toBe(true);
   });
 });
 
