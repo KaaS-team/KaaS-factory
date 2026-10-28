@@ -19,6 +19,7 @@ import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, unsigned } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart } from "./derive";
+import { findPlanComment, holdForFiles } from "./file-hold";
 import { decideMerge, mergePolicyMarker } from "./merge-policy";
 import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
@@ -221,10 +222,6 @@ function findQuestionComment(issue: GhIssue): GhComment | undefined {
     .find((c) => c.body.includes("<!-- factory:question v1 -->") || c.body.includes(RUNNER_QUESTION_MARKER));
 }
 
-function findPlanComment(issue: GhIssue): GhComment | undefined {
-  return [...issue.comments].reverse().find((c) => isTrusted(c) && c.body.includes("<!-- factory:plan v1"));
-}
-
 function ctxFrom(deps: WatchDeps, issue: GhIssue): RunCtx {
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
   return { rejectRound: derived.rejectRounds, questionRound: derived.questionRounds };
@@ -295,7 +292,10 @@ export async function resumeAwaitingApproval(
       issue.number,
       `No maintainer commented within the window, so the factory approved the plan.`,
     );
-  if (command.type === "approve") return resumeAt(edge.approve);
+  if (command.type === "approve") {
+    if (await holdForFiles(deps, config, issue, labelOf(deps, issue, edge.approve))) return "waiting";
+    return resumeAt(edge.approve);
+  }
   if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
   // A plain reply that is not a command: nothing to do yet.
   return "waiting";
