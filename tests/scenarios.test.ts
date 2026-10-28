@@ -1462,6 +1462,24 @@ describe("one labels call per tick, and rate-limit backoff", () => {
     expect(calls.filter((a) => a.includes("--label")).length).toBe(2);
   });
 
+  test("a rate limit on the full-page fallback is still a RateLimitError", async () => {
+    const page = JSON.stringify(
+      Array.from({ length: 500 }, (_, i) => ({ number: i + 1, title: "", body: "", labels: [], comments: [] })),
+    );
+    const gh = new GitHub({
+      run: async (args) => {
+        if (args[0] === "api")
+          return { stdout: JSON.stringify({ resources: { graphql: { reset: 1780000000 } } }), stderr: "", code: 0 };
+        return args.includes("--label")
+          ? { stdout: "", stderr: "HTTP 403: API rate limit exceeded", code: 1 }
+          : { stdout: page, stderr: "", code: 0 };
+      },
+    });
+    const err = await gh.listIssuesByLabels("a/b", ["x"]).catch((e) => e);
+    expect(err).toBeInstanceOf(RateLimitError);
+    expect(err.resetAt).toBe(1780000000);
+  });
+
   test("tick waits for nextTickAt, and webhook ticks before it are skipped", () => {
     const next = T0 + 600_000;
     expect(tickDue(next, T0 + 599_999)).toBe(false);
