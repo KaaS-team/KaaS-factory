@@ -226,7 +226,8 @@ describe("every inline shell command in the template passes the stage shell rule
       });
       expect(run.stderr.toString()).toBe("");
       expect(run.exitCode).toBe(0);
-    });
+      // Each spawns a shell hook; the 5s default fails the gate when the box is busy with stages.
+    }, 30_000);
 });
 
 // Shape is not enough: dontAsk also refuses a command off the stage allow-list.
@@ -282,4 +283,13 @@ describe("every [enforced:] tag names a shipped hook", () => {
   test("found the tags", () => expect(tags.length).toBeGreaterThan(3));
   for (const { file, hook } of tags)
     test(`${file}: ${hook}`, () => expect(statSync(join(root, "hooks", hook)).isFile()).toBe(true));
+});
+
+// The architecture review is operator-run, so its safety lives in its text: it ranks by git history,
+// applies the deletion test, and files one ticket without touching code.
+test("factory-architecture ranks by git history, uses the deletion test and never edits code", () => {
+  const body = readFileSync(join(SKILLS_DIR, "factory-architecture", "SKILL.md"), "utf8").replace(/\s+/g, " ");
+  expect(body).toContain("git log --since=90.days");
+  expect(body).toContain("deletion test");
+  expect(body).toContain("Never edit code here");
 });
