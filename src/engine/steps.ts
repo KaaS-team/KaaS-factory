@@ -51,7 +51,7 @@ import type { StageRunResult } from "../ports/agent";
 import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
 import { prBody, renderWhatChanged } from "./pr-body";
-import { failStage, failureLine, stageCause } from "./failure";
+import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
 import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
@@ -287,11 +287,7 @@ const build: StepType = {
       tree: await deps.git.treeHash(worktree),
     });
     const pushed = await deps.git.push(worktree, issueNumber);
-    if (pushed.code !== 0) {
-      const lines = pushed.stderr.trim().split("\n");
-      await postComment(deps, config, issueNumber, `\`\`\`\n${lines.slice(-20).join("\n")}\n\`\`\``);
-      return stop(await failStage(deps, config, issue, step.label, "build", `push_refused: ${lines.at(-1) ?? ""}`));
-    }
+    if (pushed.code !== 0) return stop(await failPush(deps, config, issue, step.label, worktree, pushed.stderr));
     return { kind: "next", facts: json };
   },
 };

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { homedir } from "node:os";
 import { defaultWorkflow } from "../src/engine/workflows";
 import { engine, removeEngineDirs } from "./engine-harness";
 
@@ -44,6 +45,24 @@ describe("a refused push", () => {
     expect(comments(e)).toContain("stderr-06");
     expect(comments(e)).toContain("stderr-25");
     expect(comments(e)).not.toContain("stderr-05");
+  });
+
+  test("a remote URL's credentials and the home path never reach the thread", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = `fatal: unable to access 'https://x-access-token:s3cr3tvalue@github.com/o/r.git/' in ${homedir()}/w`;
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("push_refused");
+    expect(comments(e)).not.toContain("s3cr3tvalue");
+    expect(comments(e)).not.toContain(homedir());
+  });
+
+  test("empty stderr posts no empty fence", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = "  \n";
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).not.toContain("````");
   });
 
   test("a clean push still reaches verify", async () => {
