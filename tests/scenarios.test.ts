@@ -611,7 +611,10 @@ describe("failure paths", () => {
     expect(c.github.createdPrs[0]!.body).not.toContain("## Factory run");
     const comments = c.github.issues.get(1)!.comments.map((x) => x.body);
     expect(comments.some((b) => b.includes("## Factory run"))).toBe(false);
-    expect(comments.filter((b) => b.startsWith("## Receipt")).length).toBe(1);
+    expect(
+      comments.filter((b) => b.startsWith("## Receipt") && b.includes("<!-- factory:run-details -->")).length,
+    ).toBe(1);
+    expect(c.github.createdPrs[0]!.body).toContain("run-details comment on #1");
     done(c);
   });
 

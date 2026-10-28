@@ -143,9 +143,8 @@ operator", which is neither a failure nor a retry), then opens that stage's sess
 `claude --resume` in the issue's worktree. With no stage running it opens the last recorded
 session. When you exit, it posts `/factory retry`, so the factory resumes at that stage with your
 changes in the worktree. Only Claude keeps a session; any other agent is refused by name. The PR
-body ends with a "Factory run" section (stage, agent, duration, tool calls, cost, what went well and
-what needed help, takeovers included); `"prRunSummary": false` leaves it out, for a public repo
-that should not show models and spend.
+body carries no models or spend: the receipt goes to a run-details comment on the issue, and the
+per-stage table stays in the operator view (`prRunSummary` is no longer read).
 
 Your team signs in to the dashboard with GitHub, and an owner gives each person a role: viewer,
 approver, operator or owner. Every write is kept in an audit log. See
