@@ -5,6 +5,7 @@
 import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { selectMutations } from "./mutation-select";
 
 interface Mutation {
   readonly name: string;
@@ -17,7 +18,10 @@ interface Mutation {
 const ROOT = join(import.meta.dir, "..");
 const SKIP = new Set(["node_modules", ".git", ".worktrees", ".factory-state", "workspaces", "artifacts"]);
 const mutations: Mutation[] = JSON.parse(readFileSync(join(ROOT, "tests", "mutations.json"), "utf8"));
-const only = process.argv[2];
+const args = process.argv.slice(2);
+const baseAt = args.indexOf("--base");
+const base = baseAt >= 0 ? args[baseAt + 1] : undefined;
+const only = args.find((a, i) => !a.startsWith("--") && (baseAt < 0 || i !== baseAt + 1));
 
 function copyRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "factory-mutant-"));
@@ -57,7 +61,16 @@ async function check(m: Mutation): Promise<string | undefined> {
 
 const dupe = mutations.find((m, i) => mutations.findIndex((n) => n.name === m.name) !== i);
 if (dupe) throw new Error(`tests/mutations.json names "${dupe.name}" twice`);
-const selected = only ? mutations.filter((m) => m.name === only) : mutations;
+let selected = only ? mutations.filter((m) => m.name === only) : mutations;
+if (base) {
+  const diff = Bun.spawnSync(["git", "diff", "--name-only", `${base}...HEAD`], { cwd: ROOT });
+  if (diff.exitCode !== 0) throw new Error(`git diff ${base}...HEAD failed: ${diff.stderr.toString()}`);
+  selected = selectMutations(selected, diff.stdout.toString().split("\n").filter(Boolean));
+  if (selected.length === 0) {
+    console.log(`check-mutations: the diff against ${base} reaches no mutation`);
+    process.exit(0);
+  }
+}
 if (selected.length === 0) throw new Error(only ? `no mutation named "${only}"` : "tests/mutations.json is empty");
 const failures: string[] = [];
 for (let i = 0; i < selected.length; i += 4) {
