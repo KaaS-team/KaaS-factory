@@ -167,4 +167,32 @@ describe("the run-details comment", () => {
     await postRunDetails(deps, config, 7, "## Receipt");
     expect(calls).toEqual(["post", "edit 9"]);
   });
+
+  test("a deleted comment is replaced, and a tracker with no comment ids is posted to once", async () => {
+    const settings = new Map<string, string>();
+    const calls: string[] = [];
+    let id: number | undefined = 9;
+    let deleted = false;
+    const deps = {
+      state: { getSetting: (k: string) => settings.get(k), setSetting: (k: string, v: string) => settings.set(k, v) },
+      github: {
+        commentIssue: async () => (calls.push("post"), id),
+        editComment: async () => {
+          calls.push("edit");
+          if (deleted) throw new Error("not found");
+        },
+      },
+    } as unknown as WatchDeps;
+    const config = mergeConfig({ repo: "o/r" });
+    await postRunDetails(deps, config, 7, "## Receipt");
+    deleted = true;
+    await postRunDetails(deps, config, 7, "## Receipt");
+    expect(calls).toEqual(["post", "edit", "post"]);
+    settings.clear();
+    calls.length = 0;
+    id = undefined;
+    await postRunDetails(deps, config, 8, "## Receipt");
+    await postRunDetails(deps, config, 8, "## Receipt");
+    expect(calls).toEqual(["post"]);
+  });
 });
