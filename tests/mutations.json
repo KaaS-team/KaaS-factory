@@ -886,5 +886,6 @@
   {"name": "pr body: a tracker with no comment ids gains a receipt per retry", "file": "src/engine/pr-body.ts", "find": "if (kept === NO_COMMENT_ID) return;", "replace": "", "test": "tests/pr-body.test.ts"},
   {"name": "mutation select: a PR runs only the touched mutations", "file": "scripts/mutation-select.ts", "find": "touched.has(m.file) ||", "replace": "true ||", "test": "tests/mutation-select.test.ts"},
   {"name": "mutation select: the runner or list change runs everything", "file": "scripts/mutation-select.ts", "find": "changed.some((f) => RUNS_ALL.has(f))", "replace": "false", "test": "tests/mutation-select.test.ts"},
-  {"name": "mutations workflow: the PR job is scoped to its base", "file": ".github/workflows/mutations.yml", "find": "--base origin/{0}", "replace": "--all origin/{0}", "test": "tests/mutation-select.test.ts"}
+  {"name": "mutations workflow: the PR job is scoped to its base", "file": ".github/workflows/mutations.yml", "find": "--base origin/{0}", "replace": "--all origin/{0}", "test": "tests/mutation-select.test.ts"},
+  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"}
 ]

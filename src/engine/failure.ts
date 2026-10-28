@@ -81,7 +81,8 @@ function inputsOf(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): strin
   return createHash("sha256").update(seen).digest("hex").slice(0, 16);
 }
 
-// A failed stage: the label, the reason line, and a comment whose marker carries the fingerprint the retry guard compares.
+// A failed stage: the label, the reason line, and a comment whose marker carries the fingerprint the retry guard compares
+// and the stage a retry re-enters (derive.ts reads it when the thread is re-derived).
 export async function failStage(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -95,7 +96,7 @@ export async function failStage(
   finish(deps, config, issue.number, "failed", line);
   await postComment(deps, config, issue.number, `Failed: ${visible}\n\n\`/factory retry\` runs it again.`, {
     stage: FAILURE,
-    json: { fingerprint, inputs: inputsOf(deps, config, issue) },
+    json: { stage, fingerprint, inputs: inputsOf(deps, config, issue) },
   });
   return "failed";
 }
