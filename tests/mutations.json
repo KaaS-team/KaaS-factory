@@ -896,5 +896,7 @@
   {"name": "failPush: stderr is not scrubbed", "file": "src/engine/failure.ts", "find": "scrubLine(stderr.trim(), process.env, [homedir(), worktree])", "replace": "stderr.trim()", "test": "tests/push-refused.test.ts"},
   {"name": "failPush: the tail is not capped at 20 lines", "file": "src/engine/failure.ts", "find": "lines.slice(-20).join", "replace": "lines.join", "test": "tests/push-refused.test.ts"},
   {"name": "failPush: the fence is always three backticks", "file": "src/engine/failure.ts", "find": "Math.max(3, ...(tail.match(/`+/g) ?? []).map((run) => run.length + 1))", "replace": "3", "test": "tests/push-refused.test.ts"},
-  {"name": "failPush: a failed tail post stops the failure", "file": "src/engine/failure.ts", "find": ".catch(() => undefined);\n  return failStage(deps, config, issue, from, \"build\"", "replace": ";\n  return failStage(deps, config, issue, from, \"build\"", "test": "tests/push-refused.test.ts"}
+  {"name": "failPush: a failed tail post stops the failure", "file": "src/engine/failure.ts", "find": ".catch(() => undefined);\n  return failStage(deps, config, issue, from, \"build\"", "replace": ";\n  return failStage(deps, config, issue, from, \"build\"", "test": "tests/push-refused.test.ts"},
+  {"name": "schedule: parallel picks may overlap", "file": "src/core/schedule.ts", "find": "if (node.files.some((f) => taken.has(f))) {", "replace": "if (false) {", "test": "tests/schedule.test.ts"},
+  {"name": "schedule: cycles go unreported", "file": "src/core/schedule.ts", "find": "if (state.get(dep) === VISITING) cycles.push(cycleFrom(stack, dep));", "replace": "if (false) cycles.push(cycleFrom(stack, dep));", "test": "tests/schedule.test.ts"}
 ]

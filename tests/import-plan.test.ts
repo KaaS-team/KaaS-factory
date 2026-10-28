@@ -49,6 +49,21 @@ test("a task file missing from ## Files is a problem", async () => {
   expect(problems.join("\n")).toContain('`src/derive.ts`, which "## Files" does not list');
 });
 
+test("a task dep on a task that does not exist is a problem", async () => {
+  const body = (await read("planned-issue.md")).replace("Deps: T1", "Deps: T9");
+  expect(parsePlannedIssue(body).problems.join("\n")).toContain("T2 depends on T9, which is not a task in Change.");
+});
+
+test("task deps that form a cycle are a problem", async () => {
+  const body = (await read("planned-issue.md")).replace("Model: haiku\n", "Model: haiku\nDeps: T2\n");
+  expect(parsePlannedIssue(body).problems.join("\n")).toContain("form a cycle");
+});
+
+test("a Runner that is not factory or operator is a problem in the preface", async () => {
+  const body = (await read("planned-issue.md")).replace("Milestone: M1", "Milestone: M1\nRunner: robot");
+  expect(parsePlannedIssue(body).problems).toContain('Runner: "robot" is not factory or operator.');
+});
+
 test("every problem is collected, not only the first", async () => {
   const body = (await unmapped()).replace("- `src/derive.ts`\n", "");
   expect(parsePlannedIssue(body).problems.length).toBeGreaterThanOrEqual(2);

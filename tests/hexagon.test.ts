@@ -72,6 +72,10 @@ describe("hexagon", () => {
     ).toEqual([]);
   });
 
+  test("the scheduler lives in core, so the purity rule covers it", () => {
+    expect(filesUnder("core")).toContain("core/schedule.ts");
+  });
+
   test("the import scanner sees every import form", () => {
     const text =
       'import { a } from "../adapters/x/a";\nimport type { B } from "../core/b";\nexport { c } from "./c";\nconst d = await import("../ports/d");\nimport "node:fs";\n';
