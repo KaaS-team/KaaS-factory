@@ -72,6 +72,7 @@ export function parseMeta(body: string): IssueMeta {
       meta.milestone = value;
     }
   }
+  meta.deps = [...new Set(meta.deps)];
   return meta;
 }
 
@@ -165,8 +166,10 @@ export function schedule(input: ScheduleInput): Schedule {
     cur = deepest(children.get(cur) ?? []);
   }
 
-  const ready = sorted.filter((n) => byNum.get(n)!.runner === "factory" && byNum.get(n)!.deps.every(isDone));
-  const operator = sorted.filter((n) => byNum.get(n)!.runner === "operator");
+  const ready = sorted.filter(
+    (n) => open.has(n) && byNum.get(n)!.runner === "factory" && byNum.get(n)!.deps.every(isDone),
+  );
+  const operator = sorted.filter((n) => open.has(n) && byNum.get(n)!.runner === "operator");
 
   const batch: number[] = [];
   const deferred: Schedule["deferred"] = [];

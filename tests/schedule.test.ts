@@ -161,6 +161,23 @@ describe("schedule", () => {
   });
 });
 
+describe("review fixes", () => {
+  test("a node that is not open is never ready, batched or operator work", () => {
+    const s = schedule({
+      nodes: [node(1, [], ["src/a.ts"]), { ...node(2), runner: "operator" }],
+      open: open(),
+      slots: 2,
+    });
+    expect(s.ready).toEqual([]);
+    expect(s.batch).toEqual([]);
+    expect(s.operator).toEqual([]);
+  });
+
+  test("a repeated dep is listed once", () => {
+    expect(parseMeta("Deps: #1 #1\n").deps).toEqual([1]);
+  });
+});
+
 describe("orderIssues", () => {
   const items = [
     { number: 3, declared: true },

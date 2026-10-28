@@ -64,6 +64,16 @@ test("a Runner that is not factory or operator is a problem in the preface", asy
   expect(parsePlannedIssue(body).problems).toContain('Runner: "robot" is not factory or operator.');
 });
 
+test("a bare Deps: line in a task means no deps and does not read the next line", async () => {
+  const body = (await read("planned-issue.md")).replace("Model: haiku\n", "Deps:\nModel: haiku\n");
+  expect(parsePlannedIssue(body).problems).toEqual([]);
+});
+
+test("two tasks with the same id are a problem", async () => {
+  const body = (await read("planned-issue.md")).replace("### T2: Resume", "### T1: Resume");
+  expect(parsePlannedIssue(body).problems.join("\n")).toContain("T1 is defined more than once");
+});
+
 test("every problem is collected, not only the first", async () => {
   const body = (await unmapped()).replace("- `src/derive.ts`\n", "");
   expect(parsePlannedIssue(body).problems.length).toBeGreaterThanOrEqual(2);

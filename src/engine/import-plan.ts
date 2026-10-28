@@ -83,8 +83,9 @@ function parseTasks(text: string, problems: string[]): PlannedTask[] {
       problems.push(`${head[1]} has no Model of haiku, sonnet or opus.`);
     const steps = lines.filter((l) => /^\d+\.\s/.test(l)).map((l) => l.replace(/^\d+\.\s*/, ""));
     if (!steps.length) problems.push(`${head[1]} has no numbered steps.`);
-    const deps = (/^Deps:\s*(.+)$/im.exec(chunk)?.[1] ?? "").split(/[\s,]+/).filter((t) => t && t !== "none");
+    const deps = (/^Deps:[ \t]*(.*)$/im.exec(chunk)?.[1] ?? "").split(/[\s,]+/).filter((t) => t && t !== "none");
     for (const d of deps) if (!/^T\d+$/.test(d)) problems.push(`${head[1]} Deps: "${d}" is not a task id.`);
+    if (tasks.some((t) => t.id === head[1])) problems.push(`${head[1]} is defined more than once.`);
     tasks.push({ id: head[1]!, title: head[2]!.trim(), files, model, steps, deps });
   }
   return tasks;
