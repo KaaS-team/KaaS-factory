@@ -281,6 +281,7 @@ export class FactoryState {
     const cols = this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string; notnull: number }[];
     if (!cols.find((c) => c.name === "cost_usd")?.notnull) return;
     const names = cols.map((c) => c.name).join(", ");
+    // nosemgrep: js-shell-exec-interpolated -- SQL, not a shell; `names` are this table's own column names
     this.db.exec(`
       CREATE TABLE stage_runs_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
