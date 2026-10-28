@@ -43,7 +43,7 @@ import type { StageRunResult } from "../ports/agent";
 import { stepOpts, type Step, type StepKind, type Workflow } from "../core/workflow";
 import { emitEvent } from "./bus";
 import { issueRef, postRunDetails, prBody, renderRunDetails, renderWhatChanged } from "./pr-body";
-import { failStage, failureLine, stageCause } from "./failure";
+import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
 import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
@@ -279,11 +279,7 @@ const build: StepType = {
       tree: await deps.git.treeHash(worktree),
     });
     const pushed = await deps.git.push(worktree, issueNumber);
-    if (pushed.code !== 0) {
-      // The failure line keeps one line, and a hook or lease refusal ends on the decisive one.
-      const last = pushed.stderr.trim().split("\n").at(-1) ?? "";
-      return stop(await failStage(deps, config, issue, step.label, "build", `push_refused: ${last}`));
-    }
+    if (pushed.code !== 0) return stop(await failPush(deps, config, issue, step.label, worktree, pushed.stderr));
     return { kind: "next", facts: json };
   },
 };

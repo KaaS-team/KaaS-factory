@@ -112,7 +112,10 @@ export class Git {
     // No --force: if `branch` already exists, this only succeeds when
     // claimSha is a fast-forward of it — which it never is, since its parent
     // is origin/base, not whatever another claimant already pushed.
-    const push = await this.runner.run(["push", "origin", `${claimSha}:refs/heads/${branch}`], { cwd: cloneDir });
+    // --no-verify: the pre-push hook would re-run the repo gate on every claim (issue #160).
+    const push = await this.runner.run(["push", "--no-verify", "origin", `${claimSha}:refs/heads/${branch}`], {
+      cwd: cloneDir,
+    });
     return push.code === 0;
   }
 
@@ -186,7 +189,8 @@ export class Git {
 
   // Generic (non-issue) counterpart to push, for `factory learn`'s branch.
   async pushBranch(worktreeDir: string, branch: string): Promise<CommandResult> {
-    return this.runner.run(["push", "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
+    // --no-verify: the gate already ran in this runner; a pre-push hook would run it again (issue #160).
+    return this.runner.run(["push", "--no-verify", "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
   }
 
   // The tree of the working directory, not of HEAD: uncommitted edits count,

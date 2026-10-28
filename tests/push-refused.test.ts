@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { homedir } from "node:os";
 import { defaultWorkflow } from "../src/engine/workflows";
 import { engine, removeEngineDirs } from "./engine-harness";
 
@@ -34,6 +35,55 @@ describe("a refused push", () => {
     e.git.pushStderr = "remote: noise\nremote: more noise\n ! [remote rejected] HEAD -> branch (hook declined)";
     expect(await e.run()).toBe("failed");
     expect(comments(e)).toContain("hook declined");
+  });
+
+  test("a refused push shows the last 20 lines of stderr", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = Array.from({ length: 25 }, (_, i) => `stderr-${String(i + 1).padStart(2, "0")}`).join("\n");
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("stderr-06");
+    expect(comments(e)).toContain("stderr-25");
+    expect(comments(e)).not.toContain("stderr-05");
+  });
+
+  test("a remote URL's credentials and the home path never reach the thread", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = `fatal: unable to access 'https://x-access-token:s3cr3tvalue@github.com/o/r.git/' in ${homedir()}/w`;
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("push_refused");
+    expect(comments(e)).not.toContain("s3cr3tvalue");
+    expect(comments(e)).not.toContain(homedir());
+  });
+
+  test("empty stderr posts no empty fence", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = "  \n";
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).not.toContain("```");
+  });
+
+  test("a failed tail post still parks the issue with the push_refused marker", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = "hook declined";
+    const post = e.github.commentIssue.bind(e.github);
+    e.github.commentIssue = async (repo, n, body) => {
+      if (body.startsWith("```")) throw new Error("rate limited");
+      return post(repo, n, body);
+    };
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("push_refused: hook declined");
+  });
+
+  test("a backtick run in stderr cannot close the fence early", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = "before\n`````\nafter";
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("``````\nbefore\n`````\nafter\n``````");
   });
 
   test("a clean push still reaches verify", async () => {
