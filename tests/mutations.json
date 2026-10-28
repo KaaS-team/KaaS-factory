@@ -887,5 +887,6 @@
   {"name": "mutation select: a PR runs only the touched mutations", "file": "scripts/mutation-select.ts", "find": "touched.has(m.file) ||", "replace": "true ||", "test": "tests/mutation-select.test.ts"},
   {"name": "mutation select: the runner or list change runs everything", "file": "scripts/mutation-select.ts", "find": "changed.some((f) => RUNS_ALL.has(f))", "replace": "false", "test": "tests/mutation-select.test.ts"},
   {"name": "mutations workflow: the PR job is scoped to its base", "file": ".github/workflows/mutations.yml", "find": "--base origin/{0}", "replace": "--all origin/{0}", "test": "tests/mutation-select.test.ts"},
-  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"}
+  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"},
+  {"name": "resume: a named retry step is ignored", "file": "src/watch.ts", "find": "const stage = Object.hasOwn(workflowOf(deps, issue).steps, command.step ?? \"\") ? command.step! : derived.resumeStage;", "replace": "const stage = derived.resumeStage;", "test": "tests/retry-resume.test.ts"}
 ]

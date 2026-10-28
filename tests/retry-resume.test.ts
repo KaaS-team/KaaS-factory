@@ -5,6 +5,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseChatOps } from "../src/chatops";
 import { mergeConfig } from "../src/config";
 import { deriveIssueState, parseDataMarkers } from "../src/derive";
 import type { StageName, StageRunResult } from "../src/executor";
@@ -65,6 +66,112 @@ describe("deriveIssueState resumes at the stage a failure names", () => {
       [comment(marker("plan", {}), 1), comment(marker("failure", { stage: "nonsense" }), 2)],
     );
     expect(deriveIssueState(issue).resumeStage).toBe("plan");
+  });
+});
+
+describe("parseChatOps reads an optional --force and step on retry", () => {
+  const parse = (body: string) => parseChatOps(body);
+
+  test("the four forms of AC-1", () => {
+    expect(parse("/factory retry")).toEqual({ type: "retry" });
+    expect(parse("/factory retry --force")).toEqual({ type: "retry", force: true });
+    expect(parse("/factory retry verify")).toEqual({ type: "retry", step: "verify" });
+    expect(parse("/factory retry --force verify")).toEqual({ type: "retry", force: true, step: "verify" });
+  });
+
+  test("the step is lowercased", () => {
+    expect(parse("/factory retry Verify")).toEqual({ type: "retry", step: "verify" });
+  });
+});
+
+describe("a retry naming a step", () => {
+  // The build-failure setup from the test below, stopped at the parked run.
+  async function parkedAtBuild() {
+    const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
+    const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
+    dirs.push(workspacesDir, cloneDir);
+    const github = new FakeGitHub([baseIssue(1, [LABEL.ready])]);
+    const state = new FactoryState(":memory:");
+    const executor = new MultiStageExecutor();
+    const config = mergeConfig({ repo: "acme/widgets" });
+    const deps = {
+      github,
+      git: new FakeGit(),
+      state,
+      executor,
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      cloneDir,
+      workspacesDir,
+    };
+    const step = () => advanceIssue(deps, config, github.issues.get(1)!);
+    const push = (stage: StageName, files: Record<string, string>, result?: Partial<StageRunResult>) =>
+      executor.push(stage, 1, fixtureFor(stage, 1), files, result);
+    state.setToggle("auto_approve_low_risk", true);
+    push("triage", {
+      "triage-comment.md": "<!-- factory:triage v1 -->\ntriage",
+      "triage.json": JSON.stringify({
+        disposition: "proceed",
+        type: "bug",
+        risk: "low",
+        done_when: "x",
+        files_expected: ["src/a.ts"],
+        gate_level: "make check",
+        confidence: 0.9,
+      }),
+    });
+    push("plan", {
+      "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",
+      "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true }),
+    });
+    push("build", {}, { exitCode: 1, killedReason: "timed out after 15 minutes" });
+    expect(await step()).toBe("failed");
+    return { github, state, step, push };
+  }
+
+  test("a retry naming a workflow step resumes there", async () => {
+    const { github, state, step, push } = await parkedAtBuild();
+    push("plan", {
+      "plan-comment.md": "<!-- factory:plan v1 rev=2 -->\nplan again",
+      "plan.json": JSON.stringify({ risk: "low", revision: 2, files: ["src/a.ts"], autoApproveEligible: true }),
+    });
+    push("build", {
+      "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
+      "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+    });
+    push("verify", {
+      "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
+      "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+    });
+    push("pr", { "pr-body.md": "Did it.\nCloses #1" });
+    github.say(1, "/factory retry plan");
+    expect(await step()).toBe("shipped");
+
+    expect(github.issues.get(1)!.comments.some((c) => c.body.includes("Retrying from plan."))).toBe(true);
+    const stages = state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage);
+    expect(stages.filter((s) => s === "plan")).toHaveLength(2);
+    state.close();
+  });
+
+  test("a retry naming an unknown step resumes at the derived stage", async () => {
+    const { github, state, step, push } = await parkedAtBuild();
+    push("build", {
+      "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
+      "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+    });
+    push("verify", {
+      "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
+      "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+    });
+    push("pr", { "pr-body.md": "Did it.\nCloses #1" });
+    github.say(1, "/factory retry nosuchstage");
+    expect(await step()).toBe("shipped");
+
+    expect(github.issues.get(1)!.comments.some((c) => c.body.includes("Retrying from build."))).toBe(true);
+    const stages = state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage);
+    expect(stages.filter((s) => s === "plan")).toHaveLength(1);
+    expect(stages.filter((s) => s === "build")).toHaveLength(2);
+    state.close();
   });
 });
 
