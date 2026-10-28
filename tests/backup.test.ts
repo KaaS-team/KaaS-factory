@@ -193,4 +193,19 @@ describe("backup", () => {
       server.stop(true);
     }
   });
+
+  test("a prune whose data-file delete fails leaves no listed backup", async () => {
+    const home = tmp();
+    stateDb(join(home, "factory.db"), 1).close();
+    const { server, objects } = fakeS3({ failDelete: (key) => key.endsWith("factory.db") });
+    try {
+      const config = configFor(server.port!, 14);
+      await backupOnce(config, backupSources(home), home, new Date("2026-10-01T00:00:00.000Z"));
+      await expect(pruneBackups(config, new Date("2026-10-27T00:00:00.000Z"))).rejects.toThrow();
+      expect(objects.size).toBe(1);
+      expect(await listBackups(config)).toEqual([]);
+    } finally {
+      server.stop(true);
+    }
+  });
 });

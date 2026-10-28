@@ -149,6 +149,10 @@ export async function pruneBackups(config: BackupConfig, now: Date = new Date())
   const client = backupClient(config);
   const cutoff = now.getTime() - config.keepDays * DAY_MS;
   const old = (await folders(client)).filter((b) => b.at.getTime() < cutoff);
-  for (const b of old) for (const key of b.keys) await client.delete(key);
+  for (const b of old) {
+    // Manifest first: a delete that fails midway leaves a folder listBackups skips, never one that looks restorable.
+    const manifest = `${BACKUP_PREFIX}${b.id}/manifest.json`;
+    for (const key of [manifest, ...b.keys.filter((k) => k !== manifest)]) await client.delete(key);
+  }
   return old.map((b) => b.id);
 }

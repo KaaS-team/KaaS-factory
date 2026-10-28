@@ -1,5 +1,5 @@
 // A path-style S3 endpoint in memory: PUT, GET, HEAD, DELETE and ListObjectsV2, the calls the adapters make.
-export function fakeS3() {
+export function fakeS3(opts: { failDelete?: (key: string) => boolean } = {}) {
   const objects = new Map<string, Uint8Array>();
   const server = Bun.serve({
     port: 0,
@@ -13,6 +13,7 @@ export function fakeS3() {
         return new Response(null, { status: 200, headers: { etag: '"1"' } });
       }
       if (req.method === "DELETE") {
+        if (opts.failDelete?.(key)) return new Response("InternalError", { status: 500 });
         objects.delete(key);
         return new Response(null, { status: 204 });
       }
