@@ -62,7 +62,28 @@ describe("a refused push", () => {
     e.git.pushCode = 1;
     e.git.pushStderr = "  \n";
     expect(await e.run()).toBe("failed");
-    expect(comments(e)).not.toContain("````");
+    expect(comments(e)).not.toContain("```");
+  });
+
+  test("a failed tail post still parks the issue with the push_refused marker", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = "hook declined";
+    const post = e.github.commentIssue.bind(e.github);
+    e.github.commentIssue = async (repo, n, body) => {
+      if (body.startsWith("```")) throw new Error("rate limited");
+      return post(repo, n, body);
+    };
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("push_refused: hook declined");
+  });
+
+  test("a backtick run in stderr cannot close the fence early", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = "before\n`````\nafter";
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("``````\nbefore\n`````\nafter\n``````");
   });
 
   test("a clean push still reaches verify", async () => {

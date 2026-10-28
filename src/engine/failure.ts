@@ -102,8 +102,8 @@ export async function failStage(
   return "failed";
 }
 
-// A refused push: git's last 20 lines on the thread, scrubbed (a remote URL can carry a token, and paths and
-// hosts are operator detail), then the failure. A failed post must not keep failStage from parking the issue.
+// A refused push: git's last 20 lines on the thread, scrubbed of credentials (a remote URL can carry a token)
+// and local paths, then the failure. A failed post must not keep failStage from parking the issue.
 export async function failPush(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -115,10 +115,11 @@ export async function failPush(
   const lines = scrubLine(stderr.trim(), process.env, [homedir(), worktree])
     .replace(/(\w+:\/\/)[^\s/@]+@/g, "$1<redacted>@")
     .split("\n");
+  const tail = lines.slice(-20).join("\n");
+  // Longer than any backtick run in the tail, so stderr cannot close the fence early.
+  const fence = "`".repeat(Math.max(3, ...(tail.match(/`+/g) ?? []).map((run) => run.length + 1)));
   if (lines.some(Boolean))
-    await postComment(deps, config, issue.number, `\`\`\`\`\n${lines.slice(-20).join("\n")}\n\`\`\`\``).catch(
-      () => undefined,
-    );
+    await postComment(deps, config, issue.number, `${fence}\n${tail}\n${fence}`).catch(() => undefined);
   return failStage(deps, config, issue, from, "build", `push_refused: ${lines.at(-1) ?? ""}`);
 }
 
