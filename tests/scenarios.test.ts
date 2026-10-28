@@ -1425,7 +1425,7 @@ describe("one labels call per tick, and rate-limit backoff", () => {
     const bare = Object.create(c.github, { listIssuesByLabels: { value: undefined } });
     await pollOnce({ ...c.deps, github: bare }, c.config);
     expect(bare.labelsCalls).toBe(0);
-    expect(bare.labelCalls).toBe(7);
+    expect(bare.labelCalls).toBe(8);
     done(c);
   });
 
