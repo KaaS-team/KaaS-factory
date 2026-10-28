@@ -900,5 +900,8 @@
   {"name": "daemon: the legacy launchd plist is never unloaded", "file": "src/daemon.ts", "find": "com.learnwithparam.${daemonName(repo)}.plist", "replace": "dev.factory.${daemonName(repo)}.plist", "test": "tests/daemon.test.ts"},
   {"name": "relay: KAAS_RELAY_ADDR is no longer read", "file": "src/deploy/stack.ts", "find": "env.KAAS_RELAY_ADDR ?? \"127.0.0.1:4200\"", "replace": "\"127.0.0.1:4200\"", "test": "tests/deploy.test.ts"},
   {"name": "events: the legacy x-kaas-signature header no longer verifies", "file": "src/core/event.ts", "find": "\"x-kaas-signature\";", "replace": "\"x-kaas-off\";", "test": "tests/events.test.ts"},
-  {"name": "agnostic: a new line names the company", "file": "src/deploy/stack.ts", "find": "const MIRROR_EVERY_MS = 30_000;", "replace": "const MIRROR_EVERY_MS = 30_000; // learnwithparam", "test": "tests/app-agnostic.test.ts"}
+  {"name": "agnostic: a new line names the company", "file": "src/deploy/stack.ts", "find": "const MIRROR_EVERY_MS = 30_000;", "replace": "const MIRROR_EVERY_MS = 30_000; // learnwithparam", "test": "tests/app-agnostic.test.ts"},
+  {"name": "retro: a mechanical violation becomes a prose rule", "file": "template/.claude/skills/factory-retro/SKILL.md", "find": "never a prose rule", "replace": "a prose rule", "test": "tests/skills.test.ts"},
+  {"name": "reviewer: the standards file is not read", "file": "template/.claude/agents/factory-reviewer.md", "find": "read `CODING_STANDARDS.md` and", "replace": "read", "test": "tests/skills.test.ts"},
+  {"name": "build: the builder is told to load the standards file", "file": "template/.claude/skills/factory-build/SKILL.md", "find": " (not `CODING_STANDARDS.md`; the reviewer enforces it)", "replace": "", "test": "tests/skills.test.ts"}
 ]
