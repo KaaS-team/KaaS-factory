@@ -1478,6 +1478,29 @@ describe("one labels call per tick, and rate-limit backoff", () => {
     expect(String(err)).toContain("403");
   });
 
+  test("a 403 that is not a rate limit is rethrown even when the probe carries the header", async () => {
+    const err = await failing("HTTP 403: Resource protected by SAML enforcement", "X-Ratelimit-Reset: 1780000000")
+      .listIssuesByLabels("a/b", ["x"])
+      .catch((e) => e);
+    expect(err).not.toBeInstanceOf(RateLimitError);
+  });
+
+  test("a full page falls back to one listing per label", async () => {
+    const calls: string[][] = [];
+    const page = JSON.stringify(
+      Array.from({ length: 500 }, (_, i) => ({ number: i + 1, title: "", body: "", labels: [], comments: [] })),
+    );
+    const gh = new GitHub({
+      run: async (args) => {
+        calls.push(args);
+        return { stdout: args.includes("--label") ? "[]" : page, stderr: "", code: 0 };
+      },
+    });
+    const found = await gh.listIssuesByLabels("a/b", ["x", "y"]);
+    expect([...found.keys()]).toEqual(["x", "y"]);
+    expect(calls.filter((a) => a.includes("--label")).length).toBe(2);
+  });
+
   test("tick waits for nextTickAt, and webhook ticks before it are skipped", () => {
     const next = T0 + 600_000;
     expect(tickDue(next, T0 + 599_999)).toBe(false);

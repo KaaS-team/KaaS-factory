@@ -62,6 +62,9 @@ class Gh extends GitHub {
   override async listIssuesByLabel(): Promise<GhIssue[]> {
     return [];
   }
+  override async listIssuesByLabels(): Promise<Map<string, GhIssue[]>> {
+    return new Map();
+  }
   override async listOpenIssues(): Promise<GhIssue[]> {
     return [];
   }

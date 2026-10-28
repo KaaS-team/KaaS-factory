@@ -72,6 +72,8 @@ function issueFrom(raw: RawIssue): GhIssue {
   };
 }
 
+const ISSUE_LIMIT = 500;
+
 class GhError extends Error {
   constructor(
     args: string[],
@@ -124,18 +126,24 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "--json",
       "number,title,body,labels,comments",
       "--limit",
-      "500",
+      String(ISSUE_LIMIT),
     ]);
     if (result.code !== 0) {
       const status = /HTTP (403|429)/.exec(result.stderr)?.[1];
-      if (status) {
+      // A 403 is also what a missing scope or SAML returns, and the header rides on every response.
+      if (status && (status === "429" || /rate limit/i.test(result.stderr))) {
         const probe = await this.runner.run(["api", "--include", "rate_limit"]);
         const reset = /^x-ratelimit-reset:\s*(\d+)/im.exec(probe.stdout)?.[1];
-        if (reset) throw new RateLimitError(Number(status), Number(reset));
+        if (probe.code === 0 && reset) throw new RateLimitError(Number(status), Number(reset));
       }
       throw new GhError(["issue", "list"], result);
     }
     const issues = (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
+    // The limit now caps every open issue, not each label; a full page may hide older ones.
+    if (issues.length >= ISSUE_LIMIT) {
+      const lists = await Promise.all(labels.map((l) => this.listIssuesByLabel(repo, l)));
+      return new Map(labels.map((l, i) => [l, lists[i]!]));
+    }
     return new Map(labels.map((l) => [l, issues.filter((i) => i.labels.some((x) => x.name === l))]));
   }
 
