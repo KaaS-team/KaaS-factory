@@ -498,7 +498,8 @@ const pr: StepType = {
       seal: readSeal(deps.state.getSetting(sealKey(config.repo, issueNumber))),
     });
     const existing = await deps.github.findPrByHead(config.repo, head);
-    await postRunDetails(deps, config, issueNumber, receipt);
+    // A revise re-entry finds the PR open; its comment is already there.
+    if (!existing) await postRunDetails(deps, config, issueNumber, receipt);
     const plan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
     const proof = readRunJson<ProofResult>(worktree, issueNumber, "proof.json");
     const prUrl =

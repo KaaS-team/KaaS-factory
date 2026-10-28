@@ -50,8 +50,9 @@ export async function postRunDetails(
   if (id) {
     try {
       return await deps.github.editComment(config.repo, id, text);
-    } catch {
-      // fall through to a fresh post
+    } catch (err) {
+      // Only a deleted comment may fall through; an auth or rate-limit error would post a duplicate.
+      if (!/404|not found/i.test(String((err as Error)?.message ?? err))) throw err;
     }
   }
   const posted = await deps.github.commentIssue(config.repo, issueNumber, text);

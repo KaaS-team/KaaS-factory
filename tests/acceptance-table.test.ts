@@ -327,7 +327,7 @@ describe("an unproven acceptance verdict rejects verify", () => {
     const tables = first.github.issues
       .get(1)!
       .comments.map((c) => c.body)
-      .filter((b) => b.includes("Not proven"));
+      .filter((b) => b.includes("Not proven") && !b.includes("factory:run-details"));
     expect(tables).toHaveLength(1);
     expect(tables[0]).toContain("Not proven: 1 of 2 criteria failed");
     expect(tables[0]).toContain("AC-2");
