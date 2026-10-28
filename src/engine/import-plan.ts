@@ -202,7 +202,7 @@ export function planFromIssue(p: PlannedIssue, issue: { body: string }, revision
     autoApproveEligible: false,
     proof: "test" as const,
     goal: p.goal,
-    criteria: p.criteria.map((c) => ({ id: c.id, text: c.text })),
+    criteria: p.criteria.map((c) => ({ id: c.id, text: c.text, task: c.task })),
     tasks: p.tasks,
     mutations: p.mutations,
     bodyHash: sha256(issue.body),
