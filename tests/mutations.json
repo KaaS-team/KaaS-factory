@@ -920,5 +920,6 @@
   {"name": "schedule: cycles go unreported", "file": "src/core/schedule.ts", "find": "if (state.get(dep) === VISITING) cycles.push(cycleFrom(stack, dep));", "replace": "if (false) cycles.push(cycleFrom(stack, dep));", "test": "tests/schedule.test.ts"},
   {"name": "epic: closing line drops the children", "file": "src/engine/epic.ts", "find": "${children.map((n) => `, closes #${n}`).join(\"\")}", "replace": "", "test": "tests/epic.test.ts"},
   {"name": "epic: settle never ticks the checklist", "file": "src/engine/epic.ts", "find": "if (ticked !== issue.body && tracker.editIssueBody)", "replace": "if (false && tracker.editIssueBody)", "test": "tests/epic.test.ts"},
-  {"name": "epic: tasks are not committed one by one", "file": "src/engine/epic.ts", "find": "if (tasks.length < 2) {", "replace": "if (true) {", "test": "tests/epic.test.ts"}
+  {"name": "epic: tasks are not committed one by one", "file": "src/engine/epic.ts", "find": "if (tasks.length < 2) {", "replace": "if (true) {", "test": "tests/epic.test.ts"},
+  {"name": "owner name returns to src", "file": "src/daemon.ts", "find": "const LAUNCHD_PREFIX = \"dev.factory.\";", "replace": "const LAUNCHD_PREFIX = \"dev.factory.\"; // learnwithparam", "test": "tests/owner-neutral.test.ts"}
 ]

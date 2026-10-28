@@ -52,10 +52,9 @@ describe("runtime code does not name the demo app", () => {
 
 describe("no company name in src or template", () => {
   const COMPANY = /learnwithparam/i;
-  // The one line is the pre-rename launchd file, kept only so install can unload it (src/daemon.ts legacyLaunchdFile).
-  const ALLOWED: Record<string, number> = { "src/daemon.ts": 1 };
+  const ALLOWED: Record<string, number> = {};
 
-  test("src/** and template/** name the company only on the allow-listed line", () => {
+  test("src/** and template/** never name the company", () => {
     // Dot directories are read too: template/.claude is shipped to other repos.
     const counts: Record<string, number> = {};
     for (const d of ["src", "template"]) {
