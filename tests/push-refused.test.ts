@@ -36,6 +36,16 @@ describe("a refused push", () => {
     expect(comments(e)).toContain("hook declined");
   });
 
+  test("a refused push shows the last 20 lines of stderr", async () => {
+    const e = make();
+    e.git.pushCode = 1;
+    e.git.pushStderr = Array.from({ length: 25 }, (_, i) => `stderr-${String(i + 1).padStart(2, "0")}`).join("\n");
+    expect(await e.run()).toBe("failed");
+    expect(comments(e)).toContain("stderr-06");
+    expect(comments(e)).toContain("stderr-25");
+    expect(comments(e)).not.toContain("stderr-05");
+  });
+
   test("a clean push still reaches verify", async () => {
     const e = make();
     expect(await e.run()).toBe("shipped");

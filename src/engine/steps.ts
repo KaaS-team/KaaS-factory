@@ -288,9 +288,9 @@ const build: StepType = {
     });
     const pushed = await deps.git.push(worktree, issueNumber);
     if (pushed.code !== 0) {
-      // The failure line keeps one line, and a hook or lease refusal ends on the decisive one.
-      const last = pushed.stderr.trim().split("\n").at(-1) ?? "";
-      return stop(await failStage(deps, config, issue, step.label, "build", `push_refused: ${last}`));
+      const lines = pushed.stderr.trim().split("\n");
+      await postComment(deps, config, issueNumber, `\`\`\`\n${lines.slice(-20).join("\n")}\n\`\`\``);
+      return stop(await failStage(deps, config, issue, step.label, "build", `push_refused: ${lines.at(-1) ?? ""}`));
     }
     return { kind: "next", facts: json };
   },

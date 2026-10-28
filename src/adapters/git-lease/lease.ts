@@ -52,7 +52,8 @@ export class GitLeases implements LeasePort {
     );
     const sha = commit.stdout.trim();
     if (commit.code !== 0 || !sha) return false;
-    return (await git(["push", "-q", "origin", `${sha}:${ref}`], this.cloneDir)).code === 0;
+    // --no-verify: a pre-push hook must not gate a lease write (issue #160).
+    return (await git(["push", "-q", "--no-verify", "origin", `${sha}:${ref}`], this.cloneDir)).code === 0;
   }
 
   async acquire(key: string, holder: string, ttlMs: number, now: number): Promise<boolean> {
