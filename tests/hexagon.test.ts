@@ -42,6 +42,10 @@ describe("hexagon", () => {
     for (const dir of ["core", "ports", "adapters", "engine"]) expect(filesUnder(dir).length).toBeGreaterThan(0);
   });
 
+  test("the scheduler lives in core, so the purity rule covers it", () => {
+    expect(filesUnder("core")).toContain("core/schedule.ts");
+  });
+
   test("core imports nothing outside core, not even node:", () => {
     expect(
       edgesIn("core")
