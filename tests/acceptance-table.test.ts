@@ -18,7 +18,6 @@ import {
 } from "../src/acceptance";
 import { CommandExecutor } from "../src/agents/executor";
 import { mergeConfig } from "../src/config";
-import type { WatchDeps } from "../src/engine/common";
 import { prBody, renderWhatChanged } from "../src/engine/pr-body";
 import type { StageName } from "../src/executor";
 import { LABEL } from "../src/labels";
@@ -141,11 +140,10 @@ describe("runAcceptance", () => {
 
 describe("prBody", () => {
   test("carries the table even when prRunSummary hides models and spend", () => {
-    const config = mergeConfig({ repo: "o/r", prRunSummary: false });
     const acceptance = renderAcceptanceTable(fixture);
-    const body = prBody({} as WatchDeps, config, {} as never, "Closes #1", {} as never, { acceptance });
+    const body = prBody("Closes #1", { acceptance });
     expect(body.startsWith("Closes #1\n\n## Acceptance")).toBe(true);
-    expect(prBody({} as WatchDeps, config, {} as never, "Closes #1", {} as never)).toBe("Closes #1");
+    expect(prBody("Closes #1")).toBe("Closes #1");
   });
 });
 
@@ -303,7 +301,7 @@ describe("an unproven acceptance verdict rejects verify", () => {
     expect(body.indexOf("Did it.")).toBeGreaterThan(body.indexOf("- Fails without it:"));
     // A plan that names no spec shows none of the kit's rows.
     expect(body).not.toContain("| 07-pricing |");
-    expect(body.lastIndexOf("## ")).toBe(body.indexOf("## Factory run"));
+    expect(body).not.toContain("## Factory run");
   });
 
   test("What changed names the test that fails without the change, or says none was shown", () => {
@@ -329,7 +327,7 @@ describe("an unproven acceptance verdict rejects verify", () => {
     const tables = first.github.issues
       .get(1)!
       .comments.map((c) => c.body)
-      .filter((b) => b.includes("Not proven"));
+      .filter((b) => b.includes("Not proven") && !b.includes("factory:run-details"));
     expect(tables).toHaveLength(1);
     expect(tables[0]).toContain("Not proven: 1 of 2 criteria failed");
     expect(tables[0]).toContain("AC-2");

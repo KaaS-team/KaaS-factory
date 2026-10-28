@@ -93,7 +93,7 @@ export interface ReceiptInput {
   readonly runs: readonly StageRun[];
   // Raw bytes of each run-dir file the predicate stands on, hashed so the receipt pins them.
   readonly files: Readonly<Record<string, string>>;
-  // Off when config.prRunSummary is off: the receipt then carries no model or spend.
+  // Off drops model and spend; the pr step always passes false, since the receipt is posted on the issue.
   readonly operatorDetail: boolean;
 }
 
@@ -265,16 +265,16 @@ export function decodeStatement(envelope: Envelope): Statement {
   return JSON.parse(Buffer.from(envelope.payload, "base64").toString("utf8")) as Statement;
 }
 
-// The PR body's section: the verdict, what is not proven, and the envelope a reviewer feeds to kaas-verify.
+// The run-details comment's section: the verdict, what is not proven, and the envelope a reviewer feeds to kaas-verify.
 export function renderReceipt(envelope: Envelope): string {
-  const { predicate } = decodeStatement(envelope);
-  const v = predicate.verdict;
-  const lines = ["## Receipt", ""];
-  lines.push(
-    envelope.signatures.length
-      ? `Signed by key \`${envelope.signatures[0]!.keyid.slice(0, 16)}\`. ${v.proven ? "Proven" : "Not proven"}: ${v.criteria - v.failed} of ${v.criteria} criteria.`
-      : `Unsigned (no ${RECEIPT_KEY_ENV} on the runner). ${v.proven ? "Proven" : "Not proven"}: ${v.criteria - v.failed} of ${v.criteria} criteria.`,
-  );
+  const v = decodeStatement(envelope).predicate.verdict;
+  const who = envelope.signatures.length
+    ? `Signed by key \`${envelope.signatures[0]!.keyid.slice(0, 16)}\`.`
+    : `Unsigned (no ${RECEIPT_KEY_ENV} on the runner).`;
+  const said = v.criteria
+    ? `${v.proven ? "Proven" : "Not proven"}: ${v.criteria - v.failed} of ${v.criteria} criteria.`
+    : "No criteria were recorded; the acceptance table is the record.";
+  const lines = ["## Receipt", "", `${who} ${said}`];
   if (v.notProven.length) lines.push("", "### Not proven", "", ...v.notProven.map((n) => `- ${n}`));
   lines.push(
     "",
@@ -302,7 +302,7 @@ export function missingReceipt(reason: string): string {
   ].join("\n");
 }
 
-// Reads the receipt envelope back out of a PR body, for `factory receipt verify --pr`.
+// Reads the receipt envelope back out of the run-details comment on the issue.
 export function envelopeFromBody(body: string): Envelope | undefined {
   const m = /## Receipt[\s\S]*?```json\n(.+)\n```/.exec(body);
   return m ? (JSON.parse(m[1]!) as Envelope) : undefined;

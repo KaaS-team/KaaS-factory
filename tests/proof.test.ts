@@ -237,6 +237,6 @@ describe("watch.ts runs the proof before verify", () => {
       reverted: ["src/a.ts"],
       cmd: "make test",
     });
-    expect(github.createdPrs[0]!.body).toContain("Proof: the new test fails without the change.");
+    expect(github.createdPrs[0]!.body).toContain("Fails without it: `tests/a.test.ts`, red with `src/a.ts` reverted");
   });
 });

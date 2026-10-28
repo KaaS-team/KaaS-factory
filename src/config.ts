@@ -127,7 +127,7 @@ export interface FactoryConfig {
   readonly holdout: HoldoutConfig;
   // One tmux window per issue in flight, tailing its transcript (`factory attach`).
   readonly tmux: TmuxConfig;
-  // Append the "Factory run" section (stages, agents, cost, what needed help) to the PR body.
+  // No longer read: the "Factory run" table never reaches the PR body or the customer-visible issue thread.
   readonly prRunSummary: boolean;
   // Installed template files this repo changed on purpose; doctor's drift check skips them.
   readonly templateOverrides: readonly string[];
