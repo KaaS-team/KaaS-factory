@@ -908,5 +908,6 @@
   {"name": "rest: a pull request counts as an issue", "file": "src/github-rest.ts", "find": ".filter((i) => !i.pull_request)", "replace": "", "test": "tests/github.test.ts"},
   {"name": "rest: the rate limit reads the graphql bucket", "file": "src/github.ts", "find": "resources?.core?.reset", "replace": "resources?.graphql?.reset", "test": "tests/scenarios.test.ts"},
   {"name": "rest: a not-planned close is lowercase again", "file": "src/github-rest.ts", "find": "i.state_reason.toUpperCase()", "replace": "i.state_reason", "test": "tests/github.test.ts"},
-  {"name": "rest: a changed comment count keeps the cached comments", "file": "src/github-rest.ts", "find": "hit.count === i.comments", "replace": "true", "test": "tests/github.test.ts"}
+  {"name": "rest: a changed comment count keeps the cached comments", "file": "src/github-rest.ts", "find": "hit.count === i.comments", "replace": "true", "test": "tests/github.test.ts"},
+  {"name": "architecture review: drops the deletion test", "file": "template/.claude/skills/factory-architecture/SKILL.md", "find": "Apply the deletion test.", "replace": "Apply a test.", "test": "tests/skills.test.ts"}
 ]
