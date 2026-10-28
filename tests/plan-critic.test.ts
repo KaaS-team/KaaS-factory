@@ -249,7 +249,7 @@ describe("deterministicCritique and critiquePlan", () => {
 test("planFromIssue keeps task on each plan.json criterion, and the check accepts the result", () => {
   const planned: PlannedIssue = {
     goal: "g",
-    tasks: [{ id: "T1", title: "t", files: ["src/exists.ts"], model: "sonnet", steps: ["do it"] }],
+    tasks: [{ id: "T1", title: "t", files: ["src/exists.ts"], model: "sonnet", steps: ["do it"], deps: [] }],
     tests: ["t.test.ts"],
     mutations: [],
     criteria: [{ id: "AC-1", text: "x", commands: ["make check"], task: "T1" }],
@@ -257,6 +257,7 @@ test("planFromIssue keeps task on each plan.json criterion, and the check accept
     files: [{ path: "src/exists.ts", isNew: false }],
     risk: "low",
     model: "sonnet",
+    meta: { deps: [], runner: "factory", declared: false, problems: [] },
   };
   const { plan, comment } = planFromIssue(planned, { body: "b" });
   expect(plan.criteria).toEqual([{ id: "AC-1", text: "x", task: "T1" }]);

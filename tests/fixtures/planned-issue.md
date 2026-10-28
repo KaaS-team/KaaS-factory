@@ -1,4 +1,6 @@
 <!-- factory:planned v1 -->
+Milestone: M1
+
 ## Why
 Resume work at the failed stage.
 
@@ -14,6 +16,7 @@ Model: haiku
 ### T2: Resume at the failed stage
 Files: `src/derive.ts`
 Model: sonnet
+Deps: T1
 1. Return `{resumeAt}` from the latest failure.
 
 ## Tests

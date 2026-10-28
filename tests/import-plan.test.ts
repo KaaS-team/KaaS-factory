@@ -56,6 +56,7 @@ test("every problem is collected, not only the first", async () => {
   expect(parsePlannedIssue(body).problems.length).toBeGreaterThanOrEqual(2);
 });
 
+<<<<<<< HEAD
 test("lint applies the AC command rule import-plan applies", async () => {
   const config = mergeConfig({ agentCommands: { read: [], build: ["make *"], verify: ["make *"] } });
   const body = await read("planned-issue.md");
@@ -63,4 +64,20 @@ test("lint applies the AC command rule import-plan applies", async () => {
   const bad = body.replace("checked by `tests/resume.test.ts` (T1)", "checked by `bun test tests/resume.test.ts` (T1)");
   expect(bad).not.toBe(body);
   expect(lintPlanned(bad, config).join("\n")).toContain("AC-1");
+=======
+test("task deps: an unknown dep and a cycle are problems, and tasks come out dependency first", async () => {
+  const body = await read("planned-issue.md");
+  const unknown = parsePlannedIssue(body.replace("Deps: T1", "Deps: T9"));
+  expect(unknown.problems.join("\n")).toContain("T2 depends on T9");
+  const cyclic = parsePlannedIssue(body.replace("Model: haiku\n", "Model: haiku\nDeps: T2\n"));
+  expect(cyclic.problems.join("\n")).toContain("form a cycle");
+  const swapped = body.replace("Deps: T1", "Deps: none").replace("Model: haiku\n", "Model: haiku\nDeps: T2\n");
+  const { plan } = parsePlannedIssue(swapped);
+  expect(planFromIssue(plan!, { body: swapped }).plan.tasks.map((t) => t.id)).toEqual(["T2", "T1"]);
+});
+
+test("a bad preface line is a problem", async () => {
+  const body = (await read("planned-issue.md")).replace("Milestone: M1", "Runner: robot");
+  expect(parsePlannedIssue(body).problems.join("\n")).toContain('Runner: "robot"');
+>>>>>>> origin/main
 });
