@@ -40,7 +40,7 @@ quarantine:
 # Each entry in tests/mutations.json breaks one thing; its test must go red.
 # Proves the checks bite. Its own CI job, since it copies the repo per mutation.
 check-mutations:
-	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null bun scripts/check-mutations.ts
+	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null bun scripts/check-mutations.ts "$(ONLY)"
 
 skills-check:
 	@command -v uvx >/dev/null 2>&1 || { \

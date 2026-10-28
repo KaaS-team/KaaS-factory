@@ -122,9 +122,9 @@ async function sections(stage: StageName, issue: number, cwd: string, opts: Pack
     if (charter) out.push({ label: CHARTER_PATH, body: charter.trim() });
   }
 
-  if (want.has("lessons")) {
-    const lessons = await readOptional(`${cwd}/${LESSONS_PATH}`);
-    if (lessons) out.push({ label: "lessons learned", body: capLessons(lessons).trim() });
+  if (want.has("architecture")) {
+    const architectureMd = await readOptional(`${cwd}/ARCHITECTURE.md`);
+    if (architectureMd) out.push({ label: "ARCHITECTURE.md", body: architectureMd.trim() });
   }
 
   if (want.has("skillsIndex")) {
@@ -139,11 +139,6 @@ async function sections(stage: StageName, issue: number, cwd: string, opts: Pack
     }
   }
 
-  if (want.has("architecture")) {
-    const architectureMd = await readOptional(`${cwd}/ARCHITECTURE.md`);
-    if (architectureMd) out.push({ label: "ARCHITECTURE.md", body: architectureMd.trim() });
-  }
-
   // Empty until a plan exists.
   if (want.has("planFiles")) {
     for (const path of await planFiles(cwd, issue)) {
@@ -152,13 +147,16 @@ async function sections(stage: StageName, issue: number, cwd: string, opts: Pack
     }
   }
 
+  if (want.has("lessons")) {
+    const lessons = await readOptional(`${cwd}/${LESSONS_PATH}`);
+    if (lessons) out.push({ label: "lessons learned", body: capLessons(lessons).trim() });
+  }
+
   return out;
 }
 
-// Sections are added highest-priority first (repo conventions and skills
-// ahead of the plan's own files), and the budget is enforced in that same
-// order: the first sections over budget get dropped, not the file content
-// inside a kept section truncated.
+// Most stable first (repo rules, skills, plan files, lessons last) so the prefix caches between runs.
+// The budget follows that order: a section that does not fit is dropped whole, so lessons go first.
 function assemble(built: readonly Section[]): string {
   const header = "## Context pack\n\n";
   let used = Buffer.byteLength(header);

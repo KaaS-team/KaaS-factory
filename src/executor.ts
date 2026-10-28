@@ -25,23 +25,31 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
   let costUsd = 0;
   let costReported = false;
   let tokensCached = 0;
+  let tokensCacheWrite = 0;
   const permissionDenials: string[] = [];
   const denied: NonNullable<StageEvent["denied"]>[number][] = [];
   const refusedBy = new Map<string, string>();
   let finalText: string | undefined;
   let sessionId: string | undefined;
-  let final: { in: number; out: number; cached: number } | "invalid" | undefined;
+  let final: { in: number; out: number; cached: number; cacheWrite: number } | "invalid" | undefined;
   for (const e of events) {
     if (e.finalText !== undefined) finalText = e.finalText;
     if (e.sessionId !== undefined) sessionId = e.sessionId;
     if (e.kind === "tool_use") toolCalls += 1;
     if (e.kind === "usage") {
       if (e.invalid) final = "invalid";
-      else if (e.total) final = { in: e.tokensIn ?? 0, out: e.tokensOut ?? 0, cached: e.tokensCached ?? 0 };
+      else if (e.total)
+        final = {
+          in: e.tokensIn ?? 0,
+          out: e.tokensOut ?? 0,
+          cached: e.tokensCached ?? 0,
+          cacheWrite: e.tokensCacheWrite ?? 0,
+        };
       else {
         tokensIn += e.tokensIn ?? 0;
         tokensOut += e.tokensOut ?? 0;
         tokensCached += e.tokensCached ?? 0;
+        tokensCacheWrite += e.tokensCacheWrite ?? 0;
       }
     }
     if (e.kind === "result") {
@@ -58,10 +66,12 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
     tokensIn = 0;
     tokensOut = 0;
     tokensCached = 0;
+    tokensCacheWrite = 0;
   } else if (final) {
     tokensIn = final.in;
     tokensOut = final.out;
     tokensCached = final.cached;
+    tokensCacheWrite = final.cacheWrite;
   }
   const finalMessage = finalText === undefined ? undefined : truncateFinalMessage(finalText);
   const result = {
@@ -70,6 +80,7 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
     tokensIn,
     tokensOut,
     tokensCached,
+    tokensCacheWrite,
     costUsd,
     costReported,
     exitCode,

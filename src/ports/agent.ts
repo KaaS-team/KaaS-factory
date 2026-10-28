@@ -15,6 +15,7 @@ export interface StageEvent {
   readonly tokensIn?: number;
   readonly tokensOut?: number;
   readonly tokensCached?: number;
+  readonly tokensCacheWrite?: number;
   // On "usage" events: `total` means these are the run's final totals (replace
   // what was summed); `invalid` means the terminal event was unreadable, so
   // tokens are "not reported".
@@ -79,6 +80,7 @@ export interface StageRunResult {
   readonly tokensIn: number;
   readonly tokensOut: number;
   readonly tokensCached?: number;
+  readonly tokensCacheWrite?: number;
   readonly costUsd: number;
   // True when the agent itself reported a cost; false means costFor decides.
   readonly costReported?: boolean;

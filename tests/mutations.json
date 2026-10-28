@@ -112,6 +112,7 @@
   {"name": "claude preset: triage runs cheap", "file": "src/agents/presets/claude.ts", "find": "triage: { model: \"sonnet\", effort: \"low\" },", "replace": "triage: {},", "test": "tests/agents.test.ts"},
   {"name": "claude preset: a configured model wins", "file": "src/agents/presets/claude.ts", "find": "configured ?? model", "replace": "model ?? configured", "test": "tests/agents.test.ts"},
   {"name": "token budget: pr gets the full pack", "file": "src/context.ts", "find": "  pr: [],", "replace": "  pr: [\"conventions\", \"charter\", \"lessons\", \"routeSkills\", \"architecture\", \"planFiles\"],", "test": "tests/token-budget.test.ts"},
+  {"name": "context pack: lessons first, not last", "file": "src/context.ts", "find": "if (lessons) out.push({ label: \"lessons learned\"", "replace": "if (lessons) out.unshift({ label: \"lessons learned\"", "test": "tests/context-pack.test.ts"},
   {"name": "token budget: AGENTS.md loaded twice", "file": "src/context.ts", "find": "  if (!contextFile) return false;\n", "replace": "  return false;\n", "test": "tests/token-budget.test.ts"},
   {"name": "stop-verifier-evidence: Stop only", "file": "template/.claude/hooks/stop-verifier-evidence.sh", "find": "event.get(\"hook_event_name\") != \"Stop\" or ", "replace": "", "test": "tests/stop-verifier-evidence.test.ts"},
   {"name": "install: --update removes retired agents", "file": "install.sh", "find": "      rm \"$TARGET/$rel\"\n", "replace": "", "test": "tests/install.test.ts"},
