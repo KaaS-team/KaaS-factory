@@ -17,6 +17,7 @@ import { configProblems } from "../src/config";
 import { framed, shq, unframe } from "../src/core/frame";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { loadMachineConfig } from "../src/machine";
+import { probeBudgetMs } from "../src/runtime-kit";
 import { BUILTIN_RUNTIMES, runtimeProblems, runtimeRefs, runtimesFrom, unknownRuntimes } from "../src/runtimes";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -350,6 +351,48 @@ describe("agent37", () => {
     } finally {
       box.stop();
     }
+  });
+
+  test("a try_again answer on setup is retried, and the command still runs", async () => {
+    const box = startAgent37("k", "i1", { busyFirst: 2 });
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-busy-"));
+    try {
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      expect(r).toEqual({ stdout: "ok\n", stderr: "", code: 0 });
+      expect(box.commands.filter((c) => c.startsWith("mkdir ")).length).toBe(3);
+    } finally {
+      box.stop();
+    }
+  }, 20_000);
+
+  test("a 504 on the main command is not sent again", async () => {
+    const box = startAgent37("k", "i1", { mainFails: { status: 504 } });
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-504-"));
+    try {
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      expect(r).toMatchObject({ code: 1, runtimeFailed: "agent37 i1 answered 504: gateway timeout" });
+      expect(box.commands.filter((c) => c.includes("bash -c")).length).toBe(1);
+    } finally {
+      box.stop();
+    }
+  }, 20_000);
+
+  test("a try_again on the main command is not sent again either", async () => {
+    const box = startAgent37("k", "i1", { mainFails: { status: 503, code: "try_again" } });
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-503-"));
+    try {
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      expect(r).toMatchObject({ code: 1, runtimeFailed: 'agent37 i1 answered 503: {"error":{"code":"try_again"}}' });
+      expect(box.commands.filter((c) => c.includes("bash -c")).length).toBe(1);
+    } finally {
+      box.stop();
+    }
+  }, 20_000);
+
+  test("the agent37 probe waits up to 45 s for a wake; every other kind keeps 15 s", () => {
+    expect(probeBudgetMs("agent37")).toBe(45000);
+    expect(probeBudgetMs("local")).toBe(15000);
+    expect(probeBudgetMs(undefined)).toBe(15000);
   });
 
   test("machine.json: instance and tokenEnv are required, the url is https or loopback", () => {

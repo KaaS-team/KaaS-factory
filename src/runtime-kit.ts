@@ -129,16 +129,23 @@ export interface Health {
   readonly detail: string;
 }
 
-// Reachability, not correctness: one trivial command in an empty directory, within `timeoutMs`.
-export async function probeRuntime(port: ExecutionPort, timeoutMs = 15_000): Promise<Health> {
+// agent37 wakes a sleeping instance in 5 to 15 s, then writes its checkpoint: 45 s covers both.
+export function probeBudgetMs(kind: string | undefined): number {
+  return kind === "agent37" ? 45_000 : 15_000;
+}
+
+// Reachability, not correctness: one trivial command in an empty directory, within `timeoutMs`
+// (default: the budget for `kind`).
+export async function probeRuntime(port: ExecutionPort, timeoutMs?: number, kind?: string): Promise<Health> {
+  const budget = timeoutMs ?? probeBudgetMs(kind);
   const dir = mkdtempSync(join(tmpdir(), "factory-probe-"));
   const start = Date.now();
   try {
     const r = await within(
       port
-        .run("echo factory-probe-ok", dir, AbortSignal.timeout(timeoutMs))
+        .run("echo factory-probe-ok", dir, AbortSignal.timeout(budget))
         .catch((e: unknown): ExecResult => ({ stdout: "", stderr: "", code: 1, runtimeFailed: String(e) })),
-      timeoutMs,
+      budget,
     );
     const ok = r.code === 0 && r.stdout.includes("factory-probe-ok");
     const why = r.runtimeFailed ?? (r.stderr.trim().split("\n")[0] || `exit ${r.code}`);

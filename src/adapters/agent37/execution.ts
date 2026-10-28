@@ -41,6 +41,35 @@ function fail(stderr: string): ExecResult {
   return { stdout: "", stderr, code: 1, runtimeFailed: stderr.split("\n")[0]! };
 }
 
+// A sleeping instance answers 409 while it writes its checkpoint and 503 after a host move.
+// Five waits, 31 s in all, cover a wake; the main command is never sent twice.
+const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
+
+function tryAgain(status: number, text: string): boolean {
+  if (status !== 409 && status !== 503) return false;
+  try {
+    return (JSON.parse(text) as { error?: { code?: unknown } }).error?.code === "try_again";
+  } catch {
+    return false;
+  }
+}
+
+// False when the signal aborts the wait.
+function pause(ms: number, signal?: AbortSignal): Promise<boolean> {
+  return new Promise((done) => {
+    if (signal?.aborted) return done(false);
+    const onAbort = () => {
+      clearTimeout(timer);
+      done(false);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      done(true);
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export class Agent37Execution implements ExecutionPort {
   constructor(
     private readonly spec: Agent37Spec,
@@ -52,33 +81,40 @@ export class Agent37Execution implements ExecutionPort {
   }
 
   // One exec; a string is a runtime failure, an object is the command's answer.
-  private async exec(token: string, command: string, signal?: AbortSignal): Promise<ExecResult | string> {
+  // Only `retry` execs wait out a try_again; the main command runs once.
+  private async exec(token: string, command: string, signal?: AbortSignal, retry = true): Promise<ExecResult | string> {
     const url = `${this.spec.url ?? AGENT37_URL}/v1/instances/${this.spec.instance}/exec`;
-    let res: Response;
-    let text: string;
-    try {
-      // A long command sends nothing until it ends; Bun's own idle timeout would drop it.
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-agent37-key": token },
-        body: JSON.stringify({ command }),
-        timeout: false,
-        ...(signal ? { signal } : {}),
-      } as RequestInit);
-      text = await res.text();
-    } catch (err) {
-      if (signal?.aborted) return `${this.where}: cut off (${String(signal.reason)})`;
-      return `${this.where} unreachable: ${err instanceof Error ? err.message : String(err)}`;
+    for (let wait = 0; ; wait++) {
+      let res: Response;
+      let text: string;
+      try {
+        // A long command sends nothing until it ends; Bun's own idle timeout would drop it.
+        res = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-agent37-key": token },
+          body: JSON.stringify({ command }),
+          timeout: false,
+          ...(signal ? { signal } : {}),
+        } as RequestInit);
+        text = await res.text();
+      } catch (err) {
+        if (signal?.aborted) return `${this.where}: cut off (${String(signal.reason)})`;
+        return `${this.where} unreachable: ${err instanceof Error ? err.message : String(err)}`;
+      }
+      if (retry && wait < BACKOFF_MS.length && tryAgain(res.status, text)) {
+        if (!(await pause(BACKOFF_MS[wait]!, signal))) return `${this.where}: cut off (${String(signal?.reason)})`;
+        continue;
+      }
+      if (!res.ok) return `${this.where} answered ${res.status}: ${text.slice(0, 500)}`;
+      try {
+        const r = JSON.parse(text) as { exit_code?: unknown; stdout?: unknown; stderr?: unknown };
+        if (typeof r.stdout === "string" && typeof r.stderr === "string" && Number.isInteger(r.exit_code))
+          return { stdout: r.stdout, stderr: r.stderr, code: r.exit_code as number };
+      } catch {
+        // falls through to the shape error
+      }
+      return `${this.where} answered without {exit_code, stdout, stderr}: ${text.slice(0, 500)}`;
     }
-    if (!res.ok) return `${this.where} answered ${res.status}: ${text.slice(0, 500)}`;
-    try {
-      const r = JSON.parse(text) as { exit_code?: unknown; stdout?: unknown; stderr?: unknown };
-      if (typeof r.stdout === "string" && typeof r.stderr === "string" && Number.isInteger(r.exit_code))
-        return { stdout: r.stdout, stderr: r.stderr, code: r.exit_code as number };
-    } catch {
-      // falls through to the shape error
-    }
-    return `${this.where} answered without {exit_code, stdout, stderr}: ${text.slice(0, 500)}`;
   }
 
   async run(cmd: string, cwd: string, signal?: AbortSignal): Promise<ExecResult> {
@@ -106,7 +142,7 @@ export class Agent37Execution implements ExecutionPort {
       const unpack = await this.exec(token, `base64 -d < ${quote(`${dir}.b64`)} | tar -xzf - -C ${quote(dir)}`, signal);
       if (typeof unpack === "string") return fail(unpack);
       if (unpack.code !== 0) return fail(`${this.where}: unpacking the worktree failed:\n${unpack.stderr}`);
-      const r = await this.exec(token, `cd ${quote(dir)} && bash -c ${quote(cmd)}`, signal);
+      const r = await this.exec(token, `cd ${quote(dir)} && bash -c ${quote(cmd)}`, signal, false);
       return typeof r === "string" ? fail(r) : r;
     } finally {
       // Best effort: a cut-off run's directory is left for the next boot's /tmp.
