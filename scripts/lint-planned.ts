@@ -14,6 +14,7 @@ export function lintPlanned(body: string, allow: readonly string[]): string[] {
 }
 
 if (import.meta.main) {
+  // This repo's config, as import-plan reads it; a body filed to another repo is checked against this one's rules.
   const allow = proofAllowRules(await loadConfig(join(import.meta.dir, "..")), 0);
   let bad = 0;
   for (const file of process.argv.slice(2)) {

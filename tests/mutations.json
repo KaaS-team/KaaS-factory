@@ -900,5 +900,6 @@
   {"name": "daemon: the legacy launchd plist is never unloaded", "file": "src/daemon.ts", "find": "com.learnwithparam.${daemonName(repo)}.plist", "replace": "dev.factory.${daemonName(repo)}.plist", "test": "tests/daemon.test.ts"},
   {"name": "relay: KAAS_RELAY_ADDR is no longer read", "file": "src/deploy/stack.ts", "find": "env.KAAS_RELAY_ADDR ?? \"127.0.0.1:4200\"", "replace": "\"127.0.0.1:4200\"", "test": "tests/deploy.test.ts"},
   {"name": "events: the legacy x-kaas-signature header no longer verifies", "file": "src/core/event.ts", "find": "\"x-kaas-signature\";", "replace": "\"x-kaas-off\";", "test": "tests/events.test.ts"},
-  {"name": "agnostic: a new line names the company", "file": "src/deploy/stack.ts", "find": "const MIRROR_EVERY_MS = 30_000;", "replace": "const MIRROR_EVERY_MS = 30_000; // learnwithparam", "test": "tests/app-agnostic.test.ts"}
+  {"name": "agnostic: a new line names the company", "file": "src/deploy/stack.ts", "find": "const MIRROR_EVERY_MS = 30_000;", "replace": "const MIRROR_EVERY_MS = 30_000; // learnwithparam", "test": "tests/app-agnostic.test.ts"},
+  {"name": "lint-planned: AC commands are not checked", "file": "scripts/lint-planned.ts", "find": "...planMustFix(planFromIssue(plan, { body }).comment, { proof: \"test\" }, allow)", "replace": "", "test": "tests/import-plan.test.ts"}
 ]
