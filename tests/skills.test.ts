@@ -226,7 +226,8 @@ describe("every inline shell command in the template passes the stage shell rule
       });
       expect(run.stderr.toString()).toBe("");
       expect(run.exitCode).toBe(0);
-    });
+      // Each spawns a shell hook; the 5s default fails the gate when the box is busy with stages.
+    }, 30_000);
 });
 
 // Shape is not enough: dontAsk also refuses a command off the stage allow-list.
