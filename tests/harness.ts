@@ -92,6 +92,12 @@ export class FakeGitHub extends GitHub {
     return new Map(labels.map((l) => [l, [...this.issues.values()].filter((i) => i.labels.some((x) => x.name === l))]));
   }
 
+  edited: { number: number; body: string }[] = [];
+
+  override async editIssueBody(_repo: string, number: number, body: string): Promise<void> {
+    this.edited.push({ number, body });
+  }
+
   override async getIssue(_repo: string, number: number): Promise<GhIssue> {
     const issue = this.issues.get(number);
     if (!issue) throw new Error(`no such issue ${number}`);
@@ -318,6 +324,13 @@ export class FakeGit extends Git {
     return true;
   }
 
+  override async commitPaths(_worktreeDir: string, paths: readonly string[], message: string): Promise<boolean> {
+    this.committed.push(message);
+    this.committedPaths.push([...paths]);
+    return true;
+  }
+
+  committedPaths: string[][] = [];
   changed: string[] = [];
 
   override async changedFiles(): Promise<string[]> {

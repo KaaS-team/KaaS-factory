@@ -153,6 +153,10 @@ export class GitHub implements TrackerPort, CodeHostPort {
     await this.exec(["issue", "close", String(number), "--repo", repo]);
   }
 
+  async editIssueBody(repo: string, number: number, body: string): Promise<void> {
+    await this.exec(["issue", "edit", String(number), "--repo", repo, "--body", body]);
+  }
+
   async reopenIssue(repo: string, number: number): Promise<void> {
     await this.exec(["issue", "reopen", String(number), "--repo", repo]);
   }

@@ -110,6 +110,32 @@ describe("a PR body built from a finished run", () => {
   });
 });
 
+describe("an epic's PR body", () => {
+  test("tasks follow What changed and the closing line precedes the run-details pointer", () => {
+    const body = prBody("Text.", {
+      whatChanged: "## What changed",
+      tasks: "## Tasks",
+      acceptance: "## Acceptance",
+      closes: "Closes #5, closes #6",
+      runDetails: "#5",
+    });
+    const at = (s: string) => body.indexOf(s);
+    expect([
+      at("## What changed"),
+      at("## Tasks"),
+      at("Text."),
+      at("## Acceptance"),
+      at("Closes #5"),
+      at("receipt"),
+    ]).toEqual(
+      [
+        ...[at("## What changed"), at("## Tasks"), at("Text."), at("## Acceptance"), at("Closes #5"), at("receipt")],
+      ].sort((a, b) => a - b),
+    );
+    expect(at("receipt")).toBeGreaterThan(0);
+  });
+});
+
 describe("the run-details comment", () => {
   test("run details comment holds the receipt envelope", () => {
     const comment = receipt();
