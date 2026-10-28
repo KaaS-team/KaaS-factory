@@ -896,5 +896,9 @@
   {"name": "failPush: stderr is not scrubbed", "file": "src/engine/failure.ts", "find": "scrubLine(stderr.trim(), process.env, [homedir(), worktree])", "replace": "stderr.trim()", "test": "tests/push-refused.test.ts"},
   {"name": "failPush: the tail is not capped at 20 lines", "file": "src/engine/failure.ts", "find": "lines.slice(-20).join", "replace": "lines.join", "test": "tests/push-refused.test.ts"},
   {"name": "failPush: the fence is always three backticks", "file": "src/engine/failure.ts", "find": "Math.max(3, ...(tail.match(/`+/g) ?? []).map((run) => run.length + 1))", "replace": "3", "test": "tests/push-refused.test.ts"},
-  {"name": "failPush: a failed tail post stops the failure", "file": "src/engine/failure.ts", "find": ".catch(() => undefined);\n  return failStage(deps, config, issue, from, \"build\"", "replace": ";\n  return failStage(deps, config, issue, from, \"build\"", "test": "tests/push-refused.test.ts"}
+  {"name": "failPush: a failed tail post stops the failure", "file": "src/engine/failure.ts", "find": ".catch(() => undefined);\n  return failStage(deps, config, issue, from, \"build\"", "replace": ";\n  return failStage(deps, config, issue, from, \"build\"", "test": "tests/push-refused.test.ts"},
+  {"name": "daemon: the legacy launchd plist is never unloaded", "file": "src/daemon.ts", "find": "com.learnwithparam.${daemonName(repo)}.plist", "replace": "dev.factory.${daemonName(repo)}.plist", "test": "tests/daemon.test.ts"},
+  {"name": "relay: KAAS_RELAY_ADDR is no longer read", "file": "src/deploy/stack.ts", "find": "env.KAAS_RELAY_ADDR ?? \"127.0.0.1:4200\"", "replace": "\"127.0.0.1:4200\"", "test": "tests/deploy.test.ts"},
+  {"name": "events: the legacy x-kaas-signature header no longer verifies", "file": "src/core/event.ts", "find": "\"x-kaas-signature\";", "replace": "\"x-kaas-off\";", "test": "tests/events.test.ts"},
+  {"name": "agnostic: a new line names the company", "file": "src/deploy/stack.ts", "find": "const MIRROR_EVERY_MS = 30_000;", "replace": "const MIRROR_EVERY_MS = 30_000; // learnwithparam", "test": "tests/app-agnostic.test.ts"}
 ]

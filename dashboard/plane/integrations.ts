@@ -8,7 +8,7 @@ import { LINEAR_AGENT_ENV, LinearAgentClient, linearAgentReceiver } from "../../
 import { LinkStore } from "../../src/integrations/links";
 import { SLACK_ENV, SlackClient, slackReceiver } from "../../src/integrations/slack";
 import { type SteerTracker, surfaceActors } from "../../src/integrations/steer";
-import { EVENT_SIGNATURE_HEADER, isExternalEventType, parseEvent, verifyEvent } from "../../src/core/event";
+import { eventSignature, isExternalEventType, parseEvent, verifyEvent } from "../../src/core/event";
 import { readCapped, WEBHOOK_MAX_BYTES } from "../../src/webhook";
 import pkg from "../../package.json";
 import type { createAccess, Route } from "./access";
@@ -64,7 +64,7 @@ export function eventsRoute(deps: EventsDeps): Route {
       // other bad signature, so the status never says which repos are served.
       const secret = served ? await deps.secretFor(target) : deps.defaultSecret();
       if (!secret && !deps.defaultSecret()) return notFound();
-      if (!verifyEvent(secret, body, req.headers.get(EVENT_SIGNATURE_HEADER)))
+      if (!verifyEvent(secret, body, eventSignature(req.headers)))
         return Response.json({ error: "bad signature" }, { status: 401 });
       if (!served) return Response.json({ error: "unknown repo" }, { status: 404 });
       if (raw === undefined) return Response.json({ error: "body is not JSON" }, { status: 400 });

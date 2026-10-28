@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -42,9 +42,7 @@ describe("daemon", () => {
 
   test("one daemon per repo, named after it", () => {
     expect(daemonName("acme/web&co")).toBe("factory-acme-web-co");
-    expect(daemonFile("launchd", "/h", "acme/web")).toBe(
-      "/h/Library/LaunchAgents/com.learnwithparam.factory-acme-web.plist",
-    );
+    expect(daemonFile("launchd", "/h", "acme/web")).toBe("/h/Library/LaunchAgents/dev.factory.factory-acme-web.plist");
     expect(daemonFile("systemd", "/h", "acme/web")).toBe("/h/.config/systemd/user/factory-acme-web.service");
   });
 
@@ -104,6 +102,22 @@ describe("daemon", () => {
     await expect(installDaemon("systemd", spec(home), 1000, runner)).rejects.toThrow(
       "systemctl --user enable --now factory-acme-web-co.service failed: nope",
     );
+  });
+
+  test("install and uninstall unload a legacy com.learnwithparam plist", async () => {
+    const home = mkdtempSync(join(tmpdir(), "daemon-"));
+    const legacy = join(home, "Library", "LaunchAgents", "com.learnwithparam.factory-acme-web-co.plist");
+    mkdirSync(join(home, "Library", "LaunchAgents"), { recursive: true });
+    writeFileSync(legacy, "old");
+    const runner = fakeRunner((argv) => argv[1] === "bootout");
+    const file = await installDaemon("launchd", spec(home), 501, runner);
+    expect(runner.ran[0]).toBe(`launchctl bootout gui/501 ${legacy}`);
+    expect(existsSync(legacy)).toBe(false);
+    expect(readFileSync(file, "utf8")).toContain("<string>dev.factory.factory-acme-web-co</string>");
+
+    writeFileSync(legacy, "old");
+    await uninstallDaemon("launchd", home, spec(home).repo, 501, runner);
+    expect(existsSync(legacy)).toBe(false);
   });
 
   test("uninstall stops it and removes the file", async () => {

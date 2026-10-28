@@ -50,6 +50,28 @@ describe("runtime code does not name the demo app", () => {
   });
 });
 
+describe("no company name in src or template", () => {
+  const COMPANY = /learnwithparam/i;
+  // The one line is the pre-rename launchd file, kept only so install can unload it (src/daemon.ts legacyLaunchdFile).
+  const ALLOWED: Record<string, number> = { "src/daemon.ts": 1 };
+
+  test("src/** and template/** name the company only on the allow-listed line", () => {
+    // Dot directories are read too: template/.claude is shipped to other repos.
+    const counts: Record<string, number> = {};
+    for (const d of ["src", "template"]) {
+      for (const e of readdirSync(join(ROOT, d), { recursive: true, withFileTypes: true })) {
+        if (!e.isFile()) continue;
+        const file = relative(ROOT, join(e.parentPath, e.name));
+        const n = readFileSync(join(ROOT, file), "utf8")
+          .split("\n")
+          .filter((line) => COMPANY.test(line)).length;
+        if (n > 0) counts[file] = n;
+      }
+    }
+    expect(counts).toEqual(ALLOWED);
+  });
+});
+
 // The stage skills and agents run against any repo's own gate and its own
 // stack (plan v2.7.0 item 8: `proof: check` exists so a Markdown-only repo
 // never needs a test runner at all). A skill that names a stack tool by name
