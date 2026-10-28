@@ -1,5 +1,5 @@
 // An approved plan waits while an issue already building, verifying or in review names any of its
-// files, and starts once that issue merges. watch.ts calls holdForFiles where an approval starts a build.
+// files, and starts once that issue merges. Its own file because watch.ts is frozen at its quality baseline.
 
 import { isTrusted } from "./chatops";
 import type { FactoryConfig } from "./config";
@@ -36,7 +36,7 @@ export function fileHold(
 }
 
 // Serialises each approval's hold check and label write, so two approvals in one poll cannot both
-// see the other as idle. Held only for those GitHub calls, never for the build itself.
+// see the other as idle. Held through the claim (worktree setup, label write), never the build itself.
 let holdChain: Promise<unknown> = Promise.resolve();
 
 function withHoldLock<T>(fn: () => Promise<T>): Promise<T> {
@@ -56,19 +56,17 @@ async function activeFileHolders(deps: WatchDeps, config: FactoryConfig, self: n
     .map((i) => ({ number: i.number, files: planFilesOf(i) }));
 }
 
-// Returns true when the approved plan is held. `buildLabel` is the label the approval would start under.
+// "held" when another issue names one of the plan's files. Otherwise `claim` runs inside the lock, so the
+// next approval sees its label; it returns whether the start went ahead (false: setup failed).
 export async function holdForFiles(
   deps: WatchDeps,
   config: FactoryConfig,
   issue: GhIssue,
-  buildLabel: string,
-): Promise<boolean> {
+  claim: () => Promise<boolean>,
+): Promise<"held" | boolean> {
   return withHoldLock(async () => {
     const hold = fileHold(planFilesOf(issue), await activeFileHolders(deps, config, issue.number));
-    if (!hold) {
-      await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], buildLabel);
-      return false;
-    }
+    if (!hold) return claim();
     // Once per holder: the hidden marker is what later polls read back.
     const marker = `<!-- factory:hold v1 for=#${hold.number} -->`;
     if (!issue.comments.some((c) => c.body.includes(marker)))
@@ -78,6 +76,6 @@ export async function holdForFiles(
         issue.number,
         `waits for #${hold.number}, same files: ${hold.shared.join(", ")}. It starts once #${hold.number} merges.\n\n${marker}`,
       );
-    return true;
+    return "held";
   });
 }

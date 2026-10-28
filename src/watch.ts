@@ -278,24 +278,24 @@ export async function resumeAwaitingApproval(
 
   if (command.type === "cancel") return cancelRun(issue, deps, config);
   if (!edge) return "waiting";
-  const resumeAt = async (stepId: string): Promise<Outcome> => {
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval)))
-      return "needs-human";
-    if (command.type === "revise" && reply) await writeRevision(worktree, issue, reply, command.text);
-    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, issue, stepId));
+  const resumeAt = async (stepId: string, guarded = false): Promise<Outcome> => {
+    const claim = async () => {
+      if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return false;
+      if (lapsed) {
+        const note = `No maintainer commented within the window, so the factory approved the plan.`;
+        await postComment(deps, config, issue.number, note);
+      }
+      if (command.type === "revise" && reply) await writeRevision(worktree, issue, reply, command.text);
+      const next = labelOf(deps, issue, stepId);
+      await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], next);
+      return true;
+    };
+    const started = guarded ? await holdForFiles(deps, config, issue, claim) : await claim();
+    if (started === "held") return "waiting";
+    if (!started) return "needs-human";
     return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
   };
-  if (lapsed)
-    await postComment(
-      deps,
-      config,
-      issue.number,
-      `No maintainer commented within the window, so the factory approved the plan.`,
-    );
-  if (command.type === "approve") {
-    if (await holdForFiles(deps, config, issue, labelOf(deps, issue, edge.approve))) return "waiting";
-    return resumeAt(edge.approve);
-  }
+  if (command.type === "approve") return resumeAt(edge.approve, true);
   if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
   // A plain reply that is not a command: nothing to do yet.
   return "waiting";

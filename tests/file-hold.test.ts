@@ -2,13 +2,15 @@
 // files, and starts once that issue merges. Two plans in one poll must not both start.
 
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDir } from "../src/artifacts";
 import { mergeConfig } from "../src/config";
 import type { StageRunOptions, StageRunResult } from "../src/executor";
 import type { GhComment, GhIssue } from "../src/github";
+import type { Workflow } from "../src/core/workflow";
+import { parseWorkflowText } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
 import { FactoryState } from "../src/state";
 import { mergedMarker, pollOnce } from "../src/watch";
@@ -40,23 +42,29 @@ class BuildExecutor {
   }
 }
 
-// An issue awaiting approval whose plan names `files`, and a maintainer's approve after it.
-function approvedIssue(n: number, files: string[]): GhIssue {
+// An issue awaiting approval whose plan names `files`, and (unless `approve` is false) a maintainer's approve.
+function approvedIssue(n: number, files: string[], approve = true): GhIssue {
   const plan = `<!-- factory:plan v1 rev=1 -->\nPlan ${n}\n\n<!-- factory:data ${JSON.stringify({ stage: "plan", json: { files } })} -->`;
   const comments: GhComment[] = [
     { id: n * 10 + 1, author: "factory-bot", authorAssociation: "OWNER", body: plan, createdAt: nextIso() },
     { id: n * 10 + 2, author: "human", authorAssociation: "OWNER", body: "/factory approve", createdAt: nextIso() },
-  ];
+  ].slice(0, approve ? 2 : 1);
   return { ...baseIssue(n, [LABEL.awaitingApproval]), comments };
 }
 
-function setup(issues: GhIssue[]) {
+interface Opts {
+  readonly setup?: string[];
+  readonly now?: () => Date;
+  readonly workflow?: Workflow;
+}
+
+function setup(issues: GhIssue[], opts: Opts = {}) {
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   const github = new FakeGitHub(issues);
   github.roles.set("factory-bot", "admin");
   const executor = new BuildExecutor();
-  const config = mergeConfig({ repo: "acme/repo", concurrency: 2 });
+  const config = mergeConfig({ repo: "acme/repo", concurrency: 2, ...(opts.setup && { setup: opts.setup }) });
   const deps = {
     github,
     git: new FakeGit(),
@@ -66,6 +74,8 @@ function setup(issues: GhIssue[]) {
     holdoutRunner: new FakeHoldoutRunner(),
     cloneDir,
     workspacesDir,
+    ...(opts.now && { now: opts.now }),
+    ...(opts.workflow && { workflow: opts.workflow }),
   };
   const cleanup = () => {
     rmSync(workspacesDir, { recursive: true, force: true });
@@ -122,6 +132,57 @@ describe("file hold: an approved plan waits for an issue that already names its 
 
     await pollOnce(deps, config);
     expect([...executor.starts].sort()).toEqual(["build:1", "build:2"]);
+
+    cleanup();
+  });
+
+  test("a failed worktree setup leaves no building label behind to hold other issues", async () => {
+    const { deps, config, github, executor, cleanup } = setup([approvedIssue(1, ["src/a.ts"])], {
+      setup: ["false"],
+    });
+
+    await pollOnce(deps, config);
+    expect(executor.starts).toEqual([]);
+    expect(labelsOf(github, 1)).toEqual([LABEL.needsHuman]);
+
+    cleanup();
+  });
+
+  test("a held plan whose window lapsed says it approved itself only when it starts", async () => {
+    const HOUR = 3_600_000;
+    const bundled = join(import.meta.dir, "..", "template", ".factory", "workflows", "feature-to-pr.yml");
+    const parsed = parseWorkflowText(
+      readFileSync(bundled, "utf8").replace("revise: plan\n", "revise: plan\n        after: 4h\n"),
+    );
+    if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+    const lapsed = approvedIssue(2, ["src/a.ts"], false);
+    const notice = `<!-- factory:data ${JSON.stringify({ stage: "park-window", json: { step: "plan" } })} -->`;
+    const noticeAt = nextIso();
+    lapsed.comments = [
+      ...lapsed.comments,
+      {
+        id: 29,
+        author: "factory-bot",
+        authorAssociation: "OWNER",
+        body: `goes on by itself\n\n${notice}`,
+        createdAt: noticeAt,
+      },
+    ];
+    const building = { ...approvedIssue(1, ["src/a.ts"]), labels: [{ name: LABEL.building }] };
+    const now = () => new Date(Date.parse(noticeAt) + 5 * HOUR);
+    const { deps, config, github, executor, cleanup } = setup([building, lapsed], { now, workflow: parsed.workflow });
+    const said = () => github.issues.get(2)!.comments.filter((c) => c.body.includes("No maintainer commented"));
+
+    await pollOnce(deps, config);
+    await pollOnce(deps, config);
+    expect(said()).toHaveLength(0);
+    expect(holdComments(github, 2)).toHaveLength(1);
+    expect(executor.starts).toEqual([]);
+
+    github.issues.get(1)!.labels = [];
+    await pollOnce(deps, config);
+    expect(said()).toHaveLength(1);
+    expect(executor.starts).toEqual(["build:2"]);
 
     cleanup();
   });
