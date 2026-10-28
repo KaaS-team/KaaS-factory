@@ -9,6 +9,7 @@ import { missingReceipt, renderReceipt, writeRunReceipt, type RunReceiptOptions 
 import type { WatchDeps } from "./common";
 
 const RUN_DETAILS_MARKER = "<!-- factory:run-details -->";
+const NO_COMMENT_ID = "no-id";
 
 // The PR body's opening section, built by the runner from the final plan, the diff and the proof, so it
 // says what this branch does even when the pr stage's own text drifts or forgets to (#90).
@@ -41,10 +42,20 @@ export async function postRunDetails(
 ): Promise<void> {
   const key = `run-details:${config.repo}#${issueNumber}`;
   const text = `${body}\n\n${RUN_DETAILS_MARKER}`;
-  const id = Number(deps.state.getSetting(key));
-  if (id) return deps.github.editComment(config.repo, id, text);
+  const kept = deps.state.getSetting(key);
+  // A tracker that returns no comment id cannot be edited, so it keeps its first receipt rather than gaining one per retry.
+  if (kept === NO_COMMENT_ID) return;
+  const id = Number(kept);
+  // A comment someone deleted fails the edit; posting a fresh one beats failing every retry on the stale id.
+  if (id) {
+    try {
+      return await deps.github.editComment(config.repo, id, text);
+    } catch {
+      // fall through to a fresh post
+    }
+  }
   const posted = await deps.github.commentIssue(config.repo, issueNumber, text);
-  if (posted !== undefined) deps.state.setSetting(key, String(posted));
+  deps.state.setSetting(key, posted === undefined ? NO_COMMENT_ID : String(posted));
 }
 
 // What the PR body is built from, beyond the pr stage's own text. Each piece is already rendered.
