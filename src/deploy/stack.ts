@@ -8,15 +8,29 @@ import { factoryHome } from "../paths";
 const ROOT = join(import.meta.dir, "../..");
 const MIRROR_EVERY_MS = 30_000;
 
+// FACTORY_RELAY_* first; KAAS_RELAY_* still works so a deployment set up before the rename keeps its tokens.
+export function relaySettings(env: NodeJS.ProcessEnv): {
+  bin?: string;
+  addr: string;
+  publish?: string;
+  subscribe?: string;
+} {
+  return {
+    bin: env.FACTORY_RELAY_BIN ?? env.KAAS_RELAY_BIN,
+    addr: env.FACTORY_RELAY_ADDR ?? env.KAAS_RELAY_ADDR ?? "127.0.0.1:4200",
+    publish: env.FACTORY_RELAY_PUBLISH_TOKEN ?? env.KAAS_RELAY_PUBLISH_TOKEN,
+    subscribe: env.FACTORY_RELAY_SUBSCRIBE_TOKEN ?? env.KAAS_RELAY_SUBSCRIBE_TOKEN,
+  };
+}
+
 export function relayBinary(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const found = [env.KAAS_RELAY_BIN, Bun.which("kaas-relay"), join(ROOT, "relay/target/release/kaas-relay")];
+  const found = [relaySettings(env).bin, Bun.which("kaas-relay"), join(ROOT, "relay/target/release/kaas-relay")];
   return found.find((p): p is string => !!p && existsSync(p));
 }
 
 // Tokens the operator did not set are made per start; the phone's token lands in a 0600 file, never a log.
 function relayTokens(env: NodeJS.ProcessEnv): { publish: string; subscribe: string } {
-  const publish = env.KAAS_RELAY_PUBLISH_TOKEN;
-  const subscribe = env.KAAS_RELAY_SUBSCRIBE_TOKEN;
+  const { publish, subscribe } = relaySettings(env);
   if (publish && subscribe) return { publish, subscribe };
   const made = { publish: `pub-${crypto.randomUUID()}`, subscribe: `sub-${crypto.randomUUID()}` };
   const home = factoryHome(env);
@@ -32,9 +46,10 @@ function startRelayProcess(env: NodeJS.ProcessEnv): ReturnType<typeof Bun.spawn>
     console.log("factory up: no kaas-relay binary, so the relay is off (cargo build --release in relay/)");
     return undefined;
   }
-  const addr = env.KAAS_RELAY_ADDR ?? "127.0.0.1:4200";
+  const addr = relaySettings(env).addr;
   const tokens = relayTokens(env);
   const relay = Bun.spawn([bin], {
+    // relay/src/main.rs reads these names.
     env: {
       PATH: env.PATH ?? "",
       KAAS_RELAY_ADDR: addr,

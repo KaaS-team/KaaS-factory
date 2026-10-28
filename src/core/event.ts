@@ -106,7 +106,13 @@ export function parseEvent(raw: unknown): { ok: true; event: CloudEvent } | { ok
   };
 }
 
-export const EVENT_SIGNATURE_HEADER = "x-kaas-signature";
+export const EVENT_SIGNATURE_HEADER = "x-factory-signature";
+// Senders and receivers built before the rename use this name, so it is still sent and still verified.
+export const LEGACY_EVENT_SIGNATURE_HEADER = "x-kaas-signature";
+
+export function eventSignature(headers: { get(name: string): string | null }): string | null {
+  return headers.get(EVENT_SIGNATURE_HEADER) ?? headers.get(LEGACY_EVENT_SIGNATURE_HEADER);
+}
 
 // `sha256=<hex>` of HMAC-SHA256(secret, body), the same shape GitHub uses.
 export function signEvent(secret: string, body: string): string {
