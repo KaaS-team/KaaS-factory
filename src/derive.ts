@@ -125,12 +125,15 @@ export function deriveIssueState(issue: GhIssue, workflow?: Pick<Workflow, "step
     // A question marker names the stage that asked it, so a plan or build
     // that stopped to ask resumes there rather than at an earlier stage.
     // A takeover marker names the stage the operator stopped, so retry re-enters it.
-    const stageOf = (m: DataMarker): string | undefined =>
-      m.stage === "question" || m.stage === "takeover"
-        ? (m.json as { stage?: string } | undefined)?.stage
-        : markerNames.has(m.stage)
-          ? m.stage
-          : undefined;
+    // A failure names the stage that failed; an older one with no stage maps to none.
+    const stageOf = (m: DataMarker): string | undefined => {
+      if (m.stage === "question" || m.stage === "takeover") return (m.json as { stage?: string } | undefined)?.stage;
+      if (m.stage === "failure") {
+        const failed = (m.json as { stage?: string } | undefined)?.stage;
+        return failed && markerNames.has(failed) ? failed : undefined;
+      }
+      return markerNames.has(m.stage) ? m.stage : undefined;
+    };
     const last = [...markers].reverse().find((m) => stageOf(m));
     resumeStage = (last && stageOf(last)) ?? (workflow ? Object.keys(workflow.steps)[0]! : "triage");
   }

@@ -879,5 +879,6 @@
   {"name": "merge push: the refusal comment drops its stderr tail", "file": "src/merge-autonomy.ts", "find": ".slice(-PUSH_TAIL_LINES)", "replace": "", "test": "tests/merge-autonomy-push.test.ts"},
   {"name": "overlap: shared files no longer block", "file": "src/overlap.ts", "find": ".filter((o) => o.shared.length > 0);", "replace": ".filter((o) => o.shared.length < 0);", "test": "tests/overlap.test.ts"},
   {"name": "watch: a tick lists each label on its own", "file": "src/watch.ts", "find": "if (deps.github.listIssuesByLabels) return", "replace": "if (false) return", "test": "tests/scenarios.test.ts"},
-  {"name": "watch: rate-limit backoff has no 900s cap", "file": "src/watch.ts", "find": "Math.min(err.resetAt * 1000, now + MAX_BACKOFF_MS)", "replace": "err.resetAt * 1000", "test": "tests/scenarios.test.ts"}
+  {"name": "watch: rate-limit backoff has no 900s cap", "file": "src/watch.ts", "find": "Math.min(err.resetAt * 1000, now + MAX_BACKOFF_MS)", "replace": "err.resetAt * 1000", "test": "tests/scenarios.test.ts"},
+  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"}
 ]
