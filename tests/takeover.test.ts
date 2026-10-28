@@ -145,6 +145,7 @@ describe("renderRunSummary", () => {
     tokens_in: 0,
     tokens_out: 0,
     tokens_cached: 0,
+    tokens_cache_write: 0,
     cost_usd: 0.5,
     usage_complete: 1,
     exit_code: 0,

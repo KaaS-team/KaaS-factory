@@ -23,6 +23,7 @@ const run = (over: Partial<StageRun>): StageRun => ({
   tokens_in: 10,
   tokens_out: 5,
   tokens_cached: 0,
+  tokens_cache_write: 0,
   cost_usd: 0.25,
   usage_complete: 1,
   exit_code: 0,

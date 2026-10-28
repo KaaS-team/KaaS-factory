@@ -7,6 +7,8 @@ export interface TokenUsage {
   readonly tokensOut: number;
   // Cache reads, a subset of tokensIn (machinist agent.py record_usage).
   readonly tokensCached: number;
+  // Claude's cache_creation_input_tokens, also inside tokensIn; 0 without cache usage.
+  readonly tokensCacheWrite: number;
 }
 
 const count = (v: unknown): number | null => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null);
@@ -20,18 +22,22 @@ export function readUsage(raw: unknown, cache: boolean): TokenUsage | null {
   if (input === null || output === null) return null;
   let tokensIn = input;
   let cached = 0;
+  let cacheWrite = 0;
   if (cache) {
     const created = count(u.cache_creation_input_tokens);
     const read = count(u.cache_read_input_tokens);
     if (created === null || read === null) return null;
     tokensIn += created + read;
     cached = read;
+    cacheWrite = created;
   } else if (u.cached_input_tokens !== undefined) {
     const c = count(u.cached_input_tokens);
     if (c === null || c > input) return null;
     cached = c;
   }
-  return Number.isSafeInteger(tokensIn + output) ? { tokensIn, tokensOut: output, tokensCached: cached } : null;
+  return Number.isSafeInteger(tokensIn + output)
+    ? { tokensIn, tokensOut: output, tokensCached: cached, tokensCacheWrite: cacheWrite }
+    : null;
 }
 
 // True when the line's own top-level "type" is `resultType`, even if the rest

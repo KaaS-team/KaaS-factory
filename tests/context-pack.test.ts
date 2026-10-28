@@ -171,6 +171,58 @@ describe("v3.0: each stage gets only what it uses", () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
+  function labels(pack: string): string[] {
+    return [...pack.matchAll(/^### (.+)$/gm)].map((m) => m[1]!);
+  }
+
+  test("a full pack lists sections stable-first, lessons last", async () => {
+    const cwd = fullRepo();
+    writeFileSync(`${cwd}/ARCHITECTURE.md`, "Three layers.");
+    mkdirSync(`${cwd}/.claude/skills/writing`, { recursive: true });
+    writeFileSync(`${cwd}/.claude/skills/writing/SKILL.md`, "---\nname: writing\n---\nWrite plainly.");
+    mkdirSync(`${cwd}/${runDir(1)}`, { recursive: true });
+    writeFileSync(
+      `${cwd}/${runDir(1)}/plan.json`,
+      JSON.stringify({ risk: "low", revision: 1, files: ["src/foo.ts"], autoApproveEligible: true }),
+    );
+    mkdirSync(`${cwd}/src`, { recursive: true });
+    writeFileSync(`${cwd}/src/foo.ts`, "export const foo = 1;");
+    const pack = await buildContextPack("build", 1, cwd, { skills: ["writing"] });
+    expect(labels(pack)).toEqual([
+      "AGENTS.md",
+      ".factory/charter.md",
+      "ARCHITECTURE.md",
+      "skill: writing",
+      "file: src/foo.ts",
+      "lessons learned",
+    ]);
+    const plan = await buildContextPack("plan", 1, cwd);
+    expect(labels(plan)).toEqual([
+      "AGENTS.md",
+      ".factory/charter.md",
+      "ARCHITECTURE.md",
+      "repo skills index",
+      "lessons learned",
+    ]);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("over budget, lessons learned is dropped before plan files", async () => {
+    const cwd = fullRepo();
+    mkdirSync(`${cwd}/${runDir(1)}`, { recursive: true });
+    writeFileSync(
+      `${cwd}/${runDir(1)}/plan.json`,
+      JSON.stringify({ risk: "low", revision: 1, files: ["src/big.ts"], autoApproveEligible: true }),
+    );
+    mkdirSync(`${cwd}/src`, { recursive: true });
+    writeFileSync(`${cwd}/src/big.ts`, "x".repeat(MAX_CONTEXT_PACK_BYTES - 1000));
+    writeFileSync(`${cwd}/.factory/memory/lessons.md`, `- ${"y".repeat(4000)}`);
+    const pack = await buildContextPack("build", 1, cwd);
+    expect(pack).toContain("Dropped for the 64 KiB context-pack budget: lessons learned.");
+    expect(labels(pack)).toContain("file: src/big.ts");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
   test("every stage has an entry", () => {
     expect(Object.keys(STAGE_PACK).sort()).toEqual(["build", "plan", "pr", "retro", "triage", "verify"]);
   });

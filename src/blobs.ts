@@ -98,7 +98,8 @@ const STAGE_COLS = {
   killed_reason: "str?",
   session_id: "str?",
   verdict: "str?",
-} as const satisfies Record<keyof Omit<StageRun, "id">, Col>;
+  // tokens_cache_write is not mirrored yet (#115 NG-4); a mirrored row reads back 0.
+} as const satisfies Record<keyof Omit<StageRun, "id" | "tokens_cache_write">, Col>;
 // Records keyed by the union types, so tsc fails here when a stage or a status is added.
 const STAGES: Record<Stage, true> = { triage: true, plan: true, build: true, verify: true, pr: true };
 const STATUSES: Record<RunStatus, true> = {
