@@ -53,6 +53,7 @@ import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
 import { emitEvent } from "./engine/bus";
+import { settleEpic } from "./engine/epic";
 import { shipRunState } from "./engine/blobs";
 import { RateLimitError, TRUSTED_ROLES } from "./ports/scm";
 import { cachedRole, isWriter, writersOnly } from "./trust";
@@ -446,6 +447,7 @@ async function recordMerge(
   if (issue.comments.some((c) => isTrusted(c) && c.body.includes(marker))) return "waiting";
   const who = by === "human" ? "by a human on the code host" : "by the merge policy";
   await postComment(deps, config, issue.number, `PR #${prNumber} was merged ${who}.\n\n${marker}`);
+  if (config.tracker.kind === "github") await settleEpic(deps.github, config.repo, issue);
   if (by === "human") {
     await deps.github
       .closeIssue(config.repo, issue.number)

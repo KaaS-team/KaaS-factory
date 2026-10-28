@@ -143,6 +143,7 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
               tokensIn: usage.tokensIn,
               tokensOut: usage.tokensOut,
               tokensCached: usage.tokensCached,
+              tokensCacheWrite: usage.tokensCacheWrite,
               total: true,
             }
           : { kind: "usage", invalid: true },

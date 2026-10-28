@@ -9,7 +9,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/executor";
 import { artifactContract, renderPrompt, stripFrontmatter } from "../src/agents/prompt";
-import { CLAUDE_STAGE_DEFAULTS, claudeArgs } from "../src/agents/presets/claude";
+import { CLAUDE_STAGE_DEFAULTS, claudeArgs, parseStreamJsonLine } from "../src/agents/presets/claude";
+import { readUsage } from "../src/agents/usage";
+import { aggregateStageEvents } from "../src/executor";
 import { PRESETS } from "../src/agents/presets";
 import {
   COMMENT_FILENAMES,
@@ -591,5 +593,48 @@ describe("preset-less command agents", () => {
       "triage",
     );
     expect(a.preset).toBeUndefined();
+  });
+});
+
+describe("cache-write tokens", () => {
+  test("readUsage reports Claude cache creation as tokensCacheWrite, 0 for Codex", () => {
+    const claude = readUsage(
+      { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 40, cache_creation_input_tokens: 15 },
+      true,
+    )!;
+    expect([claude.tokensIn, claude.tokensCached, claude.tokensCacheWrite]).toEqual([65, 40, 15]);
+    const codex = readUsage({ input_tokens: 100, output_tokens: 20, cached_input_tokens: 80 }, false)!;
+    expect([codex.tokensIn, codex.tokensCached, codex.tokensCacheWrite]).toEqual([100, 80, 0]);
+  });
+
+  test("a Claude result line carries cache creation through the aggregate into stage_runs", () => {
+    const line = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      total_cost_usd: 0.1,
+      usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 40, cache_creation_input_tokens: 15 },
+    });
+    const result = aggregateStageEvents(parseStreamJsonLine(line), 0);
+    expect(result.tokensCacheWrite).toBe(15);
+    const state = new FactoryState(":memory:");
+    state.recordStageRun({
+      repo: "acme/widgets",
+      issue: 1,
+      stage: "build",
+      agent: "claude",
+      model: null,
+      started_at: "a",
+      finished_at: "b",
+      duration_ms: 1,
+      tool_calls: 0,
+      tokens_in: result.tokensIn,
+      tokens_out: result.tokensOut,
+      tokens_cache_write: result.tokensCacheWrite ?? 0,
+      cost_usd: 0.1,
+      exit_code: 0,
+      killed_reason: null,
+    });
+    expect(state.listStageRuns("acme/widgets")[0]!.tokens_cache_write).toBe(15);
+    state.close();
   });
 });

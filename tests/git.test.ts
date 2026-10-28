@@ -107,6 +107,22 @@ describe("Git.claim (compare-and-swap)", () => {
   });
 });
 
+describe("Git.commitPaths", () => {
+  test("commits only the named paths that changed", async () => {
+    const repo = join(tmpRoot(), "repo");
+    mkdirSync(join(repo, "src"), { recursive: true });
+    await initSeededRepo(repo);
+    writeFileSync(join(repo, "src", "a.ts"), "export const a = 1;\n");
+    writeFileSync(join(repo, "src", "b.ts"), "export const b = 1;\n");
+
+    const git = new Git(new GitCommandRunner());
+    expect(await git.commitPaths(repo, ["src/a.ts", "src/never-written.ts"], "feat: a")).toBe(true);
+    expect((await run(["git", "show", "--name-only", "--pretty=", "HEAD"], repo)).trim()).toBe("src/a.ts");
+    expect(await git.commitPaths(repo, ["src/a.ts"], "feat: again")).toBe(false);
+    expect(await run(["git", "status", "--porcelain"], repo)).toContain("src/b.ts");
+  });
+});
+
 describe("Git.commitAll", () => {
   test("commits everything except .factory/runs", async () => {
     const root = tmpRoot();
@@ -282,6 +298,41 @@ describe("Git.excludeFromSparseCheckout", () => {
     await git.excludeFromSparseCheckout(root, []);
     expect(existsSync(join(root, "README.md"))).toBe(true);
     expect(existsSync(join(root, ".git", "info", "sparse-checkout"))).toBe(false);
+  });
+});
+
+// A repo whose pre-push hook runs the full gate refused every factory push (issue #160).
+function failingPrePushHook(clone: string): void {
+  writeFileSync(join(clone, ".git", "hooks", "pre-push"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+}
+
+describe("factory pushes pass --no-verify through a failing pre-push hook", () => {
+  test("claim succeeds through a failing pre-push hook", async () => {
+    const root = tmpRoot();
+    const { clones } = await bareOriginWithClones(root, ["clone-a"]);
+    failingPrePushHook(clones[0]!);
+    expect(await new Git(new GitCommandRunner()).claim(clones[0]!, 11, "main")).toBe(true);
+  });
+
+  test("a branch push succeeds through a failing pre-push hook, and the hook really blocks a plain push", async () => {
+    const root = tmpRoot();
+    const { clones } = await bareOriginWithClones(root, ["clone-a"]);
+    const clone = clones[0]!;
+    await run(["git", "checkout", "-b", "factory/issue-12"], clone);
+    writeFileSync(join(clone, "src.ts"), "changed\n");
+    await run(["git", "add", "-A"], clone);
+    await run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-m", "change"], clone);
+    failingPrePushHook(clone);
+
+    const plain = await Bun.spawn(["git", "push", "origin", "HEAD:refs/heads/factory/issue-99"], {
+      cwd: clone,
+      stdout: "pipe",
+      stderr: "pipe",
+    }).exited;
+    expect(plain).not.toBe(0);
+
+    const pushed = await new Git(new GitCommandRunner()).push(clone, 12);
+    expect(pushed.code).toBe(0);
   });
 });
 

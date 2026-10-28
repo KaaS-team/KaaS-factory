@@ -118,7 +118,7 @@ describe("bus", () => {
   test("a sink that fails twice then succeeds gets the event exactly once, signed", async () => {
     const state = new FactoryState(":memory:");
     const c = clock();
-    const received: { body: string; sig: string | null }[] = [];
+    const received: { body: string; sig: string | null; legacy: string | null }[] = [];
     let calls = 0;
     const bus = new EventBus({
       store: state,
@@ -131,7 +131,12 @@ describe("bus", () => {
       fetch: async (_url, init) => {
         calls++;
         if (calls <= 2) return new Response("down", { status: 503 });
-        received.push({ body: String(init.body), sig: new Headers(init.headers).get(EVENT_SIGNATURE_HEADER) });
+        const headers = new Headers(init.headers);
+        received.push({
+          body: String(init.body),
+          sig: headers.get(EVENT_SIGNATURE_HEADER),
+          legacy: headers.get("x-kaas-signature"),
+        });
         return new Response(null, { status: 202 });
       },
     });
@@ -149,6 +154,7 @@ describe("bus", () => {
     expect(calls).toBe(3);
     expect(received.length).toBe(1);
     expect(verifyEvent(SECRET, received[0]!.body, received[0]!.sig)).toBe(true);
+    expect(received[0]!.legacy).toBe(received[0]!.sig);
     expect(JSON.parse(received[0]!.body)).toEqual({ ...ev, data: { pr: 7 } });
     expect(state.busDeliveries(ev.id).map((d) => [d.status, d.attempts])).toEqual([["delivered", 3]]);
   });
@@ -258,13 +264,13 @@ describe("POST /events", () => {
     data: { page: "setup" },
     ...over,
   });
-  function post(body: object, opts: { secret?: string; sig?: string; type?: string } = {}) {
+  function post(body: object, opts: { secret?: string; sig?: string; type?: string; header?: string } = {}) {
     const raw = JSON.stringify(body);
     return new Request("http://factory.example:4100/events", {
       method: "POST",
       headers: {
         "content-type": opts.type ?? "application/cloudevents+json",
-        [EVENT_SIGNATURE_HEADER]: opts.sig ?? signEvent(opts.secret ?? IN_SECRET, raw),
+        [opts.header ?? EVENT_SIGNATURE_HEADER]: opts.sig ?? signEvent(opts.secret ?? IN_SECRET, raw),
       },
       body: raw,
     });
@@ -273,6 +279,16 @@ describe("POST /events", () => {
   test("is off (404) until the inbound secret is set", async () => {
     const d = dashboardWith(undefined);
     expect((await d.dashboard.handle(post(event()), "127.0.0.1")).status).toBe(404);
+  });
+
+  test("inbound verifies x-factory-signature and the legacy x-kaas-signature, and no other header", async () => {
+    expect(EVENT_SIGNATURE_HEADER).toBe("x-factory-signature");
+    const d = dashboardWith(IN_SECRET);
+    expect((await d.dashboard.handle(post(event(), { header: "x-kaas-signature" }), OFF_BOX)).status).toBe(201);
+    expect((await d.dashboard.handle(post(event({ id: "wiki-2" })), OFF_BOX)).status).toBe(201);
+    expect(
+      (await d.dashboard.handle(post(event({ id: "wiki-3" }), { header: "x-other-signature" }), OFF_BOX)).status,
+    ).toBe(401);
   });
 
   test("a bad or missing signature is 401 and records nothing", async () => {

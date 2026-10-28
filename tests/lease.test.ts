@@ -1,10 +1,25 @@
 // The lease rule and the heartbeat. The adapters' compare-and-swap is the
 // contract in tests/ports/lease.contract.ts, run against a real bare repo.
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { GitLeases } from "../src/adapters/git-lease/lease";
 import { decodeLease, encodeLease, mayTake } from "../src/core/lease";
 import { withLease } from "../src/engine/lease";
 import { FakeLeases } from "./harness";
+
+const roots: string[] = [];
+afterEach(() => {
+  while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
+});
+
+async function run(cmd: string[], cwd: string): Promise<void> {
+  const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`${cmd.join(" ")} failed: ${await new Response(proc.stderr).text()}`);
+}
 
 describe("lease record", () => {
   test("free, own, or expired may be taken; another's live lease may not", () => {
@@ -49,5 +64,22 @@ describe("withLease", () => {
     );
     expect(lost).toBe(true);
     expect(port.log).not.toContain("release 1 me");
+  });
+});
+
+describe("GitLeases through a failing pre-push hook", () => {
+  test("acquire succeeds through a failing pre-push hook", async () => {
+    const root = mkdtempSync(join(tmpdir(), "factory-lease-"));
+    roots.push(root);
+    const bare = join(root, "origin.git");
+    mkdirSync(bare);
+    await run(["git", "init", "--bare", "-b", "main", bare], root);
+    const clone = join(root, "clone");
+    await run(["git", "clone", bare, clone], root);
+    writeFileSync(join(clone, ".git", "hooks", "pre-push"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+
+    expect(await new GitLeases(clone).acquire("1", "me", 60_000, Date.now())).toBe(true);
+    const ls = Bun.spawnSync(["git", "ls-remote", bare, "refs/factory/lease/1"], { cwd: root });
+    expect(ls.stdout.toString()).toContain("refs/factory/lease/1");
   });
 });

@@ -18,7 +18,7 @@ files inside this worktree and write the artifact files below.
   `/factory revise <text>` on the PR: a change to make this round, even if
   the plan is already built. `revision.md` beside it holds every earlier
   round; honour all of it, and stop at step 5 if it crosses a non-goal.
-- Already in your context pack: the charter, the route's skills, the plan's files.
+- Already in your context pack: the charter, the route's skills, the plan's files (not `CODING_STANDARDS.md`; the reviewer enforces it).
 - The repo skills named in the plan (`.claude/skills/<name>/SKILL.md`):
   read and follow them; they encode repo-specific rules you don't know.
 

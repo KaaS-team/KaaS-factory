@@ -8,6 +8,7 @@
 
 import {
   EVENT_SIGNATURE_HEADER,
+  LEGACY_EVENT_SIGNATURE_HEADER,
   makeEvent,
   signEvent,
   type CloudEvent,
@@ -195,12 +196,14 @@ export class EventBus {
     if (!secret) error = `${sink.secretEnv} is unset`;
     else {
       const body = JSON.stringify(rowToEvent(row));
+      const sig = signEvent(secret, body);
       try {
         const res = await this.send(sink.url, {
           method: "POST",
           headers: {
             "content-type": "application/cloudevents+json",
-            [EVENT_SIGNATURE_HEADER]: signEvent(secret, body),
+            [EVENT_SIGNATURE_HEADER]: sig,
+            [LEGACY_EVENT_SIGNATURE_HEADER]: sig,
           },
           body,
         });

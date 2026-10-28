@@ -6,6 +6,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { IDLE_RSS_BUDGET_MB, treeRssKb } from "../src/deploy/rss";
+import { relaySettings } from "../src/deploy/stack";
 
 const ROOT = join(import.meta.dir, "..");
 const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
@@ -49,6 +50,52 @@ describe("one image", () => {
 
     const pkg = JSON.parse(read("package.json")) as { name: string; bin: Record<string, string> };
     expect(pkg.bin[pkg.name]).toBe("./bin/factory");
+  });
+});
+
+describe("relay settings", () => {
+  test("FACTORY_RELAY_* wins over KAAS_RELAY_*", () => {
+    const env = {
+      FACTORY_RELAY_BIN: "/new/kaas-relay",
+      KAAS_RELAY_BIN: "/old/kaas-relay",
+      FACTORY_RELAY_ADDR: "10.0.0.2:1",
+      KAAS_RELAY_ADDR: "10.0.0.1:9",
+      FACTORY_RELAY_PUBLISH_TOKEN: "new-publish-token-16",
+      KAAS_RELAY_PUBLISH_TOKEN: "old-publish-token-16",
+      FACTORY_RELAY_SUBSCRIBE_TOKEN: "new-subscribe-token-16",
+      KAAS_RELAY_SUBSCRIBE_TOKEN: "old-subscribe-token-16",
+    };
+    expect(relaySettings(env)).toEqual({
+      bin: "/new/kaas-relay",
+      addr: "10.0.0.2:1",
+      publish: "new-publish-token-16",
+      subscribe: "new-subscribe-token-16",
+    });
+  });
+
+  test("KAAS_RELAY_* alone is still read", () => {
+    expect(
+      relaySettings({
+        KAAS_RELAY_BIN: "/old/kaas-relay",
+        KAAS_RELAY_ADDR: "10.0.0.1:9",
+        KAAS_RELAY_PUBLISH_TOKEN: "old-publish-token-16",
+        KAAS_RELAY_SUBSCRIBE_TOKEN: "old-subscribe-token-16",
+      }),
+    ).toEqual({
+      bin: "/old/kaas-relay",
+      addr: "10.0.0.1:9",
+      publish: "old-publish-token-16",
+      subscribe: "old-subscribe-token-16",
+    });
+  });
+
+  test("with neither, the address defaults and the tokens are unset", () => {
+    expect(relaySettings({})).toEqual({
+      bin: undefined,
+      addr: "127.0.0.1:4200",
+      publish: undefined,
+      subscribe: undefined,
+    });
   });
 });
 

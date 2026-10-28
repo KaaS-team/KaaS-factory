@@ -331,7 +331,11 @@ async function cmdInbox(): Promise<void> {
   }
   if (has("json")) console.log(successJson({ items }, true));
   else if (!items.length) console.log("Nothing is waiting for you.");
-  else for (const i of items) console.log(`#${i.issue} ${i.kind} (${i.actions.join("/")}): ${i.title}`);
+  else
+    for (const i of items)
+      console.log(
+        `#${i.issue} ${i.kind} (${i.actions.join("/")}): ${i.title}${i.progress ? ` [${i.progress.done}/${i.progress.total}]` : ""}`,
+      );
 }
 
 async function cmdScan(): Promise<void> {
