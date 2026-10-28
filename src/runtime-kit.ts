@@ -7,6 +7,7 @@ import { join } from "node:path";
 import type { DoctorCheck } from "./doctor";
 import type { ExecResult, ExecutionPort } from "./ports/execution";
 import { type SandboxCapabilities, SandboxUnsupported } from "./ports/sandbox";
+import { type RuntimeSpec, runtimeSpecs, runtimesFrom } from "./runtimes";
 import { sandboxProvider } from "./sandbox";
 
 export interface KitCheck {
@@ -131,6 +132,11 @@ export interface Health {
   readonly missing?: string;
 }
 
+// agent37 wakes a sleeping instance in 5 to 15 s, then writes its checkpoint: 45 s covers both.
+export function probeBudgetMs(kind: string | undefined, other = 15_000): number {
+  return kind === "agent37" ? 45_000 : other;
+}
+
 const TOOLCHAIN_BINARY: Readonly<Record<string, string>> = {
   node: "node",
   bun: "bun",
@@ -190,6 +196,17 @@ export async function probeRuntime(
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+// The probe doctor, the dashboard and `runtime list` share: the named runtime of this machine,
+// within its kind's budget (`other` for every kind but agent37).
+export function probeNamed(
+  machine: Readonly<Record<string, RuntimeSpec>> | undefined,
+  name: string,
+  other?: number,
+  probe: (port: ExecutionPort, timeoutMs: number) => Promise<Health> = probeRuntime,
+): Promise<Health> {
+  return probe(runtimesFrom(machine)[name]!, probeBudgetMs(runtimeSpecs(machine)[name]?.kind, other));
 }
 
 export function formatKit(name: string, checks: readonly KitCheck[]): string {

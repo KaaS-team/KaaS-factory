@@ -3,8 +3,7 @@
 
 import { plain } from "../src/display";
 import type { MachineBeat } from "../src/machine";
-import { type Health, probeRuntime } from "../src/runtime-kit";
-import { runtimesFrom } from "../src/runtimes";
+import { type Health, probeNamed } from "../src/runtime-kit";
 import type { DashboardProject } from "./project";
 
 // Two missed polls at the slowest default interval: a machine this quiet has stopped or lost its disk.
@@ -27,8 +26,7 @@ export function fleetView(machines: readonly (MachineBeat & { heartbeatAt: numbe
 export function healthCache(clock: () => number = Date.now) {
   const cache = new Map<string, { at: number; value: Promise<Health> }>();
   return async (project: DashboardProject, runtimes: readonly { name: string; usedBy: readonly string[] }[]) => {
-    const probe =
-      project.probe ?? ((name: string) => probeRuntime(runtimesFrom(project.machine.runtimes)[name]!, 10_000));
+    const probe = project.probe ?? ((name: string) => probeNamed(project.machine.runtimes, name, 10_000));
     const used = runtimes.filter((r) => r.usedBy.length).map((r) => r.name);
     const entries = await Promise.all(
       used.map(async (name) => {

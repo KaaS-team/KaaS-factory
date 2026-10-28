@@ -9,7 +9,7 @@ import { monthKey, poolReport } from "./core/sandbox-pool";
 import { plain } from "./display";
 import { cloudRoutine, dispatchJobs, writeActionsOutput } from "./dispatch";
 import { loadMachineConfig } from "./machine";
-import { formatKit, probeRuntime, verifyRuntime } from "./runtime-kit";
+import { formatKit, probeNamed, verifyRuntime } from "./runtime-kit";
 import { defaultRuntime, poolDbPath, runtimeSpecs, runtimesFrom } from "./runtimes";
 import { capabilitiesOf } from "./sandbox";
 
@@ -59,7 +59,7 @@ export async function cmdRuntime(cli: CliContext): Promise<void> {
         name: n,
         kind: spec.kind,
         capabilities: capabilitiesOf(spec),
-        ...(cli.has("probe") ? { health: await probeRuntime(ports[n]!) } : {}),
+        ...(cli.has("probe") ? { health: await probeNamed(machine, n) } : {}),
       })),
     );
     const warning = defaultRuntime().warning;

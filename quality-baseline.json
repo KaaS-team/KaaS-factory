@@ -127,7 +127,7 @@
     "dashboard/server.ts": 736,
     "src/agents/executor.ts": 478,
     "src/agents/structured.ts": 401,
-    "src/cli.ts": 1088,
+    "src/cli.ts": 1089,
     "src/config.ts": 770,
     "src/doctor.ts": 445,
     "src/engine/common.ts": 642,
