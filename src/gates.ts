@@ -37,10 +37,19 @@ export function parseGateLine(output: string): GateResult | undefined {
 }
 
 export class ShellGateRunner implements GateRunner {
-  constructor(private readonly exec: ExecutionPort = new LocalExecution()) {}
+  // `setup` is config.setup. A remote runtime gets a bare copy of the worktree with no installed
+  // dependencies, so its setup commands run first, in the same directory as the gates.
+  // Each entry is one simple command: they are joined with `&&`, so `||` or `;` would change precedence.
+  constructor(
+    private readonly exec: ExecutionPort = new LocalExecution(),
+    private readonly setup: readonly string[] = [],
+  ) {}
   run(worktreeDir: string) {
     const port = worktreePort(worktreeDir);
-    return this.exec.run(`${port ? `FACTORY_PORT=${port} ` : ""}bash .factory/gates.sh`, worktreeDir);
+    const gates = `${port ? `FACTORY_PORT=${port} ` : ""}bash .factory/gates.sh`;
+    const remote = !(this.exec instanceof LocalExecution);
+    const cmd = remote && this.setup.length > 0 ? [...this.setup, gates].join(" && ") : gates;
+    return this.exec.run(cmd, worktreeDir);
   }
 }
 

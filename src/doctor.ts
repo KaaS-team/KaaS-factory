@@ -36,7 +36,7 @@ export interface DoctorDeps {
   readonly readFile: (path: string) => Promise<string | undefined>;
   readonly isExecutable: (path: string) => Promise<boolean>;
   // probeRuntime over this machine's runtimes; absent, doctor checks names only.
-  readonly probeRuntime?: (runtime: string) => Promise<Health>;
+  readonly probeRuntime?: (runtime: string, bins: readonly string[]) => Promise<Health>;
 }
 
 export interface DoctorContext {
@@ -306,7 +306,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
         fixable: false,
       });
       // A name that exists can still be a box that is down.
-      if (deps.probeRuntime) checks.push(...(await probeChecks(refs, ctx.runtimeNames, deps.probeRuntime)));
+      if (deps.probeRuntime) checks.push(...(await probeChecks(refs, ctx.runtimeNames, deps.probeRuntime, config)));
     }
     const named = loaded.ok
       ? Object.values(loaded.workflow.steps).flatMap((s) => (s.mcp ?? []).map((n) => ({ step: s.id, n })))
