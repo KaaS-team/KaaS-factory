@@ -1404,31 +1404,43 @@ describe("one labels call per tick, and rate-limit backoff", () => {
     done(c);
   });
 
-  const failing = (stderr: string, header: string) =>
+  // The probe is `gh api rate_limit`: its JSON body carries each bucket's reset; `reset` undefined omits graphql's.
+  const failing = (stderr: string, reset?: number) =>
     new GitHub({
       run: async (args) =>
         args[0] === "api"
-          ? { stdout: `HTTP/2.0 200 OK\n${header}\n\n{}`, stderr: "", code: 0 }
+          ? {
+              stdout: JSON.stringify({ resources: { core: { reset: 1 }, ...(reset ? { graphql: { reset } } : {}) } }),
+              stderr: "",
+              code: 0,
+            }
           : { stdout: "", stderr, code: 1 },
     });
 
-  test("GitHub.listIssuesByLabels parses the rate-limit status and header", async () => {
-    const gh = failing("HTTP 403: API rate limit exceeded", "X-Ratelimit-Reset: 1780000000");
+  test("GitHub.listIssuesByLabels parses the rate-limit status and graphql reset", async () => {
+    const gh = failing("HTTP 403: API rate limit exceeded", 1780000000);
     const err = await gh.listIssuesByLabels("a/b", ["x"]).catch((e) => e);
     expect(err).toBeInstanceOf(RateLimitError);
     expect([err.status, err.resetAt]).toEqual([403, 1780000000]);
   });
 
-  test("403 without x-ratelimit-reset is not treated as a rate limit", async () => {
-    const err = await failing("HTTP 403: forbidden", "")
+  test("gh's GraphQL rate-limit text, with no HTTP status, is a rate limit", async () => {
+    const gh = failing("GraphQL: API rate limit already exceeded for user ID 1.", 1780000000);
+    const err = await gh.listIssuesByLabels("a/b", ["x"]).catch((e) => e);
+    expect(err).toBeInstanceOf(RateLimitError);
+    expect(err.resetAt).toBe(1780000000);
+  });
+
+  test("403 without a graphql reset is not treated as a rate limit", async () => {
+    const err = await failing("HTTP 403: API rate limit exceeded")
       .listIssuesByLabels("a/b", ["x"])
       .catch((e) => e);
     expect(err).not.toBeInstanceOf(RateLimitError);
     expect(String(err)).toContain("403");
   });
 
-  test("a 403 that is not a rate limit is rethrown even when the probe carries the header", async () => {
-    const err = await failing("HTTP 403: Resource protected by SAML enforcement", "X-Ratelimit-Reset: 1780000000")
+  test("a 403 that is not a rate limit is rethrown even when the probe carries a reset", async () => {
+    const err = await failing("HTTP 403: Resource protected by SAML enforcement", 1780000000)
       .listIssuesByLabels("a/b", ["x"])
       .catch((e) => e);
     expect(err).not.toBeInstanceOf(RateLimitError);
