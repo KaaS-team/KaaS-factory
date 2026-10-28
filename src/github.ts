@@ -74,6 +74,16 @@ function issueFrom(raw: RawIssue): GhIssue {
 
 const ISSUE_LIMIT = 500;
 
+// Epoch seconds at which the GraphQL rate-limit bucket refills, from `gh api rate_limit`'s JSON body.
+function graphqlReset(stdout: string): number | undefined {
+  try {
+    const reset = (JSON.parse(stdout) as { resources?: { graphql?: { reset?: number } } }).resources?.graphql?.reset;
+    return typeof reset === "number" ? reset : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 class GhError extends Error {
   constructor(
     args: string[],
@@ -129,17 +139,18 @@ export class GitHub implements TrackerPort, CodeHostPort {
       String(ISSUE_LIMIT),
     ]);
     if (result.code !== 0) {
+      // `gh issue list` is GraphQL, so its bucket resets at rate_limit's `graphql` entry, not the REST core one.
+      // A 403 is also what a missing scope or SAML returns, so a 403 counts only when it says "rate limit".
       const status = /HTTP (403|429)/.exec(result.stderr)?.[1];
-      // A 403 is also what a missing scope or SAML returns, and the header rides on every response.
-      if (status && (status === "429" || /rate limit/i.test(result.stderr))) {
-        const probe = await this.runner.run(["api", "--include", "rate_limit"]);
-        const reset = /^x-ratelimit-reset:\s*(\d+)/im.exec(probe.stdout)?.[1];
-        if (probe.code === 0 && reset) throw new RateLimitError(Number(status), Number(reset));
+      if (status === "429" || /rate limit/i.test(result.stderr)) {
+        const probe = await this.runner.run(["api", "rate_limit"]);
+        const reset = probe.code === 0 ? graphqlReset(probe.stdout) : undefined;
+        if (reset) throw new RateLimitError(Number(status ?? 403), reset);
       }
       throw new GhError(["issue", "list"], result);
     }
     const issues = (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
-    // The limit now caps every open issue, not each label; a full page may hide older ones.
+    // The limit now caps every open issue, not each label; a full page may hide older ones, so list per label.
     if (issues.length >= ISSUE_LIMIT) {
       const lists = await Promise.all(labels.map((l) => this.listIssuesByLabel(repo, l)));
       return new Map(labels.map((l, i) => [l, lists[i]!]));
