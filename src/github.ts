@@ -27,6 +27,7 @@ export class GhCommandRunner implements CommandRunner {
   }
 }
 
+import { RateLimitError } from "./ports/scm";
 import type {
   GhIssue,
   GhComment,
@@ -71,6 +72,18 @@ function issueFrom(raw: RawIssue): GhIssue {
   };
 }
 
+const ISSUE_LIMIT = 500;
+
+// Epoch seconds at which the GraphQL rate-limit bucket refills, from `gh api rate_limit`'s JSON body.
+function graphqlReset(stdout: string): number | undefined {
+  try {
+    const reset = (JSON.parse(stdout) as { resources?: { graphql?: { reset?: number } } }).resources?.graphql?.reset;
+    return typeof reset === "number" ? reset : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 class GhError extends Error {
   constructor(
     args: string[],
@@ -107,6 +120,46 @@ export class GitHub implements TrackerPort, CodeHostPort {
       "500",
     ]);
     return (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
+  }
+
+  // One request for every label: gh's --label filter is AND, so list the open issues once and split by label here.
+  // gh prints no headers for `issue list`, so a rate limit's reset time comes from the rate_limit endpoint.
+  async listIssuesByLabels(repo: string, labels: readonly string[]): Promise<Map<string, GhIssue[]>> {
+    const result = await this.runner.run([
+      "issue",
+      "list",
+      "--repo",
+      repo,
+      "--state",
+      "open",
+      "--json",
+      "number,title,body,labels,comments",
+      "--limit",
+      String(ISSUE_LIMIT),
+    ]);
+    if (result.code !== 0) throw (await this.rateLimitOf(result)) ?? new GhError(["issue", "list"], result);
+    const issues = (JSON.parse(result.stdout || "[]") as RawIssue[]).map(issueFrom);
+    // The limit now caps every open issue, not each label; a full page may hide older ones, so list per label.
+    if (issues.length >= ISSUE_LIMIT) {
+      try {
+        const lists = await Promise.all(labels.map((l) => this.listIssuesByLabel(repo, l)));
+        return new Map(labels.map((l, i) => [l, lists[i]!]));
+      } catch (err) {
+        throw (err instanceof GhError ? await this.rateLimitOf(err.result) : undefined) ?? err;
+      }
+    }
+    return new Map(labels.map((l) => [l, issues.filter((i) => i.labels.some((x) => x.name === l))]));
+  }
+
+  // `gh issue list` is GraphQL, so its bucket resets at rate_limit's `graphql` entry, not the REST core one.
+  // A 403 is also what a missing scope or SAML returns, so a 403 counts only when it says "rate limit".
+  // If the probe fails there is no reset time to honour, so the caller rethrows the plain error.
+  private async rateLimitOf(result: CommandResult): Promise<RateLimitError | undefined> {
+    const status = /HTTP (403|429)/.exec(result.stderr)?.[1];
+    if (status !== "429" && !/rate limit/i.test(result.stderr)) return undefined;
+    const probe = await this.runner.run(["api", "rate_limit"]);
+    const reset = probe.code === 0 ? graphqlReset(probe.stdout) : undefined;
+    return reset ? new RateLimitError(Number(status ?? 403), reset) : undefined;
   }
 
   // Includes state/stateReason (blockers.ts's only reader of either field) so

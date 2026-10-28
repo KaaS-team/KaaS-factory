@@ -89,10 +89,8 @@ describe("dispatch and routine", () => {
 
   test("dispatch lists the same labels pollOnce does", () => {
     const watch = readFileSync(join(import.meta.dir, "../src/watch.ts"), "utf8");
-    const listed = watch.slice(watch.indexOf("const [readyRaw"), watch.indexOf("const { clear: ready }"));
-    const labels = [...listed.matchAll(/listIssuesByLabel\(config\.repo, LABEL\.(\w+)\)/g)].map(
-      (m) => LABEL[m[1] as keyof typeof LABEL],
-    );
+    const listed = watch.slice(watch.indexOf("async function listWatched"), watch.indexOf("function workflowOf"));
+    const labels = [...listed.matchAll(/^\s+LABEL\.(\w+),$/gm)].map((m) => LABEL[m[1] as keyof typeof LABEL]);
     expect(labels.sort()).toEqual([...INTAKE_LABELS, ...RESUME_LABELS, LABEL.blocked].sort());
   });
 });

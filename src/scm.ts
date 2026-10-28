@@ -59,6 +59,15 @@ export class LabelMappedTracker implements TrackerPort {
   async listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]> {
     return (await this.inner.listIssuesByLabel(repo, this.out(label))).map(this.issue);
   }
+  // Present only when the inner tracker has one, so the watcher's fallback still sees a missing method.
+  get listIssuesByLabels(): TrackerPort["listIssuesByLabels"] {
+    const inner = this.inner.listIssuesByLabels?.bind(this.inner);
+    if (!inner) return undefined;
+    return async (repo, labels) => {
+      const found = await inner(repo, labels.map(this.out));
+      return new Map(labels.map((l) => [l, (found.get(this.out(l)) ?? []).map(this.issue)]));
+    };
+  }
   async getIssue(repo: string, number: number): Promise<GhIssue> {
     return this.issue(await this.inner.getIssue(repo, number));
   }
@@ -125,6 +134,9 @@ export class ComposedScm implements ScmPort {
   // ---- tracker
   listIssuesByLabel(repo: string, label: string) {
     return this.tracker.listIssuesByLabel(repo, label);
+  }
+  get listIssuesByLabels(): TrackerPort["listIssuesByLabels"] {
+    return this.tracker.listIssuesByLabels?.bind(this.tracker);
   }
   getIssue(repo: string, number: number) {
     return this.tracker.getIssue(repo, number);
