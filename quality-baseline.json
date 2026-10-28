@@ -127,15 +127,15 @@
     "dashboard/server.ts": 736,
     "src/agents/executor.ts": 478,
     "src/agents/structured.ts": 401,
-    "src/cli.ts": 1084,
+    "src/cli.ts": 1088,
     "src/config.ts": 770,
     "src/doctor.ts": 445,
     "src/engine/common.ts": 642,
-    "src/engine/steps.ts": 563,
-    "src/github.ts": 501,
+    "src/engine/steps.ts": 593,
+    "src/github.ts": 505,
     "src/receipt.ts": 459,
     "src/state.ts": 732,
-    "src/watch.ts": 849
+    "src/watch.ts": 851
   },
   "names": {
     "src/engine/common.ts": 1

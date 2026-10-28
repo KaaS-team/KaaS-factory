@@ -182,6 +182,22 @@ export class Git {
     return result.code === 0;
   }
 
+  // One task's commit: only the named paths that changed, so the history follows the plan.
+  async commitPaths(worktreeDir: string, paths: readonly string[], message: string): Promise<boolean> {
+    if (!paths.length) return false;
+    const status = await this.runner.run(["status", "--porcelain", "--", ...paths, ":!.factory/runs"], {
+      cwd: worktreeDir,
+    });
+    const dirty = status.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => l.slice(3).replace(/^.* -> /, ""));
+    if (!dirty.length) return false;
+    await this.runner.run(["add", "-A", "--", ...dirty], { cwd: worktreeDir });
+    const result = await this.runner.run(["commit", "-s", "-m", message], { cwd: worktreeDir });
+    return result.code === 0;
+  }
+
   // Regular push only; the guard hook and settings.json refuse --force and merge.
   async push(worktreeDir: string, issue: number): Promise<CommandResult> {
     return this.pushBranch(worktreeDir, this.branchName(issue));
