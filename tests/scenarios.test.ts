@@ -1459,34 +1459,27 @@ describe("one labels call per tick, and rate-limit backoff", () => {
     done(c);
   });
 
-  // The probe is `gh api rate_limit`: its JSON body carries each bucket's reset; `reset` undefined omits graphql's.
+  // The probe is `gh api rate_limit`: its JSON body carries each bucket's reset; `reset` undefined omits core's.
   const failing = (stderr: string, reset?: number) =>
     new GitHub({
       run: async (args) =>
-        args[0] === "api"
+        args.includes("rate_limit")
           ? {
-              stdout: JSON.stringify({ resources: { core: { reset: 1 }, ...(reset ? { graphql: { reset } } : {}) } }),
+              stdout: JSON.stringify({ resources: { graphql: { reset: 1 }, ...(reset ? { core: { reset } } : {}) } }),
               stderr: "",
               code: 0,
             }
           : { stdout: "", stderr, code: 1 },
     });
 
-  test("GitHub.listIssuesByLabels parses the rate-limit status and graphql reset", async () => {
-    const gh = failing("HTTP 403: API rate limit exceeded", 1780000000);
+  test("GitHub.listIssuesByLabels parses the rate-limit status and the REST reset", async () => {
+    const gh = failing("gh: API rate limit exceeded (HTTP 403)", 1780000000);
     const err = await gh.listIssuesByLabels("a/b", ["x"]).catch((e) => e);
     expect(err).toBeInstanceOf(RateLimitError);
     expect([err.status, err.resetAt]).toEqual([403, 1780000000]);
   });
 
-  test("gh's GraphQL rate-limit text, with no HTTP status, is a rate limit", async () => {
-    const gh = failing("GraphQL: API rate limit already exceeded for user ID 1.", 1780000000);
-    const err = await gh.listIssuesByLabels("a/b", ["x"]).catch((e) => e);
-    expect(err).toBeInstanceOf(RateLimitError);
-    expect(err.resetAt).toBe(1780000000);
-  });
-
-  test("403 without a graphql reset is not treated as a rate limit", async () => {
+  test("403 without a REST reset is not treated as a rate limit", async () => {
     const err = await failing("HTTP 403: API rate limit exceeded")
       .listIssuesByLabels("a/b", ["x"])
       .catch((e) => e);
@@ -1499,40 +1492,6 @@ describe("one labels call per tick, and rate-limit backoff", () => {
       .listIssuesByLabels("a/b", ["x"])
       .catch((e) => e);
     expect(err).not.toBeInstanceOf(RateLimitError);
-  });
-
-  test("a full page falls back to one listing per label", async () => {
-    const calls: string[][] = [];
-    const page = JSON.stringify(
-      Array.from({ length: 500 }, (_, i) => ({ number: i + 1, title: "", body: "", labels: [], comments: [] })),
-    );
-    const gh = new GitHub({
-      run: async (args) => {
-        calls.push(args);
-        return { stdout: args.includes("--label") ? "[]" : page, stderr: "", code: 0 };
-      },
-    });
-    const found = await gh.listIssuesByLabels("a/b", ["x", "y"]);
-    expect([...found.keys()]).toEqual(["x", "y"]);
-    expect(calls.filter((a) => a.includes("--label")).length).toBe(2);
-  });
-
-  test("a rate limit on the full-page fallback is still a RateLimitError", async () => {
-    const page = JSON.stringify(
-      Array.from({ length: 500 }, (_, i) => ({ number: i + 1, title: "", body: "", labels: [], comments: [] })),
-    );
-    const gh = new GitHub({
-      run: async (args) => {
-        if (args[0] === "api")
-          return { stdout: JSON.stringify({ resources: { graphql: { reset: 1780000000 } } }), stderr: "", code: 0 };
-        return args.includes("--label")
-          ? { stdout: "", stderr: "HTTP 403: API rate limit exceeded", code: 1 }
-          : { stdout: page, stderr: "", code: 0 };
-      },
-    });
-    const err = await gh.listIssuesByLabels("a/b", ["x"]).catch((e) => e);
-    expect(err).toBeInstanceOf(RateLimitError);
-    expect(err.resetAt).toBe(1780000000);
   });
 
   test("tick waits for nextTickAt, and webhook ticks before it are skipped", () => {

@@ -903,5 +903,10 @@
   {"name": "agnostic: a new line names the company", "file": "src/deploy/stack.ts", "find": "const MIRROR_EVERY_MS = 30_000;", "replace": "const MIRROR_EVERY_MS = 30_000; // learnwithparam", "test": "tests/app-agnostic.test.ts"},
   {"name": "retro: a mechanical violation becomes a prose rule", "file": "template/.claude/skills/factory-retro/SKILL.md", "find": "never a prose rule", "replace": "a prose rule", "test": "tests/skills.test.ts"},
   {"name": "reviewer: the standards file is not read", "file": "template/.claude/agents/factory-reviewer.md", "find": "read `CODING_STANDARDS.md` and", "replace": "read", "test": "tests/skills.test.ts"},
-  {"name": "build: the builder is told to load the standards file", "file": "template/.claude/skills/factory-build/SKILL.md", "find": " (not `CODING_STANDARDS.md`; the reviewer enforces it)", "replace": "", "test": "tests/skills.test.ts"}
+  {"name": "build: the builder is told to load the standards file", "file": "template/.claude/skills/factory-build/SKILL.md", "find": " (not `CODING_STANDARDS.md`; the reviewer enforces it)", "replace": "", "test": "tests/skills.test.ts"},
+  {"name": "rest: comments are refetched on every read", "file": "src/github-rest.ts", "find": "hit && hit.updatedAt === i.updated_at ? hit.comments : undefined", "replace": "undefined", "test": "tests/github.test.ts"},
+  {"name": "rest: a pull request counts as an issue", "file": "src/github-rest.ts", "find": ".filter((i) => !i.pull_request)", "replace": "", "test": "tests/github.test.ts"},
+  {"name": "rest: the rate limit reads the graphql bucket", "file": "src/github.ts", "find": "resources?.core?.reset", "replace": "resources?.graphql?.reset", "test": "tests/scenarios.test.ts"},
+  {"name": "rest: a not-planned close is lowercase again", "file": "src/github-rest.ts", "find": "i.state_reason.toUpperCase()", "replace": "i.state_reason", "test": "tests/github.test.ts"},
+  {"name": "rest: a changed comment count keeps the cached comments", "file": "src/github-rest.ts", "find": "hit.count === i.comments", "replace": "true", "test": "tests/github.test.ts"}
 ]
