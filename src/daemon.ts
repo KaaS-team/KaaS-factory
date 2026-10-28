@@ -3,8 +3,10 @@
 // systemd user unit on Linux. No secret goes in either file: gh and claude
 // read their own credential stores, so the unit carries only PATH and HOME.
 
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
+const LAUNCHD_PREFIX = "dev.factory.";
 
 export interface DaemonSpec {
   readonly repo: string; // owner/name
@@ -30,8 +32,20 @@ export function daemonName(repo: string): string {
 
 export function daemonFile(platform: DaemonPlatform, home: string, repo: string): string {
   return platform === "launchd"
-    ? join(home, "Library", "LaunchAgents", `com.learnwithparam.${daemonName(repo)}.plist`)
+    ? join(home, "Library", "LaunchAgents", `${LAUNCHD_PREFIX}${daemonName(repo)}.plist`)
     : join(home, ".config", "systemd", "user", `${daemonName(repo)}.service`);
+}
+
+// The label before the rename; kept only so install and uninstall unload it and a machine never runs two loops.
+export function legacyLaunchdFile(home: string, repo: string): string {
+  return join(home, "Library", "LaunchAgents", `com.learnwithparam.${daemonName(repo)}.plist`);
+}
+
+async function retireLegacy(home: string, repo: string, uid: number, runner: DaemonRunner): Promise<void> {
+  const file = legacyLaunchdFile(home, repo);
+  if (!existsSync(file)) return;
+  await runner.run(["launchctl", "bootout", `gui/${uid}`, file]); // not loaded is fine
+  rmSync(file, { force: true });
 }
 
 const xml = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -42,7 +56,7 @@ export function launchdPlist(spec: DaemonSpec): string {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key>${str(`com.learnwithparam.${daemonName(spec.repo)}`)}
+  <key>Label</key>${str(`${LAUNCHD_PREFIX}${daemonName(spec.repo)}`)}
   <key>ProgramArguments</key>
   <array>${spec.argv.map((a) => `\n    ${str(a)}`).join("")}
   </array>
@@ -123,6 +137,7 @@ export async function installDaemon(
   uid: number,
   runner: DaemonRunner,
 ): Promise<string> {
+  if (platform === "launchd") await retireLegacy(spec.home, spec.repo, uid, runner);
   const file = daemonFile(platform, spec.home, spec.repo);
   mkdirSync(dirname(file), { recursive: true });
   mkdirSync(spec.logDir, { recursive: true });
@@ -143,6 +158,7 @@ export async function uninstallDaemon(
   uid: number,
   runner: DaemonRunner,
 ): Promise<string> {
+  if (platform === "launchd") await retireLegacy(home, repo, uid, runner);
   const file = daemonFile(platform, home, repo);
   for (const cmd of daemonCommands(platform, file, uid, "uninstall")) await runner.run(cmd); // not loaded is fine
   rmSync(file, { force: true });

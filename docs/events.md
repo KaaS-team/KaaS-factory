@@ -62,8 +62,8 @@ it. An unset variable is a failed attempt that sends nothing.
 
 ## Signature
 
-`x-kaas-signature: sha256=<hex>`, where hex is HMAC-SHA256 of the raw body under the shared secret.
-The same header signs outbound deliveries and authenticates inbound ones.
+`x-factory-signature: sha256=<hex>`, where hex is HMAC-SHA256 of the raw body under the shared secret.
+Outbound deliveries send `x-kaas-signature` too, with the same value, and inbound accepts either name.
 
 ## Inbound: `POST /events`
 
