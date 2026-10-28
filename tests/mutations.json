@@ -887,5 +887,13 @@
   {"name": "mutation select: a PR runs only the touched mutations", "file": "scripts/mutation-select.ts", "find": "touched.has(m.file) ||", "replace": "true ||", "test": "tests/mutation-select.test.ts"},
   {"name": "mutation select: the runner or list change runs everything", "file": "scripts/mutation-select.ts", "find": "changed.some((f) => RUNS_ALL.has(f))", "replace": "false", "test": "tests/mutation-select.test.ts"},
   {"name": "mutations workflow: the PR job is scoped to its base", "file": ".github/workflows/mutations.yml", "find": "--base origin/{0}", "replace": "--all origin/{0}", "test": "tests/mutation-select.test.ts"},
-  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"}
+  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"},
+  {"name": "push: claim passes --no-verify", "file": "src/git.ts", "find": "\"--no-verify\", \"origin\", `${claimSha}", "replace": "\"origin\", `${claimSha}", "test": "tests/git.test.ts"},
+  {"name": "push: branch push passes --no-verify", "file": "src/git.ts", "find": "\"--no-verify\", \"origin\", `HEAD:refs/heads/${branch}", "replace": "\"origin\", `HEAD:refs/heads/${branch}", "test": "tests/git.test.ts"},
+  {"name": "leases: the lease write passes --no-verify", "file": "src/adapters/git-lease/lease.ts", "find": "\"-q\", \"--no-verify\", \"origin\"", "replace": "\"-q\", \"origin\"", "test": "tests/lease.test.ts"},
+  {"name": "failPush: URL credentials are not stripped", "file": "src/engine/failure.ts", "find": ".replace(/(\\w+:\\/\\/)[^\\s/@]+@/g, \"$1<redacted>@\")", "replace": "", "test": "tests/push-refused.test.ts"},
+  {"name": "failPush: stderr is not scrubbed", "file": "src/engine/failure.ts", "find": "scrubLine(stderr.trim(), process.env, [homedir(), worktree])", "replace": "stderr.trim()", "test": "tests/push-refused.test.ts"},
+  {"name": "failPush: the tail is not capped at 20 lines", "file": "src/engine/failure.ts", "find": "lines.slice(-20).join", "replace": "lines.join", "test": "tests/push-refused.test.ts"},
+  {"name": "failPush: the fence is always three backticks", "file": "src/engine/failure.ts", "find": "Math.max(3, ...(tail.match(/`+/g) ?? []).map((run) => run.length + 1))", "replace": "3", "test": "tests/push-refused.test.ts"},
+  {"name": "failPush: a failed tail post stops the failure", "file": "src/engine/failure.ts", "find": ".catch(() => undefined);\n  return failStage(deps, config, issue, from, \"build\"", "replace": ";\n  return failStage(deps, config, issue, from, \"build\"", "test": "tests/push-refused.test.ts"}
 ]

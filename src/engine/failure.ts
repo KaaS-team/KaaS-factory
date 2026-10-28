@@ -3,6 +3,8 @@
 // times into one hook refusal, $0.30 each, under a reason that named neither the part nor the hook.
 
 import { createHash } from "node:crypto";
+import { homedir } from "node:os";
+import { scrubLine } from "../agents/record";
 import type { FactoryConfig } from "../config";
 import { parseDataMarkers } from "../derive";
 import type { Refusal, StageName, StageRunResult } from "../executor";
@@ -99,6 +101,27 @@ export async function failStage(
     json: { stage, fingerprint, inputs: inputsOf(deps, config, issue) },
   });
   return "failed";
+}
+
+// A refused push: git's last 20 lines on the thread, scrubbed of credentials (a remote URL can carry a token)
+// and local paths, then the failure. A failed post must not keep failStage from parking the issue.
+export async function failPush(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  from: string,
+  worktree: string,
+  stderr: string,
+): Promise<"failed"> {
+  const lines = scrubLine(stderr.trim(), process.env, [homedir(), worktree])
+    .replace(/(\w+:\/\/)[^\s/@]+@/g, "$1<redacted>@")
+    .split("\n");
+  const tail = lines.slice(-20).join("\n");
+  // Longer than any backtick run in the tail, so stderr cannot close the fence early.
+  const fence = "`".repeat(Math.max(3, ...(tail.match(/`+/g) ?? []).map((run) => run.length + 1)));
+  if (lines.some(Boolean))
+    await postComment(deps, config, issue.number, `${fence}\n${tail}\n${fence}`).catch(() => undefined);
+  return failStage(deps, config, issue, from, "build", `push_refused: ${lines.at(-1) ?? ""}`);
 }
 
 // The fingerprint the last two failures share, when nothing an operator could have fixed changed since.
