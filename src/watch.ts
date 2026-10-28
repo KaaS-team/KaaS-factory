@@ -793,7 +793,10 @@ export function startWatch(
         if (nextTickAt !== undefined && !stopped) arm(tickDelay(intervalMs, nextTickAt, now()));
         onTick?.(result);
       })
-      .catch((err) => console.error("factory watch: poll failed", err));
+      .catch((err) => {
+        nextTickAt = undefined;
+        console.error("factory watch: poll failed", err);
+      });
     arm(intervalMs);
   }
 
