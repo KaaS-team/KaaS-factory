@@ -169,7 +169,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
       machineGateway(machineConfig),
       tokenEnvNames(config, machineConfig),
     ),
-    gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
+    gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"], config.setup),
     holdoutRunner: new ShellHoldoutRunner(),
     rechecker: new DiffAnchorRechecker(),
     proofGit: new ShellProofGit(),
@@ -456,7 +456,7 @@ async function cmdDoctor(): Promise<void> {
       versionOf,
       fileExists,
       readFile: async (path) => ((await fileExists(path)) ? await Bun.file(path).text() : undefined),
-      probeRuntime: (name) => probeRuntime(runtimesFrom(loadMachineConfig().runtimes)[name]!, 10_000),
+      probeRuntime: (name, bins) => probeRuntime(runtimesFrom(loadMachineConfig().runtimes)[name]!, 10_000, bins),
       isExecutable: async (path) => {
         try {
           accessSync(path, constants.X_OK);

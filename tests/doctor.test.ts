@@ -5,10 +5,15 @@
 // jq (which gates.sh and the CI workflow assume). Audit findings #13.
 
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fixDoctor, runDoctor, type DoctorDeps } from "../src/doctor";
 import { GitHub, type CommandResult, type CommandRunner } from "../src/github";
 import { LABELS, labelsFor } from "../src/labels";
 import { parseWorkflowText } from "../src/engine/workflows";
+import { probeRuntime } from "../src/runtime-kit";
+import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 
 class FakeGitHub extends GitHub {
   constructor(private readonly auth: { ok: boolean; detail: string }) {
@@ -480,6 +485,48 @@ describe("doctor: mcp: servers", () => {
         cs.find((c) => c.name.startsWith("every mcp:")),
       ),
     ).toBeUndefined();
+  });
+});
+
+// Runs each command in real bash whose PATH holds only bash, so `command -v jq` finds nothing, as on a bare runtime.
+const barePath = mkdtempSync(join(tmpdir(), "factory-bare-"));
+symlinkSync("/bin/bash", join(barePath, "bash"));
+class BarePathPort implements ExecutionPort {
+  async run(cmd: string, cwd: string): Promise<ExecResult> {
+    const proc = Bun.spawn(["/bin/bash", "-c", cmd], {
+      cwd,
+      env: { PATH: barePath },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    return { stdout, stderr, code };
+  }
+}
+
+describe("doctor: runtime toolchain binaries", () => {
+  const flow =
+    "name: m\nsteps:\n  l: { uses: check, label: factory:linting, run: make lint, runtime: a37, next: p }\n  p: { uses: pr, label: factory:in-review }\n";
+  const reading: DoctorDeps = {
+    ...deps(),
+    readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : undefined),
+  };
+  const row = async (port: ExecutionPort) =>
+    (
+      await runDoctor(
+        { ...reading, probeRuntime: (_name, bins) => probeRuntime(port, 10_000, bins) },
+        { ...ctx, workflow: "m", runtime: { gates: "a37" }, runtimeNames: ["local", "a37"] },
+      )
+    ).find((c) => c.name === "runtime a37 answers")!;
+
+  test("a runtime without jq fails its row, naming the binary", async () => {
+    const check = await row(new BarePathPort());
+    expect(check.ok).toBe(false);
+    expect(check.detail).toBe("jq not found on runtime a37");
   });
 });
 
