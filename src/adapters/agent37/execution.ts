@@ -43,7 +43,13 @@ function fail(stderr: string): ExecResult {
 
 // A sleeping instance answers 409 while it writes its checkpoint and 503 after a host move.
 // Five waits, 31 s in all, cover a wake; the main command is never sent twice.
-const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
+// The budget is shared by every retrying exec of one run(), so a flapping instance cannot stall it
+// for minutes; tests shrink both.
+export interface RetryTiming {
+  readonly backoffMs: readonly number[];
+  readonly budgetMs: number;
+}
+const RETRY: RetryTiming = { backoffMs: [1_000, 2_000, 4_000, 8_000, 16_000], budgetMs: 60_000 };
 
 function tryAgain(status: number, text: string): boolean {
   if (status !== 409 && status !== 503) return false;
@@ -74,6 +80,7 @@ export class Agent37Execution implements ExecutionPort {
   constructor(
     private readonly spec: Agent37Spec,
     private readonly env: NodeJS.ProcessEnv = process.env,
+    private readonly retry: RetryTiming = RETRY,
   ) {}
 
   private get where(): string {
@@ -81,8 +88,13 @@ export class Agent37Execution implements ExecutionPort {
   }
 
   // One exec; a string is a runtime failure, an object is the command's answer.
-  // Only `retry` execs wait out a try_again; the main command runs once.
-  private async exec(token: string, command: string, signal?: AbortSignal, retry = true): Promise<ExecResult | string> {
+  // Only an exec given `retries` waits out a try_again; the main command and the cleanup run once.
+  private async exec(
+    token: string,
+    command: string,
+    signal?: AbortSignal,
+    retries?: { spent: number },
+  ): Promise<ExecResult | string> {
     const url = `${this.spec.url ?? AGENT37_URL}/v1/instances/${this.spec.instance}/exec`;
     for (let wait = 0; ; wait++) {
       let res: Response;
@@ -101,8 +113,15 @@ export class Agent37Execution implements ExecutionPort {
         if (signal?.aborted) return `${this.where}: cut off (${String(signal.reason)})`;
         return `${this.where} unreachable: ${err instanceof Error ? err.message : String(err)}`;
       }
-      if (retry && wait < BACKOFF_MS.length && tryAgain(res.status, text)) {
-        if (!(await pause(BACKOFF_MS[wait]!, signal))) return `${this.where}: cut off (${String(signal?.reason)})`;
+      const delay = this.retry.backoffMs[wait];
+      if (
+        retries &&
+        delay !== undefined &&
+        retries.spent + delay <= this.retry.budgetMs &&
+        tryAgain(res.status, text)
+      ) {
+        retries.spent += delay;
+        if (!(await pause(delay, signal))) return `${this.where}: cut off (${String(signal?.reason)})`;
         continue;
       }
       if (!res.ok) return `${this.where} answered ${res.status}: ${text.slice(0, 500)}`;
@@ -129,20 +148,31 @@ export class Agent37Execution implements ExecutionPort {
     if (tarCode !== 0) return fail(`packing the worktree failed:\n${tarErr}`);
     const b64 = Buffer.from(archive).toString("base64");
     const dir = `${this.spec.root ?? "/tmp/factory"}/${crypto.randomUUID()}`;
-    const setup = await this.exec(token, `mkdir -p ${quote(dir)} && : > ${quote(`${dir}.b64`)}`, signal);
+    const retries = { spent: 0 };
+    const setup = await this.exec(token, `mkdir -p ${quote(dir)} && : > ${quote(`${dir}.b64`)}`, signal, retries);
     if (typeof setup === "string") return fail(setup);
     if (setup.code !== 0) return fail(`${this.where}: making ${dir} failed:\n${setup.stderr}`);
     try {
       for (let i = 0; i < b64.length; i += CHUNK) {
         // Base64 has no quote in it, so a chunk goes in single quotes as is.
-        const r = await this.exec(token, `printf %s '${b64.slice(i, i + CHUNK)}' >> ${quote(`${dir}.b64`)}`, signal);
+        const r = await this.exec(
+          token,
+          `printf %s '${b64.slice(i, i + CHUNK)}' >> ${quote(`${dir}.b64`)}`,
+          signal,
+          retries,
+        );
         if (typeof r === "string") return fail(r);
         if (r.code !== 0) return fail(`${this.where}: sending the worktree failed:\n${r.stderr}`);
       }
-      const unpack = await this.exec(token, `base64 -d < ${quote(`${dir}.b64`)} | tar -xzf - -C ${quote(dir)}`, signal);
+      const unpack = await this.exec(
+        token,
+        `base64 -d < ${quote(`${dir}.b64`)} | tar -xzf - -C ${quote(dir)}`,
+        signal,
+        retries,
+      );
       if (typeof unpack === "string") return fail(unpack);
       if (unpack.code !== 0) return fail(`${this.where}: unpacking the worktree failed:\n${unpack.stderr}`);
-      const r = await this.exec(token, `cd ${quote(dir)} && bash -c ${quote(cmd)}`, signal, false);
+      const r = await this.exec(token, `cd ${quote(dir)} && bash -c ${quote(cmd)}`, signal);
       return typeof r === "string" ? fail(r) : r;
     } finally {
       // Best effort: a cut-off run's directory is left for the next boot's /tmp.

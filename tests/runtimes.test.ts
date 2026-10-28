@@ -17,7 +17,7 @@ import { configProblems } from "../src/config";
 import { framed, shq, unframe } from "../src/core/frame";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { loadMachineConfig } from "../src/machine";
-import { probeBudgetMs } from "../src/runtime-kit";
+import { probeBudgetMs, probeNamed } from "../src/runtime-kit";
 import { BUILTIN_RUNTIMES, runtimeProblems, runtimeRefs, runtimesFrom, unknownRuntimes } from "../src/runtimes";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -389,10 +389,77 @@ describe("agent37", () => {
     }
   }, 20_000);
 
-  test("the agent37 probe waits up to 45 s for a wake; every other kind keeps 15 s", () => {
+  const fast = { backoffMs: [5, 5], budgetMs: 1_000 };
+
+  test("when every retry is answered try_again, the run fails with that answer", async () => {
+    const box = startAgent37("k", "i1", { busyFirst: 10 });
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-spent-"));
+    try {
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }, fast).run("echo ok", dir());
+      expect(r.code).toBe(1);
+      expect(r.runtimeFailed).toStartWith("agent37 i1 answered 409:");
+      expect(box.commands.filter((c) => c.startsWith("mkdir ")).length).toBe(3);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("a wait is cut short by the signal", async () => {
+    const box = startAgent37("k", "i1", { busyFirst: 10 });
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-abort-"));
+    try {
+      const slow = { backoffMs: [60_000], budgetMs: 60_000 };
+      const start = Date.now();
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }, slow).run(
+        "echo ok",
+        dir(),
+        AbortSignal.timeout(300),
+      );
+      expect(r.runtimeFailed).toStartWith("agent37 i1: cut off");
+      expect(Date.now() - start).toBeLessThan(5_000);
+      expect(box.commands.filter((c) => c.startsWith("mkdir ")).length).toBe(1);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("the retry budget is one per run, not one per exec", async () => {
+    const box = startAgent37("k", "i1", { busyFirst: 2, busyOn: { prefix: "base64 -d", times: 1 } });
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-shared-"));
+    try {
+      const tight = { backoffMs: [10, 10, 10], budgetMs: 25 };
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }, tight).run("echo ok", dir());
+      expect(r.runtimeFailed).toStartWith("agent37 i1 answered 409:");
+      expect(box.commands.filter((c) => c.startsWith("base64 -d")).length).toBe(1);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("the cleanup is not retried, so a finished run returns at once", async () => {
+    const box = startAgent37("k", "i1", { busyOn: { prefix: "rm -rf", times: 1 } });
+    const root = mkdtempSync(join(tmpdir(), "factory-a37-clean-"));
+    try {
+      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      expect(r).toEqual({ stdout: "ok\n", stderr: "", code: 0 });
+      expect(box.commands.filter((c) => c.startsWith("rm -rf")).length).toBe(1);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("the probe a caller runs gives agent37 45 s and every other kind its own budget", async () => {
+    const machine = { a37: { kind: "agent37", instance: "i1", tokenEnv: "K" } } as const;
+    const budgets: number[] = [];
+    const probe = async (_port: unknown, ms: number) => {
+      budgets.push(ms);
+      return { ok: true, ms: 0, detail: "answered" };
+    };
+    await probeNamed(machine, "a37", 10_000, probe);
+    await probeNamed(machine, "local", 10_000, probe);
+    await probeNamed(machine, "local", undefined, probe);
+    expect(budgets).toEqual([45000, 10000, 15000]);
     expect(probeBudgetMs("agent37")).toBe(45000);
-    expect(probeBudgetMs("local")).toBe(15000);
-    expect(probeBudgetMs(undefined)).toBe(15000);
   });
 
   test("machine.json: instance and tokenEnv are required, the url is https or loopback", () => {

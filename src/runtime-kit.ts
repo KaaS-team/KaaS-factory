@@ -7,6 +7,7 @@ import { join } from "node:path";
 import type { DoctorCheck } from "./doctor";
 import type { ExecResult, ExecutionPort } from "./ports/execution";
 import { type SandboxCapabilities, SandboxUnsupported } from "./ports/sandbox";
+import { type RuntimeSpec, runtimeSpecs, runtimesFrom } from "./runtimes";
 import { sandboxProvider } from "./sandbox";
 
 export interface KitCheck {
@@ -130,22 +131,20 @@ export interface Health {
 }
 
 // agent37 wakes a sleeping instance in 5 to 15 s, then writes its checkpoint: 45 s covers both.
-export function probeBudgetMs(kind: string | undefined): number {
-  return kind === "agent37" ? 45_000 : 15_000;
+export function probeBudgetMs(kind: string | undefined, other = 15_000): number {
+  return kind === "agent37" ? 45_000 : other;
 }
 
-// Reachability, not correctness: one trivial command in an empty directory, within `timeoutMs`
-// (default: the budget for `kind`).
-export async function probeRuntime(port: ExecutionPort, timeoutMs?: number, kind?: string): Promise<Health> {
-  const budget = timeoutMs ?? probeBudgetMs(kind);
+// Reachability, not correctness: one trivial command in an empty directory, within `timeoutMs`.
+export async function probeRuntime(port: ExecutionPort, timeoutMs = 15_000): Promise<Health> {
   const dir = mkdtempSync(join(tmpdir(), "factory-probe-"));
   const start = Date.now();
   try {
     const r = await within(
       port
-        .run("echo factory-probe-ok", dir, AbortSignal.timeout(budget))
+        .run("echo factory-probe-ok", dir, AbortSignal.timeout(timeoutMs))
         .catch((e: unknown): ExecResult => ({ stdout: "", stderr: "", code: 1, runtimeFailed: String(e) })),
-      budget,
+      timeoutMs,
     );
     const ok = r.code === 0 && r.stdout.includes("factory-probe-ok");
     const why = r.runtimeFailed ?? (r.stderr.trim().split("\n")[0] || `exit ${r.code}`);
@@ -153,6 +152,17 @@ export async function probeRuntime(port: ExecutionPort, timeoutMs?: number, kind
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+// The probe doctor, the dashboard and `runtime list` share: the named runtime of this machine,
+// within its kind's budget (`other` for every kind but agent37).
+export function probeNamed(
+  machine: Readonly<Record<string, RuntimeSpec>> | undefined,
+  name: string,
+  other?: number,
+  probe: (port: ExecutionPort, timeoutMs: number) => Promise<Health> = probeRuntime,
+): Promise<Health> {
+  return probe(runtimesFrom(machine)[name]!, probeBudgetMs(runtimeSpecs(machine)[name]?.kind, other));
 }
 
 export function formatKit(name: string, checks: readonly KitCheck[]): string {

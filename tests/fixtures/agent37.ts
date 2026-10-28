@@ -3,11 +3,13 @@
 // and refuse a body over 128 KB the way the real one does. Tests start it
 // on a free loopback port. `busyFirst` answers the first N requests 409
 // try_again, as a sleeping instance does while it writes its checkpoint;
+// `busyOn` does the same for the first `times` commands that start with `prefix`;
 // `mainFails` answers every `bash -c` command with the given status, so a
 // test can see whether the adapter sent it again.
 
 export interface Agent37Options {
   readonly busyFirst?: number;
+  readonly busyOn?: { readonly prefix: string; readonly times: number };
   readonly mainFails?: { readonly status: number; readonly code?: string };
 }
 
@@ -19,6 +21,7 @@ export function startAgent37(
   const commands: string[] = [];
   const keys: Array<string | null> = [];
   let busyLeft = opts.busyFirst ?? 0;
+  let busyOnLeft = opts.busyOn?.times ?? 0;
   const server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
@@ -32,6 +35,10 @@ export function startAgent37(
       commands.push(command);
       if (busyLeft > 0) {
         busyLeft -= 1;
+        return Response.json({ error: { code: "try_again" } }, { status: 409 });
+      }
+      if (opts.busyOn && busyOnLeft > 0 && command.startsWith(opts.busyOn.prefix)) {
+        busyOnLeft -= 1;
         return Response.json({ error: { code: "try_again" } }, { status: 409 });
       }
       if (opts.mainFails && command.includes("bash -c")) {
