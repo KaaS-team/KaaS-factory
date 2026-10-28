@@ -93,7 +93,7 @@ export interface ReceiptInput {
   readonly runs: readonly StageRun[];
   // Raw bytes of each run-dir file the predicate stands on, hashed so the receipt pins them.
   readonly files: Readonly<Record<string, string>>;
-  // Off when config.prRunSummary is off: the receipt then carries no model or spend.
+  // Off drops model and spend; the pr step always passes false, since the receipt is posted on the issue.
   readonly operatorDetail: boolean;
 }
 

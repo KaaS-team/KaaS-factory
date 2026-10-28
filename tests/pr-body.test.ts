@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderPlanAcceptance } from "../src/acceptance";
-import { prBody, renderWhatChanged } from "../src/engine/pr-body";
-import { buildStatement, decodeStatement, envelopeFromBody, renderReceipt, unsignedEnvelope } from "../src/receipt";
+import { mergeConfig } from "../src/config";
+import type { WatchDeps } from "../src/engine/common";
+import { issueRef, postRunDetails, prBody, renderRunDetails, renderWhatChanged } from "../src/engine/pr-body";
+import {
+  buildStatement,
+  decodeStatement,
+  envelopeFromBody,
+  renderReceipt,
+  sealRunFiles,
+  unsignedEnvelope,
+} from "../src/receipt";
+import { ShellSetupRunner } from "../src/setup";
 import type { StageRun } from "../src/state";
 import { visibleLeaks } from "./harness";
 
@@ -63,7 +74,7 @@ function finishedBody(): string {
   return prBody("Why: users could not see the price.\n\nCloses #7", {
     whatChanged: renderWhatChanged(plan.goal, ["src/a.ts"], proof),
     acceptance: renderPlanAcceptance(plan, [{ id: "AC-1", status: "pass" }], undefined),
-    runDetails: true,
+    runDetails: issueRef(mergeConfig({ repo: "o/r" }), 7),
   });
 }
 
@@ -89,7 +100,13 @@ describe("a PR body built from a finished run", () => {
     const body = finishedBody();
     expect(body).not.toMatch(/[A-Za-z0-9+/=]{40,}/);
     expect(body).not.toContain("Envelope for kaas-verify");
-    expect(body).toContain("run-details comment on the issue");
+    expect(body).toContain("run-details comment on #7");
+  });
+
+  test("a non-GitHub tracker's issue is named without a #, which GitHub would link to its own issue", () => {
+    const http = { tracker: { kind: "http" } } as Parameters<typeof issueRef>[0];
+    expect(prBody("x", { runDetails: issueRef(http, 7) })).toContain("comment on tracker issue 7.");
+    expect(issueRef(http, 7)).not.toContain("#");
   });
 });
 
@@ -108,19 +125,46 @@ describe("the run-details comment", () => {
     expect(receipt(1)).toContain("Proven: 1 of 1 criteria.");
   });
 
-  test("the posted receipt drops model and spend even with prRunSummary on", () => {
-    // The pr step's worktree has no git in tests, so the call that builds the envelope is read, not run.
-    const step = readFileSync(join(import.meta.dir, "../src/engine/steps.ts"), "utf8");
-    expect(step).toMatch(/operatorDetail: false/);
-    expect(step).not.toMatch(/operatorDetail: config\.prRunSummary/);
-    const posted = decodeStatement(unsignedEnvelope(statement(false))).predicate.steps;
-    expect(posted.every((s) => s.model === null && s.costUsd === null)).toBe(true);
+  test("the posted receipt drops model and spend, built from a real worktree", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "factory-run-details-"));
+    const sh = (cmd: string) =>
+      Bun.spawnSync(["sh", "-c", cmd], { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
+    sh(
+      "git init -q -b main && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base && git update-ref refs/remotes/origin/main HEAD",
+    );
+    const dir = ".factory/runs/issue-7";
+    mkdirSync(join(repo, dir), { recursive: true });
+    const exec = new ShellSetupRunner();
+    const text = await renderRunDetails(exec, {
+      worktree: repo,
+      runDir: dir,
+      repo: "o/r",
+      issue: 7,
+      base: "main",
+      runs,
+      holdoutRequired: false,
+      seal: await sealRunFiles(exec, repo, dir),
+    });
+    rmSync(repo, { recursive: true, force: true });
+    const steps = decodeStatement(envelopeFromBody(text)!).predicate.steps;
+    expect(steps.length).toBe(runs.length);
+    expect(steps.every((s) => s.model === null && s.costUsd === null)).toBe(true);
+    expect(text).not.toMatch(/\$|claude-|gpt-/);
   });
 
-  test("the comment is posted before the PR opens, so the body's pointer is true", () => {
-    const step = readFileSync(join(import.meta.dir, "../src/engine/steps.ts"), "utf8");
-    expect(step.indexOf("await postComment(deps, config, issueNumber, receipt)")).toBeLessThan(
-      step.indexOf("await deps.github.createPr("),
-    );
+  test("posting twice edits the one comment, so a retry or a revise leaves no duplicate", async () => {
+    const settings = new Map<string, string>();
+    const calls: string[] = [];
+    const deps = {
+      state: { getSetting: (k: string) => settings.get(k), setSetting: (k: string, v: string) => settings.set(k, v) },
+      github: {
+        commentIssue: async () => (calls.push("post"), 9),
+        editComment: async (_r: string, id: number) => void calls.push(`edit ${id}`),
+      },
+    } as unknown as WatchDeps;
+    const config = mergeConfig({ repo: "o/r" });
+    await postRunDetails(deps, config, 7, "## Receipt");
+    await postRunDetails(deps, config, 7, "## Receipt");
+    expect(calls).toEqual(["post", "edit 9"]);
   });
 });

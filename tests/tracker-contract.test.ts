@@ -195,7 +195,7 @@ describe("end to end on an http tracker", () => {
       workspacesDir,
       bus,
     };
-    await pollOnce(deps, mergeConfig({ repo }));
+    await pollOnce(deps, mergeConfig({ repo, tracker: spec }));
     return { repo, n, host, state, deps };
   }
 
