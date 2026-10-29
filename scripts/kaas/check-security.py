@@ -36,7 +36,7 @@ INSTALL = "brew install gitleaks semgrep osv-scanner; npm i -g squawk-cli"
 
 
 def git(*args: str) -> str:
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True).stdout
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, errors="replace").stdout
 
 
 def base() -> str:
