@@ -927,5 +927,6 @@
   {"name": "team policy: looser value wins", "file": "src/team/resolve.ts", "find": "export const stricter = (a: boolean, b: boolean): boolean => a === false || b === false ? false : a;", "replace": "export const stricter = (a: boolean, b: boolean): boolean => a;", "test": "tests/team-resolve.test.ts"},
   {"name": "team hash: keys not sorted", "file": "src/team/hash.ts", "find": ".sort()", "replace": "", "test": "tests/team-hash.test.ts"},
   {"name": "team apply: org auto_merge false ignored", "file": "src/team/apply.ts", "find": "p.auto_merge?.allowed === false && config.merge.policy === \"auto\"", "replace": "false", "test": "tests/team-wiring.test.ts"},
-  {"name": "config hash: runs column never added", "file": "src/state.ts", "find": "[\"runs\", \"config_hash\", \"TEXT\"],", "replace": "", "test": "tests/config-hash-stamp.test.ts"}
+  {"name": "config hash: runs column never added", "file": "src/state.ts", "find": "[\"runs\", \"config_hash\", \"TEXT\"],", "replace": "", "test": "tests/config-hash-stamp.test.ts"},
+  {"name": "explain: origin always builtin", "file": "src/team/explain.ts", "find": "(${applied.resolved.origin[key]})", "replace": "(builtin)", "test": "tests/team-explain.test.ts"}
 ]
