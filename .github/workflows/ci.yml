@@ -33,6 +33,12 @@ jobs:
         if: github.event_name == 'pull_request'
         run: bun scripts/dco.ts "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
 
+      - name: The PR body follows the template (CONTRIBUTING.md)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bun scripts/check-pr-body.ts
+
       - name: Install uv (for skills-ref validate)
         uses: astral-sh/setup-uv@v3
 
