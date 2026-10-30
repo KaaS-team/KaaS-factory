@@ -8,6 +8,7 @@ import type { WatchDeps } from "./engine/common";
 import { monthKey, poolReport } from "./core/sandbox-pool";
 import { plain } from "./display";
 import { cloudRoutine, dispatchJobs, writeActionsOutput } from "./dispatch";
+import { RUNNER_VERSION } from "./version";
 import { loadMachineConfig } from "./machine";
 import { formatKit, probeNamed, verifyRuntime } from "./runtime-kit";
 import { defaultRuntime, poolDbPath, runtimeSpecs, runtimesFrom } from "./runtimes";
@@ -96,11 +97,10 @@ export async function cmdDispatch(cli: CliContext): Promise<void> {
 // `factory routine`: the Claude Code cloud routine (name, cron, prompt) that runs `factory tick`.
 export async function cmdRoutine(cli: CliContext): Promise<void> {
   const repo = cli.flag("repo") ?? (await loadConfig(await cli.resolveCloneDir())).repo;
-  const pkg = (await Bun.file(new URL("../package.json", import.meta.url)).json()) as { version: string };
   const routine = cloudRoutine({
     repo,
     runnerRepo: cli.flag("runner-repo") ?? "KaaS-team/KaaS-factory",
-    runnerRef: cli.flag("runner-ref") ?? `v${pkg.version}`,
+    runnerRef: cli.flag("runner-ref") ?? `v${RUNNER_VERSION}`,
     cron: cli.flag("cron"),
   });
   if (cli.has("json")) return void console.log(successJson(routine, true));

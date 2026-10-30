@@ -2,11 +2,13 @@
 // bin/factory imports this file. Thin dispatcher; the logic lives in the other src/ modules so it
 // stays testable without a child process.
 
-import { accessSync, constants, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
-import { join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import type { ScmPort } from "./github";
 import { makeScm } from "./scm";
+import { templateSkills } from "./template-root";
+import { RUNNER_VERSION } from "./version";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { tokenEnvNames } from "./agents/env";
@@ -406,21 +408,6 @@ async function cmdRebaseline(): Promise<void> {
     `factory rebaseline${dryRun ? " --dry-run" : ""}: ${config.baselineTag} -> origin/${config.base} (${moved.length} commit(s))`,
   );
   for (const c of moved) console.log(`  ${c}`);
-}
-
-// The skills this runner ships, keyed by their path in a target repo.
-function templateSkills(): Record<string, string> {
-  const root = resolve(import.meta.dir, "..", "template");
-  const out: Record<string, string> = {};
-  const walk = (dir: string): void => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, e.name);
-      if (e.isDirectory()) walk(full);
-      else out[relative(root, full)] = readFileSync(full, "utf8");
-    }
-  };
-  walk(join(root, ".claude", "skills"));
-  return out;
 }
 
 async function cmdDoctor(): Promise<void> {
@@ -907,7 +894,9 @@ async function cmdReceipt(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  switch (command) {
+  switch (command === "--version" ? "version" : command) {
+    case "version":
+      return void console.log(RUNNER_VERSION);
     case "up":
       return flag("repo") || flag("repo-dir") ? cmdUp() : (await import("./deploy/stack")).startStack(cmdDashboard);
     case "init":

@@ -8,6 +8,7 @@ import { loadConfig, repoFromRemoteUrl } from "./config";
 import { fixDoctor } from "./doctor";
 import { describeStack, initConfig, isFilledIn, writeCharter } from "./init";
 import { installTemplate } from "./install-template";
+import { templateDir } from "./template-root";
 import { makeScm } from "./scm";
 import { detectStack, diskFiles } from "./stack";
 import { workflowFor } from "./engine/workflows";
@@ -66,9 +67,10 @@ export async function cmdInit(cli: CliContext): Promise<void> {
   }
   const remote = Bun.spawnSync(["git", "remote", "get-url", "origin"], { cwd: dir });
   const repo = remote.exitCode === 0 ? repoFromRemoteUrl(remote.stdout.toString().trim()) : undefined;
-  const example = JSON.parse(
-    readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "config.example.json"), "utf8"),
-  ) as Record<string, unknown>;
+  const example = JSON.parse(readFileSync(join(templateDir(), ".factory", "config.example.json"), "utf8")) as Record<
+    string,
+    unknown
+  >;
   const text = `${JSON.stringify(initConfig(example, stack, repo), null, 2)}\n`;
   if (dry) {
     process.stdout.write(text);
@@ -76,7 +78,7 @@ export async function cmdInit(cli: CliContext): Promise<void> {
   }
   await Bun.write(target, text);
   console.log(`factory init: wrote ${target}${repo ? "" : ' (no github origin remote: set "repo" by hand)'}`);
-  const charter = readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "charter.md"), "utf8");
+  const charter = readFileSync(join(templateDir(), ".factory", "charter.md"), "utf8");
   if (writeCharter(dir, charter, stack, repo))
     console.log(`factory init: wrote ${join(dir, ".factory", "charter.md")}`);
   if (cli.has("pr")) {

@@ -15,7 +15,9 @@ import {
 } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-export const DEFAULTS_DIR = join(import.meta.dir, "..", "template");
+import { templateDir } from "./template-root";
+
+export const DEFAULTS_DIR = templateDir();
 const SKILL_DIRS = [".claude/skills", ".agents/skills"] as const;
 const AGENT_DIRS = [".claude/agents", ".agents/agents"] as const;
 
