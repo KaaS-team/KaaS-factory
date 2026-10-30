@@ -129,11 +129,11 @@
     "src/cli.ts": 985,
     "src/config.ts": 786,
     "src/doctor.ts": 445,
-    "src/engine/common.ts": 642,
+    "src/engine/common.ts": 646,
     "src/engine/steps.ts": 593,
     "src/github.ts": 505,
     "src/receipt.ts": 459,
-    "src/state.ts": 732,
+    "src/state.ts": 745,
     "src/watch.ts": 848
   },
   "names": {
