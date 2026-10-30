@@ -1,0 +1,3 @@
+name: site
+repos: [acme/site]
+workflow: feature-to-pr
