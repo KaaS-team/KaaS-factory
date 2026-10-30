@@ -10,13 +10,14 @@ import { parseWorkflowFull } from "../core/workflow-extras";
 import { isWorkflowMd, workflowMdToRaw } from "../core/workflow-md";
 import { STEP_LABELS } from "../labels";
 import { PLANNED_WORKFLOW } from "./import-plan";
+import { templateDir } from "../template-root";
 import { ALL_STEP_TYPES } from "./registry";
 
 export const DEFAULT_WORKFLOW = DEFAULT_CONFIG.workflow;
 // What an edge's `if:` may read besides the step ids.
 export const EXPR_ROOTS = ["toggles", "config"] as const;
 
-export const BUNDLED_DIR = join(import.meta.dir, "..", "..", "template", ".factory", "workflows");
+export const BUNDLED_DIR = join(templateDir(), ".factory", "workflows");
 
 // A .md file (frontmatter `stages:`) or a .yml one; either way the result carries the text's sha,
 // which every run's events and receipt pin, so a resume never replays steps of an edited file.

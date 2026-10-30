@@ -926,5 +926,8 @@
   {"name": "pr body: a missing template section is refused", "file": "scripts/check-pr-body.ts", "find": "if (text === undefined) out.push(", "replace": "if (false) out.push(", "test": "tests/check-pr-body.test.ts"},
   {"name": "pr body: a session link is refused", "file": "scripts/check-pr-body.ts", "find": "if (/claude\\.ai\\/code|Claude-Session:/.test(body))", "replace": "if (false)", "test": "tests/check-pr-body.test.ts"},
   {"name": "team policy: looser value wins", "file": "src/team/resolve.ts", "find": "export const stricter = (a: boolean, b: boolean): boolean => a === false || b === false ? false : a;", "replace": "export const stricter = (a: boolean, b: boolean): boolean => a;", "test": "tests/team-resolve.test.ts"},
-  {"name": "team hash: keys not sorted", "file": "src/team/hash.ts", "find": ".sort()", "replace": "", "test": "tests/team-hash.test.ts"}
+  {"name": "team hash: keys not sorted", "file": "src/team/hash.ts", "find": ".sort()", "replace": "", "test": "tests/team-hash.test.ts"},
+  {"name": "binary: init skips the template install", "file": "src/init-cli.ts", "find": "if (!existsSync(join(dir, \".factory\", \"gates.sh\")) && !dry) runInstall(dir, cli);", "replace": "if (false) runInstall(dir, cli);", "test": "tests/binary.test.ts"},
+  {"name": "binary: hooks and gates lose the executable bit", "file": "src/install-template.ts", "find": "if (isExecutable(rel)) chmodSync(dest, 0o755);", "replace": "", "test": "tests/binary.test.ts"},
+  {"name": "binary: CI example lands outside workflows", "file": "src/install-template.ts", "find": "const CI_DEST_REL = \".github/workflows/factory.yml.example\";", "replace": "const CI_DEST_REL = \".github/factory.yml.example\";", "test": "tests/binary.test.ts"}
 ]

@@ -147,6 +147,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     usage: "dispatch (--repo-dir <path> | --repo <owner/name>) [--json]",
     does: "the issues one tick would advance, written to $GITHUB_OUTPUT as a matrix for one `factory run` job each",
   },
+  { name: "version", usage: "version (or --version)", does: "print the runner version" },
   {
     name: "routine",
     usage: "routine (--repo <owner/name> | --repo-dir <path>) [--cron <expr>] [--json]",

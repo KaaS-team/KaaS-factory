@@ -18,6 +18,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
+import { runnerRoot } from "./template-root";
 import { agentRegistry } from "./agent-dirs";
 import { PRESETS } from "./agents/presets";
 
@@ -55,8 +56,6 @@ const REPO_OWNED = new Set([".factory/charter.md", ".factory/config.example.json
 const RETIRED = [".claude/agents/factory-verifier.md", ".claude/agents/factory-explorer.md"];
 const CI_DEST_REL = ".github/workflows/factory.yml.example";
 
-const root = resolve(import.meta.dir, "..");
-
 function walk(dir: string, prefix = ""): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const rel = prefix ? `${prefix}/${e.name}` : e.name;
@@ -66,6 +65,7 @@ function walk(dir: string, prefix = ""): string[] {
 
 // template/ and template-ci/ read from the repo root on disk.
 export function bundledFiles(): BundledFiles {
+  const root = runnerRoot();
   const dir = join(root, "template");
   if (!existsSync(dir)) throw new Error(`no template/ next to the runner (${dir})`);
   const template = new Map(
