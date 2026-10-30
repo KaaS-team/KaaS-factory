@@ -1,5 +1,21 @@
 # Changelog
 
+## v6.2.0
+
+The first release with installable binaries, plus the team model and a steadier supervisor.
+
+- `factory` builds as a standalone binary with the template embedded, for darwin and linux on x64
+  and arm64. A tag publishes the four binaries and a `SHA256SUMS` file to the release.
+- `factory explain <issue>` shows which file set each key, and every run stamps the resolved config
+  hash. Org, team, source, role and policy files resolve by the four rules in the docs.
+- The supervisor checks a launch before it starts and reports on its own heartbeat.
+- A tests-only diff may not delete tests or weaken assertions, and a flake policy quarantines
+  repeat offenders.
+- `check-mutations` runs only the entries a PR adds or edits, so a PR that touches the list no
+  longer reruns all of them.
+- A PR whose body skips the template is refused in CI. The README now matches the code, and a test
+  keeps it that way.
+
 ## v6.1.1
 
 Fixes from an independent check of the multi-repo release.
