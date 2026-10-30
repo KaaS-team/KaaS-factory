@@ -118,6 +118,7 @@ describe("Git.commitPaths", () => {
     const git = new Git(new GitCommandRunner());
     expect(await git.commitPaths(repo, ["src/a.ts", "src/never-written.ts"], "feat: a")).toBe(true);
     expect((await run(["git", "show", "--name-only", "--pretty=", "HEAD"], repo)).trim()).toBe("src/a.ts");
+    expect(await run(["git", "log", "-1", "--format=%B"], repo)).toMatch(/^Signed-off-by: .+ <.+>$/m);
     expect(await git.commitPaths(repo, ["src/a.ts"], "feat: again")).toBe(false);
     expect(await run(["git", "status", "--porcelain"], repo)).toContain("src/b.ts");
   });
