@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PRESETS } from "../src/agents/presets";
+import { AGENT_DIRS } from "../src/install-template";
 import { agentsTable, renderAgentsDoc } from "../src/agents/docs";
 
 const root = join(import.meta.dir, "..");
@@ -13,7 +14,6 @@ const dockerVar = (name: string) => (name === "claude" ? "CLAUDE_CODE_VERSION" :
 describe("every preset is fully registered", () => {
   const docker = read("Dockerfile");
   const ci = read("template-ci/factory.yml.example");
-  const installSh = read("install.sh");
   const agentsDoc = read("docs/agents.md");
   const readme = read("README.md");
   const runbook = read("docs/verify-an-agent.md");
@@ -41,8 +41,8 @@ describe("every preset is fully registered", () => {
         expect(new RegExp(`ARG ${dockerVar(p.name)}=${p.version.replaceAll(".", "\\.")}\\s`).test(docker)).toBe(true);
         expect(ci).toContain(`${dockerVar(p.name)}: "${p.version}"`);
       });
-      test("install.sh links its skills dir", () => {
-        expect(installSh).toContain(`${p.name}) echo "${p.skillsDir} `);
+      test("install links its skills dir", () => {
+        expect(AGENT_DIRS[p.name]?.skillsDir).toBe(p.skillsDir);
       });
       test("docs/agents.md and the README mention it, and the runbook covers it until it is verified", () => {
         expect(agentsDoc).toContain(`| \`${p.name}\` |`);
