@@ -30,6 +30,7 @@ const run = (over: Partial<StageRun>): StageRun => ({
   killed_reason: null,
   session_id: null,
   verdict: null,
+  config_hash: null,
   ...over,
 });
 

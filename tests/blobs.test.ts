@@ -193,7 +193,12 @@ describe("a stage ships its run to the blob store", () => {
 
     const db = new FactoryState(defaultStatePath(plane, "acme/widgets"));
     const runner = deps.state.getRun("acme/widgets", 1)!;
-    expect(db.getRun("acme/widgets", 1)).toEqual({ ...runner, id: db.getRun("acme/widgets", 1)!.id });
+    // config_hash is not mirrored (#325 NG-2), so the plane copy reads NULL.
+    expect(db.getRun("acme/widgets", 1)).toEqual({
+      ...runner,
+      id: db.getRun("acme/widgets", 1)!.id,
+      config_hash: null,
+    });
     expect(db.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual(["triage", "plan"]);
     db.close();
   });

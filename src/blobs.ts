@@ -78,7 +78,8 @@ const RUN_COLS = {
   pr_url: "str?",
   reason: "str?",
   // The runner's status comment id steers the plane's own edits, so it is never taken from a file.
-} as const satisfies Record<keyof Omit<Run, "id" | "status_comment_id">, Col>;
+  // config_hash is not mirrored yet; a mirrored run reads back NULL.
+} as const satisfies Record<keyof Omit<Run, "id" | "status_comment_id" | "config_hash">, Col>;
 const STAGE_COLS = {
   repo: "str",
   issue: "int",
@@ -98,8 +99,8 @@ const STAGE_COLS = {
   killed_reason: "str?",
   session_id: "str?",
   verdict: "str?",
-  // tokens_cache_write is not mirrored yet (#115 NG-4); a mirrored row reads back 0.
-} as const satisfies Record<keyof Omit<StageRun, "id" | "tokens_cache_write">, Col>;
+  // tokens_cache_write is not mirrored yet (#115 NG-4); a mirrored row reads back 0. config_hash reads back NULL.
+} as const satisfies Record<keyof Omit<StageRun, "id" | "tokens_cache_write" | "config_hash">, Col>;
 // Records keyed by the union types, so tsc fails here when a stage or a status is added.
 const STAGES: Record<Stage, true> = { triage: true, plan: true, build: true, verify: true, pr: true };
 const STATUSES: Record<RunStatus, true> = {
