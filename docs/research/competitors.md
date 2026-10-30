@@ -1,4 +1,4 @@
-# Competitive landscape and what we take
+# Competitors and what we take
 
 Research date: 30 Oct 2026. Four Opus read-only passes over five groups of public repos. We read the code, we ran none of it. Each claim below is from the repo named; the full per-source reports hold the file paths. Licences matter: we port MIT and Apache 2.0 code with the notice kept, and never copy from a source-available `ee/` folder.
 
