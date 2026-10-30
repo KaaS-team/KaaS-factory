@@ -1,0 +1,157 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same ref cancels the run it supersedes, so minutes go to the latest tree only.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # branch protection requires this job; .agents/repo.json ci.runner says where it runs (a public repo: GitHub)
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # actions: read lets the report step fetch the last runs' reports
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # Full history, so the DCO step below can read every commit in the pull request.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+
+      - name: Every commit is signed off (DCO, CONTRIBUTING.md)
+        if: github.event_name == 'pull_request'
+        run: bun scripts/dco.ts "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
+
+      - name: The PR body follows the template (CONTRIBUTING.md)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bun scripts/check-pr-body.ts
+
+      - name: A weakening test change states its reason (CONTRIBUTING.md)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bun scripts/check-tests-only.ts "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
+
+      - name: Install uv (for skills-ref validate)
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install tmux (tests/tmux.test.ts drives a real one)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux
+
+      - name: Install dependencies
+        run: make install
+
+      # An empty HOME, so a check that passes only with one machine's ~/.claude or caches fails here.
+      # The runner's own Rust toolchain stays reachable: make lint and the relay and verify tests need cargo.
+      - name: make check
+        run: RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make check
+      # The stop-stage security checks run here too, so the scanners are installed, never skipped: gitleaks
+      # and OSV-Scanner as pinned release binaries checked against their sha256, Semgrep pinned through uv.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lwp-scanners
+          key: scanners-gitleaks-8.30.1-osv-2.6.0
+      - name: Install security scanners
+        run: |
+          d=~/.cache/lwp-scanners
+          mkdir -p "$d"
+          if [ ! -x "$d/gitleaks" ]; then
+            curl -sfLo /tmp/gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+            echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gl.tgz" | sha256sum -c -
+            tar -xzf /tmp/gl.tgz -C "$d" gitleaks
+          fi
+          if [ ! -x "$d/osv-scanner" ]; then
+            curl -sfLo /tmp/osv https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+            echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  /tmp/osv" | sha256sum -c -
+            install -m 755 /tmp/osv "$d/osv-scanner"
+          fi
+          echo "$d" >> "$GITHUB_PATH"
+          uv tool install semgrep==1.182.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Security scan of what this change adds
+        run: KAAS_SECURITY_BASE=origin/${{ github.base_ref || 'main' }} python3 scripts/kaas/check-security.py gitleaks,semgrep,osv-scanner
+
+      # Flags a flaky test from the last runs' reports; name it @quarantine and it moves to the job below.
+      - uses: ctrf-io/github-test-reporter@93ff46b55aefe633bde6d13e61a7f533303233e6 # v1.3.2
+        if: always()
+        with:
+          report-path: reports/junit.xml
+          integrations-config: '{"junit-to-ctrf": {"enabled": true, "action": "convert", "options": {"output": "reports/ctrf.json"}}}'
+          summary-report: true
+          flaky-rate-report: true
+          fail-rate-report: true
+          upload-artifact: true
+          fetch-previous-results: true
+          # The defaults (scan 400 runs, fetch 100) cost 50s on main and pushed this job past 3 minutes.
+          max-workflow-runs-to-check: 50
+          max-previous-runs-to-fetch: 20
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # After the report step, so it does not overwrite the junit report that step reads.
+      - name: New and changed tests run three times
+        if: github.event_name == 'pull_request'
+        run: |
+          changed=$(git diff --name-only --diff-filter=AM "origin/${{ github.base_ref }}...HEAD" -- 'tests/*.test.ts' | tr '\n' ' ')
+          if [ -n "$changed" ]; then
+            RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make test FILES="$changed" TEST_ARGS="--rerun-each 3"
+          fi
+
+  # only the quarantined tests; it never blocks a push
+  quarantine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - name: Install tmux (tests/tmux.test.ts drives a real one)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux
+      - run: make install
+      - run: make quarantine
+
+  # The Dockerfile ships the VM run mode (plan "Run anywhere"). An image that
+  # only builds when someone remembers to try it by hand rots the first time
+  # a base-image tag or a pinned tool version moves — this is the check that
+  # keeps it honest (Rule 0: an unwired check did not ship).
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: kaas-factory:ci
+      # The image's default command must serve /health with the relay beside it, and stay under the
+      # idle memory budget (src/deploy/rss.ts measures every process in the container).
+      - name: Smoke the image and assert idle RSS
+        run: |
+          docker run -d --name factory kaas-factory:ci
+          for _ in $(seq 1 30); do docker exec factory curl -fsS http://127.0.0.1:4100/health && break; sleep 1; done
+          docker exec factory curl -fsS http://127.0.0.1:4100/health
+          docker exec factory curl -fsS http://127.0.0.1:4200/healthz
+          docker exec factory test -x /usr/local/bin/kaas-verify
+          docker exec factory bun src/deploy/gh-fields.ts
+          sleep 5
+          docker exec factory bun src/deploy/rss.ts 1
+      - name: Container log on failure
+        if: failure()
+        run: docker logs factory || true

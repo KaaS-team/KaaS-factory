@@ -29,10 +29,12 @@ typecheck:
 # `make test FILES="tests/a.test.ts"` runs named files: bun is a refused agentCommand, make is not.
 # A flaky test is named @quarantine: test skips it and writes reports/junit.xml for the CTRF step in ci.yml;
 # quarantine, a ci.yml job that never blocks a push, runs only those (bun fails a filter that matches none).
+# A test that flips in the nightly flakes run FLAKE_LIMIT times must be tagged and get an entry in tests/quarantine.json (owner, expiry);
+# tests/quarantine.test.ts fails on a tag with no entry or an expired one.
 GIT_ENV = GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true
 test:
 	@mkdir -p reports
-	$(GIT_ENV) bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(FILES)
+	$(GIT_ENV) bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_ARGS) $(FILES)
 
 quarantine:
 	@f=$$(grep -rl @quarantine tests --include='*.test.ts'); if [ -z "$$f" ]; then echo "quarantine: no @quarantine tests"; \
