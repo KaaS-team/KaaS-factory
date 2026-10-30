@@ -923,5 +923,7 @@
   {"name": "epic: tasks are not committed one by one", "file": "src/engine/epic.ts", "find": "if (tasks.length < 2) {", "replace": "if (true) {", "test": "tests/epic.test.ts"},
   {"name": "owner name returns to src", "file": "src/daemon.ts", "find": "const LAUNCHD_PREFIX = \"dev.factory.\";", "replace": "const LAUNCHD_PREFIX = \"dev.factory.\"; // learnwithparam", "test": "tests/owner-neutral.test.ts"},
   {"name": "pr body: a missing template section is refused", "file": "scripts/check-pr-body.ts", "find": "if (text === undefined) out.push(", "replace": "if (false) out.push(", "test": "tests/check-pr-body.test.ts"},
-  {"name": "pr body: a session link is refused", "file": "scripts/check-pr-body.ts", "find": "if (/claude\\.ai\\/code|Claude-Session:/.test(body))", "replace": "if (false)", "test": "tests/check-pr-body.test.ts"}
+  {"name": "pr body: a session link is refused", "file": "scripts/check-pr-body.ts", "find": "if (/claude\\.ai\\/code|Claude-Session:/.test(body))", "replace": "if (false)", "test": "tests/check-pr-body.test.ts"},
+  {"name": "team policy: looser value wins", "file": "src/team/resolve.ts", "find": "export const stricter = (a: boolean, b: boolean): boolean => a === false || b === false ? false : a;", "replace": "export const stricter = (a: boolean, b: boolean): boolean => a;", "test": "tests/team-resolve.test.ts"},
+  {"name": "team hash: keys not sorted", "file": "src/team/hash.ts", "find": ".sort()", "replace": "", "test": "tests/team-hash.test.ts"}
 ]

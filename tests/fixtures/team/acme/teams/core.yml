@@ -1,0 +1,6 @@
+name: core
+mission: Ship the platform.
+roles:
+  build:
+    harness: claude-cloud
+    model: sonnet
