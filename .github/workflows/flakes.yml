@@ -1,0 +1,35 @@
+name: flakes
+
+on:
+  schedule:
+    - cron: "47 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  # Reruns every test three times. A test that passes and fails in one report flipped; scripts/flake-report.ts
+  # counts the flips across nights and fails the run for a test that reached FLAKE_LIMIT.
+  flakes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - name: Install tmux (tests/tmux.test.ts drives a real one)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux
+      - run: make install
+      - uses: actions/cache/restore@v4
+        with:
+          path: reports/flakes-history.json
+          key: flakes-history-${{ github.run_id }}
+          restore-keys: flakes-history-
+      - name: Run every test three times
+        run: make test TEST_ARGS="--rerun-each 3" || true
+      - name: Count flips
+        run: bun scripts/flake-report.ts reports/flakes-history.json reports/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: reports/flakes-history.json
+          key: flakes-history-${{ github.run_id }}

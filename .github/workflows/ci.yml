@@ -39,6 +39,12 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: bun scripts/check-pr-body.ts
 
+      - name: A weakening test change states its reason (CONTRIBUTING.md)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bun scripts/check-tests-only.ts "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
+
       - name: Install uv (for skills-ref validate)
         uses: astral-sh/setup-uv@v3
 
@@ -94,6 +100,15 @@ jobs:
           max-previous-runs-to-fetch: 20
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # After the report step, so it does not overwrite the junit report that step reads.
+      - name: New and changed tests run three times
+        if: github.event_name == 'pull_request'
+        run: |
+          changed=$(git diff --name-only --diff-filter=AM "origin/${{ github.base_ref }}...HEAD" -- 'tests/*.test.ts' | tr '\n' ' ')
+          if [ -n "$changed" ]; then
+            RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make test FILES="$changed" TEST_ARGS="--rerun-each 3"
+          fi
 
   # only the quarantined tests; it never blocks a push
   quarantine:

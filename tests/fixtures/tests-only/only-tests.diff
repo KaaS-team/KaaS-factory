@@ -1,0 +1,8 @@
+diff --git a/tests/a.test.ts b/tests/a.test.ts
+index 1111111..2222222 100644
+--- a/tests/a.test.ts
++++ b/tests/a.test.ts
+@@ -3,0 +4,3 @@ describe("a", () => {
++  test("adds one", () => {
++    expect(1 + 1).toBe(2);
++  });
