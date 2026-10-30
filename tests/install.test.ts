@@ -6,7 +6,16 @@ import { describe, expect, test, setDefaultTimeout } from "bun:test";
 
 // Real git processes: a loaded machine can exceed bun's 5s default.
 setDefaultTimeout(30_000);
-import { chmodSync, symlinkSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import {
+  chmodSync,
+  symlinkSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctor, sha256 } from "../src/doctor";
@@ -284,7 +293,9 @@ describe("installTemplate --agents", () => {
     expect(existsSync(join(target, ".claude"))).toBe(false); // nothing written before the check
     // a flag is not an agent list: the CLI refuses before the installer runs
     for (const argv of [["--agents", "--dry-run"], ["--agents"]])
-      expect(Bun.spawnSync(["bun", CLI, "install", target, ...argv], { stdout: "pipe", stderr: "pipe" }).exitCode).not.toBe(0);
+      expect(
+        Bun.spawnSync(["bun", CLI, "install", target, ...argv], { stdout: "pipe", stderr: "pipe" }).exitCode,
+      ).not.toBe(0);
     expect(existsSync(join(target, ".claude"))).toBe(false);
     const dry = scratchTarget();
     run([dry, "--agents", "pi", "--dry-run"]);

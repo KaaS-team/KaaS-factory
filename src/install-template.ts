@@ -5,7 +5,18 @@
 // writes an inert .github/workflows/factory.yml.example. `dryRun` reports without touching anything.
 
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { agentRegistry } from "./agent-dirs";
 import { PRESETS } from "./agents/presets";
@@ -57,7 +68,11 @@ function walk(dir: string, prefix = ""): string[] {
 export function bundledFiles(): BundledFiles {
   const dir = join(root, "template");
   if (!existsSync(dir)) throw new Error(`no template/ next to the runner (${dir})`);
-  const template = new Map(walk(dir).sort().map((rel) => [rel, readFileSync(join(dir, rel))] as const));
+  const template = new Map(
+    walk(dir)
+      .sort()
+      .map((rel) => [rel, readFileSync(join(dir, rel))] as const),
+  );
   const ciPath = join(root, "template-ci", "factory.yml.example");
   return { template, ci: existsSync(ciPath) ? readFileSync(ciPath) : undefined };
 }
@@ -74,7 +89,11 @@ const isExecutable = (rel: string): boolean =>
   rel.startsWith(".claude/hooks/") || rel === ".factory/gates.sh" || rel === ".factory/mutate.sh";
 const sha = (b: Buffer): string => createHash("sha256").update(b).digest("hex");
 
-export function installTemplate(target: string, opts: InstallOptions = {}, files: BundledFiles = bundledFiles()): InstallResult {
+export function installTemplate(
+  target: string,
+  opts: InstallOptions = {},
+  files: BundledFiles = bundledFiles(),
+): InstallResult {
   // Validate before anything is written, so a typo never leaves a partial install.
   for (const agent of opts.agents ?? [])
     if (!AGENT_DIRS[agent]) throw new Error(`unknown agent "${agent}" (known: ${Object.keys(AGENT_DIRS).join(", ")})`);
@@ -116,7 +135,10 @@ export function installTemplate(target: string, opts: InstallOptions = {}, files
       continue;
     }
 
-    if (lexists(dest) && !opts.update) { skipped.push(rel); continue; }
+    if (lexists(dest) && !opts.update) {
+      skipped.push(rel);
+      continue;
+    }
     const existed = lexists(dest);
     if (dry) {
       lines.push(`${existed ? "would overwrite" : "write"}: ${rel}`);
@@ -209,7 +231,9 @@ export function installTemplate(target: string, opts: InstallOptions = {}, files
     else {
       mkdirSync(dirname(join(base, CI_DEST_REL)), { recursive: true });
       writeFileSync(join(base, CI_DEST_REL), files.ci!);
-      lines.push(`wrote: ${CI_DEST_REL} (inert, rename to factory.yml and set repo variable FACTORY_MODE=actions to activate)`);
+      lines.push(
+        `wrote: ${CI_DEST_REL} (inert, rename to factory.yml and set repo variable FACTORY_MODE=actions to activate)`,
+      );
     }
     wrote++;
   }
