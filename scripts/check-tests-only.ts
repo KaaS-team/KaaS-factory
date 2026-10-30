@@ -25,7 +25,10 @@ const REASON = /^Test change reason:[ \t]*(\S.{9,})$/m;
 const EXT = "(?:ts|tsx|js|jsx|mts|cts|mjs|cjs)";
 const TEST_PATH = new RegExp(`(?:^|/)tests?/|\\.(?:test|spec)\\.${EXT}$|_test\\.(?:go|py)$|(?:^|/)test_[^/]*\\.py$`);
 
-export const isTestFile = (path: string): boolean => TEST_PATH.test(path);
+// Fixtures and the mutation list sit under tests/ but are data, not tests.
+const TEST_DATA = /(?:^|\/)fixtures\/|(?:^|\/)tests\/mutations\.json$/;
+
+export const isTestFile = (path: string): boolean => TEST_PATH.test(path) && !TEST_DATA.test(path);
 
 export function parseDiff(text: string): DiffFile[] {
   const files: DiffFile[] = [];

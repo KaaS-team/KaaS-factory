@@ -84,6 +84,14 @@ describe("check-tests-only fixtures", () => {
       "pkg/test_a.py",
     ])
       expect(isTestFile(p)).toBe(true);
-    for (const p of ["src/a.ts", "scripts/latest.ts", "a.test.md", "src/contest.py"]) expect(isTestFile(p)).toBe(false);
+    for (const p of [
+      "src/a.ts",
+      "scripts/latest.ts",
+      "a.test.md",
+      "src/contest.py",
+      "tests/fixtures/x/a.diff",
+      "tests/mutations.json",
+    ])
+      expect(isTestFile(p)).toBe(false);
   });
 });
