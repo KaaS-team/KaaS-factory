@@ -925,6 +925,8 @@ async function main(): Promise<void> {
       return cmdRebaseline();
     case "doctor":
       return cmdDoctor();
+    case "explain":
+      return (await import("./explain-cli")).cmdExplain(cli);
     case "install":
       return (await import("./init-cli")).cmdInstall(cli);
     case "verify-agent":

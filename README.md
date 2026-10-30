@@ -6,6 +6,17 @@ it happen in issues, comments, and a dashboard, instead of an agent's private te
 Point it at any repo, label an issue `factory:ready`, and it runs the loop end to end: a PR
 lands with a test that proves it, or a human gets asked exactly what's missing.
 
+## Install
+
+No binary release has shipped yet, so none of the package channels below is live. Until one is,
+use [Quickstart](#quickstart) to run from a clone.
+
+```bash
+curl -fsSL https://factory.kaas.team/install.sh | sh   # works once the first binary release ships
+npm i -g @kaas-team/factory                            # when published
+brew install KaaS-team/tap/factory                     # when published
+```
+
 ## The loop
 
 A human labels an issue `factory:ready`. The runner claims it, then drives five stages, each a
@@ -375,20 +386,21 @@ dependency bump), clone it to see the loop run against something real before wir
 | Command | Does |
 |---|---|
 | `factory init [--repo-dir <path>] [--dry-run] [--force] [--pr]` | detect the repo's stack and write `.factory/config.json`, installing the template first if missing |
-| `factory install <target-dir> [--dry-run] [--update] [--ci]` | install or update the template in a repo |
+| `factory install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]` | install or update the template in a repo |
 | `factory doctor --repo-dir <path> [--fix]` | check `gh`, each agent's binary, `python3`, `jq` on PATH, `gh auth status`, config, charter, gates.sh, baseline tag, labels |
-| `factory up [--repo-dir <path> \| --repo <owner/name>] [--tmux]` | watch + dashboard in one process, the Docker/VM entrypoint; `--tmux` runs each in a tmux window |
+| `factory explain <N> (--repo-dir <path> \| --repo <owner/name>)` | print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems |
+| `factory up [--repo-dir <path> \| --repo <owner/name>] [--tmux]` | with a repo, watch + dashboard in one process, the Docker/VM entrypoint; `--tmux` runs each in a tmux window; with no repo, the control plane and relay |
 | `factory attach [N] [--repo <owner/name>]` | join the tmux session, or issue N's live window |
 | `factory takeover N [--repo-dir <path>] [--no-handback]` | stop N's stage, `claude --resume` its session in the worktree, hand back with `/factory retry` on exit |
 | `factory watch [--repo-dir <path> \| --repo <owner/name>] [--once]` | poll and drive the loop (local mode) |
 | `factory run [--repo-dir <path> \| --repo <owner/name>] --issue <N>` | advance one issue once, then exit (CI mode) |
 | `factory tick [--repo-dir <path> \| --repo <owner/name>]` | one poll pass across every open issue, then exit (cron) |
-| `factory park --repo-dir <path> --issue <N> --reason <text>` | park an issue as `needs-human` from outside the loop |
+| `factory park --repo-dir <path> (--issue <N> \| --pr <N>) [--reason <text>]` | park an issue as `needs-human` from outside the loop |
 | `factory dashboard [--repo <owner/name> \| --repo-dir <path>] [--port <n>]` | serve the board on :4100; with `--repo-dir` (or under `factory up`) it also shows the repo's workflows, runtimes and issue leases |
 | `factory scan --repo-dir <path>` | file issues from `osv-scanner` findings, one per package, for any lockfile it reads; without osv-scanner, a Bun project falls back to `bun audit` |
 | `factory scan --repo-dir <path> --lighthouse <report.json>` | file one `bug` per page whose Lighthouse score is under its bar, from the report the target's nightly run writes; a page with an open issue is never filed again |
 | `factory rebaseline --repo-dir <path> [--dry-run]` | move the baseline tag to the current base, keeping merged setup changes across reset |
-| `factory reset --repo-dir <path> [--dry-run]` | **destructive**: force-pushes the base branch to the baseline tag |
+| `factory reset --repo-dir <path> [--dry-run] [--all-issues]` | **destructive**: force-pushes the base branch to the baseline tag |
 
 Also `--db`, `--workspaces`, `--port` and the `FACTORY_*` env vars; `factory --help` lists them all.
 
@@ -429,3 +441,9 @@ The core is Apache-2.0 (`LICENSE`). Code under `ee/` is under the KaaS Factory E
 their upstream licence (`REUSE.toml`, `THIRD_PARTY_NOTICES.md`). The KaaS name, logo and icon are
 not licensed; a fork rebrands (`TRADEMARKS.md`). Pull requests carry a DCO sign-off
 (`CONTRIBUTING.md`).
+
+## Part of KaaS
+
+[kaas.team](https://kaas.team). Sibling repos: [factory-install](https://github.com/KaaS-team/factory-install),
+[factory-plane](https://github.com/KaaS-team/factory-plane), [factory-mcp](https://github.com/KaaS-team/factory-mcp),
+[factory-plugins](https://github.com/KaaS-team/factory-plugins), [blueprint](https://github.com/KaaS-team/blueprint).

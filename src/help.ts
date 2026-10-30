@@ -98,6 +98,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "check the loop can run; --fix creates missing labels",
   },
   {
+    name: "explain",
+    usage: "explain <N> (--repo-dir <path> | --repo <owner/name>)",
+    does: "print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems",
+  },
+  {
     name: "verify-agent",
     usage: "verify-agent <name> --repo-dir <path> --issue <N> [--out <dir>]",
     does: "run one issue on that agent, record a scrubbed fixture, print pass/fail, cost and tokens",

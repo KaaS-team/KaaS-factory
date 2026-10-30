@@ -45,6 +45,7 @@ import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
 import type { FactoryState, RetroTrigger, Stage } from "../state";
 import { LABEL, issueType } from "../labels";
 import { emitEvent, type EventBus } from "./bus";
+import { configHash } from "../team/hash";
 import type { Minion } from "../core/minion";
 import type { MachineConfig, MachineLeases, MachineSpend } from "../machine";
 
@@ -340,6 +341,7 @@ export async function runStage(
     title: issue.title,
     stage: stage as Stage,
     status: "running",
+    config_hash: configHash(config),
   });
   const run = deps.state.getRun(config.repo, issueNumber)!;
   const files = await stageFiles(deps, issueNumber);
@@ -387,6 +389,7 @@ export async function runStage(
     exit_code: result.exitCode,
     killed_reason: result.killedReason ?? null,
     session_id: result.sessionId ?? null,
+    config_hash: configHash(config),
   });
   await recordSpend(deps, config, {
     issue: issueNumber,
@@ -492,6 +495,7 @@ export async function runRetro(
       exit_code: result.exitCode,
       killed_reason: result.killedReason ?? null,
       session_id: result.sessionId ?? null,
+      config_hash: configHash(config),
     });
     await recordSpend(deps, config, {
       issue: issueNumber,

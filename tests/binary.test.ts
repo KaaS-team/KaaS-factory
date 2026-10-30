@@ -50,9 +50,9 @@ describe("host binary", () => {
   }, 120_000);
 });
 
-describe("staged release workflow", () => {
+describe("release workflow", () => {
   test("builds exactly TARGETS", () => {
-    const text = readFileSync(join(root, "ci", "release-binaries.yml"), "utf8");
+    const text = readFileSync(join(root, ".github", "workflows", "release-binaries.yml"), "utf8");
     const listed = [...text.matchAll(/^\s*-\s+(bun-\S+)\s*$/gm)].map((m) => m[1]);
     expect(listed.sort()).toEqual([...TARGETS].sort());
     expect(TARGETS as readonly string[]).toContain(hostTarget());

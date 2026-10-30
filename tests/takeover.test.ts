@@ -152,6 +152,7 @@ describe("renderRunSummary", () => {
     killed_reason: null,
     session_id: null,
     verdict: null,
+    config_hash: null,
     ...over,
   });
 
