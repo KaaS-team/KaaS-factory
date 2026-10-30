@@ -1,7 +1,7 @@
 # KaaS Factory
 
 A GitHub-native loop for coding agents: triage, plan, build, verify, PR. `src/` is the runner,
-`bin/factory` the CLI (its code is `src/cli.ts`), `dashboard/` the web view. `install.sh` copies `template/` into a target repo;
+`bin/factory` the CLI (its code is `src/cli.ts`), `dashboard/` the web view. `src/install-template.ts` copies `template/` into a target repo;
 `template-ci/` holds the inert CI workflow. Reasoning goes in `docs/decisions/`.
 
 ## Commands
