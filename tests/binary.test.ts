@@ -57,4 +57,12 @@ describe("release workflow", () => {
     expect(listed.sort()).toEqual([...TARGETS].sort());
     expect(TARGETS as readonly string[]).toContain(hostTarget());
   });
+
+  test("a tag publishes the binaries with SHA256SUMS", () => {
+    const text = readFileSync(join(root, ".github", "workflows", "release-binaries.yml"), "utf8");
+    expect(text).toContain("sha256sum factory-* > SHA256SUMS");
+    expect(text).toContain("gh release upload");
+    expect(text).toContain("startsWith(github.ref, 'refs/tags/v')");
+    expect(text).not.toContain("Staged outside");
+  });
 });
