@@ -1,30 +1,50 @@
-// install.sh's default (skip existing files) behavior has no test today;
-// this file covers that plus the new --update (audit finding #17: template
-// fixes couldn't reach an already-installed repo) and --ci flags. Runs the
-// real script against a scratch target dir — no fakes, this is a shell
-// script.
+// installTemplate's default (skip existing files) behavior, plus --update (audit finding #17:
+// template fixes couldn't reach an already-installed repo) and --ci. Runs the real installer
+// against a scratch target dir, no fakes.
 
 import { describe, expect, test, setDefaultTimeout } from "bun:test";
 
 // Real git processes: a loaded machine can exceed bun's 5s default.
 setDefaultTimeout(30_000);
-import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import {
+  chmodSync,
+  symlinkSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctor, sha256 } from "../src/doctor";
+import { installTemplate, type InstallOptions } from "../src/install-template";
 
-const SCRIPT = join(import.meta.dir, "..", "install.sh");
+const CLI = join(import.meta.dir, "..", "src", "cli.ts");
 
+// The old script's contract: argv-style flags in, exit code and stdout out.
 function run(args: string[]): { code: number; stdout: string; stderr: string } {
-  const proc = Bun.spawnSync(["bash", SCRIPT, ...args], { stdout: "pipe", stderr: "pipe" });
-  return { code: proc.exitCode, stdout: proc.stdout.toString(), stderr: proc.stderr.toString() };
+  const [target = "", ...flags] = args;
+  const opts: InstallOptions = {
+    dryRun: flags.includes("--dry-run"),
+    update: flags.includes("--update"),
+    ci: flags.includes("--ci"),
+  };
+  const i = flags.indexOf("--agents");
+  if (i !== -1) opts.agents = (flags[i + 1] ?? "").split(",");
+  try {
+    return { code: 0, stdout: installTemplate(target, opts).lines.join("\n"), stderr: "" };
+  } catch (e) {
+    return { code: 1, stdout: "", stderr: (e as Error).message };
+  }
 }
 
 function scratchTarget(): string {
   return mkdtempSync(join(tmpdir(), "factory-install-"));
 }
 
-describe("install.sh (default)", () => {
+describe("installTemplate (default)", () => {
   test("writes the template into an empty target", () => {
     const target = scratchTarget();
     const { code } = run([target]);
@@ -75,6 +95,29 @@ describe("install.sh (default)", () => {
     rmSync(target, { recursive: true, force: true });
   });
 
+  test("never writes through a dangling symlink, in a plain install or --update", () => {
+    for (const flags of [[], ["--update"]]) {
+      const target = scratchTarget();
+      const outside = join(scratchTarget(), "victim");
+      mkdirSync(join(target, ".claude"), { recursive: true });
+      symlinkSync(outside, join(target, ".claude", "settings.json"));
+      run([target, ...flags]);
+      expect(existsSync(outside)).toBe(false);
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
+  test("never writes through a symlinked parent directory", () => {
+    const target = scratchTarget();
+    const outside = scratchTarget();
+    symlinkSync(outside, join(target, ".claude"));
+    const { stdout } = run([target]);
+    expect(existsSync(join(outside, "settings.json"))).toBe(false);
+    expect(stdout).toContain("skip (outside target): .claude/settings.json");
+    rmSync(target, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  });
+
   test("--dry-run writes nothing", () => {
     const target = scratchTarget();
     run([target, "--dry-run"]);
@@ -83,7 +126,7 @@ describe("install.sh (default)", () => {
   });
 });
 
-describe("install.sh --update", () => {
+describe("installTemplate --update", () => {
   test("overwrites a factory-owned file that already exists", () => {
     const target = scratchTarget();
     run([target]); // first install
@@ -116,7 +159,7 @@ describe("install.sh --update", () => {
   });
 });
 
-describe("install.sh --ci", () => {
+describe("installTemplate --ci", () => {
   test("writes an inert factory.yml.example placeholder", () => {
     const target = scratchTarget();
     const { code, stdout } = run([target, "--ci"]);
@@ -129,7 +172,7 @@ describe("install.sh --ci", () => {
   });
 });
 
-describe("install.sh scaffold", () => {
+describe("installTemplate scaffold", () => {
   test("writes an executable gates.sh, a config example and a charter", () => {
     const target = scratchTarget();
     run([target]);
@@ -193,9 +236,9 @@ describe("install.sh scaffold", () => {
 // exists and is skipped on --dry-run, so a real install is never silently
 // missing the label-creation step it claims to run (plan v2.11.0 item A).
 describe("factory install calls fixDoctor", () => {
-  const bin = readFileSync(join(import.meta.dir, "..", "src", "cli.ts"), "utf8");
+  const bin = readFileSync(join(import.meta.dir, "..", "src", "init-cli.ts"), "utf8");
   const start = bin.indexOf("async function cmdInstall");
-  const end = bin.indexOf("async function main");
+  const end = bin.indexOf("function runInstall");
   const cmdInstall = bin.slice(start, end);
 
   test("calls fixDoctor after a real install", () => {
@@ -215,7 +258,7 @@ describe("factory install calls fixDoctor", () => {
   });
 });
 
-describe("install.sh --agents", () => {
+describe("installTemplate --agents", () => {
   const { PRESETS } = require("../src/agents/presets") as typeof import("../src/agents/presets");
   const { lstatSync, readlinkSync } = require("node:fs") as typeof import("node:fs");
 
@@ -248,8 +291,12 @@ describe("install.sh --agents", () => {
     const target = scratchTarget();
     expect(run([target, "--agents", "nope"]).code).toBe(1);
     expect(existsSync(join(target, ".claude"))).toBe(false); // nothing written before the check
-    expect(run([target, "--agents", "--dry-run"]).code).toBe(1); // a flag is not an agent list
-    expect(run([target, "--agents"]).code).toBe(1);
+    // a flag is not an agent list: the CLI refuses before the installer runs
+    for (const argv of [["--agents", "--dry-run"], ["--agents"]])
+      expect(
+        Bun.spawnSync(["bun", CLI, "install", target, ...argv], { stdout: "pipe", stderr: "pipe" }).exitCode,
+      ).not.toBe(0);
+    expect(existsSync(join(target, ".claude"))).toBe(false);
     const dry = scratchTarget();
     run([dry, "--agents", "pi", "--dry-run"]);
     expect(existsSync(join(dry, ".pi"))).toBe(false);

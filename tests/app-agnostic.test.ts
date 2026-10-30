@@ -32,11 +32,10 @@ function walk(dir: string): string[] {
 describe("runtime code does not name the demo app", () => {
   // A comment may say where a fact was found; a string or identifier may not depend on it.
   const APP = /splitbill|learnwithparam\/(?!KaaS-factory)/i;
-  const files = ["src", "bin", "template", "dashboard", "scripts"]
-    .flatMap((d) => walk(join(ROOT, d)))
-    .concat(join(ROOT, "install.sh"));
+  const files = ["src", "bin", "template", "dashboard", "scripts"].flatMap((d) => walk(join(ROOT, d)));
 
   test("every mention is on a comment line", () => {
+    expect(files).toContain(join(ROOT, "src", "install-template.ts"));
     const offenders: string[] = [];
     for (const file of files) {
       readFileSync(file, "utf8")

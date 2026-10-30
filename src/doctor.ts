@@ -264,7 +264,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       warn: true,
     });
   }
-  // install.sh records the sha256 of every factory file it left in place; a file that no longer
+  // src/install-template.ts records the sha256 of every factory file it left in place; a file that no longer
   // matches was edited in this repo, and the next `install --update` would overwrite it.
   const manifest = parseManifest(await deps.readFile(`${ctx.cloneDir}/.factory/manifest.json`));
   if (manifest) {

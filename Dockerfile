@@ -73,7 +73,6 @@ COPY dashboard ./dashboard
 COPY template ./template
 COPY template-ci ./template-ci
 COPY ee ./ee
-COPY install.sh ./install.sh
 COPY --from=rust /out/release/kaas-relay /out/release/kaas-verify /usr/local/bin/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
