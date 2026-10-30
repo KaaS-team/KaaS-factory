@@ -269,6 +269,7 @@ export class FactoryState {
       const have = (this.db.query(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
       if (have.includes(col)) continue;
       try {
+        // nosemgrep: js-shell-exec-interpolated -- SQL, not a shell; table, col and ddl come from the literal list above
         this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`);
       } catch (e) {
         if (!/duplicate column/i.test(String(e))) throw e;
