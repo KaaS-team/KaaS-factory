@@ -116,7 +116,7 @@ export function installTemplate(target: string, opts: InstallOptions = {}, files
       continue;
     }
 
-    if (existsSync(dest) && !opts.update) { skipped.push(rel); continue; }
+    if (lexists(dest) && !opts.update) { skipped.push(rel); continue; }
     const existed = lexists(dest);
     if (dry) {
       lines.push(`${existed ? "would overwrite" : "write"}: ${rel}`);
@@ -124,6 +124,8 @@ export function installTemplate(target: string, opts: InstallOptions = {}, files
       continue;
     }
     mkdirSync(dirname(dest), { recursive: true });
+    // Never write through a symlink: replace the link itself.
+    if (lstatSync(dest, { throwIfNoEntry: false })?.isSymbolicLink()) rmSync(dest);
     writeFileSync(dest, content);
     if (isExecutable(rel)) chmodSync(dest, 0o755);
     lines.push(`${existed ? "overwrote" : "wrote"}: ${rel}`);

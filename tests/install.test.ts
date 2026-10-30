@@ -6,7 +6,7 @@ import { describe, expect, test, setDefaultTimeout } from "bun:test";
 
 // Real git processes: a loaded machine can exceed bun's 5s default.
 setDefaultTimeout(30_000);
-import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, symlinkSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctor, sha256 } from "../src/doctor";
@@ -84,6 +84,18 @@ describe("installTemplate (default)", () => {
     expect(stdout).toContain("skip (exists): .claude/settings.json");
     expect(readFileSync(join(target, ".claude", "settings.json"), "utf8")).toBe("custom content");
     rmSync(target, { recursive: true, force: true });
+  });
+
+  test("never writes through a dangling symlink, in a plain install or --update", () => {
+    for (const flags of [[], ["--update"]]) {
+      const target = scratchTarget();
+      const outside = join(scratchTarget(), "victim");
+      mkdirSync(join(target, ".claude"), { recursive: true });
+      symlinkSync(outside, join(target, ".claude", "settings.json"));
+      run([target, ...flags]);
+      expect(existsSync(outside)).toBe(false);
+      rmSync(target, { recursive: true, force: true });
+    }
   });
 
   test("--dry-run writes nothing", () => {
