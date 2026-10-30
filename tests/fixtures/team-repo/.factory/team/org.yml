@@ -1,0 +1,8 @@
+name: acme
+locked: [review]
+policy:
+  risk_max: low
+  auto_merge:
+    allowed: false
+  protected_paths: ["infra/**"]
+  extend: true

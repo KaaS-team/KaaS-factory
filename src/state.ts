@@ -60,6 +60,8 @@ export interface Run {
   pr_url: string | null;
   reason: string | null;
   status_comment_id: number | null;
+  // configHash of the FactoryConfig the stage ran with; NULL for rows written before it existed.
+  config_hash: string | null;
 }
 
 export interface RunEvent {
@@ -99,10 +101,11 @@ export interface StageRun {
   session_id: string | null;
   // Verify only: pass, reject or uncertain, set once verdict.json is read (setVerifyVerdict).
   verdict: string | null;
+  config_hash: string | null;
 }
 
 // Defaulted on insert: 0 cached and cache-write tokens, a complete count, session_id NULL.
-type DefaultedStageRunKey = "tokens_cached" | "tokens_cache_write" | "usage_complete" | "session_id";
+type DefaultedStageRunKey = "tokens_cached" | "tokens_cache_write" | "usage_complete" | "session_id" | "config_hash";
 export type StageRunInput = Omit<StageRun, "id" | "verdict" | DefaultedStageRunKey> &
   Partial<Pick<StageRun, DefaultedStageRunKey>>;
 
@@ -254,19 +257,20 @@ export class FactoryState {
       CREATE INDEX IF NOT EXISTS bus_deliveries_status_next ON bus_deliveries(status, next_at);
     `);
     // Forward-only and idempotent: safe to run on boot from several replicas.
-    const have = new Set(
-      (this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name),
-    );
-    for (const [col, ddl] of [
-      ["tokens_cached", "INTEGER NOT NULL DEFAULT 0"],
-      ["tokens_cache_write", "INTEGER NOT NULL DEFAULT 0"],
-      ["usage_complete", "INTEGER NOT NULL DEFAULT 1"],
-      ["session_id", "TEXT"],
-      ["verdict", "TEXT"],
+    for (const [table, col, ddl] of [
+      ["stage_runs", "tokens_cached", "INTEGER NOT NULL DEFAULT 0"],
+      ["stage_runs", "tokens_cache_write", "INTEGER NOT NULL DEFAULT 0"],
+      ["stage_runs", "usage_complete", "INTEGER NOT NULL DEFAULT 1"],
+      ["stage_runs", "session_id", "TEXT"],
+      ["stage_runs", "verdict", "TEXT"],
+      ["stage_runs", "config_hash", "TEXT"],
+      ["runs", "config_hash", "TEXT"],
     ] as const) {
-      if (have.has(col)) continue;
+      const have = (this.db.query(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+      if (have.includes(col)) continue;
       try {
-        this.db.exec(`ALTER TABLE stage_runs ADD COLUMN ${col} ${ddl}`);
+        // nosemgrep: js-shell-exec-interpolated -- SQL, not a shell; table, col and ddl come from the literal list above
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`);
       } catch (e) {
         if (!/duplicate column/i.test(String(e))) throw e;
       }
@@ -302,7 +306,7 @@ export class FactoryState {
         tokens_cached INTEGER NOT NULL DEFAULT 0,
         usage_complete INTEGER NOT NULL DEFAULT 1,
         session_id TEXT,
-        verdict TEXT, tokens_cache_write INTEGER NOT NULL DEFAULT 0
+        verdict TEXT, tokens_cache_write INTEGER NOT NULL DEFAULT 0, config_hash TEXT
       );
       INSERT INTO stage_runs_new (${names}) SELECT ${names} FROM stage_runs;
       UPDATE stage_runs_new SET cost_usd = NULL WHERE usage_complete = 0;
@@ -317,16 +321,24 @@ export class FactoryState {
     return this.db.transaction(() => fn(this.db)).immediate();
   }
 
-  upsertRun(input: { issue: number; repo: string; title: string; stage: Stage; status: RunStatus }): Run {
+  upsertRun(input: {
+    issue: number;
+    repo: string;
+    title: string;
+    stage: Stage;
+    status: RunStatus;
+    config_hash?: string;
+  }): Run {
     const now = new Date().toISOString();
     this.db
       .query(
-        `INSERT INTO runs (issue, repo, title, stage, status, started_at, updated_at)
-         VALUES ($issue, $repo, $title, $stage, $status, $now, $now)
+        `INSERT INTO runs (issue, repo, title, stage, status, started_at, updated_at, config_hash)
+         VALUES ($issue, $repo, $title, $stage, $status, $now, $now, $config_hash)
          ON CONFLICT(repo, issue) DO UPDATE SET
            title = excluded.title,
            stage = excluded.stage,
            status = excluded.status,
+           config_hash = excluded.config_hash,
            updated_at = excluded.updated_at`,
       )
       .run({
@@ -336,6 +348,7 @@ export class FactoryState {
         $stage: input.stage,
         $status: input.status,
         $now: now,
+        $config_hash: input.config_hash ?? null,
       });
     return this.getRun(input.repo, input.issue)!;
   }
@@ -433,8 +446,8 @@ export class FactoryState {
   recordStageRun(input: StageRunInput): void {
     this.db
       .query(
-        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, tokens_cache_write, cost_usd, usage_complete, exit_code, killed_reason, session_id)
-         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $tokens_cache_write, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id)`,
+        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, tokens_cache_write, cost_usd, usage_complete, exit_code, killed_reason, session_id, config_hash)
+         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $tokens_cache_write, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id, $config_hash)`,
       )
       .run({
         $repo: input.repo,
@@ -455,6 +468,7 @@ export class FactoryState {
         $exit_code: input.exit_code,
         $killed_reason: input.killed_reason,
         $session_id: input.session_id ?? null,
+        $config_hash: input.config_hash ?? null,
       });
   }
 
