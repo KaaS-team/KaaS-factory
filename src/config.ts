@@ -11,6 +11,7 @@ import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { LABEL } from "./labels";
 import { profileProblems } from "./profile-rules";
+import { applyTeam, type TeamApplied } from "./team/apply";
 
 export interface RiskPolicy {
   // Low risk (docs, test-only, a single non-protected module) is eligible for
@@ -687,6 +688,11 @@ function agentProblems(agents: unknown, stages: unknown, routes?: unknown): stri
 export class ConfigError extends Error {}
 
 export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> {
+  return (await loadConfigExplained(targetRepoDir)).config;
+}
+
+// loadConfig plus the team resolution behind it, for `factory explain`.
+export async function loadConfigExplained(targetRepoDir: string): Promise<TeamApplied> {
   const path = `${targetRepoDir}/.factory/config.json`;
   const file = Bun.file(path);
   if (!(await file.exists())) {
@@ -717,6 +723,16 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
       `${path}: "repo" is ${config.repo} but this clone's origin is ${origin}; fix "repo" or remove it to use the origin`,
     );
   }
+  const team = applyTeam({
+    repoDir: targetRepoDir,
+    config,
+    defaults: mergeConfig({ profile: config.profile }),
+    raw: raw as Record<string, unknown>,
+    check: configProblems,
+  });
+  if (team.problems.length > 0)
+    throw new ConfigError(`${targetRepoDir}/.factory/team does not fit ${path}:\n  - ${team.problems.join("\n  - ")}`);
+  config = team.config;
   // configProblems is pure and cannot see the worktree, so a route naming a
   // skill that was never installed would otherwise only surface as a silent
   // no-op in buildContextPack, mid-run (plan v2.7.0 item 3).
@@ -729,7 +745,7 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   }
   if (missing.length > 0)
     throw new ConfigError(`${path} names a skill that does not exist:\n  - ${missing.join("\n  - ")}`);
-  return config;
+  return { ...team, config };
 }
 
 // owner/name from an https or ssh remote URL on the GitHub host (github.com, or

@@ -388,6 +388,7 @@ dependency bump), clone it to see the loop run against something real before wir
 | `factory init [--repo-dir <path>] [--dry-run] [--force] [--pr]` | detect the repo's stack and write `.factory/config.json`, installing the template first if missing |
 | `factory install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]` | install or update the template in a repo |
 | `factory doctor --repo-dir <path> [--fix]` | check `gh`, each agent's binary, `python3`, `jq` on PATH, `gh auth status`, config, charter, gates.sh, baseline tag, labels |
+| `factory explain <N> (--repo-dir <path> \| --repo <owner/name>)` | print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems |
 | `factory up [--repo-dir <path> \| --repo <owner/name>] [--tmux]` | with a repo, watch + dashboard in one process, the Docker/VM entrypoint; `--tmux` runs each in a tmux window; with no repo, the control plane and relay |
 | `factory attach [N] [--repo <owner/name>]` | join the tmux session, or issue N's live window |
 | `factory takeover N [--repo-dir <path>] [--no-handback]` | stop N's stage, `claude --resume` its session in the worktree, hand back with `/factory retry` on exit |

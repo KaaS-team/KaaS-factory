@@ -9,6 +9,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { FactoryConfig } from "../config";
+import { configHash } from "../team/hash";
 import type { CloudEvent, EventType } from "../core/event";
 import { parseMinion, type Minion } from "../core/minion";
 import type { StageName, StageRunResult } from "../executor";
@@ -231,6 +232,7 @@ async function runOnce(
     exit_code: result.exitCode,
     killed_reason: result.killedReason ?? null,
     session_id: result.sessionId ?? null,
+    config_hash: configHash(config),
   });
   // The machine tally and the shared ledger, so every worker's daily cap counts it.
   await recordSpend(deps, config, {
