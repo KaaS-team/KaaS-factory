@@ -98,6 +98,17 @@ describe("installTemplate (default)", () => {
     }
   });
 
+  test("never writes through a symlinked parent directory", () => {
+    const target = scratchTarget();
+    const outside = scratchTarget();
+    symlinkSync(outside, join(target, ".claude"));
+    const { stdout } = run([target]);
+    expect(existsSync(join(outside, "settings.json"))).toBe(false);
+    expect(stdout).toContain("skip (outside target): .claude/settings.json");
+    rmSync(target, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  });
+
   test("--dry-run writes nothing", () => {
     const target = scratchTarget();
     run([target, "--dry-run"]);

@@ -5,8 +5,8 @@
 // writes an inert .github/workflows/factory.yml.example. `dryRun` reports without touching anything.
 
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve, sep } from "node:path";
 import { agentRegistry } from "./agent-dirs";
 import { PRESETS } from "./agents/presets";
 
@@ -124,6 +124,15 @@ export function installTemplate(target: string, opts: InstallOptions = {}, files
       continue;
     }
     mkdirSync(dirname(dest), { recursive: true });
+    // A symlinked parent directory would carry the write outside the target.
+    const root = realpathSync(base);
+    const parent = realpathSync(dirname(dest));
+    if (parent !== root && !parent.startsWith(`${root}${sep}`)) {
+      lines.push(`skip (outside target): ${rel}`);
+      skipped.push(rel);
+      owned.add(rel);
+      continue;
+    }
     // Never write through a symlink: replace the link itself.
     if (lstatSync(dest, { throwIfNoEntry: false })?.isSymbolicLink()) rmSync(dest);
     writeFileSync(dest, content);
