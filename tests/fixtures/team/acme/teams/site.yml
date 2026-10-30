@@ -1,0 +1,7 @@
+name: site
+source:
+  kind: plane
+  project: SITE
+policy:
+  auto_merge:
+    allowed: false
