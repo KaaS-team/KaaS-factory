@@ -152,6 +152,7 @@ export interface FactoryConfig {
   readonly labels: Readonly<Record<string, string>>;
   // The v4 event bus: where emitted events are POSTed, and the secret inbound POST /events checks.
   readonly events: EventsConfig;
+  readonly commits?: { readonly signoff?: import("./signoff").SignoffMode }; // trailers; unset is today's
 }
 
 // Each sink gets every emitted event whose type is in `types` (all when unset),
@@ -266,13 +267,11 @@ export interface SpendConfig {
   readonly maxUnreportedRuns?: number;
 }
 
-// merge-policy.ts's inputs (plan v2.8.0 item 2). "off" (default) never looks
-// at merging; "dry-run" assesses eligibility and posts the audit comment but
-// never calls `gh pr merge`; "auto" merges once CI passes and every merge
-// gate holds. autoPaths/maxFiles/maxLines replace gate.py's hardcoded
-// docs/README-only, 10-file, 200-line allow-list with repo config, since "a
-// blog post is often longer than machinist's 200 lines" (plan). A file under
-// FactoryConfig.protectedPaths is never eligible, whatever autoPaths says.
+// merge-policy.ts's inputs (plan v2.8.0 item 2). "off" (default) never looks at merging; "dry-run"
+// assesses eligibility and posts the audit comment but never calls `gh pr merge`; "auto" merges once CI
+// passes and every merge gate holds. autoPaths/maxFiles/maxLines replace gate.py's hardcoded
+// docs/README-only, 10-file, 200-line allow-list with repo config, since "a blog post is often longer
+// than machinist's 200 lines" (plan). A file under FactoryConfig.protectedPaths is never eligible.
 export interface MergeConfig extends keys.MergeAutonomyFields {
   readonly policy: "off" | "dry-run" | "auto";
   readonly autoPaths: readonly string[];
@@ -400,6 +399,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   tracker: "object",
   labels: "object",
   events: "object",
+  commits: "object",
   riskCriteria: "object",
 };
 
