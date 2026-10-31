@@ -1,0 +1,1 @@
+{"name":"signoff none still signs","file":"src/commit-signoff.ts","find":"if (mode === \"none\") return [];","replace":"if (mode === \"none\") return [AI_TRAILER];","test":"tests/commit-signoff.test.ts"}

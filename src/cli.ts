@@ -152,7 +152,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo, selfCommand()) } : {}),
     github,
-    git: new Git(new GitCommandRunner()),
+    git: new Git(new GitCommandRunner({ mode: config.commits?.signoff })),
     state,
     bus: watcherBus(state, config),
     minions: loaded.minions,

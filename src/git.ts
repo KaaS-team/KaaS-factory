@@ -12,6 +12,7 @@ import { join } from "node:path";
 import type { CommandResult, CommandRunner } from "./github";
 import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
+import { applySignoff, type Person, type SignoffMode } from "./commit-signoff";
 import { describeFindings, scanText } from "./secret-scan";
 
 async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
@@ -53,13 +54,18 @@ export function withSignoff(args: string[], who: { name: string; email: string }
 }
 
 export class GitCommandRunner implements CommandRunner {
+  constructor(private readonly signoff?: { mode?: SignoffMode; requester?: Person }) {}
+
   async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     if (args[0] === "commit" || args[0] === "commit-tree") {
       const name = (await spawnGit(["config", "user.name"], opts?.cwd)).stdout.trim();
       const email = (await spawnGit(["config", "user.email"], opts?.cwd)).stdout.trim();
       const known = name !== "" && email !== "";
       // commit-tree has no -s, and the claim commit is in the PR, so CI's DCO check reads it.
-      const signed = args[0] === "commit-tree" ? withSignoff(args, known ? { name, email } : FALLBACK_SIGNER) : args;
+      const who = known ? { name, email } : FALLBACK_SIGNER;
+      const mode = this.signoff?.mode;
+      const stamp = (a: string[]) => (mode ? applySignoff(a, mode, who, this.signoff?.requester) : withSignoff(a, who));
+      const signed = args[0] === "commit-tree" ? stamp(args) : args;
       return spawnGit(known ? signed : [...FALLBACK_IDENTITY, ...signed], opts?.cwd, opts?.env);
     }
     return spawnGit(args, opts?.cwd, opts?.env);

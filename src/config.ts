@@ -7,6 +7,7 @@ import { PRESETS } from "./agents/presets";
 import { githubHost } from "./repo";
 import { type Toolchain, toolchainProblems } from "./images";
 import * as keys from "./config-merge";
+import { commitsProblems } from "./commit-signoff";
 import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { LABEL } from "./labels";
@@ -125,6 +126,7 @@ export interface FactoryConfig {
   // issue with a "budget" inbox item.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
+  readonly commits?: import("./commit-signoff").CommitsConfig;
   readonly holdout: HoldoutConfig;
   // The acceptance checker's path in the repo. "" turns the Acceptance table off.
   readonly acceptance: AcceptanceConfig;
@@ -384,6 +386,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   routes: "object",
   spend: "object",
   merge: "object",
+  commits: "object",
   holdout: "object",
   acceptance: "object",
   tmux: "object",
@@ -466,6 +469,7 @@ export function configProblems(raw: unknown): string[] {
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
     problems.push(...keys.mergeProblems(cfg.merge as Record<string, unknown>));
   }
+  problems.push(...commitsProblems(cfg.commits));
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
   nested("tmux", { enabled: "boolean", session: "string" });
   if (cfg.holdout !== undefined && kindOk(cfg.holdout, "object")) {
