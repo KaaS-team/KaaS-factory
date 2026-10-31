@@ -31,14 +31,16 @@ Model: sonnet
 Add one entry per new rule, each `find` matching once in the file as you wrote it.
 
 ## Acceptance
-- A body with `Verify verdict: Pending CI` fails `check-pr-body` with the placeholder message.
-- This PR's own body passes the check.
+- AC-1: a body with `Verify verdict: Pending CI` fails with the placeholder message: checked by `make test FILES=tests/check-pr-body.test.ts` (T1)
+- AC-2: a real verdict and gate output pass, and the factory-shaped body stays exempt: checked by `make test FILES=tests/check-pr-body.test.ts` (T1)
 
 ## Non-goals
 Do not touch .github/workflows. No new dependencies. No em dashes, no filler words. Nothing outside Files.
 
 ## Files
-`scripts/check-pr-body.ts`, `tests/check-pr-body.test.ts`, `tests/mutations.json`
+- `scripts/check-pr-body.ts`
+- `tests/check-pr-body.test.ts`
+- `tests/mutations.json`
 
 ## How to ship
 One PR from branch feat/q-verdict. Commits use `git commit -s`. PR body uses every section of .github/pull_request_template.md, filled with real evidence (the gate output, not "pending"). Run `python3 scripts/kaas/check-affected.py --run` before pushing. Each new mutation entry in tests/mutations.json is {name,file,find,replace,test}; its `find` must match exactly once in its file, and the test must fail under the replacement. Never put a session link in a commit or PR.
