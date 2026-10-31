@@ -65,8 +65,13 @@ export interface MutantResult {
 }
 
 // Runs every mutant in one copy of `dir`, restoring each file before the next, and never edits `dir`.
-export async function runChangedLineMutants(dir: string, diff: string, testCmd: string): Promise<MutantResult> {
-  const mutants = mutantsFor(diff, (f) => readFileSync(join(dir, f), "utf8")).slice(0, MAX_MUTANTS);
+export async function runChangedLineMutants(
+  dir: string,
+  diff: string,
+  testCmd: string,
+  max = MAX_MUTANTS,
+): Promise<MutantResult> {
+  const mutants = mutantsFor(diff, (f) => readFileSync(join(dir, f), "utf8")).slice(0, max);
   if (!mutants.length) return { mutants: 0, survived: [] };
   const copy = mkdtempSync(join(tmpdir(), "factory-mutants-"));
   const survived: string[] = [];
