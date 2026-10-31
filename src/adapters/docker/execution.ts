@@ -4,9 +4,9 @@
 // spec asks for it. The command runs as this user, so files it writes in the
 // worktree are not root's.
 
-import { withEgress } from "../../egress-env";
 import { resolveImage } from "../../images";
 import type { AgentInVm, ExecResult, ExecutionPort } from "../../ports/execution";
+import { withInternalEgress } from "./egress-network";
 
 export interface DockerSpec {
   readonly kind: "docker";
@@ -19,16 +19,13 @@ export interface DockerSpec {
   readonly pids?: number;
   // `--runtime`, for example "runsc" for gVisor.
   readonly runtime?: string;
-  // Hosts the command may reach, through the egress proxy only. Absent: the network is `network`.
+  // Hosts the command may reach, through the egress proxy only, on an internal network. Absent: `network`.
   readonly allow?: readonly string[];
 }
 
-// The container reaches the proxy on the host's loopback by this name.
-export const HOST_GATEWAY = "host.docker.internal";
-// The proxy is reached over a network, so an allow list lifts the default "none" to a bridge.
-export const withProxyNetwork = (spec: DockerSpec): DockerSpec =>
-  spec.allow ? { ...spec, network: spec.network ?? "bridge" } : spec;
-export const toGateway = (url: string): string => url.replace("127.0.0.1", HOST_GATEWAY);
+// With an allow list the network is the run's internal one, whatever the spec names: never bridge.
+export const withProxyNetwork = (spec: DockerSpec, internal: string): DockerSpec =>
+  spec.allow ? { ...spec, network: internal } : spec;
 
 export function containerArgs(
   spec: DockerSpec,
@@ -49,7 +46,6 @@ export function containerArgs(
     "no-new-privileges",
     "--network",
     spec.network ?? "none",
-    ...(spec.allow ? ["--add-host", `${HOST_GATEWAY}:host-gateway`] : []),
     "--memory",
     spec.memory ?? "4g",
     "--cpus",
@@ -120,11 +116,12 @@ export class DockerExecution implements ExecutionPort {
   constructor(private readonly spec: DockerSpec) {}
   async run(cmd: string, cwd: string): Promise<ExecResult> {
     const { allow } = this.spec;
-    if (allow) return withEgress(allow, toGateway, (env) => this.spawn(cmd, cwd, env));
-    return this.spawn(cmd, cwd, {});
+    if (allow)
+      return withInternalEgress(allow, (net, env) => this.spawn(withProxyNetwork(this.spec, net), cmd, cwd, env));
+    return this.spawn(this.spec, cmd, cwd, {});
   }
-  private async spawn(cmd: string, cwd: string, egress: Record<string, string>): Promise<ExecResult> {
-    const proc = Bun.spawn(containerArgs(withProxyNetwork(this.spec), cmd, cwd, undefined, egress), {
+  private async spawn(spec: DockerSpec, cmd: string, cwd: string, egress: Record<string, string>): Promise<ExecResult> {
+    const proc = Bun.spawn(containerArgs(spec, cmd, cwd, undefined, egress), {
       cwd,
       env: process.env,
       stdout: "pipe",
