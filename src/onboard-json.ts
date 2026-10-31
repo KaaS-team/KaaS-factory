@@ -97,7 +97,7 @@ export function unusableConfigCheck(err: unknown): DoctorCheck {
 
 export function onboardOutput(report: OnboardReport, json: boolean): string {
   if (json) return successJson(report, report.status === "completed");
-  const lines = report.steps.map((s) => `  [${s.state}] ${s.name}${s.next ? ` — ${s.next}` : ""}`);
+  const lines = report.steps.map((s) => `  [${s.state}] ${s.name}${s.next ? ` - ${s.next}` : ""}`);
   lines.push(`factory onboard: ${report.status}, doctor ${report.doctor}. next: ${report.next}`);
   return lines.join("\n");
 }
