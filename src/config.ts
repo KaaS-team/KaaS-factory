@@ -110,11 +110,9 @@ export interface FactoryConfig {
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
   // Monorepo packages, each with its own gates; see PackageSpec.
   readonly packages?: readonly PackageSpec[];
-  // Opt-in: `reset`/`rebaseline` refuse unless true, so a stray `factory reset` never force-pushes
-  // a live repo (lwp-website) back to a baseline tag (plan v2.6.2 item 2).
+  // Opt-in: `reset`/`rebaseline` refuse unless true, so a stray `factory reset` never force-pushes a live repo.
   readonly resettable: boolean;
-  // Commands run once per fresh worktree, before any stage (e.g. "npm ci").
-  // Idempotent via a marker file in the worktree; a failure parks the issue.
+  // Run once per fresh worktree, before any stage (e.g. "npm ci"), once via a marker file; a failure parks the issue.
   readonly setup: readonly string[];
   readonly agentCommands: AgentCommands;
   // Named agents, each a preset or a command; `stages` says which one runs a stage.
@@ -122,11 +120,11 @@ export interface FactoryConfig {
   readonly stages: StageAgents;
   // Per-type overrides, keyed by the type label. See RouteConfig.
   readonly routes: Readonly<Record<string, RouteConfig>>;
-  // Checked before every stage (plan v2.7.0 item 7): an issue's lifetime spend, the repo's since 00:00
-  // UTC, and the issue's runs with unknown cost, which no dollar sum can hold. A breach parks the
-  // issue with a "budget" inbox item.
+  // Checked before every stage: an issue's lifetime spend, the repo's since 00:00 UTC, and the runs with
+  // unknown cost, which no dollar sum can hold. A breach parks the issue with a "budget" inbox item.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
+  readonly review: { readonly maxRounds: number }; // failed reviews before a person takes over
   readonly holdout: HoldoutConfig;
   // The acceptance checker's path in the repo. "" turns the Acceptance table off.
   readonly acceptance: AcceptanceConfig;
@@ -144,8 +142,7 @@ export interface FactoryConfig {
   readonly toolchain?: Toolchain; // the image an "auto" docker or ssh runtime uses (src/images.ts)
   // Where gates and check steps run, by runtime name (src/runtimes.ts); unset is "local".
   readonly runtime?: RuntimeConfig;
-  // Where issues live. GitHub by default; "http" speaks Tracker API v1 (docs/tracker-api.md).
-  // PRs stay on GitHub either way (src/scm.ts).
+  // Where issues live: GitHub by default, "http" speaks Tracker API v1 (docs/tracker-api.md). PRs stay on GitHub.
   readonly tracker: TrackerConfig;
   // A factory label to the team's own name for it, e.g. LABEL.ready to "ready-for-ai".
   // Applied once, at the tracker boundary; everything inside still speaks LABEL.*.
@@ -234,8 +231,7 @@ export interface RuntimeConfig {
 
 export type Profile = "solo" | "team" | "startup" | "scaleup" | "enterprise";
 
-// What each profile changes from DEFAULT_CONFIG. "team" is the default's own
-// behaviour; the others trade autonomy for review as the company grows.
+// What each profile changes from DEFAULT_CONFIG. "team" is the default's own behaviour; the others trade autonomy for review.
 // solo: auto-approve up to medium risk, auto-merge what merge-policy allows.
 // scaleup and enterprise: every plan waits for a human, nothing auto-merges.
 export const PROFILES: Readonly<
@@ -322,6 +318,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   routes: {},
   spend: {},
   merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
+  review: { maxRounds: 3 },
   holdout: { paths: [], cmd: "" },
   acceptance: { script: "scripts/kaas/check-acceptance.py" },
   tmux: { enabled: false, session: "factory" },
@@ -348,6 +345,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
     merge: { ...DEFAULT_CONFIG.merge, ...p.merge, ...partial.merge },
+    review: { ...DEFAULT_CONFIG.review, ...partial.review },
     holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
     acceptance: { ...DEFAULT_CONFIG.acceptance, ...partial.acceptance },
     tmux: { ...DEFAULT_CONFIG.tmux, ...partial.tmux },
@@ -386,6 +384,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   routes: "object",
   spend: "object",
   merge: "object",
+  review: "object",
   holdout: "object",
   acceptance: "object",
   tmux: "object",
@@ -462,6 +461,7 @@ export function configProblems(raw: unknown): string[] {
     retro: "positive",
   });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
+  nested("review", { maxRounds: "posInt" });
   nested("runtime", { gates: "string", check: "string" });
   nested("merge", keys.MERGE_KEYS);
   // policy and autonomy are enums: a typo there would read as the default, which for autonomy
