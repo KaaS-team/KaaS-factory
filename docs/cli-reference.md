@@ -156,6 +156,14 @@ factory doctor --repo-dir <path> [--fix]
 
 check the loop can run; --fix creates missing labels.
 
+### onboard
+
+```
+factory onboard [--repo-dir <path>] [--json]
+```
+
+report onboarding as completed, blocked or failed with the next action, and doctor as Ready, Not checked or Needs setup from a live check.
+
 ### explain
 
 ```
