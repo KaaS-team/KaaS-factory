@@ -1,0 +1,7 @@
+{
+  "name": "release: the Markdown list is read without -z",
+  "file": "tests/release.test.ts",
+  "find": "[\"git\", \"ls-files\", \"-z\", \"*.md\"]",
+  "replace": "[\"git\", \"ls-files\", \"*.md\"]",
+  "test": "tests/release.test.ts"
+}

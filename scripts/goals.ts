@@ -8,6 +8,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { loadMutations } from "./mutation-list";
 
 export interface TestProof {
   readonly test: string;
@@ -51,7 +52,7 @@ export function repoAt(root: string): Repo {
   return {
     read,
     version: (JSON.parse(read("package.json") ?? "{}") as { version: string }).version,
-    mutations: JSON.parse(read("tests/mutations.json") ?? "[]"),
+    mutations: loadMutations(root),
   };
 }
 
