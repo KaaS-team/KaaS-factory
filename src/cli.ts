@@ -28,6 +28,7 @@ import { prItems } from "./stale-pr";
 import { remoteCommand } from "./remote-cli";
 import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
+import { buildOnboardReport, doctorOutput, onboardOutput, unusableConfigCheck } from "./onboard-json";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard, servingAccess as plane } from "../dashboard/server";
 import { runnerBlobStore } from "./blobs";
@@ -413,27 +414,32 @@ async function cmdDoctor(): Promise<void> {
   try {
     config = await loadConfig(cloneDir);
   } catch (err) {
-    if (has("json"))
-      console.log(
-        successJson(
-          {
-            checks: [
-              {
-                name: ".factory/config.json is usable",
-                ok: false,
-                detail: err instanceof Error ? err.message : String(err),
-                fixable: false,
-              },
-            ],
-          },
-          false,
-        ),
-      );
-    else console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
+    console.log(doctorOutput([unusableConfigCheck(err)], has("json"), false));
     process.exit(EXIT.checksFailed);
   }
   const github = makeScm(config);
-  const checks = await runDoctor(
+  const checks = await liveDoctorChecks(config, cloneDir, github);
+  const allOk = checks.every((c) => c.ok || c.warn);
+  console.log(doctorOutput(checks, has("json")));
+  if (!allOk && has("fix")) {
+    console.error("factory doctor --fix: creating missing labels");
+    await fixDoctor(github, config.repo, config.routes, await workflowFor(cloneDir, config).catch(() => undefined));
+  }
+  if (!allOk && !has("fix")) process.exit(EXIT.checksFailed);
+}
+
+// Doctor runs live inside onboard only once the template and a filled-in config exist.
+async function cmdOnboard(): Promise<void> {
+  const dir = await resolveCloneDir();
+  const report = await buildOnboardReport(dir, () =>
+    loadConfig(dir).then((config) => liveDoctorChecks(config, dir, makeScm(config))),
+  );
+  console.log(onboardOutput(report, has("json")));
+  if (report.status !== "completed") process.exit(EXIT.checksFailed);
+}
+
+async function liveDoctorChecks(config: FactoryConfig, cloneDir: string, github: ReturnType<typeof makeScm>) {
+  return runDoctor(
     {
       github,
       tracker: { kind: github.trackerKind, authStatus: () => github.tracker.authStatus() },
@@ -473,14 +479,6 @@ async function cmdDoctor(): Promise<void> {
       resettable: config.resettable,
     },
   );
-  const allOk = checks.every((c) => c.ok || c.warn);
-  if (has("json")) console.log(successJson({ checks }, allOk));
-  else for (const c of checks) console.log(`  [${c.ok ? "ok" : c.warn ? "warn" : "FAIL"}] ${c.name} — ${c.detail}`);
-  if (!allOk && has("fix")) {
-    console.error("factory doctor --fix: creating missing labels");
-    await fixDoctor(github, config.repo, config.routes, await workflowFor(cloneDir, config).catch(() => undefined));
-  }
-  if (!allOk && !has("fix")) process.exit(EXIT.checksFailed);
 }
 
 // `dashboard/server.ts`'s own `if (import.meta.main)` block never fires
@@ -857,6 +855,8 @@ async function main(): Promise<void> {
       return cmdRebaseline();
     case "doctor":
       return cmdDoctor();
+    case "onboard":
+      return cmdOnboard();
     case "explain":
       return (await import("./explain-cli")).cmdExplain(cli);
     case "install":
