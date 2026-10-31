@@ -19,7 +19,7 @@ test("leaks", () => {
 
 const repoRoot = resolve(import.meta.dir, "..");
 
-function childRun(cmd: string[], env: Record<string, string>): { code: number; left: string[] } {
+function childRun(cmd: string[], env: Record<string, string>): { code: number; left: string[]; out: string } {
   // preload's afterAll removes the run root after each --rerun-each repeat; recreate it so a repeat never needs the last one's dir.
   mkdirSync(tmpdir(), { recursive: true });
   const outer = mkdtempSync(join(tmpdir(), "temp-leak-"));
@@ -28,22 +28,43 @@ function childRun(cmd: string[], env: Record<string, string>): { code: number; l
     mkdirSync(tmp);
     const file = join(outer, "leaky.test.ts");
     writeFileSync(file, LEAKY);
+    // check-cache lists inputs with `git ls-files`, which fails where the repo is a copy with no .git (a mutant under /tmp).
+    // Point git at a throwaway dir for the work tree so the child behaves the same wherever the repo sits.
+    const gitDir = join(outer, "git");
+    const init = Bun.spawnSync(["git", "init", "-q", gitDir], { env: { ...process.env, TMPDIR: tmp } });
+    if (init.exitCode !== 0) throw new Error(`git init: ${init.stderr}`);
+    // A mutant's node_modules is a symlink, which .gitignore's `node_modules/` does not match, and git cannot hash it.
+    mkdirSync(join(gitDir, ".git", "info"), { recursive: true });
+    writeFileSync(join(gitDir, ".git", "info", "exclude"), "node_modules\nreports\n");
     const res = Bun.spawnSync(
       cmd.map((c) => c.replace("<file>", file)),
-      { cwd: repoRoot, env: { ...process.env, ...env, TMPDIR: tmp } },
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          ...env,
+          TMPDIR: tmp,
+          GIT_DIR: join(gitDir, ".git"),
+          GIT_WORK_TREE: repoRoot,
+          CHECK_CACHE_DIR: join(outer, "cache"),
+        },
+      },
     );
-    return { code: res.exitCode, left: readdirSync(tmp) };
+    const out = `${res.stdout}`.slice(-1500) + `\n--stderr--\n${res.stderr}`.slice(-1500);
+    return { code: res.exitCode, left: readdirSync(tmp), out };
   } finally {
     rmSync(outer, { recursive: true, force: true });
   }
 }
 
 test("bun test removes the temp dirs a test made and never cleaned", () => {
-  expect(childRun(["bun", "test", "<file>"], {})).toEqual({ code: 0, left: [] });
+  const r = childRun(["bun", "test", "<file>"], {});
+  expect({ code: r.code, left: r.left }, r.out).toEqual({ code: 0, left: [] });
 });
 
 test("make test removes temp files a child process made outside the test's own process", () => {
-  expect(childRun(["make", "-s", "test", "FILES=<file>"], { LEAK_SHELL: "1" })).toEqual({ code: 0, left: [] });
+  const r = childRun(["make", "-s", "test", "FILES=<file>"], { LEAK_SHELL: "1" });
+  expect({ code: r.code, left: r.left }, r.out).toEqual({ code: 0, left: [] });
 });
 
 test("make test still fails when a test fails, and still cleans up", () => {
