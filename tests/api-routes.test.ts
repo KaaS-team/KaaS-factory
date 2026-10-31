@@ -32,6 +32,7 @@ describe("ROUTES", () => {
       "runs.get",
       "runs.events",
       "spend.get",
+      "metrics.get",
       "stream",
     ]);
   });
