@@ -9,6 +9,7 @@ import {
   gateCount,
   holdoutEnabled,
   loadConfig,
+  mergeConfig,
   TRACKER_KINDS,
   type TrackerConfig,
   testGate,
@@ -251,6 +252,15 @@ describe("config validation at boot", () => {
     expect(problems.join("\n")).toMatch(/holdout\.cmd: expected string/);
     expect(problems.join("\n")).toMatch(/holdout\.paths: expected strings/);
     expect(problems.join("\n")).toMatch(/holdout\.extra: unknown key/);
+  });
+
+  test("acceptance.script defaults to the kit path, may be empty, and must be a string", () => {
+    expect(mergeConfig({ repo: "a/b" }).acceptance.script).toBe("scripts/kaas/check-acceptance.py");
+    expect(mergeConfig({ repo: "a/b", acceptance: { script: "ci/accept.py" } }).acceptance.script).toBe("ci/accept.py");
+    expect(configProblems({ repo: "a/b", acceptance: { script: "" } })).toEqual([]);
+    expect(configProblems({ repo: "a/b", acceptance: { script: 1 } }).join("\n")).toMatch(
+      /acceptance\.script: expected string/,
+    );
   });
 
   test("tmux, prRunSummary and templateOverrides are accepted, and wrong types are named", () => {

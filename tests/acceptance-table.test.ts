@@ -53,9 +53,16 @@ function exec(stdout: string, code = 0): ExecutionPort & { cmds: string[] } {
   };
 }
 
-function withScript(): string {
+// The shared temp parent can be gone on a --rerun-each pass, so each test makes its own path first.
+function freshDir(): string {
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(tmpdir(), "acceptance-"));
   dirs.push(d);
+  return d;
+}
+
+function withScript(): string {
+  const d = freshDir();
   mkdirSync(join(d, "scripts/kaas"), { recursive: true });
   writeFileSync(join(d, ACCEPTANCE_SCRIPT), "");
   return d;
@@ -129,6 +136,21 @@ describe("runAcceptance", () => {
     const e = exec(JSON.stringify(fixture));
     expect(await runAcceptance(e, withScript(), "main")).toEqual(fixture);
     expect(e.cmds).toEqual([`python3 ${ACCEPTANCE_SCRIPT} --json --base 'origin/main'`]);
+  });
+
+  test("a custom script path is the one executed", async () => {
+    const d = freshDir();
+    mkdirSync(join(d, "ci"), { recursive: true });
+    writeFileSync(join(d, "ci/accept.py"), "");
+    const e = exec(JSON.stringify(fixture));
+    expect(await runAcceptance(e, d, "main", "ci/accept.py")).toEqual(fixture);
+    expect(e.cmds).toEqual(["python3 ci/accept.py --json --base 'origin/main'"]);
+  });
+
+  test("an empty script runs nothing even when the kit script exists", async () => {
+    const e = exec(JSON.stringify(fixture));
+    expect(await runAcceptance(e, withScript(), "main", "")).toBeUndefined();
+    expect(e.cmds).toEqual([]);
   });
 
   test("a crash with no JSON becomes a problem in the table, not a missing table", async () => {

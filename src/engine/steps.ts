@@ -387,7 +387,12 @@ const verify: StepType = {
       if (survived?.reject) return rejectToBuild(sc, survived.body, found!, "plan mutations survived");
       if (survived) await postComment(deps, config, issueNumber, survived.body, { stage: "verify", json: found });
     }
-    const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
+    const acceptance = await runAcceptance(
+      deps.setupRunner ?? new ShellSetupRunner(),
+      worktree,
+      config.base,
+      config.acceptance.script,
+    );
     if (acceptance)
       await Bun.write(`${worktree}/${runDir(issueNumber)}/acceptance.json`, `${JSON.stringify(acceptance, null, 2)}\n`);
     // The pr agent runs in this worktree next, so the receipt signs what verify sealed here, not what it finds later.
