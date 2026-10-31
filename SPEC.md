@@ -38,14 +38,20 @@ Deps: T1
 Adjust `find` to text that occurs exactly once in your script.
 
 ## Acceptance
-- A stale baseline fails `make check` with the stale entries named.
-- Running the generator makes `--check` pass; growing a file past its entry is never fixed silently.
+- AC-1: a stale baseline fails the check with the stale entries named: checked by `make test FILES=tests/gen-quality-baseline.test.ts` (T1)
+- AC-2: growing a file past its entry is never fixed silently: checked by `make test FILES=tests/gen-quality-baseline.test.ts` (T1)
+- AC-3: `make check` lists `check-baseline`: checked by `make test FILES=tests/ci-wiring.test.ts` (T2)
 
 ## Non-goals
 Do not touch .github/workflows. No new dependencies. No em dashes, no filler words. Nothing outside Files.
 
 ## Files
-`scripts/gen-quality-baseline.ts`, `tests/gen-quality-baseline.test.ts`, `tests/ci-wiring.test.ts`, `Makefile`, `quality-baseline.json`, `tests/mutations.json`
+- `scripts/gen-quality-baseline.ts`
+- `tests/gen-quality-baseline.test.ts`
+- `tests/ci-wiring.test.ts`
+- `Makefile`
+- `quality-baseline.json`
+- `tests/mutations.json`
 
 ## How to ship
 One PR from branch feat/q-baseline. Commits use `git commit -s`. PR body uses every section of .github/pull_request_template.md, filled with real evidence (the gate output, not "pending"). Run `python3 scripts/kaas/check-affected.py --run` before pushing. Each new mutation entry in tests/mutations.json is {name,file,find,replace,test}; its `find` must match exactly once in its file, and the test must fail under the replacement. Never put a session link in a commit or PR.
