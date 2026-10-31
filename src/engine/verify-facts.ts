@@ -11,7 +11,7 @@ import {
   type Risk,
 } from "../artifacts";
 import { resolveRoute } from "../agents/executor";
-import type { FactoryConfig } from "../config";
+import { type FactoryConfig, testGate } from "../config";
 import type { GhIssue } from "../github";
 import { issueType } from "../labels";
 import { collectVerifyFacts, readVerifyFacts, writeVerifyFacts } from "../pr-facts-collect";
@@ -19,7 +19,7 @@ import { recordPromotion } from "../promotion";
 import { isChecked } from "../recheck";
 import { crossModel } from "../review-models";
 import { labelsOf, runStage } from "./common";
-import { type ProofGit, type ProofResult, proofCommand } from "../proof";
+import { isMutation, type PlanMutation, type ProofGit, type ProofResult, proofCommand, runMutations } from "../proof";
 import { floorPlanRisk } from "../risk";
 
 export function flooredPlan<P extends { risk: Risk; files: readonly string[] }, R extends { json?: P }>(
@@ -32,10 +32,67 @@ export function flooredPlan<P extends { risk: Risk; files: readonly string[] }, 
 // The plan's proof kind, and the top-level test gate plus each touched package's, so a monorepo
 // proof reaches the package the diff changed.
 export async function proofInputs(git: ProofGit, worktree: string, config: FactoryConfig, issue: number) {
-  const plan = (await readStageArtifacts(worktree, issue, "plan")).json as { proof?: "test" | "check" } | undefined;
+  const plan = (await readStageArtifacts(worktree, issue, "plan")).json as
+    | { proof?: "test" | "check"; mutations?: unknown[] }
+    | undefined;
   const changed = config.packages?.length ? await git.changes(worktree, config.base) : [];
   const paths = changed.map((c) => c.path);
-  return { planProof: plan?.proof, testCmd: proofCommand(config.gates, config.packages ?? [], paths) };
+  return {
+    planProof: plan?.proof,
+    testCmd: proofCommand(config.gates, config.packages ?? [], paths),
+    mutations: (plan?.mutations ?? []).filter(isMutation),
+  };
+}
+
+// What the plan's mutations found. Only a survivor, or a pass that could not run, rejects: a
+// find text the build moved or a missing test gate is the builder's to see, not a reason to fail.
+export interface MutationFindings {
+  readonly names: string[];
+  readonly body: string;
+  readonly reject: boolean;
+}
+
+// Each mutation is applied to the worktree and put back before the next.
+export async function survivingMutations(
+  git: ProofGit,
+  worktree: string,
+  config: FactoryConfig,
+  mutations: readonly PlanMutation[],
+): Promise<MutationFindings | undefined> {
+  if (!git.mutations || mutations.length === 0) return undefined;
+  const gate = testGate(config.gates);
+  // The plan's test string is never run raw: without a test gate there is nothing safe to run it with.
+  if (!gate)
+    return {
+      names: [],
+      body: "Plan mutations were not run: no gate has role test (or is named test) in config.",
+      reject: false,
+    };
+  // A test gate with fileCmd runs only the named test; without one, the whole gate runs.
+  const cmdFor = (test: string) => (gate.fileCmd ? `${gate.fileCmd} '${test.replaceAll("'", "'\\''")}'` : gate.cmd);
+  let results: Awaited<ReturnType<typeof runMutations>>;
+  try {
+    results = await runMutations(git.mutations, worktree, mutations, cmdFor);
+  } catch (err) {
+    // A bad path, a missing file or a hung test: the file is back, and the pass proved nothing.
+    return { names: [], body: `Plan mutations could not run: ${(err as Error).message}`, reject: true };
+  }
+  const code = (tail: string) => `\n\n\`\`\`\n${tail}\n\`\`\``;
+  const survivors = results.filter((r) => r.status === "survives");
+  const unapplied = results.filter((r) => r.status === "unapplied");
+  const parts = [
+    survivors.length
+      ? `Plan mutations whose test still passed:\n\n${survivors.map((r) => `- \`${r.name}\`${code(r.tail)}`).join("\n\n")}`
+      : "",
+    unapplied.length
+      ? `Plan mutations not applied (update their find text; they prove nothing):\n\n${unapplied.map((r) => `- \`${r.name}\`: ${r.tail}`).join("\n")}`
+      : "",
+    !gate.fileCmd && mutations.length > 1
+      ? `The test gate has no fileCmd, so each of the ${mutations.length} mutations ran the whole gate.`
+      : "",
+  ].filter(Boolean);
+  if (parts.length === 0) return undefined;
+  return { names: survivors.map((r) => r.name), body: parts.join("\n\n"), reject: survivors.length > 0 };
 }
 
 // Only a repo that can merge on its own pays for mutants and a clean room. A failed collection
