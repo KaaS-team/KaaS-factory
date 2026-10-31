@@ -20,6 +20,8 @@ test("leaks", () => {
 const repoRoot = resolve(import.meta.dir, "..");
 
 function childRun(cmd: string[], env: Record<string, string>): { code: number; left: string[] } {
+  // preload's afterAll removes the run root after each --rerun-each repeat; recreate it so a repeat never needs the last one's dir.
+  mkdirSync(tmpdir(), { recursive: true });
   const outer = mkdtempSync(join(tmpdir(), "temp-leak-"));
   try {
     const tmp = join(outer, "tmp");
