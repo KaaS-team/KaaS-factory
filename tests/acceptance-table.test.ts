@@ -56,6 +56,7 @@ function exec(stdout: string, code = 0): ExecutionPort & { cmds: string[] } {
 // The shared temp parent can be gone on a --rerun-each pass, so each test makes its own path first.
 function freshDir(): string {
   mkdirSync(tmpdir(), { recursive: true });
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(tmpdir(), "acceptance-"));
   dirs.push(d);
   return d;
@@ -125,6 +126,7 @@ describe("planAcceptance", () => {
 
 describe("runAcceptance", () => {
   test("a repo without the kit script gets no table", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const d = mkdtempSync(join(tmpdir(), "acceptance-"));
     dirs.push(d);
     const e = exec("{}");
@@ -219,7 +221,9 @@ describe("an unproven acceptance verdict rejects verify", () => {
   // Drives one issue from ready to a shipped PR, check-acceptance.py answering with each verdict in turn.
   async function ship(verdicts: AcceptanceVerdict[], plan: Record<string, unknown>, changed: string[] = []) {
     const n = 1;
+    mkdirSync(tmpdir(), { recursive: true });
     const workspacesDir = mkdtempSync(join(tmpdir(), "factory-accept-ws-"));
+    mkdirSync(tmpdir(), { recursive: true });
     const cloneDir = mkdtempSync(join(tmpdir(), "factory-accept-clone-"));
     dirs2.push(workspacesDir, cloneDir);
     mkdirSync(join(workspacesDir, `issue-${n}`, "scripts/kaas"), { recursive: true });
@@ -367,6 +371,7 @@ describe("an unproven acceptance verdict rejects verify", () => {
 });
 
 test("the stage's agent is handed the hidden paths, for guard-paths.sh", async () => {
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(tmpdir(), "acceptance-env-"));
   dirs.push(d);
   mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });
