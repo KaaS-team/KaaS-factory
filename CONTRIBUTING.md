@@ -9,7 +9,7 @@ The address must be the commit's author address. CI runs `bun scripts/dco.ts` on
 and names any commit that lacks one; fix it with `git rebase --signoff origin/main`.
 
 A pull request body fills every section of `.github/pull_request_template.md` (Summary, Plan, Gate evidence,
-Verify verdict, Risk and rollback), or has the factory's own What changed and Acceptance sections.
+Verify verdict, Confidence, Risk and rollback), or has the factory's own What changed and Acceptance sections.
 CI runs `bun scripts/check-pr-body.ts` and names any section that is missing or empty.
 
 A pull request that only changes tests, deletes a test, removes an assertion, adds a skip or loosens a matcher

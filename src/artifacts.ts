@@ -62,6 +62,7 @@ export interface BuildArtifact {
 
 // A finding is a plain string (older verdicts) or the blueprint review shape:
 // severity, a 0-5 confidence, and what/why/where/fix. Strings never block a pass.
+// `evidence` is the reproduction, a failing command, input or scenario.
 export type Severity = "must" | "should" | "could";
 export interface Finding {
   readonly severity: Severity;
@@ -70,6 +71,7 @@ export interface Finding {
   readonly where?: string;
   readonly why?: string;
   readonly fix?: string;
+  readonly evidence?: string;
 }
 export interface Criterion {
   readonly id: string;
@@ -101,7 +103,7 @@ export interface RetroArtifact {
 export const MAX_STEP_JSON_BYTES = 16 * 1024;
 export const VERDICT_KEY_LIST = ["result", "rounds", "findings", "criteria", "outcome", "summary"] as const;
 const VERDICT_KEYS = new Set<string>(VERDICT_KEY_LIST);
-const FINDING_KEYS = new Set(["severity", "confidence", "what", "where", "why", "fix"]);
+const FINDING_KEYS = new Set(["severity", "confidence", "what", "where", "why", "fix", "evidence"]);
 const CRITERION_KEYS = new Set(["id", "status", "gap"]);
 // A finding this sure and this serious contradicts a pass.
 export const BLOCKING_CONFIDENCE = 3;
@@ -206,6 +208,8 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
     if (!Number.isInteger(o.confidence) || (o.confidence as number) < 0 || (o.confidence as number) > 5)
       return bad("a finding's confidence must be an integer from 0 to 5");
     if (typeof o.what !== "string" || !o.what.trim()) return bad('a finding needs a non-empty "what"');
+    if (o.evidence !== undefined && (typeof o.evidence !== "string" || !o.evidence.trim()))
+      return bad('a finding\'s "evidence" must be a non-empty string');
   }
   if (v.criteria !== undefined) {
     if (!Array.isArray(v.criteria)) return bad('verdict.json "criteria" must be an array');

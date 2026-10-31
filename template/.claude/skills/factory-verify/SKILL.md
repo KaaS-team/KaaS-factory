@@ -81,7 +81,8 @@ Then write `.factory/runs/issue-<N>/verdict.json`:
 ```
 
 A finding is `{ "severity": "must|should|could", "confidence": 0-5, "what": "...",
-"where": "file:line", "why": "...", "fix": "..." }` (`what` is required). A
+"where": "file:line", "why": "...", "fix": "...", "evidence": "..." }` (`what` is required). A must or should needs
+`where` on a changed line and `evidence`, or the runner drops it. A
 criterion is `pass`, `fail`, or `unverified` (with a `gap`); AC ids come from the
 plan and are never renumbered. No other top-level fields are allowed [enforced: stop-artifact.sh];
 the runner also refuses an unknown finding or criterion field. The file must be one JSON object

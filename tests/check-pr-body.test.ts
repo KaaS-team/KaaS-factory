@@ -9,6 +9,7 @@ const filled = (over: Record<string, string> = {}): string => {
     Plan: "Planned in #12.",
     "Gate evidence": "make check: pass",
     "Verify verdict": "AC-1 pass",
+    Confidence: "| Gate | make check green |",
     "Risk and rollback": "Low; revert the commit.",
     ...over,
   };
@@ -23,8 +24,19 @@ describe("check-pr-body", () => {
   });
   test("a one-paragraph body is refused with every missing section named", () => {
     const out = problems("check-mutations was red.", template);
-    expect(out).toHaveLength(5);
+    expect(out).toHaveLength(6);
     expect(out[0]).toContain('missing section "Summary"');
+  });
+  test("the template has a Confidence section with the five layer rows", () => {
+    const section = template.split("## Confidence")[1]!.split("\n## ")[0]!;
+    for (const layer of [
+      "Gate",
+      "Proof (fails on base)",
+      "Changed-line mutants",
+      "Review findings with evidence",
+      "UI preview and smoke",
+    ])
+      expect(section).toContain(`| ${layer} |`);
   });
   test("an empty or comment-only section is refused", () => {
     expect(problems(filled({ "Gate evidence": "<!-- verbatim -->" }), template)).toEqual([
