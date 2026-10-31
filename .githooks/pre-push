@@ -1,3 +1,27 @@
 #!/bin/sh
 # Written by the kaas kit (scripts/sync-vendored.py); the gate is scripts/kaas/pre-push.sh.
-exec scripts/kaas/pre-push.sh "$@"
+# The cheap checks run first: a missing sign-off or a format failure otherwise surfaces only in CI.
+# git hands the ref lines on stdin; they are replayed to the gate below.
+refs=$(cat)
+zero=0000000000000000000000000000000000000000
+printf '%s\n' "$refs" | while read -r _ local_sha _ remote_sha; do
+  [ -n "$local_sha" ] || continue
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" = "$zero" ]; then
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null) || {
+      echo "pre-push: no origin/main to compare a new ref against, DCO check skipped" >&2
+      continue
+    }
+  else
+    base=$remote_sha
+  fi
+  if ! bun scripts/dco.ts "$base" "$local_sha"; then
+    echo "pre-push: \`bun scripts/dco.ts $base $local_sha\` failed" >&2
+    exit 1
+  fi
+done || exit 1
+if ! bun x biome ci .; then
+  echo "pre-push: \`bun x biome ci .\` failed" >&2
+  exit 1
+fi
+printf '%s\n' "$refs" | exec scripts/kaas/pre-push.sh "$@"
