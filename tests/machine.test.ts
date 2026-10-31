@@ -5,15 +5,21 @@
 // what two real `factory watch` processes sharing FACTORY_HOME would be.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentVm, escapeLike, loadMachineConfig, MachineLeases, suggestSlots } from "../src/machine";
 
+// The preload removes the tmp root after each rerun, so every directory remakes it first.
+const tmp = (prefix: string) => {
+  mkdirSync(tmpdir(), { recursive: true });
+  return mkdtempSync(join(tmpdir(), prefix));
+};
+
 const cap = (n: number) => ({ repo: "r", repoCap: n, machineSlots: n });
 
 function tmpDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "factory-machine-"));
+  const dir = tmp("factory-machine-");
   return join(dir, "machine.db");
 }
 
@@ -128,13 +134,13 @@ describe("loadMachineConfig", () => {
   });
 
   test("naming neither falls back to the default", () => {
-    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const dir = tmp("factory-home-");
     expect(loadMachineConfig({ FACTORY_HOME: dir })).toEqual({ slots: 2 });
     rmSync(dir, { recursive: true, force: true });
   });
 
   test("machine.json is read and validated when present", () => {
-    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const dir = tmp("factory-home-");
     Bun.write(`${dir}/machine.json`, JSON.stringify({ slots: 3, dailyUsd: 20 }));
     expect(loadMachineConfig({ FACTORY_HOME: dir })).toEqual({ slots: 3, dailyUsd: 20 });
     Bun.write(`${dir}/machine.json`, JSON.stringify({ slots: 0 }));
@@ -146,7 +152,7 @@ describe("loadMachineConfig", () => {
 describe("agentRuntime", () => {
   const vm = { kind: "microsandbox", image: "node:22-slim", allow: ["api.anthropic.com"] } as const;
   const home = (machine: object) => {
-    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const dir = tmp("factory-home-");
     writeFileSync(`${dir}/machine.json`, JSON.stringify(machine));
     return dir;
   };
@@ -176,5 +182,20 @@ describe("suggestSlots", () => {
   test("is a positive integer", () => {
     expect(Number.isInteger(suggestSlots())).toBe(true);
     expect(suggestSlots()).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("an agent37 worker's own instance", () => {
+  const load = (runtime: object, instanceEnv: string) => {
+    const home = tmp("factory-machine-own-");
+    writeFileSync(join(home, "machine.json"), JSON.stringify({ slots: 1, runtimes: { gates: runtime } }));
+    return () => loadMachineConfig({ FACTORY_HOME: home, FACTORY_AGENT37_INSTANCE: instanceEnv });
+  };
+
+  test("a gate runtime on the worker's own instance is refused, a different one loads", () => {
+    const own = { kind: "agent37", instance: "i1", tokenEnv: "K" };
+    expect(load(own, "i1")).toThrow(/FACTORY_AGENT37_INSTANCE/);
+    expect(load({ kind: "agent37", instances: ["i2", "i1"], tokenEnv: "K" }, "i1")).toThrow(/FACTORY_AGENT37_INSTANCE/);
+    expect(load(own, "i9")().runtimes).toHaveProperty("gates");
   });
 });
