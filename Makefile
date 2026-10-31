@@ -1,28 +1,34 @@
-.PHONY: agent-matrix install check check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix install check check-anchors check-baseline check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks
 
 install:
 	bun install
 
+# Sets core.hooksPath to .githooks: commit-msg adds a missing sign-off, pre-push checks DCO and biome.
+hooks:
+	bun scripts/install-hooks.ts
+
 # make check = lint (biome, and rustfmt plus clippy on verify/ and relay/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
 # check did not ship (see the kaas-eng plugin's engineering.md, Rule 0).
-check: lint typecheck test skills-check
+check: lint typecheck test skills-check check-anchors check-baseline
 	@echo "make check: ok"
 
 # reuse lint checks every file's licence against REUSE.toml (tests/licensing.test.ts checks what it says).
 # Biome is the one formatter and linter. The rules biome.json turns off are house idioms
 # (`!` in tests, comma and forEach shorthand, literal `${}` in test strings).
+# Each check replays a green run whose inputs hash the same (scripts/check-cache.ts); `CHECK_CACHE=off make check` runs everything.
+CACHE = bun scripts/check-cache.ts
 lint:
-	bun x biome ci .
-	uvx reuse==6.2.0 lint --quiet
+	$(CACHE) lint-biome -- bun x biome ci .
+	$(CACHE) lint-reuse -- uvx reuse==6.2.0 lint --quiet
 	@command -v cargo >/dev/null 2>&1 || { echo "make check: cargo is required for verify/ and relay/, not skipping them" >&2; exit 1; }
-	cargo fmt --manifest-path verify/Cargo.toml --check
-	cargo clippy --quiet --locked --manifest-path verify/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-verify-target} -- -D warnings
-	cargo fmt --manifest-path relay/Cargo.toml --check
-	cargo clippy --quiet --locked --manifest-path relay/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-relay-target} -- -D warnings
+	$(CACHE) lint-fmt-verify --in verify -- cargo fmt --manifest-path verify/Cargo.toml --check
+	$(CACHE) lint-clippy-verify --in verify -- cargo clippy --quiet --locked --manifest-path verify/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-verify-target} -- -D warnings
+	$(CACHE) lint-fmt-relay --in relay -- cargo fmt --manifest-path relay/Cargo.toml --check
+	$(CACHE) lint-clippy-relay --in relay -- cargo clippy --quiet --locked --manifest-path relay/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-relay-target} -- -D warnings
 
 typecheck:
-	bun x tsc --noEmit
+	$(CACHE) typecheck -- bun x tsc --noEmit
 
 # Run with no git identity, like a fresh CI runner or container, so a code path
 # that needs the developer's own identity fails here and not only on GitHub.
@@ -36,17 +42,25 @@ GIT_ENV = GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COU
 test:
 	@mkdir -p reports
 	@root=$$(mktemp -d "$${TMPDIR:-/tmp}/factory-test-run.XXXXXX"); \
-	$(GIT_ENV) TMPDIR=$$root bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_ARGS) $(FILES); \
+	$(GIT_ENV) TMPDIR=$$root $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_ARGS) $(FILES); \
 	code=$$?; rm -rf "$$root"; exit $$code
 
 quarantine:
 	@f=$$(grep -rl @quarantine tests --include='*.test.ts'); if [ -z "$$f" ]; then echo "quarantine: no @quarantine tests"; \
 	else $(GIT_ENV) bun test -t @quarantine $$f; fi
 
+# Cheap pass: each mutation's find still matches its file exactly once.
+check-anchors:
+	bun scripts/check-mutation-anchors.ts
+
 # Each entry in tests/mutations.json breaks one thing; its test must go red.
 # Proves the checks bite. Its own CI job, since it copies the repo per mutation.
 check-mutations:
 	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null bun scripts/check-mutations.ts $(MUTATION_ARGS)
+
+# A stale quality-baseline.json fails here with the entries named; `bun scripts/gen-quality-baseline.ts` lowers them.
+check-baseline:
+	bun scripts/gen-quality-baseline.ts --check
 
 skills-check:
 	@command -v uvx >/dev/null 2>&1 || { \

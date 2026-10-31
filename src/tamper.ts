@@ -14,7 +14,7 @@ const RUNNER_CONFIG = [
   /^tests\/mutations\.json$/,
 ];
 
-const SKIP = [
+export const SKIP = [
   /\b(test|it|describe)\.(skip|only|todo|failing)\s*\(/,
   /\b(xit|xdescribe|xtest)\s*\(/,
   /@pytest\.mark\.(skip|xfail)/,
@@ -26,14 +26,14 @@ const SKIP = [
 const FORCED_PASS = [/\bprocess\.exit\(\s*0\s*\)/, /\bexit\s+0\b/, /\|\|\s*true\b/, /\bsys\.exit\(\s*0\s*\)/];
 const ASSERTION = /\b(expect|assert\w*|should)\b|\b(test|it)\s*\(/;
 
-interface FileDiff {
+export interface FileDiff {
   path: string;
   deleted: boolean;
   added: string[];
   removed: string[];
 }
 
-function parseDiff(diff: string): FileDiff[] {
+export function parseDiff(diff: string): FileDiff[] {
   const files: FileDiff[] = [];
   let cur: FileDiff | undefined;
   for (const line of diff.split("\n")) {

@@ -235,7 +235,7 @@ export async function recheckFindings(
   const list = dropped.map((f) => `- ${f.what}`).join("\n");
   return {
     verdict: { ...verdict, findings: kept, result },
-    note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a line it changed, so they were dropped:\n${list}`,
+    note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a changed line with a reproduction, so they were dropped:\n${list}`,
   };
 }
 

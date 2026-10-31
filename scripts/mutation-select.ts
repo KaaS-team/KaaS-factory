@@ -3,10 +3,12 @@
 export interface Scoped {
   readonly file: string;
   readonly test: string;
+  // Files the test reads that are neither `file` nor `test`, added when a selector miss names them.
+  readonly inputs?: readonly string[];
 }
 
 // Changing the runner can change any verdict, so it runs everything.
-const RUNS_ALL = new Set(["scripts/check-mutations.ts", "scripts/mutation-select.ts"]);
+const RUNS_ALL = new Set(["scripts/check-mutations.ts", "scripts/mutation-select.ts", "scripts/repo-copy.ts"]);
 const LIST = "tests/mutations.json";
 
 // `before` is the list at the base ref. When only the list changed, the entries that are new or edited run,
@@ -24,6 +26,7 @@ export function selectMutations<T extends Scoped>(
     (m) =>
       touched.has(m.file) ||
       touched.has(m.test.replace(/^\.\//, "")) ||
+      (m.inputs ?? []).some((f) => touched.has(f)) ||
       (touched.has(LIST) && !known.has(JSON.stringify(m))),
   );
 }

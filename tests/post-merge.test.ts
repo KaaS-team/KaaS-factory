@@ -10,6 +10,25 @@ const git = (cwd: string, ...args: string[]) =>
     .stdout.toString()
     .trim();
 
+test("a failing smoke opens the revert, then one follow-up with the same sha, why and revert URL", async () => {
+  const calls: string[][] = [];
+  const steps = (ok: boolean, withFollowUp = true) => ({
+    smoke: async () => ok,
+    openRevert: async (sha: string) => (calls.push(["revert", sha]), `pr/${sha}`),
+    ...(withFollowUp ? { openFollowUp: async (...a: string[]) => void calls.push(["followUp", ...a]) } : {}),
+  });
+  await watchAfterMerge("abc", steps(true));
+  expect(calls).toEqual([]);
+  await watchAfterMerge("def", steps(false));
+  expect(calls).toEqual([
+    ["revert", "def"],
+    ["followUp", "def", "the live smoke failed after merge", "pr/def"],
+  ]);
+  calls.length = 0;
+  expect(await watchAfterMerge("ghi", steps(false, false))).toEqual({ ok: false, revert: "pr/ghi" });
+  expect(calls).toEqual([["revert", "ghi"]]);
+});
+
 test("a failing live smoke after merge opens a revert PR, and the change failure rate tightens thresholds", async () => {
   const opened: string[] = [];
   const steps = (ok: boolean) => ({

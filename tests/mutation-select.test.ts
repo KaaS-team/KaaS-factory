@@ -31,3 +31,9 @@ test("the pull request job passes the base ref so it runs the scoped set", () =>
   expect(yml).toContain("--base origin/{0}");
   expect(yml).toContain("fetch-depth: 0");
 });
+
+test("an entry's inputs select it when the diff touches one of them", () => {
+  const withInputs = { file: "src/a.ts", test: "tests/a.test.ts", inputs: ["src/shared.ts"] };
+  const without = { file: "src/b.ts", test: "tests/b.test.ts" };
+  expect(selectMutations([withInputs, without], ["src/shared.ts"])).toEqual([withInputs]);
+});

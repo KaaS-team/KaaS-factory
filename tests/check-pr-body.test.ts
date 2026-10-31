@@ -7,8 +7,9 @@ const filled = (over: Record<string, string> = {}): string => {
   const sec: Record<string, string> = {
     Summary: "One thing changed.\n\nCloses #12",
     Plan: "Planned in #12.",
-    "Gate evidence": "make check: pass",
+    "Gate evidence": "make check: 412 pass, 0 fail",
     "Verify verdict": "AC-1 pass",
+    Confidence: "| Gate | make check green |",
     "Risk and rollback": "Low; revert the commit.",
     ...over,
   };
@@ -23,8 +24,19 @@ describe("check-pr-body", () => {
   });
   test("a one-paragraph body is refused with every missing section named", () => {
     const out = problems("check-mutations was red.", template);
-    expect(out).toHaveLength(5);
+    expect(out).toHaveLength(6);
     expect(out[0]).toContain('missing section "Summary"');
+  });
+  test("the template has a Confidence section with the five layer rows", () => {
+    const section = template.split("## Confidence")[1]!.split("\n## ")[0]!;
+    for (const layer of [
+      "Gate",
+      "Proof (fails on base)",
+      "Changed-line mutants",
+      "Review findings with evidence",
+      "UI preview and smoke",
+    ])
+      expect(section).toContain(`| ${layer} |`);
   });
   test("an empty or comment-only section is refused", () => {
     expect(problems(filled({ "Gate evidence": "<!-- verbatim -->" }), template)).toEqual([
@@ -34,9 +46,29 @@ describe("check-pr-body", () => {
   test("a Summary holding only a bare Closes line is refused", () => {
     expect(problems(filled({ Summary: "Closes #" }), template)).toEqual(['section "Summary" is empty']);
   });
+  test.each(["Pending CI", "pending", "TBD", "TODO", "N/A", "n/a", "NA", "pass", "Passed.", "OK", "None"])(
+    "the placeholder verdict %p is refused",
+    (verdict) => {
+      expect(problems(filled({ "Verify verdict": verdict }), template)).toEqual([
+        'section "Verify verdict" is a placeholder',
+      ]);
+    },
+  );
+  test("a real verdict is accepted", () => {
+    const verdict = "Pass: 412 tests, 0 failures, mutations 3/3 red";
+    expect(problems(filled({ "Verify verdict": verdict }), template)).toEqual([]);
+  });
+  test("gate evidence with prose and no digit is refused", () => {
+    expect(problems(filled({ "Gate evidence": "make check passed" }), template)).toEqual([
+      'section "Gate evidence" has no output',
+    ]);
+  });
+  test("gate evidence in a fenced block is accepted", () => {
+    expect(problems(filled({ "Gate evidence": "```\nmake check: ok\n```" }), template)).toEqual([]);
+  });
   test("the factory's own shape passes", () => {
     const body =
-      "## What changed\n\nGoal.\n\n## Acceptance\n\n| a | pass |\n\nThe receipt is in the run-details comment on #7.";
+      "## What changed\n\nGoal.\n\n## Acceptance\n\n| a | pass |\n\n## Verify verdict\n\nPending\n\nThe receipt is in the run-details comment on #7.";
     expect(problems(body, template)).toEqual([]);
   });
   test("a session link is refused in either shape", () => {
