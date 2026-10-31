@@ -18,4 +18,11 @@ describe("ci wiring", () => {
     const makefile = readFileSync("Makefile", "utf8");
     expect(makefile).toMatch(/^check:.*\bcheck-baseline\b/m);
   });
+
+  test("make check lists check-anchors", () => {
+    const line = readFileSync("Makefile", "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("check:"));
+    expect(line?.split(/\s+/)).toContain("check-anchors");
+  });
 });
