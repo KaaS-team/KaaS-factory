@@ -1,0 +1,767 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "KaaS Factory API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos": {
+      "get": {
+        "operationId": "repos.list",
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "repos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "repos"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "operationId": "runs.list",
+        "parameters": [
+          {
+            "name": "repo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "issue": {
+                            "type": "integer"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "stage": {
+                            "enum": [
+                              "triage",
+                              "plan",
+                              "build",
+                              "verify",
+                              "pr"
+                            ]
+                          },
+                          "status": {
+                            "enum": [
+                              "running",
+                              "needs-info",
+                              "awaiting-approval",
+                              "verifying",
+                              "rejected",
+                              "shipped",
+                              "failed",
+                              "needs-human",
+                              "cancelled"
+                            ]
+                          },
+                          "started_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "tool_calls": {
+                            "type": "integer"
+                          },
+                          "tokens_in": {
+                            "type": "integer"
+                          },
+                          "tokens_out": {
+                            "type": "integer"
+                          },
+                          "cost_usd": {
+                            "type": "number"
+                          },
+                          "gate_line": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "pr_url": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "status_comment_id": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "config_hash": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "issue",
+                          "repo",
+                          "title",
+                          "stage",
+                          "status",
+                          "started_at",
+                          "updated_at",
+                          "tool_calls",
+                          "tokens_in",
+                          "tokens_out",
+                          "cost_usd",
+                          "gate_line",
+                          "pr_url",
+                          "reason",
+                          "status_comment_id",
+                          "config_hash"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "runs"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{repo}/{issue}": {
+      "get": {
+        "operationId": "runs.get",
+        "parameters": [
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "run": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "issue": {
+                          "type": "integer"
+                        },
+                        "repo": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "stage": {
+                          "enum": [
+                            "triage",
+                            "plan",
+                            "build",
+                            "verify",
+                            "pr"
+                          ]
+                        },
+                        "status": {
+                          "enum": [
+                            "running",
+                            "needs-info",
+                            "awaiting-approval",
+                            "verifying",
+                            "rejected",
+                            "shipped",
+                            "failed",
+                            "needs-human",
+                            "cancelled"
+                          ]
+                        },
+                        "started_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "tool_calls": {
+                          "type": "integer"
+                        },
+                        "tokens_in": {
+                          "type": "integer"
+                        },
+                        "tokens_out": {
+                          "type": "integer"
+                        },
+                        "cost_usd": {
+                          "type": "number"
+                        },
+                        "gate_line": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pr_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reason": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status_comment_id": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "config_hash": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "issue",
+                        "repo",
+                        "title",
+                        "stage",
+                        "status",
+                        "started_at",
+                        "updated_at",
+                        "tool_calls",
+                        "tokens_in",
+                        "tokens_out",
+                        "cost_usd",
+                        "gate_line",
+                        "pr_url",
+                        "reason",
+                        "status_comment_id",
+                        "config_hash"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "run"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{repo}/{issue}/events": {
+      "get": {
+        "operationId": "runs.events",
+        "parameters": [
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "run_id": {
+                            "type": "integer"
+                          },
+                          "ts": {
+                            "type": "string"
+                          },
+                          "stage": {
+                            "enum": [
+                              "triage",
+                              "plan",
+                              "build",
+                              "verify",
+                              "pr"
+                            ]
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "run_id",
+                          "ts",
+                          "stage",
+                          "kind",
+                          "text"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/spend": {
+      "get": {
+        "operationId": "spend.get",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "since": {
+                      "type": "string"
+                    },
+                    "repos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repo": {
+                            "type": "string"
+                          },
+                          "costUsd": {
+                            "type": "number"
+                          },
+                          "unreportedRuns": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "repo",
+                          "costUsd",
+                          "unreportedRuns"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "since",
+                    "repos"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "operationId": "stream",
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "x-live-events": {
+    "run.updated": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "triage",
+            "plan",
+            "build",
+            "verify",
+            "pr"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "issue",
+        "stage",
+        "status",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "stage.started": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "triage",
+            "plan",
+            "build",
+            "verify",
+            "pr"
+          ]
+        }
+      },
+      "required": [
+        "repo",
+        "issue",
+        "stage"
+      ],
+      "additionalProperties": false
+    },
+    "stage.finished": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "triage",
+            "plan",
+            "build",
+            "verify",
+            "pr"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "issue",
+        "stage",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "log.appended": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "ts": {
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "triage",
+            "plan",
+            "build",
+            "verify",
+            "pr"
+          ]
+        },
+        "kind": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "issue",
+        "id",
+        "ts",
+        "stage",
+        "kind",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "inbox.changed": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo"
+      ],
+      "additionalProperties": false
+    },
+    "message.queued": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "repo",
+        "issue"
+      ],
+      "additionalProperties": false
+    },
+    "repo.changed": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

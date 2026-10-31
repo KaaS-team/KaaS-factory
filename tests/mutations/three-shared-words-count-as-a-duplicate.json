@@ -1,0 +1,7 @@
+{
+  "name": "three shared words count as a duplicate",
+  "file": "src/duplicates.ts",
+  "find": "if (shared < 4) return false;",
+  "replace": "if (shared < 1) return false;",
+  "test": "tests/duplicates.test.ts"
+}

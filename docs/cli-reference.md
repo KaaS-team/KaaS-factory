@@ -220,6 +220,14 @@ factory events (tail [--limit N] | replay <id>) --repo-dir <path> [--json]
 
 tail: recent events in and out, with each sink's delivery status; replay: send one event to its sinks again.
 
+### serve
+
+```
+factory serve [--port <n>] [--fixture two-repos] [--print-url]
+```
+
+serve the core API (routes, openapi.json, live events) on loopback, token-gated by FACTORY_API_TOKEN; --fixture serves seeded sample data.
+
 ### pool
 
 ```

@@ -19,6 +19,14 @@ human PR. Keep this list identical to `protectedPaths` in `config.json`.
 - `.github/**`
 - TODO paths whose bugs an agent must not grade itself on (auth, billing, migrations)
 
+## Boundaries
+
+Optional. Paths whose change needs a decision record under `docs/decisions/` in the same diff
+(a public API, a schema, a config format). Verify blocks a change that touches one without it.
+Leave the section out to turn the check off.
+
+- TODO `src/api/**`
+
 ## STOP_IF
 
 When `maxOpenFactoryPrs` factory PRs are already open, no new

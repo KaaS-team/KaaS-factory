@@ -2,6 +2,7 @@
 // so an author fixes the body once.
 
 import type { Risk } from "../artifacts";
+import { sharedClaims } from "../shared-files";
 import { type IssueMeta, parseMeta, topoOrder } from "../core/schedule";
 
 // The bundled workflow a planned issue runs; watch.ts picks it from the body, not from a route.
@@ -162,6 +163,11 @@ export function parsePlannedIssue(body: string): { plan?: PlannedIssue; problems
   for (const t of tasks)
     for (const f of t.files)
       if (!listed.has(f)) problems.push(`${t.id} touches \`${f}\`, which "## Files" does not list.`);
+  const okLines = body.split("\n").filter((l) => /^\s*Shared-ok:/i.test(l));
+  for (const f of sharedClaims([...listed, ...tasks.flatMap((t) => t.files)], okLines))
+    problems.push(
+      `names shared file \`${f}\`; add a shard or a make/*.mk file instead, or excuse it with "Shared-ok: ${f}: <reason>".`,
+    );
   const risk = /^## Risk:\s*(\w+)/im.exec(body)?.[1]?.toLowerCase();
   if (risk !== "low" && risk !== "medium" && risk !== "high") problems.push('"## Risk:" must be low, medium or high.');
   const mutations = parseMutations(s.get("mutation"), problems);

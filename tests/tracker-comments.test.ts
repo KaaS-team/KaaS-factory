@@ -22,6 +22,7 @@ const WRITE_RE = /\.(commentIssue|editComment|createIssue)\(/g;
 const WRITERS: Record<string, { sites: number; driver: string } | { sites: number; echoes: string }> = {
   "adapters/github-store/spend.ts": { sites: 3, driver: "tests/tracker-comments.test.ts" },
   "blockers.ts": { sites: 1, driver: "tests/blockers.test.ts" },
+  "duplicates.ts": { sites: 2, driver: "tests/duplicates.test.ts" },
   "engine/common.ts": { sites: 3, driver: "tests/spend-caps.test.ts" },
   "engine/pr-body.ts": { sites: 2, driver: "tests/scenarios.test.ts" },
   "engine/triggers.ts": { sites: 2, driver: "tests/triggers.test.ts" },

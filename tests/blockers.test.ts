@@ -99,3 +99,15 @@ describe("resolveBlockers", () => {
     expect(github.issues.get(1)!.comments).toEqual([]);
   });
 });
+
+describe("resolveBlockers duplicates", () => {
+  test("a parked duplicate is not in clear", async () => {
+    const body = "## Files\n- `src/a.ts`\n";
+    const title = "Add retry to the webhook sender";
+    const first = { ...baseIssue(1, []), title, body };
+    const dup = { ...baseIssue(2, [LABEL.ready]), title, body };
+    const github = new FakeGitHub([first, dup]);
+    const { clear } = await resolveBlockers(github, "acme/widgets", [dup], []);
+    expect(clear).toEqual([]);
+  });
+});

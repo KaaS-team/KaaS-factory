@@ -28,6 +28,13 @@ steps:
     label: factory:verifying
     next: pr
     reject: build
+  # QA stays off until a repo uncomments it and sets verify's `next: qa`. It starts $QA_COMMAND,
+  # requests each route in the plan (or /) at $QA_URL, and adds a QA section to the PR body.
+  # qa:
+  #   uses: check
+  #   run: .factory/qa.sh
+  #   label: factory:verifying
+  #   next: pr
   pr:
     uses: pr
     label: factory:in-review
