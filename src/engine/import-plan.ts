@@ -84,7 +84,11 @@ function parseTasks(text: string, problems: string[]): PlannedTask[] {
       problems.push(`${head[1]} has no Model of haiku, sonnet or opus.`);
     const steps = lines.filter((l) => /^\d+\.\s/.test(l)).map((l) => l.replace(/^\d+\.\s*/, ""));
     if (!steps.length) problems.push(`${head[1]} has no numbered steps.`);
-    const deps = (/^Deps:[ \t]*(.+)$/im.exec(chunk)?.[1] ?? "").split(/[\s,]+/).filter((d) => d && d !== "none");
+    // `#N` and `#N Tn` name another issue's work; plan-deps.ts checks those against main.
+    const deps = (/^Deps:[ \t]*(.+)$/im.exec(chunk)?.[1] ?? "")
+      .replace(/#\d+(?:[ \t]+T\d+)?/g, "")
+      .split(/[\s,]+/)
+      .filter((d) => d && d !== "none");
     for (const d of deps) if (!/^T\d+$/.test(d)) problems.push(`${head[1]} Deps: "${d}" is not a task id.`);
     tasks.push({
       id: head[1]!,
