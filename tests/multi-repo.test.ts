@@ -33,6 +33,7 @@ const A = "acme/a";
 const B = "acme/b";
 const SECRET = "multi-repo-secret";
 const saved = { home: process.env.FACTORY_HOME, repos: process.env.FACTORY_REPOS };
+mkdirSync(tmpdir(), { recursive: true });
 const home = mkdtempSync(join(tmpdir(), "factory-multi-"));
 const states: Record<string, FactoryState> = {};
 
