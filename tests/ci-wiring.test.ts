@@ -16,6 +16,13 @@ describe("ci wiring", () => {
     expect(runs("scripts/check-tests-only.ts", [".github/workflows/ci.yml", "ci/ci.yml"])).toBe(true);
   });
 
+  test("the body check re-runs when the PR body is edited", () => {
+    const files = [".github/workflows/ci.yml", "ci/ci.yml"].filter((f) => existsSync(f));
+    expect(files.some((f) => /pull_request:\s*\n\s*types:\s*\[[^\]]*\bedited\b/.test(readFileSync(f, "utf8")))).toBe(
+      true,
+    );
+  });
+
   test("scripts/flake-report.ts is run by flakes.yml", () => {
     expect(runs("scripts/flake-report.ts", [".github/workflows/flakes.yml", "ci/flakes.yml"])).toBe(true);
   });
