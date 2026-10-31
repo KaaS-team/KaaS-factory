@@ -12,7 +12,7 @@ export type Stage = "triage" | "plan" | "build" | "verify" | "pr";
 
 // The final pipeline outcome that triggers a retro (plan v2.10.0 item 3),
 // distinct from a stage artifact's own outcome field (complete/blocked/failed).
-export type RetroTrigger = "merged" | "rejected" | "gave-up";
+export type RetroTrigger = "merged" | "rejected" | "gave-up" | "plan-rubric";
 export type RetroStatus = "queued" | "done" | "failed";
 
 // One row per final outcome, queued by checkMergePolicy, cancelRun, the verify-reject cap and the

@@ -75,6 +75,8 @@ describe("durable resume", () => {
     const e = setup(2);
     await e.run();
     await e.github.setStateLabel(e.config.repo, 1, [LABEL.awaitingApproval], LABEL.ready);
+    // An unchanged body would reuse the plan (plan-reuse.ts); a changed one plans afresh.
+    e.github.issues.get(1)!.body = "do the thing, revised";
     const first = tokenOf(e);
     expect(await e.run()).toBe("awaiting-approval");
     expect(ran(e)).toEqual(["triage", "plan", "plan"]);
