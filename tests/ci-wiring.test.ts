@@ -38,4 +38,11 @@ describe("ci wiring", () => {
       .find((l) => l.startsWith("check:"));
     expect(line?.split(/\s+/)).toContain("check-anchors");
   });
+
+  test("make check lists check-cli-reference", () => {
+    const line = readFileSync("Makefile", "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("check:"));
+    expect(line?.split(/\s+/)).toContain("check-cli-reference");
+  });
 });
