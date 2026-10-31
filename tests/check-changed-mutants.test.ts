@@ -62,3 +62,12 @@ test("the summary counts each outcome", () => {
   ]);
   expect(out.split("\n")[0]).toBe("check-changed-mutants: 1 killed, 1 survived, 1 uncovered");
 });
+
+test("the CLI exits 2 with a usage line when --base is missing", () => {
+  const run = Bun.spawnSync(["bun", join(import.meta.dir, "../scripts/check-changed-mutants.ts")], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(run.exitCode).toBe(2);
+  expect(run.stderr.toString()).toContain("usage: bun scripts/check-changed-mutants.ts --base <ref>");
+});

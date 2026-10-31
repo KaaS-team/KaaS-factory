@@ -19,6 +19,9 @@ beforeAll(() => {
   put("tests/a.test.ts", 'import { a } from "../src/a";\n');
   put("tests/d.test.ts", 'import { d } from "../src/d.js";\n');
   put("tests/fixtures/x.test.ts", "");
+  put("tests/sub/e.test.ts", 'import { a } from "../../src/a";\n');
+  put("tests/z.test.ts", 'import { d } from "../src/d";\n');
+  put("tests/b.test.ts", 'import "./z.test";\n');
 });
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
@@ -32,11 +35,25 @@ test("the closure follows relative and dynamic imports with their depth", () => 
 
 test("covering tests are found through the closure, and a .js spec resolves to .ts", () => {
   const tests = testFiles(root);
-  expect(coveringTests("src/c/index.ts", tests, root)).toEqual(["tests/a.test.ts"]);
+  expect(coveringTests("src/c/index.ts", tests, root)).toEqual(["tests/a.test.ts", "tests/sub/e.test.ts"]);
   expect(coveringTests("src/d.ts", tests, root)).toEqual(["tests/d.test.ts"]);
 });
 
 test("a spec outside the root is dropped and fixtures are not tests", () => {
   expect(importsOf("src/a.ts", 'import x from "../../out";', () => true)).toEqual([]);
-  expect(testFiles(root)).toEqual(["tests/a.test.ts", "tests/d.test.ts"]);
+  expect(testFiles(root)).toEqual([
+    "tests/a.test.ts",
+    "tests/b.test.ts",
+    "tests/d.test.ts",
+    "tests/sub/e.test.ts",
+    "tests/z.test.ts",
+  ]);
+});
+
+test("covering tests are ordered by depth, then name", () => {
+  expect(coveringTests("src/d.ts", testFiles(root), root)).toEqual([
+    "tests/d.test.ts",
+    "tests/z.test.ts",
+    "tests/b.test.ts",
+  ]);
 });
