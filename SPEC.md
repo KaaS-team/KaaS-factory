@@ -39,13 +39,13 @@ Deps: T1
 3. Tests: every value of `SessionState` appears in `SESSION_SCHEMA`'s enum and the reverse; a fixture session with an extra key fails `fitsSchema`; `title` of 201 characters fails; every `RunStatus` maps.
 
 ### T3: The adapter contract kit
-Files: `src/mc/kit.ts`, `src/mc/fake-adapter.ts`, `tests/mc-kit.test.ts`, `tests/mutations.json`
+Files: `src/mc/kit.ts`, `src/mc/fake-adapter.ts`, `tests/mc-kit.test.ts`, `tests/mutations/mc-schema-allows-unknown-session-keys.json`, `tests/mutations/mc-kit-stops-checking-unsupported-verbs.json`
 Model: sonnet
 Deps: T2
 1. `adapterKit(adapter, probe: { ref?: SessionRef })` returns `KitCheck[]` (the type from `src/runtime-kit.ts`): `list` answers within 10 s and every row fits `SESSION_SCHEMA`; every `ref.runtime` equals `adapter.kind`; a `link` is `https:` or absent; a verb whose flag is `false` throws `SessionUnsupported` and a verb whose flag is `true` does not; `follow` with an aborted signal resolves within 1 s.
 2. `src/mc/fake-adapter.ts` exports `fakeAdapter(rows, opts)`, an in-memory adapter with settable caps that later slices use in their tests.
 3. Tests: the fake passes the kit; a fake that claims `cancel: true` and throws `SessionUnsupported` fails the kit by name; a fake that returns `http://` links fails the kit.
-4. Add the two entries under Mutation to `tests/mutations.json`.
+4. Save each entry under Mutation as its own file (`tests/mutations/mc-schema-allows-unknown-session-keys.json`, `tests/mutations/mc-kit-stops-checking-unsupported-verbs.json`), a single JSON object each. Never edit the old mutations list.
 
 ## Tests
 - `tests/mc-schema.test.ts`: [permanent] schema and state enums agree; unknown keys and long titles fail; every run status maps.
@@ -76,4 +76,5 @@ Deps: T2
 - `src/mc/fake-adapter.ts` (new)
 - `tests/mc-schema.test.ts` (new)
 - `tests/mc-kit.test.ts` (new)
-- `tests/mutations.json` (edit: add the two entries)
+- `tests/mutations/mc-schema-allows-unknown-session-keys.json` (new)
+- `tests/mutations/mc-kit-stops-checking-unsupported-verbs.json` (new)
