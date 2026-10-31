@@ -32,7 +32,7 @@ Deps: T1
 - `tests/hooks.test.ts`: [permanent] the commit-msg cases, the prePush list case and the unsigned-push refusal.
 
 ## Mutation
-Keep the existing `hooks: never sign off` entry from the branch; it must still match once.
+none: the `hooks: never sign off` entry already on the branch is kept and must still match once.
 
 ## Acceptance
 - AC-1: `.githooks/pre-push` equals main's stub and the audit passes: checked by `python3.12 scripts/kaas/check-affected.py --audit` (T1)
