@@ -42,6 +42,8 @@ export interface PackOptions {
   // or imports it with `@AGENTS.md`, the agent already has it: holding it here
   // too sent the same text twice per stage.
   readonly contextFile?: string;
+  // Where the agent's repo skills live (its preset's skillsDir); default .claude/skills.
+  readonly skillsDir?: string;
 }
 
 interface Section {
@@ -88,10 +90,10 @@ export async function contextFileLoadsAgentsMd(cwd: string, contextFile: string 
 }
 
 // `- name: description` per repo skill (factory-* excluded), from frontmatter only.
-export async function skillsIndex(cwd: string): Promise<string> {
+export async function skillsIndex(cwd: string, skillsDir = ".claude/skills"): Promise<string> {
   let names: string[];
   try {
-    names = readdirSync(`${cwd}/.claude/skills`)
+    names = readdirSync(`${cwd}/${skillsDir}`)
       .filter((n) => !n.startsWith("factory-"))
       .sort();
   } catch {
@@ -99,7 +101,7 @@ export async function skillsIndex(cwd: string): Promise<string> {
   }
   const lines: string[] = [];
   for (const name of names) {
-    const text = await readOptional(`${cwd}/.claude/skills/${name}/SKILL.md`);
+    const text = await readOptional(`${cwd}/${skillsDir}/${name}/SKILL.md`);
     if (!text?.startsWith("---\n")) continue;
     const front = text.slice(4, text.indexOf("\n---", 3));
     const description = /^description:\s*(.+)$/m.exec(front)?.[1]?.trim();
@@ -127,14 +129,15 @@ async function sections(stage: StageName, issue: number, cwd: string, opts: Pack
     if (architectureMd) out.push({ label: "ARCHITECTURE.md", body: architectureMd.trim() });
   }
 
+  const skillsDir = opts.skillsDir ?? ".claude/skills";
   if (want.has("skillsIndex")) {
-    const index = await skillsIndex(cwd);
+    const index = await skillsIndex(cwd, skillsDir);
     if (index) out.push({ label: "repo skills index", body: index });
   }
 
   if (want.has("routeSkills")) {
     for (const name of opts.skills ?? []) {
-      const body = await readOptional(`${cwd}/.claude/skills/${name}/SKILL.md`);
+      const body = await readOptional(`${cwd}/${skillsDir}/${name}/SKILL.md`);
       if (body) out.push({ label: `skill: ${name}`, body: stripFrontmatter(body).trim() });
     }
   }

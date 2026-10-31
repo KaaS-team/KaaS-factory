@@ -758,8 +758,11 @@ export async function loadConfigExplained(targetRepoDir: string): Promise<TeamAp
   const missing: string[] = [];
   for (const [type, route] of Object.entries(config.routes)) {
     for (const name of route.skills ?? []) {
-      if (!existsSync(`${targetRepoDir}/.claude/skills/${name}/SKILL.md`))
-        missing.push(`routes.${type}.skills: "${name}" (.claude/skills/${name}/SKILL.md not found)`);
+      const found = [".claude", ".agents"].some((d) => existsSync(`${targetRepoDir}/${d}/skills/${name}/SKILL.md`));
+      if (!found)
+        missing.push(
+          `routes.${type}.skills: "${name}" (.claude/skills/${name}/SKILL.md or .agents/skills/${name}/SKILL.md not found)`,
+        );
     }
   }
   if (missing.length > 0)

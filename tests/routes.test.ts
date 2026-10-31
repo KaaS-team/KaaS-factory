@@ -7,7 +7,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { resolveAgent, resolveRoute } from "../src/agents/executor";
 import { configProblems, DEFAULT_CONFIG, loadConfig, mergeConfig, type FactoryConfig } from "../src/config";
 import { issueType, labelsFor, TYPE_LABELS, typesFor } from "../src/labels";
@@ -112,11 +112,15 @@ describe("config validation of routes", () => {
 });
 
 describe("loadConfig checks every routed skill exists on disk", () => {
-  const dir = mkdtempSync(join(tmpdir(), "factory-routes-"));
-  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const made: string[] = [];
+  afterEach(() => {
+    for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
 
   function repoWith(config: object): string {
-    const d = mkdtempSync(join(dir, "r-"));
+    mkdirSync(tmpdir(), { recursive: true });
+    const d = mkdtempSync(join(tmpdir(), "factory-routes-"));
+    made.push(d);
     mkdirSync(join(d, ".factory"));
     writeFileSync(join(d, ".factory/config.json"), JSON.stringify(config));
     return d;
@@ -125,8 +129,16 @@ describe("loadConfig checks every routed skill exists on disk", () => {
   test("a route naming a skill with no SKILL.md on disk is refused at boot, not left to no-op mid-run", async () => {
     const target = repoWith({ repo: "a/b", routes: { docs: { skills: ["writing"] } } });
     await expect(loadConfig(target)).rejects.toThrow(
-      /routes\.docs\.skills: "writing" \(\.claude\/skills\/writing\/SKILL\.md not found\)/,
+      /routes\.docs\.skills: "writing" \(\.claude\/skills\/writing\/SKILL\.md or \.agents\/skills\/writing\/SKILL\.md not found\)/,
     );
+  });
+
+  test("a route skill that exists only under .agents/skills passes the check", async () => {
+    const target = repoWith({ repo: "a/b", routes: { docs: { skills: ["writing"] } } });
+    mkdirSync(join(target, ".agents/skills/writing"), { recursive: true });
+    writeFileSync(join(target, ".agents/skills/writing/SKILL.md"), "---\nname: writing\n---\nPlain.");
+    const config = await loadConfig(target);
+    expect(config.routes.docs?.skills).toEqual(["writing"]);
   });
 
   test("a route naming a skill that is on disk loads cleanly", async () => {
