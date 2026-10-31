@@ -6,7 +6,10 @@ import { act, buildInbox, type InboxAction, InboxError } from "../../src/inbox";
 import { LABEL, TYPE_LABELS } from "../../src/labels";
 import { signedBy } from "../../src/chatops";
 import { type Actor, BREAK_GLASS, LOCAL, type Route } from "./access";
+import { COMMANDS } from "@kaas-team/factory-protocol";
 import type { Role } from "./store";
+
+export { COMMANDS };
 
 export interface CommandDeps {
   github: Pick<ScmPort, "getIssue" | "commentIssue" | "createIssue">;
@@ -16,14 +19,9 @@ export interface CommandDeps {
   invalidate: (repo: string) => void;
 }
 
-// Approving a plan is the one command an approver may send; the rest change what the agent does.
-export const COMMANDS: Readonly<Record<string, { action: InboxAction; role: Role }>> = {
-  "approve-plan": { action: "approve", role: "approver" },
-  revise: { action: "revise", role: "operator" },
-  answer: { action: "answer", role: "operator" },
-  retry: { action: "retry", role: "operator" },
-  cancel: { action: "cancel", role: "operator" },
-};
+// Compile-time proof that every protocol action is one the inbox takes.
+const _actionsAreInboxActions: Record<keyof typeof COMMANDS, { action: InboxAction }> = COMMANDS;
+void _actionsAreInboxActions;
 
 const TITLE_MAX = 256;
 const BODY_MAX = 20_000;

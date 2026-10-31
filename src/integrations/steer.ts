@@ -2,8 +2,7 @@
 // comment box. Each turns text into a Steer, and applySteer writes it to the tracker as the same
 // signed comment or ready label the control plane posts, so a runner that only polls still obeys.
 
-import { COMMANDS } from "../../dashboard/plane/commands";
-import { atLeast, type Role } from "../../dashboard/plane/store";
+import { atLeast, COMMANDS, type Role } from "@kaas-team/factory-protocol";
 import { signedBy } from "../chatops";
 import { act, buildInbox, type InboxAction, InboxError } from "../inbox";
 import { LABEL } from "../labels";

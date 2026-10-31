@@ -1,0 +1,13 @@
+{
+  "name": "@kaas-team/factory-protocol",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Roles and the steering command table shared by the factory runner and its dashboard.",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  }
+}
