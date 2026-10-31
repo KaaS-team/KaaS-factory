@@ -1,0 +1,7 @@
+{
+  "name": "mc: private addresses reachable",
+  "file": "src/mc/safe-fetch.ts",
+  "find": "if (isPrivate(addr) && !policy.allowPrivate)",
+  "replace": "if (false)",
+  "test": "tests/mc-safe-fetch.test.ts"
+}

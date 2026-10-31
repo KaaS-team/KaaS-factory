@@ -12,6 +12,7 @@ import { cpus, freemem, hostname } from "node:os";
 import { dirname } from "node:path";
 import { factoryHome } from "./paths";
 import type { AgentSandbox } from "./agents/agent-sandbox";
+import { type Connection, connectionProblems } from "./mc/connections";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
 import { GATEWAY_KEY_ENV, isProviderHost, type LlmGateway } from "./agents/gateway";
 
@@ -26,6 +27,8 @@ export interface MachineConfig {
   readonly llmGateway?: { readonly url: string };
   // What this machine has (gpu, macos, docker): an issue labelled `needs:<cap>` waits for one that has it.
   readonly capabilities?: readonly string[];
+  // Mission control connections: each names the environment variable holding its key, never the key.
+  readonly sessions?: { readonly connections: Readonly<Record<string, Connection>> };
 }
 
 const DEFAULT_SLOTS = 2;
@@ -78,8 +81,13 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     throw new Error(
       `${path}: "capabilities" must be a list of lowercase names, got ${JSON.stringify(raw.capabilities)}`,
     );
+  if (raw.sessions !== undefined) {
+    const problems = connectionProblems(raw.sessions).map((p) => `${path}: ${p}`);
+    if (problems.length) throw new Error(problems.join("\n"));
+  }
   return {
     slots,
+    ...(raw.sessions ? { sessions: raw.sessions as { connections: Record<string, Connection> } } : {}),
     ...(raw.llmGateway ? { llmGateway: raw.llmGateway as { url: string } } : {}),
     dailyUsd: raw.dailyUsd as number | undefined,
     ...(raw.agentRuntime ? { agentRuntime: raw.agentRuntime as string } : {}),

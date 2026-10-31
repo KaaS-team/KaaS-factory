@@ -1,0 +1,7 @@
+{
+  "name": "mc: redirects followed",
+  "file": "src/mc/safe-fetch.ts",
+  "find": "redirect: \"manual\"",
+  "replace": "redirect: \"follow\"",
+  "test": "tests/mc-safe-fetch.test.ts"
+}
