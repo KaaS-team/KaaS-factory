@@ -2,6 +2,7 @@
 // Shape of the target repo's `.factory/config.json`: the runner only reads it, `factory doctor`
 // checks it exists, and a missing field falls back to DEFAULT_CONFIG, so a minimal one works.
 
+import { baseByRouteProblems } from "./base-branch";
 import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
 import { githubHost } from "./repo";
@@ -103,6 +104,7 @@ export interface FactoryConfig {
   readonly maxBudgetUsd: StageBudgets;
   readonly baselineTag: string; // reset.ts forces main to this tag's SHA
   readonly base: string; // base branch for PRs, usually "main"
+  readonly baseByRoute?: Readonly<Record<string, string>>; // route to base branch, see resolveBase
   readonly stageTimeoutMinutes: number; // kills a stuck `claude` process (audit finding #15)
   readonly maxToolCalls: number; // kills a runaway stage before it burns budget
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
@@ -372,6 +374,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   maxBudgetUsd: "object",
   baselineTag: "string",
   base: "string",
+  baseByRoute: "object",
   stageTimeoutMinutes: "posInt",
   maxToolCalls: "posInt",
   gates: "object",
@@ -449,7 +452,7 @@ export function configProblems(raw: unknown): string[] {
   if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))
     problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
   problems.push(...profileProblems(cfg));
-  problems.push(...toolchainProblems(cfg.toolchain));
+  problems.push(...toolchainProblems(cfg.toolchain), ...baseByRouteProblems(cfg.baseByRoute));
   nested("maxBudgetUsd", {
     triage: "positive",
     plan: "positive",
@@ -728,10 +731,8 @@ export async function loadConfigExplained(targetRepoDir: string): Promise<TeamAp
   // GitHub calls follow config.repo but git pushes follow origin; a copied config must not aim one at the wrong repo.
   const origin = originRepo(targetRepoDir);
   if (config.repo === "" && origin) config = { ...config, repo: origin };
-  // "main" is only a fallback default (DEFAULT_CONFIG.base), never a guess:
-  // a config that omits "base" gets whatever origin/HEAD resolves to (a repo
-  // on "trunk" or "develop" must not be force-pushed at "main" by default).
-  // A config that names "base" explicitly, even "main", is never overridden.
+  // "main" is only a fallback (DEFAULT_CONFIG.base): a config that omits "base" gets what origin/HEAD
+  // resolves to, so a "trunk" repo is never aimed at "main". An explicit "base" is never overridden.
   if ((raw as Record<string, unknown>).base === undefined) {
     const detected = defaultBranchOf(targetRepoDir);
     if (detected) config = { ...config, base: detected };
@@ -793,11 +794,8 @@ function originRepo(dir: string): string | undefined {
   return r.exitCode === 0 ? repoFromRemoteUrl(r.stdout.toString()) : undefined;
 }
 
-// The branch name behind origin/HEAD, e.g. "trunk" for a repo cloned with a
-// non-"main" default. Mirrors ensureRepoClone's origin/HEAD resolution
-// (src/repo.ts) for local `--repo-dir` mode, which never runs that clone
-// path. Missing on a bare or freshly-inited repo (no remote fetch yet) --
-// callers fall back to DEFAULT_CONFIG.base ("main") in that case.
+// The branch name behind origin/HEAD, e.g. "trunk". Mirrors ensureRepoClone's resolution (src/repo.ts) for
+// local `--repo-dir` mode. Missing on a bare repo with no fetch yet; callers fall back to DEFAULT_CONFIG.base.
 function defaultBranchOf(dir: string): string | undefined {
   if (!existsSync(`${dir}/.git`)) return undefined;
   const r = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--abbrev-ref", "origin/HEAD"], {

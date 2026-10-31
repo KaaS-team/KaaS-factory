@@ -1,0 +1,1 @@
+{"name":"resolve base ignores the route map","file":"src/base-branch.ts","find":"if (route !== undefined && config.baseByRoute && Object.hasOwn(config.baseByRoute, route))","replace":"if (false && route !== undefined && config.baseByRoute && Object.hasOwn(config.baseByRoute, route))","test":"tests/base-branch.test.ts"}
