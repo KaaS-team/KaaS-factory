@@ -1,0 +1,1 @@
+{"name":"legacy header no longer read","file":"src/core/event.ts","find":"for (const name of SIGNATURE_HEADERS) {","replace":"for (const name of SIGNATURE_HEADERS.slice(0, 1)) {","test":"tests/events.test.ts"}

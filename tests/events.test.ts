@@ -9,6 +9,10 @@ import {
   EVENT_TYPES,
   FACTORY_EVENTS,
   EVENT_SIGNATURE_HEADER,
+  LEGACY_EVENT_SIGNATURE_HEADER,
+  SIGNATURE_HEADERS,
+  acceptsEvent,
+  eventSignature,
   parseEvent,
   signEvent,
   verifyEvent,
@@ -86,6 +90,24 @@ describe("signature", () => {
     expect(verifyEvent("k", body, null)).toBe(false);
     expect(verifyEvent("k", body, sig.slice(0, -1) + (sig.endsWith("0") ? "1" : "0"))).toBe(false);
     expect(verifyEvent("", body, signEvent("", body))).toBe(false);
+  });
+});
+
+describe("signature headers and accept globs", () => {
+  test("both headers are read, the new one first", () => {
+    expect(SIGNATURE_HEADERS).toEqual([EVENT_SIGNATURE_HEADER, LEGACY_EVENT_SIGNATURE_HEADER]);
+    const h = (o: Record<string, string>) => new Headers(o);
+    expect(eventSignature(h({ [LEGACY_EVENT_SIGNATURE_HEADER]: "old" }))).toBe("old");
+    expect(eventSignature(h({ [EVENT_SIGNATURE_HEADER]: "new", [LEGACY_EVENT_SIGNATURE_HEADER]: "old" }))).toBe("new");
+    expect(eventSignature(h({}))).toBeNull();
+  });
+
+  test("unset accept keeps the fixed list; globs filter types", () => {
+    expect(acceptsEvent("wiki.page.updated", undefined)).toBe(true);
+    expect(acceptsEvent("acme.job.done", undefined)).toBe(false);
+    expect(acceptsEvent("acme.job.done", ["acme.*"])).toBe(true);
+    expect(acceptsEvent("other.job.done", ["acme.*"])).toBe(false);
+    expect(acceptsEvent("acmeXjob", ["acme.job"])).toBe(false);
   });
 });
 

@@ -165,6 +165,8 @@ export interface EventsConfig {
   readonly sinks: readonly EventSink[];
   // Unset reads FACTORY_EVENTS_SECRET (eventsInboundSecretEnv); POST /events is off while it is empty.
   readonly inboundSecretEnv?: string;
+  // Globs of inbound event types POST /events accepts; unset keeps the fixed external list.
+  readonly accept?: readonly string[];
 }
 
 export const DEFAULT_EVENTS_SECRET_ENV = "FACTORY_EVENTS_SECRET";
@@ -570,7 +572,7 @@ function eventsProblems(raw: unknown, problems: string[]): void {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw))
     return void problems.push("events: expected an object");
   const ev = raw as Record<string, unknown>;
-  checkKeys(ev, { sinks: "object", inboundSecretEnv: "string" }, "events.", problems);
+  checkKeys(ev, { sinks: "object", inboundSecretEnv: "string", accept: "strings" }, "events.", problems);
   if (typeof ev.inboundSecretEnv === "string" && !ENV_NAME.test(ev.inboundSecretEnv))
     problems.push(
       `events.inboundSecretEnv: expected an env var name like "FACTORY_EVENTS_SECRET", got ${JSON.stringify(ev.inboundSecretEnv)}`,
