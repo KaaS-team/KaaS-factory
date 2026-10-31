@@ -1,4 +1,4 @@
-.PHONY: agent-matrix hooks install check check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix install check check-anchors check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks
 
 install:
 	bun install
@@ -10,7 +10,7 @@ hooks:
 # make check = lint (biome, and rustfmt plus clippy on verify/ and relay/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
 # check did not ship (see the kaas-eng plugin's engineering.md, Rule 0).
-check: lint typecheck test skills-check
+check: lint typecheck test skills-check check-anchors
 	@echo "make check: ok"
 
 # reuse lint checks every file's licence against REUSE.toml (tests/licensing.test.ts checks what it says).
@@ -43,6 +43,10 @@ test:
 quarantine:
 	@f=$$(grep -rl @quarantine tests --include='*.test.ts'); if [ -z "$$f" ]; then echo "quarantine: no @quarantine tests"; \
 	else $(GIT_ENV) bun test -t @quarantine $$f; fi
+
+# Cheap pass: each mutation's find still matches its file exactly once.
+check-anchors:
+	bun scripts/check-mutation-anchors.ts
 
 # Each entry in tests/mutations.json breaks one thing; its test must go red.
 # Proves the checks bite. Its own CI job, since it copies the repo per mutation.
