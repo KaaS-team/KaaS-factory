@@ -36,7 +36,7 @@ test("the closure follows relative and dynamic imports with their depth", () => 
 test("covering tests are found through the closure, and a .js spec resolves to .ts", () => {
   const tests = testFiles(root);
   expect(coveringTests("src/c/index.ts", tests, root)).toEqual(["tests/a.test.ts", "tests/sub/e.test.ts"]);
-  expect(coveringTests("src/d.ts", tests, root)).toEqual(["tests/d.test.ts"]);
+  expect(coveringTests("src/d.ts", tests, root)).toEqual(["tests/d.test.ts", "tests/z.test.ts", "tests/b.test.ts"]);
 });
 
 test("a spec outside the root is dropped and fixtures are not tests", () => {
