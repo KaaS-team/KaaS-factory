@@ -1,6 +1,6 @@
 // Seeded in-memory state for `factory serve --fixture` and the generated client's fake: two repos, three runs.
 
-import type { Run, RunEvent } from "../state";
+import type { Run, RunEvent, StageRun } from "../state";
 import { tokenAuth } from "./auth";
 import type { ApiState, CoreDeps } from "./core";
 import { LiveFeed } from "./stream";
@@ -47,6 +47,9 @@ class FixtureState implements ApiState {
   }
   listEvents(runId: number, opts?: { after?: number; limit?: number }): RunEvent[] {
     return this.events.filter((e) => e.run_id === runId && e.id > (opts?.after ?? 0)).slice(0, opts?.limit ?? 200);
+  }
+  listStageRuns(): StageRun[] {
+    return [];
   }
   spendSummary(repo: string): { costUsd: number; unreportedRuns: number } {
     return { costUsd: this.listRuns(repo).reduce((sum, r) => sum + r.cost_usd, 0), unreportedRuns: 0 };

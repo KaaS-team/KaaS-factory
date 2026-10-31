@@ -18,6 +18,7 @@ export interface ApiRoute {
 
 const str: JsonSchema = { type: "string" };
 const int: JsonSchema = { type: "integer" };
+const num: JsonSchema = { type: "number" };
 const nullable = (s: JsonSchema): JsonSchema => ({ anyOf: [s, { type: "null" }] });
 
 // Copied from `Stage` and `RunStatus` in src/state.ts; tests/api-routes.test.ts compares them.
@@ -114,6 +115,15 @@ export const ROUTES: readonly ApiRoute[] = [
     auth: "token",
     req: object({ since: str }, []),
     res: SPEND_SCHEMA,
+  },
+  {
+    id: "metrics.get",
+    method: "GET",
+    path: "/api/metrics",
+    auth: "token",
+    res: object({
+      metrics: object({ mergeRate: num, costPerMergedChange: num, judgeVetoRate: num }, []),
+    }),
   },
   { id: "stream", method: "GET", path: "/api/events", auth: "token", res: { type: "string" }, sse: true },
 ];
