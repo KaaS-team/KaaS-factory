@@ -1,0 +1,1 @@
+{"name":"mc: unknown factory cost shown as zero","file":"src/mc/adapters/factory.ts","find":"costUsd: unknown ? null : total","replace":"costUsd: total","test":"tests/mc-adapter-factory.test.ts"}
