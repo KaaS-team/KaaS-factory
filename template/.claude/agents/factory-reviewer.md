@@ -38,7 +38,9 @@ Shell rules for this stage: a command is refused if it writes a file with > or >
 
 One finding per item, each with: severity (`must` fix, `should` fix, or
 `could` fix), confidence 0-5, what is wrong, where (file and line), why it
-matters, and the fix. Not a style pass. Leave out: an issue the diff did not
+matters, the fix, and evidence: the command, input or scenario that shows
+the failure. A `must` or `should` with no evidence or no changed `file:line`
+is dropped before the verdict counts, so leave it out. Not a style pass. Leave out: an issue the diff did not
 introduce, anything the gate or a linter already catches, style with no rule
 you can quote, and a problem you can only imagine. A `must` quotes the rule
 it breaks or the `file:line` that fails. Confidence 0-2 means you could not
