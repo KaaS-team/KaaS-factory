@@ -44,15 +44,20 @@ Model: sonnet
 Adjust `find` to text that occurs exactly once in the script you wrote.
 
 ## Acceptance
-- After `make hooks`, `git commit -m x` in the repo yields a commit with one `Signed-off-by:` line.
-- An unsigned commit cannot be pushed.
-- `make hooks` run twice changes nothing.
+- AC-1: a commit with no `-s` ends with exactly one `Signed-off-by:` line: checked by `make test FILES=tests/hooks.test.ts` (T1)
+- AC-2: an unsigned commit cannot be pushed: checked by `make test FILES=tests/hooks.test.ts` (T2)
+- AC-3: `make hooks` run twice changes nothing: checked by `make test FILES=tests/hooks.test.ts` (T3)
 
 ## Non-goals
 Do not touch .github/workflows. No new dependencies. No em dashes, no filler words. Nothing outside Files.
 
 ## Files
-`.githooks/commit-msg`, `.githooks/pre-push`, `scripts/install-hooks.ts`, `tests/hooks.test.ts`, `Makefile`, `tests/mutations.json`
+- `.githooks/commit-msg`
+- `.githooks/pre-push`
+- `scripts/install-hooks.ts`
+- `tests/hooks.test.ts`
+- `Makefile`
+- `tests/mutations.json`
 
 ## How to ship
 One PR from branch feat/q-hooks. Commits use `git commit -s`. PR body uses every section of .github/pull_request_template.md, filled with real evidence (the gate output, not "pending"). Run `python3 scripts/kaas/check-affected.py --run` before pushing. Each new mutation entry in tests/mutations.json is {name,file,find,replace,test}; its `find` must match exactly once in its file, and the test must fail under the replacement. Never put a session link in a commit or PR.
