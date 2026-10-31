@@ -15,7 +15,7 @@ export const EXTRA_ICONS = {
   events: "M4 6h16M4 12h10M4 18h6M18 14l3 3-3 3",
   minions: "M12 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM6 20v-2a6 6 0 0 1 12 0v2",
 };
-export const EXTRA_LOADERS = { events: ["events", "/api/events"], minions: ["minions", "/api/minions"] };
+export const EXTRA_LOADERS = { events: ["events", "/api/bus-events"], minions: ["minions", "/api/minions"] };
 export const FORM_FIELDS = ["agent", "timeout", "retries"];
 
 const table = (h, cols, rows) =>
@@ -93,7 +93,7 @@ export function workflowEditor({ h, post }, w) {
 export function extraViews({ h, heading, stateOr, quiet, post }) {
   const replay = async (id, cell) => {
     try {
-      const r = await post(`/api/events/${encodeURIComponent(id)}/replay`, {});
+      const r = await post(`/api/bus-events/${encodeURIComponent(id)}/replay`, {});
       cell.textContent = `Sent again to ${r.queued} sink(s)`;
     } catch (err) {
       cell.textContent = err.message;

@@ -134,8 +134,8 @@ export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
     },
     {
       method: "GET",
-      pattern: /^\/api\/events$/,
-      label: "GET /api/events",
+      pattern: /^\/api\/bus-events$/,
+      label: "GET /api/bus-events",
       role: "operator",
       repo: "query",
       handler: (req, url) => {
@@ -146,8 +146,8 @@ export function workflowRoutes(deps: WorkflowRouteDeps): Route[] {
     },
     {
       method: "POST",
-      pattern: /^\/api\/events\/([\w.:-]+)\/replay$/,
-      label: "POST /api/events/:event/replay",
+      pattern: /^\/api\/bus-events\/([\w.:-]+)\/replay$/,
+      label: "POST /api/bus-events/:event/replay",
       role: "operator",
       repo: "body",
       handler: async (req, _url, m) => {
