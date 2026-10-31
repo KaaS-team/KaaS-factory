@@ -45,16 +45,19 @@ Deps: T1
 Adjust each `find` to the exact text you wrote so it matches once.
 
 ## Acceptance
-- `bun scripts/check-mutation-anchors.ts` prints `ok` on the tree and exits 0.
-- Editing one `find` in `tests/mutations.json` to text that is absent makes it exit 1 and name the entry.
-- `make check` runs it.
-- `bun scripts/lint-planned.ts` is not needed for this file.
+- AC-1: `bun scripts/check-mutation-anchors.ts` prints `ok` on the tree and exits 0: checked by `make test FILES=tests/check-mutation-anchors.test.ts` (T1)
+- AC-2: a `find` that is absent makes the checker exit 1 and name the entry: checked by `make test FILES=tests/check-mutation-anchors.test.ts` (T1)
+- AC-3: `make check` runs the anchor check: checked by `make test FILES=tests/ci-wiring.test.ts` (T2)
 
 ## Non-goals
 Do not touch .github/workflows (stage any CI change under ci/ and say so in the PR). No new dependencies. No em dashes, no filler words. Nothing outside Files.
 
 ## Files
-`scripts/check-mutation-anchors.ts`, `tests/check-mutation-anchors.test.ts`, `tests/ci-wiring.test.ts`, `Makefile`, `tests/mutations.json`
+- `scripts/check-mutation-anchors.ts`
+- `tests/check-mutation-anchors.test.ts`
+- `tests/ci-wiring.test.ts`
+- `Makefile`
+- `tests/mutations.json`
 
 ## How to ship
 One PR from branch feat/q-anchors. Commits use `git commit -s`. PR body uses every section of .github/pull_request_template.md, filled with real evidence (the gate output, not "pending"). Run `python3 scripts/kaas/check-affected.py --run` before pushing. Each new mutation entry in tests/mutations.json is {name,file,find,replace,test}; its `find` must match exactly once in its file, and the test must fail under the replacement. Never put a session link in a commit or PR.
