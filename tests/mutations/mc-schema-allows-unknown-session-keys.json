@@ -1,0 +1,1 @@
+{"name":"mc: schema allows unknown session keys","file":"src/mc/schema.ts","find":"additionalProperties: false","replace":"additionalProperties: true","test":"tests/mc-schema.test.ts"}
