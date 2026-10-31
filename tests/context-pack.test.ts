@@ -13,6 +13,7 @@ import { buildContextPack, MAX_CONTEXT_PACK_BYTES, MAX_LESSONS_BYTES, STAGE_PACK
 import { STAGE_GUIDANCE } from "../src/stage-permissions";
 
 function worktree(): string {
+  mkdirSync(tmpdir(), { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), "factory-ctx-"));
   mkdirSync(`${dir}/.claude/skills/factory-build`, { recursive: true });
   writeFileSync(`${dir}/.claude/skills/factory-build/SKILL.md`, "# factory-build\n\nDo the build stage.\n");
@@ -257,5 +258,42 @@ describe("the context pack reaches both agent paths", () => {
   test("an empty context pack leaves Claude's argv exactly as v2.4.0 sent it", () => {
     const opts = { stage: "build" as const, issue: 12, cwd: "/w", maxBudgetUsd: 5 };
     expect(claudeArgs(opts, "")).toEqual(claudeArgs(opts));
+  });
+});
+
+describe("buildContextPack skillsDir", () => {
+  function twoDirs(): string {
+    mkdirSync(tmpdir(), { recursive: true });
+    const cwd = mkdtempSync(join(tmpdir(), "factory-ctx-sd-"));
+    for (const [dir, name] of [
+      [".agents/skills", "agentskill"],
+      [".claude/skills", "claudeskill"],
+    ] as const) {
+      mkdirSync(`${cwd}/${dir}/${name}`, { recursive: true });
+      writeFileSync(
+        `${cwd}/${dir}/${name}/SKILL.md`,
+        `---\nname: ${name}\ndescription: about ${name}\n---\nBody of ${name}.`,
+      );
+    }
+    return cwd;
+  }
+
+  test("with skillsDir .agents/skills the index lists that directory only, and a routed skill is read from it", async () => {
+    const cwd = twoDirs();
+    const opts = { skillsDir: ".agents/skills", skills: ["agentskill"] };
+    const index = await buildContextPack("plan", 1, cwd, opts);
+    expect(index).toContain("- agentskill: about agentskill");
+    expect(index).not.toContain("claudeskill");
+    expect(await buildContextPack("build", 1, cwd, opts)).toContain("Body of agentskill.");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("the default still reads .claude/skills", async () => {
+    const cwd = twoDirs();
+    const index = await buildContextPack("plan", 1, cwd, { skills: ["claudeskill"] });
+    expect(index).toContain("- claudeskill: about claudeskill");
+    expect(index).not.toContain("agentskill");
+    expect(await buildContextPack("build", 1, cwd, { skills: ["claudeskill"] })).toContain("Body of claudeskill.");
+    rmSync(cwd, { recursive: true, force: true });
   });
 });

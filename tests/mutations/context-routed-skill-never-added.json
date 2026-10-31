@@ -1,0 +1,7 @@
+{
+  "name": "context: routed skill never added",
+  "file": "src/context.ts",
+  "find": "if (body) out.push({ label: `skill: ${name}`",
+  "replace": "if (!body) out.push({ label: `skill: ${name}`",
+  "test": "tests/context-pack.test.ts"
+}
