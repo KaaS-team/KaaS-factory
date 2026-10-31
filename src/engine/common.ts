@@ -32,6 +32,7 @@ import { mcpServersFor } from "../mcp";
 import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
 import { type IssueScope, scopeFrom } from "../core/model-tier";
 import { rehydrate } from "../rehydrate";
+import { sanitizeIssue } from "../sanitize-issue";
 import type { GateRunner } from "../gates";
 import type { ProofGit } from "../proof";
 import type { GhIssue } from "../github";
@@ -285,10 +286,9 @@ export function finish(
 
 // Skills never call `gh` (only the runner talks to GitHub), so the current
 // issue thread is handed to them as a file: they read it instead of fetching
-// it themselves. Written fresh before every stage so a resumed stage sees any
-// new trusted reply.
+// it themselves. Rewritten before every stage, sanitised (src/sanitize-issue.ts).
 export async function writeIssueSnapshot(worktree: string, issue: GhIssue): Promise<void> {
-  await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(issue, null, 2));
+  await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(sanitizeIssue(issue), null, 2));
 }
 
 // The agent's own cost wins; otherwise price the tokens. No price means the

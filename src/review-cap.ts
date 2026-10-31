@@ -3,5 +3,5 @@
 export const rejectLimit = (workflowRejects: number, maxRounds: number): number =>
   Math.min(workflowRejects, maxRounds - 1);
 
-export const capNote = (round: number, maxRounds: number): string =>
-  round >= maxRounds ? "; review cap reached, rethink the approach instead of patching again" : "";
+export const rejectedNote = (round: number, maxRounds: number): string =>
+  `rejected ${round} times${round >= maxRounds ? "; review cap reached, rethink the approach instead of patching again" : ""}`;
