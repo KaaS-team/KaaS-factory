@@ -6,7 +6,7 @@
 // left on disk.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDir } from "../src/artifacts";
@@ -123,5 +123,61 @@ describe("rehydrate", () => {
     expect(await Bun.file(`${dir}/triage.json`).exists()).toBe(false);
     expect(await Bun.file(`${dir}/triage-comment.md`).exists()).toBe(false);
     rmSync(worktree, { recursive: true, force: true });
+  });
+});
+
+describe("rehydrate: prior findings and operator answers", () => {
+  const trusted = (body: string, id: number): GhComment => ({ ...comment(body, id), authorAssociation: "OWNER" });
+  const verdict = (json: object, id: number) =>
+    comment(`<!-- factory:verdict v1 -->\n${dataMarker("verify", json)}`, id);
+  async function run(comments: GhComment[], seed?: string) {
+    const worktree = mkdtempSync(join(tmpdir(), "factory-rehydrate-"));
+    if (seed) {
+      mkdirSync(join(worktree, runDir(5)), { recursive: true });
+      writeFileSync(join(worktree, runDir(5), "prior-findings.json"), seed);
+    }
+    await rehydrate(worktree, { number: 5, title: "t", body: "", labels: [], comments });
+    const out = new Map<string, string>();
+    for (const n of ["prior-findings.json", "operator-answers.md"]) {
+      const f = join(worktree, runDir(5), n);
+      if (existsSync(f)) out.set(n, readFileSync(f, "utf8"));
+    }
+    rmSync(worktree, { recursive: true, force: true });
+    return (n: string) => out.get(n);
+  }
+  const reject = {
+    result: "reject",
+    rounds: 1,
+    findings: [
+      "plain",
+      { severity: "must", confidence: 4, what: "m" },
+      { severity: "should", confidence: 4, what: "s" },
+    ],
+  };
+
+  test("a last reject writes its must findings only", async () => {
+    const read = await run([verdict(reject, 1)]);
+    expect(JSON.parse(read("prior-findings.json")!)).toEqual(["plain", "m"]);
+  });
+  test("a last pass, or a holdout-only marker after it, writes none", async () => {
+    const pass = verdict({ result: "pass", rounds: 2, findings: [] }, 2);
+    expect(await run([verdict(reject, 1), pass])).toBeDefined();
+    expect((await run([verdict(reject, 1), pass]))("prior-findings.json")).toBeUndefined();
+    const holdout = comment(`<!-- factory:holdout -->\n${dataMarker("verify", { acceptance: [] })}`, 3);
+    expect((await run([verdict(reject, 1), pass, holdout]))("prior-findings.json")).toBeUndefined();
+  });
+  test("an existing prior-findings.json is left alone", async () => {
+    expect((await run([verdict(reject, 1)], '["kept"]'))("prior-findings.json")).toBe('["kept"]');
+  });
+  test("trusted plain comments become operator-answers.md; commands, runner and untrusted ones do not", async () => {
+    const read = await run([
+      trusted("use the v2 API", 1),
+      trusted("/factory retry", 2),
+      trusted("<!-- factory:status v1 -->\nrunner", 3),
+      comment("drive-by", 4),
+      trusted("and keep it small", 5),
+    ]);
+    expect(read("operator-answers.md")).toBe("use the v2 API\n\n---\n\nand keep it small\n");
+    expect((await run([comment("drive-by", 1)]))("operator-answers.md")).toBeUndefined();
   });
 });

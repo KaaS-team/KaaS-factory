@@ -669,7 +669,9 @@ describe("failure paths", () => {
     c.push("verify", verdict("pass"));
     c.push("pr", pr());
     expect(await c.step()).toBe("shipped");
-    expect(c.executor.resumed[4]).toEqual({ failure: "<!-- factory:verdict v1 -->\nstill throws" });
+    expect(c.executor.resumed[4]).toEqual({
+      failure: "<!-- factory:verdict v1 -->\n## Verdict: reject (round 1 of 2)\n\nstill throws",
+    });
     done(c);
   });
 
@@ -691,7 +693,7 @@ describe("failure paths", () => {
     // Runs in order: triage, plan, build, verify, the rebuild, verify, pr.
     expect(c.executor.resumed[4]).toEqual({
       sessionId: "s-build-1",
-      failure: "<!-- factory:verdict v1 -->\nthe empty list still throws",
+      failure: "<!-- factory:verdict v1 -->\n## Verdict: reject (round 1 of 2)\n\nthe empty list still throws",
     });
     // Only the rebuild resumes: triage, plan, the first build and every verify start fresh.
     expect(c.executor.resumed.filter(Boolean)).toHaveLength(1);
@@ -868,7 +870,15 @@ describe("failure paths", () => {
     d.push("build", build());
     d.push("verify", rejected([finding("real bug")]));
     d.push("build", build());
-    d.push("verify", verdict("pass"));
+    d.push("verify", {
+      ...verdict("pass"),
+      "verdict.json": JSON.stringify({
+        result: "pass",
+        rounds: 1,
+        findings: [],
+        prior: [{ what: "real bug", status: "resolved" }],
+      }),
+    });
     d.push("pr", pr());
     expect(await d.step()).toBe("shipped");
     expect(d.github.seenLabels.has(LABEL.building)).toBe(true);
