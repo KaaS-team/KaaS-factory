@@ -68,6 +68,7 @@ RUN bun install --frozen-lockfile
 
 COPY bin ./bin
 COPY src ./src
+COPY scripts/check-pr-body.ts ./scripts/check-pr-body.ts
 COPY contrib ./contrib
 COPY dashboard ./dashboard
 COPY template ./template

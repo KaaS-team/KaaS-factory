@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { problems } from "../scripts/check-pr-body";
 
 const template = readFileSync(".github/pull_request_template.md", "utf8");
@@ -75,5 +78,27 @@ describe("check-pr-body", () => {
     expect(problems(`${filled()}\nhttps://claude.ai/code/session_x`, template)).toEqual([
       "the body links a Claude session",
     ]);
+  });
+});
+
+describe("check-pr-body --file", () => {
+  const run = (body: string, env: Record<string, string> = {}) => {
+    const dir = mkdtempSync(join(tmpdir(), "prbody-"));
+    const file = join(dir, "body.md");
+    writeFileSync(file, body);
+    const args = ["bun", "scripts/check-pr-body.ts", ...(env.PR_BODY === undefined ? ["--file", file] : [])];
+    return Bun.spawnSync(args, { env: { ...process.env, ...env } });
+  };
+  test("a placeholder verdict exits 1 with the placeholder message", () => {
+    const r = run(filled({ "Verify verdict": "Pending CI" }));
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr.toString()).toContain('section "Verify verdict" is a placeholder');
+  });
+  test("a complete body exits 0", () => {
+    expect(run(filled()).exitCode).toBe(0);
+  });
+  test("PR_BODY still works", () => {
+    expect(run("", { PR_BODY: filled() }).exitCode).toBe(0);
+    expect(run("", { PR_BODY: "short" }).exitCode).toBe(1);
   });
 });
