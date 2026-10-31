@@ -20,6 +20,7 @@ import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps, uns
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart } from "./derive";
 import { decideMerge, mergePolicyMarker } from "./merge-policy";
+import { unlockedReady } from "./area-locks";
 import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
@@ -626,7 +627,6 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // STOP_IF, the auto_start switch and the spend caps pause new pickups only (src/dispatch.ts);
   // approvals, answers, retries and revises keep flowing so a human can clear the backlog.
   const gate = await intakeGate(deps, config, openPrs);
-  const intakeGated = gate.open;
   if (deps.machine) deps.machine.leases.beat(machineBeat(deps.machine));
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
   for (const workflow of allWorkflows(deps)) {
@@ -647,8 +647,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     return { paused: false, processed: [], nextTickAt: Math.min(err.resetAt * 1000, now + MAX_BACKOFF_MS) };
   }
   const labelled = (label: string) => found.get(label) ?? [];
-  const readyRaw = intakeGated ? labelled(LABEL.ready) : [];
-  const blockedRaw = intakeGated ? labelled(LABEL.blocked) : [];
+  const intake = (label: string) => (gate.open ? labelled(label) : []);
   const needsInfo = labelled(LABEL.needsInfo);
   const awaitingApproval = labelled(LABEL.awaitingApproval);
   const failed = labelled(LABEL.failed);
@@ -658,9 +657,10 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
 
   // The dependency gate (blockers.ts), once per poll before any dispatch: a ready issue with an open
   // "Blocked by" moves to LABEL.blocked, and back to ready the poll its last blocker clears.
-  const { clear } = await resolveBlockers(deps.github, config.repo, readyRaw, blockedRaw);
+  const { clear } = await resolveBlockers(deps.github, config.repo, intake(LABEL.ready), intake(LABEL.blocked));
   // Per-team and org caps hold back new pickups while work waits on people (src/org-caps.ts).
-  const ready = admitReady(clear, [...awaitingApproval, ...inReview], capsFor(config));
+  const admitted = admitReady(clear, [...awaitingApproval, ...inReview], capsFor(config));
+  const ready = await unlockedReady(deps, config, admitted);
   const buckets = [ready, needsInfo, awaitingApproval, overlapped, failed, needsHuman, inReview];
 
   const seen = new Set<number>();
