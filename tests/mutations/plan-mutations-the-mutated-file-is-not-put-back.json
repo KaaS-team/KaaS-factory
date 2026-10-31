@@ -1,0 +1,7 @@
+{
+  "name": "plan mutations: the mutated file is not put back",
+  "file": "src/proof.ts",
+  "find": "await io.write(worktree, m.file, original);",
+  "replace": "",
+  "test": "tests/mutate.test.ts"
+}
