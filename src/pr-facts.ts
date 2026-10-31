@@ -28,12 +28,13 @@ export interface PrFacts {
     readonly builderModel: string;
     readonly reviewers: readonly { readonly model: string; readonly blockers: number; readonly verdict?: string }[];
   } | null;
-  // 8. UI paths: preview, smoke and visual diffs nobody reviewed
+  // 8. UI paths: preview, smoke, visual diffs nobody reviewed and a committed Playwright spec
   readonly ui: {
     readonly changed: boolean;
     readonly preview: boolean;
     readonly smoke: boolean;
     readonly unreviewedDiffs: number;
+    readonly qaSpec: boolean;
   };
   // 10. a post-merge watch is armed (src/post-merge.ts)
   readonly postMergeWatch: boolean;
@@ -70,6 +71,7 @@ export function factRefusals(facts: PrFacts, mode: Autonomy): MergeRefusal[] {
   out.push(...reviewRefusals(facts, mode));
   const ui = facts.ui;
   if (ui.changed && (!ui.preview || !ui.smoke)) out.push(fail(8, "a UI change has no preview or no smoke"));
+  if (ui.changed && !ui.qaSpec) out.push(fail(8, "a UI change has no committed Playwright spec"));
   if (ui.changed && ui.unreviewedDiffs) out.push(fail(8, `${ui.unreviewedDiffs} visual diffs nobody reviewed`));
   if (!facts.postMergeWatch) out.push(fail(10, "no post-merge watch is armed"));
   return out;

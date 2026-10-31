@@ -23,7 +23,7 @@ test("UI changes get a preview, a smoke test and a visual diff", async () => {
   try {
     const previewTemplate = `http://127.0.0.1:${server.port}/pr-{pr}`;
     const ui = await uiFacts(["web/components/Cart.tsx"], { previewTemplate, pr: 7, baseline, current });
-    expect(ui).toEqual({ changed: true, preview: true, smoke: true, unreviewedDiffs: 1 });
+    expect(ui).toEqual({ changed: true, preview: true, smoke: true, unreviewedDiffs: 1, qaSpec: false });
     expect((await uiFacts(["web/components/Cart.tsx"], { previewTemplate, pr: 8, baseline, current })).smoke).toBe(
       false,
     );
@@ -39,12 +39,22 @@ test("UI changes get a preview, a smoke test and a visual diff", async () => {
       ).unreviewedDiffs,
     ).toBe(0);
     expect((await uiFacts(["src/server.ts"], { previewTemplate, pr: 7, baseline, current })).changed).toBe(false);
+    const withSpec = await uiFacts(["web/components/Cart.tsx", "e2e/cart.spec.ts"], {
+      previewTemplate,
+      pr: 7,
+      baseline,
+      current,
+    });
+    expect(withSpec.qaSpec).toBe(true);
     const facts = {
       tamper: [],
       risk: { blastRadius: { owners: [], protected: [] }, level: "low" },
       ui,
     } as unknown as PrFacts;
     expect(factRefusals(facts, "semi").map((r) => r.detail)).toContain("8: 1 visual diffs nobody reviewed");
+    expect(factRefusals(facts, "semi").map((r) => r.detail)).toContain(
+      "8: a UI change has no committed Playwright spec",
+    );
   } finally {
     server.stop(true);
   }

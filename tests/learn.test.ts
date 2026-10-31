@@ -3,7 +3,7 @@
 // anything outside its allowed paths, and never re-batching a row twice.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LEARNING_ALLOWED_PATHS, branchNameFor, runLearn } from "../src/learn";
@@ -89,11 +89,25 @@ describe("factory learn", () => {
 
     // Simulate a bug that wrote outside .factory/memory or .claude/skills.
     git.changed = ["src/watch.ts"];
+    const tree = join(deps.workspacesDir, branchNameFor(NOW).replace(/\//g, "-"));
+    mkdirSync(join(tree, "src"), { recursive: true });
+    writeFileSync(join(tree, "src/watch.ts"), "");
 
     await expect(runLearn(deps, repo, "main", NOW)).rejects.toThrow(/outside its allowed paths/);
     expect(deps.git.pushedBranches).toEqual([]);
     expect(deps.github.createdPrs).toEqual([]);
     // Never marked learned, so it's still pending for a fixed run to pick up.
+    expect(state.pendingLessons(repo)).toHaveLength(1);
+  });
+
+  test("refuses a batch that deletes a skill file before any push", async () => {
+    const { deps, repo, git, state } = setup();
+    const id = state.queueRetro(repo, 3, "rejected");
+    state.completeRetro(id, { lesson: "Something worth remembering." });
+    git.changed = [".claude/skills/factory-build/SKILL.md"];
+
+    await expect(runLearn(deps, repo, "main", NOW)).rejects.toThrow(/never remove/);
+    expect(deps.git.pushedBranches).toEqual([]);
     expect(state.pendingLessons(repo)).toHaveLength(1);
   });
 
