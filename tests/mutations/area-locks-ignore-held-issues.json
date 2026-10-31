@@ -1,0 +1,1 @@
+{"name":"area locks ignore held issues","file":"src/area-locks.ts","find":"files.length === 0 ? undefined : taken.find(","replace":"files.length === 0 || true ? undefined : taken.find(","test":"tests/area-locks.test.ts"}
