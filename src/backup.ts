@@ -1,11 +1,11 @@
 // Snapshots the factory's SQLite state to an S3/R2 bucket, one timestamped folder per run with a sha256
 // manifest written last, so a folder without a manifest is a partial upload and never a restore point.
 import { Database } from "bun:sqlite";
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { S3Client } from "bun";
 import { defaultStatePath, discoverRepos, factoryHome } from "./paths";
 
@@ -20,6 +20,8 @@ export interface BackupConfig {
   region: string;
   keepDays: number;
   at: string;
+  // Signs the manifest; read from FACTORY_BACKUP_SIGNING_KEY and never uploaded.
+  signingKey?: string;
 }
 
 export interface BackupFile {
@@ -34,23 +36,31 @@ export interface BackupEntry {
   keys: string[];
 }
 
-// Backups share the blob store's bucket and credentials unless FACTORY_BACKUP_* says otherwise.
-export function backupConfigFromEnv(env: NodeJS.ProcessEnv = process.env): BackupConfig | undefined {
-  const pick = (name: string) => env[`FACTORY_BACKUP_${name}`] ?? env[`FACTORY_BLOB_${name}`];
-  const bucket = pick("BUCKET");
-  if (!bucket) return undefined;
+// Backups use their own bucket and credentials, never the blob store's, which the runners hold.
+export function backupConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  warn: (line: string) => void = console.error,
+): BackupConfig | undefined {
+  const vars = ["BUCKET", "ENDPOINT", "ACCESS_KEY_ID", "SECRET_ACCESS_KEY"] as const;
+  const missing = vars.filter((name) => !env[`FACTORY_BACKUP_${name}`]);
+  if (missing.length === vars.length) return undefined;
+  if (missing.length) {
+    warn(`backups are off: ${missing.map((name) => `FACTORY_BACKUP_${name}`).join(", ")} unset`);
+    return undefined;
+  }
   const keepDays = Number(env.FACTORY_BACKUP_KEEP_DAYS);
   const at = env.FACTORY_BACKUP_AT ?? "03:30";
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(at)) throw new Error(`FACTORY_BACKUP_AT must be HH:MM (UTC), got ${at}`);
   return {
-    bucket,
-    endpoint: pick("ENDPOINT"),
-    accessKeyId: pick("ACCESS_KEY_ID"),
-    secretAccessKey: pick("SECRET_ACCESS_KEY"),
-    region: pick("REGION") ?? "auto",
+    bucket: env.FACTORY_BACKUP_BUCKET!,
+    endpoint: env.FACTORY_BACKUP_ENDPOINT,
+    accessKeyId: env.FACTORY_BACKUP_ACCESS_KEY_ID,
+    secretAccessKey: env.FACTORY_BACKUP_SECRET_ACCESS_KEY,
+    region: env.FACTORY_BACKUP_REGION ?? "auto",
     // 0 would put the cutoff at the prune call, so `backup now` would delete the backup it just wrote.
     keepDays: env.FACTORY_BACKUP_KEEP_DAYS && Number.isFinite(keepDays) && keepDays >= 1 ? keepDays : 14,
     at,
+    ...(env.FACTORY_BACKUP_SIGNING_KEY ? { signingKey: env.FACTORY_BACKUP_SIGNING_KEY } : {}),
   };
 }
 
@@ -65,6 +75,18 @@ export function backupClient(config: BackupConfig): S3Client {
 }
 
 const sha256Hex = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
+const signHex = (key: string, manifest: string) => createHmac("sha256", key).update(manifest).digest("hex");
+
+const SEGMENT = /^[A-Za-z0-9_.-]+$/;
+const FLAT_NAMES = new Set(["factory.db", "plane.db", "machine.db", "integrations.db"]);
+// factory.db, the three other DBs, or <owner>/<repo>/factory.db; nothing else is ever restored.
+function allowedName(name: string): boolean {
+  if (FLAT_NAMES.has(name)) return true;
+  const parts = name.split("/");
+  return (
+    parts.length === 3 && parts[2] === "factory.db" && parts.every((p) => SEGMENT.test(p) && p !== "." && p !== "..")
+  );
+}
 
 // Every state DB under FACTORY_HOME: the run state (shared and per repo), the board, leases and integration links.
 export function backupSources(home: string = factoryHome()): string[] {
@@ -122,7 +144,11 @@ export async function backupOnce(
       await client.write(key, body);
       files.push({ key, bytes: body.length, sha256: sha256Hex(body) });
     }
-    await client.write(`${BACKUP_PREFIX}${id}/manifest.json`, JSON.stringify({ createdAt: now.toISOString(), files }));
+    const manifest = JSON.stringify({ createdAt: now.toISOString(), files });
+    // The signature goes first: the manifest is the commit marker, so a folder with one is always complete.
+    if (config.signingKey)
+      await client.write(`${BACKUP_PREFIX}${id}/manifest.sig`, signHex(config.signingKey, manifest));
+    await client.write(`${BACKUP_PREFIX}${id}/manifest.json`, manifest);
     return { id, files };
   } finally {
     await rm(scratch, { recursive: true, force: true });
@@ -174,14 +200,25 @@ export async function restoreBackup(
   if (!pick) throw new Error(`no backup ${opts.id ?? opts.date} in the bucket`);
   const client = backupClient(config);
   const prefix = `${BACKUP_PREFIX}${pick.id}/`;
-  const manifest = JSON.parse(await client.file(`${prefix}manifest.json`).text()) as { files: BackupFile[] };
+  if (!config.signingKey)
+    throw new Error("FACTORY_BACKUP_SIGNING_KEY is unset; restore needs it to verify the manifest");
+  const raw = await client.file(`${prefix}manifest.json`).text();
+  const sigFile = client.file(`${prefix}manifest.sig`);
+  if (!(await sigFile.exists())) throw new Error("manifest.sig is missing; refusing an unsigned manifest");
+  const got = Buffer.from((await sigFile.text()).trim());
+  const want = Buffer.from(signHex(config.signingKey, raw));
+  if (got.length !== want.length || !timingSafeEqual(got, want)) throw new Error("manifest signature does not match");
+  const manifest = JSON.parse(raw) as { files: BackupFile[] };
   const staged: { target: string; bytes: Uint8Array }[] = [];
   for (const f of manifest.files) {
+    if (!f.key.startsWith(prefix)) throw new Error(`${f.key}: key is outside ${prefix}`);
     const name = f.key.slice(prefix.length);
-    if (isAbsolute(name) || name.split(/[\\/]/).includes("..")) throw new Error(`${name}: unsafe path in the manifest`);
+    if (!allowedName(name)) throw new Error(`${name}: unsafe path in the manifest`);
+    const target = join(opts.to, name);
+    if (!resolve(target).startsWith(resolve(opts.to) + sep)) throw new Error(`${name}: unsafe path in the manifest`);
     const bytes = new Uint8Array(await client.file(f.key).arrayBuffer());
     if (sha256Hex(bytes) !== f.sha256) throw new Error(`${name}: sha256 does not match the manifest`);
-    staged.push({ target: join(opts.to, name), bytes });
+    staged.push({ target, bytes });
   }
   for (const { target } of staged)
     if (existsSync(target) && !force) throw new Error(`${target} exists; pass --force to overwrite`);

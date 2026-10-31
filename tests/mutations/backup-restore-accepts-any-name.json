@@ -1,0 +1,7 @@
+{
+  "name": "backup: restore accepts any name",
+  "file": "src/backup.ts",
+  "find": "!allowedName(name)",
+  "replace": "false",
+  "test": "tests/backup.test.ts"
+}
