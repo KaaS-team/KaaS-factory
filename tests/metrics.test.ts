@@ -59,8 +59,8 @@ describe("metrics", () => {
   test("a fixture over the bars fails --check naming the metric", () => {
     const r = check(fixture(20, { plan: 1, build: 0.2, shipped: 20, rejects: 20 }));
     expect(r.code).toBe(1);
-    expect(r.out).toContain("planShare");
-    expect(r.out).toContain("rejectsPerRun");
+    expect(r.out).toContain("planShare 0.83 is over its bar");
+    expect(r.out).toContain("rejectsPerRun 1.00 is over its bar");
   });
   test("costPerShipped over its bar fails on its own", () => {
     const r = check(fixture(20, { plan: 0.1, build: 2, shipped: 20, rejects: 0 }));
