@@ -34,7 +34,11 @@ Deps: T1
 - `tests/backup.test.ts`: [permanent] the cases in T1 and T2.
 
 ## Mutation
-Add one shard file per rule under `tests/mutations/` (name `backup-<slug>.json`, fields name, file, find, replace, test): the prefix check, the allowed-name check, the signature compare. Each `find` must match exactly once in `src/backup.ts` and the replacement must make `tests/backup.test.ts` fail. Do not edit `tests/mutations.json`. `tests/mutation-list.test.ts` already counts shard files, so it needs no change.
+One shard file per rule under `tests/mutations/` (name `backup-<slug>.json`). Do not edit `tests/mutations.json`; `tests/mutation-list.test.ts` already counts shard files. Adjust each `find` to text that occurs exactly once in `src/backup.ts` as you wrote it, and confirm the replacement makes `tests/backup.test.ts` fail.
+```json
+{"name":"backup: restore accepts a key outside the prefix","file":"src/backup.ts","find":"startsWith(prefix)","replace":"startsWith(\"\")","test":"tests/backup.test.ts"}
+```
+Add the same shape for the allowed-name check and the signature compare.
 
 ## Acceptance
 - AC-1: blob credentials are never used for backups: checked by `make test FILES=tests/backup.test.ts` (T1)
