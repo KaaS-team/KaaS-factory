@@ -20,7 +20,7 @@ Files: `.githooks/pre-push`, `.agents/repo.json`, `tests/hooks.test.ts`
 Model: sonnet
 1. `git fetch origin feat/q-hooks main && git checkout -b feat/q-hooks-fix origin/feat/q-hooks`. Make `.githooks/pre-push` byte-identical to its content on `origin/main` (`git show origin/main:.githooks/pre-push`).
 2. Find where `scripts/kaas/check-repo.py` and `scripts/kaas/pre-push.sh` read the `prePush` list (read both first) and add the two commands, `bun scripts/dco.ts` and `bun x biome ci .`, to that list in the repo's repo.json (the file the kit reads; `.agents/repo.json` if that is where the other keys live).
-3. In `tests/hooks.test.ts`, replace the "script text calls both commands" test with one that reads the repo.json `prePush` list and asserts it contains both commands; keep the temp-repo test that an unsigned commit is refused.
+3. In `tests/hooks.test.ts`, replace the "script text calls both commands" test with one that reads the repo.json `prePush` list and asserts it contains both commands; keep the temp-repo test that an unsigned commit is refused. Add a test that `.githooks/pre-push` equals the kit stub exactly (the three lines `#!/bin/sh`, the `# Written by the kaas kit` comment and `exec scripts/kaas/pre-push.sh "$@"`, as on main).
 
 ### T2: put the Makefile edit back where the anchor expects it
 Files: `Makefile`
@@ -35,9 +35,9 @@ Deps: T1
 none: the `hooks: never sign off` entry already on the branch is kept and must still match once.
 
 ## Acceptance
-- AC-1: `.githooks/pre-push` equals main's stub and the audit passes: checked by `python3.12 scripts/kaas/check-affected.py --audit` (T1)
+- AC-1: `.githooks/pre-push` equals main's stub and the audit passes: checked by `make test FILES=tests/hooks.test.ts` (T1)
 - AC-2: the prePush list holds the dco and biome commands: checked by `make test FILES=tests/hooks.test.ts` (T1)
-- AC-3: every mutation anchor matches once: checked by `bun scripts/check-mutation-anchors.ts` (T2)
+- AC-3: every mutation anchor matches once: checked by `make test FILES=tests/check-mutation-anchors.test.ts` (T2)
 
 ## Non-goals
 Do not touch .github/workflows. No new dependencies. No em dashes, no filler words. Nothing outside Files.
