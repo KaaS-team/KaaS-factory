@@ -1,7 +1,11 @@
-.PHONY: agent-matrix install check check-anchors check-baseline check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix install check check-anchors check-baseline check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks
 
 install:
 	bun install
+
+# Sets core.hooksPath to .githooks: commit-msg adds a missing sign-off, pre-push checks DCO and biome.
+hooks:
+	bun scripts/install-hooks.ts
 
 # make check = lint (biome, and rustfmt plus clippy on verify/ and relay/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped

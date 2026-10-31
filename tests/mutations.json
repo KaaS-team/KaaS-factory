@@ -948,5 +948,6 @@
   {"name": "pr-body: accept pending verdict", "file": "scripts/check-pr-body.ts", "find": "is a placeholder", "replace": "is a placeholder_", "test": "tests/check-pr-body.test.ts"},
   {"name": "pr-body: accept gate evidence with no output", "file": "scripts/check-pr-body.ts", "find": "has no output", "replace": "has no output_", "test": "tests/check-pr-body.test.ts"},
   {"name": "anchors: accept zero matches", "file": "scripts/check-mutation-anchors.ts", "find": "!== 1", "replace": "< 0", "test": "tests/check-mutation-anchors.test.ts"},
-  {"name": "anchors: skip missing file", "file": "scripts/check-mutation-anchors.ts", "find": "if (text === undefined)", "replace": "if (false)", "test": "tests/check-mutation-anchors.test.ts"}
+  {"name": "anchors: skip missing file", "file": "scripts/check-mutation-anchors.ts", "find": "if (text === undefined)", "replace": "if (false)", "test": "tests/check-mutation-anchors.test.ts"},
+  {"name": "hooks: never sign off", "file": ".githooks/commit-msg", "find": "printf '\\nSigned-off-by: %s\\n'", "replace": "printf '\\nSigned-off-by-x: %s\\n'", "test": "tests/hooks.test.ts"}
 ]

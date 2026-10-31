@@ -16,6 +16,7 @@
     "push": "make check && python3 scripts/kaas/check-security.py gitleaks,semgrep,osv-scanner"
   },
   "$stageGates": "push matches stop so the scanners run before every push, not the gate alone; CI runs the same scan.",
+  "prePush": "bun scripts/dco.ts origin/main && bun x biome ci .",
   "kitExtras": [
     "scripts/kaas/check-security.py",
     "scripts/kaas/semgrep.yml"

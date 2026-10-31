@@ -1,0 +1,7 @@
+#!/bin/sh
+# Appends a Signed-off-by trailer from the author identity when the message has none (the DCO, scripts/dco.ts).
+msg="$1"
+grep -q '^Signed-off-by:' "$msg" && exit 0
+ident=$(git var GIT_AUTHOR_IDENT) || exit 1
+name_email=${ident%> *}'>'
+printf '\nSigned-off-by: %s\n' "$name_email" >> "$msg"
