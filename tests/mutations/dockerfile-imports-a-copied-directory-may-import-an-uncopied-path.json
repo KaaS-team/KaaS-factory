@@ -1,0 +1,7 @@
+{
+  "name": "dockerfile imports: a copied directory may import an uncopied path",
+  "file": "Dockerfile",
+  "find": "COPY scripts/lint-planned.ts ./scripts/lint-planned.ts\n",
+  "replace": "",
+  "test": "tests/dockerfile-imports.test.ts"
+}
