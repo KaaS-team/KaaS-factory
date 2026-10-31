@@ -1,6 +1,7 @@
 // The CLI's runtime and run-anywhere commands: `factory pool`, `factory runtime`, `factory dispatch`
 // and `factory routine`. src/cli.ts dispatches here so it stays a thin switch.
 
+import { Agent37Execution, accountLine, type Agent37Spec } from "./adapters/agent37/execution";
 import { SqliteUsageStore } from "./adapters/pool/execution";
 import { successJson, UsageError, EXIT } from "./cli-output";
 import { loadConfig, type FactoryConfig } from "./config";
@@ -45,6 +46,11 @@ export async function cmdPool(cli: CliContext): Promise<void> {
   }
 }
 
+const accountOf = (spec: Agent37Spec) => {
+  const ex = new Agent37Execution(spec);
+  return Promise.all(ex.ids.map((id) => ex.account(id)));
+};
+
 const RUNTIME_USAGE = "usage: factory runtime (list [--probe] | verify <name>) [--json]";
 
 // `factory runtime list`: every runtime, its kind and capability flags, and with --probe whether it answers.
@@ -61,13 +67,14 @@ export async function cmdRuntime(cli: CliContext): Promise<void> {
         kind: spec.kind,
         capabilities: capabilitiesOf(spec),
         ...(cli.has("probe") ? { health: await probeNamed(machine, n) } : {}),
+        ...(cli.has("probe") && spec.kind === "agent37" ? { account: await accountOf(spec) } : {}),
       })),
     );
     const warning = defaultRuntime().warning;
     if (cli.has("json")) return void console.log(successJson({ runtimes: rows, ...(warning ? { warning } : {}) }));
     for (const r of rows)
       console.log(
-        `${r.name}  ${r.kind}  isolation ${r.capabilities.isolation}, egress ${r.capabilities.egress}${r.health ? `  ${r.health.ok ? "up" : "DOWN"} (${plain(r.health.detail)}, ${r.health.ms} ms)` : ""}`,
+        `${r.name}  ${r.kind}  isolation ${r.capabilities.isolation}, egress ${r.capabilities.egress}${r.health ? `  ${r.health.ok ? "up" : "DOWN"} (${plain(r.health.detail)}, ${r.health.ms} ms)` : ""}${r.account ? `  ${plain(accountLine(r.account))}` : ""}`,
       );
     if (warning) console.log(`warning: ${warning}`);
     return;

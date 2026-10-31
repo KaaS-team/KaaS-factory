@@ -12,6 +12,7 @@ import { cpus, freemem, hostname } from "node:os";
 import { dirname } from "node:path";
 import { factoryHome } from "./paths";
 import type { AgentSandbox } from "./agents/agent-sandbox";
+import type { Agent37Spec } from "./adapters/agent37/execution";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
 import { GATEWAY_KEY_ENV, isProviderHost, type LlmGateway } from "./agents/gateway";
 
@@ -61,6 +62,7 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     const problems = runtimeProblems(raw.runtimes, `${path}: runtimes`);
     if (problems.length) throw new Error(problems.join("\n"));
   }
+  ownInstanceProblem(raw.runtimes, env.FACTORY_AGENT37_INSTANCE, path);
   if (raw.agentRuntime !== undefined) {
     const named = (raw.runtimes as Record<string, RuntimeSpec> | undefined)?.[raw.agentRuntime as string];
     if (named?.kind !== "microsandbox" && named?.kind !== "docker")
@@ -86,6 +88,17 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}),
     ...(raw.capabilities ? { capabilities: raw.capabilities as string[] } : {}),
   };
+}
+
+// A worker on a hosted instance shares its model plan's limits with its gates, so they run elsewhere.
+function ownInstanceProblem(runtimes: unknown, own: string | undefined, path: string): void {
+  if (!own || typeof runtimes !== "object" || runtimes === null) return;
+  for (const [name, r] of Object.entries(runtimes as Record<string, Partial<Agent37Spec>>)) {
+    if (r?.kind === "agent37" && [r.instance, ...(r.instances ?? [])].includes(own))
+      throw new Error(
+        `${path}: runtime "${name}" runs gates on instance ${own}, which is this worker's own (FACTORY_AGENT37_INSTANCE); name another instance`,
+      );
+  }
 }
 
 const CAPABILITY = /^[a-z0-9][a-z0-9-]{0,31}$/;

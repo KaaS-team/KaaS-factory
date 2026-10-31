@@ -79,8 +79,16 @@ const SHAPES: Readonly<
   wrap: { required: ["argv"], fields: { argv: "strings" } },
   http: { required: ["url"], fields: { url: "string", tokenEnv: "string", exclude: "strings" } },
   agent37: {
-    required: ["instance", "tokenEnv"],
-    fields: { instance: "string", tokenEnv: "string", url: "string", root: "string", exclude: "strings" },
+    required: ["tokenEnv"],
+    fields: {
+      instance: "string",
+      instances: "strings",
+      tokenEnv: "string",
+      url: "string",
+      apiUrl: "string",
+      root: "string",
+      exclude: "strings",
+    },
   },
   microsandbox: {
     required: ["image"],
@@ -122,6 +130,14 @@ function kindProblems(at: string, s: Record<string, unknown>, all: Record<string
     !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(s.url)
   )
     return [`${at}.url: https (plain http only to localhost), since the worktree is sent to it`];
+  if (s.kind === "agent37") {
+    const named = (s.instance === undefined ? 0 : 1) + (s.instances === undefined ? 0 : 1);
+    if (typeof s.apiUrl === "string" && !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(s.apiUrl))
+      return [`${at}.apiUrl: https (plain http only to localhost), since the key is sent to it`];
+    if (named === 2) return [`${at}: name instance or instances, not both`];
+    if (named === 0) return [`${at}.instance: required for agent37 (or instances)`];
+    if (Array.isArray(s.instances) && !s.instances.length) return [`${at}.instances: at least one`];
+  }
   if (s.kind === "microsandbox" && Array.isArray(s.secrets)) return secretProblems(at, s.secrets, s.allow);
   return [];
 }

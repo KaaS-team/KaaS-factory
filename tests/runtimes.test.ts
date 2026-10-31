@@ -7,7 +7,7 @@ import { containerArgs } from "../src/adapters/docker/execution";
 import { lwprArgs } from "../src/adapters/lwpr/execution";
 import { agentArgs, guestGit, MicrosandboxExecution, sandboxArgs } from "../src/adapters/microsandbox/execution";
 import { CommandExecutor } from "../src/agents/executor";
-import { Agent37Execution, CHUNK } from "../src/adapters/agent37/execution";
+import { Agent37Execution, accountLine, CHUNK } from "../src/adapters/agent37/execution";
 import { archiveArgs, HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { sshArgs } from "../src/adapters/ssh/execution";
 import { wrapArgs } from "../src/adapters/wrap/execution";
@@ -19,9 +19,15 @@ import { parseWorkflowText } from "../src/engine/workflows";
 import { loadMachineConfig } from "../src/machine";
 import { probeBudgetMs, probeNamed } from "../src/runtime-kit";
 import { BUILTIN_RUNTIMES, runtimeProblems, runtimeRefs, runtimesFrom, unknownRuntimes } from "../src/runtimes";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// The preload removes the tmp root after each rerun, so every directory remakes it first.
+const tmp = (prefix: string) => {
+  mkdirSync(tmpdir(), { recursive: true });
+  return mkdtempSync(join(tmpdir(), prefix));
+};
 
 describe("frame", () => {
   test("carries stdout, stderr and the code through one merged, noisy log", () => {
@@ -142,7 +148,7 @@ describe("wrap", () => {
 
 describe("http sandbox", () => {
   const dir = () => {
-    const d = mkdtempSync(join(tmpdir(), "factory-http-"));
+    const d = tmp("factory-http-");
     for (const sub of [".git", "node_modules", "dist"]) {
       Bun.spawnSync(["mkdir", "-p", join(d, sub)]);
       writeFileSync(join(d, sub, "f"), sub);
@@ -268,7 +274,7 @@ describe("names", () => {
     ]);
   });
   test("a bad machine.json runtime stops boot", () => {
-    const home = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const home = tmp("factory-home-");
     writeFileSync(
       join(home, "machine.json"),
       JSON.stringify({ slots: 1, runtimes: { box: { kind: "ssh", host: "h" } } }),
@@ -305,9 +311,15 @@ describe("names", () => {
   });
 });
 
+const a37 = (
+  spec: ConstructorParameters<typeof Agent37Execution>[0],
+  env: NodeJS.ProcessEnv,
+  retry?: ConstructorParameters<typeof Agent37Execution>[2],
+) => new Agent37Execution(spec, env, retry, 20);
+
 describe("agent37", () => {
   const dir = () => {
-    const d = mkdtempSync(join(tmpdir(), "factory-a37-"));
+    const d = tmp("factory-a37-");
     for (const sub of [".git", "node_modules", "dist"]) {
       Bun.spawnSync(["mkdir", "-p", join(d, sub)]);
       writeFileSync(join(d, sub, "f"), sub);
@@ -318,12 +330,12 @@ describe("agent37", () => {
 
   test("sends the worktree in chunks under the body cap, runs there, answers its exit code, cleans up", async () => {
     const box = startAgent37("k", "i1");
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-root-"));
+    const root = tmp("factory-a37-root-");
     try {
       const d = dir();
       // Random bytes do not compress, so the archive needs several chunks.
       writeFileSync(join(d, "big.bin"), crypto.getRandomValues(new Uint8Array(3 * CHUNK)));
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run(
+      const r = await a37(spec(box.url, root), { K: "k" }).run(
         "ls -A | sort | tr '\\n' ' '; printf \"it's\" >&2; exit 3",
         d,
       );
@@ -335,17 +347,155 @@ describe("agent37", () => {
     }
   });
 
+  test("a command longer than one exec's wait returns its output and code", async () => {
+    const box = startAgent37("k", "i1", { maxWaitMs: 200 });
+    const root = tmp("factory-a37-long-");
+    try {
+      const r = await a37(spec(box.url, root), { K: "k" }).run("sleep 1; echo done", dir());
+      expect(r).toEqual({ stdout: "done\n", stderr: "", code: 0 });
+      expect(readdirSync(root)).toEqual([]);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("an aborted run leaves no process and no directory", async () => {
+    const box = startAgent37("k", "i1");
+    const root = tmp("factory-a37-abort-");
+    try {
+      const ac = new AbortController();
+      const mark = `sleep 3${Date.now() % 100000}`;
+      const run = a37(spec(box.url, root), { K: "k" }).run(mark, dir(), ac.signal);
+      while (!box.commands.some((c) => c.includes("nohup"))) await Bun.sleep(10);
+      ac.abort("stop");
+      expect((await run).runtimeFailed).toStartWith("agent37 i1: cut off");
+      expect(readdirSync(root)).toEqual([]);
+      // SIGKILL is delivered at once but the process table empties a moment later.
+      const left = () => Bun.spawnSync(["pgrep", "-af", mark]).stdout.toString();
+      for (let i = 0; i < 40 && left(); i++) await Bun.sleep(50);
+      expect(left()).toBe("");
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("a 1 MB file round-trips over at most 8 concurrent part writes", async () => {
+    const box = startAgent37("k", "i1", { partDelayMs: 40 });
+    const root = tmp("factory-a37-parts-");
+    try {
+      const d = dir();
+      writeFileSync(join(d, "big.bin"), crypto.getRandomValues(new Uint8Array(1024 * 1024)));
+      const r = await a37(spec(box.url, root), { K: "k" }).run("wc -c < big.bin", d);
+      expect(r.stdout.trim()).toBe(String(1024 * 1024));
+      expect(box.peak()).toBeGreaterThan(1);
+      expect(box.peak()).toBeLessThanOrEqual(8);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("an answer marked truncated adds a line to stderr", async () => {
+    const box = startAgent37("k", "i1", { truncated: true });
+    const root = tmp("factory-a37-trunc-");
+    try {
+      const r = await a37(spec(box.url, root), { K: "k" }).run("echo hi", dir());
+      expect(r.stderr).toContain("agent37: output truncated at 512 KB per stream");
+      expect(r.stdout).toBe("hi\n");
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("tar runs with COPYFILE_DISABLE=1", async () => {
+    const box = startAgent37("k", "i1");
+    const root = tmp("factory-a37-env-");
+    const bin = tmp("factory-a37-bin-");
+    const seen = join(bin, "seen");
+    const real = Bun.which("tar")!;
+    writeFileSync(join(bin, "tar"), `#!/bin/sh\necho "$COPYFILE_DISABLE" > ${seen}\nexec ${real} "$@"\n`, {
+      mode: 0o755,
+    });
+    const path = process.env.PATH;
+    process.env.PATH = `${bin}:${path}`;
+    try {
+      await a37(spec(box.url, root), { K: "k" }).run("true", dir());
+      expect(readFileSync(seen, "utf8")).toBe("1\n");
+    } finally {
+      process.env.PATH = path;
+      box.stop();
+    }
+  });
+
+  test("a run directory three hours old is reaped and one a minute old is kept", async () => {
+    const box = startAgent37("k", "i1");
+    const root = tmp("factory-a37-reap-");
+    try {
+      const old = join(root, "old");
+      const fresh = join(root, "fresh");
+      mkdirSync(old);
+      mkdirSync(fresh);
+      const ago = new Date(Date.now() - 3 * 3600_000);
+      utimesSync(old, ago, ago);
+      await a37(spec(box.url, root), { K: "k" }).run("true", dir());
+      expect(readdirSync(root)).toEqual(["fresh"]);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("account() reads status and wallet with the bearer key; a failure is a reason", async () => {
+    const box = startAgent37("k", "i1");
+    try {
+      const s = { ...spec(box.url, "/tmp/x"), apiUrl: box.url };
+      expect(await a37(s, { K: "k" }).account()).toEqual({ status: "sleeping", balance: 4.2 });
+      expect(box.bearers).toEqual(["Bearer k", "Bearer k"]);
+      expect(await a37(s, { K: "wrong" }).account()).toEqual({ reason: "/v1/instances/i1 answered 401" });
+      expect(await a37(s, {}).account()).toEqual({ reason: "env var K is not set" });
+      expect(accountLine([{ status: "sleeping", balance: 4.2 }])).toBe("instance sleeping, wallet $4.20");
+      expect(accountLine([{ reason: "x" }])).toBe("account unreadable: x");
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("runs over several instances go to the least busy, and naming both forms is refused", async () => {
+    const box = startAgent37("k", ["i1", "i2"]);
+    const root = tmp("factory-a37-multi-");
+    try {
+      const s = { kind: "agent37", instances: ["i1", "i2"], tokenEnv: "K", url: box.url, root } as const;
+      const ex = a37(s, { K: "k" });
+      const rs = await Promise.all([1, 2, 3].map(() => ex.run("sleep 0.3; echo ok", dir())));
+      expect(rs.map((r) => r.stdout)).toEqual(["ok\n", "ok\n", "ok\n"]);
+      expect(new Set(box.instances)).toEqual(new Set(["i1", "i2"]));
+      expect(runtimeProblems({ a: { kind: "agent37", instance: "i1", instances: ["i2"], tokenEnv: "K" } })).toEqual([
+        "runtimes.a: name instance or instances, not both",
+      ]);
+      expect(runtimeProblems({ a: { kind: "agent37", tokenEnv: "K" } })).toEqual([
+        "runtimes.a.instance: required for agent37 (or instances)",
+      ]);
+    } finally {
+      box.stop();
+    }
+  });
+
+  test("docs/runtimes.md carries the poll design, the wallet and the worker recipe", () => {
+    const doc = readFileSync(join(import.meta.dir, "../docs/runtimes.md"), "utf8");
+    expect(doc).toContain("agent37 has no free minutes");
+    expect(doc).toContain("A worker on a hosted instance");
+    expect(doc).not.toContain("waits at most 15 minutes");
+  });
+
   test("the key goes in the header only; unset, wrong or unreachable fails the step, never throws", async () => {
     const box = startAgent37("right", "i1");
     try {
-      const unset = await new Agent37Execution(spec(box.url, "/tmp/x"), {}).run("true", dir());
+      const unset = await a37(spec(box.url, "/tmp/x"), {}).run("true", dir());
       expect(unset.runtimeFailed).toBe("agent37 i1: env var K is not set");
       expect(box.keys.length).toBe(0);
-      const wrong = await new Agent37Execution(spec(box.url, "/tmp/x"), { K: "wrong-key-value" }).run("true", dir());
+      const wrong = await a37(spec(box.url, "/tmp/x"), { K: "wrong-key-value" }).run("true", dir());
       expect(wrong).toMatchObject({ code: 1, runtimeFailed: "agent37 i1 answered 401: unauthorized" });
       expect(wrong.stderr).not.toContain("wrong-key-value");
       expect(box.keys.at(-1)).toBe("wrong-key-value");
-      const down = await new Agent37Execution(spec("http://127.0.0.1:1", "/tmp/x"), { K: "k" }).run("true", dir());
+      const down = await a37(spec("http://127.0.0.1:1", "/tmp/x"), { K: "k" }).run("true", dir());
       expect(down.code).toBe(1);
       expect(down.runtimeFailed).toStartWith("agent37 i1 unreachable:");
     } finally {
@@ -355,11 +505,11 @@ describe("agent37", () => {
 
   test("a try_again answer on setup is retried, and the command still runs", async () => {
     const box = startAgent37("k", "i1", { busyFirst: 2 });
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-busy-"));
+    const root = tmp("factory-a37-busy-");
     try {
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      const r = await a37(spec(box.url, root), { K: "k" }).run("echo ok", dir());
       expect(r).toEqual({ stdout: "ok\n", stderr: "", code: 0 });
-      expect(box.commands.filter((c) => c.startsWith("mkdir ")).length).toBe(3);
+      expect(box.commands.filter((c) => c.includes("mkdir -p")).length).toBe(3);
     } finally {
       box.stop();
     }
@@ -367,9 +517,9 @@ describe("agent37", () => {
 
   test("a 504 on the main command is not sent again", async () => {
     const box = startAgent37("k", "i1", { mainFails: { status: 504 } });
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-504-"));
+    const root = tmp("factory-a37-504-");
     try {
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      const r = await a37(spec(box.url, root), { K: "k" }).run("echo ok", dir());
       expect(r).toMatchObject({ code: 1, runtimeFailed: "agent37 i1 answered 504: gateway timeout" });
       expect(box.commands.filter((c) => c.includes("bash -c")).length).toBe(1);
     } finally {
@@ -379,9 +529,9 @@ describe("agent37", () => {
 
   test("a try_again on the main command is not sent again either", async () => {
     const box = startAgent37("k", "i1", { mainFails: { status: 503, code: "try_again" } });
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-503-"));
+    const root = tmp("factory-a37-503-");
     try {
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      const r = await a37(spec(box.url, root), { K: "k" }).run("echo ok", dir());
       expect(r).toMatchObject({ code: 1, runtimeFailed: 'agent37 i1 answered 503: {"error":{"code":"try_again"}}' });
       expect(box.commands.filter((c) => c.includes("bash -c")).length).toBe(1);
     } finally {
@@ -393,12 +543,12 @@ describe("agent37", () => {
 
   test("when every retry is answered try_again, the run fails with that answer", async () => {
     const box = startAgent37("k", "i1", { busyFirst: 10 });
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-spent-"));
+    const root = tmp("factory-a37-spent-");
     try {
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }, fast).run("echo ok", dir());
+      const r = await a37(spec(box.url, root), { K: "k" }, fast).run("echo ok", dir());
       expect(r.code).toBe(1);
       expect(r.runtimeFailed).toStartWith("agent37 i1 answered 409:");
-      expect(box.commands.filter((c) => c.startsWith("mkdir ")).length).toBe(3);
+      expect(box.commands.filter((c) => c.includes("mkdir -p")).length).toBe(3);
     } finally {
       box.stop();
     }
@@ -406,18 +556,14 @@ describe("agent37", () => {
 
   test("a wait is cut short by the signal", async () => {
     const box = startAgent37("k", "i1", { busyFirst: 10 });
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-abort-"));
+    const root = tmp("factory-a37-abort-");
     try {
       const slow = { backoffMs: [60_000], budgetMs: 60_000 };
       const start = Date.now();
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }, slow).run(
-        "echo ok",
-        dir(),
-        AbortSignal.timeout(300),
-      );
+      const r = await a37(spec(box.url, root), { K: "k" }, slow).run("echo ok", dir(), AbortSignal.timeout(300));
       expect(r.runtimeFailed).toStartWith("agent37 i1: cut off");
       expect(Date.now() - start).toBeLessThan(5_000);
-      expect(box.commands.filter((c) => c.startsWith("mkdir ")).length).toBe(1);
+      expect(box.commands.filter((c) => c.includes("mkdir -p")).length).toBe(1);
     } finally {
       box.stop();
     }
@@ -425,10 +571,10 @@ describe("agent37", () => {
 
   test("the retry budget is one per run, not one per exec", async () => {
     const box = startAgent37("k", "i1", { busyFirst: 2, busyOn: { prefix: "base64 -d", times: 1 } });
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-shared-"));
+    const root = tmp("factory-a37-shared-");
     try {
       const tight = { backoffMs: [10, 10, 10], budgetMs: 25 };
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }, tight).run("echo ok", dir());
+      const r = await a37(spec(box.url, root), { K: "k" }, tight).run("echo ok", dir());
       expect(r.runtimeFailed).toStartWith("agent37 i1 answered 409:");
       expect(box.commands.filter((c) => c.startsWith("base64 -d")).length).toBe(1);
     } finally {
@@ -438,9 +584,9 @@ describe("agent37", () => {
 
   test("the cleanup is not retried, so a finished run returns at once", async () => {
     const box = startAgent37("k", "i1", { busyOn: { prefix: "rm -rf", times: 1 } });
-    const root = mkdtempSync(join(tmpdir(), "factory-a37-clean-"));
+    const root = tmp("factory-a37-clean-");
     try {
-      const r = await new Agent37Execution(spec(box.url, root), { K: "k" }).run("echo ok", dir());
+      const r = await a37(spec(box.url, root), { K: "k" }).run("echo ok", dir());
       expect(r).toEqual({ stdout: "ok\n", stderr: "", code: 0 });
       expect(box.commands.filter((c) => c.startsWith("rm -rf")).length).toBe(1);
     } finally {
@@ -537,7 +683,7 @@ describe("microsandbox", () => {
   });
 
   test("with agentRuntime set, the executor starts the agent through msb with the prompt as a file", async () => {
-    const d = mkdtempSync(join(tmpdir(), "factory-msb-agent-"));
+    const d = tmp("factory-msb-agent-");
     mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });
     writeFileSync(join(d, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
     const saved = process.env.PATH;
@@ -560,7 +706,7 @@ describe("microsandbox", () => {
   });
 
   test("with agentRuntime set in a git worktree, the executor hands the guest its own GIT_DIR", async () => {
-    const d = mkdtempSync(join(tmpdir(), "factory-msb-gitdir-"));
+    const d = tmp("factory-msb-gitdir-");
     mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });
     writeFileSync(join(d, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
     Bun.spawnSync(
@@ -592,7 +738,7 @@ describe("microsandbox", () => {
 
   // A repo with a committed holdout and a sparse worktree that hides it, as the runner makes one.
   function holdoutWorktree(): string {
-    const d = mkdtempSync(join(tmpdir(), "factory-msb-git-"));
+    const d = tmp("factory-msb-git-");
     const sh = (c: string) => expect(Bun.spawnSync(["bash", "-c", c], { cwd: d }).exitCode).toBe(0);
     sh(
       "git init -q -b main main && cd main && echo a > a && mkdir holdout && echo secret-7m1 > holdout/t && git add . && " +
@@ -606,7 +752,7 @@ describe("microsandbox", () => {
     const wt = holdoutWorktree();
     const env = {
       ...process.env,
-      ...guestGit(wt, mkdtempSync(join(tmpdir(), "factory-msb-scratch-")), ["holdout/**"]),
+      ...guestGit(wt, tmp("factory-msb-scratch-"), ["holdout/**"]),
     };
     const git = (...a: string[]) => Bun.spawnSync(["git", ...a], { cwd: wt, env });
     expect(git("status", "--short").stdout.toString()).toBe(" M a\n");
@@ -620,7 +766,7 @@ describe("microsandbox", () => {
   });
 
   test("outside a git worktree the guest gets no repo", () => {
-    expect(guestGit(mkdtempSync(join(tmpdir(), "factory-msb-plain-")), "/s", ["holdout/**"])).toEqual({});
+    expect(guestGit(tmp("factory-msb-plain-"), "/s", ["holdout/**"])).toEqual({});
   });
 
   test.skipIf(!Bun.which("msb"))(
@@ -649,7 +795,7 @@ describe("microsandbox", () => {
   test.skipIf(!Bun.which("msb"))(
     "live: an agent stage runs in the VM, reads its prompt, and holds only a placeholder for the key",
     async () => {
-      const d = mkdtempSync(join(tmpdir(), "factory-msb-agent-"));
+      const d = tmp("factory-msb-agent-");
       mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });
       writeFileSync(join(d, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
       const probe = "fake-probe-value-7m1";
@@ -690,7 +836,7 @@ describe("microsandbox", () => {
       const js = `const h={"X-P":process.env.PROBE};
 for(const u of["https://httpbin.org/headers","https://postman-echo.com/headers","https://example.com"])
 await fetch(u,{headers:h}).then(async r=>console.log(r.status,JSON.stringify(await r.text())),e=>console.log("err"));`;
-      const d = mkdtempSync(join(tmpdir(), "factory-msb-"));
+      const d = tmp("factory-msb-");
       writeFileSync(join(d, "probe.mjs"), js);
       const r = await new MicrosandboxExecution(spec, { ...process.env, PROBE: probe }).run(
         'echo "guest=$PROBE"; node probe.mjs; touch made; exit 4',
