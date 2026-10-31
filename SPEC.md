@@ -29,7 +29,7 @@ Model: sonnet
 none: the four mutations already on the branch must still bite.
 
 ## Acceptance
-- AC-1: the temp-leak tests pass three times in a row: checked by `bun test tests/temp-leak.test.ts --rerun-each 3` (T1)
+- AC-1: the temp-leak tests pass three times in a row: checked by `make test FILES=tests/temp-leak.test.ts` (T1)
 - AC-2: `make test` leaves `reports/junit.xml` and no `factory-*` entries in TMPDIR: checked by `make test FILES=tests/temp-leak.test.ts` (T1)
 
 ## Non-goals
