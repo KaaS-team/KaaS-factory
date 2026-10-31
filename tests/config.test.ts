@@ -22,6 +22,8 @@ import { loadWorkflow } from "../src/engine/workflows";
 import { advanceIssue } from "../src/watch";
 import { engine, removeEngineDirs } from "./engine-harness";
 
+mkdirSync(tmpdir(), { recursive: true });
+
 const dir = mkdtempSync(join(tmpdir(), "factory-cfg-"));
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
@@ -29,6 +31,7 @@ afterAll(() => {
 });
 
 function repoWith(config?: object): string {
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(dir, "r-"));
   if (config) {
     mkdirSync(join(d, ".factory"));
@@ -65,11 +68,13 @@ describe('base branch defaults to origin/HEAD, not the hard-coded "main"', () =>
   }
 
   function cloneOfTrunkRepo(): string {
+    mkdirSync(tmpdir(), { recursive: true });
     const src = mkdtempSync(join(dir, "src-"));
     git(src, "init", "-q", "-b", "trunk");
     writeFileSync(join(src, "f.txt"), "x");
     git(src, "add", ".");
     git(src, "-c", "user.email=a@b.c", "-c", "user.name=a", "commit", "-q", "-m", "x");
+    mkdirSync(tmpdir(), { recursive: true });
     const bare = `${mkdtempSync(join(dir, "bare-"))}.git`;
     git(dir, "clone", "-q", "--bare", src, bare);
     const wd = join(dir, `wd-${Math.random().toString(36).slice(2)}`);
@@ -91,6 +96,15 @@ describe('base branch defaults to origin/HEAD, not the hard-coded "main"', () =>
     writeFileSync(join(wd, ".factory/config.json"), JSON.stringify({ repo: "acme/x", base: "main", gates: [] }));
     const c = await loadConfig(wd);
     expect(c.base).toBe("main");
+  });
+});
+
+describe("events.accept", () => {
+  test("a list of strings is valid and a non-array is refused", () => {
+    expect(configProblems({ events: { sinks: [], accept: ["acme.*"] } })).toEqual([]);
+    expect(configProblems({ events: { sinks: [], accept: "acme.*" } }).some((p) => p.includes("events.accept"))).toBe(
+      true,
+    );
   });
 });
 
@@ -376,6 +390,7 @@ describe("configStaleness and warnWhenStale", () => {
   });
 
   test("a stage that starts on a stale config logs the warning on its run", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const empty = mkdtempSync(join(dir, "wf-"));
     const loaded = await loadWorkflow(empty, "spec-to-plan");
     if (!loaded.ok) throw new Error(loaded.problems.join("; "));

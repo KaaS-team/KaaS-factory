@@ -110,9 +110,23 @@ export const EVENT_SIGNATURE_HEADER = "x-factory-signature";
 // Senders and receivers built before the rename use this name, so it is still sent and still verified.
 export const LEGACY_EVENT_SIGNATURE_HEADER = "x-kaas-signature";
 
+export const SIGNATURE_HEADERS = [EVENT_SIGNATURE_HEADER, LEGACY_EVENT_SIGNATURE_HEADER] as const;
+
 export function eventSignature(headers: { get(name: string): string | null }): string | null {
-  return headers.get(EVENT_SIGNATURE_HEADER) ?? headers.get(LEGACY_EVENT_SIGNATURE_HEADER);
+  for (const name of SIGNATURE_HEADERS) {
+    const v = headers.get(name);
+    if (v !== null) return v;
+  }
+  return null;
 }
+
+// Unset `accept` keeps the fixed list; a list of globs (`*` is any run of characters) widens it.
+export function acceptsEvent(type: unknown, accept: readonly string[] | undefined): boolean {
+  if (accept === undefined) return isExternalEventType(type);
+  if (typeof type !== "string") return false;
+  return accept.some((g) => new RegExp(`^${g.split("*").map(escapeRe).join(".*")}$`).test(type));
+}
+const escapeRe = (s: string) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 
 // `sha256=<hex>` of HMAC-SHA256(secret, body), the same shape GitHub uses.
 export function signEvent(secret: string, body: string): string {
