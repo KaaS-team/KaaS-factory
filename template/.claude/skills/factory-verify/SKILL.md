@@ -15,9 +15,8 @@ the runner posts the verdict and moves the issue's label.
 - `gate.json` and `proof.json` in the same directory: what the runner
   measured on this tree. Do not re-run the gates; the runner refuses a red one
   before verify. Holdout tests are the runner's too: never read their paths.
-- `prior-findings.json` (the last reject's findings) and `operator-answers.md`
-  (what a human answered), when present. List each prior finding in `verdict.json` as
-  `"prior": [{ "what": "...", "status": "resolved" }]`, `resolved` or `open`.
+- `prior-findings.json` (last reject's findings) and `operator-answers.md`, when present.
+  List each prior finding in `verdict.json` as `"prior": [{ "what": "...", "status": "resolved" }]` (`resolved` or `open`).
 - The worktree at its current state. Write `"rounds": 1`; the runner replaces it.
 
 ## 2. UI route: the visual check
@@ -90,6 +89,4 @@ the runner also refuses an unknown finding or criterion field. The file must be 
 under 16 KiB.
 
 Set `outcome` to `blocked` (with a `summary`) only if you could not review at
-all. `result` is `pass`, `reject`, or `uncertain`; `findings` is the
-reviewer's list verbatim plus any from step 2 (empty array if none); the
-retry and escalation rules are step 4's, not repeated here.
+all. `findings` is the reviewer's list verbatim plus any from step 2 (empty array if none).
