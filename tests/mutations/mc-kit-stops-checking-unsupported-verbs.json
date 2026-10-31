@@ -1,0 +1,1 @@
+{"name":"mc: kit stops checking unsupported verbs","file":"src/mc/kit.ts","find":"instanceof SessionUnsupported","replace":"instanceof Error","test":"tests/mc-kit.test.ts"}
