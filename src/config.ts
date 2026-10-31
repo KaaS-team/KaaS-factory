@@ -92,7 +92,7 @@ export interface RouteConfig {
   readonly workflow?: string;
 }
 
-export interface FactoryConfig {
+export interface FactoryConfig extends keys.ReviewFields {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
   readonly postEditCommand: readonly string[]; // argv the post-edit-check hook runs on each build edit; {file} is the path; [] is off
@@ -356,10 +356,9 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
   };
 }
 
-// Every key is listed here; the Record type makes tsc fail if FactoryConfig
-// gains a key that is not. `riskCriteria` is never read by the runner (the
-// factory-plan skill reads it). A `_`-prefixed key is a comment. Any other
-// unknown key is a typo that would silently do nothing, so boot refuses it.
+// Every key is listed here; the Record type makes tsc fail if FactoryConfig gains a key that is not.
+// `riskCriteria` is never read by the runner (the factory-plan skill reads it). A `_`-prefixed key is a
+// comment. Any other unknown key is a typo that would silently do nothing, so boot refuses it.
 type Kind = "string" | "posInt" | "positive" | "boolean" | "strings" | "object";
 const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   repo: "string",
@@ -384,6 +383,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   routes: "object",
   spend: "object",
   merge: "object",
+  review: "object",
   holdout: "object",
   acceptance: "object",
   tmux: "object",
@@ -448,7 +448,7 @@ export function configProblems(raw: unknown): string[] {
     problems.push(`riskPolicy.autoApproveMaxRisk: expected "low" or "medium", got ${JSON.stringify(maxRisk)}`);
   if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))
     problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
-  problems.push(...profileProblems(cfg));
+  problems.push(...profileProblems(cfg), ...keys.reviewProblems(cfg.review));
   problems.push(...toolchainProblems(cfg.toolchain));
   nested("maxBudgetUsd", {
     triage: "positive",

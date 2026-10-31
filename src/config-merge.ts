@@ -50,3 +50,20 @@ export function mergeProblems(merge: Record<string, unknown>): string[] {
     ...oneOf("autonomy", merge.autonomy, ["supervised", "semi", "full"]),
   ];
 }
+
+// `review.alwaysHumanPaths`: globs a human always reviews, added to the defaults in src/human-paths.ts.
+export interface ReviewFields {
+  readonly review?: { readonly alwaysHumanPaths?: readonly string[] };
+}
+
+export function reviewProblems(review: unknown): string[] {
+  if (review === undefined) return [];
+  const bad = (v: unknown, what: string) => [`review${what}: expected strings, got ${JSON.stringify(v)}`];
+  if (typeof review !== "object" || review === null || Array.isArray(review)) return bad(review, "");
+  const { alwaysHumanPaths, ...rest } = review as Record<string, unknown>;
+  const unknown = Object.keys(rest).map((k) => `review.${k}: unknown key (allowed: alwaysHumanPaths)`);
+  const listed = Array.isArray(alwaysHumanPaths) && alwaysHumanPaths.every((p) => typeof p === "string");
+  return alwaysHumanPaths === undefined || listed
+    ? unknown
+    : [...unknown, ...bad(alwaysHumanPaths, ".alwaysHumanPaths")];
+}
