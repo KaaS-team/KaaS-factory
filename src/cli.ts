@@ -152,7 +152,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo, selfCommand()) } : {}),
     github,
-    git: new Git(new GitCommandRunner()),
+    git: new Git(new GitCommandRunner(config.commits ?? {})),
     state,
     bus: watcherBus(state, config),
     minions: loaded.minions,
@@ -472,7 +472,7 @@ async function cmdDoctor(): Promise<void> {
       configuredSlots: loadMachineConfig().slots,
       resettable: config.resettable,
     },
-  );
+  ).then(async (c) => [...c, await (await import("./merge-method")).mergeMethodCheck(config)]);
   const allOk = checks.every((c) => c.ok || c.warn);
   if (has("json")) console.log(successJson({ checks }, allOk));
   else for (const c of checks) console.log(`  [${c.ok ? "ok" : c.warn ? "warn" : "FAIL"}] ${c.name} — ${c.detail}`);

@@ -1,0 +1,1 @@
+{"name":"docker: allow list keeps network none","file":"src/adapters/docker/execution.ts","find":"spec.allow ? { ...spec, network: spec.network ?? \"bridge\" } : spec;","replace":"spec;","test":"tests/egress-env.test.ts"}

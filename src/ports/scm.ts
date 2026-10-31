@@ -2,6 +2,8 @@
 // host (PRs). GitHub (and GHE through GH_HOST) implements both in src/github.ts;
 // makeScm (src/scm.ts) pairs a tracker with a code host.
 
+import type { MergeConfig } from "../config";
+type MergeSettings = Pick<MergeConfig, "method" | "queue">;
 export interface GhIssue {
   number: number;
   title: string;
@@ -153,7 +155,7 @@ export interface CodeHostPort {
   prDiff(repo: string, prNumber: number): Promise<string>;
   // The open PR for this issue: by "Closes #n" when the tracker is GitHub, by head branch otherwise.
   prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }): Promise<GhPr | undefined>;
-  mergePr(repo: string, number: number, headSha: string): Promise<void>;
+  mergePr(repo: string, number: number, headSha: string, settings?: MergeSettings): Promise<void>;
   // Optional: the files a PR changes, and a file's text at a ref (undefined when absent).
   prFiles?(repo: string, prNumber: number): Promise<PrFile[]>;
   fileAtRef?(repo: string, path: string, ref: string): Promise<string | undefined>;

@@ -29,6 +29,7 @@ import {
   type VerdictArtifact,
 } from "../artifacts";
 import { isChecked } from "../recheck";
+import { rejectedNote, rejectLimit } from "../review-cap";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
 import { runProof, type ProofResult } from "../proof";
 import { touchesProtectedPath } from "../boundary";
@@ -74,8 +75,7 @@ import {
   type WatchDeps,
 } from "./common";
 
-// A check step names a runtime this machine lacks. Boot refuses that, so this
-// is a workflow edited while the watcher runs.
+// A check step names a runtime this machine lacks. Boot refuses that, so this is a workflow edited while running.
 export class RuntimeMissing extends Error {}
 
 export interface StepCtx {
@@ -321,7 +321,7 @@ const verify: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, ctx, step, workflow } = sc;
     const issueNumber = issue.number;
-    const maxRejects = workflow.limits.rejects;
+    const maxRejects = rejectLimit(workflow.limits.rejects, config.review.maxRounds);
     // A verdict is only as good as its evidence: gate.json must describe
     // the tree being verified, so a resumed or amended run re-measures it.
     const tree = await deps.git.treeHash(worktree);
@@ -450,7 +450,7 @@ const verify: StepType = {
       if (ctx.rejectRound > maxRejects) {
         await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
         await runRetro(deps, config, issue, "gave-up");
-        finish(deps, config, issueNumber, "needs-human", `rejected ${ctx.rejectRound} times`);
+        finish(deps, config, issueNumber, "needs-human", rejectedNote(ctx.rejectRound, config.review.maxRounds));
         return stop("needs-human");
       }
       return { kind: "reject" };

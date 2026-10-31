@@ -35,6 +35,7 @@ missing from it, or when a factory type is never emitted.
 | `factory.approval.requested` | a step parks for approval; `token` is what resolves it |
 | `factory.approval.resolved` | that `token` is approved or revised (`POST /api/approvals/:token` on the dashboard) |
 | `factory.workflow.emitted` | a run of a workflow with `emit:` ships; workflows whose `on: emitted:` lists the name file an issue |
+| `factory.audit.recorded` | a plane audit row is stored; `data` has `at`, `actor`, `role`, `route`, `issue`, `status`, `outcome`, and `subject` is the route |
 
 Other apps' types, the only ones `POST /events` accepts: `tasks.task.ready`, `tasks.task.updated`,
 `wiki.page.updated`, `wiki.question.unanswered`, `decisions.decision.proposed`,

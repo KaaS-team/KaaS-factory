@@ -7,6 +7,9 @@ export interface MergeAutonomyFields {
   // The live URL the post-merge watch smokes, and the PR preview URL with `{pr}` (src/visual.ts).
   readonly smokeUrl?: string;
   readonly previewUrl?: string;
+  // How `gh pr merge` merges, and who queues it (src/merge-method.ts); absent is squash, factory-run.
+  readonly method?: "squash" | "rebase" | "merge" | "host";
+  readonly queue?: "factory" | "host" | "none";
 }
 
 export interface PackageOwnership {
@@ -24,6 +27,8 @@ export const MERGE_KEYS = {
   autonomy: "string",
   smokeUrl: "string",
   previewUrl: "string",
+  method: "string",
+  queue: "string",
 } as const;
 
 export const PACKAGE_KEYS = {
@@ -48,22 +53,12 @@ export function mergeProblems(merge: Record<string, unknown>): string[] {
   return [
     ...oneOf("policy", merge.policy, ["off", "dry-run", "auto"]),
     ...oneOf("autonomy", merge.autonomy, ["supervised", "semi", "full"]),
+    ...oneOf("method", merge.method, ["squash", "rebase", "merge", "host"]),
+    ...oneOf("queue", merge.queue, ["factory", "host", "none"]),
   ];
 }
 
 // `review.alwaysHumanPaths`: globs a human always reviews, added to the defaults in src/human-paths.ts.
 export interface ReviewFields {
-  readonly review?: { readonly alwaysHumanPaths?: readonly string[] };
-}
-
-export function reviewProblems(review: unknown): string[] {
-  if (review === undefined) return [];
-  const bad = (v: unknown, what: string) => [`review${what}: expected strings, got ${JSON.stringify(v)}`];
-  if (typeof review !== "object" || review === null || Array.isArray(review)) return bad(review, "");
-  const { alwaysHumanPaths, ...rest } = review as Record<string, unknown>;
-  const unknown = Object.keys(rest).map((k) => `review.${k}: unknown key (allowed: alwaysHumanPaths)`);
-  const listed = Array.isArray(alwaysHumanPaths) && alwaysHumanPaths.every((p) => typeof p === "string");
-  return alwaysHumanPaths === undefined || listed
-    ? unknown
-    : [...unknown, ...bad(alwaysHumanPaths, ".alwaysHumanPaths")];
+  readonly review?: { readonly alwaysHumanPaths?: readonly string[]; readonly maxRounds?: number };
 }

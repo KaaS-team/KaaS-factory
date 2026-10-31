@@ -28,6 +28,7 @@ export class GhCommandRunner implements CommandRunner {
 }
 
 import { RestIssues } from "./github-rest";
+import { type MergeSettings, mergeArgs } from "./merge-method";
 import { RateLimitError } from "./ports/scm";
 import type {
   GhIssue,
@@ -425,11 +426,10 @@ export class GitHub implements TrackerPort, CodeHostPort {
     );
   }
 
-  // --squash --match-head-commit refuses the merge if the PR's head moved
-  // since headSha was read, so a stale readiness snapshot never merges the
-  // wrong commit. Never --admin: a branch-protection block is respected.
-  async mergePr(repo: string, number: number, headSha: string): Promise<void> {
-    await this.exec(["pr", "merge", String(number), "--repo", repo, "--squash", "--match-head-commit", headSha]);
+  // --match-head-commit refuses the merge if the PR's head moved since headSha was read.
+  // Never --admin: a branch-protection block is respected.
+  async mergePr(repo: string, number: number, headSha: string, settings?: MergeSettings): Promise<void> {
+    await this.exec(mergeArgs(repo, number, headSha, settings));
   }
 
   async prFiles(repo: string, prNumber: number): Promise<PrFile[]> {

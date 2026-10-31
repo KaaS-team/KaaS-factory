@@ -7,6 +7,7 @@ import type { FactoryConfig, Profile } from "./config";
 import type { ChangedFile, MergeRefusal } from "./merge-policy";
 import type { CodeHostPort } from "./ports/scm";
 import { capsProblems, type OrgCaps } from "./org-caps";
+import { commitsProblems } from "./signoff";
 
 export interface ProfileRules {
   readonly codeownerApproval: boolean;
@@ -130,7 +131,7 @@ export function codeownerCheck(
 
 // Config problems these rules add; configProblems runs it on the raw config.
 export function profileProblems(cfg: Record<string, unknown>): string[] {
-  const problems = capsProblems(cfg.caps);
+  const problems = [...capsProblems(cfg.caps), ...commitsProblems(cfg.commits)];
   if (!rulesFor(cfg.profile as Profile).forcedSandbox) return problems;
   const runtime = (cfg.runtime ?? {}) as Record<string, unknown>;
   for (const key of ["gates", "check"]) {

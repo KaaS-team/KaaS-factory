@@ -76,7 +76,7 @@ test("review.alwaysHumanPaths loads from config and a typo key is refused", asyn
       join(dir, ".factory/config.json"),
       JSON.stringify({ repo: "o/r", review: { alwaysHumanPaths: ["infra/**"] } }),
     );
-    expect((await loadConfig(dir)).review).toEqual({ alwaysHumanPaths: ["infra/**"] });
+    expect((await loadConfig(dir)).review).toEqual({ maxRounds: 3, alwaysHumanPaths: ["infra/**"] });
     writeFileSync(join(dir, ".factory/config.json"), JSON.stringify({ repo: "o/r", review: { humanPaths: [] } }));
     await expect(loadConfig(dir)).rejects.toThrow("review.humanPaths");
   } finally {
@@ -85,6 +85,6 @@ test("review.alwaysHumanPaths loads from config and a typo key is refused", asyn
 });
 
 test("the watcher's merge inputs carry review.alwaysHumanPaths", () => {
-  const config = mergeConfig({ review: { alwaysHumanPaths: ["infra/**"] } });
+  const config = mergeConfig({ review: { maxRounds: 3, alwaysHumanPaths: ["infra/**"] } });
   expect(tierInput(undefined, config, "low").humanPaths).toEqual(["infra/**"]);
 });
