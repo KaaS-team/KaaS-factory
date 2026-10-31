@@ -21,6 +21,7 @@ const PROOF_LINE: Record<ProofStatus, string> = {
   "no-tests": "the diff adds no test",
   skipped: "skipped: the plan's proof is check, so the named checks were re-run instead",
   unavailable: "unavailable: the repo has no test gate, so nothing showed the change works",
+  "compile-only": "compile-only: the new test failed without the change only because the tree did not compile",
 };
 
 function seconds(ms: number): string {

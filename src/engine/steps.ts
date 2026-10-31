@@ -4,7 +4,7 @@
 // and moves the label), "reject" (the engine follows `reject:`), or "stop"
 // once it has parked or finished the issue itself, from `step.label`.
 
-import { readFileSync } from "node:fs";
+import { readRunJson, settleVerdict, verdictPost } from "./verdict-rules";
 import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
@@ -418,6 +418,8 @@ const verify: StepType = {
       json = rechecked.verdict;
       recheckNote = rechecked.note;
     }
+    if (json) json = await settleVerdict(sc, json);
+    const posted = art.comment && `${verdictPost(art.comment, json, ctx.rejectRound + 1, maxRejects)}${recheckNote}`;
     if (json) deps.state.setVerifyVerdict(config.repo, issueNumber, json.result);
     if (checked && !checked.ok) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
@@ -428,8 +430,7 @@ const verify: StepType = {
     if (verifyStop) return stop(await stopStep(deps, config, issueNumber, step.label, verifyStop));
     if (result.exitCode !== 0 || !json || json.result === "uncertain") {
       // The human needs the verdict to act on, and the post is the marker that retires the retry that led here.
-      if (art.comment)
-        await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+      if (posted) await postComment(deps, config, issueNumber, posted, { stage: "verify", json });
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
       const fallback = json ? "verify uncertain" : "verify produced no valid verdict.json";
       const cause = stageCause(config, issueNumber, "verify", result, { fallback });
@@ -442,11 +443,10 @@ const verify: StepType = {
       );
       return stop("needs-human");
     }
-    if (art.comment)
-      await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+    if (posted) await postComment(deps, config, issueNumber, posted, { stage: "verify", json });
     if (json.result === "reject") {
       ctx.rejectRound += 1;
-      ctx.failure = failureTail(art.comment ?? JSON.stringify(json.findings, null, 2));
+      ctx.failure = failureTail(posted || JSON.stringify(json.findings, null, 2));
       if (ctx.rejectRound > maxRejects) {
         await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
         await runRetro(deps, config, issue, "gave-up");
@@ -459,14 +459,6 @@ const verify: StepType = {
     return { kind: "next", facts: json };
   },
 };
-
-function readRunJson<T>(worktree: string, issueNumber: number, name: string): T | undefined {
-  try {
-    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/${name}`, "utf8")) as T;
-  } catch {
-    return undefined; // the stage that writes it did not run
-  }
-}
 
 async function unshippedBranch(
   deps: WatchDeps,

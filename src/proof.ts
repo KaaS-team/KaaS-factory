@@ -11,7 +11,16 @@ import { touchedPackages } from "./risk";
 
 // "unavailable": the repo has no test gate, so nothing could prove the change. It is shown
 // in the PR's run summary rather than passing silently.
-export type ProofStatus = "bites" | "passes-without" | "no-tests" | "skipped" | "unavailable";
+export type ProofStatus = "bites" | "passes-without" | "no-tests" | "skipped" | "unavailable" | "compile-only";
+
+const COMPILE_ERROR = /Cannot find module|Could not resolve|error TS\d+|SyntaxError|ModuleNotFoundError|ImportError/;
+
+// A revert that fails only to compile shows the code exists, not what it does (#116).
+export function classifyProof(proof: ProofResult, added: number): ProofResult {
+  return proof.status === "bites" && added === 0 && COMPILE_ERROR.test(proof.tail)
+    ? { ...proof, status: "compile-only" }
+    : proof;
+}
 
 export interface ProofResult {
   readonly status: ProofStatus;
@@ -93,14 +102,17 @@ export async function runProof(
   const left = await git.dirty(worktree);
   if (left.length > 0) throw new Error(`proof: the worktree is not clean after restoring HEAD: ${left.join(", ")}`);
   const tail = `${result.stdout}\n${result.stderr}`.trim().slice(-2000);
-  return {
-    status: result.code === 0 ? "passes-without" : "bites",
-    reverted: [...existing, ...added],
-    tests,
-    cmd,
-    exitCode: result.code,
-    tail,
-  };
+  return classifyProof(
+    {
+      status: result.code === 0 ? "passes-without" : "bites",
+      reverted: [...existing, ...added],
+      tests,
+      cmd,
+      exitCode: result.code,
+      tail,
+    },
+    added.length,
+  );
 }
 
 async function sh(args: string[], cwd: string): Promise<CommandResult> {
