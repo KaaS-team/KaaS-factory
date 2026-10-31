@@ -1,3 +1,0 @@
-#!/bin/sh
-# Written by the kaas kit (scripts/sync-vendored.py); the gate is scripts/kaas/pre-push.sh.
-exec scripts/kaas/pre-push.sh "$@"

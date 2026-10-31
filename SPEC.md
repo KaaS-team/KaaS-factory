@@ -51,7 +51,7 @@ Do not touch .github/workflows. No new dependencies. No em dashes, no filler wor
 - `tests/ci-wiring.test.ts`
 - `Makefile`
 - `quality-baseline.json`
-- `tests/mutations.json`
+- `tests/mutations/baseline-allow-raise-without-flag.json`
 
 ## How to ship
-One PR from branch feat/q-baseline. Commits use `git commit -s`. PR body uses every section of .github/pull_request_template.md, filled with real evidence (the gate output, not "pending"). Run `python3 scripts/kaas/check-affected.py --run` before pushing. Each new mutation entry in tests/mutations.json is {name,file,find,replace,test}; its `find` must match exactly once in its file, and the test must fail under the replacement. Never put a session link in a commit or PR.
+One PR from branch feat/q-baseline. Commits use `git commit -s`. PR body uses every section of .github/pull_request_template.md, filled with real evidence (the gate output, not "pending"). Run `python3 scripts/kaas/check-affected.py --run` before pushing. Put the new mutation in the shard file tests/mutations/baseline-allow-raise-without-flag.json (an array of {name,file,find,replace,test}), never in tests/mutations.json; do not edit tests/mutation-list.test.ts; its `find` must match exactly once in its file, and the test must fail under the replacement. Never put a session link in a commit or PR.

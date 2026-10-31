@@ -1,6 +1,0 @@
-name: acme
-locked: [review, merge]
-policy:
-  auto_merge:
-    allowed: false
-  models: [haiku, sonnet]
