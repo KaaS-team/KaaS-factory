@@ -61,11 +61,11 @@ Model: sonnet
 7. Test: `fakeClient("two-repos").runs.list()` returns 3 runs that pass the schema; `cmdServe` with `--fixture two-repos --port 0` answers `/api/health`.
 
 ### T6: Goals and mutations
-Files: `goals.json`, `tests/mutations.json`
+Files: `goals.json`, `tests/mutations/api-token-compare-always-passes.json`, `tests/mutations/api-stale-id-never-resets.json`, `tests/mutations/api-schema-arrays-unchecked.json`, `tests/mutations/api-openapi-drops-token-security.json`
 Model: haiku
 1. Add phase `{"id":"v7-modular","title":"Agnostic modular core","release":"7.0.0"}` to `goals.json` if absent.
 2. Add one goal per task T1, T2, T4, T5 with `phase: "v7-modular"`, a proof `{test, name, mutation}` naming the tests above.
-3. Add the mutation entries from the Mutation section below to `tests/mutations.json`.
+3. Save each entry from the Mutation section as its own file (`tests/mutations/api-token-compare-always-passes.json`, `tests/mutations/api-stale-id-never-resets.json`, `tests/mutations/api-schema-arrays-unchecked.json`, `tests/mutations/api-openapi-drops-token-security.json`), a single JSON object each. Never edit the old mutations list.
 
 ## Tests
 - `tests/api-routes.test.ts`: route ids are unique and token-gated [unit]
@@ -132,7 +132,10 @@ Model: haiku
 - `dashboard/public/lib/workflow-pages.js`
 - `docs/control-plane.md`
 - `goals.json`
-- `tests/mutations.json`
+- `tests/mutations/api-token-compare-always-passes.json` (new)
+- `tests/mutations/api-stale-id-never-resets.json` (new)
+- `tests/mutations/api-schema-arrays-unchecked.json` (new)
+- `tests/mutations/api-openapi-drops-token-security.json` (new)
 - `tests/api-routes.test.ts` (new)
 - `tests/api-contract.test.ts` (new)
 - `tests/api-client.test.ts` (new)
@@ -140,7 +143,7 @@ Model: haiku
 - `tests/multi-repo.test.ts`
 
 ## Risk: medium
-The token gate is security relevant and `/api/events` changes meaning, so any outside script that polled the bus listing breaks (the rename is grep-complete inside the repo). `quality-baseline.json`, `goals.json`, `src/help.ts` and `tests/mutations.json` are also touched by #197 and #198; a rebase conflict there resolves to both entries and the exact `wc -l` of `src/cli.ts`.
+The token gate is security relevant and `/api/events` changes meaning, so any outside script that polled the bus listing breaks (the rename is grep-complete inside the repo). `quality-baseline.json`, `goals.json`, `src/help.ts` are also touched by #197 and #198; a rebase conflict there resolves to both entries and the exact `wc -l` of `src/cli.ts`.
 ## Model: opus
 
 
