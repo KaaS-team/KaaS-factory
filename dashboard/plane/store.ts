@@ -5,14 +5,9 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-export const ROLES = ["viewer", "approver", "operator", "owner"] as const;
-export type Role = (typeof ROLES)[number];
+import { isRole, type Role } from "@kaas-team/factory-protocol";
 
-export function atLeast(have: Role, need: Role): boolean {
-  return ROLES.indexOf(have) >= ROLES.indexOf(need);
-}
-
-export const isRole = (v: unknown): v is Role => ROLES.includes(v as Role);
+export { atLeast, isRole, ROLES, type Role } from "@kaas-team/factory-protocol";
 
 export interface Member {
   login: string;
