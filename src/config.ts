@@ -125,6 +125,7 @@ export interface FactoryConfig {
   // issue with a "budget" inbox item.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
+  readonly review: { readonly maxRounds: number }; // failed reviews before a person takes over
   readonly holdout: HoldoutConfig;
   // The acceptance checker's path in the repo. "" turns the Acceptance table off.
   readonly acceptance: AcceptanceConfig;
@@ -321,6 +322,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   routes: {},
   spend: {},
   merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
+  review: { maxRounds: 3 },
   holdout: { paths: [], cmd: "" },
   acceptance: { script: "scripts/kaas/check-acceptance.py" },
   tmux: { enabled: false, session: "factory" },
@@ -347,6 +349,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
     merge: { ...DEFAULT_CONFIG.merge, ...p.merge, ...partial.merge },
+    review: { ...DEFAULT_CONFIG.review, ...partial.review },
     holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
     acceptance: { ...DEFAULT_CONFIG.acceptance, ...partial.acceptance },
     tmux: { ...DEFAULT_CONFIG.tmux, ...partial.tmux },
@@ -384,6 +387,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   routes: "object",
   spend: "object",
   merge: "object",
+  review: "object",
   holdout: "object",
   acceptance: "object",
   tmux: "object",
@@ -459,6 +463,7 @@ export function configProblems(raw: unknown): string[] {
     retro: "positive",
   });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
+  nested("review", { maxRounds: "posInt" });
   nested("runtime", { gates: "string", check: "string" });
   nested("merge", keys.MERGE_KEYS);
   // policy and autonomy are enums: a typo there would read as the default, which for autonomy

@@ -29,6 +29,7 @@ import {
   type VerdictArtifact,
 } from "../artifacts";
 import { isChecked } from "../recheck";
+import { capNote, rejectLimit } from "../review-cap";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
 import { runProof, type ProofResult } from "../proof";
 import { touchesProtectedPath } from "../boundary";
@@ -321,7 +322,7 @@ const verify: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, ctx, step, workflow } = sc;
     const issueNumber = issue.number;
-    const maxRejects = workflow.limits.rejects;
+    const maxRejects = rejectLimit(workflow.limits.rejects, config.review.maxRounds);
     // A verdict is only as good as its evidence: gate.json must describe
     // the tree being verified, so a resumed or amended run re-measures it.
     const tree = await deps.git.treeHash(worktree);
@@ -450,7 +451,13 @@ const verify: StepType = {
       if (ctx.rejectRound > maxRejects) {
         await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
         await runRetro(deps, config, issue, "gave-up");
-        finish(deps, config, issueNumber, "needs-human", `rejected ${ctx.rejectRound} times`);
+        finish(
+          deps,
+          config,
+          issueNumber,
+          "needs-human",
+          `rejected ${ctx.rejectRound} times${capNote(ctx.rejectRound, config.review.maxRounds)}`,
+        );
         return stop("needs-human");
       }
       return { kind: "reject" };
