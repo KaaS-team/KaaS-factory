@@ -6,6 +6,12 @@ const runs = (script: string, files: string[]): boolean =>
   files.some((f) => existsSync(f) && readFileSync(f, "utf8").includes(`bun ${script}`));
 
 describe("ci wiring", () => {
+  test("scripts/check-changed-mutants.ts and scripts/selector-misses.ts are run by the mutations workflow", () => {
+    const files = [".github/workflows/mutations.yml", "ci/mutations.yml"];
+    expect(runs("scripts/check-changed-mutants.ts", files)).toBe(true);
+    expect(runs("scripts/selector-misses.ts", files)).toBe(true);
+  });
+
   test("scripts/check-tests-only.ts is run by ci.yml", () => {
     expect(runs("scripts/check-tests-only.ts", [".github/workflows/ci.yml", "ci/ci.yml"])).toBe(true);
   });

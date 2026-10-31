@@ -2,10 +2,11 @@
 // breaks one thing in a temp copy of the repo; the named test must then fail.
 // A mutation that leaves the test green names a check that guards nothing.
 
-import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { availableParallelism, tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
+import { dirname, join } from "node:path";
 import { selectMutations } from "./mutation-select";
+import { copyRepo, ROOT } from "./repo-copy";
 
 interface Mutation {
   readonly name: string;
@@ -13,22 +14,15 @@ interface Mutation {
   readonly find: string;
   readonly replace: string;
   readonly test: string;
+  readonly inputs?: readonly string[];
 }
 
-const ROOT = join(import.meta.dir, "..");
-const SKIP = new Set(["node_modules", ".git", ".worktrees", ".factory-state", "workspaces", "artifacts"]);
 const mutations: Mutation[] = JSON.parse(readFileSync(join(ROOT, "tests", "mutations.json"), "utf8"));
 const args = process.argv.slice(2);
-const baseAt = args.indexOf("--base");
-const base = baseAt >= 0 ? args[baseAt + 1] : undefined;
-const only = args.find((a, i) => !a.startsWith("--") && (baseAt < 0 || i !== baseAt + 1));
-
-function copyRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), "factory-mutant-"));
-  cpSync(ROOT, dir, { recursive: true, filter: (src) => !SKIP.has(src.slice(ROOT.length + 1).split("/")[0]!) });
-  symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"));
-  return dir;
-}
+const flagValue = (flag: string) => (args.indexOf(flag) >= 0 ? args[args.indexOf(flag) + 1] : undefined);
+const base = flagValue("--base");
+const report = flagValue("--report");
+const only = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base" && args[i - 1] !== "--report");
 
 // --bail: one red test already proves the mutant is caught, so the rest of the file need not run.
 async function runTest(dir: string, test: string, bail: boolean): Promise<{ code: number; out: string }> {
@@ -88,6 +82,7 @@ if (base) {
 }
 if (selected.length === 0) throw new Error(only ? `no mutation named "${only}"` : "tests/mutations.json is empty");
 const failures: string[] = [];
+const failedNames: string[] = [];
 const queue = [...selected];
 const workers = Math.min(Number(process.env.MUTATION_WORKERS) || availableParallelism(), queue.length);
 await Promise.all(
@@ -96,13 +91,20 @@ await Promise.all(
     try {
       for (let m = queue.shift(); m; m = queue.shift()) {
         const problem = await check(dir, m);
-        if (problem) failures.push(problem);
+        if (problem) {
+          failures.push(problem);
+          failedNames.push(m.name);
+        }
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   }),
 );
+if (report) {
+  mkdirSync(dirname(report), { recursive: true });
+  writeFileSync(report, JSON.stringify({ selected: selected.map((m) => m.name), failed: failedNames }, null, 2));
+}
 if (failures.length) {
   console.error(`\ncheck-mutations: ${failures.length} of ${selected.length} failed\n${failures.join("\n")}`);
   process.exit(1);
