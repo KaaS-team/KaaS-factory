@@ -15,6 +15,7 @@ import type { FactoryConfig } from "../config";
 import type { GhIssue } from "../github";
 import { issueType } from "../labels";
 import { collectVerifyFacts, readVerifyFacts, writeVerifyFacts } from "../pr-facts-collect";
+import { recordPromotion } from "../promotion";
 import { isChecked } from "../recheck";
 import { crossModel } from "../review-models";
 import { labelsOf, runStage } from "./common";
@@ -46,6 +47,7 @@ export async function recordVerifyFacts(
   testCmd: string | undefined,
   proof: ProofResult,
 ): Promise<void> {
+  await recordPromotion(worktree, config, issue, proof);
   if (config.merge.policy === "off" && !config.merge.autonomy) return;
   try {
     await writeVerifyFacts(worktree, issue, await collectVerifyFacts(worktree, config, issue, testCmd, proof));

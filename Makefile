@@ -16,17 +16,19 @@ check: lint typecheck test skills-check check-anchors check-baseline
 # reuse lint checks every file's licence against REUSE.toml (tests/licensing.test.ts checks what it says).
 # Biome is the one formatter and linter. The rules biome.json turns off are house idioms
 # (`!` in tests, comma and forEach shorthand, literal `${}` in test strings).
+# Each check replays a green run whose inputs hash the same (scripts/check-cache.ts); `CHECK_CACHE=off make check` runs everything.
+CACHE = bun scripts/check-cache.ts
 lint:
-	bun x biome ci .
-	uvx reuse==6.2.0 lint --quiet
+	$(CACHE) lint-biome -- bun x biome ci .
+	$(CACHE) lint-reuse -- uvx reuse==6.2.0 lint --quiet
 	@command -v cargo >/dev/null 2>&1 || { echo "make check: cargo is required for verify/ and relay/, not skipping them" >&2; exit 1; }
-	cargo fmt --manifest-path verify/Cargo.toml --check
-	cargo clippy --quiet --locked --manifest-path verify/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-verify-target} -- -D warnings
-	cargo fmt --manifest-path relay/Cargo.toml --check
-	cargo clippy --quiet --locked --manifest-path relay/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-relay-target} -- -D warnings
+	$(CACHE) lint-fmt-verify --in verify -- cargo fmt --manifest-path verify/Cargo.toml --check
+	$(CACHE) lint-clippy-verify --in verify -- cargo clippy --quiet --locked --manifest-path verify/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-verify-target} -- -D warnings
+	$(CACHE) lint-fmt-relay --in relay -- cargo fmt --manifest-path relay/Cargo.toml --check
+	$(CACHE) lint-clippy-relay --in relay -- cargo clippy --quiet --locked --manifest-path relay/Cargo.toml --target-dir $${CARGO_TARGET_DIR:-$${TMPDIR:-/tmp}/kaas-relay-target} -- -D warnings
 
 typecheck:
-	bun x tsc --noEmit
+	$(CACHE) typecheck -- bun x tsc --noEmit
 
 # Run with no git identity, like a fresh CI runner or container, so a code path
 # that needs the developer's own identity fails here and not only on GitHub.
@@ -38,7 +40,7 @@ typecheck:
 GIT_ENV = GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true
 test:
 	@mkdir -p reports
-	$(GIT_ENV) bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_ARGS) $(FILES)
+	$(GIT_ENV) $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_ARGS) $(FILES)
 
 quarantine:
 	@f=$$(grep -rl @quarantine tests --include='*.test.ts'); if [ -z "$$f" ]; then echo "quarantine: no @quarantine tests"; \
