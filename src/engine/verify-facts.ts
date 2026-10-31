@@ -1,5 +1,6 @@
 // The P6 pieces of the plan and verify steps, kept out of steps.ts: the plan's risk floor, the
 // monorepo proof command, and the PR facts a tiered merge reads.
+import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -21,6 +22,7 @@ import { crossModel } from "../review-models";
 import { labelsOf, runStage } from "./common";
 import { isMutation, type PlanMutation, type ProofGit, type ProofResult, proofCommand, runMutations } from "../proof";
 import { floorPlanRisk } from "../risk";
+import { skipDeltas } from "../skip-count";
 
 export function flooredPlan<P extends { risk: Risk; files: readonly string[] }, R extends { json?: P }>(
   parsed: R,
@@ -95,6 +97,13 @@ export async function survivingMutations(
   return { names: survivors.map((r) => r.name), body: parts.join("\n\n"), reject: survivors.length > 0 };
 }
 
+// A diff that raises the skip count in a test file fails verify: a skipped test needs a person.
+export function skipRiseHits(diff: string): string[] {
+  return skipDeltas(diff)
+    .filter((f) => f.delta > 0)
+    .map((f) => `${f.path}: adds ${f.delta} skipped test${f.delta > 1 ? "s" : ""}, and a skipped test needs a person`);
+}
+
 // Only a repo that can merge on its own pays for mutants and a clean room. A failed collection
 // writes nothing, so the merge reads the signals as missing and refuses.
 export async function recordVerifyFacts(
@@ -107,7 +116,13 @@ export async function recordVerifyFacts(
   await recordPromotion(worktree, config, issue, proof);
   if (config.merge.policy === "off" && !config.merge.autonomy) return;
   try {
-    await writeVerifyFacts(worktree, issue, await collectVerifyFacts(worktree, config, issue, testCmd, proof));
+    const facts = await collectVerifyFacts(worktree, config, issue, testCmd, proof);
+    const diff = execFileSync("git", ["diff", "-U0", `origin/${config.base}...HEAD`], {
+      cwd: worktree,
+      encoding: "utf8",
+      maxBuffer: 1 << 28,
+    });
+    await writeVerifyFacts(worktree, issue, { ...facts, tamper: [...facts.tamper, ...skipRiseHits(diff)] });
   } catch (err) {
     console.error(`verify facts for #${issue} were not collected:`, err);
   }
