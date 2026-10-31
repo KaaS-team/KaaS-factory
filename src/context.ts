@@ -9,6 +9,7 @@ import { readStageArtifacts } from "./artifacts";
 import type { StageName } from "./executor";
 import { stripFrontmatter } from "./agents/prompt";
 import { readdirSync } from "node:fs";
+import { reviewMdSection } from "./review-md";
 
 export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
 
@@ -117,6 +118,11 @@ async function sections(stage: StageName, issue: number, cwd: string, opts: Pack
   if (want.has("conventions") && !(await contextFileLoadsAgentsMd(cwd, opts.contextFile))) {
     const agentsMd = await readOptional(`${cwd}/AGENTS.md`);
     if (agentsMd) out.push({ label: "AGENTS.md", body: agentsMd.trim() });
+  }
+
+  if (want.has("conventions")) {
+    const review = reviewMdSection(cwd);
+    if (review) out.push(review);
   }
 
   if (want.has("charter")) {
