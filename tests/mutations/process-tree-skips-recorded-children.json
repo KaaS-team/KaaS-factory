@@ -1,0 +1,1 @@
+{"name":"process tree skips recorded children","file":"src/process-tree.ts","find":"  const all = [s.root, ...s.children];","replace":"  const all = [s.root];","test":"tests/process-tree.test.ts"}
