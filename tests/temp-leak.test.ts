@@ -36,12 +36,15 @@ function childRun(cmd: string[], env: Record<string, string>): { code: number; l
     // A mutant's node_modules is a symlink, which .gitignore's `node_modules/` does not match, and git cannot hash it.
     mkdirSync(join(gitDir, ".git", "info"), { recursive: true });
     writeFileSync(join(gitDir, ".git", "info", "exclude"), "node_modules\nreports\n");
+    // `make test TEST_ARGS=...` exports TEST_ARGS and MAKEFLAGS; a child inheriting --rerun-each repeats the
+    // fixture after the preload removed its root. Each child runs once.
+    const { MAKEFLAGS: _m, MFLAGS: _f, TEST_ARGS: _t, ...base } = process.env;
     const res = Bun.spawnSync(
       cmd.map((c) => c.replace("<file>", file)),
       {
         cwd: repoRoot,
         env: {
-          ...process.env,
+          ...base,
           ...env,
           TMPDIR: tmp,
           GIT_DIR: join(gitDir, ".git"),
