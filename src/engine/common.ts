@@ -27,6 +27,7 @@ import {
 } from "../artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isTrusted } from "../chatops";
+import { describeFindings, scanText } from "../secret-scan";
 import { mcpServersFor } from "../mcp";
 import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
 import { type IssueScope, scopeFrom } from "../core/model-tier";
@@ -209,6 +210,11 @@ export async function postComment(
   dataTag?: { stage: string; json: unknown },
 ): Promise<void> {
   if (!body.trim()) return;
+  const secrets = scanText(body);
+  if (secrets.length > 0) {
+    finish(deps, config, issueNumber, "needs-human", describeFindings(secrets));
+    return;
+  }
   // No marker means it would read as an OWNER-authored human comment.
   const full = dataTag
     ? withDataMarker(body, dataTag.stage, dataTag.json)

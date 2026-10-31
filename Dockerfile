@@ -73,6 +73,8 @@ COPY dashboard ./dashboard
 COPY template ./template
 COPY template-ci ./template-ci
 COPY ee ./ee
+# src/plan-guard.ts imports this one script; copy it alone, not all of scripts/.
+COPY scripts/lint-planned.ts ./scripts/lint-planned.ts
 COPY --from=rust /out/release/kaas-relay /out/release/kaas-verify /usr/local/bin/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
