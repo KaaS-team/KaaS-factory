@@ -1,0 +1,7 @@
+{
+  "name": "api: openapi drops token security",
+  "file": "scripts/openapi.ts",
+  "find": "bearerAuth",
+  "replace": "noAuth",
+  "test": "tests/api-routes.test.ts"
+}

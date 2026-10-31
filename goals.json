@@ -61,6 +61,11 @@
       "release": "6.2.0"
     },
     {
+      "id": "v7-modular",
+      "title": "Agnostic modular core",
+      "release": "7.0.0"
+    },
+    {
       "id": "later",
       "title": "Later, for production use"
     }
@@ -1522,6 +1527,46 @@
       "source": "user, 27 Oct 2026",
       "owner": "agent",
       "proof": {"test": "tests/import-plan-step.test.ts", "name": "a planned issue reaches a PR with no plan stage run", "mutation": "import-plan: a planned body is not recognised"}
+    },
+    {
+      "id": "api-routes-declared",
+      "phase": "v7-modular",
+      "ask": "One route table declares every API route with a response schema and the token gate",
+      "source": "epic E25, core API",
+      "owner": "agent",
+      "proof": {"test": "tests/api-routes.test.ts", "name": "route ids are unique and token-gated", "mutation": "api: openapi drops token security"}
+    },
+    {
+      "id": "api-openapi-pinned",
+      "phase": "v7-modular",
+      "ask": "openapi.json is generated from ROUTES and a test fails on drift",
+      "source": "epic E25, core API",
+      "owner": "agent",
+      "proof": {"test": "tests/api-routes.test.ts", "name": "openapi.json matches buildOpenApi output", "mutation": "api: openapi drops token security"}
+    },
+    {
+      "id": "api-contract-and-stream",
+      "phase": "v7-modular",
+      "ask": "Every route answers schema-valid bodies, live events validate, and a stale Last-Event-ID resets",
+      "source": "epic E25, core API",
+      "owner": "agent",
+      "proof": {"test": "tests/api-contract.test.ts", "name": "a stale Last-Event-ID gets a reset event", "mutation": "api: stale id never resets"}
+    },
+    {
+      "id": "api-token-gate",
+      "phase": "v7-modular",
+      "ask": "A wrong bearer token gets 401 on every token route",
+      "source": "epic E25, core API",
+      "owner": "agent",
+      "proof": {"test": "tests/api-contract.test.ts", "name": "a wrong bearer token gets 401, and so does none or an unset server token", "mutation": "api: token compare always passes"}
+    },
+    {
+      "id": "api-serve-and-client",
+      "phase": "v7-modular",
+      "ask": "factory serve runs a seeded fixture whose bodies fit the route schemas the generated client reads",
+      "source": "epic E25, core API",
+      "owner": "agent",
+      "proof": {"test": "tests/api-contract.test.ts", "name": "every GET route answers a body that fits its res schema", "mutation": "api: schema arrays unchecked"}
     }
   ]
 }

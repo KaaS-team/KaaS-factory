@@ -41,7 +41,6 @@ import {
   transcriptPath,
 } from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
-import { tailEvents } from "./events-tail";
 import { followStream } from "./view";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
 import { LABEL } from "./labels";
@@ -62,7 +61,6 @@ import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { probeNamed, probeRuntime } from "./runtime-kit";
 import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { warnWhenStale } from "./config-health";
-import { EventBus } from "./engine/bus";
 import { loadMinions, runMinion } from "./engine/minion";
 import { parseEvent } from "./core/event";
 import { watcherBus } from "./integrations/wire";
@@ -827,36 +825,6 @@ async function cmdMinion(): Promise<void> {
   if (run.status !== "ok") process.exit(EXIT.checksFailed);
 }
 
-// `factory events tail|replay <id>`: the outbox and inbox, newest last, or one event sent again.
-async function cmdEvents(): Promise<void> {
-  const sub = args[1];
-  if (sub !== "tail" && sub !== "replay")
-    throw new UsageError(
-      "usage: factory events (tail [--limit N] [--follow] | replay <id>) --repo-dir <path> [--json]",
-    );
-  const cloneDir = resolve(flag("repo-dir") ?? ".");
-  const config = await loadConfig(cloneDir);
-  const state = new FactoryState(stateDbPath(config.repo));
-  if (sub === "tail") {
-    const controller = new AbortController();
-    process.on("SIGINT", () => controller.abort());
-    const opts = { limit: Number(flag("limit") ?? 50), follow: has("follow"), json: has("json") };
-    return tailEvents(state, { ...opts, signal: controller.signal });
-  }
-  const id = args[2];
-  if (!id || id.startsWith("--")) throw new UsageError("events replay: an event id is required");
-  const bus = new EventBus({
-    store: state,
-    sinks: config.events.sinks,
-    source: `factory/${config.repo}`,
-    autoDeliver: false,
-  });
-  const queued = bus.replay(id);
-  if (!queued) throw new UsageError(`events replay: no event "${id}" with a configured sink`);
-  const delivered = await bus.deliver();
-  console.log(`factory events: ${id} queued to ${queued} sink(s), ${delivered} delivered now`);
-}
-
 async function main(): Promise<void> {
   switch (command === "--version" || command === "--skill" ? "version" : command) {
     case "version":
@@ -910,7 +878,9 @@ async function main(): Promise<void> {
     case "minion":
       return cmdMinion();
     case "events":
-      return cmdEvents();
+      return (await import("./events-cli")).cmdEvents(harnessCtx());
+    case "serve":
+      return void (await (await import("./api/serve-cli")).cmdServe(cli));
     case "pool":
       return cmdPool(cli);
     case "runtime":

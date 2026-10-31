@@ -383,7 +383,7 @@ describe("each repo's own config", () => {
     expect(JSON.parse(await get("/api/workflow-source?name=a-flow", B)).available).toBe(false);
     expect(JSON.parse(await get("/api/workflow-source?name=..%2Fconfig", B)).available).toBe(false);
     expect((await hit(dash, new Request(`${BASE}/api/settings?repo=acme/elsewhere`))).status).toBe(404);
-    for (const label of ["POST /api/workflow-edit", "POST /api/events/e1/replay"]) {
+    for (const label of ["POST /api/workflow-edit", "POST /api/bus-events/e1/replay"]) {
       const res = await hit(dash, request(label, B, { name: "b-flow", form: { build: { timeout: 5 } } }));
       expect([res.status, JSON.parse(res.text).error]).toEqual([409, READ_ONLY]);
     }

@@ -77,7 +77,7 @@ describe("events page", () => {
     });
     bus.emit("factory.issue.ready", { issue: 4 }, "issue/4");
     await bus.deliver();
-    const listed = (await (await s.call("GET", "/api/events")).json()) as {
+    const listed = (await (await s.call("GET", "/api/bus-events")).json()) as {
       events: { id: string; type: string; deliveries: { status: string }[] }[];
     };
     expect(listed.events.map((e) => [e.type, e.deliveries.map((d) => d.status)])).toEqual([
@@ -85,11 +85,11 @@ describe("events page", () => {
     ]);
     const id = listed.events[0]!.id;
     expect(received).toEqual([id]);
-    const res = await s.call("POST", `/api/events/${id}/replay`, {});
+    const res = await s.call("POST", `/api/bus-events/${id}/replay`, {});
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, queued: 1, delivered: 1 });
     expect(received).toEqual([id, id]);
-    expect((await s.call("POST", "/api/events/nope/replay", {})).status).toBe(404);
+    expect((await s.call("POST", "/api/bus-events/nope/replay", {})).status).toBe(404);
   });
 });
 

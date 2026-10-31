@@ -138,6 +138,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "tail: recent events in and out, with each sink's delivery status; replay: send one event to its sinks again",
   },
   {
+    name: "serve",
+    usage: "serve [--port <n>] [--fixture two-repos] [--print-url]",
+    does: "serve the core API (routes, openapi.json, live events) on loopback, token-gated by FACTORY_API_TOKEN; --fixture serves seeded sample data",
+  },
+  {
     name: "pool",
     usage: "pool [--json]",
     does: "each pool runtime in machine.json: every member's free minutes used and left this month, and its last failure",
