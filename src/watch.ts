@@ -26,7 +26,7 @@ import { runPool } from "./pool";
 import { holdForOverlap, overlapsOf, plannedFiles } from "./overlap";
 import type { GhComment, GhIssue } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
-import { canServe, effectiveSlots, machineBeat } from "./machine";
+import { canServe, machineBeat } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
   ensureWorktreeReady,
@@ -591,14 +591,14 @@ async function advanceListed(deps: WatchDeps, config: FactoryConfig, listed: GhI
 
 // This process's own cap, narrowed to the machine's cap when one is configured (plan v2.7.0 item 5).
 function dispatchConcurrency(deps: WatchDeps, config: FactoryConfig): number {
-  return deps.machine ? effectiveSlots(config.concurrency, deps.machine.config) : config.concurrency;
+  return deps.machine ? Math.min(config.concurrency, deps.machine.config.slots) : config.concurrency;
 }
 
-// A lease before an issue advances keeps two watchers sharing one FACTORY_HOME under the machine's
-// slot count, which each pool's own cap alone would not. No lease just means "waiting" until next poll.
+// A lease keeps watchers sharing one FACTORY_HOME under the machine's slots and each repo under its cap.
 async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome> {
   if (!deps.machine) return advanceIssue(deps, config, issue);
-  const leaseId = deps.machine.leases.acquire(`${config.repo}#${issue.number}`, dispatchConcurrency(deps, config));
+  const cap = { repo: config.repo, repoCap: config.concurrency, machineSlots: deps.machine.config.slots };
+  const leaseId = deps.machine.leases.acquire(`${config.repo}#${issue.number}`, cap);
   if (leaseId === undefined) return "waiting";
   try {
     return await advanceIssue(deps, config, issue);

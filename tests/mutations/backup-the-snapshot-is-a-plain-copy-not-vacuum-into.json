@@ -1,0 +1,7 @@
+{
+  "name": "backup: the snapshot is a plain copy, not VACUUM INTO",
+  "file": "src/backup.ts",
+  "find": "src.run(\"VACUUM INTO ?\", [target]);",
+  "replace": "require(\"node:fs\").copyFileSync(source, target);",
+  "test": "tests/backup.test.ts"
+}
