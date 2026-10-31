@@ -30,6 +30,7 @@ import { readJournal } from "./journal";
 import { lateRoute } from "./late-route";
 import { holdForOverlap } from "../overlap";
 import { guardPlan } from "../plan-guard";
+import { unmetDeps } from "../plan-deps";
 import { isPlannedBody } from "./import-plan";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
@@ -118,7 +119,9 @@ async function walk(
 
   // A fresh planned run (the issue body or an operator-passed spec) is read before any step runs.
   if (journal.finished.size === 0 && isPlannedBody(issue.body ?? "")) {
-    const guard = guardPlan(issue.body ?? "", config);
+    const plain = guardPlan(issue.body ?? "", config);
+    const unmet = plain.ok ? await unmetDeps(issue.body ?? "", deps.github, config.repo, worktree) : [];
+    const guard = unmet.length ? { ok: false as const, reasons: unmet } : plain;
     if (!guard.ok) {
       await postComment(
         deps,
