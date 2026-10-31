@@ -58,15 +58,16 @@ function parseWhere(where: string | undefined): { path: string; from: number; to
   return { path: m[1]!, from, to: m[3] === undefined ? from : Number(m[3]) };
 }
 
-// Supported means `where` names a file in the diff and a line range that overlaps
-// one of its hunks. A finding with no `where`, or one outside every hunk, is dropped.
+// Supported means `where` names a file in the diff and a line range that overlaps one of its
+// hunks, and `evidence` holds a reproduction; anything else is dropped.
 export class DiffAnchorRechecker implements Rechecker {
   async supported(findings: readonly Finding[], diff: string): Promise<number[]> {
     const lines = changedLines(diff);
     return findings.flatMap((f, i) => {
       const at = parseWhere(f.where);
       const hunks = at && lines.get(at.path);
-      return hunks?.some(([a, b]) => at!.from <= b && at!.to >= a) ? [i] : [];
+      const reproduced = Boolean(f.evidence?.trim());
+      return reproduced && hunks?.some(([a, b]) => at!.from <= b && at!.to >= a) ? [i] : [];
     });
   }
 }

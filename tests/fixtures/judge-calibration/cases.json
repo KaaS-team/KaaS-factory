@@ -1,0 +1,156 @@
+[
+  {
+    "name": "inside an added hunk with evidence",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/a.ts:12",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -10,2 +10,5 @@\n ctx\n-old\n+new0\n+new1\n+new2\n+new3",
+    "real": true
+  },
+  {
+    "name": "range overlapping a hunk",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/a.ts:6-11",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -10,2 +10,5 @@\n ctx\n-old\n+new0\n+new1\n+new2\n+new3",
+    "real": true
+  },
+  {
+    "name": "in a new file",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/new.ts:2",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/new.ts b/src/new.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/new.ts\n@@ -0,0 +1,4 @@\n+line0\n+line1\n+line2\n+line3",
+    "real": true
+  },
+  {
+    "name": "./ prefix and trailing prose",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "./src/b.ts:21 (the guard)",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/b.ts b/src/b.ts\n--- a/src/b.ts\n+++ b/src/b.ts\n@@ -20,2 +20,4 @@\n ctx\n-old\n+new0\n+new1\n+new2",
+    "real": true
+  },
+  {
+    "name": "should-level in a test file",
+    "finding": {
+      "severity": "should",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "tests/b.test.ts:31",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/tests/b.test.ts b/tests/b.test.ts\n--- a/tests/b.test.ts\n+++ b/tests/b.test.ts\n@@ -30,2 +30,3 @@\n ctx\n-old\n+new0\n+new1",
+    "real": true
+  },
+  {
+    "name": "single line at hunk edge",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "lib/c.py:40",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/lib/c.py b/lib/c.py\n--- a/lib/c.py\n+++ b/lib/c.py\n@@ -40,2 +40,3 @@\n ctx\n-old\n+new0\n+new1",
+    "real": true
+  },
+  {
+    "name": "outside every hunk",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/a.ts:80",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -10,2 +10,5 @@\n ctx\n-old\n+new0\n+new1\n+new2\n+new3",
+    "real": false
+  },
+  {
+    "name": "file the diff never touched",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/other.ts:12",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -10,2 +10,5 @@\n ctx\n-old\n+new0\n+new1\n+new2\n+new3",
+    "real": false
+  },
+  {
+    "name": "no line in where",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/a.ts",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -10,2 +10,5 @@\n ctx\n-old\n+new0\n+new1\n+new2\n+new3",
+    "real": false
+  },
+  {
+    "name": "no where",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -10,2 +10,5 @@\n ctx\n-old\n+new0\n+new1\n+new2\n+new3",
+    "real": false
+  },
+  {
+    "name": "inside a hunk but no evidence",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/a.ts:12"
+    },
+    "diff": "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -10,2 +10,5 @@\n ctx\n-old\n+new0\n+new1\n+new2\n+new3",
+    "real": false
+  },
+  {
+    "name": "on a deleted file",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "src/gone.ts:1",
+      "evidence": "Running `bun test tests/x.test.ts` fails with a TypeError"
+    },
+    "diff": "diff --git a/src/gone.ts b/src/gone.ts\ndeleted file mode 100644\n--- a/src/gone.ts\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-x\n-y",
+    "real": false
+  },
+  {
+    "name": "blank evidence in a hunk",
+    "finding": {
+      "severity": "must",
+      "confidence": 4,
+      "what": "a defect",
+      "where": "lib/c.py:41",
+      "evidence": "   "
+    },
+    "diff": "diff --git a/lib/c.py b/lib/c.py\n--- a/lib/c.py\n+++ b/lib/c.py\n@@ -40,2 +40,3 @@\n ctx\n-old\n+new0\n+new1",
+    "real": false
+  }
+]

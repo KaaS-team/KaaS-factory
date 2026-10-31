@@ -10,7 +10,7 @@ import { factRefusals, type PrFacts } from "../src/pr-facts";
 import { GitHub } from "../src/github";
 import { LABEL } from "../src/labels";
 import type { GhIssue } from "../src/ports/scm";
-import { floorPlanRisk, riskObject } from "../src/risk";
+import { floorPlanRisk, ratedRisk, riskObject } from "../src/risk";
 import { FactoryState } from "../src/state";
 
 const marker = (stage: string, json: unknown) => `<!-- factory:data ${JSON.stringify({ stage, json })} -->`;
@@ -91,4 +91,14 @@ test("a package's owners and protected paths make a change under it high risk, a
   expect(guarded.blastRadius.protected).toEqual(["packages/billing/ledger/post.ts"]);
   const facts = { risk: owned, tamper: [], ui: { changed: false } } as unknown as PrFacts;
   expect(factRefusals(facts, "full").map((r) => r.detail)).toContain("5: needs an owner: @finance");
+});
+
+test("auth, security and money paths rate high with a named reason; look-alikes stay low", () => {
+  for (const p of ["src/auth/session.ts", "lib/payments.ts", "billing/invoice.go", "app/security/csp.ts"]) {
+    const r = ratedRisk([p], { protectedPaths: [] });
+    expect(r.level).toBe("high");
+    expect(r.reasons[0]).toStartWith("auth, security or money path:");
+  }
+  for (const p of ["src/author.ts", "docs/billing-faq.md"])
+    expect(ratedRisk([p], { protectedPaths: [] }).level).toBe("low");
 });
