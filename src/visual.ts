@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { type A11yElement, type A11yViolation, a11yViolations } from "./visual-a11y.js";
 
 export const UI_GLOBS: readonly RegExp[] = [
   /\.(tsx|jsx|vue|svelte|astro|css|scss|html)$/,
@@ -45,11 +46,19 @@ export interface UiFacts {
   readonly smoke: boolean;
   readonly unreviewedDiffs: number;
   readonly qaSpec: boolean;
+  readonly a11y?: readonly A11yViolation[];
 }
 
 export async function uiFacts(
   paths: readonly string[],
-  o: { previewTemplate?: string; pr: number; baseline: string; current: string; approved?: readonly string[] },
+  o: {
+    previewTemplate?: string;
+    pr: number;
+    baseline: string;
+    current: string;
+    approved?: readonly string[];
+    elements?: readonly A11yElement[];
+  },
 ): Promise<UiFacts> {
   if (!isUiChange(paths)) return { changed: false, preview: false, smoke: false, unreviewedDiffs: 0, qaSpec: false };
   const url = o.previewTemplate ? previewUrl(o.previewTemplate, o.pr) : undefined;
@@ -59,5 +68,6 @@ export async function uiFacts(
     smoke: url !== undefined && (await smoke(url)),
     unreviewedDiffs: visualDiffs(o.baseline, o.current, o.approved).length,
     qaSpec: paths.some(isQaSpec),
+    ...(o.elements ? { a11y: a11yViolations(o.elements) } : {}),
   };
 }

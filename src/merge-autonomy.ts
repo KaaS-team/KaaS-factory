@@ -9,6 +9,7 @@ import { type Autonomy, webMode } from "./autonomy";
 import type { FactoryConfig, MergeConfig } from "./config";
 import { followUpIssue } from "./escaped-defect";
 import { attemptMerge, type ChangedFile, type MergeDecision, renderAuditComment } from "./merge-policy";
+import { mayRebase } from "./merge-method";
 import { DirLease, type Lease, serialMerge } from "./merge-queue";
 import { syncRebase } from "./rebase-sync";
 import { changeFailureRate, revertBranch, tightenThresholds, watchAfterMerge } from "./post-merge";
@@ -178,10 +179,10 @@ async function autonomousMerge(
     }
   };
   const outcome = await serialMerge(deps.lease ?? new DirLease(STATE), config.repo, decision.headSha, {
-    rebase,
+    rebase: mayRebase(config.merge) ? rebase : async () => decision.headSha,
     gated: async (head) => head === decision.headSha,
     merge: async (head) => {
-      await deps.github.mergePr(config.repo, run.pr, head);
+      await deps.github.mergePr(config.repo, run.pr, head, config.merge);
       const url = config.merge.smokeUrl;
       if (!url) return;
       const watched = await watchAfterMerge(head, {
@@ -215,7 +216,13 @@ async function autonomousMerge(
 // rating otherwise. An unrated plan reads as high.
 export function tierInput(auto: MergeContext | undefined, config: FactoryConfig, planRisk: Risk | undefined) {
   const risk: Risk = auto?.facts?.risk.level ?? planRisk ?? "high";
-  return { risk, merge: auto?.merge ?? config.merge, autonomy: auto?.mode, facts: auto?.facts };
+  return {
+    risk,
+    merge: auto?.merge ?? config.merge,
+    autonomy: auto?.mode,
+    facts: auto?.facts,
+    humanPaths: config.review?.alwaysHumanPaths,
+  };
 }
 
 // `post` is set once per head: the audit comment, then the signed record beside it. Under a tier
@@ -232,6 +239,6 @@ export async function settleMerge(
     const signed = auto && signedMergeRecord(config, run.issue, auto, decision);
     if (signed) await run.post(signed);
   }
-  if (!auto) return attemptMerge(deps.github, config.repo, run.pr, decision);
+  if (!auto) return attemptMerge(deps.github, config.repo, run.pr, decision, config.merge);
   return autonomousMerge(deps, config, run, decision);
 }

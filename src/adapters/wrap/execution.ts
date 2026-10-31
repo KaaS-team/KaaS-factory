@@ -4,11 +4,14 @@
 // "{cwd}" anywhere is replaced by the worktree path. The launcher must make
 // the worktree visible at that path and run `bash -c` on {cmd}'s element.
 
+import { withEgress } from "../../egress-env";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface WrapSpec {
   readonly kind: "wrap";
   readonly argv: readonly string[];
+  // Hosts the command may reach, through the egress proxy only; the launcher gets the proxy variables.
+  readonly allow?: readonly string[];
 }
 
 export const CMD = "{cmd}";
@@ -20,7 +23,22 @@ export function wrapArgs(spec: WrapSpec, cmd: string, cwd: string): string[] {
 export class WrapExecution implements ExecutionPort {
   constructor(private readonly spec: WrapSpec) {}
   async run(cmd: string, cwd: string): Promise<ExecResult> {
-    const proc = Bun.spawn(wrapArgs(this.spec, cmd, cwd), { cwd, env: process.env, stdout: "pipe", stderr: "pipe" });
+    const { allow } = this.spec;
+    if (allow)
+      return withEgress(
+        allow,
+        (url) => url,
+        (env) => this.spawn(cmd, cwd, env),
+      );
+    return this.spawn(cmd, cwd, {});
+  }
+  private async spawn(cmd: string, cwd: string, egress: Record<string, string>): Promise<ExecResult> {
+    const proc = Bun.spawn(wrapArgs(this.spec, cmd, cwd), {
+      cwd,
+      env: { ...process.env, ...egress },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const [stdout, stderr, code] = await Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),

@@ -1,0 +1,1 @@
+{"name":"host mode still rebases","file":"src/merge-method.ts","find":"export const mayRebase = (s: MergeSettings | undefined): boolean => !isHostRun(s) && s?.queue !== \"none\";","replace":"export const mayRebase = (s: MergeSettings | undefined): boolean => s?.queue !== \"none\";","test":"tests/merge-method.test.ts"}

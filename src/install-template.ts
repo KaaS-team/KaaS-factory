@@ -51,7 +51,12 @@ export const AGENT_DIRS: Readonly<Record<string, { skillsDir: string; contextFil
   ]),
 );
 
-const REPO_OWNED = new Set([".factory/charter.md", ".factory/config.example.json", ".factory/memory/lessons.md"]);
+const REPO_OWNED = new Set([
+  ".factory/charter.md",
+  ".factory/config.example.json",
+  ".factory/memory/lessons.md",
+  "REVIEW.md",
+]);
 // Files an earlier release installed and this one no longer ships; `update` removes them.
 const RETIRED = [".claude/agents/factory-verifier.md", ".claude/agents/factory-explorer.md"];
 const CI_DEST_REL = ".github/workflows/factory.yml.example";

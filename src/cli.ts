@@ -153,7 +153,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo, selfCommand()) } : {}),
     github,
-    git: new Git(new GitCommandRunner()),
+    git: new Git(new GitCommandRunner(config.commits ?? {})),
     state,
     bus: watcherBus(state, config),
     minions: loaded.minions,
@@ -478,7 +478,7 @@ async function liveDoctorChecks(config: FactoryConfig, cloneDir: string, github:
       configuredSlots: loadMachineConfig().slots,
       resettable: config.resettable,
     },
-  );
+  ).then(async (c) => [...c, await (await import("./merge-method")).mergeMethodCheck(config)]);
 }
 
 // `dashboard/server.ts`'s own `if (import.meta.main)` block never fires

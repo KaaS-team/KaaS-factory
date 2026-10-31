@@ -2,6 +2,7 @@
 // Shape of the target repo's `.factory/config.json`: the runner only reads it, `factory doctor`
 // checks it exists, and a missing field falls back to DEFAULT_CONFIG, so a minimal one works.
 
+import { baseByRouteProblems } from "./base-branch";
 import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
 import { githubHost } from "./repo";
@@ -92,7 +93,7 @@ export interface RouteConfig {
   readonly workflow?: string;
 }
 
-export interface FactoryConfig {
+export interface FactoryConfig extends keys.ReviewFields {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
   readonly postEditCommand: readonly string[]; // argv the post-edit-check hook runs on each build edit; {file} is the path; [] is off
@@ -103,16 +104,15 @@ export interface FactoryConfig {
   readonly maxBudgetUsd: StageBudgets;
   readonly baselineTag: string; // reset.ts forces main to this tag's SHA
   readonly base: string; // base branch for PRs, usually "main"
+  readonly baseByRoute?: Readonly<Record<string, string>>; // route to base branch, see resolveBase
   readonly stageTimeoutMinutes: number; // kills a stuck `claude` process (audit finding #15)
   readonly maxToolCalls: number; // kills a runaway stage before it burns budget
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
   // Monorepo packages, each with its own gates; see PackageSpec.
   readonly packages?: readonly PackageSpec[];
-  // Opt-in: `reset`/`rebaseline` refuse unless true, so a stray `factory reset` never force-pushes
-  // a live repo (lwp-website) back to a baseline tag (plan v2.6.2 item 2).
+  // Opt-in: `reset`/`rebaseline` refuse unless true, so a stray `factory reset` never force-pushes a live repo.
   readonly resettable: boolean;
-  // Commands run once per fresh worktree, before any stage (e.g. "npm ci").
-  // Idempotent via a marker file in the worktree; a failure parks the issue.
+  // Run once per fresh worktree, before any stage (e.g. "npm ci"), once via a marker file; a failure parks the issue.
   readonly setup: readonly string[];
   readonly agentCommands: AgentCommands;
   // Named agents, each a preset or a command; `stages` says which one runs a stage.
@@ -120,11 +120,11 @@ export interface FactoryConfig {
   readonly stages: StageAgents;
   // Per-type overrides, keyed by the type label. See RouteConfig.
   readonly routes: Readonly<Record<string, RouteConfig>>;
-  // Checked before every stage (plan v2.7.0 item 7): an issue's lifetime spend, the repo's since 00:00
-  // UTC, and the issue's runs with unknown cost, which no dollar sum can hold. A breach parks the
-  // issue with a "budget" inbox item.
+  // Checked before every stage: an issue's lifetime spend, the repo's since 00:00 UTC, and the runs with
+  // unknown cost, which no dollar sum can hold. A breach parks the issue with a "budget" inbox item.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
+  readonly review: { readonly maxRounds: number; readonly alwaysHumanPaths?: readonly string[] }; // maxRounds: failed reviews before a person takes over
   readonly holdout: HoldoutConfig;
   // The acceptance checker's path in the repo. "" turns the Acceptance table off.
   readonly acceptance: AcceptanceConfig;
@@ -142,14 +142,14 @@ export interface FactoryConfig {
   readonly toolchain?: Toolchain; // the image an "auto" docker or ssh runtime uses (src/images.ts)
   // Where gates and check steps run, by runtime name (src/runtimes.ts); unset is "local".
   readonly runtime?: RuntimeConfig;
-  // Where issues live. GitHub by default; "http" speaks Tracker API v1 (docs/tracker-api.md).
-  // PRs stay on GitHub either way (src/scm.ts).
+  // Where issues live: GitHub by default, "http" speaks Tracker API v1 (docs/tracker-api.md). PRs stay on GitHub.
   readonly tracker: TrackerConfig;
   // A factory label to the team's own name for it, e.g. LABEL.ready to "ready-for-ai".
   // Applied once, at the tracker boundary; everything inside still speaks LABEL.*.
   readonly labels: Readonly<Record<string, string>>;
   // The v4 event bus: where emitted events are POSTed, and the secret inbound POST /events checks.
   readonly events: EventsConfig;
+  readonly commits?: { readonly signoff?: import("./signoff").SignoffMode }; // trailers; unset is today's
 }
 
 // Each sink gets every emitted event whose type is in `types` (all when unset),
@@ -231,8 +231,7 @@ export interface RuntimeConfig {
 
 export type Profile = "solo" | "team" | "startup" | "scaleup" | "enterprise";
 
-// What each profile changes from DEFAULT_CONFIG. "team" is the default's own
-// behaviour; the others trade autonomy for review as the company grows.
+// What each profile changes from DEFAULT_CONFIG. "team" is the default's own behaviour; the others trade autonomy for review.
 // solo: auto-approve up to medium risk, auto-merge what merge-policy allows.
 // scaleup and enterprise: every plan waits for a human, nothing auto-merges.
 export const PROFILES: Readonly<
@@ -264,13 +263,11 @@ export interface SpendConfig {
   readonly maxUnreportedRuns?: number;
 }
 
-// merge-policy.ts's inputs (plan v2.8.0 item 2). "off" (default) never looks
-// at merging; "dry-run" assesses eligibility and posts the audit comment but
-// never calls `gh pr merge`; "auto" merges once CI passes and every merge
-// gate holds. autoPaths/maxFiles/maxLines replace gate.py's hardcoded
-// docs/README-only, 10-file, 200-line allow-list with repo config, since "a
-// blog post is often longer than machinist's 200 lines" (plan). A file under
-// FactoryConfig.protectedPaths is never eligible, whatever autoPaths says.
+// merge-policy.ts's inputs (plan v2.8.0 item 2). "off" (default) never looks at merging; "dry-run"
+// assesses eligibility and posts the audit comment but never calls `gh pr merge`; "auto" merges once CI
+// passes and every merge gate holds. autoPaths/maxFiles/maxLines replace gate.py's hardcoded
+// docs/README-only, 10-file, 200-line allow-list with repo config, since "a blog post is often longer
+// than machinist's 200 lines" (plan). A file under FactoryConfig.protectedPaths is never eligible.
 export interface MergeConfig extends keys.MergeAutonomyFields {
   readonly policy: "off" | "dry-run" | "auto";
   readonly autoPaths: readonly string[];
@@ -321,6 +318,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   routes: {},
   spend: {},
   merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
+  review: { maxRounds: 3 },
   holdout: { paths: [], cmd: "" },
   acceptance: { script: "scripts/kaas/check-acceptance.py" },
   tmux: { enabled: false, session: "factory" },
@@ -347,6 +345,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
     merge: { ...DEFAULT_CONFIG.merge, ...p.merge, ...partial.merge },
+    review: { ...DEFAULT_CONFIG.review, ...partial.review },
     holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
     acceptance: { ...DEFAULT_CONFIG.acceptance, ...partial.acceptance },
     tmux: { ...DEFAULT_CONFIG.tmux, ...partial.tmux },
@@ -356,10 +355,9 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
   };
 }
 
-// Every key is listed here; the Record type makes tsc fail if FactoryConfig
-// gains a key that is not. `riskCriteria` is never read by the runner (the
-// factory-plan skill reads it). A `_`-prefixed key is a comment. Any other
-// unknown key is a typo that would silently do nothing, so boot refuses it.
+// Every key is listed here; the Record type makes tsc fail if FactoryConfig gains a key that is not.
+// `riskCriteria` is never read by the runner (the factory-plan skill reads it). A `_`-prefixed key is a
+// comment. Any other unknown key is a typo that would silently do nothing, so boot refuses it.
 type Kind = "string" | "posInt" | "positive" | "boolean" | "strings" | "object";
 const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   repo: "string",
@@ -372,6 +370,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   maxBudgetUsd: "object",
   baselineTag: "string",
   base: "string",
+  baseByRoute: "object",
   stageTimeoutMinutes: "posInt",
   maxToolCalls: "posInt",
   gates: "object",
@@ -384,6 +383,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   routes: "object",
   spend: "object",
   merge: "object",
+  review: "object",
   holdout: "object",
   acceptance: "object",
   tmux: "object",
@@ -397,6 +397,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   tracker: "object",
   labels: "object",
   events: "object",
+  commits: "object",
   riskCriteria: "object",
 };
 
@@ -449,7 +450,7 @@ export function configProblems(raw: unknown): string[] {
   if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))
     problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
   problems.push(...profileProblems(cfg));
-  problems.push(...toolchainProblems(cfg.toolchain));
+  problems.push(...toolchainProblems(cfg.toolchain), ...baseByRouteProblems(cfg.baseByRoute));
   nested("maxBudgetUsd", {
     triage: "positive",
     plan: "positive",
@@ -459,6 +460,7 @@ export function configProblems(raw: unknown): string[] {
     retro: "positive",
   });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
+  nested("review", { maxRounds: "posInt", alwaysHumanPaths: "strings" });
   nested("runtime", { gates: "string", check: "string" });
   nested("merge", keys.MERGE_KEYS);
   // policy and autonomy are enums: a typo there would read as the default, which for autonomy
@@ -728,10 +730,8 @@ export async function loadConfigExplained(targetRepoDir: string): Promise<TeamAp
   // GitHub calls follow config.repo but git pushes follow origin; a copied config must not aim one at the wrong repo.
   const origin = originRepo(targetRepoDir);
   if (config.repo === "" && origin) config = { ...config, repo: origin };
-  // "main" is only a fallback default (DEFAULT_CONFIG.base), never a guess:
-  // a config that omits "base" gets whatever origin/HEAD resolves to (a repo
-  // on "trunk" or "develop" must not be force-pushed at "main" by default).
-  // A config that names "base" explicitly, even "main", is never overridden.
+  // "main" is only a fallback (DEFAULT_CONFIG.base): a config that omits "base" gets what origin/HEAD
+  // resolves to, so a "trunk" repo is never aimed at "main". An explicit "base" is never overridden.
   if ((raw as Record<string, unknown>).base === undefined) {
     const detected = defaultBranchOf(targetRepoDir);
     if (detected) config = { ...config, base: detected };
@@ -793,11 +793,8 @@ function originRepo(dir: string): string | undefined {
   return r.exitCode === 0 ? repoFromRemoteUrl(r.stdout.toString()) : undefined;
 }
 
-// The branch name behind origin/HEAD, e.g. "trunk" for a repo cloned with a
-// non-"main" default. Mirrors ensureRepoClone's origin/HEAD resolution
-// (src/repo.ts) for local `--repo-dir` mode, which never runs that clone
-// path. Missing on a bare or freshly-inited repo (no remote fetch yet) --
-// callers fall back to DEFAULT_CONFIG.base ("main") in that case.
+// The branch name behind origin/HEAD, e.g. "trunk". Mirrors ensureRepoClone's resolution (src/repo.ts) for
+// local `--repo-dir` mode. Missing on a bare repo with no fetch yet; callers fall back to DEFAULT_CONFIG.base.
 function defaultBranchOf(dir: string): string | undefined {
   if (!existsSync(`${dir}/.git`)) return undefined;
   const r = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--abbrev-ref", "origin/HEAD"], {

@@ -3,6 +3,7 @@
 // Sent to OTEL_EXPORTER_OTLP_ENDPOINT/v1/traces, so any OTLP collector (Langfuse, Honeycomb) takes it.
 
 import { createHash } from "node:crypto";
+import { agentSpanName, GENAI_OP, modelSpanName } from "../otel-genai";
 import type { StageRun } from "../state";
 
 export const OTEL_ENV = { endpoint: "OTEL_EXPORTER_OTLP_ENDPOINT", headers: "OTEL_EXPORTER_OTLP_HEADERS" } as const;
@@ -67,26 +68,43 @@ export function runTrace(run: { repo: string; issue: number; outcome: string }, 
       ],
       status: { code: run.outcome === "failed" ? 2 : 1 },
     },
-    ...stages.map((s) => ({
-      traceId,
-      spanId: hex(`${traceId}/${s.id}`, 16),
-      parentSpanId: rootId,
-      name: `invoke_agent ${s.stage}`,
-      kind: 3,
-      startTimeUnixNano: nanos(s.started_at),
-      endTimeUnixNano: nanos(s.finished_at),
-      attributes: [
-        attr("gen_ai.operation.name", "invoke_agent"),
-        attr("gen_ai.agent.name", s.agent),
-        ...(s.model ? [attr("gen_ai.request.model", s.model)] : []),
-        attr("gen_ai.usage.input_tokens", s.tokens_in),
-        attr("gen_ai.usage.output_tokens", s.tokens_out),
-        attr("gen_ai.usage.cache_read.input_tokens", s.tokens_cached),
-        ...(s.cost_usd === null ? [] : [attr("factory.cost_usd", s.cost_usd)]),
-        attr("factory.stage", s.stage),
-      ],
-      status: { code: s.exit_code === 0 ? 1 : 2 },
-    })),
+    ...stages.flatMap((s) => [
+      {
+        traceId,
+        spanId: hex(`${traceId}/${s.id}`, 16),
+        parentSpanId: rootId,
+        name: agentSpanName(s.agent),
+        kind: 3,
+        startTimeUnixNano: nanos(s.started_at),
+        endTimeUnixNano: nanos(s.finished_at),
+        attributes: [
+          attr("gen_ai.operation.name", "invoke_agent"),
+          attr("gen_ai.agent.name", s.agent),
+          ...(s.model ? [attr("gen_ai.request.model", s.model)] : []),
+          attr("gen_ai.usage.input_tokens", s.tokens_in),
+          attr("gen_ai.usage.output_tokens", s.tokens_out),
+          attr("gen_ai.usage.cache_read.input_tokens", s.tokens_cached),
+          ...(s.cost_usd === null ? [] : [attr("factory.cost_usd", s.cost_usd)]),
+          attr("factory.stage", s.stage),
+        ],
+        status: { code: s.exit_code === 0 ? 1 : 2 },
+      },
+      ...(s.model
+        ? [
+            {
+              traceId,
+              spanId: hex(`${traceId}/${s.id}/model`, 16),
+              parentSpanId: hex(`${traceId}/${s.id}`, 16),
+              name: modelSpanName(s.model),
+              kind: 3,
+              startTimeUnixNano: nanos(s.started_at),
+              endTimeUnixNano: nanos(s.finished_at),
+              attributes: [attr("gen_ai.operation.name", GENAI_OP.model), attr("gen_ai.request.model", s.model)],
+              status: { code: s.exit_code === 0 ? 1 : 2 },
+            },
+          ]
+        : []),
+    ]),
   ];
   return {
     resourceSpans: [

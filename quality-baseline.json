@@ -127,7 +127,7 @@
     "src/agents/executor.ts": 482,
     "src/agents/structured.ts": 401,
     "src/cli.ts": 912,
-    "src/config.ts": 810,
+    "src/config.ts": 807,
     "src/doctor.ts": 445,
     "src/engine/common.ts": 652,
     "src/engine/steps.ts": 586,

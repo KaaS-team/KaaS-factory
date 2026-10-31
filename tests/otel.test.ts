@@ -61,9 +61,18 @@ describe("OTel gen_ai trace", () => {
 
     expect(got.map((g) => [g.path, g.auth])).toEqual([["/v1/traces", "Bearer k"]]);
     const spans = spansOf(got[0]!.body);
-    expect(spans.map((s) => s.name)).toEqual(["factory.run issue/5", "invoke_agent triage", "invoke_agent build"]);
+    expect(spans.map((s) => s.name)).toEqual([
+      "factory.run issue/5",
+      "invoke_agent claude",
+      "chat m-1",
+      "invoke_agent claude",
+      "chat m-1",
+    ]);
     expect(new Set(spans.map((s) => s.traceId)).size).toBe(1);
-    expect(spans.slice(1).every((s) => s.parentSpanId === spans[0]!.spanId)).toBe(true);
+    expect(
+      spans.filter((s) => s.name.startsWith("invoke_agent")).every((s) => s.parentSpanId === spans[0]!.spanId),
+    ).toBe(true);
+    expect(spans[2]!.parentSpanId).toBe(spans[1]!.spanId);
     expect(spans[1]!.attributes.map((a) => a.key)).toEqual([
       "gen_ai.operation.name",
       "gen_ai.agent.name",
@@ -80,6 +89,7 @@ describe("OTel gen_ai trace", () => {
     const stages = [stage(7, "build", "2026-10-26T10:01:00.000Z", null)];
     const a = runTrace({ repo: "acme/shop", issue: 5, outcome: "failed" }, stages);
     expect(a).toEqual(runTrace({ repo: "acme/shop", issue: 5, outcome: "failed" }, stages));
+    expect(spansOf(a).map((x) => x.name)).toEqual(["factory.run issue/5", "invoke_agent claude"]);
     expect(spansOf(a)[1]!.attributes.map((x) => x.key)).not.toContain("gen_ai.request.model");
     expect(runTrace({ repo: "acme/shop", issue: 5, outcome: "failed" }, [])).toBeUndefined();
     expect(otlpHeaders("a=1, b=x%3Dy")).toEqual({ a: "1", b: "x=y" });
