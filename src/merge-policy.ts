@@ -6,6 +6,7 @@ import { touchesProtectedPath } from "./boundary";
 import type { CiResult } from "./ci";
 import type { MergeConfig } from "./config";
 import type { GitHub, MergeReadiness } from "./github";
+import type { MergeSettings } from "./merge-method";
 import { type CodeownersRule, codeownerRefusals } from "./profile-rules";
 import { factRefusals, type PrFacts } from "./pr-facts";
 
@@ -221,9 +222,10 @@ export async function attemptMerge(
   repo: string,
   prNumber: number,
   decision: MergeDecision,
+  settings?: MergeSettings,
 ): Promise<boolean> {
   if (decision.outcome !== "merge") return false;
-  await github.mergePr(repo, prNumber, decision.headSha);
+  await github.mergePr(repo, prNumber, decision.headSha, settings);
   return true;
 }
 
