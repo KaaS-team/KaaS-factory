@@ -1,0 +1,7 @@
+{
+  "name": "backup: restore skips the signature compare",
+  "file": "src/backup.ts",
+  "find": "got.length !== want.length || !timingSafeEqual(got, want)",
+  "replace": "false",
+  "test": "tests/backup.test.ts"
+}
