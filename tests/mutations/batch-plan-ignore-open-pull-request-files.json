@@ -1,0 +1,7 @@
+{
+  "name": "batch-plan: ignore open pull request files",
+  "file": "src/batch-plan.ts",
+  "find": "busy.some(",
+  "replace": "false && busy.some(",
+  "test": "tests/batch-plan.test.ts"
+}
