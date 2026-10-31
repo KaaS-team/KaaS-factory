@@ -55,7 +55,8 @@ test("the slug is unique over the real list, and the repo loads as legacy plus t
   const legacy: Mutation[] = JSON.parse(require("node:fs").readFileSync(join(ROOT, "tests/mutations.json"), "utf8"));
   expect(new Set(legacy.map((m) => mutationSlug(m.name))).size).toBe(legacy.length);
   const all = loadMutations(ROOT);
-  expect(all.length).toBe(legacy.length + 6);
+  const shards = require("node:fs").readdirSync(join(ROOT, "tests/mutations")).filter((f: string) => f.endsWith(".json")).length;
+  expect(all.length).toBe(legacy.length + shards);
   expect(all.slice(0, legacy.length)).toEqual(legacy);
 });
 
