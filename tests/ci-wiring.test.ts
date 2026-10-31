@@ -14,6 +14,11 @@ describe("ci wiring", () => {
     expect(runs("scripts/flake-report.ts", [".github/workflows/flakes.yml", "ci/flakes.yml"])).toBe(true);
   });
 
+  test("make check lists check-baseline", () => {
+    const makefile = readFileSync("Makefile", "utf8");
+    expect(makefile).toMatch(/^check:.*\bcheck-baseline\b/m);
+  });
+
   test("make check lists check-anchors", () => {
     const line = readFileSync("Makefile", "utf8")
       .split("\n")

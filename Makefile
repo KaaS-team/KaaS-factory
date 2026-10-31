@@ -1,4 +1,4 @@
-.PHONY: agent-matrix install check check-anchors check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix install check check-anchors check-baseline check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
@@ -6,7 +6,7 @@ install:
 # make check = lint (biome, and rustfmt plus clippy on verify/ and relay/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
 # check did not ship (see the kaas-eng plugin's engineering.md, Rule 0).
-check: lint typecheck test skills-check check-anchors
+check: lint typecheck test skills-check check-anchors check-baseline
 	@echo "make check: ok"
 
 # reuse lint checks every file's licence against REUSE.toml (tests/licensing.test.ts checks what it says).
@@ -48,6 +48,10 @@ check-anchors:
 # Proves the checks bite. Its own CI job, since it copies the repo per mutation.
 check-mutations:
 	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null bun scripts/check-mutations.ts $(MUTATION_ARGS)
+
+# A stale quality-baseline.json fails here with the entries named; `bun scripts/gen-quality-baseline.ts` lowers them.
+check-baseline:
+	bun scripts/gen-quality-baseline.ts --check
 
 skills-check:
 	@command -v uvx >/dev/null 2>&1 || { \
