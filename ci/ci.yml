@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, edited]
 
 # A newer push to the same ref cancels the run it supersedes, so minutes go to the latest tree only.
 concurrency:

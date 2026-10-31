@@ -51,7 +51,7 @@ import {
   renderTaskTable,
   scopeOf,
 } from "./epic";
-import { issueRef, postRunDetails, prBody, renderRunDetails, renderWhatChanged } from "./pr-body";
+import { issueRef, postRunDetails, prBody, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
@@ -534,6 +534,7 @@ const pr: StepType = {
             readRunJson<VerdictArtifact>(worktree, issueNumber, "verdict.json")?.criteria,
           ),
           closes: config.tracker.kind === "github" && children.length ? closingLine(issueNumber, children) : undefined,
+          template: prTemplate(worktree),
         }),
         draft: true,
       }));
