@@ -268,6 +268,14 @@ factory receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <k
 
 keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code).
 
+### backup
+
+```
+factory backup (now | list | restore (--id <id> | --date <YYYY-MM-DD>) [--to <dir>] [--force]) [--json]
+```
+
+now: snapshot every state DB to the bucket with a sha256 manifest, then prune past FACTORY_BACKUP_KEEP_DAYS; list: the backups there; restore: check every sha256, then write the files (stop the stack first).
+
 ### install
 
 ```

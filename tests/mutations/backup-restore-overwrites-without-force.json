@@ -1,0 +1,7 @@
+{
+  "name": "backup: restore overwrites without --force",
+  "file": "src/backup.ts",
+  "find": "if (existsSync(target) && !force)",
+  "replace": "if (false)",
+  "test": "tests/backup.test.ts"
+}

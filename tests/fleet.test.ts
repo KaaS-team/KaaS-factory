@@ -51,7 +51,7 @@ function setup(probe: DashboardProject["probe"]) {
 describe("fleet view", () => {
   test("every machine, its tags, slots in use, last heartbeat and current task, in one view", async () => {
     const { dir, leases, settings } = setup(async () => ({ ok: true, ms: 1, detail: "ok" }));
-    leases.acquire("acme/widgets#4", 2);
+    leases.acquire("acme/widgets#4", { repo: "acme/widgets", repoCap: 2, machineSlots: 2 });
     leases.beat({ name: "ci-runner", tags: [], slots: 1, used: 0, tasks: [] }, Date.now() - 10 * 60_000);
     // A poll is the heartbeat: the watcher writes this machine's row before it lists any issue.
     await pollOnce(
@@ -97,7 +97,7 @@ describe("fleet view", () => {
       return { ok: false, ms: 9, detail: `${name}: connection refused` };
     });
     expect((await settings()).slotsInUse).toBe(0);
-    const id = leases.acquire("acme/widgets#7", 3)!;
+    const id = leases.acquire("acme/widgets#7", { repo: "acme/widgets", repoCap: 3, machineSlots: 3 })!;
     const body = await settings();
     expect(body.slotsInUse).toBe(1);
     expect(slotsText(body)).toBe("1 of 3 in use");

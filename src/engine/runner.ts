@@ -29,6 +29,8 @@ import { emitEvent } from "./bus";
 import { readJournal } from "./journal";
 import { lateRoute } from "./late-route";
 import { holdForOverlap } from "../overlap";
+import { guardPlan } from "../plan-guard";
+import { isPlannedBody } from "./import-plan";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
 const PARKED: ReadonlySet<Outcome> = new Set(["needs-info", "needs-human", "awaiting-approval", "failed"]);
@@ -113,6 +115,24 @@ async function walk(
     step = workflow.steps["park" in edge ? edge.approve : edge.to]!;
   }
   if (step.label !== held) await moveLabel(deps, config, issueNumber, held, step.label);
+
+  // A fresh planned run (the issue body or an operator-passed spec) is read before any step runs.
+  if (journal.finished.size === 0 && isPlannedBody(issue.body ?? "")) {
+    const guard = guardPlan(issue.body ?? "", config);
+    if (!guard.ok) {
+      await postComment(
+        deps,
+        config,
+        issueNumber,
+        ["Refused: the planned body is not a plan yet.", "", ...guard.reasons.map((r) => `- ${r}`)].join("\n"),
+        { stage: "plan-guard", json: { ok: false, reasons: guard.reasons } },
+      );
+      return await stopStep(deps, config, issueNumber, step.label, {
+        status: "needs-human",
+        reason: `plan guard: ${guard.reasons.length} reason(s)`,
+      });
+    }
+  }
 
   try {
     for (;;) {
