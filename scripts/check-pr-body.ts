@@ -28,6 +28,15 @@ export function problems(body: string, template: string): string[] {
     if (text === undefined) out.push(`missing section "${name}"`);
     else if (!text.replace(/^Closes #?\s*$/m, "").trim()) out.push(`section "${name}" is empty`);
   }
+  const verdict = (found.get("Verify verdict") ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .trim();
+  if (/^(pending|tbd|todo|na)(\s|$)/.test(verdict) || /^(pass|passed|ok|none)$/.test(verdict)) {
+    out.push('section "Verify verdict" is a placeholder');
+  }
+  const gate = found.get("Gate evidence");
+  if (gate?.trim() && !/```|\d/.test(gate)) out.push('section "Gate evidence" has no output');
   return out;
 }
 

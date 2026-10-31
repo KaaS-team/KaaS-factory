@@ -944,6 +944,9 @@
   {"name": "binary: hooks and gates lose the executable bit", "file": "src/install-template.ts", "find": "if (isExecutable(rel)) chmodSync(dest, 0o755);", "replace": "", "test": "tests/binary.test.ts"},
   {"name": "binary: CI example lands outside workflows", "file": "src/install-template.ts", "find": "const CI_DEST_REL = \".github/workflows/factory.yml.example\";", "replace": "const CI_DEST_REL = \".github/factory.yml.example\";", "test": "tests/binary.test.ts"},
   {"name": "binary release: the tag upload carries SHA256SUMS", "file": ".github/workflows/release-binaries.yml", "find": "sha256sum factory-* > SHA256SUMS", "replace": "ls factory-* > SHA256SUMS", "test": "tests/binary.test.ts"},
+  {"name": "baseline: allow raise without flag", "file": "scripts/gen-quality-baseline.ts", "find": "|| allowRaise ?", "replace": "|| true ?", "test": "tests/gen-quality-baseline.test.ts"},
+  {"name": "pr-body: accept pending verdict", "file": "scripts/check-pr-body.ts", "find": "is a placeholder", "replace": "is a placeholder_", "test": "tests/check-pr-body.test.ts"},
+  {"name": "pr-body: accept gate evidence with no output", "file": "scripts/check-pr-body.ts", "find": "has no output", "replace": "has no output_", "test": "tests/check-pr-body.test.ts"},
   {"name": "anchors: accept zero matches", "file": "scripts/check-mutation-anchors.ts", "find": "!== 1", "replace": "< 0", "test": "tests/check-mutation-anchors.test.ts"},
   {"name": "anchors: skip missing file", "file": "scripts/check-mutation-anchors.ts", "find": "if (text === undefined)", "replace": "if (false)", "test": "tests/check-mutation-anchors.test.ts"},
   {"name": "hooks: never sign off", "file": ".githooks/commit-msg", "find": "printf '\\nSigned-off-by: %s\\n'", "replace": "printf '\\nSigned-off-by-x: %s\\n'", "test": "tests/hooks.test.ts"}
