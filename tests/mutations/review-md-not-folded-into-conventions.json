@@ -1,0 +1,1 @@
+{"name":"review md not folded into conventions","file":"src/context.ts","find":"if (review) out.push(review);","replace":"if (review && false) out.push(review);","test":"tests/review-md.test.ts"}
