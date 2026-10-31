@@ -210,3 +210,17 @@ export function helpText(): string {
     "Humans answer through GitHub: /factory approve|revise <text>|retry|cancel in a trusted issue or PR comment.",
   ].join("\n");
 }
+
+// The agent-facing guide for `factory --skill`: every command with one line, then the flags.
+export function skillText(): string {
+  const first = (s: string) => s.split(";")[0]!.trim();
+  return [
+    "factory: a GitHub-native loop for coding agents. Run `factory <command> --help` for one command's usage.",
+    "",
+    "commands:",
+    ...COMMANDS.map((c) => `  ${c.name}: ${first(c.does)}`),
+    "",
+    "flags:",
+    ...OPTIONS.map(([k, v]) => `  ${k}: ${v}`),
+  ].join("\n");
+}

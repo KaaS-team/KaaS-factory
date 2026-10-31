@@ -1,0 +1,7 @@
+{
+  "name": "cli-reference: check passes on drift",
+  "file": "scripts/gen-cli-reference.ts",
+  "find": "process.exit(1)",
+  "replace": "process.exit(0)",
+  "test": "tests/gen-cli-reference.test.ts"
+}

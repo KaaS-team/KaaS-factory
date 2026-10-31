@@ -47,7 +47,7 @@ import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeov
 import { LABEL } from "./labels";
 import { ensureRepoClone } from "./repo";
 import { daemonPlatform, installDaemon, uninstallDaemon } from "./daemon";
-import { helpText } from "./help";
+import { helpText, skillText } from "./help";
 import { decodeStatement, type Envelope, generateReceiptKey, keyId, RECEIPT_KEY_ENV, verifyEnvelope } from "./receipt";
 import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
@@ -894,9 +894,9 @@ async function cmdReceipt(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  switch (command === "--version" ? "version" : command) {
+  switch (command === "--version" || command === "--skill" ? "version" : command) {
     case "version":
-      return void console.log(RUNNER_VERSION);
+      return void console.log(command === "--skill" ? skillText() : RUNNER_VERSION);
     case "up":
       return flag("repo") || flag("repo-dir") ? cmdUp() : (await import("./deploy/stack")).startStack(cmdDashboard);
     case "init":
