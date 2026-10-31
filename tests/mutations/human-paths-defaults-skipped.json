@@ -1,0 +1,1 @@
+{"name":"human paths defaults skipped","file":"src/human-paths.ts","find":"...new Set<string>([...DEFAULT_HUMAN_PATHS, ...extra])","replace":"...new Set<string>(extra.length > 0 ? extra : DEFAULT_HUMAN_PATHS)","test":"tests/human-paths.test.ts"}

@@ -57,3 +57,8 @@ export function mergeProblems(merge: Record<string, unknown>): string[] {
     ...oneOf("queue", merge.queue, ["factory", "host", "none"]),
   ];
 }
+
+// `review.alwaysHumanPaths`: globs a human always reviews, added to the defaults in src/human-paths.ts.
+export interface ReviewFields {
+  readonly review?: { readonly alwaysHumanPaths?: readonly string[]; readonly maxRounds?: number };
+}

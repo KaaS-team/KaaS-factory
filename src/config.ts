@@ -93,7 +93,7 @@ export interface RouteConfig {
   readonly workflow?: string;
 }
 
-export interface FactoryConfig {
+export interface FactoryConfig extends keys.ReviewFields {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
   readonly postEditCommand: readonly string[]; // argv the post-edit-check hook runs on each build edit; {file} is the path; [] is off
@@ -124,7 +124,7 @@ export interface FactoryConfig {
   // unknown cost, which no dollar sum can hold. A breach parks the issue with a "budget" inbox item.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
-  readonly review: { readonly maxRounds: number }; // failed reviews before a person takes over
+  readonly review: { readonly maxRounds: number; readonly alwaysHumanPaths?: readonly string[] }; // maxRounds: failed reviews before a person takes over
   readonly holdout: HoldoutConfig;
   // The acceptance checker's path in the repo. "" turns the Acceptance table off.
   readonly acceptance: AcceptanceConfig;
@@ -355,10 +355,9 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
   };
 }
 
-// Every key is listed here; the Record type makes tsc fail if FactoryConfig
-// gains a key that is not. `riskCriteria` is never read by the runner (the
-// factory-plan skill reads it). A `_`-prefixed key is a comment. Any other
-// unknown key is a typo that would silently do nothing, so boot refuses it.
+// Every key is listed here; the Record type makes tsc fail if FactoryConfig gains a key that is not.
+// `riskCriteria` is never read by the runner (the factory-plan skill reads it). A `_`-prefixed key is a
+// comment. Any other unknown key is a typo that would silently do nothing, so boot refuses it.
 type Kind = "string" | "posInt" | "positive" | "boolean" | "strings" | "object";
 const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   repo: "string",
@@ -461,7 +460,7 @@ export function configProblems(raw: unknown): string[] {
     retro: "positive",
   });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
-  nested("review", { maxRounds: "posInt" });
+  nested("review", { maxRounds: "posInt", alwaysHumanPaths: "strings" });
   nested("runtime", { gates: "string", check: "string" });
   nested("merge", keys.MERGE_KEYS);
   // policy and autonomy are enums: a typo there would read as the default, which for autonomy

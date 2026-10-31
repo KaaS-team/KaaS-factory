@@ -216,7 +216,13 @@ async function autonomousMerge(
 // rating otherwise. An unrated plan reads as high.
 export function tierInput(auto: MergeContext | undefined, config: FactoryConfig, planRisk: Risk | undefined) {
   const risk: Risk = auto?.facts?.risk.level ?? planRisk ?? "high";
-  return { risk, merge: auto?.merge ?? config.merge, autonomy: auto?.mode, facts: auto?.facts };
+  return {
+    risk,
+    merge: auto?.merge ?? config.merge,
+    autonomy: auto?.mode,
+    facts: auto?.facts,
+    humanPaths: config.review?.alwaysHumanPaths,
+  };
 }
 
 // `post` is set once per head: the audit comment, then the signed record beside it. Under a tier
