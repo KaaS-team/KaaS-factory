@@ -36,6 +36,10 @@ function withHooks(root: string): void {
   git(root, "config", "core.hooksPath", join(REPO, ".githooks"));
 }
 
+function prePush(): string {
+  return JSON.parse(readFileSync(join(REPO, ".agents/repo.json"), "utf8")).prePush;
+}
+
 function signoffs(root: string): string[] {
   return git(root, "log", "-1", "--format=%B")
     .out.split("\n")
@@ -59,10 +63,17 @@ describe("commit-msg", () => {
 });
 
 describe("pre-push", () => {
-  test("the script runs the DCO check and biome", () => {
-    const text = readFileSync(join(REPO, ".githooks/pre-push"), "utf8");
-    expect(text).toContain("bun scripts/dco.ts");
-    expect(text).toContain("bun x biome ci .");
+  test("repo.json prePush runs the DCO check and biome", () => {
+    expect(prePush()).toContain("bun scripts/dco.ts");
+    expect(prePush()).toContain("bun x biome ci .");
+  });
+
+  test("the hook is the kit stub, byte for byte", () => {
+    expect(readFileSync(join(REPO, ".githooks/pre-push"), "utf8")).toBe(
+      "#!/bin/sh\n" +
+        "# Written by the kaas kit (scripts/sync-vendored.py); the gate is scripts/kaas/pre-push.sh.\n" +
+        'exec scripts/kaas/pre-push.sh "$@"\n',
+    );
   });
 
   test("a push of an unsigned commit is refused", () => {
@@ -73,6 +84,11 @@ describe("pre-push", () => {
     mkdirSync(join(root, "scripts/kaas"), { recursive: true });
     copyFileSync(join(REPO, "scripts/dco.ts"), join(root, "scripts/dco.ts"));
     copyFileSync(join(REPO, "scripts/kaas/pre-push.sh"), join(root, "scripts/kaas/pre-push.sh"));
+    copyFileSync(join(REPO, "scripts/kaas/check-repo.py"), join(root, "scripts/kaas/check-repo.py"));
+    // The audit and the gate are not under test here: stub them, and keep the real prePush command.
+    writeFileSync(join(root, "scripts/kaas/check-affected.py"), "");
+    mkdirSync(join(root, ".agents"));
+    writeFileSync(join(root, ".agents/repo.json"), JSON.stringify({ prePush: prePush() }));
     git(root, "remote", "add", "origin", remote);
     writeFileSync(join(root, "a"), "1");
     git(root, "add", "-A");
