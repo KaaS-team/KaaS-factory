@@ -1,0 +1,7 @@
+{
+  "name": "shared files: an excuse without a reason passes",
+  "file": "src/shared-files.ts",
+  "find": "m[2]!.trim()",
+  "replace": "true",
+  "test": "tests/shared-files.test.ts"
+}
