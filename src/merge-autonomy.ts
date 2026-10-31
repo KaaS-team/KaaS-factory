@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { readStageArtifacts, runDir } from "./artifacts";
 import { type Autonomy, webMode } from "./autonomy";
 import type { FactoryConfig, MergeConfig } from "./config";
+import { followUpIssue } from "./escaped-defect";
 import { attemptMerge, type ChangedFile, type MergeDecision, renderAuditComment } from "./merge-policy";
 import { DirLease, type Lease, serialMerge } from "./merge-queue";
 import { changeFailureRate, revertBranch, tightenThresholds, watchAfterMerge } from "./post-merge";
@@ -126,7 +127,7 @@ function refusedPushComment(err: GitRefused): string {
 }
 
 export interface AutonomousMergeDeps {
-  readonly github: Pick<ScmPort, "mergePr" | "createPr">;
+  readonly github: Pick<ScmPort, "mergePr" | "createPr" | "createIssue">;
   readonly state: History;
   readonly lease?: Lease;
   readonly rebase?: () => Promise<string>;
@@ -196,6 +197,10 @@ async function autonomousMerge(
             title: `Revert #${run.pr}`,
             body: `${why} (${sha}).`,
           });
+        },
+        openFollowUp: async (sha, why, revertUrl) => {
+          const f = followUpIssue({ kind: "revert", ref: `#${run.pr}`, why, sha, link: revertUrl });
+          await deps.github.createIssue(config.repo, f.title, f.body, []);
         },
       });
       rememberMerge(deps.state, config.repo, !watched.ok);

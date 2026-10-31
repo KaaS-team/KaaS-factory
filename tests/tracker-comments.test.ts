@@ -33,6 +33,10 @@ const WRITERS: Record<string, { sites: number; driver: string } | { sites: numbe
   "inbox.ts": { sites: 1, echoes: "act posts the /factory command an operator typed" },
   "reset.ts": { sites: 1, echoes: "reset re-files the seed issues the repo itself holds" },
   "scan.ts": { sites: 1, echoes: "scan files the audit tool's own finding text" },
+  "merge-autonomy.ts": {
+    sites: 1,
+    echoes: "the escaped-defect issue states the sha, the smoke failure and the revert link",
+  },
   "mcp-server.ts": { sites: 1, echoes: "start_task files the title and body its MCP caller wrote" },
   "integrations/steer.ts": { sites: 1, echoes: "a board's new task files the title and body its sender wrote" },
 };
