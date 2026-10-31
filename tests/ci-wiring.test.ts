@@ -13,4 +13,9 @@ describe("ci wiring", () => {
   test("scripts/flake-report.ts is run by flakes.yml", () => {
     expect(runs("scripts/flake-report.ts", [".github/workflows/flakes.yml", "ci/flakes.yml"])).toBe(true);
   });
+
+  test("make check lists check-baseline", () => {
+    const makefile = readFileSync("Makefile", "utf8");
+    expect(makefile).toMatch(/^check:.*\bcheck-baseline\b/m);
+  });
 });

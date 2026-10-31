@@ -943,5 +943,6 @@
   {"name": "binary: init skips the template install", "file": "src/init-cli.ts", "find": "if (!existsSync(join(dir, \".factory\", \"gates.sh\")) && !dry) runInstall(dir, cli);", "replace": "if (false) runInstall(dir, cli);", "test": "tests/binary.test.ts"},
   {"name": "binary: hooks and gates lose the executable bit", "file": "src/install-template.ts", "find": "if (isExecutable(rel)) chmodSync(dest, 0o755);", "replace": "", "test": "tests/binary.test.ts"},
   {"name": "binary: CI example lands outside workflows", "file": "src/install-template.ts", "find": "const CI_DEST_REL = \".github/workflows/factory.yml.example\";", "replace": "const CI_DEST_REL = \".github/factory.yml.example\";", "test": "tests/binary.test.ts"},
-  {"name": "binary release: the tag upload carries SHA256SUMS", "file": ".github/workflows/release-binaries.yml", "find": "sha256sum factory-* > SHA256SUMS", "replace": "ls factory-* > SHA256SUMS", "test": "tests/binary.test.ts"}
+  {"name": "binary release: the tag upload carries SHA256SUMS", "file": ".github/workflows/release-binaries.yml", "find": "sha256sum factory-* > SHA256SUMS", "replace": "ls factory-* > SHA256SUMS", "test": "tests/binary.test.ts"},
+  {"name": "baseline: allow raise without flag", "file": "scripts/gen-quality-baseline.ts", "find": "|| allowRaise ?", "replace": "|| true ?", "test": "tests/gen-quality-baseline.test.ts"}
 ]
