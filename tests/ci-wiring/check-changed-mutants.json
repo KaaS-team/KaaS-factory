@@ -1,0 +1,1 @@
+{"scripts":["scripts/check-changed-mutants.ts","scripts/selector-misses.ts"],"workflows":[".github/workflows/mutations.yml","ci/mutations.yml"]}

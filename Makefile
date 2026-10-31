@@ -1,4 +1,5 @@
 .PHONY: agent-matrix install check check-anchors check-baseline check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks
+include $(wildcard make/*.mk)
 
 install:
 	bun install
@@ -10,7 +11,7 @@ hooks:
 # make check = lint (biome, and rustfmt plus clippy on verify/ and relay/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
 # check did not ship (see the kaas-eng plugin's engineering.md, Rule 0).
-check: lint typecheck test skills-check check-anchors check-baseline
+check: lint typecheck test skills-check check-anchors check-baseline $(CHECK_EXTRA)
 	@echo "make check: ok"
 
 # reuse lint checks every file's licence against REUSE.toml (tests/licensing.test.ts checks what it says).
