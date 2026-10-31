@@ -2,6 +2,7 @@
 // process tree. The image runs exactly this (docker-compose.yml), so a laptop and factory.kaas.team match.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { startBackups } from "../backup";
 import { blobStoreFromEnv, mirrorDown } from "../blobs";
 import { factoryHome } from "../paths";
 
@@ -88,5 +89,6 @@ export async function startStack(plane: () => Promise<void>, env: NodeJS.Process
     void tick();
     setInterval(tick, MIRROR_EVERY_MS);
   }
+  startBackups(env);
   await plane();
 }
