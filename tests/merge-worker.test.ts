@@ -21,6 +21,7 @@ const ident = {
 const out = (p: ReturnType<typeof git>) => p.stdout.toString().trim();
 
 function setup(file: string) {
+  mkdirSync(tmpdir(), { recursive: true }); // the preload removes the root after each rerun
   const root = mkdtempSync(join(tmpdir(), "mw-"));
   const origin = join(root, "origin.git");
   const work = join(root, "work");

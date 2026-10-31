@@ -14,6 +14,7 @@ const git = (cwd: string, ...a: string[]) =>
   });
 
 function conflicted(file: string): string {
+  mkdirSync(tmpdir(), { recursive: true }); // the preload removes the root after each rerun
   const dir = mkdtempSync(join(tmpdir(), "mr-"));
   git(dir, "init", "-q", "-b", "main");
   const put = (text: string) => {
