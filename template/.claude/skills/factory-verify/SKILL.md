@@ -15,8 +15,9 @@ the runner posts the verdict and moves the issue's label.
 - `gate.json` and `proof.json` in the same directory: what the runner
   measured on this tree. Do not re-run the gates; the runner refuses a red one
   before verify. Holdout tests are the runner's too: never read their paths.
-- The worktree at its current state. Write `"rounds": 1`; the runner
-  counts verify rounds itself and replaces the value.
+- `prior-findings.json` (last reject's findings) and `operator-answers.md`, when present.
+  List each prior finding in `verdict.json` as `"prior": [{ "what": "...", "status": "resolved" }]` (`resolved` or `open`).
+- The worktree at its current state. Write `"rounds": 1`; the runner replaces it.
 
 ## 2. UI route: the visual check
 
@@ -29,13 +30,12 @@ The runner has run the revert check and the gate on this tree. Read
 `.factory/runs/issue-<N>/proof.json` and quote `gate.json`'s `line`:
 - `bites`: the new tests failed with the change reverted. Confirm from
   `tail` that they failed for the stated reason, not a compile error.
-- `passes-without`: the tests pass without the change, so prove nothing: reject.
+- `passes-without` or `compile-only`: no test shows what the change does: reject.
 - `no-tests`, `skipped`, `unavailable`, or no file: read
   `.claude/skills/factory-verify/references/prove.md` and prove it yourself.
 
 An AC like "removing X makes the tests fail" is a mutation: run it with
 .factory/mutate.sh on a copy as prove.md says, never by editing the worktree.
-
 Every AC needs a command you ran or the proof's output as evidence; a
 crossed NG-n is a reject. When uncertain, the verdict is `uncertain`; a
 refused command is not uncertainty.
@@ -67,7 +67,7 @@ Use `factory-comment`'s `verdict.md` template for
 `.factory/runs/issue-<N>/verdict-comment.md`: per-AC pass/fail with the
 evidence command and result, the test-that-bites (name, failing output on
 the base branch, passing output here), reviewer findings verbatim, a summary of
-non-goals respected, and (on reject) which round this is.
+non-goals respected. Leave out the `## Verdict` heading and the round; the runner writes both.
 
 Then write `.factory/runs/issue-<N>/verdict.json`:
 
@@ -89,6 +89,4 @@ the runner also refuses an unknown finding or criterion field. The file must be 
 under 16 KiB.
 
 Set `outcome` to `blocked` (with a `summary`) only if you could not review at
-all. `result` is `pass`, `reject`, or `uncertain`; `findings` is the
-reviewer's list verbatim plus any from step 2 (empty array if none); the
-retry and escalation rules are step 4's, not repeated here.
+all. `findings` is the reviewer's list verbatim plus any from step 2 (empty array if none).

@@ -1,0 +1,7 @@
+{
+  "name": "backup: restore skips the sha check",
+  "file": "src/backup.ts",
+  "find": "if (sha256Hex(bytes) !== f.sha256)",
+  "replace": "if (false)",
+  "test": "tests/backup.test.ts"
+}

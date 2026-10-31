@@ -91,6 +91,7 @@ describe("check-tests-only fixtures", () => {
       "src/contest.py",
       "tests/fixtures/x/a.diff",
       "tests/mutations.json",
+      "tests/mutations/a.json",
     ])
       expect(isTestFile(p)).toBe(false);
   });

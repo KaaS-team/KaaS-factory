@@ -1,23 +1,15 @@
-// make check-mutations: every check must bite. Each entry in tests/mutations.json
-// breaks one thing in a temp copy of the repo; the named test must then fail.
+// make check-mutations: every check must bite. Each entry, in tests/mutations.json or its own
+// file under tests/mutations/, breaks one thing in a temp copy of the repo; the named test must then fail.
 // A mutation that leaves the test green names a check that guards nothing.
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, join } from "node:path";
+import { type Mutation, loadMutations } from "./mutation-list";
 import { selectMutations } from "./mutation-select";
 import { copyRepo, ROOT } from "./repo-copy";
 
-interface Mutation {
-  readonly name: string;
-  readonly file: string;
-  readonly find: string;
-  readonly replace: string;
-  readonly test: string;
-  readonly inputs?: readonly string[];
-}
-
-const mutations: Mutation[] = JSON.parse(readFileSync(join(ROOT, "tests", "mutations.json"), "utf8"));
+const mutations = loadMutations(ROOT);
 const args = process.argv.slice(2);
 const flagValue = (flag: string) => (args.indexOf(flag) >= 0 ? args[args.indexOf(flag) + 1] : undefined);
 const base = flagValue("--base");
@@ -66,8 +58,6 @@ async function check(dir: string, m: Mutation): Promise<string | undefined> {
   }
 }
 
-const dupe = mutations.find((m, i) => mutations.findIndex((n) => n.name === m.name) !== i);
-if (dupe) throw new Error(`tests/mutations.json names "${dupe.name}" twice`);
 let selected = only ? mutations.filter((m) => m.name === only) : mutations;
 if (base) {
   const diff = Bun.spawnSync(["git", "diff", "--name-only", `${base}...HEAD`], { cwd: ROOT });
@@ -80,7 +70,7 @@ if (base) {
     process.exit(0);
   }
 }
-if (selected.length === 0) throw new Error(only ? `no mutation named "${only}"` : "tests/mutations.json is empty");
+if (selected.length === 0) throw new Error(only ? `no mutation named "${only}"` : "the mutation list is empty");
 const failures: string[] = [];
 const failedNames: string[] = [];
 const queue = [...selected];

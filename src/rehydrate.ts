@@ -4,6 +4,8 @@
 // wiped) still has every earlier stage's artifact available. This is what
 // makes an issue resumable from any machine (plan section "Core refactor").
 
+import { existsSync } from "node:fs";
+import { isHumanComment, parseChatOps } from "./chatops";
 import { runDir, COMMENT_FILENAMES, JSON_FILENAMES, type ArtifactStage } from "./artifacts";
 import { parseDataMarkers } from "./derive";
 import type { GhComment, GhIssue } from "./github";
@@ -47,4 +49,22 @@ export async function rehydrate(worktree: string, issue: GhIssue): Promise<void>
     const comment = findComment(issue.comments, needle);
     if (comment) await Bun.write(`${dir}/${COMMENT_FILENAMES[stage]}`, stripDataMarker(comment.body));
   }
+
+  const lastVerdict = [...markers]
+    .reverse()
+    .find((m) => m.stage === "verify" && (m.json as { result?: unknown } | undefined)?.result);
+  const last = lastVerdict?.json as
+    | { result?: string; findings?: (string | { severity?: string; what?: string })[] }
+    | undefined;
+  if (last?.result === "reject") {
+    const prior = (last.findings ?? []).flatMap((f) =>
+      typeof f === "string" ? [f] : f.severity === "must" && f.what ? [f.what] : [],
+    );
+    const priorPath = `${dir}/prior-findings.json`;
+    if (prior.length > 0 && !existsSync(priorPath)) await Bun.write(priorPath, JSON.stringify(prior, null, 2));
+  }
+  const answers = issue.comments
+    .filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "answer")
+    .map((c) => c.body.trim());
+  if (answers.length > 0) await Bun.write(`${dir}/operator-answers.md`, `${answers.join("\n\n---\n\n")}\n`);
 }

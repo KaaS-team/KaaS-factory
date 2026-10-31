@@ -1,5 +1,4 @@
 <!-- factory:verdict v1 -->
-## Verdict: {{pass|reject|uncertain}}
 
 ### Acceptance criteria evidence
 {{#each ac}}
@@ -21,9 +20,6 @@ None.
 ### Non-goals respected
 {{ng_respected_summary}}
 
-{{#if reject}}
-Sending back to build (round {{round}} of 2) with the findings above.
-{{/if}}
 {{#if uncertain}}
 Uncertain: flagging for a human rather than guessing.
 {{/if}}

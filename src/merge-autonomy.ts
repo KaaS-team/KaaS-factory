@@ -10,6 +10,7 @@ import type { FactoryConfig, MergeConfig } from "./config";
 import { followUpIssue } from "./escaped-defect";
 import { attemptMerge, type ChangedFile, type MergeDecision, renderAuditComment } from "./merge-policy";
 import { DirLease, type Lease, serialMerge } from "./merge-queue";
+import { syncRebase } from "./rebase-sync";
 import { changeFailureRate, revertBranch, tightenThresholds, watchAfterMerge } from "./post-merge";
 import { type PrFacts, mergeRecord, withMerge } from "./pr-facts";
 import { readVerifyFacts } from "./pr-facts-collect";
@@ -111,6 +112,7 @@ export async function rebaseOnBase(worktree: string, base: string, branch: strin
   await git(worktree, "fetch", "--quiet", "origin", base);
   const before = await git(worktree, "rev-parse", "HEAD");
   await git(worktree, "rebase", `origin/${base}`).catch(async (err) => {
+    if (await syncRebase(worktree)) return;
     await git(worktree, "rebase", "--abort").catch(() => undefined);
     throw err;
   });

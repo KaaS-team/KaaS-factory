@@ -14,6 +14,8 @@ const RUNNER_CONFIG = [
   /^tests\/mutations\.json$/,
 ];
 
+const SHARD = /^tests\/mutations\/[^/]+\.json$/;
+
 export const SKIP = [
   /\b(test|it|describe)\.(skip|only|todo|failing)\s*\(/,
   /\b(xit|xdescribe|xtest)\s*\(/,
@@ -56,6 +58,7 @@ export function tamperHits(diff: string): string[] {
   for (const f of parseDiff(diff)) {
     const test = isTestPath(f.path);
     if (RUNNER_CONFIG.some((re) => re.test(f.path))) hits.push(`${f.path}: runner config changed`);
+    if (SHARD.test(f.path) && !f.deleted && f.removed.length) hits.push(`${f.path}: mutation entry changed`);
     if (test && f.deleted) hits.push(`${f.path}: test file deleted`);
     if (f.added.some((l) => SKIP.some((re) => re.test(l)))) hits.push(`${f.path}: adds a skip marker`);
     if ((test || f.path.endsWith(".sh")) && f.added.some((l) => FORCED_PASS.some((re) => re.test(l))))
