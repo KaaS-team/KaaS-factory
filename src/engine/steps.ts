@@ -51,7 +51,7 @@ import {
   renderTaskTable,
   scopeOf,
 } from "./epic";
-import { issueRef, postRunDetails, prBody, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
+import { issueRef, postRunDetails, prBody, prExtras, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
@@ -485,8 +485,7 @@ const pr: StepType = {
     if (unshipped) return stop(await failStage(deps, config, issue, sc.step.label, "pr", unshipped));
     await runStage(deps, config, issue, "pr", worktree, stepOpts(sc.step));
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
-    // A revise from in-review re-enters here with the PR already open;
-    // the push in build already updated its branch.
+    // A revise from in-review re-enters here with the PR open; build's push updated its branch.
     const head = deps.git.branchName(issueNumber);
     const receipt = await renderRunDetails(deps.setupRunner ?? new ShellSetupRunner(), {
       worktree,
@@ -535,6 +534,7 @@ const pr: StepType = {
           ),
           closes: config.tracker.kind === "github" && children.length ? closingLine(issueNumber, children) : undefined,
           template: prTemplate(worktree),
+          ...(await prExtras(worktree, config, issueNumber, await deps.git.changedFiles(worktree, config.base))),
         }),
         draft: true,
       }));

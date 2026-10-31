@@ -15,7 +15,7 @@ import { healFindings } from "./healer";
 import { tamperHits } from "./tamper";
 
 export const PR_FACTS_FILE = "pr-facts.json";
-export type VerifyFacts = Pick<PrFacts, "cleanRoom" | "changedLines" | "tamper" | "supplyChain" | "review">;
+export type VerifyFacts = Pick<PrFacts, "cleanRoom" | "changedLines" | "tamper" | "supplyChain" | "review" | "docs">;
 
 async function sh(cwd: string, cmd: string[]): Promise<{ code: number; out: string }> {
   const p = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "ignore" });

@@ -1331,6 +1331,36 @@
       }
     },
     {
+      "id": "plan-share",
+      "phase": "P10",
+      "ask": "Plan stage spend stays under 25% of all stage spend over the last 20 finished runs",
+      "source": "issue #213, R8",
+      "owner": "agent",
+      "proof": {
+        "probe": "scripts/probes/metrics.sh"
+      }
+    },
+    {
+      "id": "rejects-per-run",
+      "phase": "P10",
+      "ask": "Verify rejects stay under 0.5 per run over the last 20 finished runs",
+      "source": "issue #213, R8",
+      "owner": "agent",
+      "proof": {
+        "probe": "scripts/probes/metrics.sh"
+      }
+    },
+    {
+      "id": "cost-per-shipped",
+      "phase": "P10",
+      "ask": "Spend per merged run stays under $1.50 over the last 20 finished runs",
+      "source": "issue #213, R8",
+      "owner": "agent",
+      "proof": {
+        "probe": "scripts/probes/metrics.sh"
+      }
+    },
+    {
       "id": "cron-dedupe",
       "phase": "P5",
       "ask": "Cron dedupe through GitHub: two watchers could each still file one scheduled issue.",
