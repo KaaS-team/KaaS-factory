@@ -1,7 +1,7 @@
 // The P6 pieces of the plan and verify steps, kept out of steps.ts: the plan's risk floor, the
 // monorepo proof command, and the PR facts a tiered merge reads.
 import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   BLOCKING_CONFIDENCE,
@@ -16,6 +16,7 @@ import { type FactoryConfig, testGate } from "../config";
 import type { GhIssue } from "../github";
 import { issueType } from "../labels";
 import { collectVerifyFacts, readVerifyFacts, writeVerifyFacts } from "../pr-facts-collect";
+import { boundaryGlobs, docsMissing } from "../docs-check";
 import { recordPromotion } from "../promotion";
 import { isChecked } from "../recheck";
 import { crossModel } from "../review-models";
@@ -122,7 +123,19 @@ export async function recordVerifyFacts(
       encoding: "utf8",
       maxBuffer: 1 << 28,
     });
-    await writeVerifyFacts(worktree, issue, { ...facts, tamper: [...facts.tamper, ...skipRiseHits(diff)] });
+    const charter = join(worktree, ".factory/charter.md");
+    const globs = existsSync(charter) ? boundaryGlobs(readFileSync(charter, "utf8")) : [];
+    const names = execFileSync("git", ["diff", "--name-only", `origin/${config.base}...HEAD`], {
+      cwd: worktree,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(Boolean);
+    await writeVerifyFacts(worktree, issue, {
+      ...facts,
+      tamper: [...facts.tamper, ...skipRiseHits(diff)],
+      ...(globs.length ? { docs: { missing: docsMissing(names, globs) } } : {}),
+    });
   } catch (err) {
     console.error(`verify facts for #${issue} were not collected:`, err);
   }

@@ -36,6 +36,8 @@ export interface PrFacts {
     readonly unreviewedDiffs: number;
     readonly qaSpec: boolean;
   };
+  // Boundary paths changed with no decision record (src/docs-check.ts); absent when the charter has no Boundaries.
+  readonly docs?: { readonly missing: readonly string[] };
   // 10. a post-merge watch is armed (src/post-merge.ts)
   readonly postMergeWatch: boolean;
 }
@@ -54,6 +56,8 @@ export function factRefusals(facts: PrFacts, mode: Autonomy): MergeRefusal[] {
   if (!facts.changedLines) out.push(fail(2, "changed-line mutants did not run"));
   else if (facts.changedLines.survived.length)
     out.push(fail(2, `mutants survived: ${facts.changedLines.survived.join(", ")}`));
+  if (facts.docs?.missing.length)
+    out.push(fail(2, `boundary changed with no decision record in docs/decisions/: ${facts.docs.missing.join(", ")}`));
   if (facts.tamper.length) out.push(fail(2, `the diff weakens the proof: ${facts.tamper.join(", ")}`));
   const s = facts.supplyChain;
   if (!s) out.push(fail(4, "the supply-chain scan did not run"));

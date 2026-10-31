@@ -9,6 +9,8 @@ import type { FactoryConfig } from "../config";
 import type { ExecutionPort } from "../ports/execution";
 import type { ProofResult } from "../proof";
 import { missingReceipt, renderReceipt, writeRunReceipt, type RunReceiptOptions } from "../receipt";
+import { qaSection, readQa, type Qa } from "../qa";
+import { publishShots, runGit, shotsSection, type ShotUrls } from "../assets-branch";
 import type { WatchDeps } from "./common";
 
 const RUN_DETAILS_MARKER = "<!-- factory:run-details -->";
@@ -73,6 +75,9 @@ export interface PrParts {
   readonly runDetails?: string;
   // The target repo's PR template; given, a body CI would refuse throws instead of being opened.
   readonly template?: string;
+  // The QA step's qa.json, and a UI change's before and after URLs; each renders only when given.
+  readonly qa?: Qa;
+  readonly shots?: readonly ShotUrls[];
 }
 
 // `#n` links on GitHub; a PR body must not carry it for another tracker, whose n is not a GitHub issue.
@@ -92,6 +97,10 @@ function assemble(body: string, parts: PrParts): string {
   if (parts.tasks) body = `${parts.tasks}\n\n${body}`;
   if (parts.whatChanged) body = `${parts.whatChanged}\n\n${body}`;
   if (parts.acceptance) body = `${body}\n\n${parts.acceptance}`;
+  const out: string[] = [];
+  if (parts.qa) out.push(qaSection(parts.qa));
+  if (parts.shots?.length) out.push(shotsSection(parts.shots));
+  if (out.length) body = `${body}\n\n${out.join("\n\n")}`;
   if (parts.closes) body = `${body}\n\n${parts.closes}`;
   if (parts.runDetails) body = `${body}\n\nThe receipt is in the run-details comment on ${parts.runDetails}.`;
   return body;
@@ -106,4 +115,17 @@ export function checkedPrBody(body: string, template: string | undefined): strin
   const found = template === undefined ? [] : problems(body, template);
   if (found.length) throw new Error(`the PR body does not follow the template:\n- ${found.join("\n- ")}`);
   return body;
+}
+
+// The QA result and a UI change's pushed screenshots, for the PR body's optional sections.
+export async function prExtras(
+  worktree: string,
+  config: Pick<FactoryConfig, "repo">,
+  issue: number,
+  changed: readonly string[],
+): Promise<Pick<PrParts, "qa" | "shots">> {
+  return {
+    qa: readQa(worktree, issue),
+    shots: await publishShots(runGit, worktree, { repo: config.repo, issue, changed }),
+  };
 }
