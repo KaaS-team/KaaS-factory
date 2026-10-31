@@ -55,7 +55,7 @@ import { issueRef, postRunDetails, prBody, renderRunDetails, renderWhatChanged }
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
-import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
+import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
 import {
   failureTail,
   finish,
@@ -302,6 +302,19 @@ const build: StepType = {
   },
 };
 
+// A check the build failed is the build's to fix: send it back, or past the reject limit hand it to a person.
+async function rejectToBuild(sc: StepCtx, body: string, json: object, why: string): Promise<StepResult> {
+  const { deps, config, issue, ctx, step } = sc;
+  ctx.rejectRound += 1;
+  ctx.failure = failureTail(body);
+  await postComment(deps, config, issue.number, body, { stage: "verify", json });
+  if (ctx.rejectRound <= sc.workflow.limits.rejects) return { kind: "reject" };
+  await moveLabel(deps, config, issue.number, step.label, LABEL.needsHuman);
+  await runRetro(deps, config, issue, "gave-up");
+  finish(deps, config, issue.number, "needs-human", `${why} ${ctx.rejectRound} times`);
+  return stop("needs-human");
+}
+
 const verify: StepType = {
   agent: true,
   rejects: true,
@@ -350,24 +363,11 @@ const verify: StepType = {
         `${worktree}/${runDir(issueNumber)}/holdout.json`,
         `${JSON.stringify({ ok: holdout.ok, cmd: config.holdout.cmd, tail: holdout.detail }, null, 2)}\n`,
       );
-      if (!holdout.ok) {
-        ctx.rejectRound += 1;
-        ctx.failure = failureTail(`Holdout tests failed:\n${holdout.detail}`);
-        await postComment(deps, config, issueNumber, `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``, {
-          stage: "verify",
-          json: { holdout: holdout.detail },
-        });
-        if (ctx.rejectRound > maxRejects) {
-          await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
-          await runRetro(deps, config, issue, "gave-up");
-          finish(deps, config, issueNumber, "needs-human", `holdout tests failed ${ctx.rejectRound} times`);
-          return stop("needs-human");
-        }
-        return { kind: "reject" };
-      }
+      const failed = `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``;
+      if (!holdout.ok) return rejectToBuild(sc, failed, { holdout: holdout.detail }, "holdout tests failed");
     }
     if (deps.proofGit) {
-      const { planProof, testCmd } = await proofInputs(deps.proofGit, worktree, config, issueNumber);
+      const { planProof, testCmd, mutations } = await proofInputs(deps.proofGit, worktree, config, issueNumber);
       let proof: ProofResult;
       try {
         proof = await runProof(deps.proofGit, worktree, config.base, planProof, testCmd);
@@ -382,6 +382,10 @@ const verify: StepType = {
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
       await recordVerifyFacts(worktree, config, issueNumber, testCmd, proof);
+      const survived = await survivingMutations(deps.proofGit, worktree, config, mutations);
+      const found = survived && { survivingMutations: survived.names };
+      if (survived?.reject) return rejectToBuild(sc, survived.body, found!, "plan mutations survived");
+      if (survived) await postComment(deps, config, issueNumber, survived.body, { stage: "verify", json: found });
     }
     const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
     if (acceptance)
@@ -397,16 +401,7 @@ const verify: StepType = {
       acceptance && planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json"));
     if (ownAcceptance && !acceptanceProven(ownAcceptance)) {
       const table = renderAcceptanceTable(ownAcceptance);
-      ctx.rejectRound += 1;
-      ctx.failure = failureTail(table);
-      await postComment(deps, config, issueNumber, table, { stage: "verify", json: { acceptance: ownAcceptance } });
-      if (ctx.rejectRound > maxRejects) {
-        await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
-        await runRetro(deps, config, issue, "gave-up");
-        finish(deps, config, issueNumber, "needs-human", `acceptance not proven ${ctx.rejectRound} times`);
-        return stop("needs-human");
-      }
-      return { kind: "reject" };
+      return rejectToBuild(sc, table, { acceptance: ownAcceptance }, "acceptance not proven");
     }
     const result = await runStage(deps, config, issue, "verify", worktree, stepOpts(step));
     const art = await readStageArtifacts(worktree, issueNumber, "verify");

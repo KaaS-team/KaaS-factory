@@ -15,7 +15,12 @@ afterAll(() => {
   removeEngineDirs();
 });
 
-const fixture = () => Bun.file(`${import.meta.dir}/fixtures/planned-issue.md`).text();
+// Padded past the plan guard's size floor, which a run checks before any step.
+const fixture = async () =>
+  (await Bun.file(`${import.meta.dir}/fixtures/planned-issue.md`).text()).replace(
+    "## Why\n",
+    `## Why\n${"Resume work at the failed stage. ".repeat(30)}\n`,
+  );
 const planOf = async (edit = (s: string) => s) => parsePlannedIssue(edit(await fixture())).plan!;
 const tree = (files: Record<string, string>) => {
   const root = mkdtempSync(join(tmpdir(), "factory-import-"));
@@ -117,7 +122,7 @@ describe("planned-to-pr", () => {
       .get(1)!
       .comments.map((c) => c.body)
       .join("\n");
-    expect(text).toContain("Planned issue refused");
+    expect(text).toContain("Refused: the planned body is not a plan yet.");
     expect(text).toContain("AC-2 maps to T9");
   });
 });
