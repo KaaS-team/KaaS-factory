@@ -53,9 +53,17 @@ function exec(stdout: string, code = 0): ExecutionPort & { cmds: string[] } {
   };
 }
 
-function withScript(): string {
+// The shared temp parent can be gone on a --rerun-each pass, so each test makes its own path first.
+function freshDir(): string {
+  mkdirSync(tmpdir(), { recursive: true });
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(tmpdir(), "acceptance-"));
   dirs.push(d);
+  return d;
+}
+
+function withScript(): string {
+  const d = freshDir();
   mkdirSync(join(d, "scripts/kaas"), { recursive: true });
   writeFileSync(join(d, ACCEPTANCE_SCRIPT), "");
   return d;
@@ -118,6 +126,7 @@ describe("planAcceptance", () => {
 
 describe("runAcceptance", () => {
   test("a repo without the kit script gets no table", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const d = mkdtempSync(join(tmpdir(), "acceptance-"));
     dirs.push(d);
     const e = exec("{}");
@@ -129,6 +138,21 @@ describe("runAcceptance", () => {
     const e = exec(JSON.stringify(fixture));
     expect(await runAcceptance(e, withScript(), "main")).toEqual(fixture);
     expect(e.cmds).toEqual([`python3 ${ACCEPTANCE_SCRIPT} --json --base 'origin/main'`]);
+  });
+
+  test("a custom script path is the one executed", async () => {
+    const d = freshDir();
+    mkdirSync(join(d, "ci"), { recursive: true });
+    writeFileSync(join(d, "ci/accept.py"), "");
+    const e = exec(JSON.stringify(fixture));
+    expect(await runAcceptance(e, d, "main", "ci/accept.py")).toEqual(fixture);
+    expect(e.cmds).toEqual(["python3 ci/accept.py --json --base 'origin/main'"]);
+  });
+
+  test("an empty script runs nothing even when the kit script exists", async () => {
+    const e = exec(JSON.stringify(fixture));
+    expect(await runAcceptance(e, withScript(), "main", "")).toBeUndefined();
+    expect(e.cmds).toEqual([]);
   });
 
   test("a crash with no JSON becomes a problem in the table, not a missing table", async () => {
@@ -197,7 +221,9 @@ describe("an unproven acceptance verdict rejects verify", () => {
   // Drives one issue from ready to a shipped PR, check-acceptance.py answering with each verdict in turn.
   async function ship(verdicts: AcceptanceVerdict[], plan: Record<string, unknown>, changed: string[] = []) {
     const n = 1;
+    mkdirSync(tmpdir(), { recursive: true });
     const workspacesDir = mkdtempSync(join(tmpdir(), "factory-accept-ws-"));
+    mkdirSync(tmpdir(), { recursive: true });
     const cloneDir = mkdtempSync(join(tmpdir(), "factory-accept-clone-"));
     dirs2.push(workspacesDir, cloneDir);
     mkdirSync(join(workspacesDir, `issue-${n}`, "scripts/kaas"), { recursive: true });
@@ -345,6 +371,7 @@ describe("an unproven acceptance verdict rejects verify", () => {
 });
 
 test("the stage's agent is handed the hidden paths, for guard-paths.sh", async () => {
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(tmpdir(), "acceptance-env-"));
   dirs.push(d);
   mkdirSync(join(d, ".claude/skills/factory-plan"), { recursive: true });

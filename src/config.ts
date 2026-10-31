@@ -126,6 +126,8 @@ export interface FactoryConfig {
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
   readonly holdout: HoldoutConfig;
+  // The acceptance checker's path in the repo. "" turns the Acceptance table off.
+  readonly acceptance: AcceptanceConfig;
   // One tmux window per issue in flight, tailing its transcript (`factory attach`).
   readonly tmux: TmuxConfig;
   // No longer read: the "Factory run" table never reaches the PR body or the customer-visible issue thread.
@@ -287,6 +289,10 @@ export interface HoldoutConfig {
   readonly cmd: string;
 }
 
+export interface AcceptanceConfig {
+  readonly script: string;
+}
+
 export function holdoutEnabled(holdout: HoldoutConfig): boolean {
   return holdout.cmd !== "";
 }
@@ -314,6 +320,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   spend: {},
   merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
   holdout: { paths: [], cmd: "" },
+  acceptance: { script: "scripts/kaas/check-acceptance.py" },
   tmux: { enabled: false, session: "factory" },
   prRunSummary: true,
   templateOverrides: [],
@@ -339,6 +346,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
     merge: { ...DEFAULT_CONFIG.merge, ...p.merge, ...partial.merge },
     holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
+    acceptance: { ...DEFAULT_CONFIG.acceptance, ...partial.acceptance },
     tmux: { ...DEFAULT_CONFIG.tmux, ...partial.tmux },
     tracker: partial.tracker ?? DEFAULT_CONFIG.tracker,
     labels: { ...DEFAULT_CONFIG.labels, ...partial.labels },
@@ -375,6 +383,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   spend: "object",
   merge: "object",
   holdout: "object",
+  acceptance: "object",
   tmux: "object",
   prRunSummary: "boolean",
   templateOverrides: "strings",
@@ -469,6 +478,16 @@ export function configProblems(raw: unknown): string[] {
       else if (key === "cmd") {
         if (typeof value !== "string") problems.push(`holdout.cmd: expected string, got ${JSON.stringify(value)}`);
       } else problems.push(`holdout.${key}: unknown key (allowed: paths, cmd)`);
+    }
+  }
+  if (cfg.acceptance !== undefined && kindOk(cfg.acceptance, "object")) {
+    for (const [key, value] of Object.entries(cfg.acceptance as Record<string, unknown>)) {
+      if (key.startsWith("_")) continue;
+      // "" is the off switch, so only a non-string is a problem.
+      if (key === "script") {
+        if (typeof value !== "string")
+          problems.push(`acceptance.script: expected string, got ${JSON.stringify(value)}`);
+      } else problems.push(`acceptance.${key}: unknown key (allowed: script)`);
     }
   }
   if (cfg.events !== undefined) eventsProblems(cfg.events, problems);
