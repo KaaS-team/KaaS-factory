@@ -1,0 +1,1 @@
+{"name":"update overwrites edited files","file":"src/update-guard.ts","find":"if (recorded === undefined || !existsSync(dest)) return false;","replace":"if (recorded === undefined || !existsSync(dest) || true) return false;","test":"tests/update-guard.test.ts"}
