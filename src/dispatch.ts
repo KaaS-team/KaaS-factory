@@ -4,6 +4,7 @@
 
 import { appendFileSync } from "node:fs";
 import { resolveBlockers } from "./blockers";
+import { orderByBump } from "./ci-failure-priority";
 import { parseCron } from "./core/cron";
 import type { FactoryConfig } from "./config";
 import { type SpendDeps, spendCapHit, type WatchDeps } from "./engine/common";
@@ -58,6 +59,7 @@ export async function intakeGate(
 export async function dispatchJobs(
   deps: SpendDeps & Pick<WatchDeps, "github">,
   config: FactoryConfig,
+  bumps: ReadonlyMap<number, number> = new Map(),
 ): Promise<Dispatch> {
   const { github } = deps;
   const repo = config.repo;
@@ -86,8 +88,8 @@ export async function dispatchJobs(
       seen.add(issue.number);
       jobs.push({ issue: issue.number, label });
     }
-  jobs.sort((a, b) => a.issue - b.issue);
-  return gate.paused ? { jobs, paused: gate.paused } : { jobs };
+  const ordered = orderByBump(jobs, bumps);
+  return gate.paused ? { jobs: ordered, paused: gate.paused } : { jobs: ordered };
 }
 
 // What a later `strategy: matrix: ${{ fromJSON(needs.dispatch.outputs.matrix) }}` reads.

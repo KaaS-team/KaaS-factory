@@ -1,6 +1,6 @@
 // Running with no watcher: `factory dispatch` for an Actions matrix, `factory routine` for a cloud tick.
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cloudRoutine, dispatchJobs, INTAKE_LABELS, RESUME_LABELS, writeActionsOutput } from "../src/dispatch";
@@ -40,6 +40,7 @@ describe("dispatch and routine", () => {
     const gpu = await dispatchJobs({ github, state, machine: machine({ capabilities: ["gpu"] }) }, config);
     expect(gpu.jobs.map((j) => j.issue)).toEqual([2, 5, 6, 7]);
 
+    mkdirSync(tmpdir(), { recursive: true });
     const out = join(mkdtempSync(join(tmpdir(), "factory-dispatch-")), "output");
     writeActionsOutput(result, out);
     expect(readFileSync(out, "utf8")).toBe('matrix={"include":[{"issue":2},{"issue":5},{"issue":7}]}\ncount=3\n');
