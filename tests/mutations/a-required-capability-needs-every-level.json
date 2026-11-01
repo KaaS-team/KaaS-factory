@@ -1,0 +1,1 @@
+{"name":"a required capability needs every level","file":"src/team/capabilities.ts","find":"const required = levelsList.some((l) => l.required === true);","replace":"const required = levelsList.every((l) => l.required === true);","test":"tests/team-capabilities.test.ts"}
