@@ -221,7 +221,9 @@ export class Git {
   async pushBranch(worktreeDir: string, branch: string): Promise<CommandResult> {
     const held = heldRefusal(worktreeDir);
     if (held) return held;
-    const unpushed = await this.runner.run(["log", "-p", "--format=", "HEAD", "--not", "--remotes=origin"], { cwd: worktreeDir });
+    const unpushed = await this.runner.run(["log", "-p", "--format=", "HEAD", "--not", "--remotes=origin"], {
+      cwd: worktreeDir,
+    });
     const secrets = scanText(unpushed.stdout);
     if (secrets.length > 0) return { stdout: "", stderr: `refusing to push: ${describeFindings(secrets)}`, code: 1 };
     // --no-verify: the gate already ran in this runner; a pre-push hook would run it again (issue #160).
