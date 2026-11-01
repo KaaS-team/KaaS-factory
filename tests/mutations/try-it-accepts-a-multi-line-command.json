@@ -1,0 +1,1 @@
+{"name":"try it accepts a multi-line command","file":"src/try-it.ts","find":"if (!command || /[\\r\\n]/.test(command)) return undefined;","replace":"if (!command) return undefined;","test":"tests/try-it.test.ts"}
