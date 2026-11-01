@@ -1,0 +1,1 @@
+{"name":"a us endpoint passes an eu policy","file":"src/residency.ts","find":"const want = policy === \"eu\" ? \"eu-\" : \"us-\";","replace":"const want = \"\";","test":"tests/residency.test.ts"}
