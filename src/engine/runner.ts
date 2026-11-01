@@ -28,6 +28,7 @@ import { ALL_STEP_TYPES as STEP_TYPES } from "./registry";
 import { bindingFields } from "./approval-binding";
 import { emitEvent } from "./bus";
 import { readJournal } from "./journal";
+import { chooseLane, type LaneDecision } from "./lane";
 import { lateRoute } from "./late-route";
 import { holdForOverlap } from "../overlap";
 import { guardPlan } from "../plan-guard";
@@ -122,6 +123,20 @@ async function walk(
     },
     config,
   });
+  // Triage's expected files, widened by what the branch has changed so far; a diff that cannot be read is full.
+  const laneNow = async (): Promise<LaneDecision> => {
+    const triaged = Object.entries(workflow.steps).find(([, s]) => s.uses === "triage")?.[0];
+    const expected = (facts[triaged ?? ""] as { files_expected?: unknown } | undefined)?.files_expected;
+    if (!Array.isArray(expected)) return { lane: "full", reason: "no triage files to size" };
+    try {
+      const stat = await deps.git.diffStat(worktree, config.base);
+      const changedLines = stat.reduce((n, f) => n + f.additions + f.deletions, 0);
+      const files = [...expected.map(String), ...stat.map((f) => f.path)];
+      return chooseLane({ files, changedLines }, config.protectedPaths);
+    } catch {
+      return { lane: "full", reason: "the diff could not be read" };
+    }
+  };
   // Steps the journal shows finished are not run again; a park edge is passed only once its token was approved.
   const journal = readJournal(deps.state, issueNumber, workflow);
   const held = step.label;
@@ -242,7 +257,19 @@ async function walk(
         finish(deps, config, issueNumber, "awaiting-approval");
         return "awaiting-approval";
       }
-      const to: Step = workflow.steps[edge.to]!;
+      let to: Step = workflow.steps[edge.to]!;
+      // A lite change skips the steps this workflow marks optional; asked again at each one, so a
+      // change that grew since triage (or touched a protected path in build) runs them.
+      for (; to.optional; ) {
+        const lane = await laneNow();
+        const next = pickEdge(to.next, await scope(to));
+        if (lane.lane !== "lite" || "park" in next) break;
+        await postComment(deps, config, issueNumber, `Skipped ${to.id}: this is a lite change (${lane.reason}).`, {
+          stage: "lane",
+          json: { skipped: to.id, ...lane },
+        });
+        to = workflow.steps[next.to]!;
+      }
       if (step.uses === "plan" && to.uses === "build") {
         const files = (facts.plan as { files?: string[] } | undefined)?.files ?? [];
         if (await holdForOverlap(deps, config, issueNumber, files, from)) return "awaiting-approval";
