@@ -1,8 +1,7 @@
-// The built-in step types a workflow's `uses:` names. Each handler is one
-// stage of what used to be watch.ts's driveFromStage, unchanged in what it
-// checks and posts. It returns "next" (the engine follows the step's edges
-// and moves the label), "reject" (the engine follows `reject:`), or "stop"
-// once it has parked or finished the issue itself, from `step.label`.
+// The built-in step types a workflow's `uses:` names. Each handler is one stage of what used to be
+// watch.ts's driveFromStage, unchanged in what it checks and posts. It returns "next" (the engine follows
+// the step's edges and moves the label), "reject" (it follows `reject:`), or "stop" once it has parked
+// or finished the issue itself, from `step.label`.
 
 import { readRunJson, settleVerdict, verdictPost } from "./verdict-rules";
 import { prPreflight } from "./pr-preflight";
@@ -57,6 +56,7 @@ import {
 import { issueRef, postRunDetails, prBody, prExtras, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
+import { parkLowConfidence } from "../triage-confidence";
 import { runStageChecked } from "./stage-retry";
 import { checkedPlan } from "./plan-critic";
 import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
@@ -149,7 +149,7 @@ const triage: StepType = {
       return stop("needs-human");
     }
     if (json.disposition === "needs-info") return askOrHandOver(sc, art.question);
-    return { kind: "next", facts: json };
+    return (await parkLowConfidence(sc, json, art.question)) ?? { kind: "next", facts: json };
   },
 };
 
