@@ -1,0 +1,1 @@
+{"name":"the brain sink posts under the wrong tenant","file":"src/lesson-sink.ts","find":"tenant: tenantOf(repo),","replace":"tenant: repo,","test":"tests/lesson-sink.test.ts"}
