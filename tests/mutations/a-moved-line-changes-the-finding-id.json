@@ -1,0 +1,1 @@
+{"name":"a moved line changes the finding id","file":"src/finding-disposition.ts","find":"const place = pathOf(f.where);","replace":"const place = f.where ?? \"\";","test":"tests/finding-disposition.test.ts"}
