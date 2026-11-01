@@ -1,0 +1,1 @@
+{"name":"review acted ignores the line range","file":"src/review-acted.ts","find":"at.from <= b && at.to >= a","replace":"at.from <= b","test":"tests/review-acted.test.ts"}

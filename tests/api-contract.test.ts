@@ -194,6 +194,7 @@ function makeState() {
     listRuns: () => runs as never,
     getRun: () => runs[0] as never,
     listEvents: (_id: number, o?: { after?: number }) => events.filter((e) => e.id > (o?.after ?? 0)) as never,
+    listStageRuns: () => [],
     spendSummary: () => ({ costUsd: 0, unreportedRuns: 0 }),
   };
 }

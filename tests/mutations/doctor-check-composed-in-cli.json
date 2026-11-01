@@ -1,0 +1,1 @@
+{"name":"doctor check composed in cli","file":"src/doctor-checks.ts","find":"export const DOCTOR_CHECKS: readonly DoctorCheckSource[] = [coreChecks, mergeMethod];","replace":"export const DOCTOR_CHECKS: readonly DoctorCheckSource[] = [mergeMethod, coreChecks];","test":"tests/doctor-checks.test.ts"}

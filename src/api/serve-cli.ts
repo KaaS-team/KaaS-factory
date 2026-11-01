@@ -24,6 +24,7 @@ function liveDeps(): CoreDeps {
     },
     feed: new LiveFeed(),
     auth: tokenAuth(process.env),
+    operator: tokenAuth({ FACTORY_API_TOKEN: process.env.FACTORY_API_OPERATOR_TOKEN }),
   };
 }
 

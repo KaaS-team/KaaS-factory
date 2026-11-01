@@ -1,0 +1,1 @@
+{"name":"stacked prs base skips parent","file":"src/stacked-prs.ts","find":"base: prev ? `${epicBranch}-${prev.id}` : epicBase,","replace":"base: epicBase,","test":"tests/stacked-prs.test.ts"}

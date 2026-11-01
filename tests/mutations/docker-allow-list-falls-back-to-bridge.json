@@ -1,0 +1,1 @@
+{"name":"docker allow list falls back to bridge","file":"src/adapters/docker/execution.ts","find":"spec.allow ? { ...spec, network: internal } : spec;","replace":"spec.allow ? { ...spec, network: spec.network ?? \"bridge\" } : spec;","test":"tests/docker-egress-network.test.ts"}

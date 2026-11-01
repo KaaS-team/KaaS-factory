@@ -1,0 +1,1 @@
+{"name": "metrics get shows cost to every caller", "file": "src/metrics-get.ts", "find": "if (opts.operator && shipped.length) {", "replace": "if (shipped.length) {", "test": "tests/metrics-get.test.ts"}
