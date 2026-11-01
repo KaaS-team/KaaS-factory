@@ -1,0 +1,1 @@
+{"name":"ssh control host option injection is allowed","file":"src/ssh-control.ts","find":"if (!host || host.startsWith(\"-\") || /\\s/.test(host))","replace":"if (!host || /\\s/.test(host))","test":"tests/ssh-control.test.ts"}
