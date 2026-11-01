@@ -7,7 +7,7 @@
 // runner is the only thing that turns those files into GitHub API calls.
 
 import { mkdir, unlink } from "node:fs/promises";
-import { schemaProblem } from "./schemas";
+import { schemaProblems } from "./schemas";
 
 export type Disposition = "proceed" | "needs-info" | "refused" | "duplicate";
 export type Risk = "low" | "medium" | "high";
@@ -158,21 +158,35 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
   retro: ["lesson", "skill_name", "skill_edit", "outcome", "summary"],
 };
 
-// `types` bounds triage's `type` enum to the repo's actual type list
-// (typesFor(config.routes)); omit it to fall back to the fixed TYPE_LABELS.
+// Every problem with a step's JSON, in the order validateStepJson reports the first. `types` bounds
+// triage's `type` enum to the repo's actual type list (typesFor(config.routes)); omit it for TYPE_LABELS.
+export function stepProblems(
+  stage: Exclude<ArtifactStage, "verify">,
+  raw: unknown,
+  types?: readonly string[],
+): string[] {
+  const name = JSON_FILENAMES[stage];
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return [`${name} is not a JSON object`];
+  const o = raw as Record<string, unknown>;
+  const allowed = new Set(STEP_KEYS[stage]);
+  const unknown = Object.keys(o)
+    .filter((k) => !allowed.has(k))
+    .map((k) => `${name} has unknown field "${k}"`);
+  const envelope = stepEnvelopeProblem(o);
+  return [
+    ...unknown,
+    ...(envelope ? [`${name}: ${envelope}`] : []),
+    ...schemaProblems(stage, o, types).map((p) => `${name}: ${p}`),
+  ];
+}
+
 export function validateStepJson(
   stage: Exclude<ArtifactStage, "verify">,
   raw: unknown,
   types?: readonly string[],
 ): { ok: true } | { ok: false; reason: string } {
-  const name = JSON_FILENAMES[stage];
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
-    return { ok: false, reason: `${name} is not a JSON object` };
-  const o = raw as Record<string, unknown>;
-  const extra = unknownKey(o, new Set(STEP_KEYS[stage]));
-  if (extra) return { ok: false, reason: `${name} has unknown field "${extra}"` };
-  const problem = stepEnvelopeProblem(o) ?? schemaProblem(stage, o, types);
-  return problem ? { ok: false, reason: `${name}: ${problem}` } : { ok: true };
+  const [reason] = stepProblems(stage, raw, types);
+  return reason === undefined ? { ok: true } : { ok: false, reason };
 }
 
 // Where a step that reported "blocked" or "failed" stops. Undefined means carry on.
