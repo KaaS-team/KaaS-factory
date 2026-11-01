@@ -1,0 +1,1 @@
+{"name":"deny: a hard-deny rule can be overridden by a team value","file":"src/team/resolve.ts","find":"if (kind === \"hard\" && !(cur !== undefined && same(cur, v))) {","replace":"if (false as boolean) {","test":"tests/team-deny.test.ts"}
