@@ -2,11 +2,12 @@
 
 import type { Run, RunEvent } from "../state";
 import type { ApiAuth } from "./auth";
+import { metricsFor, type MetricsState } from "../metrics-get";
 import { type ApiRoute, ROUTES } from "./routes";
 import { type LiveFeed, sseResponse } from "./stream";
 
 /** The slice of FactoryState the API reads. */
-export interface ApiState {
+export interface ApiState extends MetricsState {
   listRuns(repo?: string): Run[];
   getRun(repo: string, issue: number): Run | undefined;
   listEvents(runId: number, opts?: { after?: number; limit?: number }): RunEvent[];
@@ -18,6 +19,8 @@ export interface CoreDeps {
   state(repo: string): ApiState | null;
   feed: LiveFeed;
   auth: ApiAuth;
+  /** Passes for callers who may see cost; without it metrics.get omits cost. */
+  operator?: ApiAuth;
 }
 
 const SPEND_WINDOW_MS = 30 * 24 * 3600 * 1000;
@@ -92,6 +95,13 @@ export function coreRoutes(deps: CoreDeps): { fetch(req: Request): Promise<Respo
         });
         return json({ since, repos });
       }
+      case "metrics.get": {
+        const sources = deps.repos().flatMap((repo) => {
+          const state = deps.state(repo);
+          return state ? [{ repo, state }] : [];
+        });
+        return json({ metrics: metricsFor(sources, { operator: deps.operator?.(req) === true }) });
+      }
       case "stream": {
         const raw = req.headers.get("last-event-id");
         // A cursor that is not a number can never be in the ring, so it resets like a stale one.
@@ -109,7 +119,7 @@ export function coreRoutes(deps: CoreDeps): { fetch(req: Request): Promise<Respo
       for (const { route, match } of COMPILED) {
         const params = route.method === req.method ? match(path) : null;
         if (!params) continue;
-        if (route.auth === "token" && !deps.auth(req)) return err(401, "unauthorized");
+        if (route.auth === "token" && !deps.auth(req) && !deps.operator?.(req)) return err(401, "unauthorized");
         return handle(route, params, req);
       }
       return err(404, "not found");
