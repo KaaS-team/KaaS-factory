@@ -26,11 +26,11 @@ const review = (blockers: number): PrFacts["review"] => ({
 test("agent and human verdicts read off the facts and the review decision", () => {
   expect(agentVerdict(review(0))).toBe("approve");
   expect(agentVerdict(review(2))).toBe("reject");
-  expect(agentVerdict(null)).toBeUndefined();
+  expect(agentVerdict(null)).toBe(undefined);
   expect(humanVerdict("APPROVED")).toBe("approve");
   expect(humanVerdict("CHANGES_REQUESTED")).toBe("reject");
-  expect(humanVerdict("REVIEW_REQUIRED")).toBeUndefined();
-  expect(humanVerdict("")).toBeUndefined();
+  expect(humanVerdict("REVIEW_REQUIRED")).toBe(undefined);
+  expect(humanVerdict("")).toBe(undefined);
 });
 
 test("mergeContext records a fixture history and the report lists agreement, gates and thin evidence", async () => {
