@@ -278,14 +278,14 @@ const build: StepType = {
     // protected path never reaches Edit/Write, so the hook never sees it
     // (audit finding #12). Diff the branch itself before pushing anything.
     const changed = await deps.git.changedFiles(worktree, config.base);
-    // `.factory/**` is already unconditionally protected below (ALWAYS_PROTECTED_PATHS),
-    // covering the default holdout location; this adds any holdout path a
-    // repo configured outside it.
+    // `.factory/**` is already always protected (ALWAYS_PROTECTED_PATHS), covering the default
+    // holdout location; this adds any holdout path a repo configured outside it.
     const protectedPaths = [
       ...config.protectedPaths,
       ...(await hiddenPaths(deps.setupRunner ?? new ShellSetupRunner(), config, worktree)),
     ];
-    const hits = touchesProtectedPath(changed, protectedPaths);
+    const baseFiles = await deps.git.baseFiles(worktree, config.base);
+    const hits = touchesProtectedPath(changed, protectedPaths, { baseFiles });
     if (hits.length) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
       finish(deps, config, issueNumber, "needs-human", `touched protected path(s): ${hits.join(", ")}`);
