@@ -62,7 +62,7 @@ describe("pickDeployment", () => {
       ],
       { head: "abc", environment: "preview" },
     );
-    expect(got).toBeUndefined();
+    expect(got === undefined).toBe(true);
   });
 });
 
