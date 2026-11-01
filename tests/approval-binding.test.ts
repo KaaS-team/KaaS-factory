@@ -1,6 +1,8 @@
 // An approve names the plan digest it was asked for: it is refused once the plan is revised, a new
 // commit lands, or the window passes, and one token is claimed once.
 
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { afterAll, describe, expect, test } from "bun:test";
 import { APPROVAL_TTL_MS, bindingFields, planDigest, refuseApproval } from "../src/engine/approval-binding";
 import { EventBus } from "../src/engine/bus";
@@ -35,6 +37,7 @@ const PLAN = (revision: number) => ({
 async function parked() {
   const parsed = parseWorkflowText(SHIP);
   if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+  mkdirSync(tmpdir(), { recursive: true });
   const state = new FactoryState(":memory:");
   const bus = new EventBus({ store: state, sinks: [], source: "factory/acme/widgets", autoDeliver: false });
   const e = engine(parsed.workflow, 0, {}, {}, { state, bus }, { outputs: { plan: [PLAN(1)] } });
