@@ -58,7 +58,7 @@ test("an illegal move is applied but logged under its own kind", () => {
 });
 
 test("an unknown run is a no-op", () => {
-  expect(transition(fresh(), "acme/w", 99, "failed")).toBeUndefined();
+  expect(transition(fresh(), "acme/w", 99, "failed") === undefined).toBe(true);
 });
 
 test("settle closes the window for shipped, cancelled and failed only", () => {
