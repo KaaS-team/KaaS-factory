@@ -33,6 +33,7 @@ import { holdForOverlap } from "../overlap";
 import { guardPlan } from "../plan-guard";
 import { unmetDeps } from "../plan-deps";
 import { isPlannedBody } from "./import-plan";
+import { runOriginOf } from "./run-origin";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
 const PARKED: ReadonlySet<Outcome> = new Set(["needs-info", "needs-human", "awaiting-approval", "failed"]);
@@ -50,7 +51,14 @@ export async function runWorkflow(
 ): Promise<Outcome> {
   if (!workflow.steps[startStep]) throw new Error(`workflow ${workflow.name} has no step "${startStep}"`);
   const at = { step: startStep, workflow };
-  const base = () => ({ repo: config.repo, issue: issue.number, workflow: at.workflow.name, sha: at.workflow.sha });
+  const origin = runOriginOf(issue.body);
+  const base = () => ({
+    repo: config.repo,
+    issue: issue.number,
+    workflow: at.workflow.name,
+    sha: at.workflow.sha,
+    startedBy: origin,
+  });
   const subject = `issue/${issue.number}`;
   let outcome: Outcome;
   try {
@@ -82,7 +90,14 @@ async function walk(
 ): Promise<Outcome> {
   let workflow = at.workflow;
   let step: Step = workflow.steps[at.step]!;
-  const base = () => ({ repo: config.repo, issue: issue.number, workflow: workflow.name, sha: workflow.sha });
+  const origin = runOriginOf(issue.body);
+  const base = () => ({
+    repo: config.repo,
+    issue: issue.number,
+    workflow: workflow.name,
+    sha: workflow.sha,
+    startedBy: origin,
+  });
   const subject = `issue/${issue.number}`;
   const issueNumber = issue.number;
   // What `if:` reads: each step's JSON, seeded from the thread so a resumed run sees earlier steps.
