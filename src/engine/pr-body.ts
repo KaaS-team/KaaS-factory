@@ -11,6 +11,7 @@ import type { ProofResult } from "../proof";
 import { missingReceipt, renderReceipt, writeRunReceipt, type RunReceiptOptions } from "../receipt";
 import { qaSection, readQa, type Qa } from "../qa";
 import { publishShots, runGit, shotsSection, type ShotUrls } from "../assets-branch";
+import { readTryIt, tryItSection, type TryIt } from "../try-it";
 import type { WatchDeps } from "./common";
 
 const RUN_DETAILS_MARKER = "<!-- factory:run-details -->";
@@ -78,6 +79,8 @@ export interface PrParts {
   // The QA step's qa.json, and a UI change's before and after URLs; each renders only when given.
   readonly qa?: Qa;
   readonly shots?: readonly ShotUrls[];
+  // One command and its expected output (src/try-it.ts); the section is absent without it.
+  readonly tryIt?: TryIt;
 }
 
 // `#n` links on GitHub; a PR body must not carry it for another tracker, whose n is not a GitHub issue.
@@ -100,6 +103,7 @@ function assemble(body: string, parts: PrParts): string {
   const out: string[] = [];
   if (parts.qa) out.push(qaSection(parts.qa));
   if (parts.shots?.length) out.push(shotsSection(parts.shots));
+  if (parts.tryIt) out.push(tryItSection(parts.tryIt));
   if (out.length) body = `${body}\n\n${out.join("\n\n")}`;
   if (parts.closes) body = `${body}\n\n${parts.closes}`;
   if (parts.runDetails) body = `${body}\n\nThe receipt is in the run-details comment on ${parts.runDetails}.`;
@@ -123,9 +127,10 @@ export async function prExtras(
   config: Pick<FactoryConfig, "repo">,
   issue: number,
   changed: readonly string[],
-): Promise<Pick<PrParts, "qa" | "shots">> {
+): Promise<Pick<PrParts, "qa" | "shots" | "tryIt">> {
   return {
     qa: readQa(worktree, issue),
+    tryIt: readTryIt(worktree, issue),
     shots: await publishShots(runGit, worktree, { repo: config.repo, issue, changed }),
   };
 }
