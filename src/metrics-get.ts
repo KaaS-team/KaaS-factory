@@ -1,6 +1,8 @@
 // The numbers behind metrics.get and get_task_report. A metric with no data is left out of the
 // object, never reported as 0; cost is only included when the caller is an operator.
 
+import type { FactoryConfig } from "./config";
+import { evidenceReport } from "./merge-evidence";
 import type { Run, StageRun } from "./state";
 
 export interface MetricsState {
@@ -13,16 +15,22 @@ export interface Metrics {
   costPerMergedChange?: number;
   judgeVetoRate?: number;
   unknownVerdicts?: number;
+  // One read-only report per repo whose source carries its config and a settings store.
+  mergeEvidence?: { repo: string; report: string }[];
+}
+
+export interface MetricsSource {
+  repo: string;
+  state: MetricsState & { getSetting?(key: string): string | undefined };
+  // Without the config there is no protected-path list to report on, so the repo is skipped.
+  config?: FactoryConfig;
 }
 
 const ENDED = new Set(["shipped", "failed", "cancelled", "rejected"]);
 const ALL = 100_000;
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
 
-export function metricsFor(
-  sources: readonly { repo: string; state: MetricsState }[],
-  opts: { operator: boolean },
-): Metrics {
+export function metricsFor(sources: readonly MetricsSource[], opts: { operator: boolean }): Metrics {
   const runs = sources.flatMap(({ repo, state }) => state.listRuns(repo));
   const ended = runs.filter((r) => ENDED.has(r.status));
   const shipped = runs.filter((r) => r.status === "shipped");
@@ -35,6 +43,13 @@ export function metricsFor(
   const known = verdicts.filter((s) => s.verdict !== "unknown");
   if (known.length) out.judgeVetoRate = round(known.filter((s) => s.verdict === "reject").length / known.length, 3);
   if (verdicts.length > known.length) out.unknownVerdicts = verdicts.length - known.length;
+
+  const evidence = sources.flatMap(({ repo, state, config }) =>
+    config && state.getSetting
+      ? [{ repo, report: evidenceReport({ getSetting: state.getSetting.bind(state), setSetting() {} }, config) }]
+      : [],
+  );
+  if (evidence.length) out.mergeEvidence = evidence;
 
   if (opts.operator && shipped.length) {
     const attempts = shipped.flatMap((r) => {

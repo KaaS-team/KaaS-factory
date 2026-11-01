@@ -1,0 +1,1 @@
+{"name": "metrics evidence report not called", "file": "src/metrics-get.ts", "find": "if (evidence.length) out.mergeEvidence = evidence;", "replace": "void evidence;", "test": "tests/metrics-evidence.test.ts"}
