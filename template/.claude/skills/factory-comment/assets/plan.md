@@ -1,38 +1,40 @@
 <!-- factory:plan v1 rev={{rev}} -->
+{{one_sentence_what_i_plan_to_do_and_that_i_wait_for_approval}}
+
 ## Plan (rev {{rev}})
 
-**Goal:** {{one_line_goal}}
+The goal is to {{one_line_goal}}.
 
-### Acceptance criteria
+### How we will know it works
 {{#each ac}}
-- **AC-{{n}}:** {{criterion}}: checked by `{{command_or_test}}`
+- {{criterion_as_a_short_sentence}} I will check it with `{{command_or_test}}`.
 {{/each}}
 
-### Non-goals (binding; a diff that crosses one fails verify)
+### What this will not do (binding; a diff that crosses one fails verify)
 {{#each ng}}
-- **NG-{{n}}:** {{non_goal}}
+- {{non_goal_as_a_short_sentence}}
 {{/each}}
 
-### Files to touch
+### Files I will change
 {{files_list}}
 
-### Tests to write first
+### Tests I will write first
 {{#each tests}}
 - `{{test_name}}`
 {{/each}}
 
-### Repo skills to apply
+### Repo skills I will apply
 {{repo_skills_list}} <!-- e.g. handling-money, or "none" -->
 
-### Risk: {{risk}}
+### Risk is {{risk}}
 {{risk_reasoning_with_charter_citation}}
 
-**Gate level:** {{gate_level}}
+I will check the build with {{gate_level}}.
 
 {{#if auto_approve_eligible}}
-Low risk: eligible for auto-approve if the toggle is on. Otherwise, reply
-`/factory approve` to proceed, or `/factory revise <what to change>`.
+This is low risk, so it can start on its own if auto-approve is on. Otherwise,
+reply `/factory approve` to proceed, or `/factory revise <what to change>`.
 {{else}}
-This needs a human: reply `/factory approve` to proceed, or
+This needs a person: reply `/factory approve` to proceed, or
 `/factory revise <what to change>`.
 {{/if}}

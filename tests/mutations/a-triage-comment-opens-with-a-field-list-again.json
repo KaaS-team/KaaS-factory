@@ -1,0 +1,1 @@
+{"name":"a triage comment opens with a field list again","file":"template/.claude/skills/factory-comment/assets/triage.md","find":"{{one_sentence_what_i_decided_and_what_happens_next}}","replace":"**Disposition:** {{disposition}}","test":"tests/comment-voice.test.ts"}
