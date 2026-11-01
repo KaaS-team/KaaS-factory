@@ -10,6 +10,7 @@ import { runHoldout } from "../holdout";
 import {
   acceptanceProven,
   hiddenPaths,
+  planAcceptance,
   renderAcceptanceTable,
   renderPlanAcceptance,
   runAcceptance,
@@ -35,7 +36,7 @@ import { touchesProtectedPath } from "../boundary";
 import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
-import { ownVerdict } from "../bug-repro";
+import { withRepro } from "../bug-repro";
 import { LABEL, issueType, typesFor } from "../labels";
 import { resolveAgentByName, resolveRoute } from "../agents/executor";
 import { buildEscalation, buildFamily } from "../core/model-tier";
@@ -348,13 +349,9 @@ const verify: StepType = {
         return { kind: "reject" };
       }
     }
-    // Also a build problem, not something for the verifier to judge: a
-    // holdout test the build never saw is the one check its own gates.sh
-    // cannot have been tuned to pass. Unlike the gates recheck above, this
-    // runs on every entry to verify, not only a stale one — a fresh build
-    // flowing straight into verify in the same tick is the common case,
-    // and gate.json (written by the build, which never saw these paths)
-    // cannot possibly already cover them.
+    // Also a build problem, not the verifier's to judge: a holdout test the build never saw is the one
+    // check its own gates.sh cannot have been tuned to pass. It runs on every entry to verify, not only a
+    // stale one, since gate.json cannot already cover paths the build never saw.
     clearRunFiles(worktree, runDir(issueNumber));
     if (holdoutEnabled(config.holdout)) {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
@@ -402,8 +399,9 @@ const verify: StepType = {
     );
     deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : "");
     // Like a failing holdout, an unproven criterion is the build's to fix, not the verifier's to judge.
-    const ownAcceptance =
-      acceptance && ownVerdict(acceptance, worktree, issueNumber, issueType(config.routes, labelsOf(issue)));
+    const kitOwn =
+      acceptance && planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json"));
+    const ownAcceptance = kitOwn && withRepro(kitOwn, issueType(config.routes, labelsOf(issue)));
     if (ownAcceptance && !acceptanceProven(ownAcceptance)) {
       const table = renderAcceptanceTable(ownAcceptance);
       return rejectToBuild(sc, table, { acceptance: ownAcceptance }, "acceptance not proven");

@@ -1,11 +1,8 @@
 // A bug must reproduce at base: verify rejects a bug whose acceptance rows never failed before the change.
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { acceptanceProven, type AcceptanceRow, type AcceptanceVerdict } from "../src/acceptance";
-import { bugReproProblem, ownVerdict } from "../src/bug-repro";
+import { bugReproProblem, withRepro } from "../src/bug-repro";
 
 const row = (over: Partial<AcceptanceRow>): AcceptanceRow => ({
   spec: "s",
@@ -19,21 +16,11 @@ const row = (over: Partial<AcceptanceRow>): AcceptanceRow => ({
   ...over,
 });
 const verdict = (...acs: AcceptanceRow[]): AcceptanceVerdict => ({ base: "origin/main", acs, errors: [] });
-function plan(): string {
-  mkdirSync(tmpdir(), { recursive: true });
-  const dir = mkdtempSync(join(tmpdir(), "bug-repro-"));
-  mkdirSync(join(dir, ".factory/runs/issue-7"), { recursive: true });
-  writeFileSync(
-    join(dir, ".factory/runs/issue-7/plan.json"),
-    JSON.stringify({ criteria: [{ id: "AC-1", text: "x" }], spec: "s" }),
-  );
-  return dir;
-}
 const REPRO = "A bug needs at least one acceptance row that fails at base and passes on the branch.";
 
 describe("bug reproduction", () => {
   test("a bug with a row that fails at base and passes at head is reproduced", () => {
-    expect(bugReproProblem("bug", verdict(row({})))).toBeUndefined();
+    expect(bugReproProblem("bug", verdict(row({})))).toEqual(undefined);
   });
 
   test("a bug whose rows all passed at base is not reproduced", () => {
@@ -49,23 +36,21 @@ describe("bug reproduction", () => {
   });
 
   test("a feature needs no reproduction", () => {
-    expect(bugReproProblem("feature", verdict(row({ base: "pass" })))).toBeUndefined();
-    expect(bugReproProblem(undefined, verdict())).toBeUndefined();
+    expect(bugReproProblem("feature", verdict(row({ base: "pass" })))).toEqual(undefined);
+    expect(bugReproProblem(undefined, verdict())).toEqual(undefined);
   });
 
   test("a bug without a reproduction gets the problem as an error, so verify rejects it", () => {
-    const v = ownVerdict(verdict(row({ base: "pass" })), plan(), 7, "bug");
-    expect(v?.errors).toEqual([REPRO]);
-    expect(v && acceptanceProven(v)).toBe(false);
+    const v = withRepro(verdict(row({ base: "pass" })), "bug");
+    expect(v.errors).toEqual([REPRO]);
+    expect(acceptanceProven(v)).toBe(false);
   });
 
   test("a reproduced bug stays proven", () => {
-    const v = ownVerdict(verdict(row({})), plan(), 7, "bug");
-    expect(v && acceptanceProven(v)).toBe(true);
+    expect(acceptanceProven(withRepro(verdict(row({})), "bug"))).toBe(true);
   });
 
   test("a feature with an old row is not held to a reproduction", () => {
-    const v = ownVerdict(verdict(row({ base: "pass" })), plan(), 7, "feature");
-    expect(v?.errors).toEqual([]);
+    expect(withRepro(verdict(row({ base: "pass" })), "feature").errors).toEqual([]);
   });
 });
