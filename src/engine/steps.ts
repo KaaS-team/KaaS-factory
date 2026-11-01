@@ -10,7 +10,6 @@ import { runHoldout } from "../holdout";
 import {
   acceptanceProven,
   hiddenPaths,
-  planAcceptance,
   renderAcceptanceTable,
   renderPlanAcceptance,
   runAcceptance,
@@ -36,6 +35,7 @@ import { touchesProtectedPath } from "../boundary";
 import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
+import { ownVerdict } from "../bug-repro";
 import { LABEL, issueType, typesFor } from "../labels";
 import { resolveAgentByName, resolveRoute } from "../agents/executor";
 import { buildEscalation, buildFamily } from "../core/model-tier";
@@ -403,7 +403,7 @@ const verify: StepType = {
     deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : "");
     // Like a failing holdout, an unproven criterion is the build's to fix, not the verifier's to judge.
     const ownAcceptance =
-      acceptance && planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json"));
+      acceptance && ownVerdict(acceptance, worktree, issueNumber, issueType(config.routes, labelsOf(issue)));
     if (ownAcceptance && !acceptanceProven(ownAcceptance)) {
       const table = renderAcceptanceTable(ownAcceptance);
       return rejectToBuild(sc, table, { acceptance: ownAcceptance }, "acceptance not proven");
