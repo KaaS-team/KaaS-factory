@@ -1,0 +1,1 @@
+{"name":"safe-config-dropped","file":"src/git.ts","find":"Bun.spawn([\"git\", ...safeArgs(args)]","replace":"Bun.spawn([\"git\", ...args]","test":"tests/git-safe.test.ts"}
