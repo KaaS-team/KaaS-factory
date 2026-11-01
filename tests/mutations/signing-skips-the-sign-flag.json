@@ -1,0 +1,1 @@
+{"name":"signing skips the sign flag","file":"src/commit-signing.ts","find":"\"-S\",","replace":"","test":"tests/commit-signing.test.ts"}
