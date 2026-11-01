@@ -26,6 +26,7 @@ import {
   type RetroArtifact,
   type VerdictArtifact,
 } from "../artifacts";
+import { describeTagged } from "../finding-check";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isTrusted } from "../chatops";
 import { describeFindings, scanText } from "../secret-scan";
@@ -234,16 +235,15 @@ export async function recheckFindings(
   worktree: string,
   verdict: VerdictArtifact,
 ): Promise<{ verdict: VerdictArtifact; note: string }> {
-  const checked = verdict.findings.filter(isChecked);
-  const supported = await deps.rechecker!.supported(checked, await deps.git.diff(worktree, config.base));
+  const diff = await deps.git.diff(worktree, config.base);
+  const supported = await deps.rechecker!.supported(verdict.findings.filter(isChecked), diff);
   if (supported === undefined) return { verdict, note: "" };
   const { kept, dropped } = keepSupported(verdict.findings, supported);
   if (dropped.length === 0) return { verdict, note: "" };
   const result = verdict.result === "reject" && !hasBlocking(kept) ? "uncertain" : verdict.result;
-  const list = dropped.map((f) => `- ${f.what}`).join("\n");
   return {
     verdict: { ...verdict, findings: kept, result },
-    note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a changed line with a reproduction, so they were dropped:\n${list}`,
+    note: `\n\nThe diff does not support ${dropped.length} finding(s): none is confirmed (a changed line plus a reproduction), so they were dropped:\n${describeTagged(dropped, diff)}`,
   };
 }
 
