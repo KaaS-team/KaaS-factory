@@ -10,7 +10,8 @@ import type { ExecutionPort } from "../ports/execution";
 import type { ProofResult } from "../proof";
 import { missingReceipt, renderReceipt, writeRunReceipt, type RunReceiptOptions } from "../receipt";
 import { qaSection, readQa, type Qa } from "../qa";
-import { publishShots, runGit, shotsSection, type ShotUrls } from "../assets-branch";
+import { publishShots, runGit, type ShotUrls } from "../assets-branch";
+import { renderShotPairs } from "../screenshot-pair";
 import { readTryIt, tryItSection, type TryIt } from "../try-it";
 import type { WatchDeps } from "./common";
 
@@ -94,6 +95,13 @@ export function prTemplate(worktree: string): string | undefined {
   return existsSync(path) ? readFileSync(path, "utf8") : undefined;
 }
 
+// Pushed screenshots as a before and after table. The first column is the shot's file name, which is
+// not always a route; a new screen has no before and shows as none.
+function screenshotsSection(shots: readonly ShotUrls[]): string {
+  const table = renderShotPairs(shots.map((s) => ({ route: s.name, before: s.before ?? "", after: s.after })));
+  return `## Screenshots\n\n${table}`;
+}
+
 // The PR body opens with What changed, then the pr stage's text and the Acceptance section. The receipt
 // envelope stays out, in the issue comment, so the body never carries an attestation blob.
 function assemble(body: string, parts: PrParts): string {
@@ -102,7 +110,7 @@ function assemble(body: string, parts: PrParts): string {
   if (parts.acceptance) body = `${body}\n\n${parts.acceptance}`;
   const out: string[] = [];
   if (parts.qa) out.push(qaSection(parts.qa));
-  if (parts.shots?.length) out.push(shotsSection(parts.shots));
+  if (parts.shots?.length) out.push(screenshotsSection(parts.shots));
   if (parts.tryIt) out.push(tryItSection(parts.tryIt));
   if (out.length) body = `${body}\n\n${out.join("\n\n")}`;
   if (parts.closes) body = `${body}\n\n${parts.closes}`;
