@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { containerArgs, toGateway, withProxyNetwork } from "../src/adapters/docker/execution";
+import { containerArgs, withProxyNetwork } from "../src/adapters/docker/execution";
 import { CMD, WrapExecution } from "../src/adapters/wrap/execution";
 import { egressEnv, LOOPBACK } from "../src/egress-env";
 import { runtimeProblems } from "../src/runtimes";
@@ -26,22 +26,20 @@ describe("egress env", () => {
     expect(() => egressEnv("http://127.0.0.1:9", ["a.test,evil.test"])).toThrow('"a.test,evil.test" is not a hostname');
   });
 
-  test("docker with an allow list uses bridge, the host gateway and the proxy env; without it, none", () => {
+  test("docker with an allow list uses the internal network and the proxy env; without it, none", () => {
     const spec = { kind: "docker", image: "node:22", allow: ["registry.npmjs.org"] } as const;
     const on = containerArgs(
-      withProxyNetwork(spec),
+      withProxyNetwork(spec, "factory-egress-t"),
       "true",
       "/w",
       "1:1",
-      egressEnv("http://host.docker.internal:9", spec.allow),
+      egressEnv("http://172.30.0.1:9", spec.allow),
     );
-    expect(on[on.indexOf("--network") + 1]).toBe("bridge");
-    expect(on).toContain("host.docker.internal:host-gateway");
-    expect(on).toContain("HTTPS_PROXY=http://host.docker.internal:9");
+    expect(on[on.indexOf("--network") + 1]).toBe("factory-egress-t");
+    expect(on).toContain("HTTPS_PROXY=http://172.30.0.1:9");
     const off = containerArgs({ kind: "docker", image: "node:22" }, "true", "/w", "1:1");
     expect(off[off.indexOf("--network") + 1]).toBe("none");
     expect(off.join(" ")).not.toContain("PROXY");
-    expect(toGateway("http://127.0.0.1:5")).toBe("http://host.docker.internal:5");
   });
 
   test("config accepts allow on docker and wrap", () => {
