@@ -12,6 +12,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DEFAULT_RESERVE_MIN, grant, type MemberMonth, monthKey, type PoolMember } from "../../core/sandbox-pool";
+import { classifyLaunch } from "../../launch-attempt";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface PoolSpec {
@@ -152,7 +153,7 @@ export class PoolExecution implements ExecutionPort {
       }
       this.store.settle(hold, (this.now().getTime() - started) / this.msPerMinute, r.runtimeFailed);
       if (!r.runtimeFailed || signal?.aborted || cut.aborted) return r;
-      failures.push(`${m.runtime}: ${r.runtimeFailed}`);
+      failures.push(`${m.runtime}: ${r.runtimeFailed} [${classifyLaunch({ runtimeFailed: r.runtimeFailed })}]`);
     }
     const why = failures.length ? failures.join("; ") : "every member is spent this month";
     if (!this.fallback) return { stdout: "", stderr: `pool: ${why}; no fallback`, code: 1, runtimeFailed: why };
