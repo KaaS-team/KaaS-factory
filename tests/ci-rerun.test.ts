@@ -46,7 +46,7 @@ describe("rerunFailedCiJobs", () => {
   });
 
   test("loops already spent by commits count toward the cap", () => {
-    expect(decideRerun({ ...fresh, redLoops: 1 }, 77)).toBeUndefined();
+    expect(decideRerun({ ...fresh, redLoops: 1 }, 77) === undefined).toBe(true);
     expect(decideRerun({ ...fresh, redLoops: 2 }, 77)).toBe("loop-cap");
   });
 });
