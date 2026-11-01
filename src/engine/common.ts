@@ -34,6 +34,7 @@ import { mcpServersFor } from "../mcp";
 import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
 import { type IssueScope, scopeFrom } from "../core/model-tier";
 import { rehydrate } from "../rehydrate";
+import { stripOperatorDetail } from "../comment-voice";
 import { sanitizeIssue } from "../sanitize-issue";
 import type { GateRunner } from "../gates";
 import type { ProofGit } from "../proof";
@@ -52,7 +53,6 @@ import { emitEvent, type EventBus } from "./bus";
 import { configHash } from "../team/hash";
 import type { Minion } from "../core/minion";
 import type { MachineConfig, MachineLeases, MachineSpend } from "../machine";
-
 export type { Stage };
 export type Outcome =
   | "needs-info"
@@ -212,7 +212,7 @@ export async function postComment(
   body: string,
   dataTag?: { stage: string; json: unknown },
 ): Promise<void> {
-  if (!body.trim()) return;
+  if (!(body = stripOperatorDetail(body)).trim()) return; // no model, amount or run id reaches a maintainer (#145)
   const secrets = scanText(body);
   if (secrets.length > 0) {
     finish(deps, config, issueNumber, "needs-human", describeFindings(secrets));

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { commentProblems, openingLine } from "../src/comment-voice";
+import { commentProblems, openingLine, stripOperatorDetail } from "../src/comment-voice";
 
 const ASSETS = join(import.meta.dir, "..", "template", ".claude", "skills", "factory-comment", "assets");
 const TEMPLATES = ["triage", "question", "plan", "status", "verdict"] as const;
@@ -94,6 +94,14 @@ describe("commentProblems rejects", () => {
     expect(commentProblems(`${ok}The run id is missing.\n`)).toEqual(["shows a run id"]);
     expect(commentProblems(`${ok}Run 123e4567-e89b-12d3-a456-426614174000 ended.\n`)).toEqual(["shows a run id"]);
   });
+  test("a runner id with a timestamp", () => {
+    expect(commentProblems(`${ok}Claimed by runner-10289-1793103791470.\n`)).toEqual(["shows a run id"]);
+  });
+  test("a money amount written with a code or word", () => {
+    expect(commentProblems(`${ok}It cost 1.2 USD.\n`)).toEqual(["shows a dollar amount"]);
+    expect(commentProblems(`${ok}It cost EUR 3.\n`)).toEqual(["shows a dollar amount"]);
+    expect(commentProblems(`${ok}It cost 5 dollars.\n`)).toEqual(["shows a dollar amount"]);
+  });
   test("every problem at once", () => {
     expect(commentProblems("**Stage:** build\nclaude-opus-5-5 spent $2 in run-abcd1234\n")).toEqual([
       "opens with something other than one plain sentence",
@@ -101,5 +109,23 @@ describe("commentProblems rejects", () => {
       "shows a dollar amount",
       "shows a run id",
     ]);
+  });
+});
+
+describe("commentProblems allows plain prose with numbers", () => {
+  const ok = "<!-- factory:status v1 -->\nThe build finished and verify is next.\n";
+  test("counts, dates, versions and ids that are not runs", () => {
+    expect(commentProblems(`${ok}I changed 3 files in 12 minutes on 2026-11-01.\n`)).toEqual([]);
+    expect(commentProblems(`${ok}Tests 10289 passed, see issue-145-2026.\n`)).toEqual([]);
+    expect(commentProblems(`${ok}The user pays in euros and uses 2 USB ports.\n`)).toEqual([]);
+  });
+});
+
+describe("stripOperatorDetail", () => {
+  test("removes each kind and keeps the prose", () => {
+    expect(stripOperatorDetail("Built by claude-opus-5-5 for 1.2 USD in runner-10289-1793103791470.")).toBe(
+      "Built by [removed] for [removed] in [removed].",
+    );
+    expect(stripOperatorDetail("I changed 3 files.")).toBe("I changed 3 files.");
   });
 });
