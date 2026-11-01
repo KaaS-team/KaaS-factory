@@ -1,0 +1,1 @@
+{"name":"commit why is not capped at three sentences","file":"src/commit-message.ts","find":"sentences.slice(0, max).join(\"\")","replace":"sentences.join(\"\")","test":"tests/commit-message.test.ts"}

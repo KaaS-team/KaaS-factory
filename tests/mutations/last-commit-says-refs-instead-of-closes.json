@@ -1,0 +1,1 @@
+{"name":"last commit says Refs instead of Closes","file":"src/engine/epic.ts","find":"taskCommitMessage(last, goal, type, ref, \"Closes\")","replace":"taskCommitMessage(last, goal, type, ref, \"Refs\")","test":"tests/commit-message.test.ts"}

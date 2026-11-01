@@ -66,9 +66,82 @@ describe("factory commit messages", () => {
     expect(bodies).toHaveLength(2);
     for (const b of bodies) {
       expect(b).toContain("Operators need a machine readable record of runs.");
-      expect(b).toMatch(/^Closes #122$/m);
       expect(b).toMatch(/^Signed-off-by: .+ <.+>$/m);
     }
+    // Newest first: the last commit closes, the earlier task commit only refers.
+    expect(bodies[0]).toMatch(/^Closes #122$/m);
+    expect(bodies[1]).toMatch(/^Refs #122$/m);
+    expect(bodies[1]).not.toContain("Closes");
+  });
+
+  test("the why is the Problem paragraph capped at three sentences, not the whole goal", async () => {
+    const dir = repo();
+    writeFileSync(join(dir, "a.ts"), "a");
+    await commitByTask(new Git(new GitCommandRunner()), dir, {
+      tasks: [],
+      goal: "Goal one. Goal two. Goal three. Goal four.",
+      problem: "## Problem\nFirst. Second. Third. Fourth. Fifth.\n\n## Wanted\nOther text.",
+      type: "feat",
+      ref: "#122",
+      title: "Export runs",
+      files: ["a.ts"],
+    });
+    const body = git(dir, "log", "-1", "--format=%b").trim();
+    expect(body).toContain("First. Second. Third.");
+    expect(body).not.toContain("Fourth");
+    expect(body).not.toContain("Goal");
+    expect(body).not.toContain("Other text");
+  });
+
+  test("without a Problem paragraph the goal is the why, capped at three sentences", async () => {
+    const dir = repo();
+    writeFileSync(join(dir, "a.ts"), "a");
+    await commitByTask(new Git(new GitCommandRunner()), dir, {
+      tasks: [],
+      goal: "Goal one. Goal two. Goal three. Goal four.",
+      type: "feat",
+      ref: "#122",
+      title: "Export runs",
+      files: ["a.ts"],
+    });
+    const body = git(dir, "log", "-1", "--format=%b").trim();
+    expect(body).toContain("Goal one. Goal two. Goal three.");
+    expect(body).not.toContain("Goal four");
+  });
+
+  test("task commits use their own task text, not the shared goal title", async () => {
+    const dir = repo();
+    writeFileSync(join(dir, "a.ts"), "a");
+    writeFileSync(join(dir, "b.ts"), "b");
+    await commitByTask(new Git(new GitCommandRunner()), dir, {
+      tasks: [
+        { id: "T1", title: "Write the parser", files: ["a.ts"] },
+        { id: "T2", title: "Wire the flag", files: ["b.ts"] },
+      ],
+      goal: "Runs need exporting.",
+      type: "feat",
+      ref: "#122",
+      title: "Export runs",
+      files: ["a.ts", "b.ts"],
+    });
+    const body = git(dir, "log", "-2", "--format=%b%x00");
+    expect(body).toContain("Task T1 of #122.");
+    expect(body).toContain("Task T2 of #122.");
+  });
+
+  test("the claim commit pushed by Git.claim has a plain title, the marker, and no Closes", async () => {
+    const origin = repo();
+    git(origin, "config", "receive.denyCurrentBranch", "ignore");
+    mkdirSync(tmpdir(), { recursive: true });
+    const clone = mkdtempSync(join(tmpdir(), "factory-cm-clone-"));
+    roots.push(clone);
+    git(clone, "init", "-q", "-b", "main");
+    git(clone, "remote", "add", "origin", origin);
+    expect(await new Git(new GitCommandRunner()).claim(clone, 122, "main")).toBe(true);
+    const msg = git(origin, "log", "-1", "--format=%B", "factory/issue-122");
+    expect(msg.split("\n")[0]).toBe("chore(factory): claim issue #122 for the factory");
+    expect(msg).toMatch(/^Factory-Claim: #122 runner .+$/m);
+    expect(msg).not.toMatch(/Closes/);
   });
 
   test("a single-task build title matches the conventional form with the issue at the end", async () => {

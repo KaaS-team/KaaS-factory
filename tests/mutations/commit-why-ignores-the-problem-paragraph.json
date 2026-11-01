@@ -1,0 +1,1 @@
+{"name":"commit why ignores the Problem paragraph","file":"src/commit-message.ts","find":"capSentences(problemParagraph(problemText) ?? goal)","replace":"capSentences(goal)","test":"tests/commit-message.test.ts"}
