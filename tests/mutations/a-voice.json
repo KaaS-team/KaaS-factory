@@ -1,0 +1,1 @@
+{"name":"a voice","file":"src/engine/common.ts","find":"if (!(body = stripOperatorDetail(body)).trim()) return;","replace":"if (!body.trim()) return;","test":"tests/secret-scan-wiring.test.ts"}

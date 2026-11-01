@@ -263,7 +263,6 @@ const build: StepType = {
     // The runner commits — the build skill's own instructions say so, but
     // nothing enforced it before (audit finding #4). `.factory/runs/` is
     // excluded; it's the stage handoff, never meant to land in the repo.
-    // One commit per planned task, conventional titles (epic.ts).
     const builtPlan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
     await commitByTask(deps.git, worktree, {
       tasks: builtPlan?.tasks ?? [],
@@ -272,6 +271,7 @@ const build: StepType = {
       ref: `#${issueNumber}`,
       title: issue.title,
       files: builtPlan?.files ?? [],
+      problem: issue.body,
     });
 
     // Defense in depth behind the guard hook: a Bash-made edit to a

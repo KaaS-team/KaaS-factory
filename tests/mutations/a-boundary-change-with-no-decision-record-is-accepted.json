@@ -1,1 +1,1 @@
-{"name":"a boundary change with no decision record is accepted","file":"src/boundary-record.ts","find":"if (plan?.boundaryChange !== true) return undefined;","replace":"if (true) return undefined;","test":"tests/boundary-record.test.ts"}
+{"name":"a boundary change with no decision record is accepted","file":"src/boundary-record.ts","find":"if (!plan || !planFlagsBoundary(plan)) return undefined;","replace":"if (true) return undefined;","test":"tests/boundary-record.test.ts"}
