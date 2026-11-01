@@ -13,3 +13,5 @@ relay/target/
 .playwright-cli/
 .claude/.gate-ran
 dist/
+__pycache__/
+*.pyc

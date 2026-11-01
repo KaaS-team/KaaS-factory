@@ -1,0 +1,1 @@
+{"name":"no-compiled-python","file":".gitignore","find":"__pycache__/\n","replace":"","test":"tests/no-compiled-python.test.ts"}
