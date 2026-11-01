@@ -882,7 +882,7 @@ describe("failure paths", () => {
       .comments.map((m) => m.body)
       .join("\n");
     expect(body).toContain("does not support 1 finding(s)");
-    expect(body).toContain("- invented bug");
+    expect(body).toContain("- [rejected] invented bug");
     // A supported finding stands: the reject still sends the issue back to build.
     const d = setup([LABEL.ready]);
     d.state.setToggle("auto_approve_low_risk", true);
