@@ -1,0 +1,1 @@
+{"name":"verdict post omits the requirement id table","file":"src/engine/verdict-rules.ts","find":"const table = criteriaTable(verdict.criteria);","replace":"const table = \"\";","test":"tests/verdict-criteria.test.ts"}
