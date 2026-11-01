@@ -5,7 +5,9 @@ import { type Autonomy, mergeAutoAllowed } from "./autonomy";
 import { touchesProtectedPath } from "./boundary";
 import type { CiResult } from "./ci";
 import type { MergeConfig } from "./config";
+import { humanPathRefusals } from "./human-paths";
 import type { GitHub, MergeReadiness } from "./github";
+import type { MergeSettings } from "./merge-method";
 import { type CodeownersRule, codeownerRefusals } from "./profile-rules";
 import { factRefusals, type PrFacts } from "./pr-facts";
 
@@ -170,6 +172,8 @@ export interface DecideMergeInput {
   // Set, the tier decides the merge from the PR facts instead of merge.policy alone.
   readonly autonomy?: Autonomy;
   readonly facts?: PrFacts;
+  // review.alwaysHumanPaths: added to the defaults in src/human-paths.ts.
+  readonly humanPaths?: readonly string[];
 }
 
 // Authority is explicit only (herdr SKILL.md:18-23): "merge" is returned only
@@ -183,7 +187,12 @@ export function decideMerge(input: DecideMergeInput): MergeDecision {
   const eligibilityRefusals = autoEligible(input.risk, input.changedFiles, input.merge, input.protectedPaths, mode);
   const owners = input.codeowners;
   const ownerRefusals = owners ? codeownerRefusals(owners.rules, input.changedFiles, owners.approvedBy) : [];
-  const refusals = [...readinessRefusals, ...eligibilityRefusals, ...ownerRefusals];
+  const refusals = [
+    ...readinessRefusals,
+    ...eligibilityRefusals,
+    ...ownerRefusals,
+    ...humanPathRefusals(input.changedFiles, input.humanPaths),
+  ];
   if (mode !== undefined) {
     if (mode === "supervised")
       return { outcome: "refuse", headSha, refusals: [{ reason: "autonomy-supervised", detail: "a human merges" }] };
@@ -221,9 +230,10 @@ export async function attemptMerge(
   repo: string,
   prNumber: number,
   decision: MergeDecision,
+  settings?: MergeSettings,
 ): Promise<boolean> {
   if (decision.outcome !== "merge") return false;
-  await github.mergePr(repo, prNumber, decision.headSha);
+  await github.mergePr(repo, prNumber, decision.headSha, settings);
   return true;
 }
 

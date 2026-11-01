@@ -23,7 +23,10 @@ reads like a triage comment on issue #40.
    (normally `.factory/runs/issue-<N>/<stage>-comment.md`). You do not call
    `gh` yourself: settings.json denies `gh` and `git push` to every stage,
    and the runner posts what you write.
-5. Plain language, short sentences. No em dashes. A person reading only this
+5. Open with one plain sentence saying what happened and what comes next.
+   Criteria and findings are short sentences, not field lists. Never put a
+   run id, a model name or a cost in a comment. Plain language, short
+   sentences. No em dashes. A person reading only this
    comment, with no other context, should understand the decision and why.
 
 ## Status comments are special

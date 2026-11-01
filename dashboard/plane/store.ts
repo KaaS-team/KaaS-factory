@@ -5,14 +5,9 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-export const ROLES = ["viewer", "approver", "operator", "owner"] as const;
-export type Role = (typeof ROLES)[number];
+import { isRole, type Role } from "@kaas-team/factory-protocol";
 
-export function atLeast(have: Role, need: Role): boolean {
-  return ROLES.indexOf(have) >= ROLES.indexOf(need);
-}
-
-export const isRole = (v: unknown): v is Role => ROLES.includes(v as Role);
+export { atLeast, isRole, ROLES, type Role } from "@kaas-team/factory-protocol";
 
 export interface Member {
   login: string;
@@ -49,6 +44,8 @@ export class PlaneStore {
   private readonly db: Database;
   // What else a removed member loses: remote.ts revokes their phones and push subscriptions here.
   readonly onRemoved: ((login: string) => void)[] = [];
+  // Called with each audit row once stored; a throwing hook never fails the write it records.
+  readonly onRecord: ((row: AuditRow) => void)[] = [];
 
   constructor(
     readonly path = ":memory:",
@@ -186,6 +183,13 @@ export class PlaneStore {
     const r = this.db
       .query("INSERT INTO plane_audit (at, actor, role, route, issue, status) VALUES (?, ?, ?, ?, ?, ?)")
       .run(new Date().toISOString(), row.actor, row.role, row.route, row.issue, row.status);
+    const stored = this.db.query("SELECT * FROM plane_audit WHERE id = ?").get(Number(r.lastInsertRowid)) as AuditRow;
+    for (const fn of this.onRecord)
+      try {
+        fn(stored);
+      } catch (e) {
+        console.error(`audit hook failed: ${String(e)}`);
+      }
     if (Number(r.lastInsertRowid) % this.limits.every !== 0) return;
     for (const [refused, keep] of [
       [1, this.limits.refusals],

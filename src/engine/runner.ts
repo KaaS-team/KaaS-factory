@@ -25,10 +25,15 @@ import {
 } from "./common";
 import { RuntimeMissing } from "./steps";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./registry";
+import { bindingFields } from "./approval-binding";
 import { emitEvent } from "./bus";
 import { readJournal } from "./journal";
 import { lateRoute } from "./late-route";
 import { holdForOverlap } from "../overlap";
+import { guardPlan } from "../plan-guard";
+import { unmetDeps } from "../plan-deps";
+import { isPlannedBody } from "./import-plan";
+import { runOriginOf } from "./run-origin";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
 const PARKED: ReadonlySet<Outcome> = new Set(["needs-info", "needs-human", "awaiting-approval", "failed"]);
@@ -46,7 +51,14 @@ export async function runWorkflow(
 ): Promise<Outcome> {
   if (!workflow.steps[startStep]) throw new Error(`workflow ${workflow.name} has no step "${startStep}"`);
   const at = { step: startStep, workflow };
-  const base = () => ({ repo: config.repo, issue: issue.number, workflow: at.workflow.name, sha: at.workflow.sha });
+  const origin = runOriginOf(issue.body);
+  const base = () => ({
+    repo: config.repo,
+    issue: issue.number,
+    workflow: at.workflow.name,
+    sha: at.workflow.sha,
+    startedBy: origin,
+  });
   const subject = `issue/${issue.number}`;
   let outcome: Outcome;
   try {
@@ -78,7 +90,14 @@ async function walk(
 ): Promise<Outcome> {
   let workflow = at.workflow;
   let step: Step = workflow.steps[at.step]!;
-  const base = () => ({ repo: config.repo, issue: issue.number, workflow: workflow.name, sha: workflow.sha });
+  const origin = runOriginOf(issue.body);
+  const base = () => ({
+    repo: config.repo,
+    issue: issue.number,
+    workflow: workflow.name,
+    sha: workflow.sha,
+    startedBy: origin,
+  });
   const subject = `issue/${issue.number}`;
   const issueNumber = issue.number;
   // What `if:` reads: each step's JSON, seeded from the thread so a resumed run sees earlier steps.
@@ -113,6 +132,44 @@ async function walk(
     step = workflow.steps["park" in edge ? edge.approve : edge.to]!;
   }
   if (step.label !== held) await moveLabel(deps, config, issueNumber, held, step.label);
+
+  // A fresh planned run (the issue body or an operator-passed spec) is read before any step runs.
+  if (journal.finished.size === 0 && isPlannedBody(issue.body ?? "")) {
+    const plain = guardPlan(issue.body ?? "", config);
+    const unmet = plain.ok ? await unmetDeps(issue.body ?? "", deps.github, config.repo, worktree) : [];
+    const guard = unmet.length ? { ok: false as const, reasons: unmet } : plain;
+    if (!guard.ok) {
+      await postComment(
+        deps,
+        config,
+        issueNumber,
+        ["Refused: the planned body is not a plan yet.", "", ...guard.reasons.map((r) => `- ${r}`)].join("\n"),
+        { stage: "plan-guard", json: { ok: false, reasons: guard.reasons } },
+      );
+      return await stopStep(deps, config, issueNumber, step.label, {
+        status: "needs-human",
+        reason: `plan guard: ${guard.reasons.length} reason(s)`,
+      });
+    }
+  }
+
+  // A fresh run proves it can push before any step spends: a refusal stops it with the plain reason.
+  if (journal.finished.size === 0 && deps.pushProbe) {
+    const probe = await deps.pushProbe(worktree, `issue-${issueNumber}-${Date.now()}`);
+    if (!probe.ok) {
+      await postComment(
+        deps,
+        config,
+        issueNumber,
+        `Stopped before any work: this session cannot push (${probe.reason}). Fix the access and \`/factory retry\`.`,
+        { stage: "push-probe", json: { ok: false, reason: probe.reason } },
+      );
+      return await stopStep(deps, config, issueNumber, step.label, {
+        status: "needs-human",
+        reason: `push probe: ${probe.reason}`,
+      });
+    }
+  }
 
   try {
     for (;;) {
@@ -166,7 +223,12 @@ async function walk(
       if ("park" in edge) {
         await moveLabel(deps, config, issueNumber, from, LABEL.awaitingApproval);
         const token = crypto.randomUUID();
-        emitEvent(deps.bus, "factory.approval.requested", { ...base(), step: step.id, token }, subject);
+        emitEvent(
+          deps.bus,
+          "factory.approval.requested",
+          { ...base(), step: step.id, token, ...bindingFields(facts.plan, undefined, deps.now?.() ?? new Date()) },
+          subject,
+        );
         if (edge.after) {
           const at = new Date((deps.now?.() ?? new Date()).getTime() + edge.after).toISOString();
           await postComment(

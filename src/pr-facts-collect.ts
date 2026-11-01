@@ -11,10 +11,11 @@ import type { PrFacts } from "./pr-facts";
 import type { ProofResult } from "./proof";
 import { isChecked } from "./recheck";
 import { reviewModel } from "./review-models";
+import { healFindings } from "./healer";
 import { tamperHits } from "./tamper";
 
 export const PR_FACTS_FILE = "pr-facts.json";
-export type VerifyFacts = Pick<PrFacts, "cleanRoom" | "changedLines" | "tamper" | "supplyChain" | "review">;
+export type VerifyFacts = Pick<PrFacts, "cleanRoom" | "changedLines" | "tamper" | "supplyChain" | "review" | "docs">;
 
 async function sh(cwd: string, cmd: string[]): Promise<{ code: number; out: string }> {
   const p = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "ignore" });
@@ -59,7 +60,7 @@ export async function collectVerifyFacts(
   const reviewer = resolveRoute(config.agents, config.stages, config.routes, "verify", type).config;
   const model = reviewModel(reviewer.model, builder.model, [reviewer.model, ...Object.values(reviewer.models ?? {})]);
   return {
-    tamper: tamperHits(diff),
+    tamper: [...tamperHits(diff), ...healFindings(worktree, issue)],
     changedLines: testCmd ? await runChangedLineMutants(worktree, diff, testCmd) : null,
     cleanRoom: room
       ? { ran: room.ran, failToPass: proof?.status === "bites", passToPass: room.ran && room.exitCode === 0 }

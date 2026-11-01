@@ -1,0 +1,7 @@
+{
+  "name": "backup: the stack never schedules a backup",
+  "file": "src/backup.ts",
+  "find": "return config ? schedule(config, factoryHome(env)) : undefined;",
+  "replace": "return undefined;",
+  "test": "tests/backup.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "machine: acquire drops the per-repo count",
+  "file": "src/machine.ts",
+  "find": "if (mine >= cap.repoCap) return undefined;",
+  "replace": "",
+  "test": "tests/machine.test.ts"
+}

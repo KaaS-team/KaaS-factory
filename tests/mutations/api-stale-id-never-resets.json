@@ -1,0 +1,7 @@
+{
+  "name": "api: stale id never resets",
+  "file": "src/api/stream.ts",
+  "find": "reset: true",
+  "replace": "reset: false",
+  "test": "tests/api-contract.test.ts"
+}

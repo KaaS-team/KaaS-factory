@@ -1,0 +1,7 @@
+{
+  "name": "merge-resolve: take the branch side for baseline",
+  "file": "src/merge-resolve.ts",
+  "find": "\"checkout\", \"--ours\"",
+  "replace": "\"checkout\", \"--theirs\"",
+  "test": "tests/merge-resolve.test.ts"
+}

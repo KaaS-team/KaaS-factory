@@ -20,6 +20,18 @@ Closes #
 
 <!-- Link to the verdict comment: per-AC pass/fail and the test that bites. -->
 
+## Confidence
+
+<!-- One row per layer: what it proved for this change, or `not run` and why. -->
+
+| Layer | What it proved |
+| --- | --- |
+| Gate | |
+| Proof (fails on base) | |
+| Changed-line mutants | |
+| Review findings with evidence | |
+| UI preview and smoke | |
+
 ## Risk and rollback
 
 <!-- Risk level from the plan, and how to roll this back if it goes wrong. -->

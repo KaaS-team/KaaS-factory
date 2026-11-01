@@ -4,7 +4,8 @@
 // and moves the label), "reject" (the engine follows `reject:`), or "stop"
 // once it has parked or finished the issue itself, from `step.label`.
 
-import { readFileSync } from "node:fs";
+import { readRunJson, settleVerdict, verdictPost } from "./verdict-rules";
+import { prPreflight } from "./pr-preflight";
 import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
@@ -29,12 +30,14 @@ import {
   type VerdictArtifact,
 } from "../artifacts";
 import { isChecked } from "../recheck";
+import { rejectedNote, rejectLimit } from "../review-cap";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
 import { runProof, type ProofResult } from "../proof";
 import { touchesProtectedPath } from "../boundary";
 import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
+import { withRepro } from "../bug-repro";
 import { LABEL, issueType, typesFor } from "../labels";
 import { resolveAgentByName, resolveRoute } from "../agents/executor";
 import { buildEscalation, buildFamily } from "../core/model-tier";
@@ -51,11 +54,11 @@ import {
   renderTaskTable,
   scopeOf,
 } from "./epic";
-import { issueRef, postRunDetails, prBody, renderRunDetails, renderWhatChanged } from "./pr-body";
+import { issueRef, postRunDetails, prBody, prExtras, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
-import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
+import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
 import {
   failureTail,
   finish,
@@ -74,8 +77,7 @@ import {
   type WatchDeps,
 } from "./common";
 
-// A check step names a runtime this machine lacks. Boot refuses that, so this
-// is a workflow edited while the watcher runs.
+// A check step names a runtime this machine lacks. Boot refuses that, so this is a workflow edited while running.
 export class RuntimeMissing extends Error {}
 
 export interface StepCtx {
@@ -261,7 +263,6 @@ const build: StepType = {
     // The runner commits — the build skill's own instructions say so, but
     // nothing enforced it before (audit finding #4). `.factory/runs/` is
     // excluded; it's the stage handoff, never meant to land in the repo.
-    // One commit per planned task, conventional titles (epic.ts).
     const builtPlan = readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json");
     await commitByTask(deps.git, worktree, {
       tasks: builtPlan?.tasks ?? [],
@@ -270,20 +271,21 @@ const build: StepType = {
       ref: `#${issueNumber}`,
       title: issue.title,
       files: builtPlan?.files ?? [],
+      problem: issue.body,
     });
 
     // Defense in depth behind the guard hook: a Bash-made edit to a
     // protected path never reaches Edit/Write, so the hook never sees it
     // (audit finding #12). Diff the branch itself before pushing anything.
     const changed = await deps.git.changedFiles(worktree, config.base);
-    // `.factory/**` is already unconditionally protected below (ALWAYS_PROTECTED_PATHS),
-    // covering the default holdout location; this adds any holdout path a
-    // repo configured outside it.
+    // `.factory/**` is already always protected (ALWAYS_PROTECTED_PATHS), covering the default
+    // holdout location; this adds any holdout path a repo configured outside it.
     const protectedPaths = [
       ...config.protectedPaths,
       ...(await hiddenPaths(deps.setupRunner ?? new ShellSetupRunner(), config, worktree)),
     ];
-    const hits = touchesProtectedPath(changed, protectedPaths);
+    const baseFiles = await deps.git.baseFiles(worktree, config.base);
+    const hits = touchesProtectedPath(changed, protectedPaths, { baseFiles });
     if (hits.length) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
       finish(deps, config, issueNumber, "needs-human", `touched protected path(s): ${hits.join(", ")}`);
@@ -302,13 +304,26 @@ const build: StepType = {
   },
 };
 
+// A check the build failed is the build's to fix: send it back, or past the reject limit hand it to a person.
+async function rejectToBuild(sc: StepCtx, body: string, json: object, why: string): Promise<StepResult> {
+  const { deps, config, issue, ctx, step } = sc;
+  ctx.rejectRound += 1;
+  ctx.failure = failureTail(body);
+  await postComment(deps, config, issue.number, body, { stage: "verify", json });
+  if (ctx.rejectRound <= sc.workflow.limits.rejects) return { kind: "reject" };
+  await moveLabel(deps, config, issue.number, step.label, LABEL.needsHuman);
+  await runRetro(deps, config, issue, "gave-up");
+  finish(deps, config, issue.number, "needs-human", `${why} ${ctx.rejectRound} times`);
+  return stop("needs-human");
+}
+
 const verify: StepType = {
   agent: true,
   rejects: true,
   async run(sc) {
     const { deps, config, issue, worktree, ctx, step, workflow } = sc;
     const issueNumber = issue.number;
-    const maxRejects = workflow.limits.rejects;
+    const maxRejects = rejectLimit(workflow.limits.rejects, config.review.maxRounds);
     // A verdict is only as good as its evidence: gate.json must describe
     // the tree being verified, so a resumed or amended run re-measures it.
     const tree = await deps.git.treeHash(worktree);
@@ -335,13 +350,9 @@ const verify: StepType = {
         return { kind: "reject" };
       }
     }
-    // Also a build problem, not something for the verifier to judge: a
-    // holdout test the build never saw is the one check its own gates.sh
-    // cannot have been tuned to pass. Unlike the gates recheck above, this
-    // runs on every entry to verify, not only a stale one — a fresh build
-    // flowing straight into verify in the same tick is the common case,
-    // and gate.json (written by the build, which never saw these paths)
-    // cannot possibly already cover them.
+    // Also a build problem, not the verifier's to judge: a holdout test the build never saw is the one
+    // check its own gates.sh cannot have been tuned to pass. It runs on every entry to verify, not only a
+    // stale one, since gate.json cannot already cover paths the build never saw.
     clearRunFiles(worktree, runDir(issueNumber));
     if (holdoutEnabled(config.holdout)) {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
@@ -350,24 +361,11 @@ const verify: StepType = {
         `${worktree}/${runDir(issueNumber)}/holdout.json`,
         `${JSON.stringify({ ok: holdout.ok, cmd: config.holdout.cmd, tail: holdout.detail }, null, 2)}\n`,
       );
-      if (!holdout.ok) {
-        ctx.rejectRound += 1;
-        ctx.failure = failureTail(`Holdout tests failed:\n${holdout.detail}`);
-        await postComment(deps, config, issueNumber, `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``, {
-          stage: "verify",
-          json: { holdout: holdout.detail },
-        });
-        if (ctx.rejectRound > maxRejects) {
-          await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
-          await runRetro(deps, config, issue, "gave-up");
-          finish(deps, config, issueNumber, "needs-human", `holdout tests failed ${ctx.rejectRound} times`);
-          return stop("needs-human");
-        }
-        return { kind: "reject" };
-      }
+      const failed = `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``;
+      if (!holdout.ok) return rejectToBuild(sc, failed, { holdout: holdout.detail }, "holdout tests failed");
     }
     if (deps.proofGit) {
-      const { planProof, testCmd } = await proofInputs(deps.proofGit, worktree, config, issueNumber);
+      const { planProof, testCmd, mutations } = await proofInputs(deps.proofGit, worktree, config, issueNumber);
       let proof: ProofResult;
       try {
         proof = await runProof(deps.proofGit, worktree, config.base, planProof, testCmd);
@@ -382,8 +380,17 @@ const verify: StepType = {
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
       await recordVerifyFacts(worktree, config, issueNumber, testCmd, proof);
+      const survived = await survivingMutations(deps.proofGit, worktree, config, mutations);
+      const found = survived && { survivingMutations: survived.names };
+      if (survived?.reject) return rejectToBuild(sc, survived.body, found!, "plan mutations survived");
+      if (survived) await postComment(deps, config, issueNumber, survived.body, { stage: "verify", json: found });
     }
-    const acceptance = await runAcceptance(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.base);
+    const acceptance = await runAcceptance(
+      deps.setupRunner ?? new ShellSetupRunner(),
+      worktree,
+      config.base,
+      config.acceptance.script,
+    );
     if (acceptance)
       await Bun.write(`${worktree}/${runDir(issueNumber)}/acceptance.json`, `${JSON.stringify(acceptance, null, 2)}\n`);
     // The pr agent runs in this worktree next, so the receipt signs what verify sealed here, not what it finds later.
@@ -393,20 +400,12 @@ const verify: StepType = {
     );
     deps.state.setSetting(sealKey(config.repo, issueNumber), seal ? JSON.stringify(seal) : "");
     // Like a failing holdout, an unproven criterion is the build's to fix, not the verifier's to judge.
-    const ownAcceptance =
+    const kitOwn =
       acceptance && planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json"));
+    const ownAcceptance = kitOwn && withRepro(kitOwn, issueType(config.routes, labelsOf(issue)));
     if (ownAcceptance && !acceptanceProven(ownAcceptance)) {
       const table = renderAcceptanceTable(ownAcceptance);
-      ctx.rejectRound += 1;
-      ctx.failure = failureTail(table);
-      await postComment(deps, config, issueNumber, table, { stage: "verify", json: { acceptance: ownAcceptance } });
-      if (ctx.rejectRound > maxRejects) {
-        await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
-        await runRetro(deps, config, issue, "gave-up");
-        finish(deps, config, issueNumber, "needs-human", `acceptance not proven ${ctx.rejectRound} times`);
-        return stop("needs-human");
-      }
-      return { kind: "reject" };
+      return rejectToBuild(sc, table, { acceptance: ownAcceptance }, "acceptance not proven");
     }
     const result = await runStage(deps, config, issue, "verify", worktree, stepOpts(step));
     const art = await readStageArtifacts(worktree, issueNumber, "verify");
@@ -418,6 +417,8 @@ const verify: StepType = {
       json = rechecked.verdict;
       recheckNote = rechecked.note;
     }
+    if (json) json = await settleVerdict(sc, json);
+    const posted = art.comment && `${verdictPost(art.comment, json, ctx.rejectRound + 1, maxRejects)}${recheckNote}`;
     if (json) deps.state.setVerifyVerdict(config.repo, issueNumber, json.result);
     if (checked && !checked.ok) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
@@ -428,8 +429,7 @@ const verify: StepType = {
     if (verifyStop) return stop(await stopStep(deps, config, issueNumber, step.label, verifyStop));
     if (result.exitCode !== 0 || !json || json.result === "uncertain") {
       // The human needs the verdict to act on, and the post is the marker that retires the retry that led here.
-      if (art.comment)
-        await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+      if (posted) await postComment(deps, config, issueNumber, posted, { stage: "verify", json });
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
       const fallback = json ? "verify uncertain" : "verify produced no valid verdict.json";
       const cause = stageCause(config, issueNumber, "verify", result, { fallback });
@@ -442,15 +442,14 @@ const verify: StepType = {
       );
       return stop("needs-human");
     }
-    if (art.comment)
-      await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+    if (posted) await postComment(deps, config, issueNumber, posted, { stage: "verify", json });
     if (json.result === "reject") {
       ctx.rejectRound += 1;
-      ctx.failure = failureTail(art.comment ?? JSON.stringify(json.findings, null, 2));
+      ctx.failure = failureTail(posted || JSON.stringify(json.findings, null, 2));
       if (ctx.rejectRound > maxRejects) {
         await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
         await runRetro(deps, config, issue, "gave-up");
-        finish(deps, config, issueNumber, "needs-human", `rejected ${ctx.rejectRound} times`);
+        finish(deps, config, issueNumber, "needs-human", rejectedNote(ctx.rejectRound, config.review.maxRounds));
         return stop("needs-human");
       }
       return { kind: "reject" };
@@ -460,32 +459,6 @@ const verify: StepType = {
   },
 };
 
-function readRunJson<T>(worktree: string, issueNumber: number, name: string): T | undefined {
-  try {
-    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/${name}`, "utf8")) as T;
-  } catch {
-    return undefined; // the stage that writes it did not run
-  }
-}
-
-async function unshippedBranch(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  worktree: string,
-  issueNumber: number,
-): Promise<string | undefined> {
-  let remote: string | undefined;
-  try {
-    remote = await deps.git.remoteHeadSha(worktree, issueNumber);
-  } catch (err) {
-    return `pr_remote_unreachable: ${(err as Error).message}`;
-  }
-  if ((await deps.git.headSha(worktree)) !== remote)
-    return "pr_head_mismatch: the remote branch is not the verified commit";
-  if (!(await deps.git.hasCommits(worktree, config.base))) return "pr_empty: the branch has no commits over base";
-  return undefined;
-}
-
 const pr: StepType = {
   agent: true,
   terminal: true,
@@ -494,12 +467,11 @@ const pr: StepType = {
     const issueNumber = issue.number;
     // The PR must point at the commit verify saw: a refused or stale push leaves the remote behind.
     // Checked before the paid pr agent runs.
-    const unshipped = await unshippedBranch(deps, config, worktree, issueNumber);
+    const unshipped = await prPreflight(deps, config, worktree, issueNumber);
     if (unshipped) return stop(await failStage(deps, config, issue, sc.step.label, "pr", unshipped));
     await runStage(deps, config, issue, "pr", worktree, stepOpts(sc.step));
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
-    // A revise from in-review re-enters here with the PR already open;
-    // the push in build already updated its branch.
+    // A revise from in-review re-enters here with the PR open; build's push updated its branch.
     const head = deps.git.branchName(issueNumber);
     const receipt = await renderRunDetails(deps.setupRunner ?? new ShellSetupRunner(), {
       worktree,
@@ -547,6 +519,8 @@ const pr: StepType = {
             readRunJson<VerdictArtifact>(worktree, issueNumber, "verdict.json")?.criteria,
           ),
           closes: config.tracker.kind === "github" && children.length ? closingLine(issueNumber, children) : undefined,
+          template: prTemplate(worktree),
+          ...(await prExtras(worktree, config, issueNumber, await deps.git.changedFiles(worktree, config.base))),
         }),
         draft: true,
       }));

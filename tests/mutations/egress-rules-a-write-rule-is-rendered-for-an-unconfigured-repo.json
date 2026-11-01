@@ -1,0 +1,1 @@
+{"name":"egress rules: a write rule is rendered for an unconfigured repo","file":"src/egress-rules.ts","find":"...cfg.repos.flatMap((repo): EgressRule[] => [","replace":"...[...cfg.repos, \"evil/other\"].flatMap((repo): EgressRule[] => [","test":"tests/egress-rules.test.ts"}

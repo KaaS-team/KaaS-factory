@@ -14,13 +14,14 @@ files inside this worktree and write the artifact files below.
 - `.factory/runs/issue-<N>/issue.json`, `triage.json`, `plan.json`,
   `plan-comment.md`: the approved plan (AC-n, NG-n, files, tests, repo
   skills to apply, gate level).
+- `plan.json` is absent when the workflow has no plan step: do not stop. Build from `triage.json`:
+  each `done_when` entry is an AC-n, `files_expected` the files to touch, `gate_level` the gate, proof `test`.
 - `.factory/runs/issue-<N>/revise.md`, present only when a human sent
   `/factory revise <text>` on the PR: a change to make this round, even if
   the plan is already built. `revision.md` beside it holds every earlier
   round; honour all of it, and stop at step 5 if it crosses a non-goal.
 - Already in your context pack: the charter, the route's skills, the plan's files (not `CODING_STANDARDS.md`; the reviewer enforces it).
-- The repo skills named in the plan (`.claude/skills/<name>/SKILL.md`):
-  read and follow them; they encode repo-specific rules you don't know.
+- The repo skills the plan names (`.claude/skills/<name>/SKILL.md`): read and follow them.
 
 ## 2. Build to the plan's proof, smallest change
 
@@ -34,12 +35,12 @@ Read `plan.json`'s `proof` (absent means `test`).
   clean, a link check finds no dead link). Re-run every named check before
   step 3, not just the one for the AC you just touched.
 
-Either way: do not touch a file outside the plan's "files to touch" list
-without a real reason; if you find you need to, that's a signal to stop and
-ask (step 5), not to quietly expand scope. Never cross a non-goal (NG-n);
-those are binding.
+Either way: stay inside the "files to touch" list; needing more is a signal
+to stop and ask (step 5). Never cross a non-goal (NG-n); those are binding.
 
 Apply every repo skill named in the plan as you go, not as an afterthought.
+
+git rm takes plain files only; protected paths are refused.
 
 ## 3. Run the gate
 
@@ -51,7 +52,6 @@ tests failed"; show the line that failed.
 If the gate fails and you can see why, fix it and re-run. Stop after 3
 failed gate runs: write `"status": "red"` and `"outcome": "blocked"` with the
 reason in `summary`, and quote the failing gate line in the status comment.
-A human looks at a blocked build; don't leave it for `factory-verify` to find.
 
 ## 4. UI route: capture screenshots
 

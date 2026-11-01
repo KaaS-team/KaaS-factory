@@ -10,3 +10,5 @@ and stage it (`git add docs/design/reviews/`, the runner pushes it like any
 other file), then record `{ "state", "viewport", "theme", "path" }` in
 `build.json`'s `screenshots` array. Only the `ui` route adds that array. An empty or
 missing one is not done; `factory-verify` rejects it for missing coverage.
+
+QA output is a Playwright spec committed with the change (`*.spec.ts` or `*.e2e.ts`) that drives the AC states; it fails on the parent commit and passes on head; a UI change with no spec cannot merge on its own (rung 8).

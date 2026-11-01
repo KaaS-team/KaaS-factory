@@ -1,0 +1,7 @@
+{
+  "name": "onboard ignores unchecked doctor",
+  "file": "src/onboard-json.ts",
+  "find": "if (checks === undefined) return \"Not checked\";",
+  "replace": "if (checks === undefined) return \"Ready\";",
+  "test": "tests/onboard-json.test.ts"
+}

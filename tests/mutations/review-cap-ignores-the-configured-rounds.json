@@ -1,0 +1,1 @@
+{"name": "review cap ignores the configured rounds", "file": "src/review-cap.ts", "find": "Math.min(workflowRejects, maxRounds - 1)", "replace": "Math.min(workflowRejects, maxRounds)", "test": "tests/scenarios.test.ts"}

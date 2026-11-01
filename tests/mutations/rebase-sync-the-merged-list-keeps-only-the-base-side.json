@@ -1,0 +1,7 @@
+{
+  "name": "rebase sync: the merged list keeps only the base side",
+  "file": "src/rebase-sync.ts",
+  "find": "if (ours === base) return { value: theirs };",
+  "replace": "if (ours === base) return { value: ours };",
+  "test": "tests/rebase-sync.test.ts"
+}

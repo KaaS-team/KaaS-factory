@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { gateCount } from "./config";
 import { CHARTER_PATH } from "./context";
 import { toolchainOf } from "./images";
+import { withBuildScriptsProtected } from "./init-guard";
 import { readCommands, type Stack } from "./stack";
 
 // A config a person has filled in (no TODO, at least one gate) is theirs: init leaves it alone.
@@ -27,7 +28,7 @@ export function initConfig(
 ): Record<string, unknown> {
   const agentCommands = (example.agentCommands ?? {}) as Record<string, unknown>;
   const toolchain = toolchainOf(stack.name);
-  return {
+  const config = {
     ...example,
     ...(repo ? { repo } : {}),
     ...(toolchain ? { toolchain } : {}),
@@ -35,6 +36,7 @@ export function initConfig(
     setup: stack.setup,
     agentCommands: { ...agentCommands, read: readCommands(stack), build: stack.commands, verify: stack.commands },
   };
+  return withBuildScriptsProtected(config);
 }
 
 export function describeStack(stack: Stack): string[] {

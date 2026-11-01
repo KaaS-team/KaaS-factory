@@ -25,6 +25,10 @@ const HIGH_RISK = [
   /(^|\/)Dockerfile$/,
 ];
 
+// A model review is never the only pass for auth, security or money code,
+// so these paths need a human merge.
+const SENSITIVE = /(^|\/)(auth|authn|authz|oauth|security|payments?|billing)(\/|\.[a-z]+$)/;
+
 // Wider than this many files is medium at least, however small each edit is.
 export const WIDE_FILES = 10;
 
@@ -77,6 +81,8 @@ export function ratedRisk(
   const reasons: string[] = [];
   const risky = paths.filter((p) => HIGH_RISK.some((re) => re.test(p)));
   if (risky.length) reasons.push(`schema, CI or dependency file: ${risky.join(", ")}`);
+  const sensitive = paths.filter((p) => SENSITIVE.test(p));
+  if (sensitive.length) reasons.push(`auth, security or money path: ${sensitive.join(", ")}`);
   if (protectedHits.length) reasons.push(`protected path: ${protectedHits.join(", ")}`);
   if (owners.length) reasons.push(`owned by ${owners.join(", ")}`);
   let level: Risk = reasons.length ? "high" : "low";

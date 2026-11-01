@@ -9,11 +9,16 @@ export interface RevertSteps {
   smoke(): Promise<boolean>;
   // Opens a PR that reverts `sha` and returns its URL.
   openRevert(sha: string, why: string): Promise<string>;
+  // Opens the follow-up issue that asks for a regression test or a rule for the reverted change.
+  openFollowUp?(sha: string, why: string, revertUrl: string): Promise<void>;
 }
 
 export async function watchAfterMerge(sha: string, steps: RevertSteps): Promise<{ ok: boolean; revert?: string }> {
   if (await steps.smoke()) return { ok: true };
-  return { ok: false, revert: await steps.openRevert(sha, "the live smoke failed after merge") };
+  const why = "the live smoke failed after merge";
+  const revert = await steps.openRevert(sha, why);
+  if (steps.openFollowUp) await steps.openFollowUp(sha, why, revert);
+  return { ok: false, revert };
 }
 
 export const CFR_TIGHTEN = 0.15;

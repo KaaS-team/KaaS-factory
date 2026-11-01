@@ -23,4 +23,12 @@ export const LIVE_RUNTIMES: Readonly<Record<string, LiveRuntime>> = {
     env: ["FACTORY_LIVE_SANDBOX_URL", "FACTORY_LIVE_SANDBOX_TOKEN"],
     spec: (e) => ({ kind: "http", url: e.FACTORY_LIVE_SANDBOX_URL!, tokenEnv: "FACTORY_LIVE_SANDBOX_TOKEN" }),
   },
+  agent37: {
+    env: ["FACTORY_LIVE_AGENT37_INSTANCE", "FACTORY_LIVE_AGENT37_KEY"],
+    spec: (e) => ({
+      kind: "agent37",
+      instance: e.FACTORY_LIVE_AGENT37_INSTANCE!,
+      tokenEnv: "FACTORY_LIVE_AGENT37_KEY",
+    }),
+  },
 };

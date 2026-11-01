@@ -1,0 +1,1 @@
+{"name":"pr-lint: open a PR with a placeholder verdict","file":"src/engine/pr-body.ts","find":"template === undefined ? [] : problems(body, template)","replace":"[]","test":"tests/pr-body-lint.test.ts"}

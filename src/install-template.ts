@@ -1,6 +1,7 @@
 // Installs the factory template into a target repo. Default mode never overwrites a file that is
 // already there, so a repo customizing a skill keeps its own copy. `update` pulls in runner-side
-// fixes: every factory-owned file is overwritten except .claude/settings.json, which a repo may
+// fixes: every factory-owned file is overwritten, unless the repo edited it since the last install
+// (see update-guard.ts; it gets a .factory-new beside it), except .claude/settings.json, which a repo may
 // have hand-tuned; that one gets a .claude/settings.json.factory-new when it differs. `ci` also
 // writes an inert .github/workflows/factory.yml.example. `dryRun` reports without touching anything.
 
@@ -21,6 +22,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { runnerRoot } from "./template-root";
 import { agentRegistry } from "./agent-dirs";
 import { PRESETS } from "./agents/presets";
+import { readManifest, userEdited } from "./update-guard";
 
 export interface InstallOptions {
   dryRun?: boolean;
@@ -51,9 +53,17 @@ export const AGENT_DIRS: Readonly<Record<string, { skillsDir: string; contextFil
   ]),
 );
 
-const REPO_OWNED = new Set([".factory/charter.md", ".factory/config.example.json", ".factory/memory/lessons.md"]);
+const REPO_OWNED = new Set([
+  ".factory/charter.md",
+  ".factory/config.example.json",
+  ".factory/memory/lessons.md",
+  "REVIEW.md",
+]);
 // Files an earlier release installed and this one no longer ships; `update` removes them.
 const RETIRED = [".claude/agents/factory-verifier.md", ".claude/agents/factory-explorer.md"];
+// Offered, never written: install does not create files under .github/workflows beyond the inert --ci example.
+export const RELEASE_OFFER =
+  "factory install: offer: a release workflow (tag and generated notes on a merged PR) is not installed; add .github/workflows/release.yml yourself if you want one.";
 const CI_DEST_REL = ".github/workflows/factory.yml.example";
 
 function walk(dir: string, prefix = ""): string[] {
@@ -107,6 +117,8 @@ export function installTemplate(
   let wrote = 0;
   let unchanged = 0;
   const owned = new Set<string>();
+  const manifest = opts.update ? readManifest(base) : new Map<string, string>();
+  const kept = new Set<string>();
 
   for (const [rel, content] of files.template) {
     const dest = join(base, rel);
@@ -132,6 +144,16 @@ export function installTemplate(
       lines.push(`skip (repo-owned): ${rel}`);
       skipped.push(rel);
       owned.add(rel);
+      continue;
+    }
+
+    // update keeps a file the repo edited since the last install and offers the template beside it.
+    if (opts.update && userEdited(manifest, rel, dest, content)) {
+      if (!dry) writeFileSync(`${dest}.factory-new`, content);
+      lines.push(`kept (edited): ${rel}, ${dry ? "would write" : "wrote"} ${rel}.factory-new to reconcile`);
+      skipped.push(rel);
+      owned.add(rel);
+      kept.add(rel);
       continue;
     }
 
@@ -183,6 +205,10 @@ export function installTemplate(
     for (const [rel, content] of files.template) {
       if (REPO_OWNED.has(rel)) continue;
       const dest = join(base, rel);
+      if (kept.has(rel)) {
+        entries.push(`    ${JSON.stringify(rel)}: "${manifest.get(rel)}"`);
+        continue;
+      }
       if (!existsSync(dest) || !readFileSync(dest).equals(content)) continue;
       entries.push(`    ${JSON.stringify(rel)}: "${sha(content)}"`);
     }
@@ -239,6 +265,7 @@ export function installTemplate(
   }
 
   lines.push("");
+  lines.push(RELEASE_OFFER);
   lines.push(
     `factory install: ${dry ? "would write" : "wrote"} ${wrote} item(s), skipped ${skipped.length} existing item(s), ${unchanged} unchanged in ${base}`,
   );

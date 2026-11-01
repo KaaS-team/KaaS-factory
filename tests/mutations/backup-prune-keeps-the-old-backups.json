@@ -1,0 +1,7 @@
+{
+  "name": "backup: prune keeps the old backups",
+  "file": "src/backup.ts",
+  "find": "b.at.getTime() < cutoff",
+  "replace": "b.at.getTime() >= cutoff",
+  "test": "tests/backup.test.ts"
+}

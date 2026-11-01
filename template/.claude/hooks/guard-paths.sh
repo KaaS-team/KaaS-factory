@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Read|Bash|Agent. Refuses writes to
+# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Read|Bash|Agent|Grep|Glob. Refuses writes to
 # protected paths (.factory/config.json's protectedPaths, plus .claude/**, .agents/** and
 # .factory/** always), merges and force-pushes, and inside a factory stage the
 # shell shapes the stage's permission mode refuses, naming the fix, and a
@@ -209,7 +209,48 @@ def hidden_root(glob):
 
 
 def names_hidden(command):
-    return [g for g in HIDDEN if re.search(r"(?<![\w.-])" + re.escape(hidden_root(g)) + r"(?![\w-])", command)]
+    return [g for g in HIDDEN if re.search(r"(?<![\w.-])" + re.escape(hidden_root(g)) + r"(?![\w-])", command, re.I)]
+
+
+def git_rm_problem(command):
+    # The one implementation of the git rm rules (#52): build may delete only named plain files inside
+    # the worktree and outside protectedPaths. Refuses by default and fails closed.
+    root = os.path.realpath(project_dir)
+    globs = []
+    try:
+        with open(f"{root}/.factory/config.json") as f:
+            globs = json.load(f).get("protectedPaths", [])
+    except FileNotFoundError:
+        pass
+    except Exception:
+        return "config.json cannot be read (fails closed)"
+    if not (isinstance(globs, list) and all(isinstance(g, str) for g in globs)):
+        return "protectedPaths is not a list of strings (fails closed)"
+    if any("{" in g for g in globs):
+        return "a brace glob in protectedPaths cannot be matched here (fails closed)"
+    for segment in re.split(SEPARATORS, unquoted(command)):
+        words = segment.split()
+        if words[:1] == ["git"] and words[1:2] and words[1].startswith("-") and "rm" in words[1:]:
+            return "options before rm are not allowed"
+        if words[:2] != ["git", "rm"]:
+            continue
+        if re.search(r"[\\'\"$`]", command):
+            return "name each plain file, no patterns (quotes and escapes are masked, so they are refused)"
+        flags = [w for w in words[2:] if w.startswith("-") and w != "--"]
+        if any(not re.fullmatch(r"-[fq]+|--(quiet|ignore-unmatch)", w) for w in flags):
+            return "only -f, -q, --quiet and --ignore-unmatch are allowed"
+        paths = [w for w in words[2:] if w not in flags and w != "--"]
+        if not paths or any(not re.fullmatch(r"[\w@%+=,./-]+", w) for w in paths):
+            return "name each plain file, no patterns"
+        for w in paths:
+            rel = os.path.relpath(os.path.realpath(os.path.join(root, w)), root)
+            if rel == "." or rel.startswith(".."):
+                return f"{w} is outside the worktree"
+            # Compared without case: SRC/payments/x.ts is src/payments/x.ts on macOS and Windows.
+            low = rel.lower()
+            if low.split("/")[0] in (".claude", ".agents", ".factory") or any(fnmatch.fnmatchcase(low, g.lower()) for g in globs):
+                return f"{w} is a protected path"
+    return None
 
 
 if tool_name == "Bash":
@@ -220,6 +261,9 @@ if tool_name == "Bash":
     if hits:
         block(f"guard-paths: blocked, {hidden_root(hits[0])} holds the tests this change is graded by; no stage reads them. "
               "Build from the spec's acceptance criteria instead.")
+    rm_problem = git_rm_problem(command) if os.environ.get("FACTORY_STAGE") else None
+    if rm_problem:
+        block(f"guard-paths: blocked git rm: {rm_problem}. Command: {command}")
     if merges_or_force_pushes(command):
         block(f"guard-paths: blocked — a stage never merges or force-pushes: {command}")
     if os.environ.get("FACTORY_STAGE"):
@@ -237,10 +281,19 @@ if tool_name == "Agent":
               "and wait for its answer: a stage must not end its turn before the result is in.")
     sys.exit(0)
 
-if tool_name not in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Read"):
+if tool_name not in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Read") + ("Grep", "Glob"):
     sys.exit(0)
-if tool_name == "Read" and not HIDDEN:
+if tool_name in ("Read", "Grep", "Glob") and not HIDDEN:
     sys.exit(0)
+
+# Grep and Glob read like Read: their pattern and glob text may name a hidden root too.
+if tool_name in ("Grep", "Glob"):
+    for key in ("pattern", "glob"):
+        text = tool_input.get(key, "")
+        if not isinstance(text, str):
+            block(f"guard-paths: blocked, the {key} is not a string (fails closed)")
+        if names_hidden(text):
+            block(f"guard-paths: blocked, the {key} names {hidden_root(names_hidden(text)[0])}, which holds the tests this change is graded by; no stage reads them.")
 
 path = tool_input.get("file_path") or tool_input.get("notebook_path") or tool_input.get("path") or ""
 if not isinstance(path, str) or not isinstance(hook_input.get("cwd") or "", str):
@@ -268,10 +321,11 @@ root = max(inside, key=len) if inside else roots[0]
 
 rel = path[len(root) + 1 :] if path.startswith(root + "/") else path
 
+# macOS ignores case: HoldOut/x is holdout/x.
 for g in HIDDEN:
-    if fnmatch.fnmatch(rel, g) or rel == hidden_root(g) or rel.startswith(hidden_root(g) + "/"):
+    if fnmatch.fnmatch(rel.lower(), g.lower()) or rel.lower().startswith(hidden_root(g).lower() + "/") or rel.lower() == hidden_root(g).lower():
         block(f'guard-paths: blocked, "{rel}" holds the tests this change is graded by; no stage reads or edits them.')
-if tool_name == "Read":
+if tool_name in ("Read", "Grep", "Glob"):
     sys.exit(0)
 
 if rel.startswith(".factory/runs/"):
@@ -290,8 +344,13 @@ if os.path.lexists(config_path):
 
 globs += [".claude/**", ".agents/**", ".factory/**"]
 
+# macOS ignores case, so `.Claude/x` is `.claude/x`: compare lowercased, and refuse anything
+# under the three always-protected roots by name, whatever the globs say.
+if rel.lower().split("/")[0] in (".claude", ".agents", ".factory"):
+    block(f'guard-paths: "{rel}" is under a protected root (compared without case) — this needs a human, not a stage edit')
+
 for g in globs:
-    if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(path, g):
+    if fnmatch.fnmatch(rel.lower(), g.lower()) or fnmatch.fnmatch(path.lower(), g.lower()):
         block(f'guard-paths: "{rel}" matches protected path "{g}" — this needs a human, not a stage edit')
 
 sys.exit(0)

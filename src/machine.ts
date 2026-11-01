@@ -12,6 +12,8 @@ import { cpus, freemem, hostname } from "node:os";
 import { dirname } from "node:path";
 import { factoryHome } from "./paths";
 import type { AgentSandbox } from "./agents/agent-sandbox";
+import type { Agent37Spec } from "./adapters/agent37/execution";
+import { type Connection, connectionProblems } from "./mc/connections";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
 import { GATEWAY_KEY_ENV, isProviderHost, type LlmGateway } from "./agents/gateway";
 
@@ -26,6 +28,8 @@ export interface MachineConfig {
   readonly llmGateway?: { readonly url: string };
   // What this machine has (gpu, macos, docker): an issue labelled `needs:<cap>` waits for one that has it.
   readonly capabilities?: readonly string[];
+  // Mission control connections: each names the environment variable holding its key, never the key.
+  readonly sessions?: { readonly connections: Readonly<Record<string, Connection>> };
 }
 
 const DEFAULT_SLOTS = 2;
@@ -61,6 +65,7 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     const problems = runtimeProblems(raw.runtimes, `${path}: runtimes`);
     if (problems.length) throw new Error(problems.join("\n"));
   }
+  ownInstanceProblem(raw.runtimes, env.FACTORY_AGENT37_INSTANCE, path);
   if (raw.agentRuntime !== undefined) {
     const named = (raw.runtimes as Record<string, RuntimeSpec> | undefined)?.[raw.agentRuntime as string];
     if (named?.kind !== "microsandbox" && named?.kind !== "docker")
@@ -78,14 +83,30 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     throw new Error(
       `${path}: "capabilities" must be a list of lowercase names, got ${JSON.stringify(raw.capabilities)}`,
     );
+  if (raw.sessions !== undefined) {
+    const problems = connectionProblems(raw.sessions).map((p) => `${path}: ${p}`);
+    if (problems.length) throw new Error(problems.join("\n"));
+  }
   return {
     slots,
+    ...(raw.sessions ? { sessions: raw.sessions as { connections: Record<string, Connection> } } : {}),
     ...(raw.llmGateway ? { llmGateway: raw.llmGateway as { url: string } } : {}),
     dailyUsd: raw.dailyUsd as number | undefined,
     ...(raw.agentRuntime ? { agentRuntime: raw.agentRuntime as string } : {}),
     ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}),
     ...(raw.capabilities ? { capabilities: raw.capabilities as string[] } : {}),
   };
+}
+
+// A worker on a hosted instance shares its model plan's limits with its gates, so they run elsewhere.
+function ownInstanceProblem(runtimes: unknown, own: string | undefined, path: string): void {
+  if (!own || typeof runtimes !== "object" || runtimes === null) return;
+  for (const [name, r] of Object.entries(runtimes as Record<string, Partial<Agent37Spec>>)) {
+    if (r?.kind === "agent37" && [r.instance, ...(r.instances ?? [])].includes(own))
+      throw new Error(
+        `${path}: runtime "${name}" runs gates on instance ${own}, which is this worker's own (FACTORY_AGENT37_INSTANCE); name another instance`,
+      );
+  }
 }
 
 const CAPABILITY = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -152,6 +173,17 @@ function alive(pid: number): boolean {
   }
 }
 
+export interface LeaseCap {
+  readonly repo: string;
+  readonly repoCap: number;
+  readonly machineSlots: number;
+}
+
+// A holder is `owner/repo#N`; `\`, `%` and `_` in a repo name must not act as LIKE wildcards.
+export function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, "\\$&");
+}
+
 export interface MachineBeat {
   readonly name: string;
   readonly tags: readonly string[];
@@ -212,13 +244,19 @@ export class MachineLeases {
   // Count-then-insert inside one BEGIN IMMEDIATE transaction, so two
   // processes racing for the last slot never both succeed (the same shape as
   // git.ts's compare-and-swap push). Returns the lease id to release later,
-  // or undefined when every slot is already held.
-  acquire(holder: string, slots: number, pid: number = process.pid): number | undefined {
+  // or undefined when every machine slot is held or `repo` already holds its `repoCap`.
+  acquire(holder: string, cap: LeaseCap, pid: number = process.pid): number | undefined {
     return this.db
       .transaction(() => {
         this.reclaimDead();
         const n = (this.db.query("SELECT COUNT(*) AS n FROM leases").get() as { n: number }).n;
-        if (n >= slots) return undefined;
+        if (n >= cap.machineSlots) return undefined;
+        const mine = (
+          this.db
+            .query("SELECT COUNT(*) AS n FROM leases WHERE holder LIKE $prefix ESCAPE '\\'")
+            .get({ $prefix: `${escapeLike(cap.repo)}#%` }) as { n: number }
+        ).n;
+        if (mine >= cap.repoCap) return undefined;
         const row = this.db
           .query("INSERT INTO leases (holder, pid, acquired_at) VALUES ($holder, $pid, $now) RETURNING id")
           .get({ $holder: holder, $pid: pid, $now: new Date().toISOString() }) as { id: number };
@@ -255,12 +293,6 @@ export class MachineLeases {
   close(): void {
     this.db.close();
   }
-}
-
-// The smaller of the machine's own cap and this repo's own config.concurrency
-// (plan v2.7.0 item 5: "repo concurrency becomes a cap for that repo").
-export function effectiveSlots(repoConcurrency: number, machine: MachineConfig): number {
-  return Math.min(repoConcurrency, machine.slots);
 }
 
 // The machine's own dailyUsd cap (plan v2.7.0 item 7) is a cap on every

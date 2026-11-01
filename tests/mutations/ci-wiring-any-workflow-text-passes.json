@@ -1,0 +1,7 @@
+{
+  "name": "ci-wiring: any workflow text passes",
+  "file": "tests/ci-wiring.test.ts",
+  "find": ".includes(`bun ${script}`)",
+  "replace": ".includes(\"\")",
+  "test": "tests/ci-wiring.test.ts"
+}

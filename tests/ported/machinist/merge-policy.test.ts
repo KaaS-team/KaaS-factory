@@ -244,7 +244,7 @@ function facts(overrides: Partial<PrFacts> = {}): PrFacts {
     supplyChain: { highFindings: 0, newDependencies: [], alerts: 0 },
     risk: riskObject({ risk: "low" }, { risk: "low", files: ["lib/a.ts"] }, { protectedPaths: [] }),
     review: { builderModel: "builder", reviewers: [{ model: "reviewer", blockers: 0 }] },
-    ui: { changed: false, preview: false, smoke: false, unreviewedDiffs: 0 },
+    ui: { changed: false, preview: false, smoke: false, unreviewedDiffs: 0, qaSpec: false },
     postMergeWatch: true,
     ...overrides,
   };

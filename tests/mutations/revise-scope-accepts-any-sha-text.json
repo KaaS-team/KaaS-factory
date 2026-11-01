@@ -1,0 +1,1 @@
+{"name":"revise scope accepts any sha text","file":"src/revise-scope.ts","find":"if (typeof sha !== \"string\" || !SHA_RE.test(sha)) return undefined;","replace":"if (typeof sha !== \"string\") return undefined;","test":"tests/revise-scope.test.ts"}

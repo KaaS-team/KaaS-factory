@@ -45,3 +45,13 @@ test("a diff that weakens tests, runner config or skips fails the tamper check",
     "2: the diff weakens the proof: tests/a.test.ts: adds a skip marker",
   );
 });
+
+test("an added mutation file is not a hit, an edited one is, a deleted one is a deleted test", () => {
+  const added = diff("tests/mutations/a.json", '+{"name":"a"}', "new file mode 100644\n");
+  expect(tamperHits(added)).toEqual([]);
+  expect(tamperHits(diff("tests/mutations/a.json", '-{"name":"a"}\n+{"name":"b"}'))).toContain(
+    "tests/mutations/a.json: mutation entry changed",
+  );
+  const gone = tamperHits(diff("tests/mutations/a.json", '-{"name":"a"}', "deleted file mode 100644\n"));
+  expect(gone.some((h) => h.includes("test file deleted"))).toBe(true);
+});

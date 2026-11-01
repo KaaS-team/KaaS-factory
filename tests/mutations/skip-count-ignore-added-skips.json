@@ -1,0 +1,7 @@
+{
+  "name": "skip-count: ignore added skips",
+  "file": "src/skip-count.ts",
+  "find": "held(f.added) - held(f.removed)",
+  "replace": "0 - held(f.removed)",
+  "test": "tests/skip-count.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "api: token compare always passes",
+  "file": "src/api/auth.ts",
+  "find": "timingSafeEqual(",
+  "replace": "true || timingSafeEqual(",
+  "test": "tests/api-contract.test.ts"
+}

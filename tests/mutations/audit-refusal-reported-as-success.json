@@ -1,0 +1,1 @@
+{"name":"audit refusal reported as success","file":"src/audit-cloudevents.ts","find":"row.status >= 200 && row.status < 400 ? \"success\" : row.status === 403 ? \"refused\" : \"failure\"","replace":"row.status >= 200 ? \"success\" : row.status === 403 ? \"refused\" : \"failure\"","test":"tests/audit-cloudevents.test.ts"}

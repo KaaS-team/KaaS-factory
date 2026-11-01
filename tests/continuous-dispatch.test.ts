@@ -159,21 +159,21 @@ describe("pollOnce's inFlight set makes overlapping polls (what startWatch now r
   test("a poll whose issue list predates an issue's release does not redispatch it from that stale list", async () => {
     // The second poll lists #1 as ready while the first is running it, and its
     // list comes back only after #1 has parked and left inFlight.
+    const inFlight = new Set<number>();
+    const { deps, config, executor, workspacesDir, cloneDir } = setup(() => 10);
+    const released = () => executor.starts.includes(1) && !inFlight.has(1);
     class StaleGitHub extends FakeGitHub {
-      override async listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]> {
-        const snapshot = await super.listIssuesByLabel(repo, label);
-        await Bun.sleep(80);
+      override async listIssuesByLabels(repo: string, labels: readonly string[]): Promise<Map<string, GhIssue[]>> {
+        const snapshot = await super.listIssuesByLabels(repo, labels);
+        for (let t = 0; t < 3000 && !released(); t += 10) await Bun.sleep(10);
         return snapshot;
       }
     }
-    const { deps, config, executor, workspacesDir, cloneDir } = setup(() => 10);
     const stale = { ...deps, github: new StaleGitHub([baseIssue(1, ["factory:ready"])]) };
-    const inFlight = new Set<number>();
-
     const first = pollOnce(deps, config, inFlight);
     const second = pollOnce(stale, config, inFlight);
     await Promise.all([first, second]);
-
+    expect(released()).toBe(true);
     expect(executor.starts).toEqual([1]);
     rmSync(workspacesDir, { recursive: true, force: true });
     rmSync(cloneDir, { recursive: true, force: true });

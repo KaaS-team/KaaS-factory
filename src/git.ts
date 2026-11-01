@@ -9,9 +9,14 @@
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { claimCommitMessage } from "./commit-message";
 import type { CommandResult, CommandRunner } from "./github";
 import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
+import { describeFindings, scanText } from "./secret-scan";
+import { heldRefusal } from "./hold";
+import { type SigningConfig, withSigning } from "./commit-signing";
+import { type Person, type SignoffMode, signoffTrailers, withTrailers } from "./signoff";
 
 async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
   const proc = Bun.spawn(["git", ...args], {
@@ -52,14 +57,24 @@ export function withSignoff(args: string[], who: { name: string; email: string }
 }
 
 export class GitCommandRunner implements CommandRunner {
+  constructor(private readonly commits: { signoff?: SignoffMode; requester?: Person; signing?: SigningConfig } = {}) {}
+
   async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     if (args[0] === "commit" || args[0] === "commit-tree") {
       const name = (await spawnGit(["config", "user.name"], opts?.cwd)).stdout.trim();
       const email = (await spawnGit(["config", "user.email"], opts?.cwd)).stdout.trim();
       const known = name !== "" && email !== "";
       // commit-tree has no -s, and the claim commit is in the PR, so CI's DCO check reads it.
-      const signed = args[0] === "commit-tree" ? withSignoff(args, known ? { name, email } : FALLBACK_SIGNER) : args;
-      return spawnGit(known ? signed : [...FALLBACK_IDENTITY, ...signed], opts?.cwd, opts?.env);
+      const who = known ? { name, email } : FALLBACK_SIGNER;
+      const { signoff, requester } = this.commits;
+      const signed =
+        args[0] !== "commit-tree"
+          ? args
+          : signoff
+            ? withTrailers(args, signoffTrailers(signoff, who, requester))
+            : withSignoff(args, who);
+      const final = withSigning(signed, this.commits.signing);
+      return spawnGit(known ? final : [...FALLBACK_IDENTITY, ...final], opts?.cwd, opts?.env);
     }
     return spawnGit(args, opts?.cwd, opts?.env);
   }
@@ -103,7 +118,7 @@ export class Git {
 
     const runnerId = `${process.env.HOSTNAME ?? "runner"}-${process.pid}-${Date.now()}`;
     const commitTree = await this.runner.run(
-      ["commit-tree", `${baseSha}^{tree}`, "-p", baseSha, "-m", `factory: claim #${issue} by ${runnerId}`],
+      ["commit-tree", `${baseSha}^{tree}`, "-p", baseSha, "-m", claimCommitMessage(issue, runnerId)],
       { cwd: cloneDir },
     );
     const claimSha = commitTree.stdout.trim();
@@ -205,6 +220,13 @@ export class Git {
 
   // Generic (non-issue) counterpart to push, for `factory learn`'s branch.
   async pushBranch(worktreeDir: string, branch: string): Promise<CommandResult> {
+    const held = heldRefusal(worktreeDir);
+    if (held) return held;
+    const unpushed = await this.runner.run(["log", "-p", "--format=", "HEAD", "--not", "--remotes=origin"], {
+      cwd: worktreeDir,
+    });
+    const secrets = scanText(unpushed.stdout);
+    if (secrets.length > 0) return { stdout: "", stderr: `refusing to push: ${describeFindings(secrets)}`, code: 1 };
     // --no-verify: the gate already ran in this runner; a pre-push hook would run it again (issue #160).
     return this.runner.run(["push", "--no-verify", "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
   }
@@ -258,6 +280,15 @@ export class Git {
   // guard hook never saw (audit finding #12).
   async changedFiles(worktreeDir: string, base: string): Promise<string[]> {
     const result = await this.runner.run(["diff", "--name-only", `origin/${base}...HEAD`], { cwd: worktreeDir });
+    return result.stdout
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  // Every file in the base tree: the build step uses it to tell a greenfield scaffold (no Makefile yet).
+  async baseFiles(worktreeDir: string, base: string): Promise<string[]> {
+    const result = await this.runner.run(["ls-tree", "-r", "--name-only", `origin/${base}`], { cwd: worktreeDir });
     return result.stdout
       .split("\n")
       .map((s) => s.trim())

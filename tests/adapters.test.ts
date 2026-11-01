@@ -2,7 +2,7 @@
 // so a new runtime or SCM can't land without proving it behaves like the rest.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll } from "bun:test";
@@ -25,6 +25,12 @@ import { executionContract } from "./ports/execution.contract";
 import { leaseContract } from "./ports/lease.contract";
 import { spendContract } from "./ports/spend.contract";
 import { baseIssue, FakeGitHub, FakeLeases } from "./harness";
+
+// The preload removes the tmp root after each rerun, so every directory remakes it first.
+const tmp = (prefix: string) => {
+  mkdirSync(tmpdir(), { recursive: true });
+  return mkdtempSync(join(tmpdir(), prefix));
+};
 
 // A fake that obeys the contract by running through bash too: what a test
 // double of a remote runtime looks like when it is held to the same suite.
@@ -50,7 +56,7 @@ function onFakePath(run: () => void): () => void {
 
 // Each worker gets its own clone of one bare remote, as separate machines would.
 function gitLeases() {
-  const root = mkdtempSync(join(tmpdir(), "factory-lease-"));
+  const root = tmp("factory-lease-");
   Bun.spawnSync(["git", "init", "-q", "--bare", join(root, "origin.git")]);
   let n = 0;
   const clone = () => {
@@ -96,9 +102,11 @@ function agent37(): () => void {
               instance: "i1",
               tokenEnv: "AGENT37_API_KEY",
               url: box.url,
-              root: mkdtempSync(join(tmpdir(), "factory-a37-")),
+              root: tmp("factory-a37-"),
             },
             { AGENT37_API_KEY: "s3cret" },
+            undefined,
+            20,
           ),
       );
     });
@@ -213,7 +221,7 @@ const REGISTRY: Record<string, () => void> = {
       "codespaces",
       () =>
         new CodespacesExecution(
-          { kind: "codespaces", codespace: "cs", root: mkdtempSync(join(tmpdir(), "factory-cs-")) },
+          { kind: "codespaces", codespace: "cs", root: tmp("factory-cs-") },
           { ...process.env, PATH: `${join(import.meta.dir, "fixtures/fake-gh")}:${process.env.PATH}` },
         ),
     ),
@@ -260,7 +268,7 @@ describe("git-lease held()", () => {
 
   // An empty list would read as "nobody holds anything"; the Settings page has to say it could not look.
   test("a remote it cannot read throws instead of reporting no leases", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "factory-lease-"));
+    const dir = tmp("factory-lease-");
     Bun.spawnSync(["git", "init", "-q", dir]);
     Bun.spawnSync(["git", "remote", "add", "origin", join(dir, "missing.git")], { cwd: dir });
     await expect(new GitLeases(dir).held()).rejects.toThrow(/ls-remote/);

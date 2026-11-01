@@ -1,0 +1,7 @@
+{
+  "name": "verify: a surviving plan mutation does not reject",
+  "file": "src/engine/steps.ts",
+  "find": "if (survived?.reject) return rejectToBuild(sc, survived.body",
+  "replace": "if (false) return rejectToBuild(sc, survived.body",
+  "test": "tests/mutate.test.ts"
+}

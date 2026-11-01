@@ -6,6 +6,7 @@
 
 import { resolveImage } from "../../images";
 import type { AgentInVm, ExecResult, ExecutionPort } from "../../ports/execution";
+import { withInternalEgress } from "./egress-network";
 
 export interface DockerSpec {
   readonly kind: "docker";
@@ -18,13 +19,20 @@ export interface DockerSpec {
   readonly pids?: number;
   // `--runtime`, for example "runsc" for gVisor.
   readonly runtime?: string;
+  // Hosts the command may reach, through the egress proxy only, on an internal network. Absent: `network`.
+  readonly allow?: readonly string[];
 }
+
+// With an allow list the network is the run's internal one, whatever the spec names: never bridge.
+export const withProxyNetwork = (spec: DockerSpec, internal: string): DockerSpec =>
+  spec.allow ? { ...spec, network: internal } : spec;
 
 export function containerArgs(
   spec: DockerSpec,
   cmd: string,
   cwd: string,
   user = `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
+  egress: Readonly<Record<string, string>> = {},
 ): string[] {
   return [
     "docker",
@@ -49,6 +57,7 @@ export function containerArgs(
     user,
     "-e",
     "HOME=/tmp",
+    ...Object.entries(egress).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
     "-v",
     `${cwd}:${cwd}`,
     "-w",
@@ -106,7 +115,13 @@ export function dockerAgentArgs(
 export class DockerExecution implements ExecutionPort {
   constructor(private readonly spec: DockerSpec) {}
   async run(cmd: string, cwd: string): Promise<ExecResult> {
-    const proc = Bun.spawn(containerArgs(this.spec, cmd, cwd), {
+    const { allow } = this.spec;
+    if (allow)
+      return withInternalEgress(allow, (net, env) => this.spawn(withProxyNetwork(this.spec, net), cmd, cwd, env));
+    return this.spawn(this.spec, cmd, cwd, {});
+  }
+  private async spawn(spec: DockerSpec, cmd: string, cwd: string, egress: Record<string, string>): Promise<ExecResult> {
+    const proc = Bun.spawn(containerArgs(spec, cmd, cwd, undefined, egress), {
       cwd,
       env: process.env,
       stdout: "pipe",

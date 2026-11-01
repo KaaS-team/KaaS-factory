@@ -4,7 +4,9 @@
 
 import type { Workflow } from "../core/workflow";
 import { LABEL } from "../labels";
+import { claimToken, refuseApproval, type ApprovalNow } from "./approval-binding";
 import { emitEvent } from "./bus";
+import { type ApprovalDecision, approves, decidedBy } from "./run-origin";
 import type { WatchDeps } from "./common";
 import type { FactoryConfig } from "../config";
 
@@ -50,13 +52,13 @@ export function readJournal(
     if (r.type === "factory.step.completed") finished.set(step, { result: String(d.result), facts: d.facts });
     else if (r.type === "factory.step.failed" || r.type === "factory.step.started") finished.delete(step);
     else if (r.type === "factory.approval.requested") tokens.set(String(d.token), step), approved.delete(step);
-    else if (r.type === "factory.approval.resolved" && d.decision === "approve" && tokens.has(String(d.token)))
+    else if (r.type === "factory.approval.resolved" && approves(d.decision) && tokens.has(String(d.token)))
       approved.add(tokens.get(String(d.token))!);
   }
   return { finished, approved };
 }
 
-export type Decision = "approve" | "revise";
+export type Decision = ApprovalDecision;
 
 // The wait-for-event token a park hands out. Resolving it records the decision and puts the issue
 // back in factory:ready, where pickup replays the journal up to the approved step and goes on.
@@ -66,6 +68,7 @@ export async function resolveApproval(
   token: string,
   decision: Decision,
   by: string,
+  current?: ApprovalNow,
 ): Promise<{ issue: number; step: string } | { error: string }> {
   const rows = deps.state.busEvents(WINDOW);
   const asked = rows.find((r) => r.type === "factory.approval.requested" && dataOf(r).token === token);
@@ -73,8 +76,16 @@ export async function resolveApproval(
   if (rows.some((r) => r.type === "factory.approval.resolved" && dataOf(r).token === token))
     return { error: "that approval is already resolved" };
   const d = dataOf(asked);
+  const refused = decision !== "revise" ? refuseApproval(d, current ?? { now: new Date() }) : undefined;
+  if (refused) return { error: refused };
+  if (!claimToken(token)) return { error: "that approval is already resolved" };
   const issue = Number(d.issue);
-  emitEvent(deps.bus, "factory.approval.resolved", { ...d, decision, by }, asked.subject ?? undefined);
+  emitEvent(
+    deps.bus,
+    "factory.approval.resolved",
+    { ...d, decision, by: decidedBy(decision, by) },
+    asked.subject ?? undefined,
+  );
   await deps.github.setStateLabel(config.repo, issue, [LABEL.awaitingApproval], LABEL.ready);
   return { issue, step: String(d.step) };
 }

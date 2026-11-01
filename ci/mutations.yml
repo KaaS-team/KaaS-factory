@@ -1,0 +1,68 @@
+name: mutations
+
+# Every check must bite: each mutation in tests/mutations.json turns its test red. A PR runs the mutations its
+# diff reaches plus one mutant per changed source line, a push to main runs every mutation and logs selector
+# misses, and the nightly run is the full list. It runs off the push verdict in ci.yml.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-mutations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions: { contents: read, issues: write }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - name: Install dependencies
+        run: make install
+      - name: Restore the selector miss log
+        if: github.event_name == 'push'
+        uses: actions/cache/restore@v4
+        with:
+          path: reports/selector-misses.jsonl
+          key: selector-misses-${{ github.run_id }}
+          restore-keys: selector-misses-
+      # A PR runs the mutations its diff reaches; push, nightly and manual runs run all of them.
+      - name: make check-mutations
+        run: make check-mutations MUTATION_ARGS="${{ github.event_name == 'pull_request' && format('--base origin/{0}', github.base_ref) || '--report reports/mutations-report.json' }}"
+      - name: Selector misses on this push
+        if: always() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/selector-misses.ts --before "${{ github.event.before }}" --report reports/mutations-report.json --open-issues >> "$GITHUB_STEP_SUMMARY"
+      - name: Save the selector miss log
+        if: always() && github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: reports/selector-misses.jsonl
+          key: selector-misses-${{ github.run_id }}
+
+  changed-mutants:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - name: Install dependencies
+        run: make install
+      - name: One mutant per changed source line
+        run: bun scripts/check-changed-mutants.ts --base "origin/${{ github.base_ref }}"

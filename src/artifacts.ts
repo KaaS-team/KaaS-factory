@@ -50,6 +50,8 @@ export interface PlanArtifact {
   readonly criteria?: readonly { readonly id: string; readonly text: string; readonly task?: string }[];
   readonly tasks?: readonly { readonly id: string; readonly title: string; readonly files: readonly string[] }[];
   readonly spec?: string;
+  // The planner flags a public API, schema or config-format change; the pr step then needs a docs/decisions record.
+  readonly boundaryChange?: boolean;
 }
 
 export interface BuildArtifact {
@@ -62,6 +64,7 @@ export interface BuildArtifact {
 
 // A finding is a plain string (older verdicts) or the blueprint review shape:
 // severity, a 0-5 confidence, and what/why/where/fix. Strings never block a pass.
+// `evidence` is the reproduction, a failing command, input or scenario.
 export type Severity = "must" | "should" | "could";
 export interface Finding {
   readonly severity: Severity;
@@ -70,6 +73,7 @@ export interface Finding {
   readonly where?: string;
   readonly why?: string;
   readonly fix?: string;
+  readonly evidence?: string;
 }
 export interface Criterion {
   readonly id: string;
@@ -84,6 +88,7 @@ export interface VerdictArtifact {
   readonly rounds: number;
   readonly findings: (string | Finding)[];
   readonly criteria?: Criterion[];
+  readonly prior?: readonly { what: string; status: "resolved" | "open" }[];
 }
 
 // v2.10.0 item 3: read-only, runs after a final outcome. At most one proposal
@@ -99,9 +104,10 @@ export interface RetroArtifact {
 
 // A step result is one JSON object of at most 16 KiB (machinist workflow.go).
 export const MAX_STEP_JSON_BYTES = 16 * 1024;
-export const VERDICT_KEY_LIST = ["result", "rounds", "findings", "criteria", "outcome", "summary"] as const;
+export const VERDICT_KEY_LIST = ["result", "rounds", "findings", "criteria", "outcome", "summary", "prior"] as const;
 const VERDICT_KEYS = new Set<string>(VERDICT_KEY_LIST);
-const FINDING_KEYS = new Set(["severity", "confidence", "what", "where", "why", "fix"]);
+const FINDING_KEYS = new Set(["severity", "confidence", "what", "where", "why", "fix", "evidence"]);
+const PRIOR_KEYS = new Set(["what", "status"]);
 const CRITERION_KEYS = new Set(["id", "status", "gap"]);
 // A finding this sure and this serious contradicts a pass.
 export const BLOCKING_CONFIDENCE = 3;
@@ -143,6 +149,7 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
     "goal",
     "criteria",
     "spec",
+    "boundaryChange",
     "outcome",
     "summary",
   ],
@@ -206,6 +213,8 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
     if (!Number.isInteger(o.confidence) || (o.confidence as number) < 0 || (o.confidence as number) > 5)
       return bad("a finding's confidence must be an integer from 0 to 5");
     if (typeof o.what !== "string" || !o.what.trim()) return bad('a finding needs a non-empty "what"');
+    if (o.evidence !== undefined && (typeof o.evidence !== "string" || !o.evidence.trim()))
+      return bad('a finding\'s "evidence" must be a non-empty string');
   }
   if (v.criteria !== undefined) {
     if (!Array.isArray(v.criteria)) return bad('verdict.json "criteria" must be an array');
@@ -217,6 +226,17 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
       if (typeof o.id !== "string" || !/^AC-\d+$/.test(o.id)) return bad("a criterion id must look like AC-1");
       if (o.status !== "pass" && o.status !== "fail" && o.status !== "unverified")
         return bad("a criterion status must be pass, fail or unverified");
+    }
+  }
+  if (v.prior !== undefined) {
+    if (!Array.isArray(v.prior)) return bad('verdict.json "prior" must be an array');
+    for (const p of v.prior) {
+      if (typeof p !== "object" || p === null) return bad('a "prior" entry must be an object');
+      const key = unknownKey(p, PRIOR_KEYS);
+      if (key) return bad(`a "prior" entry has unknown field "${key}"`);
+      const o = p as Record<string, unknown>;
+      if (typeof o.what !== "string" || !o.what.trim()) return bad('a "prior" entry needs a non-empty "what"');
+      if (o.status !== "resolved" && o.status !== "open") return bad('a "prior" entry status must be resolved or open');
     }
   }
   const verdict = v as unknown as VerdictArtifact;

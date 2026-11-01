@@ -10,6 +10,7 @@
 
 import type { FactoryConfig, TrackerConfig } from "./config";
 import { GitHub } from "./github";
+import type { MergeSettings } from "./merge-method";
 import { appFromEnv, ghRunner, rateBudget } from "./github-app";
 import { issueBranch, issueOfBranch } from "./git";
 import type {
@@ -253,8 +254,8 @@ export class ComposedScm implements ScmPort {
     return opts?.excludeHead === head ? undefined : this.findPrByHead(repo, head);
   }
   // GitHub closes a "Closes #n" issue on merge by itself; a tracker elsewhere is told here.
-  async mergePr(repo: string, number: number, headSha: string): Promise<void> {
-    await this.codeHost.mergePr(repo, number, headSha);
+  async mergePr(repo: string, number: number, headSha: string, settings?: MergeSettings): Promise<void> {
+    await this.codeHost.mergePr(repo, number, headSha, settings);
     if (this.link === "closes") return;
     const n = issueOfBranch((await this.codeHost.getPr(repo, number)).headRefName);
     if (n !== undefined) await this.tracker.closeIssue(repo, n);

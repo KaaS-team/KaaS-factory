@@ -11,6 +11,8 @@ import { bashAllowed, stageAllowRules } from "../stage-permissions";
 import { runStage, stageJson, type WatchDeps } from "./common";
 import type { PlannedTask } from "./import-plan";
 import { pathProblem } from "./import-plan-step";
+import { planRubric } from "./plan-rubric";
+import { reusablePlan, reusedPlan, stampBodyHash } from "./plan-reuse";
 import { flooredPlan } from "./verify-facts";
 
 const AC_LINE = /^\s*-\s*\*\*(AC-\d+):\*\*(.*)$/;
@@ -186,11 +188,15 @@ async function attempt(
         ...critiquePlan({ plan: json, comment: art.comment!, worktree, config }),
       ]
     : [];
-  return { result, comment: art.comment, question: art.question, parsed, mustFix };
+  return { result, comment: art.comment, question: art.question, parsed: stampBodyHash(parsed, issue), mustFix };
 }
 
-// One plan run, and at most one revision on a fork of its session. What is still wrong after that
-// posts with the plan and waits for a human, never auto-approved.
+// The plan is sent back at most once (#156).
+const MAX_REVISIONS = 1;
+
+// Reuse the thread's plan when the body is unchanged. Else one plan run, one rubric pass when the repo
+// commits its skill, and at most one revision on a fork of the plan session. What is still wrong
+// after that posts with the plan and waits for a human, never auto-approved.
 export async function checkedPlan(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -198,14 +204,20 @@ export async function checkedPlan(
   worktree: string,
   opts: Parameters<typeof runStage>[5] = {},
 ): Promise<CheckedPlan> {
+  const prior = opts.resume ? undefined : reusablePlan(issue);
+  if (prior) return reusedPlan(worktree, issue.number, prior);
   let run = await attempt(deps, config, issue, worktree, opts);
-  if (!run.mustFix.length) return run;
+  // Taken before the rubric's own stage run, which must not become the session the revision forks.
   const sessionId = deps.state.lastSession(config.repo, issue.number, "plan")?.session_id;
-  const failure = sendBack(run.mustFix, proofAllowRules(config, issue.number));
-  run = await attempt(deps, config, issue, worktree, {
-    ...opts,
-    resume: { ...(sessionId ? { sessionId } : {}), failure },
-  });
+  run = { ...run, mustFix: [...run.mustFix, ...(await planRubric(deps, config, issue, worktree, run, opts))] };
+  if (!run.mustFix.length) return run;
+  for (let round = 0; round < MAX_REVISIONS && run.mustFix.length; round += 1) {
+    const failure = sendBack(run.mustFix, proofAllowRules(config, issue.number));
+    run = await attempt(deps, config, issue, worktree, {
+      ...opts,
+      resume: { ...(sessionId ? { sessionId } : {}), failure },
+    });
+  }
   if (!run.mustFix.length || !run.parsed.json) return run;
   const note = `\n\n### Plan check: still open\n\n${run.mustFix.map((i) => `- ${i}`).join("\n")}\n\nThis plan waits for \`/factory approve\` or \`/factory revise <what to change>\`.\n`;
   return {

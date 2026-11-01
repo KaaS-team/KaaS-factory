@@ -1,0 +1,1 @@
+{"name":"agent37: finished run directory kept","file":"src/adapters/agent37/execution.ts","find":"if (!signal?.aborted) await this.exec(inst, token, `rm -rf","replace":"if (false) await this.exec(inst, token, `rm -rf","test":"tests/runtimes.test.ts"}

@@ -8,5 +8,12 @@
   "enable": "`{\"kind\": \"agent37\", \"instance\": \"...\", \"tokenEnv\": \"AGENT37_API_KEY\"}` in machine.json",
   "module": "src/adapters/agent37/execution.ts",
   "contract": "tests/adapters.test.ts",
-  "default": false
+  "default": false,
+  "live": {
+    "test": "tests/live-runtimes.test.ts",
+    "env": [
+      "FACTORY_LIVE_AGENT37_INSTANCE",
+      "FACTORY_LIVE_AGENT37_KEY"
+    ]
+  }
 }

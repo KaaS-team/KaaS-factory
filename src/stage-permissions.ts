@@ -31,6 +31,7 @@ const BUILD_EXTRA = [
   "Edit(**)",
   "Bash(git add *)",
   "Bash(git commit *)",
+  "Bash(git rm *)",
   "Bash(.factory/gates.sh*)",
   "Bash(bash .factory/gates.sh*)",
 ];

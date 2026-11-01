@@ -1,3 +1,5 @@
+import { BUILD_SCRIPT_GLOBS } from "./init-guard";
+
 // Defense in depth behind guard-paths.sh (the PreToolUse hook): that hook
 // only sees Edit/Write tool calls, so `Bash("cat > src/auth/x.ts")`, `bun -e`
 // or `sed -i` all bypass it (audit finding #12). Before any push, the runner
@@ -16,12 +18,25 @@
 // `.agents/**` too: a repo's skills there are what the next stage reads (src/harness-defaults.ts).
 export const ALWAYS_PROTECTED_PATHS = [".claude/**", ".agents/**", ".factory/**"] as const;
 
-export function touchesProtectedPath(changedFiles: readonly string[], protectedPaths: readonly string[]): string[] {
-  const patterns = [...protectedPaths, ...ALWAYS_PROTECTED_PATHS];
+// True when the base tree already holds a build script (Makefile, GNUmakefile, *.mk) at any depth.
+const hasBuildScript = (files: readonly string[]): boolean =>
+  files.some((f) => BUILD_SCRIPT_GLOBS.some((g) => new Bun.Glob(g.toLowerCase()).match(f.toLowerCase())));
+
+// Paths compare without case: macOS and Windows filesystems treat `SRC/Pay/x.ts` and `src/pay/x.ts` as one file.
+// `baseFiles` is the base tree, supplied by the caller that knows it: when it holds no build script,
+// creating the first Makefile of a greenfield repo is not a protected touch. Omitted, build scripts stay protected.
+export function touchesProtectedPath(
+  changedFiles: readonly string[],
+  protectedPaths: readonly string[],
+  opts: { baseFiles?: readonly string[] } = {},
+): string[] {
+  const greenfield = opts.baseFiles !== undefined && !hasBuildScript(opts.baseFiles);
+  const exempt = new Set<string>(greenfield ? BUILD_SCRIPT_GLOBS : []);
+  const patterns = [...protectedPaths.filter((g) => !exempt.has(g)), ...ALWAYS_PROTECTED_PATHS];
   const hits: string[] = [];
   for (const file of changedFiles) {
     for (const pattern of patterns) {
-      if (new Bun.Glob(pattern).match(file)) {
+      if (new Bun.Glob(pattern.toLowerCase()).match(file.toLowerCase())) {
         hits.push(file);
         break;
       }

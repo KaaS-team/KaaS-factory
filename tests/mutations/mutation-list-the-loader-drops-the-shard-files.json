@@ -1,0 +1,7 @@
+{
+  "name": "mutation list: the loader drops the shard files",
+  "file": "scripts/mutation-list.ts",
+  "find": "const all = [...legacy, ...shards];",
+  "replace": "const all = [...legacy];",
+  "test": "tests/mutation-list.test.ts"
+}

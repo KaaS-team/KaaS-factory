@@ -7,6 +7,9 @@ export interface MergeAutonomyFields {
   // The live URL the post-merge watch smokes, and the PR preview URL with `{pr}` (src/visual.ts).
   readonly smokeUrl?: string;
   readonly previewUrl?: string;
+  // How `gh pr merge` merges, and who queues it (src/merge-method.ts); absent is squash, factory-run.
+  readonly method?: "squash" | "rebase" | "merge" | "host";
+  readonly queue?: "factory" | "host" | "none";
 }
 
 export interface PackageOwnership {
@@ -24,6 +27,8 @@ export const MERGE_KEYS = {
   autonomy: "string",
   smokeUrl: "string",
   previewUrl: "string",
+  method: "string",
+  queue: "string",
 } as const;
 
 export const PACKAGE_KEYS = {
@@ -48,5 +53,12 @@ export function mergeProblems(merge: Record<string, unknown>): string[] {
   return [
     ...oneOf("policy", merge.policy, ["off", "dry-run", "auto"]),
     ...oneOf("autonomy", merge.autonomy, ["supervised", "semi", "full"]),
+    ...oneOf("method", merge.method, ["squash", "rebase", "merge", "host"]),
+    ...oneOf("queue", merge.queue, ["factory", "host", "none"]),
   ];
+}
+
+// `review.alwaysHumanPaths`: globs a human always reviews, added to the defaults in src/human-paths.ts.
+export interface ReviewFields {
+  readonly review?: { readonly alwaysHumanPaths?: readonly string[]; readonly maxRounds?: number };
 }

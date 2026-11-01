@@ -1,0 +1,7 @@
+{
+  "name": "docs: any change passes",
+  "file": "src/docs-check.ts",
+  "find": "if (changed.some((p) => p.startsWith(\"docs/decisions/\"))) return [];",
+  "replace": "return [];",
+  "test": "tests/docs-check.test.ts"
+}

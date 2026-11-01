@@ -1,29 +1,26 @@
 <!-- factory:verdict v1 -->
-## Verdict: {{pass|reject|uncertain}}
+{{one_sentence_pass_reject_or_uncertain_and_what_happens_next}}
 
-### Acceptance criteria evidence
+### What I found for each criterion
 {{#each ac}}
-- **AC-{{n}}:** {{pass|fail|unverified}}: {{evidence_command_and_result}}
+- {{criterion_as_a_short_sentence}} It {{passes|fails|is unverified}}: {{evidence_command_and_result}}
 {{/each}}
 
-### The test that bites
-`{{test_name}}` fails on the base branch ({{failing_output_snippet}}), passes here
-(`{{command}}` → {{passing_output_snippet}}).
+### The test that proves it
+`{{test_name}}` fails on the base branch ({{failing_output_snippet}}) and passes here
+(`{{command}}` gave {{passing_output_snippet}}).
 
-### Reviewer findings
+### What the reviewer found
 {{#each findings}}
-- {{finding}}
+- {{finding_as_a_short_sentence}}
 {{/each}}
 {{#unless findings}}
-None.
+The reviewer found nothing to fix.
 {{/unless}}
 
-### Non-goals respected
+### The non-goals held
 {{ng_respected_summary}}
 
-{{#if reject}}
-Sending back to build (round {{round}} of 2) with the findings above.
-{{/if}}
 {{#if uncertain}}
-Uncertain: flagging for a human rather than guessing.
+I am not sure about this one, so I am flagging it for a person rather than guessing.
 {{/if}}

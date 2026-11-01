@@ -2,6 +2,7 @@
 // so an author fixes the body once.
 
 import type { Risk } from "../artifacts";
+import { sharedClaims } from "../shared-files";
 import { type IssueMeta, parseMeta, topoOrder } from "../core/schedule";
 
 // The bundled workflow a planned issue runs; watch.ts picks it from the body, not from a route.
@@ -83,7 +84,11 @@ function parseTasks(text: string, problems: string[]): PlannedTask[] {
       problems.push(`${head[1]} has no Model of haiku, sonnet or opus.`);
     const steps = lines.filter((l) => /^\d+\.\s/.test(l)).map((l) => l.replace(/^\d+\.\s*/, ""));
     if (!steps.length) problems.push(`${head[1]} has no numbered steps.`);
-    const deps = (/^Deps:[ \t]*(.+)$/im.exec(chunk)?.[1] ?? "").split(/[\s,]+/).filter((d) => d && d !== "none");
+    // `#N` and `#N Tn` name another issue's work; plan-deps.ts checks those against main.
+    const deps = (/^Deps:[ \t]*(.+)$/im.exec(chunk)?.[1] ?? "")
+      .replace(/#\d+(?:[ \t]+T\d+)?/g, "")
+      .split(/[\s,]+/)
+      .filter((d) => d && d !== "none");
     for (const d of deps) if (!/^T\d+$/.test(d)) problems.push(`${head[1]} Deps: "${d}" is not a task id.`);
     tasks.push({
       id: head[1]!,
@@ -162,6 +167,11 @@ export function parsePlannedIssue(body: string): { plan?: PlannedIssue; problems
   for (const t of tasks)
     for (const f of t.files)
       if (!listed.has(f)) problems.push(`${t.id} touches \`${f}\`, which "## Files" does not list.`);
+  const okLines = body.split("\n").filter((l) => /^\s*Shared-ok:/i.test(l));
+  for (const f of sharedClaims([...listed, ...tasks.flatMap((t) => t.files)], okLines))
+    problems.push(
+      `names shared file \`${f}\`; add a shard or a make/*.mk file instead, or excuse it with "Shared-ok: ${f}: <reason>".`,
+    );
   const risk = /^## Risk:\s*(\w+)/im.exec(body)?.[1]?.toLowerCase();
   if (risk !== "low" && risk !== "medium" && risk !== "high") problems.push('"## Risk:" must be low, medium or high.');
   const mutations = parseMutations(s.get("mutation"), problems);

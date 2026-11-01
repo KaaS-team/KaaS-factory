@@ -12,12 +12,14 @@ import { pushTicker } from "./push";
 import { RunnerHub, HEARTBEAT_MS } from "./runners";
 import { RUNNER_ROUTES, runnerRoutes } from "./runner-routes";
 import { startRelay } from "../relay";
+import { PUBLIC_BOARD_ROUTE, publicBoardRoutes } from "../public-board";
 
 // Reached without a session: each checks a runner secret or spends a one-time pairing token itself.
 export const REMOTE_PUBLIC_ROUTES: readonly string[] = [
   ...RUNNER_ROUTES,
   "POST /api/pair/peek",
   "POST /api/pair/claim",
+  PUBLIC_BOARD_ROUTE,
 ];
 // Writes a viewer may make, because they touch only the caller's own phones and notifications.
 export const SELF_SERVICE_ROUTES: readonly string[] = [
@@ -114,6 +116,10 @@ export function createRemote(deps: RemoteDeps) {
       visibleRepos: deps.access.visibleRepos,
     }),
     ...push.routes,
+    ...publicBoardRoutes({
+      board: (repo) => deps.handle(new Request(`http://localhost/api/board?repo=${encodeURIComponent(repo)}`)),
+      env,
+    }),
   ];
 
   function start(env: Record<string, string | undefined> = process.env): void {

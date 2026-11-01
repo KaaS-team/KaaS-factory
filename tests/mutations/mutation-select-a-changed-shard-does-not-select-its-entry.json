@@ -1,0 +1,7 @@
+{
+  "name": "mutation select: a changed shard does not select its entry",
+  "file": "scripts/mutation-select.ts",
+  "find": "touched.has(shardPath(m.name)) ||",
+  "replace": "",
+  "test": "tests/mutation-select.test.ts"
+}

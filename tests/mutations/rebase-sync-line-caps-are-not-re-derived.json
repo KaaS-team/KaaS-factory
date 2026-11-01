@@ -1,0 +1,7 @@
+{
+  "name": "rebase sync: line caps are not re-derived",
+  "file": "src/rebase-sync.ts",
+  "find": "lines[file] = lineCount(readFileSync(path, \"utf8\"));",
+  "replace": "lines[file] = 0;",
+  "test": "tests/rebase-sync.test.ts"
+}

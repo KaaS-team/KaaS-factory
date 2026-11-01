@@ -1,0 +1,7 @@
+{
+  "name": "backup: restore accepts a key outside the prefix",
+  "file": "src/backup.ts",
+  "find": "!f.key.startsWith(prefix)",
+  "replace": "false",
+  "test": "tests/backup.test.ts"
+}

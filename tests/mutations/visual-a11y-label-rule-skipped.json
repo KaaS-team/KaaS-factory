@@ -1,0 +1,1 @@
+{"name":"visual a11y label rule skipped","file":"src/visual-a11y.ts","find":"!UNLABELLED_EXEMPT.has(e.type ?? \"\") && !e.label?.trim()","replace":"false","test":"tests/visual-a11y.test.ts"}

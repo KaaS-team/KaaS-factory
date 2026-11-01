@@ -141,9 +141,30 @@ Create the instance once (`POST https://api.agent37.com/v1/instances` with `"aut
 an idle one bills only its disk) and put its id in `instance`. Each run sends the worktree, without
 `.git` and `exclude`, over the exec API itself: an exec body is capped at 128 KB, and the instance's
 file API answers only on templates that run an agent. The tar.gz goes in base64 chunks of 96 KB,
-is unpacked into a fresh directory under `root`, `bash -c cmd` runs there, and the directory is
-removed after. One exec waits at most 15 minutes, so a longer step needs another runtime. A 1 MB
-worktree took 12.5 seconds end to end on the default 2 vCPU instance.
+is unpacked into a fresh directory under `root`, up to 8 parts at a time, then joined and unpacked.
+`bash -c cmd` runs there detached, in its own process group, and the runner polls every 5 s with one
+short exec until the exit code file exists, so a step may outlast the 15 minutes one exec waits. The
+cost is one exec per 5 s. The last 512 KB of each stream comes back (the `FACTORY_GATES` line is
+kept), and an answer marked `truncated` adds `agent37: output truncated at 512 KB per stream` to
+stderr. An abort kills the process group before the directory is removed; each run first reaps
+directories under `root` older than 2 hours. A 1 MB worktree took 12.5 seconds end to end on the
+default 2 vCPU instance.
+
+`instances` (a list) replaces `instance`: each run takes the instance with the fewest runs in
+flight in this process, ties by order. Naming both is a problem at load. `apiUrl` (default
+`https://api.agent37.com`) serves `factory runtime list --probe`, which adds the instance state and
+the wallet to the row (`instance sleeping, wallet $4.20`).
+
+agent37 has no free minutes. A pool member's `minutes` is the operator's own cap, and awake billing
+includes the idle timeout after each run.
+
+### A worker on a hosted instance
+
+Create the instance with the `agent37-claude-code` template and `"auto_sleep": false`, pass the
+credentials as create-time `env`, then run `factory daemon install --repo <owner/name>` over ssh.
+The worker shares one model plan's rate limit, so its gates must run on another runtime: set
+`FACTORY_AGENT37_INSTANCE` to the instance id and loading `machine.json` fails if an agent37 runtime
+names that same instance.
 
 ## codespaces
 

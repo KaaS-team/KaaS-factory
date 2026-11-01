@@ -1,10 +1,12 @@
 // UI changes get three checks before they can merge: a preview URL, a smoke request that answers,
 // and a visual diff against the baseline screenshots, where any changed shot nobody approved is an
-// unreviewed diff. Screenshots compare by hash: equal bytes, no diff; anything else, a person looks.
+// unreviewed diff, and a committed Playwright spec. Screenshots compare by hash: equal bytes, no
+// diff; anything else, a person looks.
 
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { type A11yElement, type A11yViolation, a11yViolations } from "./visual-a11y.js";
 
 export const UI_GLOBS: readonly RegExp[] = [
   /\.(tsx|jsx|vue|svelte|astro|css|scss|html)$/,
@@ -13,6 +15,8 @@ export const UI_GLOBS: readonly RegExp[] = [
 
 export const isUiChange = (paths: readonly string[], globs = UI_GLOBS) =>
   paths.some((p) => globs.some((re) => re.test(p)));
+
+export const isQaSpec = (path: string) => /\.(spec|e2e)\.[cm]?[jt]sx?$/.test(path);
 
 export const previewUrl = (template: string, pr: number) => template.replaceAll("{pr}", String(pr));
 
@@ -41,18 +45,29 @@ export interface UiFacts {
   readonly preview: boolean;
   readonly smoke: boolean;
   readonly unreviewedDiffs: number;
+  readonly qaSpec: boolean;
+  readonly a11y?: readonly A11yViolation[];
 }
 
 export async function uiFacts(
   paths: readonly string[],
-  o: { previewTemplate?: string; pr: number; baseline: string; current: string; approved?: readonly string[] },
+  o: {
+    previewTemplate?: string;
+    pr: number;
+    baseline: string;
+    current: string;
+    approved?: readonly string[];
+    elements?: readonly A11yElement[];
+  },
 ): Promise<UiFacts> {
-  if (!isUiChange(paths)) return { changed: false, preview: false, smoke: false, unreviewedDiffs: 0 };
+  if (!isUiChange(paths)) return { changed: false, preview: false, smoke: false, unreviewedDiffs: 0, qaSpec: false };
   const url = o.previewTemplate ? previewUrl(o.previewTemplate, o.pr) : undefined;
   return {
     changed: true,
     preview: url !== undefined,
     smoke: url !== undefined && (await smoke(url)),
     unreviewedDiffs: visualDiffs(o.baseline, o.current, o.approved).length,
+    qaSpec: paths.some(isQaSpec),
+    ...(o.elements ? { a11y: a11yViolations(o.elements) } : {}),
   };
 }

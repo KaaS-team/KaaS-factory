@@ -76,6 +76,14 @@ describe("hexagon", () => {
     ).toEqual([]);
   });
 
+  test("src imports dashboard/ only from src/cli.ts, which starts it", () => {
+    const bad = filesUnder(".")
+      .filter((f) => f !== "cli.ts")
+      .flatMap((f) => importsOf(f, readFileSync(join(SRC, f), "utf8")))
+      .filter((e) => e.target.startsWith("../dashboard"));
+    expect(bad.map(show)).toEqual([]);
+  });
+
   test("the import scanner sees every import form", () => {
     const text =
       'import { a } from "../adapters/x/a";\nimport type { B } from "../core/b";\nexport { c } from "./c";\nconst d = await import("../ports/d");\nimport "node:fs";\n';

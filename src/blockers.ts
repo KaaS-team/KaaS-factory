@@ -10,6 +10,7 @@
 // worktree or a stage; it only reads issue state and swaps a label.
 
 import type { GhIssue, ScmPort } from "./github";
+import { reconcileDuplicates } from "./duplicates";
 import { LABEL } from "./labels";
 
 const BLOCKED_BY_LINE = /^.*Blocked by:\s*(.+?)\s*$/im;
@@ -46,10 +47,16 @@ export interface BlockerResolution {
 export async function resolveBlockers(
   github: ScmPort,
   repo: string,
-  ready: readonly GhIssue[],
+  allReady: readonly GhIssue[],
   blocked: readonly GhIssue[],
 ): Promise<BlockerResolution> {
   const clear: GhIssue[] = [];
+  // A failed duplicate check must not stop dispatch.
+  const parked = await reconcileDuplicates(github, repo, allReady).catch((err) => {
+    console.error(`duplicate check failed: ${err instanceof Error ? err.message : err}`);
+    return [] as number[];
+  });
+  const ready = allReady.filter((i) => !parked.includes(i.number));
 
   for (const issue of ready) {
     const numbers = blockerNumbers(issue.body);

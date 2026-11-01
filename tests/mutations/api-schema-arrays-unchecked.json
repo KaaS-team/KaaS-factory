@@ -1,0 +1,7 @@
+{
+  "name": "api: schema arrays unchecked",
+  "file": "src/schemas.ts",
+  "find": "return Array.isArray(v) && v.every(",
+  "replace": "return Array.isArray(v) || v.every(",
+  "test": "tests/api-contract.test.ts"
+}

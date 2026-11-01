@@ -1,0 +1,1 @@
+{"name":"route scope grants the wrong scope","file":"src/route-scopes.ts","find":"return granted.includes(scopeOf(route));","replace":"return granted.length > 0 || granted.includes(scopeOf(route));","test":"tests/route-scopes.test.ts"}

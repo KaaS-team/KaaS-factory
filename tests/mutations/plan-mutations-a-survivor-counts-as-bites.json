@@ -1,0 +1,7 @@
+{
+  "name": "plan mutations: a survivor counts as bites",
+  "file": "src/proof.ts",
+  "find": "r.code === 0 ? \"survives\" : \"bites\"",
+  "replace": "r.code === 0 ? \"bites\" : \"survives\"",
+  "test": "tests/mutate.test.ts"
+}

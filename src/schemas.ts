@@ -5,7 +5,8 @@
 import { type ArtifactStage, STEP_KEYS, VERDICT_KEY_LIST } from "./artifacts";
 import { TYPE_LABELS } from "./labels";
 
-type Prop = Record<string, unknown>;
+export type JsonSchema = Record<string, unknown>;
+type Prop = JsonSchema;
 const str: Prop = { type: "string" };
 const int: Prop = { type: "integer" };
 const strings: Prop = { type: "array", items: str };
@@ -32,6 +33,7 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       revision: int,
       files: strings,
       autoApproveEligible: { type: "boolean" },
+      boundaryChange: { type: "boolean" },
       commentId: int,
       // Read by factory-build/factory-verify, never inferred from the type
       // name (plan v2.7.0 item 8). Absent means "test", today's behavior.
@@ -64,6 +66,7 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       rounds: int,
       findings: { type: "array", items: { anyOf: [str, { type: "object" }] } },
       criteria: { type: "array", items: { type: "object" } },
+      prior: { type: "array", items: { type: "object" } },
     },
     pr: {},
     retro: { lesson: str, skill_name: str, skill_edit: str },
@@ -148,7 +151,8 @@ export function schemaProblem(
   return undefined;
 }
 
-function fits(prop: Prop, v: unknown): boolean {
+// Exported for src/api/: checks a value against one JSON Schema node (type, enum, anyOf, items).
+export function fitsSchema(prop: Prop, v: unknown): boolean {
   if (Array.isArray(prop.anyOf)) return (prop.anyOf as Prop[]).some((p) => fits(p, v));
   if (Array.isArray(prop.enum)) return prop.enum.includes(v);
   switch (prop.type) {
@@ -172,3 +176,4 @@ function fits(prop: Prop, v: unknown): boolean {
       return true;
   }
 }
+const fits = fitsSchema;

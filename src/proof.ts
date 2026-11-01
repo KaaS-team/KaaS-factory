@@ -7,11 +7,29 @@
 
 import { type GateSpec, type PackageSpec, testGate } from "./config";
 import type { CommandResult } from "./github";
+import { isGateFile, ranZeroTests } from "./proof-keep";
 import { touchedPackages } from "./risk";
 
 // "unavailable": the repo has no test gate, so nothing could prove the change. It is shown
 // in the PR's run summary rather than passing silently.
-export type ProofStatus = "bites" | "passes-without" | "no-tests" | "skipped" | "unavailable";
+export type ProofStatus =
+  | "bites"
+  | "passes-without"
+  | "no-tests"
+  | "skipped"
+  | "unavailable"
+  | "compile-only"
+  | "did-not-run";
+
+const COMPILE_ERROR = /Cannot find module|Could not resolve|error TS\d+|SyntaxError|ModuleNotFoundError|ImportError/;
+
+// A revert that fails only to compile shows the code exists, not what it does (#116).
+export function classifyProof(proof: ProofResult, added: number): ProofResult {
+  if (ranZeroTests(proof.tail)) return { ...proof, status: "did-not-run" };
+  return proof.status === "bites" && added === 0 && COMPILE_ERROR.test(proof.tail)
+    ? { ...proof, status: "compile-only" }
+    : proof;
+}
 
 export interface ProofResult {
   readonly status: ProofStatus;
@@ -52,6 +70,8 @@ export interface ProofGit {
   restoreHead(worktree: string): Promise<void>;
   dirty(worktree: string): Promise<string[]>;
   test(worktree: string, cmd: string): Promise<CommandResult>;
+  // Where plan mutations are applied and run; absent means the plan's mutations are not run.
+  readonly mutations?: MutationIO;
 }
 
 // The factory's own files never count as the change under test.
@@ -77,7 +97,7 @@ export async function runProof(
     };
   const changes = (await git.changes(worktree, base)).filter((c) => !FACTORY_OWNED.test(c.path));
   const tests = changes.filter((c) => isTestPath(c.path) && c.status !== "D").map((c) => c.path);
-  const impl = changes.filter((c) => !isTestPath(c.path));
+  const impl = changes.filter((c) => !isTestPath(c.path) && !isGateFile(c.path));
   if (tests.length === 0)
     return { status: "no-tests", reverted: [], tests, cmd, tail: "the diff adds or changes no test file" };
   const added = impl.filter((c) => c.status === "A").map((c) => c.path);
@@ -93,14 +113,17 @@ export async function runProof(
   const left = await git.dirty(worktree);
   if (left.length > 0) throw new Error(`proof: the worktree is not clean after restoring HEAD: ${left.join(", ")}`);
   const tail = `${result.stdout}\n${result.stderr}`.trim().slice(-2000);
-  return {
-    status: result.code === 0 ? "passes-without" : "bites",
-    reverted: [...existing, ...added],
-    tests,
-    cmd,
-    exitCode: result.code,
-    tail,
-  };
+  return classifyProof(
+    {
+      status: result.code === 0 ? "passes-without" : "bites",
+      reverted: [...existing, ...added],
+      tests,
+      cmd,
+      exitCode: result.code,
+      tail,
+    },
+    added.length,
+  );
 }
 
 async function sh(args: string[], cwd: string): Promise<CommandResult> {
@@ -120,6 +143,7 @@ async function git(args: string[], cwd: string): Promise<CommandResult> {
 }
 
 export class ShellProofGit implements ProofGit {
+  readonly mutations = new ShellMutationIO();
   async changes(worktree: string, base: string) {
     const out = (await git(["diff", "--name-status", "--no-renames", `origin/${base}...HEAD`], worktree)).stdout;
     return out
@@ -169,4 +193,93 @@ export function proofCommand(
   });
   const all = [testGate(gates)?.cmd, ...pkg].filter((c): c is string => !!c);
   return all.length ? all.join(" && ") : undefined;
+}
+
+export interface PlanMutation {
+  readonly name: string;
+  readonly file: string;
+  readonly find: string;
+  readonly replace: string;
+  readonly test: string;
+}
+
+// "unapplied": the find text is no longer in the file, which says nothing about the tests.
+export interface MutationResult {
+  readonly name: string;
+  readonly status: "bites" | "survives" | "unapplied";
+  readonly exitCode?: number;
+  readonly tail: string;
+}
+
+export interface MutationIO {
+  read(worktree: string, file: string): Promise<Buffer>;
+  write(worktree: string, file: string, content: Buffer): Promise<void>;
+  test(worktree: string, cmd: string): Promise<CommandResult>;
+}
+
+export function isMutation(m: unknown): m is PlanMutation {
+  const o = m as Record<string, unknown> | null;
+  return !!o && ["name", "file", "find", "replace", "test"].every((k) => typeof o[k] === "string");
+}
+
+// The file is put back from the bytes read, so a runner that throws still leaves the worktree
+// as it found it. `cmdFor` turns a mutation's named test into the command to run.
+export async function runMutations(
+  io: MutationIO,
+  worktree: string,
+  mutations: readonly PlanMutation[],
+  cmdFor: (test: string) => string = (test) => test,
+): Promise<MutationResult[]> {
+  const results: MutationResult[] = [];
+  for (const m of mutations) {
+    if (m.file.startsWith("/") || m.file.split("/").includes(".."))
+      throw new Error(`mutation "${m.name}": ${m.file} is outside the repo`);
+    const original = await io.read(worktree, m.file);
+    const text = original.toString("utf8");
+    const at = text.indexOf(m.find);
+    if (at < 0) {
+      results.push({ name: m.name, status: "unapplied", tail: `the find text is not in ${m.file}` });
+      continue;
+    }
+    const mutated = text.slice(0, at) + m.replace + text.slice(at + m.find.length);
+    try {
+      await io.write(worktree, m.file, Buffer.from(mutated, "utf8"));
+      const r = await io.test(worktree, cmdFor(m.test));
+      const tail = `${r.stdout}\n${r.stderr}`.trim().slice(-2000);
+      results.push({ name: m.name, status: r.code === 0 ? "survives" : "bites", exitCode: r.code, tail });
+    } finally {
+      await io.write(worktree, m.file, original);
+    }
+  }
+  return results;
+}
+
+export class ShellMutationIO implements MutationIO {
+  async read(worktree: string, file: string) {
+    return Buffer.from(await Bun.file(`${worktree}/${file}`).arrayBuffer());
+  }
+  async write(worktree: string, file: string, content: Buffer) {
+    await Bun.write(`${worktree}/${file}`, content);
+  }
+  constructor(private readonly timeoutMs = 300_000) {}
+  // A hung test must not leave the file mutated, and the throw keeps a kill from reading as bites.
+  // The race matters: killing bash leaves a grandchild holding the pipes, so reading them never ends.
+  async test(worktree: string, cmd: string) {
+    const proc = Bun.spawn(["bash", "-c", cmd], { cwd: worktree, stdout: "pipe", stderr: "pipe" });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        proc.kill("SIGKILL");
+        reject(new Error(`the mutation's test ran past ${this.timeoutMs / 1000}s and was killed`));
+      }, this.timeoutMs);
+    });
+    try {
+      const done = Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]).then(
+        ([stdout, stderr, code]) => ({ stdout, stderr, code }),
+      );
+      return await Promise.race([done, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }

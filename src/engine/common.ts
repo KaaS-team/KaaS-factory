@@ -7,6 +7,7 @@ import { shipStage } from "./blobs";
 import type { FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
+import { settle } from "../run-transitions";
 import { costFor } from "../pricing";
 import {
   OPERATOR_TAKEOVER,
@@ -25,12 +26,16 @@ import {
   type RetroArtifact,
   type VerdictArtifact,
 } from "../artifacts";
+import { describeTagged } from "../finding-check";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isTrusted } from "../chatops";
+import { describeFindings, scanText } from "../secret-scan";
 import { mcpServersFor } from "../mcp";
 import { deriveIssueState, latestDataFor, parseDataMarkers } from "../derive";
 import { type IssueScope, scopeFrom } from "../core/model-tier";
 import { rehydrate } from "../rehydrate";
+import { stripOperatorDetail } from "../comment-voice";
+import { sanitizeIssue } from "../sanitize-issue";
 import type { GateRunner } from "../gates";
 import type { ProofGit } from "../proof";
 import type { GhIssue } from "../github";
@@ -48,7 +53,6 @@ import { emitEvent, type EventBus } from "./bus";
 import { configHash } from "../team/hash";
 import type { Minion } from "../core/minion";
 import type { MachineConfig, MachineLeases, MachineSpend } from "../machine";
-
 export type { Stage };
 export type Outcome =
   | "needs-info"
@@ -73,9 +77,9 @@ export interface WatchDeps {
   // Runs the proof:test revert check before verify and writes proof.json; absent means verify does it by hand.
   readonly proofGit?: ProofGit;
   readonly cloneDir: string;
+  readonly pushProbe?: (worktree: string, runId: string) => Promise<import("../push-probe").ProbeResult>;
   readonly workspacesDir: string;
-  // Runs config.setup once per worktree; defaults to a real shell so tests
-  // can inject a fake instead of actually running `npm ci`.
+  // Runs config.setup once per worktree; defaults to a real shell, so tests can inject a fake.
   readonly setupRunner?: SetupRunner;
   // Absent: this process is the only worker on the repo. Present: every
   // advance holds the issue's lease (src/engine/lease.ts) for its whole run,
@@ -208,7 +212,12 @@ export async function postComment(
   body: string,
   dataTag?: { stage: string; json: unknown },
 ): Promise<void> {
-  if (!body.trim()) return;
+  if (!(body = stripOperatorDetail(body)).trim()) return; // no model, amount or run id reaches a maintainer (#145)
+  const secrets = scanText(body);
+  if (secrets.length > 0) {
+    finish(deps, config, issueNumber, "needs-human", describeFindings(secrets));
+    return;
+  }
   // No marker means it would read as an OWNER-authored human comment.
   const full = dataTag
     ? withDataMarker(body, dataTag.stage, dataTag.json)
@@ -226,16 +235,15 @@ export async function recheckFindings(
   worktree: string,
   verdict: VerdictArtifact,
 ): Promise<{ verdict: VerdictArtifact; note: string }> {
-  const checked = verdict.findings.filter(isChecked);
-  const supported = await deps.rechecker!.supported(checked, await deps.git.diff(worktree, config.base));
+  const diff = await deps.git.diff(worktree, config.base);
+  const supported = await deps.rechecker!.supported(verdict.findings.filter(isChecked), diff);
   if (supported === undefined) return { verdict, note: "" };
   const { kept, dropped } = keepSupported(verdict.findings, supported);
   if (dropped.length === 0) return { verdict, note: "" };
   const result = verdict.result === "reject" && !hasBlocking(kept) ? "uncertain" : verdict.result;
-  const list = dropped.map((f) => `- ${f.what}`).join("\n");
   return {
     verdict: { ...verdict, findings: kept, result },
-    note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a line it changed, so they were dropped:\n${list}`,
+    note: `\n\nThe diff does not support ${dropped.length} finding(s): none is confirmed (a changed line plus a reproduction), so they were dropped:\n${describeTagged(dropped, diff)}`,
   };
 }
 
@@ -270,19 +278,14 @@ export function finish(
   status: "needs-info" | "awaiting-approval" | "needs-human" | "failed" | "shipped" | "cancelled",
   reason?: string,
 ): void {
-  deps.state.updateRun(config.repo, issueNumber, { status, reason: reason ?? null });
-  // Parked issues keep their window, so the operator can still read it.
-  if (deps.view && (status === "shipped" || status === "cancelled" || status === "failed")) {
-    deps.view.close(issueNumber).catch((e) => console.error(`[tmux] close #${issueNumber}: ${e}`));
-  }
+  settle(deps.state, deps.view, config.repo, issueNumber, status, reason);
 }
 
 // Skills never call `gh` (only the runner talks to GitHub), so the current
 // issue thread is handed to them as a file: they read it instead of fetching
-// it themselves. Written fresh before every stage so a resumed stage sees any
-// new trusted reply.
+// it themselves. Rewritten before every stage, sanitised (src/sanitize-issue.ts).
 export async function writeIssueSnapshot(worktree: string, issue: GhIssue): Promise<void> {
-  await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(issue, null, 2));
+  await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(sanitizeIssue(issue), null, 2));
 }
 
 // The agent's own cost wins; otherwise price the tokens. No price means the

@@ -1,0 +1,1 @@
+{"name":"failure ledger recurrence of a verified failure is not regressed","file":"src/failure-ledger.ts","find":"row.status === \"verified\" ? \"regressed\"","replace":"row.status === \"verified\" ? \"verified\"","test":"tests/failure-ledger.test.ts"}

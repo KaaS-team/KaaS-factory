@@ -1,0 +1,15 @@
+# Shared CI baseline (#349). Inert until renamed to .github/workflows/ci-baseline.yml in the one repo
+# that owns it; every other KaaS-team repo calls it with:
+#   jobs:
+#     ci:
+#       uses: KaaS-team/KaaS-factory/.github/workflows/ci-baseline.yml@main
+name: ci-baseline
+on:
+  workflow_call:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: make check

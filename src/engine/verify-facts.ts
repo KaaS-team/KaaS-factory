@@ -1,6 +1,7 @@
 // The P6 pieces of the plan and verify steps, kept out of steps.ts: the plan's risk floor, the
 // monorepo proof command, and the PR facts a tiered merge reads.
-import { lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   BLOCKING_CONFIDENCE,
@@ -11,15 +12,18 @@ import {
   type Risk,
 } from "../artifacts";
 import { resolveRoute } from "../agents/executor";
-import type { FactoryConfig } from "../config";
+import { type FactoryConfig, testGate } from "../config";
 import type { GhIssue } from "../github";
 import { issueType } from "../labels";
 import { collectVerifyFacts, readVerifyFacts, writeVerifyFacts } from "../pr-facts-collect";
+import { boundaryGlobs, docsMissing } from "../docs-check";
+import { recordPromotion } from "../promotion";
 import { isChecked } from "../recheck";
 import { crossModel } from "../review-models";
 import { labelsOf, runStage } from "./common";
-import { type ProofGit, type ProofResult, proofCommand } from "../proof";
+import { isMutation, type PlanMutation, type ProofGit, type ProofResult, proofCommand, runMutations } from "../proof";
 import { floorPlanRisk } from "../risk";
+import { skipDeltas } from "../skip-count";
 
 export function flooredPlan<P extends { risk: Risk; files: readonly string[] }, R extends { json?: P }>(
   parsed: R,
@@ -31,10 +35,74 @@ export function flooredPlan<P extends { risk: Risk; files: readonly string[] }, 
 // The plan's proof kind, and the top-level test gate plus each touched package's, so a monorepo
 // proof reaches the package the diff changed.
 export async function proofInputs(git: ProofGit, worktree: string, config: FactoryConfig, issue: number) {
-  const plan = (await readStageArtifacts(worktree, issue, "plan")).json as { proof?: "test" | "check" } | undefined;
+  const plan = (await readStageArtifacts(worktree, issue, "plan")).json as
+    | { proof?: "test" | "check"; mutations?: unknown[] }
+    | undefined;
   const changed = config.packages?.length ? await git.changes(worktree, config.base) : [];
   const paths = changed.map((c) => c.path);
-  return { planProof: plan?.proof, testCmd: proofCommand(config.gates, config.packages ?? [], paths) };
+  return {
+    planProof: plan?.proof,
+    testCmd: proofCommand(config.gates, config.packages ?? [], paths),
+    mutations: (plan?.mutations ?? []).filter(isMutation),
+  };
+}
+
+// What the plan's mutations found. Only a survivor, or a pass that could not run, rejects: a
+// find text the build moved or a missing test gate is the builder's to see, not a reason to fail.
+export interface MutationFindings {
+  readonly names: string[];
+  readonly body: string;
+  readonly reject: boolean;
+}
+
+// Each mutation is applied to the worktree and put back before the next.
+export async function survivingMutations(
+  git: ProofGit,
+  worktree: string,
+  config: FactoryConfig,
+  mutations: readonly PlanMutation[],
+): Promise<MutationFindings | undefined> {
+  if (!git.mutations || mutations.length === 0) return undefined;
+  const gate = testGate(config.gates);
+  // The plan's test string is never run raw: without a test gate there is nothing safe to run it with.
+  if (!gate)
+    return {
+      names: [],
+      body: "Plan mutations were not run: no gate has role test (or is named test) in config.",
+      reject: false,
+    };
+  // A test gate with fileCmd runs only the named test; without one, the whole gate runs.
+  const cmdFor = (test: string) => (gate.fileCmd ? `${gate.fileCmd} '${test.replaceAll("'", "'\\''")}'` : gate.cmd);
+  let results: Awaited<ReturnType<typeof runMutations>>;
+  try {
+    results = await runMutations(git.mutations, worktree, mutations, cmdFor);
+  } catch (err) {
+    // A bad path, a missing file or a hung test: the file is back, and the pass proved nothing.
+    return { names: [], body: `Plan mutations could not run: ${(err as Error).message}`, reject: true };
+  }
+  const code = (tail: string) => `\n\n\`\`\`\n${tail}\n\`\`\``;
+  const survivors = results.filter((r) => r.status === "survives");
+  const unapplied = results.filter((r) => r.status === "unapplied");
+  const parts = [
+    survivors.length
+      ? `Plan mutations whose test still passed:\n\n${survivors.map((r) => `- \`${r.name}\`${code(r.tail)}`).join("\n\n")}`
+      : "",
+    unapplied.length
+      ? `Plan mutations not applied (update their find text; they prove nothing):\n\n${unapplied.map((r) => `- \`${r.name}\`: ${r.tail}`).join("\n")}`
+      : "",
+    !gate.fileCmd && mutations.length > 1
+      ? `The test gate has no fileCmd, so each of the ${mutations.length} mutations ran the whole gate.`
+      : "",
+  ].filter(Boolean);
+  if (parts.length === 0) return undefined;
+  return { names: survivors.map((r) => r.name), body: parts.join("\n\n"), reject: survivors.length > 0 };
+}
+
+// A diff that raises the skip count in a test file fails verify: a skipped test needs a person.
+export function skipRiseHits(diff: string): string[] {
+  return skipDeltas(diff)
+    .filter((f) => f.delta > 0)
+    .map((f) => `${f.path}: adds ${f.delta} skipped test${f.delta > 1 ? "s" : ""}, and a skipped test needs a person`);
 }
 
 // Only a repo that can merge on its own pays for mutants and a clean room. A failed collection
@@ -46,9 +114,28 @@ export async function recordVerifyFacts(
   testCmd: string | undefined,
   proof: ProofResult,
 ): Promise<void> {
+  await recordPromotion(worktree, config, issue, proof);
   if (config.merge.policy === "off" && !config.merge.autonomy) return;
   try {
-    await writeVerifyFacts(worktree, issue, await collectVerifyFacts(worktree, config, issue, testCmd, proof));
+    const facts = await collectVerifyFacts(worktree, config, issue, testCmd, proof);
+    const diff = execFileSync("git", ["diff", "-U0", `origin/${config.base}...HEAD`], {
+      cwd: worktree,
+      encoding: "utf8",
+      maxBuffer: 1 << 28,
+    });
+    const charter = join(worktree, ".factory/charter.md");
+    const globs = existsSync(charter) ? boundaryGlobs(readFileSync(charter, "utf8")) : [];
+    const names = execFileSync("git", ["diff", "--name-only", `origin/${config.base}...HEAD`], {
+      cwd: worktree,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(Boolean);
+    await writeVerifyFacts(worktree, issue, {
+      ...facts,
+      tamper: [...facts.tamper, ...skipRiseHits(diff)],
+      ...(globs.length ? { docs: { missing: docsMissing(names, globs) } } : {}),
+    });
   } catch (err) {
     console.error(`verify facts for #${issue} were not collected:`, err);
   }

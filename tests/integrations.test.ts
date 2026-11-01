@@ -72,6 +72,6 @@ describe("live suites", () => {
     expect(keys(LIVE_TRACKERS)).toEqual(live("tracker"));
     expect(keys(LIVE_RUNTIMES)).toEqual(live("runtime"));
     expect(Object.keys(LIVE_TRACKERS).sort()).toEqual(["asana", "clickup", "jira", "linear", "plane"]);
-    expect(Object.keys(LIVE_RUNTIMES).sort()).toEqual(["http-sandbox", "ssh", "wrap"]);
+    expect(Object.keys(LIVE_RUNTIMES).sort()).toEqual(["agent37", "http-sandbox", "ssh", "wrap"]);
   });
 });

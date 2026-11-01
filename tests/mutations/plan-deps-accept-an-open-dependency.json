@@ -1,0 +1,7 @@
+{
+  "name": "plan-deps: accept an open dependency",
+  "file": "src/plan-deps.ts",
+  "find": "dep?.state === \"CLOSED\" && dep.stateReason !== \"NOT_PLANNED\"",
+  "replace": "true",
+  "test": "tests/plan-deps.test.ts"
+}

@@ -1,0 +1,1 @@
+{"name":"otel agent span named by stage","file":"src/otel-genai.ts","find":"export const agentSpanName = (agent: string) => `${GENAI_OP.agent} ${agent}`;","replace":"export const agentSpanName = (agent: string) => `${GENAI_OP.agent} stage`;","test":"tests/otel.test.ts"}

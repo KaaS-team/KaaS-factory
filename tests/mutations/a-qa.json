@@ -1,0 +1,1 @@
+{"name":"a qa","file":"src/qa-step.ts","find":"outcome = await runQaStep(","replace":"outcome = { ran: false, ok: true }; void (","test":"tests/qa-step.test.ts"}

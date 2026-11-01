@@ -41,6 +41,7 @@ function labels(github: FakeGitHub, n: number): string[] {
 }
 
 function setup(initial: string[], overrides: Partial<typeof DEFAULT_CONFIG> = {}, n = 1) {
+  mkdirSync(tmpdir(), { recursive: true });
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   dirs.push(workspacesDir, cloneDir);
@@ -188,6 +189,7 @@ describe("approval paths", () => {
         workflow: "feature-to-pr",
         sha: expect.any(String),
         step: "plan",
+        startedBy: "person",
         outcome: "awaiting-approval",
       },
     ]);
@@ -658,6 +660,27 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("11d. review.maxRounds hands a PR that fails review to a person, with a note to rethink", async () => {
+    for (const [maxRounds, expected] of [
+      [3, 3],
+      [2, 2],
+    ] as const) {
+      const c = setup([LABEL.ready], { review: { maxRounds } });
+      c.state.setToggle("auto_approve_low_risk", true);
+      c.push("triage", triage());
+      c.push("plan", plan("low"));
+      for (let i = 0; i < 4; i++) {
+        c.push("build", build());
+        c.push("verify", verdict("reject"));
+      }
+      expect(await c.step()).toBe("needs-human");
+      expect(c.state.getRun("acme/widgets", 1)!.reason).toBe(
+        `rejected ${expected} times; review cap reached, rethink the approach instead of patching again`,
+      );
+      done(c);
+    }
+  });
+
   test("11c. a rebuild by an agent that kept no session is still told why it came back", async () => {
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);
@@ -669,7 +692,9 @@ describe("failure paths", () => {
     c.push("verify", verdict("pass"));
     c.push("pr", pr());
     expect(await c.step()).toBe("shipped");
-    expect(c.executor.resumed[4]).toEqual({ failure: "<!-- factory:verdict v1 -->\nstill throws" });
+    expect(c.executor.resumed[4]).toEqual({
+      failure: "<!-- factory:verdict v1 -->\n## Verdict: reject (round 1 of 2)\n\nstill throws",
+    });
     done(c);
   });
 
@@ -691,7 +716,7 @@ describe("failure paths", () => {
     // Runs in order: triage, plan, build, verify, the rebuild, verify, pr.
     expect(c.executor.resumed[4]).toEqual({
       sessionId: "s-build-1",
-      failure: "<!-- factory:verdict v1 -->\nthe empty list still throws",
+      failure: "<!-- factory:verdict v1 -->\n## Verdict: reject (round 1 of 2)\n\nthe empty list still throws",
     });
     // Only the rebuild resumes: triage, plan, the first build and every verify start fresh.
     expect(c.executor.resumed.filter(Boolean)).toHaveLength(1);
@@ -858,7 +883,7 @@ describe("failure paths", () => {
       .comments.map((m) => m.body)
       .join("\n");
     expect(body).toContain("does not support 1 finding(s)");
-    expect(body).toContain("- invented bug");
+    expect(body).toContain("- [rejected] invented bug");
     // A supported finding stands: the reject still sends the issue back to build.
     const d = setup([LABEL.ready]);
     d.state.setToggle("auto_approve_low_risk", true);
@@ -868,7 +893,15 @@ describe("failure paths", () => {
     d.push("build", build());
     d.push("verify", rejected([finding("real bug")]));
     d.push("build", build());
-    d.push("verify", verdict("pass"));
+    d.push("verify", {
+      ...verdict("pass"),
+      "verdict.json": JSON.stringify({
+        result: "pass",
+        rounds: 1,
+        findings: [],
+        prior: [{ what: "real bug", status: "resolved" }],
+      }),
+    });
     d.push("pr", pr());
     expect(await d.step()).toBe("shipped");
     expect(d.github.seenLabels.has(LABEL.building)).toBe(true);

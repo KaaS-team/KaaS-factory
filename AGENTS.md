@@ -6,10 +6,13 @@ A GitHub-native loop for coding agents: triage, plan, build, verify, PR. `src/` 
 
 ## Commands
 
+- `make fast`: about 7 seconds. Biome, typecheck, test-only check, mutation check against `BASE` (default origin/main), line-cap baseline and anchors. Run it before every push.
 - `make check`: typecheck, `bun test`, then `skills-ref validate` on every template skill. It needs
   `uvx` and fails without it. This is the gate.
-- `make check-mutations`: applies each entry in `tests/mutations.json` to a copy of the repo, and its
-  test must go red. A new check lands with its mutation in the same change. It runs in `mutations.yml`, off the push verdict: on a pull request, a push that changes a
+- `make check-mutations`: applies each mutation entry to a copy of the repo, and its test must go red.
+  Each entry is one file, `tests/mutations/<slug>.json`, named by `mutationSlug` of its name.
+  `tests/mutations.json` is the old list, still read until `scripts/split-mutations.ts` moves it. A new
+  check lands with its mutation file in the same change. It runs in `mutations.yml`, off the push verdict: on a pull request, a push that changes a
   test or a check, and nightly.
 - `make agent-matrix` spends tokens on real agents, so it is never part of the gate.
 

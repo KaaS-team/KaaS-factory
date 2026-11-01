@@ -19,7 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctor, sha256 } from "../src/doctor";
-import { installTemplate, type InstallOptions } from "../src/install-template";
+import { installTemplate, RELEASE_OFFER, type InstallOptions } from "../src/install-template";
 
 const CLI = join(import.meta.dir, "..", "src", "cli.ts");
 
@@ -41,10 +41,19 @@ function run(args: string[]): { code: number; stdout: string; stderr: string } {
 }
 
 function scratchTarget(): string {
+  mkdirSync(tmpdir(), { recursive: true });
   return mkdtempSync(join(tmpdir(), "factory-install-"));
 }
 
 describe("installTemplate (default)", () => {
+  test("offers the release workflow in its output and writes no release.yml", () => {
+    const target = scratchTarget();
+    const { stdout } = run([target]);
+    expect(stdout).toContain(RELEASE_OFFER);
+    expect(existsSync(join(target, ".github", "workflows", "release.yml"))).toBe(false);
+    rmSync(target, { recursive: true, force: true });
+  });
+
   test("writes the template into an empty target", () => {
     const target = scratchTarget();
     const { code } = run([target]);
@@ -130,6 +139,7 @@ describe("installTemplate --update", () => {
   test("overwrites a factory-owned file that already exists", () => {
     const target = scratchTarget();
     run([target]); // first install
+    rmSync(join(target, ".factory", "manifest.json")); // an install from before the manifest: a stale copy is not an edit
     writeFileSync(join(target, ".claude", "hooks", "guard-paths.sh"), "#!/usr/bin/env bash\n# stale\n");
     const { stdout } = run([target, "--update"]);
     expect(stdout).toContain("overwrote: .claude/hooks/guard-paths.sh");
@@ -206,6 +216,7 @@ describe("installTemplate scaffold", () => {
   test("--update refreshes gates.sh but never touches the repo's charter", () => {
     const target = scratchTarget();
     run([target]);
+    rmSync(join(target, ".factory", "manifest.json")); // pre-manifest install: old copies are stale, not edits
     writeFileSync(join(target, ".factory", "charter.md"), "my charter");
     writeFileSync(join(target, ".factory", "gates.sh"), "old");
     writeFileSync(join(target, ".factory", "mutate.sh"), "old");

@@ -1,0 +1,1 @@
+{"name":"commit bodies drop the closes line","file":"src/commit-message.ts","find":"\\n\\n${keyword} ${ref}`;","replace":"`;","test":"tests/commit-message.test.ts"}

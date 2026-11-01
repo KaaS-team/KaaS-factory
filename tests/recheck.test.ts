@@ -44,7 +44,13 @@ const DIFF = [
   "-y",
 ].join("\n");
 
-const at = (where?: string): Finding => ({ severity: "must", confidence: 4, what: "w", ...(where ? { where } : {}) });
+const at = (where?: string, evidence = "bun test tests/a.test.ts fails"): Finding => ({
+  severity: "must",
+  confidence: 4,
+  what: "w",
+  ...(where ? { where } : {}),
+  ...(evidence ? { evidence } : {}),
+});
 
 test("changedLines reads each file's new-side hunk ranges and skips deleted files", () => {
   expect([...changedLines(DIFF)]).toEqual([
@@ -65,4 +71,9 @@ test("a finding is supported only when its where overlaps a changed hunk", async
     at("src/gone.ts:1"), // a deleted file has no new side
   ];
   expect(await new DiffAnchorRechecker().supported(findings, DIFF)).toEqual([0, 1, 2]);
+});
+
+test("a finding on a changed line is dropped when its evidence is empty or blank", async () => {
+  const findings = [at("src/a.ts:12", ""), at("src/a.ts:12", "   "), at("src/a.ts:12")];
+  expect(await new DiffAnchorRechecker().supported(findings, DIFF)).toEqual([2]);
 });

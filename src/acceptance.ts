@@ -32,9 +32,13 @@ export async function runAcceptance(
   exec: ExecutionPort,
   worktree: string,
   base: string,
+  script: string = ACCEPTANCE_SCRIPT,
 ): Promise<AcceptanceVerdict | undefined> {
-  if (!existsSync(`${worktree}/${ACCEPTANCE_SCRIPT}`)) return undefined;
-  const out = await exec.run(`python3 ${ACCEPTANCE_SCRIPT} --json --base ${shq(`origin/${base}`)}`, worktree);
+  if (!script || !existsSync(`${worktree}/${script}`)) return undefined;
+  const out = await exec.run(
+    `python3 ${/^[\w./-]+$/.test(script) ? script : shq(script)} --json --base ${shq(`origin/${base}`)}`,
+    worktree,
+  );
   try {
     return JSON.parse(out.stdout) as AcceptanceVerdict;
   } catch {

@@ -12,3 +12,5 @@ worktree file, not a URL) against the five-criterion rubric
 the criterion and the score, and three or more such findings become a
 `must`. This runs alongside, not instead of, step 3: a `ui`-typed issue
 still needs a green gate and every AC proven.
+
+A healer never edits a spec; it writes its proposed locator changes as a unified diff to the run dir's `heal.diff` for a person to review, and the runner refuses one that touches a non-spec file, deletes a spec, adds a skip or fixme, or changes anything but a locator.

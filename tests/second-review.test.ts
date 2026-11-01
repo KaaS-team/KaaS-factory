@@ -67,7 +67,7 @@ test("a high-risk task runs two review sessions on two different models, and a r
   const full = {
     ...facts,
     risk: { level: "high", blastRadius: { owners: [], protected: [] } },
-    ui: { changed: false, preview: false, smoke: false, unreviewedDiffs: 0 },
+    ui: { changed: false, preview: false, smoke: false, unreviewedDiffs: 0, qaSpec: false },
     postMergeWatch: true,
   } as unknown as PrFacts;
   const sevens = factRefusals(full, "full")

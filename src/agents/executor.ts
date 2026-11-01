@@ -1,9 +1,9 @@
 // Ported from owainlewis/machinist@3943516 internal/runner/runner.go:190-240 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the process-group kill is process_unix.go, and TypeScript on Bun (`detached` is setsid); the event cap and 1 MiB line cap follow events.go and codex_usage.go; the tool-call cap and stderr tail are the factory's own (audit finding #15).
-// The one executor: spawn any agent CLI, feed the prompt, watch its output through the preset's
-// line parser, and kill the whole process group on a timeout or a runaway tool-call count.
-
+// The one executor: spawn any agent CLI, feed the prompt, parse its output, and kill the process group on a timeout or runaway tool calls.
+import { trackStep } from "../process-tree";
 import { crossModel } from "../review-models";
 import { tierFor } from "../core/model-tier";
+import { DEFAULT_AGENT } from "./default";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -33,14 +33,14 @@ import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 import { portEnv } from "../port";
+import { forwardSettings } from "../sandbox-env";
 import { guestGit } from "../adapters/microsandbox/execution";
 import { type AgentSandbox, forGateway, removeSandbox, sandboxArgv } from "./agent-sandbox";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
 export const MAX_ARG_BYTES = 120 * 1024;
-// What the stop-artifact hook checks: only the stages whose file watch.ts requires and
-// validates (pr and retro owe none), and a stopped verify owes nothing but its outcome.
+// What the stop-artifact hook checks: stages whose file watch.ts validates; a stopped verify owes only its outcome.
 export function stopArtifactSpec(
   stage: StageRunOptions["stage"],
   types: readonly string[],
@@ -52,8 +52,7 @@ export function stopArtifactSpec(
 export const MAX_EVENT_LINE_BYTES = 1 << 20;
 export const MAX_RECORDED_OUTPUT_BYTES = 64 << 20;
 
-// One transcript line per event, the same text `factory logs` prints. A path inside the stage's
-// worktree prints relative to it: the watcher reads src/csv.ts, never the operator's home folder.
+// One transcript line per event, as `factory logs` prints it; a worktree path prints relative to it.
 // The 90 character cap applies after, so a long command keeps its tail, not the absolute prefix.
 export function renderEvent(e: StageEvent, cwd?: string): string | undefined {
   if (e.kind === "tool_use") {
@@ -98,7 +97,7 @@ export function resolveRoute(
   type: string | undefined,
 ): ResolvedAgent {
   const routed = stage !== "triage" && type ? routes?.[type]?.stages?.[stage] : undefined;
-  const name = routed ?? stages[stage] ?? stages.default ?? "claude";
+  const name = routed ?? stages[stage] ?? stages.default ?? DEFAULT_AGENT;
   return resolveAgentByName(agents, name, stage);
 }
 
@@ -228,7 +227,11 @@ export class CommandExecutor implements Executor {
     const contextPack =
       opts.prompt !== undefined
         ? ""
-        : await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
+        : await buildContextPack(opts.stage, opts.issue, opts.cwd, {
+            skills,
+            contextFile: agent.preset?.contextFile,
+            skillsDir: agent.preset?.skillsDir,
+          });
     const reply = agent.config.outputSchema && (spec || readOnly) ? join(scratch, "reply.schema.json") : undefined;
     if (reply) writeFileSync(reply, JSON.stringify(replySchema(opts.stage, types)));
     if (agent.preset?.ownsPrompt) {
@@ -279,11 +282,10 @@ export class CommandExecutor implements Executor {
     const via = key && this.gateway ? agent.preset?.gateway : undefined;
     const gatewayUrl = via ? { [via.baseUrl]: `${this.gateway!.url.replace(/\/$/, "")}${via.path ?? ""}` } : {};
     const vm = via && this.vm ? forGateway(this.vm) : this.vm;
-    // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
     const vmName = vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
     if (vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
     const guestEnv = vm
-      ? { ...stageEnv, ...gatewayUrl, ...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? []) }
+      ? { ...forwardSettings(stageEnv), ...gatewayUrl, ...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? []) }
       : stageEnv;
     const proc = Bun.spawn(
       vm && vmName
@@ -332,17 +334,19 @@ export class CommandExecutor implements Executor {
       );
     };
     writeLive();
+    const tree = trackStep(`${opts.issue}-${opts.stage}-${proc.pid}`, proc.pid);
     let cancelRead: (() => void) | undefined;
     const killGroup = () => {
+      tree.record(); // before the kill orphans them
       // ESRCH means it already exited; that is the goal.
       try {
         process.kill(-proc.pid, "SIGKILL");
       } catch {
         proc.kill();
       }
+      tree.reap(opts.transcriptFile, opts.stage);
       if (vm && vmName) removeSandbox(vm, vmName);
-      // A descendant that left the group (setsid) can still hold the pipe open:
-      // give the reader a moment to drain, then stop waiting for it.
+      // A setsid descendant can still hold the pipe open: drain briefly, then stop waiting.
       setTimeout(() => cancelRead?.(), 2000).unref();
     };
     const events: StageEvent[] = [];
@@ -350,8 +354,7 @@ export class CommandExecutor implements Executor {
     let killedReason: string | undefined;
     let usageComplete = agent.preset !== undefined;
     let recorded = 0;
-    // Read alongside stdout, not after: an unread pipe can fill its OS buffer
-    // and stall the child, and launch-time errors go to stderr only.
+    // Read beside stdout: an unread pipe stalls the child, and launch errors go to stderr only.
     const errReader = proc.stderr.getReader();
     const stderrPromise = (async () => {
       const dec = new TextDecoder();
@@ -450,6 +453,7 @@ export class CommandExecutor implements Executor {
     }
 
     const [exitCode, stderr] = await Promise.all([proc.exited, stderrPromise]);
+    await tree.stop();
     if (opts.liveFile) rmSync(opts.liveFile, { force: true });
     if (marker && existsSync(marker)) {
       killedReason = OPERATOR_TAKEOVER;

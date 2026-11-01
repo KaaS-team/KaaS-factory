@@ -3,7 +3,10 @@
 // already made the judgment (what lesson, what skill edit); this just
 // durably exposes it for human review. It never auto-merges.
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { outsideAllowedPaths } from "./boundary";
+import { loopRefusals } from "./loop-guard";
 import { capLessons, LESSONS_PATH } from "./context";
 import type { Git } from "./git";
 import type { ScmPort } from "./github";
@@ -88,7 +91,8 @@ function buildPrBody(rows: readonly RetroRow[]): string {
 // would touch anything outside LEARNING_ALLOWED_PATHS: the one case that
 // should never happen since only src/state.ts and this file write these
 // paths, but is checked anyway as defense in depth (mirrors
-// touchesProtectedPath's use in watch.ts).
+// touchesProtectedPath's use in watch.ts). It also refuses a batch that deletes a file or edits a
+// calibration label: the loop may add, never remove or relabel.
 export async function runLearn(
   deps: LearnDeps,
   repo: string,
@@ -109,6 +113,9 @@ export async function runLearn(
   if (!committed) return { batched: 0 };
 
   const changed = await deps.git.changedFiles(worktreeDir, base);
+  const refused = loopRefusals(changed, (f) => existsSync(join(worktreeDir, f)));
+  if (refused.length)
+    throw new Error(`factory learn: the loop may add, never remove or relabel: ${refused.join(", ")}`);
   const outside = outsideAllowedPaths(changed, LEARNING_ALLOWED_PATHS);
   if (outside.length > 0) {
     throw new Error(`factory learn: refusing to push outside its allowed paths: ${outside.join(", ")}`);

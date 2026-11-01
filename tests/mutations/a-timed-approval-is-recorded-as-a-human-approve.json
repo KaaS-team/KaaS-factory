@@ -1,0 +1,1 @@
+{"name":"a timed approval is recorded as a human approve","file":"src/engine/run-origin.ts","find":"return decision === \"timed\" ? TIMER : by;","replace":"return by;","test":"tests/run-origin.test.ts"}

@@ -64,15 +64,19 @@ RUN set -e; for agent in $AGENTS; do \
 
 WORKDIR /app
 COPY package.json bun.lock ./
+COPY packages ./packages
 RUN bun install --frozen-lockfile
 
 COPY bin ./bin
 COPY src ./src
+COPY scripts/check-pr-body.ts ./scripts/check-pr-body.ts
 COPY contrib ./contrib
 COPY dashboard ./dashboard
 COPY template ./template
 COPY template-ci ./template-ci
 COPY ee ./ee
+# src/plan-guard.ts imports this one script; copy it alone, not all of scripts/.
+COPY scripts/lint-planned.ts ./scripts/lint-planned.ts
 COPY --from=rust /out/release/kaas-relay /out/release/kaas-verify /usr/local/bin/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

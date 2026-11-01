@@ -25,6 +25,12 @@ describe("factory help", () => {
     for (const f of used) expect(helpText()).toContain(`--${f}`);
   });
 
+  test("serve is documented and dispatched", () => {
+    expect(COMMANDS.map((c) => c.name)).toContain("serve");
+    expect(readFileSync(cli, "utf8")).toContain('case "serve":');
+    expect(helpText()).toContain("--fixture");
+  });
+
   for (const arg of ["-h", "--help", "help"]) {
     test(`${arg} exits 0 and prints usage`, async () => {
       const proc = Bun.spawn(["bun", bin, arg], { stdout: "pipe", stderr: "pipe" });

@@ -2,10 +2,16 @@
 // own text and Acceptance. The receipt goes to a comment on the issue; the run table (models, spend) stays
 // in the operator view, because the issue thread is read by customers.
 
+import { problems } from "../../scripts/check-pr-body";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { FactoryConfig } from "../config";
 import type { ExecutionPort } from "../ports/execution";
 import type { ProofResult } from "../proof";
 import { missingReceipt, renderReceipt, writeRunReceipt, type RunReceiptOptions } from "../receipt";
+import { qaSection, readQa, type Qa } from "../qa";
+import { publishShots, runGit, shotsSection, type ShotUrls } from "../assets-branch";
+import { readTryIt, tryItSection, type TryIt } from "../try-it";
 import type { WatchDeps } from "./common";
 
 const RUN_DETAILS_MARKER = "<!-- factory:run-details -->";
@@ -68,6 +74,13 @@ export interface PrParts {
   readonly closes?: string;
   // How the body names the issue holding the run-details comment (see issueRef); it then points there.
   readonly runDetails?: string;
+  // The target repo's PR template; given, a body CI would refuse throws instead of being opened.
+  readonly template?: string;
+  // The QA step's qa.json, and a UI change's before and after URLs; each renders only when given.
+  readonly qa?: Qa;
+  readonly shots?: readonly ShotUrls[];
+  // One command and its expected output (src/try-it.ts); the section is absent without it.
+  readonly tryIt?: TryIt;
 }
 
 // `#n` links on GitHub; a PR body must not carry it for another tracker, whose n is not a GitHub issue.
@@ -75,13 +88,49 @@ export function issueRef(config: Pick<FactoryConfig, "tracker">, issueNumber: nu
   return config.tracker.kind === "github" ? `#${issueNumber}` : `tracker issue ${issueNumber}`;
 }
 
+// The target repo's PR template, or undefined when it has none (nothing to lint against).
+export function prTemplate(worktree: string): string | undefined {
+  const path = join(worktree, ".github/pull_request_template.md");
+  return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+}
+
 // The PR body opens with What changed, then the pr stage's text and the Acceptance section. The receipt
 // envelope stays out, in the issue comment, so the body never carries an attestation blob.
-export function prBody(body: string, parts: PrParts = {}): string {
+function assemble(body: string, parts: PrParts): string {
   if (parts.tasks) body = `${parts.tasks}\n\n${body}`;
   if (parts.whatChanged) body = `${parts.whatChanged}\n\n${body}`;
   if (parts.acceptance) body = `${body}\n\n${parts.acceptance}`;
+  const out: string[] = [];
+  if (parts.qa) out.push(qaSection(parts.qa));
+  if (parts.shots?.length) out.push(shotsSection(parts.shots));
+  if (parts.tryIt) out.push(tryItSection(parts.tryIt));
+  if (out.length) body = `${body}\n\n${out.join("\n\n")}`;
   if (parts.closes) body = `${body}\n\n${parts.closes}`;
   if (parts.runDetails) body = `${body}\n\nThe receipt is in the run-details comment on ${parts.runDetails}.`;
   return body;
+}
+
+export const prBody = (body: string, parts: PrParts = {}): string =>
+  checkedPrBody(assemble(body, parts), parts.template);
+
+// A body CI would refuse never reaches the open call: editing the body does not re-run the check (#385).
+// Without a template there is nothing to lint against.
+export function checkedPrBody(body: string, template: string | undefined): string {
+  const found = template === undefined ? [] : problems(body, template);
+  if (found.length) throw new Error(`the PR body does not follow the template:\n- ${found.join("\n- ")}`);
+  return body;
+}
+
+// The QA result and a UI change's pushed screenshots, for the PR body's optional sections.
+export async function prExtras(
+  worktree: string,
+  config: Pick<FactoryConfig, "repo">,
+  issue: number,
+  changed: readonly string[],
+): Promise<Pick<PrParts, "qa" | "shots" | "tryIt">> {
+  return {
+    qa: readQa(worktree, issue),
+    tryIt: readTryIt(worktree, issue),
+    shots: await publishShots(runGit, worktree, { repo: config.repo, issue, changed }),
+  };
 }

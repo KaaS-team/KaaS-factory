@@ -1,0 +1,1 @@
+{"name":"acceptance ignores the empty switch","file":"src/acceptance.ts","find":"if (!script || !existsSync(`${worktree}/${script}`)) return undefined;","replace":"if (!existsSync(`${worktree}/${script}`)) return undefined;","test":"tests/acceptance-table.test.ts"}

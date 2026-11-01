@@ -1,0 +1,7 @@
+{
+  "name": "metrics: bars loosened",
+  "file": "scripts/metrics.ts",
+  "find": "planShare: 0.25,",
+  "replace": "planShare: 1,",
+  "test": "tests/metrics.test.ts"
+}

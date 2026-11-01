@@ -98,6 +98,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "check the loop can run; --fix creates missing labels",
   },
   {
+    name: "onboard",
+    usage: "onboard [--repo-dir <path>] [--json]",
+    does: "report onboarding as completed, blocked or failed with the next action, and doctor as Ready, Not checked or Needs setup from a live check",
+  },
+  {
     name: "explain",
     usage: "explain <N> (--repo-dir <path> | --repo <owner/name>)",
     does: "print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems",
@@ -138,6 +143,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "tail: recent events in and out, with each sink's delivery status; replay: send one event to its sinks again",
   },
   {
+    name: "serve",
+    usage: "serve [--port <n>] [--fixture two-repos] [--print-url]",
+    does: "serve the core API (routes, openapi.json, live events) on loopback, token-gated by FACTORY_API_TOKEN; --fixture serves seeded sample data",
+  },
+  {
     name: "pool",
     usage: "pool [--json]",
     does: "each pool runtime in machine.json: every member's free minutes used and left this month, and its last failure",
@@ -162,6 +172,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     name: "receipt",
     usage: "receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <key.pub>) [--json]",
     does: "keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code)",
+  },
+  {
+    name: "backup",
+    usage: "backup (now | list | restore (--id <id> | --date <YYYY-MM-DD>) [--to <dir>] [--force]) [--json]",
+    does: "now: snapshot every state DB to the bucket with a sha256 manifest, then prune past FACTORY_BACKUP_KEEP_DAYS; list: the backups there; restore: check every sha256, then write the files (stop the stack first)",
   },
   {
     name: "install",
@@ -208,5 +223,19 @@ export function helpText(): string {
     ...ENV.map(([k, v]) => `  ${k}: ${v}`),
     "",
     "Humans answer through GitHub: /factory approve|revise <text>|retry|cancel in a trusted issue or PR comment.",
+  ].join("\n");
+}
+
+// The agent-facing guide for `factory --skill`: every command with one line, then the flags.
+export function skillText(): string {
+  const first = (s: string) => s.split(";")[0]!.trim();
+  return [
+    "factory: a GitHub-native loop for coding agents. Run `factory <command> --help` for one command's usage.",
+    "",
+    "commands:",
+    ...COMMANDS.map((c) => `  ${c.name}: ${first(c.does)}`),
+    "",
+    "flags:",
+    ...OPTIONS.map(([k, v]) => `  ${k}: ${v}`),
   ].join("\n");
 }

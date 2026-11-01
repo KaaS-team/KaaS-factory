@@ -5,20 +5,28 @@
 // what two real `factory watch` processes sharing FACTORY_HOME would be.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { agentVm, effectiveSlots, loadMachineConfig, MachineLeases, suggestSlots } from "../src/machine";
+import { agentVm, escapeLike, loadMachineConfig, MachineLeases, suggestSlots } from "../src/machine";
+
+// The preload removes the tmp root after each rerun, so every directory remakes it first.
+const tmp = (prefix: string) => {
+  mkdirSync(tmpdir(), { recursive: true });
+  return mkdtempSync(join(tmpdir(), prefix));
+};
+
+const cap = (n: number) => ({ repo: "r", repoCap: n, machineSlots: n });
 
 function tmpDb(): string {
-  const dir = mkdtempSync(join(tmpdir(), "factory-machine-"));
+  const dir = tmp("factory-machine-");
   return join(dir, "machine.db");
 }
 
 describe("MachineLeases", () => {
   test("a slot can be acquired and released", () => {
     const leases = new MachineLeases(tmpDb());
-    const id = leases.acquire("a", 2);
+    const id = leases.acquire("r#a", cap(2));
     expect(id).not.toBeUndefined();
     expect(leases.held()).toBe(1);
     leases.release(id!);
@@ -28,8 +36,8 @@ describe("MachineLeases", () => {
 
   test("acquiring past the slot count returns undefined, never oversubscribes", () => {
     const leases = new MachineLeases(tmpDb());
-    const a = leases.acquire("a", 1);
-    const b = leases.acquire("b", 1);
+    const a = leases.acquire("r#a", cap(1));
+    const b = leases.acquire("r#b", cap(1));
     expect(a).not.toBeUndefined();
     expect(b).toBeUndefined();
     expect(leases.held()).toBe(1);
@@ -39,9 +47,9 @@ describe("MachineLeases", () => {
   test("a lease held by a dead pid is reclaimed on the next acquire", () => {
     const leases = new MachineLeases(tmpDb());
     // A pid this high is never a real running process.
-    const dead = leases.acquire("a", 1, 999_999_999);
+    const dead = leases.acquire("r#a", cap(1), 999_999_999);
     expect(dead).not.toBeUndefined();
-    const next = leases.acquire("b", 1);
+    const next = leases.acquire("r#b", cap(1));
     expect(next).not.toBeUndefined();
     expect(leases.held()).toBe(1);
     leases.close();
@@ -62,7 +70,7 @@ describe("MachineLeases", () => {
       for (let i = 0; i < 8; i++) {
         let id: number | undefined;
         for (;;) {
-          id = leases.acquire(holder, slots);
+          id = leases.acquire(`r#${holder}`, cap(slots));
           if (id !== undefined) break;
           await Bun.sleep(1);
         }
@@ -86,10 +94,35 @@ describe("MachineLeases", () => {
   });
 });
 
-describe("effectiveSlots", () => {
-  test("is the smaller of the repo's own concurrency and the machine's slots", () => {
-    expect(effectiveSlots(5, { slots: 2 })).toBe(2);
-    expect(effectiveSlots(1, { slots: 5 })).toBe(1);
+describe("per-repo cap", () => {
+  const of = (repo: string) => ({ repo, repoCap: 2, machineSlots: 4 });
+
+  test("a repo at its repoCap waits while another repo still gets a machine slot", () => {
+    const leases = new MachineLeases(tmpDb());
+    const a1 = leases.acquire("acme/a#1", of("acme/a"));
+    expect(leases.acquire("acme/a#2", of("acme/a"))).not.toBeUndefined();
+    expect(leases.acquire("acme/b#1", of("acme/b"))).not.toBeUndefined();
+    expect(leases.acquire("acme/a#3", of("acme/a"))).toBeUndefined();
+    expect(leases.acquire("acme/b#2", of("acme/b"))).not.toBeUndefined();
+    leases.release(a1!);
+    expect(leases.acquire("acme/a#3", of("acme/a"))).not.toBeUndefined();
+    leases.close();
+  });
+
+  test("the repo count escapes LIKE wildcards in the repo name", () => {
+    expect(escapeLike("a_b%c\\d")).toBe("a\\_b\\%c\\\\d");
+    const leases = new MachineLeases(tmpDb());
+    expect(leases.acquire("acme/aXb#1", of("acme/aXb"))).not.toBeUndefined();
+    expect(leases.acquire("acme/a_b#1", of("acme/a_b"))).not.toBeUndefined();
+    expect(leases.acquire("acme/a_b#2", of("acme/a_b"))).not.toBeUndefined();
+    expect(leases.acquire("acme/a_b#3", of("acme/a_b"))).toBeUndefined();
+    leases.close();
+
+    const wild = new MachineLeases(tmpDb());
+    wild.acquire("acme/ab#1", of("acme/ab"));
+    wild.acquire("acme/ab#2", of("acme/ab"));
+    expect(wild.acquire("acme/a%#1", of("acme/a%"))).not.toBeUndefined();
+    wild.close();
   });
 });
 
@@ -101,13 +134,13 @@ describe("loadMachineConfig", () => {
   });
 
   test("naming neither falls back to the default", () => {
-    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const dir = tmp("factory-home-");
     expect(loadMachineConfig({ FACTORY_HOME: dir })).toEqual({ slots: 2 });
     rmSync(dir, { recursive: true, force: true });
   });
 
   test("machine.json is read and validated when present", () => {
-    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const dir = tmp("factory-home-");
     Bun.write(`${dir}/machine.json`, JSON.stringify({ slots: 3, dailyUsd: 20 }));
     expect(loadMachineConfig({ FACTORY_HOME: dir })).toEqual({ slots: 3, dailyUsd: 20 });
     Bun.write(`${dir}/machine.json`, JSON.stringify({ slots: 0 }));
@@ -119,7 +152,7 @@ describe("loadMachineConfig", () => {
 describe("agentRuntime", () => {
   const vm = { kind: "microsandbox", image: "node:22-slim", allow: ["api.anthropic.com"] } as const;
   const home = (machine: object) => {
-    const dir = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const dir = tmp("factory-home-");
     writeFileSync(`${dir}/machine.json`, JSON.stringify(machine));
     return dir;
   };
@@ -149,5 +182,20 @@ describe("suggestSlots", () => {
   test("is a positive integer", () => {
     expect(Number.isInteger(suggestSlots())).toBe(true);
     expect(suggestSlots()).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("an agent37 worker's own instance", () => {
+  const load = (runtime: object, instanceEnv: string) => {
+    const home = tmp("factory-machine-own-");
+    writeFileSync(join(home, "machine.json"), JSON.stringify({ slots: 1, runtimes: { gates: runtime } }));
+    return () => loadMachineConfig({ FACTORY_HOME: home, FACTORY_AGENT37_INSTANCE: instanceEnv });
+  };
+
+  test("a gate runtime on the worker's own instance is refused, a different one loads", () => {
+    const own = { kind: "agent37", instance: "i1", tokenEnv: "K" };
+    expect(load(own, "i1")).toThrow(/FACTORY_AGENT37_INSTANCE/);
+    expect(load({ kind: "agent37", instances: ["i2", "i1"], tokenEnv: "K" }, "i1")).toThrow(/FACTORY_AGENT37_INSTANCE/);
+    expect(load(own, "i9")().runtimes).toHaveProperty("gates");
   });
 });

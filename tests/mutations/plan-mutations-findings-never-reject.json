@@ -1,0 +1,7 @@
+{
+  "name": "plan mutations: findings never reject",
+  "file": "src/engine/verify-facts.ts",
+  "find": "reject: survivors.length > 0",
+  "replace": "reject: false",
+  "test": "tests/mutate.test.ts"
+}
