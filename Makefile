@@ -45,7 +45,7 @@ GIT_ENV = GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COU
 test:
 	@mkdir -p reports
 	@root=$$(mktemp -d "$${TMPDIR:-/tmp}/factory-test-run.XXXXXX"); \
-	$(GIT_ENV) TMPDIR=$$root $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_PAR) $(TEST_ARGS) $(FILES); \
+	$(GIT_ENV) TMPDIR=$$root $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_PAR) $(TEST_ARGS) $(FILES) || { c=$$?; bun scripts/test-failures.ts reports/junit.xml || true; (exit $$c); }; \
 	code=$$?; rm -rf "$$root"; exit $$code
 
 quarantine:

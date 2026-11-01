@@ -1,0 +1,1 @@
+{"name":"a failing test name line is dropped from the summary","file":"scripts/test-failures.ts","find":"lines.push(`FAILED ${file} > ${name}`);","replace":"void file;","test":"tests/test-failures.test.ts"}

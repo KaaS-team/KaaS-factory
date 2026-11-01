@@ -1,0 +1,1 @@
+{"name":"a missing junit file makes the summary throw","file":"scripts/test-failures.ts","find":"const missing = !existsSync(path) || readFileSync(path, \"utf8\").trim() === \"\";","replace":"const missing = readFileSync(path, \"utf8\").trim() === \"\";","test":"tests/test-failures.test.ts"}
