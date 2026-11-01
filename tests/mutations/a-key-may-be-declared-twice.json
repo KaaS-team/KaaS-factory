@@ -1,0 +1,1 @@
+{"name":"a key may be declared twice","file":"src/settings/registry.ts","find":"if (seen.has(s.key)) out.push(`${s.key} is declared twice.`);","replace":"void seen;","test":"tests/settings-registry.test.ts"}

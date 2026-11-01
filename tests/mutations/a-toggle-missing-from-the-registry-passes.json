@@ -1,0 +1,1 @@
+{"name":"a toggle missing from the registry passes","file":"src/settings/registry.ts","find":"key: \"toggles.auto_approve_low_risk\",","replace":"key: \"toggles.auto_approve_low_risk_unlisted\",","test":"tests/settings-registry.test.ts"}
