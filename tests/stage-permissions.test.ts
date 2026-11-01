@@ -105,6 +105,7 @@ describe("uncoveredPart", () => {
 // #88: kaas.team's .claude/settings.json turned on the operator's plugins, and one of their hooks refused every plan Write.
 describe("project plugins stay out of a stage", () => {
   test("every plugin the repo turns on is turned off in the stage settings", () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const dir = mkdtempSync(join(tmpdir(), "plugins-"));
     mkdirSync(join(dir, ".claude"));
     writeFileSync(
@@ -119,6 +120,7 @@ describe("project plugins stay out of a stage", () => {
   });
 
   test("a repo with no settings file adds no enabledPlugins key", () => {
+    mkdirSync(tmpdir(), { recursive: true });
     expect(projectPlugins(mkdtempSync(join(tmpdir(), "plugins-")))).toEqual([]);
     expect(JSON.parse(stageSettings("plan", 1)).enabledPlugins).toBeUndefined();
   });

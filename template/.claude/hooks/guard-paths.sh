@@ -212,6 +212,35 @@ def names_hidden(command):
     return [g for g in HIDDEN if re.search(r"(?<![\w.-])" + re.escape(hidden_root(g)) + r"(?![\w-])", command)]
 
 
+def git_rm_problem(command):
+    # Mirrors src/git-rm.ts: build may delete only named files inside the worktree and outside protectedPaths.
+    root = os.path.realpath(project_dir)
+    globs = [".claude/**", ".agents/**", ".factory/**"]
+    try:
+        with open(f"{root}/.factory/config.json") as f:
+            globs += json.load(f).get("protectedPaths", [])
+    except FileNotFoundError:
+        pass
+    except Exception:
+        return "config.json cannot be read (fails closed)"
+    for segment in re.split(SEPARATORS, unquoted(command)):
+        words = segment.split()
+        if words[:2] != ["git", "rm"]:
+            continue
+        paths = [w for w in words[2:] if not w.startswith("-") or w == "--"]
+        if not paths or any(re.search(r"[*?\[\]{}$`~]", w) for w in paths):
+            return "name each file, no patterns"
+        for w in paths:
+            if w == "--":
+                continue
+            rel = os.path.relpath(os.path.realpath(os.path.join(root, w)), root)
+            if rel == "." or rel.startswith(".."):
+                return f"{w} is outside the worktree"
+            if any(fnmatch.fnmatch(rel, g) for g in globs):
+                return f"{w} is a protected path"
+    return None
+
+
 if tool_name == "Bash":
     command = tool_input.get("command", "")
     if not isinstance(command, str):
@@ -220,6 +249,9 @@ if tool_name == "Bash":
     if hits:
         block(f"guard-paths: blocked, {hidden_root(hits[0])} holds the tests this change is graded by; no stage reads them. "
               "Build from the spec's acceptance criteria instead.")
+    rm_problem = git_rm_problem(command) if os.environ.get("FACTORY_STAGE") else None
+    if rm_problem:
+        block(f"guard-paths: blocked git rm: {rm_problem}. Command: {command}")
     if merges_or_force_pushes(command):
         block(f"guard-paths: blocked — a stage never merges or force-pushes: {command}")
     if os.environ.get("FACTORY_STAGE"):
