@@ -520,7 +520,7 @@ describe("skill text the runner depends on", () => {
       join(import.meta.dir, "../template/.claude/skills/factory-comment/assets/verdict.md"),
       "utf8",
     );
-    expect(t).toContain("{{pass|fail|unverified}}");
+    expect(t).toContain("{{passes|fails|is unverified}}");
     expect(t).not.toContain("pass_or_fail");
   });
 });

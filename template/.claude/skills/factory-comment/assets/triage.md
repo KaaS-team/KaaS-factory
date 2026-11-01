@@ -1,29 +1,28 @@
 <!-- factory:triage v1 -->
+{{one_sentence_what_i_decided_and_what_happens_next}}
+
 ## Triage
 
-**Disposition:** {{disposition}} <!-- proceed | needs-info | refused | duplicate -->
-**Type:** {{type}} <!-- bug | feature | docs | security | dependency -->
-**Risk:** {{risk}} <!-- low | medium | high -->
-**Confidence:** {{confidence}} <!-- 0.0-1.0 -->
+This looks like a {{type}} ({{risk}} risk), and I am {{confidence_in_words}} about that. <!-- type: bug | feature | docs | security | dependency; risk: low | medium | high -->
 
-**Done when:** {{done_when}}
+Disposition: {{disposition}}. <!-- proceed | needs-info | refused | duplicate -->
 
-**Files expected:** {{files_expected_list}}
+It is done when {{done_when}}.
 
-**Gate level:** {{gate_level}}
+I expect to touch {{files_expected_list}}, and I will check it with {{gate_level}}.
 
 {{#if refused}}
-**Refused.** This crosses a protected boundary:
+I refused this one because it crosses a protected boundary:
 
 > {{charter_rule_quoted_verbatim}}
 
-A human needs to decide this one.
+A human needs to decide it.
 {{/if}}
 
 {{#if duplicate}}
-**Duplicate of** #{{duplicate_of}}. Closing the loop here; follow that issue.
+This repeats #{{duplicate_of}}, so I am stopping here. Please follow that issue.
 {{/if}}
 
 {{#if needs_info}}
-I can't write a checkable "done when" yet. See the question below.
+I can't write a checkable "done when" yet, so I have a question below.
 {{/if}}
