@@ -1,0 +1,1 @@
+{"name":"a stale cursor is not reported as events lost","file":"src/run-wait.ts","find":"cursor < oldestKept || ","replace":"","test":"tests/run-wait.test.ts"}
