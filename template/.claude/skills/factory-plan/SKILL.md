@@ -79,9 +79,7 @@ item it returns in `plan-comment.md`, and never dispatch it again. Then write
 The PR body's What changed and Acceptance come from `goal` and `criteria` alone. Add
 `"spec": "<stem>"` only when the issue implements a `specs/` file, to show its holdouts.
 
-Add `"boundaryChange": true` when the plan changes a public API, a schema or a config format; the pr
-step then refuses a diff with no `docs/decisions/*.md` record.
-
+Add `"boundaryChange": true` for an API, schema or config-format change; pr needs a `docs/decisions/*.md`.
 `outcome` is optional: `complete` (the default), `blocked` (you cannot go on and a human must
 look; put the reason in `summary`), or `failed`. No other fields are allowed [enforced: stop-artifact.sh].
 

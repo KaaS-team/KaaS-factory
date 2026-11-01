@@ -149,6 +149,7 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
     "goal",
     "criteria",
     "spec",
+    "boundaryChange",
     "outcome",
     "summary",
   ],
