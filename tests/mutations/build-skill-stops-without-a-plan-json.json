@@ -1,0 +1,1 @@
+{"name":"build skill stops without a plan json","file":"template/.claude/skills/factory-build/SKILL.md","find":"`plan.json` is absent when the workflow has no plan step","replace":"`plan.json` is required even when the workflow has no plan step","test":"tests/planless-build.test.ts"}
