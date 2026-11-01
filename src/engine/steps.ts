@@ -5,6 +5,7 @@
 // once it has parked or finished the issue itself, from `step.label`.
 
 import { readRunJson, settleVerdict, verdictPost } from "./verdict-rules";
+import { prPreflight } from "./pr-preflight";
 import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
@@ -458,24 +459,6 @@ const verify: StepType = {
   },
 };
 
-async function unshippedBranch(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  worktree: string,
-  issueNumber: number,
-): Promise<string | undefined> {
-  let remote: string | undefined;
-  try {
-    remote = await deps.git.remoteHeadSha(worktree, issueNumber);
-  } catch (err) {
-    return `pr_remote_unreachable: ${(err as Error).message}`;
-  }
-  if ((await deps.git.headSha(worktree)) !== remote)
-    return "pr_head_mismatch: the remote branch is not the verified commit";
-  if (!(await deps.git.hasCommits(worktree, config.base))) return "pr_empty: the branch has no commits over base";
-  return undefined;
-}
-
 const pr: StepType = {
   agent: true,
   terminal: true,
@@ -484,7 +467,7 @@ const pr: StepType = {
     const issueNumber = issue.number;
     // The PR must point at the commit verify saw: a refused or stale push leaves the remote behind.
     // Checked before the paid pr agent runs.
-    const unshipped = await unshippedBranch(deps, config, worktree, issueNumber);
+    const unshipped = await prPreflight(deps, config, worktree, issueNumber);
     if (unshipped) return stop(await failStage(deps, config, issue, sc.step.label, "pr", unshipped));
     await runStage(deps, config, issue, "pr", worktree, stepOpts(sc.step));
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
