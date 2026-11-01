@@ -30,6 +30,7 @@ import { readJournal } from "./journal";
 import { lateRoute } from "./late-route";
 import { holdForOverlap } from "../overlap";
 import { guardPlan } from "../plan-guard";
+import { unmetDeps } from "../plan-deps";
 import { isPlannedBody } from "./import-plan";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
@@ -118,7 +119,9 @@ async function walk(
 
   // A fresh planned run (the issue body or an operator-passed spec) is read before any step runs.
   if (journal.finished.size === 0 && isPlannedBody(issue.body ?? "")) {
-    const guard = guardPlan(issue.body ?? "", config);
+    const plain = guardPlan(issue.body ?? "", config);
+    const unmet = plain.ok ? await unmetDeps(issue.body ?? "", deps.github, config.repo, worktree) : [];
+    const guard = unmet.length ? { ok: false as const, reasons: unmet } : plain;
     if (!guard.ok) {
       await postComment(
         deps,
@@ -130,6 +133,24 @@ async function walk(
       return await stopStep(deps, config, issueNumber, step.label, {
         status: "needs-human",
         reason: `plan guard: ${guard.reasons.length} reason(s)`,
+      });
+    }
+  }
+
+  // A fresh run proves it can push before any step spends: a refusal stops it with the plain reason.
+  if (journal.finished.size === 0 && deps.pushProbe) {
+    const probe = await deps.pushProbe(worktree, `issue-${issueNumber}-${Date.now()}`);
+    if (!probe.ok) {
+      await postComment(
+        deps,
+        config,
+        issueNumber,
+        `Stopped before any work: this session cannot push (${probe.reason}). Fix the access and \`/factory retry\`.`,
+        { stage: "push-probe", json: { ok: false, reason: probe.reason } },
+      );
+      return await stopStep(deps, config, issueNumber, step.label, {
+        status: "needs-human",
+        reason: `push probe: ${probe.reason}`,
       });
     }
   }

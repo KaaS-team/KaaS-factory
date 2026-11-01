@@ -558,6 +558,49 @@
         }
       }
     },
+    "/api/metrics": {
+      "get": {
+        "operationId": "metrics.get",
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "metrics": {
+                      "type": "object",
+                      "properties": {
+                        "mergeRate": {
+                          "type": "number"
+                        },
+                        "costPerMergedChange": {
+                          "type": "number"
+                        },
+                        "judgeVetoRate": {
+                          "type": "number"
+                        }
+                      },
+                      "required": []
+                    }
+                  },
+                  "required": [
+                    "metrics"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events": {
       "get": {
         "operationId": "stream",

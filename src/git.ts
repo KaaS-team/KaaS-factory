@@ -13,6 +13,7 @@ import type { CommandResult, CommandRunner } from "./github";
 import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
 import { describeFindings, scanText } from "./secret-scan";
+import { type SigningConfig, withSigning } from "./commit-signing";
 import { type Person, type SignoffMode, signoffTrailers, withTrailers } from "./signoff";
 
 async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
@@ -54,7 +55,7 @@ export function withSignoff(args: string[], who: { name: string; email: string }
 }
 
 export class GitCommandRunner implements CommandRunner {
-  constructor(private readonly commits: { signoff?: SignoffMode; requester?: Person } = {}) {}
+  constructor(private readonly commits: { signoff?: SignoffMode; requester?: Person; signing?: SigningConfig } = {}) {}
 
   async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     if (args[0] === "commit" || args[0] === "commit-tree") {
@@ -70,7 +71,8 @@ export class GitCommandRunner implements CommandRunner {
           : signoff
             ? withTrailers(args, signoffTrailers(signoff, who, requester))
             : withSignoff(args, who);
-      return spawnGit(known ? signed : [...FALLBACK_IDENTITY, ...signed], opts?.cwd, opts?.env);
+      const final = withSigning(signed, this.commits.signing);
+      return spawnGit(known ? final : [...FALLBACK_IDENTITY, ...final], opts?.cwd, opts?.env);
     }
     return spawnGit(args, opts?.cwd, opts?.env);
   }

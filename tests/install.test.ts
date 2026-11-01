@@ -41,6 +41,7 @@ function run(args: string[]): { code: number; stdout: string; stderr: string } {
 }
 
 function scratchTarget(): string {
+  mkdirSync(tmpdir(), { recursive: true });
   return mkdtempSync(join(tmpdir(), "factory-install-"));
 }
 
@@ -130,6 +131,7 @@ describe("installTemplate --update", () => {
   test("overwrites a factory-owned file that already exists", () => {
     const target = scratchTarget();
     run([target]); // first install
+    rmSync(join(target, ".factory", "manifest.json")); // an install from before the manifest: a stale copy is not an edit
     writeFileSync(join(target, ".claude", "hooks", "guard-paths.sh"), "#!/usr/bin/env bash\n# stale\n");
     const { stdout } = run([target, "--update"]);
     expect(stdout).toContain("overwrote: .claude/hooks/guard-paths.sh");
@@ -206,6 +208,7 @@ describe("installTemplate scaffold", () => {
   test("--update refreshes gates.sh but never touches the repo's charter", () => {
     const target = scratchTarget();
     run([target]);
+    rmSync(join(target, ".factory", "manifest.json")); // pre-manifest install: old copies are stale, not edits
     writeFileSync(join(target, ".factory", "charter.md"), "my charter");
     writeFileSync(join(target, ".factory", "gates.sh"), "old");
     writeFileSync(join(target, ".factory", "mutate.sh"), "old");

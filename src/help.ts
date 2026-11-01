@@ -98,6 +98,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "check the loop can run; --fix creates missing labels",
   },
   {
+    name: "onboard",
+    usage: "onboard [--repo-dir <path>] [--json]",
+    does: "report onboarding as completed, blocked or failed with the next action, and doctor as Ready, Not checked or Needs setup from a live check",
+  },
+  {
     name: "explain",
     usage: "explain <N> (--repo-dir <path> | --repo <owner/name>)",
     does: "print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems",

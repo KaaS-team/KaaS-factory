@@ -1,0 +1,1 @@
+{"name":"ci failure priority bump ignores the cap","file":"src/ci-failure-priority.ts","find":"bumps.set(issue.number, Math.min(levels, opts.maxLevels));","replace":"bumps.set(issue.number, levels);","test":"tests/ci-failure-priority.test.ts"}

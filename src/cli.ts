@@ -2,12 +2,12 @@
 // bin/factory imports this file. Thin dispatcher; the logic lives in the other src/ modules so it
 // stays testable without a child process.
 
+// biome-ignore lint/correctness/noUnusedImports: tests/mutations.json anchors a mutation on this exact line
 import { accessSync, constants, existsSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, resolve } from "node:path";
 import type { ScmPort } from "./github";
 import { makeScm } from "./scm";
-import { templateSkills } from "./template-root";
 import { RUNNER_VERSION } from "./version";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
@@ -27,12 +27,13 @@ import { act, buildInbox, inboxPositionals, parkReasons, type InboxAction } from
 import { prItems } from "./stale-pr";
 import { remoteCommand } from "./remote-cli";
 import { reset, rebaseline } from "./reset";
-import { runDoctor, fixDoctor } from "./doctor";
+import { fixDoctor } from "./doctor";
+import { liveDoctorChecks } from "./doctor-checks";
+import { buildOnboardReport, doctorOutput, onboardOutput, unusableConfigCheck } from "./onboard-json";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard, servingAccess as plane } from "../dashboard/server";
 import { runnerBlobStore } from "./blobs";
 import type { DashboardProject } from "../dashboard/project";
-import { versionOf, which } from "./probes";
 import {
   workspacesDir as defaultWorkspacesDir,
   defaultStatePath,
@@ -58,7 +59,6 @@ import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { spendPolicy } from "./ports/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
-import { probeNamed, probeRuntime } from "./runtime-kit";
 import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { warnWhenStale } from "./config-health";
 import { loadMinions, runMinion } from "./engine/minion";
@@ -78,10 +78,6 @@ function has(name: string): boolean {
 }
 
 const cli = { args, flag, has, resolveCloneDir: () => resolveCloneDir(), watchDeps: buildWatchDeps };
-
-async function fileExists(path: string): Promise<boolean> {
-  return await Bun.file(path).exists();
-}
 
 // `--repo-dir <path>` (local mode: the clone already exists) or `--repo
 // owner/name` (VM/CI modes: nothing is on disk yet, clone it under
@@ -407,80 +403,82 @@ async function cmdRebaseline(): Promise<void> {
   for (const c of moved) console.log(`  ${c}`);
 }
 
+// factory doctor: one row per live check, printed by doctorOutput.
+//
+// Where the rows come from: src/doctor-checks.ts. Its DOCTOR_CHECKS list is the only place a check
+// is composed, so a feature adds a doctor row by appending one entry there and never edits this file.
+// tests/doctor-checks.test.ts fails when a check is composed here again.
+//
+// Flow:
+//   1. Resolve the clone, then load its config. An unusable config prints one failing row and exits
+//      with EXIT.checksFailed, because no other check can run without it.
+//   2. Run liveDoctorChecks, which walks DOCTOR_CHECKS in order.
+//   3. A row passes when ok or warn is set. A warn row never fails the run.
+//   4. Without --fix, any failing row exits with EXIT.checksFailed.
+//   5. With --fix, fixDoctor creates the missing labels and the run exits 0. The rows printed are
+//      the ones from before the fix, so run doctor again to see the repaired state.
+//
+// --json prints the same rows as machine-readable output (doctorOutput owns the shape).
+//
+// onboard (cmdOnboard below) calls the same liveDoctorChecks, but only once the template and a
+// filled-in config exist, so the two commands cannot disagree about what a live check is.
+//
+// A row is { name, ok, detail, fixable } and may add warn. Keep detail to one line an operator can
+// act on. Doctor output is pasted into issues, so tokens, hosts and stack traces stay out of it.
+//
+// A check that cannot reach GitHub returns a warn row naming what went unchecked, as
+// mergeMethodCheck does, rather than failing. A failing row says the setup is wrong.
+//
+// Order matters only for reading: core rows come first, then one entry per feature, in the order
+// the entries sit in DOCTOR_CHECKS. A check that depends on another's row belongs in the same
+// entry, because separate entries run one after the other and share nothing.
+//
+// Nothing in this comment is enforced except the part tests/doctor-checks.test.ts asserts.
+// The fs import above keeps accessSync and constants unused on purpose: the legacy mutation list
+// anchors on that exact line, and the list is read-only until scripts/split-mutations.ts moves it.
+// Drop them from the line when that mutation has moved to tests/mutations/.
+//
+// Not here: probing agents and runtimes (agentChecks in src/doctor.ts), the label fixer (fixDoctor),
+// and the onboard report shape (src/onboard-json.ts).
+//
+// Adding a check:
+//   1. Write `async (config, env) => DoctorCheck[]` in the feature's own file.
+//   2. Append it to DOCTOR_CHECKS in src/doctor-checks.ts.
+//   3. Test the row by calling your function directly, as tests/merge-method.test.ts does.
+//
+// Exit codes: 0 when every row passes or warns (or --fix ran), EXIT.checksFailed otherwise.
+// A config that will not load is the one case that skips the registry entirely.
+//
+// The registry takes the loaded config and the clone directory plus the scm client, nothing more.
+// A check that needs another dependency builds it from those, so the signature stays stable.
 async function cmdDoctor(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   let config: FactoryConfig;
   try {
     config = await loadConfig(cloneDir);
   } catch (err) {
-    if (has("json"))
-      console.log(
-        successJson(
-          {
-            checks: [
-              {
-                name: ".factory/config.json is usable",
-                ok: false,
-                detail: err instanceof Error ? err.message : String(err),
-                fixable: false,
-              },
-            ],
-          },
-          false,
-        ),
-      );
-    else console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
+    console.log(doctorOutput([unusableConfigCheck(err)], has("json"), false));
     process.exit(EXIT.checksFailed);
   }
   const github = makeScm(config);
-  const checks = await runDoctor(
-    {
-      github,
-      tracker: { kind: github.trackerKind, authStatus: () => github.tracker.authStatus() },
-      git: new GitCommandRunner(),
-      which,
-      versionOf,
-      fileExists,
-      readFile: async (path) => ((await fileExists(path)) ? await Bun.file(path).text() : undefined),
-      probeRuntime: (name, bins) =>
-        probeNamed(loadMachineConfig().runtimes, name, 10_000, (port, ms) => probeRuntime(port, ms, bins)),
-      isExecutable: async (path) => {
-        try {
-          accessSync(path, constants.X_OK);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    },
-    {
-      repo: config.repo,
-      cloneDir,
-      baselineTag: config.baselineTag,
-      factoryMode: process.env.FACTORY_MODE,
-      agents: config.agents,
-      stages: config.stages,
-      routes: config.routes,
-      templateSkills: templateSkills(),
-      templateOverrides: config.templateOverrides,
-      workflow: config.workflow,
-      runtime: config.runtime,
-      runtimeNames: Object.keys(runtimesFrom(loadMachineConfig().runtimes)),
-      tmux: config.tmux.enabled,
-      legacyStatePath: defaultStatePath(process.env),
-      legacyWorkspacesDir: defaultWorkspacesDir(process.env),
-      configuredSlots: loadMachineConfig().slots,
-      resettable: config.resettable,
-    },
-  ).then(async (c) => [...c, await (await import("./merge-method")).mergeMethodCheck(config)]);
+  const checks = await liveDoctorChecks(config, { cloneDir, github });
   const allOk = checks.every((c) => c.ok || c.warn);
-  if (has("json")) console.log(successJson({ checks }, allOk));
-  else for (const c of checks) console.log(`  [${c.ok ? "ok" : c.warn ? "warn" : "FAIL"}] ${c.name} — ${c.detail}`);
+  console.log(doctorOutput(checks, has("json")));
   if (!allOk && has("fix")) {
     console.error("factory doctor --fix: creating missing labels");
     await fixDoctor(github, config.repo, config.routes, await workflowFor(cloneDir, config).catch(() => undefined));
   }
   if (!allOk && !has("fix")) process.exit(EXIT.checksFailed);
+}
+
+// Doctor runs live inside onboard only once the template and a filled-in config exist.
+async function cmdOnboard(): Promise<void> {
+  const dir = await resolveCloneDir();
+  const report = await buildOnboardReport(dir, () =>
+    loadConfig(dir).then((config) => liveDoctorChecks(config, { cloneDir: dir, github: makeScm(config) })),
+  );
+  console.log(onboardOutput(report, has("json")));
+  if (report.status !== "completed") process.exit(EXIT.checksFailed);
 }
 
 // `dashboard/server.ts`'s own `if (import.meta.main)` block never fires
@@ -857,6 +855,8 @@ async function main(): Promise<void> {
       return cmdRebaseline();
     case "doctor":
       return cmdDoctor();
+    case "onboard":
+      return cmdOnboard();
     case "explain":
       return (await import("./explain-cli")).cmdExplain(cli);
     case "install":
