@@ -34,6 +34,8 @@ describe("gitRmProblem", () => {
     expect(gitRmProblem("git rm src/payments/charge.ts", ROOT, PROTECTED)).toBe(
       "src/payments/charge.ts is a protected path",
     );
+    expect(gitRmProblem("git rm -r .claude", ROOT, PROTECTED)).toBe(".claude is a protected path");
+    expect(gitRmProblem("git rm -r src", ROOT, PROTECTED)).toBe("src is a protected path");
     expect(gitRmProblem("git rm src/x/../payments/charge.ts", ROOT, PROTECTED)).toBe(
       "src/x/../payments/charge.ts is a protected path",
     );
@@ -71,5 +73,7 @@ describe("guard-paths.sh on git rm", () => {
     expect(await run("git rm ../escape.ts", dir)).toBe(2);
     expect(await run("git rm src/payments/charge.ts", dir)).toBe(2);
     expect(await run("git rm src/*.ts", dir)).toBe(2);
+    expect(await run("git rm -r .claude", dir)).toBe(2);
+    expect(await run("git rm -r src", dir)).toBe(2);
   });
 });

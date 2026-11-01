@@ -236,7 +236,7 @@ def git_rm_problem(command):
             rel = os.path.relpath(os.path.realpath(os.path.join(root, w)), root)
             if rel == "." or rel.startswith(".."):
                 return f"{w} is outside the worktree"
-            if any(fnmatch.fnmatch(rel, g) for g in globs):
+            if any(fnmatch.fnmatch(p, g) for g in globs for p in (rel, f"{rel}/x")) or any(g.split("*")[0].startswith(f"{rel}/") for g in globs):
                 return f"{w} is a protected path"
     return None
 
