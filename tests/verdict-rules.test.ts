@@ -130,6 +130,20 @@ describe("the verify step", () => {
     expect(e.github.issues.get(1)!.labels.map((l) => l.name)).toContain(LABEL.needsHuman);
   });
 
+  test("a verify that wrote no verdict is recorded unknown and blocks the merge", async () => {
+    const e = engine(
+      bundledWorkflow("bug-to-pr"),
+      0,
+      {},
+      {},
+      {},
+      { outputs: { build: [BUILD], verify: [{ "verdict-comment.md": "<!-- factory:verdict v1 -->\nv" }] } },
+    );
+    expect(await e.run()).toBe("needs-human");
+    expect(e.github.issues.get(1)!.labels.map((l) => l.name)).toContain(LABEL.needsHuman);
+    expect(e.deps.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.verdict)).toContain("unknown");
+  });
+
   test("a reject posts its round, the rebuild sees it, and the next verify finds prior-findings.json", async () => {
     const e = engine(
       bundledWorkflow("bug-to-pr"),

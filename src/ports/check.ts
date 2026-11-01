@@ -2,7 +2,7 @@
 // graded by its one FACTORY_GATES line, never by the agent.
 
 export interface GateResult {
-  readonly status: "GREEN" | "RED" | "MISCONFIGURED";
+  readonly status: "GREEN" | "RED" | "UNKNOWN";
   readonly passed: number;
   readonly failed: number;
   readonly skipped: number;

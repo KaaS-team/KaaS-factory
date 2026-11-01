@@ -1,0 +1,1 @@
+{"name":"a verify that errored is recorded as its verdict not unknown","file":"src/engine/steps.ts","find":"json && result.exitCode === 0 ? json.result : \"unknown\"","replace":"json ? json.result : \"pass\"","test":"tests/verdict-rules.test.ts"}

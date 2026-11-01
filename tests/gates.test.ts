@@ -91,10 +91,10 @@ describe("runGates", () => {
     expect(result.status).toBe("GREEN");
   });
 
-  test("falls back to MISCONFIGURED, not GREEN, when no line is printed", async () => {
+  test("falls back to UNKNOWN, not GREEN, when no line is printed", async () => {
     const runner = new FixedGateRunner({ stdout: "gates.sh: command not found", stderr: "", code: 127 });
     const result = await runGates(runner, "/tmp/whatever");
-    expect(result.status).toBe("MISCONFIGURED");
+    expect(result.status).toBe("UNKNOWN");
     expect(result.failedGates).toContain("gates.sh produced no FACTORY_GATES line");
   });
 
@@ -171,4 +171,11 @@ describe("gates.sh packages", () => {
     expect(gates(repo(["packages/api/change.txt"]), "no-such-ref").ran).toEqual(["api", "web", "shared"]);
     expect(gates(repo(["notes.md"])).ran).toEqual(["api", "web", "shared"]);
   });
+});
+
+test("a gates.sh that reports MISCONFIGURED is unknown, not red", () => {
+  const r = parseGateLine(
+    "FACTORY_GATES: status=MISCONFIGURED passed=0 failed=0 skipped=0 failed_gates=config-missing",
+  );
+  expect(r?.status).toBe("UNKNOWN");
 });

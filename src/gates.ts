@@ -26,8 +26,10 @@ export function parseGateLine(output: string): GateResult | undefined {
     string,
     string,
   ];
+  // A gate that could not run says nothing about the build, so it is unknown, never red.
+  const upper = status.toUpperCase();
   return {
-    status: status.toUpperCase() as GateResult["status"],
+    status: (upper === "MISCONFIGURED" ? "UNKNOWN" : upper) as GateResult["status"],
     passed: Number(passed),
     failed: Number(failed),
     skipped: Number(skipped),
@@ -59,7 +61,7 @@ export async function runGates(gateRunner: GateRunner, worktreeDir: string): Pro
   const parsed = parseGateLine(combined);
   if (parsed) return parsed;
   return {
-    status: "MISCONFIGURED",
+    status: "UNKNOWN",
     passed: 0,
     failed: 0,
     skipped: 0,

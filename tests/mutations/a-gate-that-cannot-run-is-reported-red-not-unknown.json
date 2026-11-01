@@ -1,0 +1,1 @@
+{"name":"a gate that cannot run is reported red not unknown","file":"src/gates.ts","find":"upper === \"MISCONFIGURED\" ? \"UNKNOWN\" : upper","replace":"upper === \"MISCONFIGURED\" ? \"RED\" : upper","test":"tests/gates.test.ts"}

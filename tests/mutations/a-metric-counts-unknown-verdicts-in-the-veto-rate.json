@@ -1,0 +1,1 @@
+{"name":"a metric counts unknown verdicts in the veto rate","file":"src/metrics-get.ts","find":"verdicts.filter((s) => s.verdict !== \"unknown\")","replace":"verdicts.filter(() => true)","test":"tests/metrics-get.test.ts"}
