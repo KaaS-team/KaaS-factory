@@ -19,6 +19,13 @@ export function explainLines(input: { issue: number; repo: string; type?: string
     const line = `${key} = ${JSON.stringify(valueAt(applied.resolved.values, key))} (${applied.resolved.origin[key]})`;
     lines.push(input.type && key.startsWith(`routes.${input.type}.`) ? `${line} [this issue]` : line);
   }
+  // Which kind of deny holds each marked rule, so a blocked step names hard-deny or soft-deny.
+  for (const [rule, kind] of Object.entries(applied.resolved.denied).sort())
+    lines.push(
+      kind === "soft" && applied.resolved.lifted[rule] !== undefined
+        ? `deny policy.${rule}: soft-deny, lifted by ${applied.resolved.lifted[rule]}`
+        : `deny policy.${rule}: ${kind}-deny`,
+    );
   for (const p of applied.resolved.problems) lines.push(`problem: ${p}`);
   return lines;
 }

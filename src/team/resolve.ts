@@ -1,7 +1,7 @@
 // Four rules decide a team's config. Preferences: the most local level wins. Policy: the strictest
 // value wins, so no level loosens what the one above set. Roles, workflows and routes: replaced by
 // name, except a name the org locked. Levels apply in the order builtin, org, team, repo.
-import { type OrgFile, RISKS, type TeamFile } from "./schema";
+import { DENY_RULES, type DenyKind, type OrgFile, RISKS, type TeamFile } from "./schema";
 
 export type Level = "builtin" | "org" | "team" | "repo";
 type Obj = Record<string, unknown>;
@@ -10,6 +10,14 @@ export interface Resolved {
   values: Obj;
   origin: Record<string, string>;
   problems: string[];
+  // The org's deny marks, and each soft-deny rule a named approver lifted for the team.
+  denied: Record<string, DenyKind>;
+  lifted: Record<string, string>;
+}
+
+interface Deny {
+  marks: Record<string, DenyKind>;
+  lifted: Record<string, string>;
 }
 
 interface Prefs {
@@ -80,13 +88,29 @@ class Merge {
     }
   }
 
-  policy(from: unknown, level: Level, union: boolean): void {
+  policy(from: unknown, level: Level, union: boolean, deny: Deny, who: string): void {
     if (!isObj(from)) return;
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     const pick = (path: string, v: unknown, wins: (cur: unknown, v: unknown) => unknown) => {
       if (v === undefined) return;
       const cur = this.get(path);
-      const next = cur === undefined ? v : wins(cur, v);
-      if (JSON.stringify(next) !== JSON.stringify(cur)) this.set(path, next, level);
+      const rule = path.slice("policy.".length);
+      const kind = level === "org" ? undefined : deny.marks[rule];
+      if (kind === "hard" && !(cur !== undefined && same(cur, v))) {
+        this.problems.push(
+          `${who} tried to set ${path}, which the org marked hard-deny; no approval, workflow or team override lifts it, so the org's value stays.`,
+        );
+        return;
+      }
+      let next = cur === undefined ? v : wins(cur, v);
+      if (kind === "soft" && !same(next, v)) {
+        if (deny.lifted[rule] !== undefined) next = v;
+        else
+          this.problems.push(
+            `${who} asked for a looser ${path}, which the org marked soft-deny; it needs a named approver in preapprove, so the stricter value stays.`,
+          );
+      }
+      if (!same(next, cur)) this.set(path, next, level);
     };
     const lowest = (cur: unknown, v: unknown) => ((v as number) < (cur as number) ? v : cur);
     const lowestRisk = (cur: unknown, v: unknown) => (rank(v) < rank(cur) ? v : cur);
@@ -117,8 +141,30 @@ class Merge {
   }
 }
 
+// Reads the org's deny marks and checks the team's pre-approvals against them. Only a soft-deny rule
+// named by an approver in the team's own approvers list is lifted; each refusal is one problem.
+function denyOf(input: ResolveInput, problems: string[]): Deny {
+  const marks: Record<string, DenyKind> = {};
+  for (const [rule, kind] of Object.entries(input.org?.policy?.deny ?? {}))
+    if (DENY_RULES.includes(rule) && (kind === "hard" || kind === "soft")) marks[rule] = kind;
+  const lifted: Record<string, string> = {};
+  const team = input.team;
+  for (const [rule, approver] of Object.entries(team?.policy?.preapprove ?? {})) {
+    const who = `team ${team?.name}`;
+    if (marks[rule] === undefined)
+      problems.push(`${who} pre-approved policy.${rule}, which the org did not mark soft-deny.`);
+    else if (marks[rule] === "hard")
+      problems.push(`${who} pre-approved policy.${rule}, which the org marked hard-deny; approval cannot lift it.`);
+    else if (!(team?.approvers ?? []).includes(approver))
+      problems.push(`${who} pre-approved policy.${rule} by ${approver}, who is not one of its approvers.`);
+    else lifted[rule] = approver;
+  }
+  return { marks, lifted };
+}
+
 export function resolveTeam(input: ResolveInput): Resolved {
   const m = new Merge(input.builtin);
+  const deny = denyOf(input, m.problems);
   const levels: [Level, Obj | undefined, string][] = [
     ["org", input.org as unknown as Obj | undefined, "the org"],
     ["team", input.team as unknown as Obj | undefined, `team ${input.team?.name}`],
@@ -130,7 +176,7 @@ export function resolveTeam(input: ResolveInput): Resolved {
     if (!from) continue;
     m.named(from, level, locked, who);
     m.preferences(from, level);
-    m.policy(from.policy, level, union);
+    m.policy(from.policy, level, union, deny, who);
   }
-  return { values: m.values, origin: m.origin, problems: m.problems };
+  return { values: m.values, origin: m.origin, problems: m.problems, denied: deny.marks, lifted: deny.lifted };
 }

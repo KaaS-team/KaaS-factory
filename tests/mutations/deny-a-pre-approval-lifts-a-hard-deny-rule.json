@@ -1,0 +1,1 @@
+{"name":"deny: a pre-approval lifts a hard-deny rule","file":"src/team/resolve.ts","find":"else if (marks[rule] === \"hard\")","replace":"else if (false as boolean)","test":"tests/team-deny.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"deny: explain drops the deny kind line","file":"src/team/explain.ts","find":"for (const [rule, kind] of Object.entries(applied.resolved.denied).sort())","replace":"for (const [rule, kind] of Object.entries({} as Record<string, string>))","test":"tests/team-deny.test.ts"}
