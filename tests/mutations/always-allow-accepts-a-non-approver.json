@@ -1,0 +1,1 @@
+{"name":"always-allow accepts a non-approver","file":"src/team/always-allow.ts","find":"if (!(team.approvers ?? []).includes(approver))","replace":"if (false)","test":"tests/team-always-allow.test.ts"}
