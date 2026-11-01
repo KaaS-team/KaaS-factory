@@ -75,7 +75,10 @@ describe("checkSpendCap parks an issue before any stage runs", () => {
     expect(issue.labels.map((l) => l.name)).toContain("factory:needs-human");
     expect(issue.comments.at(-1)?.body).toContain("perIssueUsd");
     // The amounts stay in the hidden marker; the visible text is the plain park line.
-    const visible = (issue.comments.at(-1)?.body ?? "").replace(/<!--[\s\S]*?-->/g, "");
+    const visible = (issue.comments.at(-1)?.body ?? "")
+      .split("<!--")
+      .map((part, i) => (i === 0 ? part : part.slice(part.indexOf("-->") + 3)))
+      .join("");
     expect(visible).toContain("Parked: a spend cap is reached.");
     expect(visible).not.toContain("perIssueUsd");
     expect(buildInbox([issue])[0]?.kind).toBe("budget");
