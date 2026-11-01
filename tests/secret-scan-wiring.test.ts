@@ -28,6 +28,14 @@ describe("comment gate", () => {
     expect(run.reason).not.toContain(key);
   });
 
+  test("operator detail is removed from a posted comment", async () => {
+    const { github, config, deps } = commentSetup();
+    await postComment(deps, config, 1, "Done with claude-opus-5-5 for 1.2 USD in runner-10289-1793103791470.");
+    const body = github.issues.get(1)!.comments[0]!.body;
+    expect(body).toContain("Done with [removed] for [removed] in [removed].");
+    expect(body).not.toContain("USD");
+  });
+
   test("a clean body is posted", async () => {
     const { github, config, deps } = commentSetup();
     await postComment(deps, config, 1, "all good");
