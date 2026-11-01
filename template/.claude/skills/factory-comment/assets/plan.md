@@ -5,25 +5,25 @@
 
 The goal is to {{one_line_goal}}.
 
-### How we will know it works
+### Acceptance criteria
 {{#each ac}}
-- {{criterion_as_a_short_sentence}} I will check it with `{{command_or_test}}`.
+- **AC-{{n}}:** {{criterion_as_a_short_sentence}}, checked by `{{command_or_test}}`
 {{/each}}
 
-### What this will not do (binding; a diff that crosses one fails verify)
+### Non-goals (binding; a diff that crosses one fails verify)
 {{#each ng}}
-- {{non_goal_as_a_short_sentence}}
+- **NG-{{n}}:** {{non_goal_as_a_short_sentence}}
 {{/each}}
 
-### Files I will change
+### Files to touch
 {{files_list}}
 
-### Tests I will write first
+### Tests to write first
 {{#each tests}}
 - `{{test_name}}`
 {{/each}}
 
-### Repo skills I will apply
+### Repo skills to apply
 {{repo_skills_list}} <!-- e.g. handling-money, or "none" -->
 
 ### Risk is {{risk}}

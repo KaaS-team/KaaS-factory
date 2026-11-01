@@ -9,6 +9,7 @@ import { type Autonomy, webMode } from "./autonomy";
 import type { FactoryConfig, MergeConfig } from "./config";
 import { followUpIssue } from "./escaped-defect";
 import { attemptMerge, type ChangedFile, type MergeDecision, renderAuditComment } from "./merge-policy";
+import { recordEvidence } from "./merge-evidence";
 import { mayRebase } from "./merge-method";
 import { DirLease, type Lease, serialMerge } from "./merge-queue";
 import { syncRebase } from "./rebase-sync";
@@ -44,7 +45,7 @@ export interface MergeContext {
   readonly facts?: PrFacts;
 }
 
-type Github = Pick<ScmPort, "listIssuesByLabel" | "currentLogin" | "roleOf">;
+type Github = Pick<ScmPort, "listIssuesByLabel" | "currentLogin" | "roleOf"> & Partial<Pick<ScmPort, "mergeReadiness">>;
 
 // Undefined when neither the web nor config set a tier: the merge then runs on merge.policy alone.
 export async function mergeContext(
@@ -61,6 +62,11 @@ export async function mergeContext(
   const verify = await readVerifyFacts(worktree, issue);
   if (!verify) return { mode: t.mode, merge: { ...config.merge, ...t.limits } };
   const paths = changed.map((f) => f.path);
+  // Read-only evidence for raising autonomy; a failed read never blocks the merge.
+  const readiness = await deps.github.mergeReadiness?.(config.repo, pr).catch(() => undefined);
+  if (readiness) {
+    recordEvidence(deps.state, config, { pr, review: verify.review, decision: readiness.reviewDecision, paths });
+  }
   const triage = (await readStageArtifacts(worktree, issue, "triage")).json as { risk?: unknown } | undefined;
   const plan = (await readStageArtifacts(worktree, issue, "plan")).json as { risk?: unknown } | undefined;
   const findings = ((await readStageArtifacts(worktree, issue, "verify")).json as { findings?: unknown[] } | undefined)

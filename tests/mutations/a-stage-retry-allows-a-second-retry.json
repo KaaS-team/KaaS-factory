@@ -1,0 +1,1 @@
+{"name":"a stage retry allows a second retry","file":"src/engine/stage-retry.ts","find":"if (attempt === 1) return","replace":"if (attempt === 2) return","test":"tests/stage-retry.test.ts"}

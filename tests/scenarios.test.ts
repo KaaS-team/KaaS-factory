@@ -942,10 +942,12 @@ describe("failure paths", () => {
 
   test("14d. an unknown field in any stage JSON fails the stage and names the field", async () => {
     const c = setup([LABEL.ready]);
+    // The invalid output is run once more (src/engine/stage-retry.ts) before the stage fails.
+    c.push("triage", triage({ dispositon: "proceed" }));
     c.push("triage", triage({ dispositon: "proceed" }));
     expect(await c.step()).toBe("failed");
     expect(c.state.getRun("acme/widgets", 1)!.reason).toBe(
-      'triage attempt 1: triage.json has unknown field "dispositon"; spent $0.01 on this issue',
+      'triage attempt 2: triage.json has unknown field "dispositon"; spent $0.02 on this issue',
     );
     const d = setup([LABEL.ready]);
     d.state.setToggle("auto_approve_low_risk", true);

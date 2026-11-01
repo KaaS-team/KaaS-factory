@@ -38,7 +38,7 @@ import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
 import { withRepro } from "../bug-repro";
-import { LABEL, issueType, typesFor } from "../labels";
+import { LABEL, issueType } from "../labels";
 import { resolveAgentByName, resolveRoute } from "../agents/executor";
 import { buildEscalation, buildFamily } from "../core/model-tier";
 import { latestPricedModel } from "../pricing";
@@ -57,6 +57,7 @@ import {
 import { issueRef, postRunDetails, prBody, prExtras, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
+import { runStageChecked } from "./stage-retry";
 import { checkedPlan } from "./plan-critic";
 import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
 import {
@@ -69,7 +70,7 @@ import {
   recheckFindings,
   runRetro,
   runStage,
-  stageJson,
+  type stageJson,
   stopStep,
   upsertStatusComment,
   type Outcome,
@@ -123,7 +124,7 @@ async function askOrHandOver(sc: StepCtx, question: string | undefined): Promise
 const triage: StepType = {
   agent: true,
   async run(sc) {
-    const { deps, config, issue, worktree, step } = sc;
+    const { deps, config, issue, step } = sc;
     const issueNumber = issue.number;
     // Someone else's open PR already closes this issue: don't spend tokens on a second fix.
     const own = deps.git.branchName(issueNumber);
@@ -133,9 +134,7 @@ const triage: StepType = {
       finish(deps, config, issueNumber, "needs-human", `open PR #${taken.number} already closes this issue`);
       return stop("needs-human");
     }
-    const result = await runStage(deps, config, issue, "triage", worktree, stepOpts(step));
-    const art = await readStageArtifacts(worktree, issueNumber, "triage");
-    const { json, problem } = stageJson<TriageArtifact>("triage", art.json, typesFor(config.routes));
+    const { result, art, json, problem } = await runStageChecked<TriageArtifact>(sc, "triage", stepOpts(step));
     if (result.exitCode !== 0 || !json) {
       const fallback = "triage produced no valid triage.json";
       const cause = stageCause(config, issueNumber, "triage", result, { problem, fallback });
@@ -216,14 +215,12 @@ const build: StepType = {
     let json: (BuildArtifact & { rounds: number }) | undefined;
     let gate: Awaited<ReturnType<typeof runGates>>;
     for (;;) {
-      result = await runStage(deps, config, issue, "build", worktree, {
+      ({ result, art, ...built } = await runStageChecked<BuildArtifact>(sc, "build", {
         ...rebuildFrom(sc),
         ...(sc.ctx.rejectRound ? { rejects: sc.ctx.rejectRound } : {}),
         ...(model ? { model } : {}),
         ...stepOpts(step),
-      });
-      art = await readStageArtifacts(worktree, issueNumber, "build");
-      built = stageJson<BuildArtifact>("build", art.json);
+      }));
       // The runner owns the attempt count: the agent's copy of the file is cleared every round.
       json = built.json && {
         ...built.json,
