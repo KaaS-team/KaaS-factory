@@ -416,7 +416,7 @@ const verify: StepType = {
     }
     if (json) json = await settleVerdict(sc, json);
     const posted = art.comment && `${verdictPost(art.comment, json, ctx.rejectRound + 1, maxRejects)}${recheckNote}`;
-    if (json) deps.state.setVerifyVerdict(config.repo, issueNumber, json.result);
+    deps.state.setVerifyVerdict(config.repo, issueNumber, json && result.exitCode === 0 ? json.result : "unknown"); // judge error
     if (checked && !checked.ok) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
       finish(deps, config, issueNumber, "needs-human", checked.reason);

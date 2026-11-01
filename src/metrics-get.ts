@@ -12,6 +12,7 @@ export interface Metrics {
   mergeRate?: number;
   costPerMergedChange?: number;
   judgeVetoRate?: number;
+  unknownVerdicts?: number;
 }
 
 const ENDED = new Set(["shipped", "failed", "cancelled", "rejected"]);
@@ -31,8 +32,9 @@ export function metricsFor(
   const verdicts = sources.flatMap(({ repo, state }) =>
     state.listStageRuns(repo, { limit: ALL }).filter((s) => s.stage === "verify" && s.verdict !== null),
   );
-  if (verdicts.length)
-    out.judgeVetoRate = round(verdicts.filter((s) => s.verdict === "reject").length / verdicts.length, 3);
+  const known = verdicts.filter((s) => s.verdict !== "unknown");
+  if (known.length) out.judgeVetoRate = round(known.filter((s) => s.verdict === "reject").length / known.length, 3);
+  if (verdicts.length > known.length) out.unknownVerdicts = verdicts.length - known.length;
 
   if (opts.operator && shipped.length) {
     const attempts = shipped.flatMap((r) => {

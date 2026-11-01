@@ -55,6 +55,26 @@ describe("metricsFor", () => {
     done();
   });
 
+  test("unknown verdicts are counted and left out of the veto rate", () => {
+    const { state, done } = open();
+    seed(state, 1, "failed", "reject", 1);
+    seed(state, 2, "failed", "unknown", 1);
+    seed(state, 3, "failed", "unknown", 1);
+    expect(metricsFor([{ repo: REPO, state }], { operator: false })).toEqual({
+      mergeRate: 0,
+      judgeVetoRate: 1,
+      unknownVerdicts: 2,
+    });
+    done();
+  });
+
+  test("only unknown verdicts leave the veto rate out", () => {
+    const { state, done } = open();
+    seed(state, 1, "failed", "unknown", 1);
+    expect(metricsFor([{ repo: REPO, state }], { operator: false })).toEqual({ mergeRate: 0, unknownVerdicts: 1 });
+    done();
+  });
+
   test("unknown cost omits cost rather than understating it", () => {
     const { state, done } = open();
     seed(state, 1, "shipped", "pass", null);
