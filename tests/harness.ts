@@ -332,6 +332,12 @@ export class FakeGit extends Git {
 
   committedPaths: string[][] = [];
   changed: string[] = [];
+  // Files in the base tree; a Makefile here keeps build scripts protected.
+  baseTree: string[] = ["Makefile"];
+
+  override async baseFiles(): Promise<string[]> {
+    return this.baseTree;
+  }
 
   override async changedFiles(): Promise<string[]> {
     return this.changed;

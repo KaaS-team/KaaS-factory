@@ -286,6 +286,15 @@ export class Git {
       .filter(Boolean);
   }
 
+  // Every file in the base tree: the build step uses it to tell a greenfield scaffold (no Makefile yet).
+  async baseFiles(worktreeDir: string, base: string): Promise<string[]> {
+    const result = await this.runner.run(["ls-tree", "-r", "--name-only", `origin/${base}`], { cwd: worktreeDir });
+    return result.stdout
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
   // File-by-file added/deleted line counts, for merge-policy's autoEligible
   // (src/merge-policy.ts). A binary file reports "-" for both counts in
   // `--numstat`; those count as a changed file but add no lines.
