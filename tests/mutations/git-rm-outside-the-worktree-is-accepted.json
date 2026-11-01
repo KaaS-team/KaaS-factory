@@ -1,1 +1,0 @@
-{"name":"git rm outside the worktree is accepted","file":"src/git-rm.ts","find":"rel.startsWith(\"..\") || isAbsolute(rel)","replace":"false","test":"tests/git-rm.test.ts"}
