@@ -19,7 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctor, sha256 } from "../src/doctor";
-import { installTemplate, type InstallOptions } from "../src/install-template";
+import { installTemplate, RELEASE_OFFER, type InstallOptions } from "../src/install-template";
 
 const CLI = join(import.meta.dir, "..", "src", "cli.ts");
 
@@ -46,6 +46,14 @@ function scratchTarget(): string {
 }
 
 describe("installTemplate (default)", () => {
+  test("offers the release workflow in its output and writes no release.yml", () => {
+    const target = scratchTarget();
+    const { stdout } = run([target]);
+    expect(stdout).toContain(RELEASE_OFFER);
+    expect(existsSync(join(target, ".github", "workflows", "release.yml"))).toBe(false);
+    rmSync(target, { recursive: true, force: true });
+  });
+
   test("writes the template into an empty target", () => {
     const target = scratchTarget();
     const { code } = run([target]);
