@@ -27,7 +27,22 @@ export interface PolicySpec {
   approvals?: { requester_cannot_approve?: boolean };
   budget_usd_month?: number;
   extend?: boolean;
+  // Org only: a rule named here is hard-deny (no one lifts it) or soft-deny (a named approver can).
+  deny?: Record<string, DenyKind>;
+  // Team only: rule -> the approver, from the team's own approvers, who lifts a soft-deny rule.
+  preapprove?: Record<string, string>;
 }
+
+export type DenyKind = "hard" | "soft";
+export const DENY_KINDS: readonly DenyKind[] = ["hard", "soft"];
+// The policy rules a deny mark or a pre-approval can name, as dotted paths under policy.
+export const DENY_RULES: readonly string[] = [
+  "risk_max",
+  "auto_merge.allowed",
+  "auto_merge.max_risk",
+  "approvals.requester_cannot_approve",
+  "budget_usd_month",
+];
 
 export interface TeamFile {
   name: string;
@@ -104,12 +119,32 @@ function policy(path: string, v: unknown, out: string[]): void {
       extend: bool,
       auto_merge: map,
       approvals: map,
+      deny: map,
+      preapprove: map,
     },
     out,
   );
   if (!isObject(v)) return;
   if (isObject(v.auto_merge)) fields(`${path}.auto_merge`, v.auto_merge, { allowed: bool, max_risk: risk }, out);
   if (isObject(v.approvals)) fields(`${path}.approvals`, v.approvals, { requester_cannot_approve: bool }, out);
+}
+
+// deny belongs to the org and preapprove to a team: a file cannot mark its own rules or lift its own.
+function denyProblems(path: string, v: unknown, kind: "org" | "team", out: string[]): void {
+  if (!isObject(v)) return;
+  const field = kind === "org" ? "preapprove" : "deny";
+  if (v[field] !== undefined)
+    out.push(`${path}.${field} is only valid in the ${kind === "org" ? "team" : "org"} file.`);
+  const marks = kind === "org" ? v.deny : v.preapprove;
+  if (!isObject(marks)) return;
+  const name = kind === "org" ? "deny" : "preapprove";
+  for (const [rule, value] of Object.entries(marks)) {
+    if (!DENY_RULES.includes(rule)) out.push(`${path}.${name}.${rule} is not a rule; use ${DENY_RULES.join(", ")}.`);
+    else if (kind === "org" && !DENY_KINDS.includes(value as DenyKind))
+      out.push(`${path}.deny.${rule} must be hard or soft, got ${JSON.stringify(value)}.`);
+    else if (kind === "team" && (typeof value !== "string" || value === ""))
+      out.push(`${path}.preapprove.${rule} must be the name of an approver.`);
+  }
 }
 
 function source(path: string, v: unknown, out: string[]): void {
@@ -125,6 +160,7 @@ export function teamProblems(raw: unknown, kind: "org" | "team"): string[] {
   if (raw.roles !== undefined) roles("roles", raw.roles, out);
   if (raw.workflows !== undefined && !isObject(raw.workflows)) out.push("workflows must be a mapping.");
   if (raw.policy !== undefined) policy("policy", raw.policy, out);
+  if (raw.policy !== undefined) denyProblems("policy", raw.policy, kind, out);
   if (kind === "org") {
     if (raw.locked !== undefined) {
       const problem = strs("locked", raw.locked);
