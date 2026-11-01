@@ -1,0 +1,1 @@
+{"name":"init config leaves the makefile unprotected","file":"src/init.ts","find":"return withBuildScriptsProtected(config);","replace":"return config;","test":"tests/init-guard.test.ts"}

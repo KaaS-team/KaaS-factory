@@ -37,6 +37,8 @@ test("guard-paths.sh is registered for every tool it guards", () => {
     "Agent",
     "Bash",
     "Edit",
+    "Glob",
+    "Grep",
     "MultiEdit",
     "NotebookEdit",
     "Read",
