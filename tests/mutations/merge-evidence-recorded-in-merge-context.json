@@ -1,0 +1,1 @@
+{"name": "merge evidence: recorded in merge context", "file": "src/merge-autonomy.ts", "find": "if (readiness) {", "replace": "if (false as boolean) {", "test": "tests/merge-evidence.test.ts"}
