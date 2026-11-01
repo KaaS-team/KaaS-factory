@@ -1,0 +1,7 @@
+{
+  "name": "ci-baseline: queue limit is ignored",
+  "file": "scripts/ci-baseline.ts",
+  "find": "if (minutes > limit)",
+  "replace": "if (minutes > 100000)",
+  "test": "tests/ci-baseline.test.ts"
+}
