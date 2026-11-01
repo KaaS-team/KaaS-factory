@@ -1,0 +1,1 @@
+{"name":"a preview at another sha is ready","file":"src/preview/contract.ts","find":"const state = given === \"ready\" && sha !== want.head ? \"stale\" : given;","replace":"const state = given;","test":"tests/preview-contract.test.ts"}
