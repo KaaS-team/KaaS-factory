@@ -1,0 +1,1 @@
+{"name":"the proof reverts the gate Makefile","file":"src/proof.ts","find":"!isTestPath(c.path) && !isGateFile(c.path)","replace":"!isTestPath(c.path)","test":"tests/proof-keep.test.ts"}

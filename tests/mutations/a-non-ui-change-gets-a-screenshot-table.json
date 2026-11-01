@@ -1,0 +1,1 @@
+{"name":"a non-UI change gets a screenshot table","file":"src/screenshot-pair.ts","find":"if (pairs.length === 0) return \"\";","replace":"if (false) return \"\";","test":"tests/screenshot-pair.test.ts"}
