@@ -1,0 +1,1 @@
+{"name":"a-gitrm","file":"template/.claude/hooks/guard-paths.sh","find":"low = rel.lower()","replace":"low = rel","test":"tests/git-rm.test.ts"}

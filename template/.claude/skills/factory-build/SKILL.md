@@ -40,6 +40,8 @@ to stop and ask (step 5). Never cross a non-goal (NG-n); those are binding.
 
 Apply every repo skill named in the plan as you go, not as an afterthought.
 
+git rm takes plain files only; protected paths are refused.
+
 ## 3. Run the gate
 
 Run `.factory/gates.sh` (or the narrower `gate_level` the plan named).
@@ -50,7 +52,6 @@ tests failed"; show the line that failed.
 If the gate fails and you can see why, fix it and re-run. Stop after 3
 failed gate runs: write `"status": "red"` and `"outcome": "blocked"` with the
 reason in `summary`, and quote the failing gate line in the status comment.
-A human looks at a blocked build; don't leave it for `factory-verify` to find.
 
 ## 4. UI route: capture screenshots
 

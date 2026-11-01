@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gitRmProblem } from "../src/git-rm";
 import { stageSettings } from "../src/stage-permissions";
 
-const ROOT = "/work/tree";
 const PROTECTED = ["src/payments/**"];
 
 describe("build allow-list for git rm (#52)", () => {
@@ -18,64 +16,107 @@ describe("build allow-list for git rm (#52)", () => {
   });
 });
 
-describe("gitRmProblem", () => {
-  test("accepts named files inside the worktree", () => {
-    expect(gitRmProblem("git rm apps/a/src/inbound.ts apps/b/src/inbound.ts", ROOT, PROTECTED)).toEqual(undefined);
-    expect(gitRmProblem("git rm -f -- old/file.ts", ROOT, PROTECTED)).toEqual(undefined);
-  });
+const HOOK = join(import.meta.dir, "..", "template", ".claude", "hooks", "guard-paths.sh");
 
-  test("refuses paths outside the worktree", () => {
-    expect(gitRmProblem("git rm ../other/file.ts", ROOT, PROTECTED)).toBe("../other/file.ts is outside the worktree");
-    expect(gitRmProblem("git rm /etc/hosts", ROOT, PROTECTED)).toBe("/etc/hosts is outside the worktree");
-    expect(gitRmProblem("git rm .", ROOT, PROTECTED)).toBe(". is outside the worktree");
-  });
+function project(protectedPaths: unknown): string {
+  mkdirSync(tmpdir(), { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "factory-gitrm-"));
+  mkdirSync(join(dir, ".factory"), { recursive: true });
+  writeFileSync(join(dir, ".factory", "config.json"), JSON.stringify({ protectedPaths }));
+  return dir;
+}
 
-  test("refuses protected paths, configured and always-protected", () => {
-    expect(gitRmProblem("git rm src/payments/charge.ts", ROOT, PROTECTED)).toBe(
-      "src/payments/charge.ts is a protected path",
-    );
-    expect(gitRmProblem("git rm -r .claude", ROOT, PROTECTED)).toBe("flag -r is not allowed");
-    expect(gitRmProblem("git rm :(top)src/payments/charge.ts", ROOT, PROTECTED)).toBe(
-      ":(top)src/payments/charge.ts is a pattern, name each file",
-    );
-    expect(gitRmProblem("git rm src/x/../payments/charge.ts", ROOT, PROTECTED)).toBe(
-      "src/x/../payments/charge.ts is a protected path",
-    );
-    expect(gitRmProblem("git rm .factory/config.json", ROOT, [])).toBe(".factory/config.json is a protected path");
-  });
-
-  test("refuses patterns, odd flags and a bare command", () => {
-    expect(gitRmProblem("git rm src/*.ts", ROOT, [])).toBe("src/*.ts is a pattern, name each file");
-    expect(gitRmProblem("git rm --cached a.ts", ROOT, [])).toBe("flag --cached is not allowed");
-    expect(gitRmProblem("git rm", ROOT, [])).toBe("no path given");
-    expect(gitRmProblem("rm a.ts", ROOT, [])).toBe("not a git rm command");
-  });
-});
-
-describe("guard-paths.sh on git rm", () => {
-  const hook = join(import.meta.dir, "..", "template", ".claude", "hooks", "guard-paths.sh");
-  async function run(command: string, dir: string): Promise<number> {
-    const proc = Bun.spawn([hook], {
+// Runs the real hook as a build stage: JSON payload on stdin, exit code and stderr back.
+async function run(command: string, dir: string): Promise<{ code: number; stderr: string }> {
+  const proc = Bun.spawn(
+    ["python3", "-c", "import subprocess,sys;sys.exit(subprocess.call(['bash',sys.argv[1]]))", HOOK],
+    {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
       env: { ...process.env, CLAUDE_PROJECT_DIR: dir, FACTORY_STAGE: "build" },
-    });
-    proc.stdin.write(JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: dir }));
-    await proc.stdin.end();
-    return await proc.exited;
-  }
+    },
+  );
+  proc.stdin.write(JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: dir }));
+  await proc.stdin.end();
+  const stderr = await new Response(proc.stderr).text();
+  return { code: await proc.exited, stderr };
+}
 
-  test("passes an in-tree file, blocks outside and protected ones", async () => {
-    mkdirSync(tmpdir(), { recursive: true });
-    const dir = mkdtempSync(join(tmpdir(), "factory-gitrm-"));
-    mkdirSync(join(dir, ".factory"), { recursive: true });
-    writeFileSync(join(dir, ".factory", "config.json"), JSON.stringify({ protectedPaths: PROTECTED }));
-    expect(await run("git rm apps/a/inbound.ts", dir)).toBe(0);
-    expect(await run("git rm ../escape.ts", dir)).toBe(2);
-    expect(await run("git rm src/payments/charge.ts", dir)).toBe(2);
-    expect(await run("git rm src/*.ts", dir)).toBe(2);
-    expect(await run("git rm -r .claude", dir)).toBe(2);
-    expect(await run("git rm :(top)src/payments/charge.ts", dir)).toBe(2);
+async function refused(command: string, reason: string, dir = project(PROTECTED)): Promise<void> {
+  const result = await run(command, dir);
+  expect(result.code).toBe(2);
+  expect(result.stderr).toContain(`guard-paths: blocked git rm: ${reason}.`);
+  rmSync(dir, { recursive: true, force: true });
+}
+
+describe("guard-paths.sh on git rm (the one implementation)", () => {
+  test("accepts named files inside the worktree", async () => {
+    const dir = project(PROTECTED);
+    expect((await run("git rm apps/a/src/inbound.ts apps/b/src/inbound.ts", dir)).code).toBe(0);
+    expect((await run("git rm -f -- old/file.ts", dir)).code).toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("refuses paths outside the worktree", async () => {
+    await refused("git rm ../other/file.ts", "../other/file.ts is outside the worktree");
+    await refused("git rm /etc/hosts", "/etc/hosts is outside the worktree");
+    await refused("git rm .", ". is outside the worktree");
+  });
+
+  test("refuses protected paths, configured and always-protected", async () => {
+    await refused("git rm src/payments/charge.ts", "src/payments/charge.ts is a protected path");
+    await refused("git rm -r .claude", "only -f, -q, --quiet and --ignore-unmatch are allowed");
+    await refused("git rm .claude", ".claude is a protected path");
+    await refused("git rm :(top)src/payments/charge.ts", "name each plain file, no patterns");
+    await refused("git rm src/x/../payments/charge.ts", "src/x/../payments/charge.ts is a protected path");
+    await refused("git rm .factory/config.json", ".factory/config.json is a protected path", project([]));
+  });
+
+  test("refuses patterns, odd flags and a bare command", async () => {
+    await refused("git rm src/*.ts", "name each plain file, no patterns");
+    await refused("git rm --cached a.ts", "only -f, -q, --quiet and --ignore-unmatch are allowed");
+    await refused("git rm", "name each plain file, no patterns");
+    const dir = project([]);
+    expect((await run("rm a.ts", dir)).code).toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("compares protected paths without case", async () => {
+    await refused("git rm SRC/payments/x.ts", "SRC/payments/x.ts is a protected path");
+    await refused("git rm Src/Payments/x.ts", "Src/Payments/x.ts is a protected path", project(["SRC/Pay*/**"]));
+    await refused("git rm .Claude/settings.json", ".Claude/settings.json is a protected path");
+    await refused("git rm .FACTORY/config.json", ".FACTORY/config.json is a protected path", project([]));
+  });
+
+  test("bypass shapes are refused: quotes, global options, brace globs, bad config", async () => {
+    await refused(
+      'git rm "src/payments/x.ts"',
+      "name each plain file, no patterns (quotes and escapes are masked, so they are refused)",
+    );
+    await refused(
+      "git rm 'src/payments/x.ts'",
+      "name each plain file, no patterns (quotes and escapes are masked, so they are refused)",
+    );
+    await refused(
+      "git rm src/pay\\ments/x.ts",
+      "name each plain file, no patterns (quotes and escapes are masked, so they are refused)",
+    );
+    await refused(
+      "git rm src/payments/$X.ts",
+      "name each plain file, no patterns (quotes and escapes are masked, so they are refused)",
+    );
+    await refused("git -C . rm src/payments/x.ts", "options before rm are not allowed");
+    await refused("git rm a.ts && git rm SRC/payments/x.ts", "SRC/payments/x.ts is a protected path");
+    await refused(
+      "git rm a.ts",
+      "a brace glob in protectedPaths cannot be matched here (fails closed)",
+      project(["{a,b}/**"]),
+    );
+    await refused("git rm a.ts", "protectedPaths is not a list of strings (fails closed)", project("src/**"));
+    await refused("git rm a.ts", "protectedPaths is not a list of strings (fails closed)", project([1]));
+    const dir = project([]);
+    writeFileSync(join(dir, ".factory", "config.json"), "{");
+    await refused("git rm a.ts", "config.json cannot be read (fails closed)", dir);
   });
 });
