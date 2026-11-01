@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+mkdirSync(tmpdir(), { recursive: true });
 const root = mkdtempSync(join(tmpdir(), "factory-test-"));
 process.env.TMPDIR = root;
 process.env.FACTORY_HOME = join(root, "home");

@@ -83,6 +83,12 @@ describe("proof keeps the gate", () => {
     expect(ranZeroTests("make: *** No rule to make target 'test'.  Stop.")).toBe(true);
     expect(ranZeroTests("3 pass\n0 fail")).toBe(false);
   });
+  test("any *.mk file at any depth is a gate file, mkv and mk are not", () => {
+    expect(isGateFile("foo.mk")).toBe(true);
+    expect(isGateFile("a/b/rules.mk")).toBe(true);
+    expect(isGateFile("foo.mkv")).toBe(false);
+    expect(isGateFile("mk")).toBe(false);
+  });
   test("one gate passing does not hide another that found nothing to run", () => {
     expect(ranZeroTests("12 pass\n0 fail\nmake: *** No rule to make target 'test'.  Stop.")).toBe(true);
   });
