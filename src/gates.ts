@@ -88,7 +88,7 @@ export const NO_GATES_COMMENT = `This repo has no gates in \`.factory/config.jso
 
 Add a gate: run \`factory init\` to detect the stack and write them, or add one by hand. A docs-only repo can ship with one lint or link-check gate. Then move this issue back to \`factory:ready\`.`;
 
-// A workflow stage's `gates: [names]` runs only those gates (`FACTORY_GATES_ONLY=a,b bash .factory/gates.sh`).
+// A workflow stage's `gates: [names]` runs only those gates (it becomes `FACTORY_GATES_ONLY=a,b`).
 // A build that edits template/** can break a test in another file (#497), so such a diff adds the test
 // gate, which runs the whole suite, to the list.
 const ONLY = "FACTORY_GATES_ONLY=";
