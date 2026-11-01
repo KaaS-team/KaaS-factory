@@ -9,6 +9,7 @@
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { claimCommitMessage } from "./commit-message";
 import type { CommandResult, CommandRunner } from "./github";
 import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
@@ -117,7 +118,7 @@ export class Git {
 
     const runnerId = `${process.env.HOSTNAME ?? "runner"}-${process.pid}-${Date.now()}`;
     const commitTree = await this.runner.run(
-      ["commit-tree", `${baseSha}^{tree}`, "-p", baseSha, "-m", `factory: claim #${issue} by ${runnerId}`],
+      ["commit-tree", `${baseSha}^{tree}`, "-p", baseSha, "-m", claimCommitMessage(issue, runnerId)],
       { cwd: cloneDir },
     );
     const claimSha = commitTree.stdout.trim();
