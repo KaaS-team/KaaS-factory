@@ -4,6 +4,7 @@
 
 import type { Workflow } from "../core/workflow";
 import { LABEL } from "../labels";
+import { claimToken, refuseApproval, type ApprovalNow } from "./approval-binding";
 import { emitEvent } from "./bus";
 import type { WatchDeps } from "./common";
 import type { FactoryConfig } from "../config";
@@ -66,6 +67,7 @@ export async function resolveApproval(
   token: string,
   decision: Decision,
   by: string,
+  current?: ApprovalNow,
 ): Promise<{ issue: number; step: string } | { error: string }> {
   const rows = deps.state.busEvents(WINDOW);
   const asked = rows.find((r) => r.type === "factory.approval.requested" && dataOf(r).token === token);
@@ -73,6 +75,9 @@ export async function resolveApproval(
   if (rows.some((r) => r.type === "factory.approval.resolved" && dataOf(r).token === token))
     return { error: "that approval is already resolved" };
   const d = dataOf(asked);
+  const refused = decision === "approve" ? refuseApproval(d, current ?? { now: new Date() }) : undefined;
+  if (refused) return { error: refused };
+  if (!claimToken(token)) return { error: "that approval is already resolved" };
   const issue = Number(d.issue);
   emitEvent(deps.bus, "factory.approval.resolved", { ...d, decision, by }, asked.subject ?? undefined);
   await deps.github.setStateLabel(config.repo, issue, [LABEL.awaitingApproval], LABEL.ready);
