@@ -20,6 +20,11 @@ const ZERO_TESTS = [
   /Ran 0 tests/,
 ];
 
+// A runner that printed a failure or a nonzero pass count did run tests: bun prints "0 pass" next to
+// "1 fail" when the only test fails, and that is a real result, not an empty run.
+const RAN_SOMETHING = /^\s*[1-9]\d* (pass|fail)\b/m;
+
 export function ranZeroTests(output: string): boolean {
+  if (RAN_SOMETHING.test(output)) return false;
   return ZERO_TESTS.some((re) => re.test(output));
 }
