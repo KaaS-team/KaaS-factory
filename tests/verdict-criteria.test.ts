@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDir, type VerdictArtifact } from "../src/artifacts";
-import { applyPlanCriteria, settleVerdict } from "../src/engine/verdict-rules";
+import { applyPlanCriteria, settleVerdict, verdictPost } from "../src/engine/verdict-rules";
 import type { StepCtx } from "../src/engine/steps";
 
 const dirs: string[] = [];
@@ -76,5 +76,45 @@ describe("settleVerdict", () => {
     } as unknown as StepCtx;
     const out = await settleVerdict(sc, pass([{ id: "AC-1", status: "pass" }]));
     expect(out.result).toBe("uncertain");
+  });
+});
+
+describe("requirement ID table and unmatched IDs", () => {
+  test("a verdict ID the plan does not have blocks the pass with its name in the reason", () => {
+    const out = applyPlanCriteria(
+      pass([
+        { id: "AC-1", status: "pass" },
+        { id: "AC-2", status: "pass" },
+        { id: "AC-9", status: "pass" },
+      ]),
+      planned,
+    );
+    expect(out.result).toBe("uncertain");
+    expect(JSON.stringify(out.findings)).toContain("the plan does not have: AC-9");
+  });
+
+  test("the posted verdict lists every ID with met, not met or unverified", () => {
+    const body = verdictPost(
+      "<!-- factory:verdict v1 -->\n## Verdict: uncertain\n\ntext",
+      {
+        result: "uncertain",
+        rounds: 1,
+        findings: [],
+        criteria: [
+          { id: "AC-1", status: "pass" },
+          { id: "AC-2", status: "fail", gap: "no test" },
+          { id: "AC-3", status: "unverified" },
+        ],
+      },
+      1,
+      3,
+    );
+    expect(body).toContain("| AC-1 | met |  |");
+    expect(body).toContain("| AC-2 | not met | no test |");
+    expect(body).toContain("| AC-3 | unverified |  |");
+  });
+
+  test("no criteria means no table", () => {
+    expect(verdictPost("x", pass(), 1, 3).includes("Requirement IDs")).toBe(false);
   });
 });
