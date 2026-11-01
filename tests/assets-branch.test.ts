@@ -60,7 +60,7 @@ describe("assets branch", () => {
     ]);
     const body = prBody("b", { shots: urls });
     expect(body).toContain(
-      "| new screen | ![after fresh.png](https://raw.githubusercontent.com/o/r/factory/assets/5/after/fresh.png) |",
+      "| `fresh.png` | _none_ | ![](https://raw.githubusercontent.com/o/r/factory/assets/5/after/fresh.png) |",
     );
     expect(shotsSection(urls)).toContain("factory/assets/5/before/home.png");
     expect(prBody("b", { shots: [] })).not.toContain("Screenshots");
