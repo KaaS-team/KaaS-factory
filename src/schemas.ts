@@ -33,6 +33,7 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       revision: int,
       files: strings,
       autoApproveEligible: { type: "boolean" },
+      boundaryChange: { type: "boolean" },
       commentId: int,
       // Read by factory-build/factory-verify, never inferred from the type
       // name (plan v2.7.0 item 8). Absent means "test", today's behavior.
