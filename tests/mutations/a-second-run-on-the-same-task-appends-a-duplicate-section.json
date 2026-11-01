@@ -1,0 +1,1 @@
+{"name":"a second run on the same task appends a duplicate section","file":"src/knowledge-distill.ts","find":"if (!start) return existing.trim()","replace":"if (true) return existing.trim()","test":"tests/knowledge-distill.test.ts"}
