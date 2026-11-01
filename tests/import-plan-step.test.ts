@@ -7,7 +7,7 @@ import { parsePlannedIssue, planFromIssue } from "../src/engine/import-plan";
 import { fileProblems, importProblems, mutationProblems } from "../src/engine/import-plan-step";
 import { defaultWorkflow, workflowFor } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
-import { engine, removeEngineDirs } from "./engine-harness";
+import { engine, removeEngineDirs, plannedVerdict } from "./engine-harness";
 
 const roots: string[] = [];
 afterAll(() => {
@@ -100,6 +100,7 @@ describe("planned-to-pr", () => {
       { routeWorkflows: { "planned-to-pr": planned } },
       {
         config: { agentCommands: COMMANDS },
+        outputs: { verify: [plannedVerdict] },
       },
     );
     e.github.issues.get(1)!.body = body;

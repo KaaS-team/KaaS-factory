@@ -486,7 +486,12 @@ describe("verify with plan mutations", () => {
       },
       verify: {
         "verdict-comment.md": "<!-- factory:verdict v1 -->\nv",
-        "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+        "verdict.json": JSON.stringify({
+          result: "pass",
+          rounds: 1,
+          findings: [],
+          criteria: [{ id: "AC-1", status: "pass" }],
+        }),
       },
       pr: { "pr-body.md": "Did it.\nCloses #1" },
     } as const;

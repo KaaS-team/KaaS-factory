@@ -279,7 +279,11 @@ describe("an unproven acceptance verdict rejects verify", () => {
         result: "pass",
         rounds: 1,
         findings: [],
-        criteria: [{ id: "AC-1", status: "pass" }],
+        // The verdict marks every criterion the plan lists, so the runner leaves it as shipped.
+        criteria: ((plan.criteria as { id: string }[] | undefined) ?? [{ id: "AC-1" }]).map((c) => ({
+          id: c.id,
+          status: "pass",
+        })),
       }),
     });
     push("pr", { "pr-body.md": "Did it.\nCloses #1" });

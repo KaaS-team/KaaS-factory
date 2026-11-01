@@ -44,6 +44,20 @@ export interface EngineOpts {
   readonly outputs?: Partial<Record<Stage, Array<Record<string, string>>>>;
 }
 
+// A verify output that marks both criteria of tests/fixtures/planned-issue.md, for a run on a planned issue.
+export const plannedVerdict = {
+  "verdict-comment.md": "<!-- factory:verdict v1 -->\nv",
+  "verdict.json": JSON.stringify({
+    result: "pass",
+    rounds: 1,
+    findings: [],
+    criteria: [
+      { id: "AC-1", status: "pass" },
+      { id: "AC-2", status: "pass" },
+    ],
+  }),
+};
+
 export function engine(
   workflow: Workflow,
   lintExit: number,

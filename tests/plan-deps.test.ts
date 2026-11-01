@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { depRefs, unmetDeps } from "../src/plan-deps";
 import { baseIssue, FakeGitHub } from "./harness";
 import { defaultWorkflow, workflowFor } from "../src/engine/workflows";
-import { engine, removeEngineDirs } from "./engine-harness";
+import { engine, removeEngineDirs, plannedVerdict } from "./engine-harness";
 import { validBody } from "./plan-guard.test";
 
 const dirs: string[] = [];
@@ -81,6 +81,7 @@ describe("the dependency check at run start", () => {
       { routeWorkflows: { "planned-to-pr": planned } },
       {
         config: { agentCommands: COMMANDS },
+        outputs: { verify: [plannedVerdict] },
       },
     );
     e.github.issues.get(1)!.body = body;
