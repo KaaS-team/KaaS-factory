@@ -1,6 +1,7 @@
 // The qa step kind: the pure render, the injected runner, and the workflow accepting `uses: qa`.
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { runDir } from "../src/artifacts";
 import { parseWorkflowText } from "../src/engine/workflows";
@@ -8,6 +9,8 @@ import { engine, FakeShell, removeEngineDirs } from "./engine-harness";
 import { ALL_STEP_TYPES } from "../src/engine/registry";
 import { criterionVerdict, qaEnabled, renderQa, runQaStep, type QaRouteResult } from "../src/qa-step";
 
+// A rerun finds the per-run tmpdir removed; the harness mkdtemps inside it.
+beforeAll(() => mkdirSync(tmpdir(), { recursive: true }));
 afterAll(removeEngineDirs);
 
 const results: QaRouteResult[] = [
