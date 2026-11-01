@@ -38,12 +38,14 @@ typecheck:
 # quarantine, a ci.yml job that never blocks a push, runs only those (bun fails a filter that matches none).
 # A test that flips in the nightly flakes run FLAKE_LIMIT times must be tagged and get an entry in tests/quarantine.json (owner, expiry);
 # tests/quarantine.test.ts fails on a tag with no entry or an expired one.
+# Test files run in 4 worker processes; a --rerun-each run (the three-times check) stays serial.
+TEST_PAR ?= $(if $(findstring --rerun-each,$(TEST_ARGS)),,--parallel=4)
 GIT_ENV = GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true
 # Every temp file a test, or a process it starts, makes lands in one dir, removed when the run ends (#270).
 test:
 	@mkdir -p reports
 	@root=$$(mktemp -d "$${TMPDIR:-/tmp}/factory-test-run.XXXXXX"); \
-	$(GIT_ENV) TMPDIR=$$root $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_ARGS) $(FILES); \
+	$(GIT_ENV) TMPDIR=$$root $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_PAR) $(TEST_ARGS) $(FILES); \
 	code=$$?; rm -rf "$$root"; exit $$code
 
 quarantine:
