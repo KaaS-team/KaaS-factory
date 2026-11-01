@@ -1,5 +1,6 @@
 // A before and after screenshot pair for the PR body of a UI change. Pure: the capture function is
-// injected, so nothing here launches a browser. Not yet called from the PR body builder.
+// injected, so nothing here launches a browser. Only renderShotPairs is called in production (by the PR
+// body builder, src/engine/pr-body.ts). visibleRoutes and screenshotSection have no caller yet.
 
 export type ShotPair = { route: string; before: string; after: string };
 export type Capture = (route: string, ref: "base" | "head") => Promise<string>;
@@ -14,10 +15,13 @@ export function visibleRoutes(paths: readonly string[]): string[] {
     if (!PAGE_FILE.test(p)) continue;
     const m = /(?:^|\/)(?:app|pages|dashboard\/public)\/(.+)$/.exec(p);
     if (!m) continue;
-    let r = (m[1] ?? "").replace(PAGE_FILE, "").replace(/(^|\/)(page|index)$/, "");
+    const stem = (m[1] ?? "").replace(PAGE_FILE, "");
+    if (/(^|\/)(layout|loading|error|not-found)$/.test(stem)) continue;
+    const r = stem.replace(/(^|\/)(page|index)$/, "");
     if (/(^|\/)(_|api\/)/.test(r) || r.startsWith("api/")) continue;
-    r = r.replace(/\/$/, "");
-    routes.add(`/${r}`);
+    const segs = r.split("/").filter((x) => x !== "" && !/^\(.*\)$/.test(x));
+    if (segs.some((x) => x.includes("["))) continue;
+    routes.add(`/${segs.join("/")}`);
   }
   return [...routes].sort();
 }

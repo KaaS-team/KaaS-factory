@@ -9,6 +9,17 @@ describe("visibleRoutes", () => {
       "/settings",
     ]);
   });
+  test("layout, loading, error and not-found files name no route", () => {
+    expect(
+      visibleRoutes(["app/layout.tsx", "app/loading.tsx", "app/x/error.tsx", "app/not-found.tsx", "app/x/layout.tsx"]),
+    ).toEqual([]);
+  });
+  test("a route with a [param] segment is skipped", () => {
+    expect(visibleRoutes(["app/[id]/page.tsx", "app/a/[...slug]/page.tsx"])).toEqual([]);
+  });
+  test("(group) segments are dropped", () => {
+    expect(visibleRoutes(["app/(auth)/login/page.tsx", "app/(m)/(n)/page.tsx"])).toEqual(["/", "/login"]);
+  });
   test("non-UI and non-route files name no route", () => {
     expect(visibleRoutes(["src/engine/pr-body.ts", "components/Button.tsx", "app/api/x.ts", "README.md"])).toEqual([]);
   });

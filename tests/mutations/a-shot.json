@@ -1,0 +1,1 @@
+{"name":"a-shot","file":"src/engine/pr-body.ts","find":"const table = renderShotPairs(shots.map((s) => ({ route: s.name, before: s.before ?? \"\", after: s.after })));","replace":"const table = \"\";","test":"tests/pr-body.test.ts"}

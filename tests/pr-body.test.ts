@@ -110,6 +110,24 @@ describe("a PR body built from a finished run", () => {
   });
 });
 
+describe("a PR body with screenshots", () => {
+  const base = "https://raw.githubusercontent.com/o/r/factory/assets/5";
+  const shots = [
+    { name: "home.png", before: `${base}/before/home.png`, after: `${base}/after/home.png` },
+    { name: "fresh.png", after: `${base}/after/fresh.png` },
+  ];
+  test("renders the pairs through the pair builder", () => {
+    const body = prBody("text", { shots });
+    expect(body).toContain(
+      `## Screenshots\n\n| Route | Before | After |\n| --- | --- | --- |\n| \`home.png\` | ![](${base}/before/home.png) | ![](${base}/after/home.png) |\n| \`fresh.png\` | _none_ | ![](${base}/after/fresh.png) |`,
+    );
+    expect(visibleLeaks(body)).toEqual([]);
+  });
+  test("no shots, no section", () => {
+    expect(prBody("text", { shots: [] })).not.toContain("## Screenshots");
+  });
+});
+
 describe("an epic's PR body", () => {
   test("tasks follow What changed and the closing line precedes the run-details pointer", () => {
     const body = prBody("Text.", {
@@ -152,6 +170,7 @@ describe("the run-details comment", () => {
   });
 
   test("the posted receipt drops model and spend, built from a real worktree", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const repo = mkdtempSync(join(tmpdir(), "factory-run-details-"));
     const sh = (cmd: string) =>
       Bun.spawnSync(["sh", "-c", cmd], { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
