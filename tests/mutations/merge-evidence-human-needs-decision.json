@@ -1,0 +1,1 @@
+{"name": "merge evidence: human needs decision", "file": "src/merge-evidence.ts", "find": "if (!agent || !human) return;", "replace": "if (!agent) return;", "test": "tests/merge-evidence.test.ts"}

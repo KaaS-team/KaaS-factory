@@ -1,0 +1,1 @@
+{"name": "merge evidence: replaces same pr", "file": "src/merge-evidence.ts", "find": ".filter((e) => e.pr !== input.pr)", "replace": ".filter(() => true)", "test": "tests/merge-evidence.test.ts"}
