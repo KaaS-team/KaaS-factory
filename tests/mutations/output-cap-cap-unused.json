@@ -1,0 +1,1 @@
+{"name":"output-cap: cap-unused","file":"src/adapters/agent37/execution.ts","find":"capOutput(out.stdout,","replace":"String(out.stdout,","test":"tests/runtimes.test.ts"}

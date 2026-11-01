@@ -13,6 +13,7 @@
 // read from the environment by name when the step runs, so it is never in
 // machine.json, an argv or a log.
 
+import { capOutput } from "../../output-cap";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface Agent37Spec {
@@ -312,10 +313,12 @@ export class Agent37Execution implements ExecutionPort {
       ]);
       if (typeof out === "string") return fail(out);
       if (typeof err === "string") return fail(err);
+      const stdout = capOutput(out.stdout, TAIL).text;
+      const stderr = capOutput(err.stdout, TAIL).text;
       const note = out.truncated || err.truncated ? "agent37: output truncated at 512 KB per stream" : "";
       return {
-        stdout: out.stdout,
-        stderr: note ? `${err.stdout}${err.stdout && !err.stdout.endsWith("\n") ? "\n" : ""}${note}\n` : err.stdout,
+        stdout,
+        stderr: note ? `${stderr}${stderr && !stderr.endsWith("\n") ? "\n" : ""}${note}\n` : stderr,
         code: Number.parseInt(done.stdout.trim(), 10),
       };
     }
