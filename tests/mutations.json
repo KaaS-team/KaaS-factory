@@ -140,7 +140,7 @@
   {"name": "merge: refuse binary files", "file": "src/merge-policy.ts", "find": "if (binaries.length > 0) {", "replace": "if (false) {", "test": "tests/boundary.test.ts"},
   {"name": "diffStat: renames split into both paths", "file": "src/git.ts", "find": "[\"diff\", \"--numstat\", \"--no-renames\", \"-z\", range]", "replace": "[\"diff\", \"--numstat\", \"-M\", \"-z\", range]", "test": "tests/git.test.ts"},
   {"name": "diffStat: judges the given head", "file": "src/git.ts", "find": "const range = `origin/${base}...${head}`;", "replace": "const range = `origin/${base}...HEAD`;", "test": "tests/git.test.ts"},
-  {"name": "executor: timeout kills the process group", "file": "src/agents/executor.ts", "find": "process.kill(-proc.pid, \"SIGKILL\");", "replace": "proc.kill();", "test": "tests/ported/machinist/runner.test.ts"},
+  {"name": "executor: timeout kills the process group", "file": "src/agents/executor.ts", "find": "process.kill(-proc.pid, \"SIGKILL\");", "replace": "proc.kill(); return;", "test": "tests/ported/machinist/runner.test.ts"},
   {"name": "workflow: a forward cycle is refused", "file": "src/core/workflow.ts", "find": "if (cycle)\n      problems.push(", "replace": "if (false && cycle)\n      problems.push(", "test": "tests/workflow.test.ts"},
   {"name": "workflow: an unreachable step is refused", "file": "src/core/workflow.ts", "find": "for (const id of ids) if (!reached.has(id))", "replace": "for (const id of ids) if (false && !reached.has(id))", "test": "tests/workflow.test.ts"},
   {"name": "workflow: the last edge must be unconditional", "file": "src/core/workflow.ts", "find": "if (edges.length > 0 && edges.at(-1)!.if)", "replace": "if (false)", "test": "tests/workflow.test.ts"},
