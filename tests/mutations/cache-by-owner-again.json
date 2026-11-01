@@ -1,0 +1,7 @@
+{
+  "name": "cache-by-owner-again",
+  "file": "src/github-app.ts",
+  "find": "this.tokens.get(key)",
+  "replace": "this.tokens.get(owner)",
+  "test": "tests/github-app-scope.test.ts"
+}

@@ -41,6 +41,9 @@ export interface AppOptions {
   apiUrl?: string;
 }
 
+// Repo-scoped tokens are held per owner/name; the owner-wide listing token is held under the owner.
+const tokenKey = (owner: string, repo: string) => (repo ? `${owner}/${repo.split("/")[1] ?? ""}` : owner);
+
 export class GitHubApp {
   private readonly key: KeyObject;
   private readonly doFetch: typeof fetch;
@@ -66,11 +69,12 @@ export class GitHubApp {
     this.owners = new Set(opts.owners.map((o) => o.toLowerCase()));
   }
 
-  private async call(path: string, auth: string, method = "GET"): Promise<Response> {
+  private async call(path: string, auth: string, method = "GET", json?: unknown): Promise<Response> {
     return this.doFetch(`${this.api}${path}`, {
       method,
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { accept: "application/vnd.github+json", authorization: `Bearer ${auth}` },
+      ...(json === undefined ? {} : { body: JSON.stringify(json) }),
     });
   }
 
@@ -81,16 +85,17 @@ export class GitHubApp {
 
   private jwt = () => appJwt(this.opts.appId, this.key, this.now());
 
-  // The installation token for a repo's owner, or null when the App is not installed there.
+  // A token for one repo, scoped to it, or null when the App is not installed on its owner.
   async tokenFor(repo: string): Promise<string | null> {
     const owner = repo.split("/")[0]!.toLowerCase();
     if (!this.owners.has(owner)) return null;
-    const held = this.tokens.get(owner);
+    const key = tokenKey(owner, repo);
+    const held = this.tokens.get(key);
     if (held && this.now() < held.expiresAt - TOKEN_MARGIN_MS) return held.token;
-    const pending = this.minting.get(owner);
+    const pending = this.minting.get(key);
     if (pending) return pending;
-    const p = this.mint(owner, repo).finally(() => this.minting.delete(owner));
-    this.minting.set(owner, p);
+    const p = this.mint(owner, repo).finally(() => this.minting.delete(key));
+    this.minting.set(key, p);
     return p;
   }
 
@@ -102,9 +107,11 @@ export class GitHubApp {
       this.installs.set(owner, id);
     }
     if (id === null) return null;
-    const res = await this.call(`/app/installations/${id}/access_tokens`, this.jwt(), "POST");
+    const name = repo.split("/")[1] ?? "";
+    const scope = name ? { repositories: [name] } : undefined;
+    const res = await this.call(`/app/installations/${id}/access_tokens`, this.jwt(), "POST", scope);
     const { token, expires_at } = await this.body<{ token: string; expires_at: string }>(res, "minting a token");
-    this.tokens.set(owner, { token, expiresAt: Date.parse(expires_at) });
+    this.tokens.set(tokenKey(owner, repo), { token, expiresAt: Date.parse(expires_at) });
     return token;
   }
 
