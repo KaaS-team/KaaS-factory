@@ -1,0 +1,1 @@
+{"name":"the check step runs a named-gates command without widening it for a template diff","file":"src/engine/steps.ts","find":"await scopeGateRun(step.run!, deps.git, worktree, config)","replace":"step.run!","test":"tests/gate-scope.test.ts"}

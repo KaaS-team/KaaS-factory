@@ -30,7 +30,7 @@ import {
 } from "../artifacts";
 import { isChecked } from "../recheck";
 import { rejectedNote, rejectLimit } from "../review-cap";
-import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
+import { hasNoGates, NO_GATES_COMMENT, runGates, scopeGateRun } from "../gates";
 import { runProof, type ProofResult } from "../proof";
 import { touchesProtectedPath } from "../boundary";
 import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
@@ -545,7 +545,7 @@ const check: StepType = {
     const name = step.runtime ?? config.runtime?.check;
     const runtime = name ? deps.runtimes?.[name] : (deps.setupRunner ?? new ShellSetupRunner());
     if (!runtime) throw new RuntimeMissing(`no runtime "${name}" on this machine`);
-    const out = await runtime.run(step.run!, worktree);
+    const out = await runtime.run(await scopeGateRun(step.run!, deps.git, worktree, config), worktree);
     if (out.code === 0) return { kind: "next", facts: { ok: true } };
     const tail = `${out.stdout}\n${out.stderr}`.trim().slice(-4000);
     await postComment(
