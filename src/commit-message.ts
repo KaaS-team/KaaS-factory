@@ -3,10 +3,37 @@
 
 export const CLAIM_MARKER = "Factory-Claim";
 
-// The why is the plan's goal, kept to a few sentences, followed by the closing line.
-export function withWhyAndCloses(subject: string, why: string, ref: string, extra = ""): string {
-  const body = why.trim() || "Built from the approved plan.";
-  return `${subject}\n\n${body}${extra ? `\n\n${extra}` : ""}\n\nCloses ${ref}`;
+export const WHY_SENTENCES = 3;
+
+// The first sentences of a text, at most `max`, so a long goal never fills a commit body.
+export function capSentences(text: string, max = WHY_SENTENCES): string {
+  const flat = text.trim().replace(/\s+/g, " ");
+  const sentences = flat.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g) ?? [flat];
+  return sentences.slice(0, max).join("").trim();
+}
+
+// The first paragraph under a "Problem" heading of a markdown text, if there is one.
+export function problemParagraph(markdown: string | undefined): string | undefined {
+  const m = /^#{1,6}\s*Problem\s*\n+([\s\S]*?)(?:\n\s*\n|\n#{1,6}\s|$)/im.exec(markdown ?? "");
+  const text = m?.[1]?.trim();
+  return text ? text : undefined;
+}
+
+// The why: the Problem paragraph when present, else the goal, capped at three sentences.
+export function whyOf(goal: string, problemText?: string): string {
+  return capSentences(problemParagraph(problemText) ?? goal);
+}
+
+// Only a branch's last commit closes the issue; the commits before it say Refs.
+export function withWhyAndCloses(
+  subject: string,
+  why: string,
+  ref: string,
+  extra = "",
+  keyword: "Closes" | "Refs" = "Closes",
+): string {
+  const body = capSentences(why) || "Built from the approved plan.";
+  return `${subject}\n\n${body}${extra ? `\n\n${extra}` : ""}\n\n${keyword} ${ref}`;
 }
 
 // The runner id stays in the body for tracing; the title says what happened in plain words.

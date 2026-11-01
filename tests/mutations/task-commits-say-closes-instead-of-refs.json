@@ -1,0 +1,1 @@
+{"name":"task commits say Closes instead of Refs","file":"src/engine/epic.ts","find":"keyword: \"Closes\" | \"Refs\" = \"Refs\",","replace":"keyword: \"Closes\" | \"Refs\" = \"Closes\",","test":"tests/commit-message.test.ts"}

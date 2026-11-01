@@ -1,7 +1,7 @@
 // Epic support: an issue whose body is a checklist of child issues ships as one PR. Pure helpers
 // (title, commit messages, task table, checklist) plus the two calls that touch a tracker.
 
-import { withWhyAndCloses } from "../commit-message";
+import { whyOf, withWhyAndCloses } from "../commit-message";
 import { cell } from "../acceptance";
 import type { Git } from "../git";
 import type { TrackerPort } from "../ports/scm";
@@ -83,10 +83,16 @@ export interface EpicTask {
   readonly files: readonly string[];
 }
 
-export function taskCommitMessage(task: EpicTask, goal: string, type: string, ref: string): string {
+export function taskCommitMessage(
+  task: EpicTask,
+  goal: string,
+  type: string,
+  ref: string,
+  keyword: "Closes" | "Refs" = "Refs",
+): string {
   const scope = scopeOf(task.files);
   const subject = clip(`${type}${scope ? `(${scope})` : ""}: `, lowerFirst(task.title), "");
-  return withWhyAndCloses(subject, goal, ref, `Task ${task.id} of ${ref}.`);
+  return withWhyAndCloses(subject, goal, ref, `Task ${task.id} of ${ref}.`, keyword);
 }
 
 export function issueCommitMessage(
@@ -118,7 +124,7 @@ export function renderTaskTable(
 type Committer = Pick<Git, "commitAll" | "commitPaths">;
 
 // One commit per task in plan order, so the history reads as the plan; a single task or a plan
-// without tasks stays one commit. A closing commitAll catches files no task named.
+// without tasks stays one commit. Earlier task commits say Refs; the last commit says Closes.
 export async function commitByTask(
   git: Committer,
   worktree: string,
@@ -129,16 +135,22 @@ export async function commitByTask(
     ref: string;
     title: string;
     files: readonly string[];
+    problem?: string;
   },
 ): Promise<void> {
-  const { tasks, goal, type, ref } = input;
+  const { tasks, type, ref } = input;
+  const goal = whyOf(input.goal, input.problem);
   const whole = issueCommitMessage(input.title, goal, input.files, type, ref);
   if (tasks.length < 2) {
     await git.commitAll(worktree, whole);
     return;
   }
-  for (const task of tasks) await git.commitPaths(worktree, task.files, taskCommitMessage(task, goal, type, ref));
-  await git.commitAll(worktree, whole);
+  // The last task's commit also sweeps up files no task named, and it alone closes the issue.
+  const last = tasks[tasks.length - 1]!;
+  for (const task of tasks.slice(0, -1)) {
+    await git.commitPaths(worktree, task.files, taskCommitMessage(task, goal, type, ref));
+  }
+  await git.commitAll(worktree, taskCommitMessage(last, goal, type, ref, "Closes"));
 }
 
 // After the epic's PR merges: close the children and tick the checklist. A failure is logged and never

@@ -72,7 +72,7 @@ describe("conventional titles and commits", () => {
   });
   test("a task commit names the task and carries no operator detail", () => {
     const msg = taskCommitMessage({ ...tasks[0]!, model: "haiku" } as never, "Ship epics", "feat", "#225");
-    expect(msg).toBe("feat(engine): add the epic module\n\nShip epics\n\nTask T1 of #225.\n\nCloses #225");
+    expect(msg).toBe("feat(engine): add the epic module\n\nShip epics\n\nTask T1 of #225.\n\nRefs #225");
     expect(msg).not.toMatch(/haiku|sonnet|opus|\$|claude\.ai/i);
   });
 });
@@ -109,11 +109,7 @@ describe("commitByTask", () => {
       ),
     };
     await commitByTask(git, "/w", { ...input, tasks });
-    expect(calls).toEqual([
-      "src/engine/epic.ts:feat(engine): add the epic module",
-      "src/git.ts+src/engine/steps.ts:feat(src): commit per task",
-      "all:feat(src): epic PRs (#225)",
-    ]);
+    expect(calls).toEqual(["src/engine/epic.ts:feat(engine): add the epic module", "all:feat(src): commit per task"]);
   });
   test("fewer than two tasks is one commit", async () => {
     const calls: string[] = [];
