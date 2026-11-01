@@ -47,6 +47,12 @@ The org level itself is not checked against marks. The org sets its own values.
 - Under the intersection rule, a team's `protected_paths` list can drop an entry the org listed unless
   the org sets `extend: true`. The code does this as written; this record does not claim otherwise.
 
+## Alternatives considered
+
+- Treat every ceiling rule as fixed. Rejected: the org then has no way to let one named approver
+  lower a rule for a single team.
+- Treat every ceiling rule as lowerable. Rejected: the org could not say that a rule must never move.
+
 ## Where in the code
 
 - `src/team/schema.ts`: `DENY_KINDS`, `DENY_RULES`, `denyProblems` (called from `teamProblems`).

@@ -46,6 +46,12 @@ and no base list exists to compare against.
   pushes to `main` that touch `tests/`, `src/`, the check script or the workflow, and nightly at
   03:17 UTC.
 
+## Alternatives considered
+
+- Keep one `tests/mutations.json`. Rejected: the list grew too large for one file.
+- Match an entry by position or free-form name only. Rejected: a drifted anchor would then guard
+  nothing without any check failing.
+
 ## Where in the code
 
 - `scripts/mutation-list.ts`: `mutationSlug`, `shardPath`, `loadMutations`, `shardText`.

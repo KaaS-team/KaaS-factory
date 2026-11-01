@@ -38,6 +38,12 @@ lists any criterion whose status is not `pass`, and any status outside `pass`, `
 - The criterion ids come from the plan, so a plan with no criteria skips this check entirely.
 - `applyPlanCriteria` changes the result to `uncertain` but does not reject the run.
 
+## Alternatives considered
+
+- Trust the criteria the verdict lists. Rejected: a verdict that drops a criterion would still pass.
+- Reject the run when a criterion is unmarked. Rejected: a person can read an `uncertain` run, and
+  the gap is recorded as a finding.
+
 ## Where in the code
 
 - `src/engine/verdict-rules.ts`: `applyPlanCriteria`, `settleVerdict`, `applyVerdictRules`.
