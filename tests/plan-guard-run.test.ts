@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { defaultWorkflow, workflowFor } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
-import { engine, removeEngineDirs } from "./engine-harness";
+import { engine, removeEngineDirs, plannedVerdict } from "./engine-harness";
 import { validBody } from "./plan-guard.test";
 
 afterAll(removeEngineDirs);
@@ -21,7 +21,7 @@ const run = async (body: string) => {
     {},
     {},
     { routeWorkflows: { "planned-to-pr": planned } },
-    { config: { agentCommands: COMMANDS } },
+    { config: { agentCommands: COMMANDS }, outputs: { verify: [plannedVerdict] } },
   );
   e.github.issues.get(1)!.body = body;
   return { e, outcome: await e.run() };
