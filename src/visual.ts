@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { checkHealth } from "./preview/health.js";
 import { type A11yElement, type A11yViolation, a11yViolations } from "./visual-a11y.js";
 
 export const UI_GLOBS: readonly RegExp[] = [
@@ -58,6 +59,7 @@ export async function uiFacts(
     current: string;
     approved?: readonly string[];
     elements?: readonly A11yElement[];
+    health?: { path: string; expectSha: string; head: string; fetch?: typeof fetch };
   },
 ): Promise<UiFacts> {
   if (!isUiChange(paths)) return { changed: false, preview: false, smoke: false, unreviewedDiffs: 0, qaSpec: false };
@@ -65,7 +67,7 @@ export async function uiFacts(
   return {
     changed: true,
     preview: url !== undefined,
-    smoke: url !== undefined && (await smoke(url)),
+    smoke: url !== undefined && (o.health ? (await checkHealth(url, o.health)).healthy : await smoke(url)),
     unreviewedDiffs: visualDiffs(o.baseline, o.current, o.approved).length,
     qaSpec: paths.some(isQaSpec),
     ...(o.elements ? { a11y: a11yViolations(o.elements) } : {}),
