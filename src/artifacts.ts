@@ -50,6 +50,8 @@ export interface PlanArtifact {
   readonly criteria?: readonly { readonly id: string; readonly text: string; readonly task?: string }[];
   readonly tasks?: readonly { readonly id: string; readonly title: string; readonly files: readonly string[] }[];
   readonly spec?: string;
+  // The planner flags a public API, schema or config-format change; the pr step then needs a docs/decisions record.
+  readonly boundaryChange?: boolean;
 }
 
 export interface BuildArtifact {
