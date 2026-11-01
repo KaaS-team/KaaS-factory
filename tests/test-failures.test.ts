@@ -74,4 +74,8 @@ describe("test failures summary", () => {
     expect(without.exitCode).toBe(0);
     expect(without.stdout.toString().includes("no junit report at")).toBe(true);
   });
+  test("make test names the failing tests when the run fails", () => {
+    const mk = readFileSync(join(import.meta.dir, "..", "Makefile"), "utf8");
+    expect(mk.includes("bun scripts/test-failures.ts reports/junit.xml")).toBe(true);
+  });
 });

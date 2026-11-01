@@ -1,0 +1,7 @@
+{
+  "name": "make test skips the failing test summary",
+  "file": "Makefile",
+  "find": "bun scripts/test-failures.ts reports/junit.xml || true; (exit $$c); }",
+  "replace": "(exit $$c); }",
+  "test": "tests/test-failures.test.ts"
+}
