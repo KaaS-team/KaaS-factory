@@ -13,6 +13,7 @@ import type { CommandResult, CommandRunner } from "./github";
 import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
 import { describeFindings, scanText } from "./secret-scan";
+import { heldRefusal } from "./hold";
 import { type SigningConfig, withSigning } from "./commit-signing";
 import { type Person, type SignoffMode, signoffTrailers, withTrailers } from "./signoff";
 
@@ -218,10 +219,9 @@ export class Git {
 
   // Generic (non-issue) counterpart to push, for `factory learn`'s branch.
   async pushBranch(worktreeDir: string, branch: string): Promise<CommandResult> {
-    // What the remote does not hold yet; a hit refuses the push.
-    const unpushed = await this.runner.run(["log", "-p", "--format=", "HEAD", "--not", "--remotes=origin"], {
-      cwd: worktreeDir,
-    });
+    const held = heldRefusal(worktreeDir);
+    if (held) return held;
+    const unpushed = await this.runner.run(["log", "-p", "--format=", "HEAD", "--not", "--remotes=origin"], { cwd: worktreeDir });
     const secrets = scanText(unpushed.stdout);
     if (secrets.length > 0) return { stdout: "", stderr: `refusing to push: ${describeFindings(secrets)}`, code: 1 };
     // --no-verify: the gate already ran in this runner; a pre-push hook would run it again (issue #160).
