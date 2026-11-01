@@ -1,0 +1,1 @@
+{"name":"agent37 account reason order","file":"src/adapters/agent37/execution.ts","find":"if (i.status === \"rejected\") throw i.reason;\n      if (b.status === \"rejected\") throw b.reason;","replace":"if (b.status === \"rejected\") throw b.reason;\n      if (i.status === \"rejected\") throw i.reason;","test":"tests/runtimes.test.ts"}
