@@ -1,0 +1,1 @@
+{"name":"a file outside the plan is not a deviation","file":"src/summary/plan-vs-reality.ts","find":"const extra = touched.filter((f) => !planned.has(f));","replace":"const extra: string[] = [];","test":"tests/summary-plan-vs-reality.test.ts"}
