@@ -1,0 +1,1 @@
+{"name":"a changelog step writes an entry twice for the same issue","file":"src/changelog.ts","find":"if (lines.slice(at + 1, end).some((l) => l.endsWith(marker))) return text;","replace":"if (false) return text;","test":"tests/changelog.test.ts"}

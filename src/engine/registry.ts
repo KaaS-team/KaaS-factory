@@ -7,6 +7,7 @@ import { callMcpTool } from "../mcp-call";
 import { ShellSetupRunner } from "../setup";
 import { finish, moveLabel, postComment } from "./common";
 import { importPlanStep } from "./import-plan-step";
+import { changelogStep } from "../changelog";
 import { qaStep } from "../qa-step";
 import { STEP_TYPES, type StepCtx, type StepResult, type StepType } from "./steps";
 
@@ -101,4 +102,5 @@ export const ALL_STEP_TYPES: Readonly<Record<string, StepType>> = {
   report,
   "import-plan": importPlanStep,
   qa: qaStep,
+  changelog: changelogStep,
 };
