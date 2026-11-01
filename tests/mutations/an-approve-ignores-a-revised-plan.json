@@ -1,0 +1,1 @@
+{"name":"an approve ignores a revised plan","file":"src/engine/approval-binding.ts","find":"asked.planDigest !== planDigest(current.plan)","replace":"false","test":"tests/approval-binding.test.ts"}

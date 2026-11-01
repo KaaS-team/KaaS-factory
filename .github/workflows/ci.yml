@@ -86,7 +86,7 @@ jobs:
 
       # Flags a flaky test from the last runs' reports; name it @quarantine and it moves to the job below.
       - uses: ctrf-io/github-test-reporter@93ff46b55aefe633bde6d13e61a7f533303233e6 # v1.3.2
-        if: always()
+        if: ${{ always() && hashFiles('reports/junit.xml') != '' }}
         with:
           report-path: reports/junit.xml
           integrations-config: '{"junit-to-ctrf": {"enabled": true, "action": "convert", "options": {"output": "reports/ctrf.json"}}}'

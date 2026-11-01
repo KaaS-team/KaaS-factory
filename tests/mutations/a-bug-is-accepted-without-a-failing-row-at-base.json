@@ -1,0 +1,1 @@
+{"name":"a bug is accepted without a failing row at base","file":"src/bug-repro.ts","find":"if (type !== \"bug\") return undefined;","replace":"if (type !== \"bug\" || true) return undefined;","test":"tests/bug-repro.test.ts"}

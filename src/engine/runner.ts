@@ -25,6 +25,7 @@ import {
 } from "./common";
 import { RuntimeMissing } from "./steps";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./registry";
+import { bindingFields } from "./approval-binding";
 import { emitEvent } from "./bus";
 import { readJournal } from "./journal";
 import { lateRoute } from "./late-route";
@@ -207,7 +208,12 @@ async function walk(
       if ("park" in edge) {
         await moveLabel(deps, config, issueNumber, from, LABEL.awaitingApproval);
         const token = crypto.randomUUID();
-        emitEvent(deps.bus, "factory.approval.requested", { ...base(), step: step.id, token }, subject);
+        emitEvent(
+          deps.bus,
+          "factory.approval.requested",
+          { ...base(), step: step.id, token, ...bindingFields(facts.plan, undefined, deps.now?.() ?? new Date()) },
+          subject,
+        );
         if (edge.after) {
           const at = new Date((deps.now?.() ?? new Date()).getTime() + edge.after).toISOString();
           await postComment(
