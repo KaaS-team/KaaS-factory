@@ -1,0 +1,1 @@
+{"name":"a failed check the selection skipped is not reported as a miss","file":"scripts/affected-misses.py","find":"return [f for f in failed if f not in reached]","replace":"return []","test":"tests/affected-misses.test.ts"}
