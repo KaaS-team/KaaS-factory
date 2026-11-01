@@ -318,9 +318,6 @@ rel = path[len(root) + 1 :] if path.startswith(root + "/") else path
 for g in HIDDEN:
     if fnmatch.fnmatch(rel.lower(), g.lower()) or rel.lower().startswith(hidden_root(g).lower() + "/") or rel.lower() == hidden_root(g).lower():
         block(f'guard-paths: blocked, "{rel}" holds the tests this change is graded by; no stage reads or edits them.')
-for g in HIDDEN:
-    if fnmatch.fnmatch(rel, g) or rel == hidden_root(g) or rel.startswith(hidden_root(g) + "/"):
-        block(f'guard-paths: blocked, "{rel}" holds the tests this change is graded by; no stage reads or edits them.')
 if tool_name in ("Read", "Grep", "Glob"):
     sys.exit(0)
 
