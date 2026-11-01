@@ -1,0 +1,1 @@
+{"name": "metrics evidence ignores missing config", "file": "src/metrics-get.ts", "find": "config && state.getSetting", "replace": "state.getSetting", "test": "tests/metrics-evidence.test.ts"}
