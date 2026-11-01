@@ -1,0 +1,1 @@
+{"name": "verdict: a proof that passes without the change passes", "file": "src/engine/verdict-rules.ts", "find": "if (facts.proof === \"passes-without\" && verdict.result === \"pass\")", "replace": "if (false)", "test": "tests/verdict-rules.test.ts"}

@@ -59,6 +59,12 @@ describe("rules", () => {
     expect(JSON.stringify(out.findings)).toContain("does not compile");
     expect(applyVerdictRules(v("pass"), { ...facts, proof: "bites" }).result).toBe("pass");
   });
+  test("a proof that passes without the change never passes", () => {
+    const out = applyVerdictRules(v("pass"), { ...facts, proof: "passes-without" });
+    expect(out.result).toBe("reject");
+    expect(JSON.stringify(out.findings)).toContain("still pass with the implementation reverted");
+    expect(applyVerdictRules(v("uncertain"), { ...facts, proof: "passes-without" }).result).toBe("uncertain");
+  });
   test("a should-only reject goes to a human; a must keeps it a reject", () => {
     expect(applyVerdictRules(v("reject", [should]), facts).result).toBe("uncertain");
     expect(applyVerdictRules(v("reject", [should, must]), facts).result).toBe("reject");
