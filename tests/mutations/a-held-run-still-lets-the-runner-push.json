@@ -1,0 +1,1 @@
+{"name":"a held run still lets the runner push","file":"src/hold.ts","find":"if (!isHeld(worktreeDir)) return undefined;","replace":"if (isHeld(worktreeDir)) return undefined;","test":"tests/hold.test.ts"}
