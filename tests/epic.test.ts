@@ -72,7 +72,7 @@ describe("conventional titles and commits", () => {
   });
   test("a task commit names the task and carries no operator detail", () => {
     const msg = taskCommitMessage({ ...tasks[0]!, model: "haiku" } as never, "Ship epics", "feat", "#225");
-    expect(msg).toBe("feat(engine): add the epic module\n\nShip epics\n\nTask T1 of #225.");
+    expect(msg).toBe("feat(engine): add the epic module\n\nShip epics\n\nTask T1 of #225.\n\nCloses #225");
     expect(msg).not.toMatch(/haiku|sonnet|opus|\$|claude\.ai/i);
   });
 });

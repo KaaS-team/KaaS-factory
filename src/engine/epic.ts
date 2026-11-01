@@ -1,6 +1,7 @@
 // Epic support: an issue whose body is a checklist of child issues ships as one PR. Pure helpers
 // (title, commit messages, task table, checklist) plus the two calls that touch a tracker.
 
+import { withWhyAndCloses } from "../commit-message";
 import { cell } from "../acceptance";
 import type { Git } from "../git";
 import type { TrackerPort } from "../ports/scm";
@@ -85,7 +86,7 @@ export interface EpicTask {
 export function taskCommitMessage(task: EpicTask, goal: string, type: string, ref: string): string {
   const scope = scopeOf(task.files);
   const subject = clip(`${type}${scope ? `(${scope})` : ""}: `, lowerFirst(task.title), "");
-  return `${subject}\n\n${goal.trim()}\n\nTask ${task.id} of ${ref}.`;
+  return withWhyAndCloses(subject, goal, ref, `Task ${task.id} of ${ref}.`);
 }
 
 export function issueCommitMessage(
@@ -95,7 +96,7 @@ export function issueCommitMessage(
   type: string,
   ref: string,
 ): string {
-  return `${conventionalTitle(type, scopeOf(files), title, ref)}\n\n${goal.trim()}`;
+  return withWhyAndCloses(conventionalTitle(type, scopeOf(files), title, ref), goal, ref);
 }
 
 export function renderTaskTable(
