@@ -1,0 +1,1 @@
+{"name":"the customer view carries the operator block","file":"src/extension/result.ts","find":"customer: { status, summary, findings },","replace":"customer: { status, summary, findings, operator: o.operator },","test":"tests/extension-result.test.ts"}
