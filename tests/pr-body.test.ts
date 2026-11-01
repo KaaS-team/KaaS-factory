@@ -170,6 +170,7 @@ describe("the run-details comment", () => {
   });
 
   test("the posted receipt drops model and spend, built from a real worktree", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const repo = mkdtempSync(join(tmpdir(), "factory-run-details-"));
     const sh = (cmd: string) =>
       Bun.spawnSync(["sh", "-c", cmd], { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
