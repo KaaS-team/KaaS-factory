@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Read|Bash|Agent. Refuses writes to
+# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Read|Bash|Agent|Grep|Glob. Refuses writes to
 # protected paths (.factory/config.json's protectedPaths, plus .claude/**, .agents/** and
 # .factory/** always), merges and force-pushes, and inside a factory stage the
 # shell shapes the stage's permission mode refuses, naming the fix, and a
@@ -209,7 +209,7 @@ def hidden_root(glob):
 
 
 def names_hidden(command):
-    return [g for g in HIDDEN if re.search(r"(?<![\w.-])" + re.escape(hidden_root(g)) + r"(?![\w-])", command)]
+    return [g for g in HIDDEN if re.search(r"(?<![\w.-])" + re.escape(hidden_root(g)) + r"(?![\w-])", command, re.I)]
 
 
 def git_rm_problem(command):
@@ -274,10 +274,19 @@ if tool_name == "Agent":
               "and wait for its answer: a stage must not end its turn before the result is in.")
     sys.exit(0)
 
-if tool_name not in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Read"):
+if tool_name not in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Read") + ("Grep", "Glob"):
     sys.exit(0)
-if tool_name == "Read" and not HIDDEN:
+if tool_name in ("Read", "Grep", "Glob") and not HIDDEN:
     sys.exit(0)
+
+# Grep and Glob read like Read: their pattern and glob text may name a hidden root too.
+if tool_name in ("Grep", "Glob"):
+    for key in ("pattern", "glob"):
+        text = tool_input.get(key, "")
+        if not isinstance(text, str):
+            block(f"guard-paths: blocked, the {key} is not a string (fails closed)")
+        if names_hidden(text):
+            block(f"guard-paths: blocked, the {key} names {hidden_root(names_hidden(text)[0])}, which holds the tests this change is graded by; no stage reads them.")
 
 path = tool_input.get("file_path") or tool_input.get("notebook_path") or tool_input.get("path") or ""
 if not isinstance(path, str) or not isinstance(hook_input.get("cwd") or "", str):
@@ -305,10 +314,11 @@ root = max(inside, key=len) if inside else roots[0]
 
 rel = path[len(root) + 1 :] if path.startswith(root + "/") else path
 
+# macOS ignores case: HoldOut/x is holdout/x.
 for g in HIDDEN:
-    if fnmatch.fnmatch(rel, g) or rel == hidden_root(g) or rel.startswith(hidden_root(g) + "/"):
+    if fnmatch.fnmatch(rel.lower(), g.lower()) or rel.lower().startswith(hidden_root(g).lower() + "/") or rel.lower() == hidden_root(g).lower():
         block(f'guard-paths: blocked, "{rel}" holds the tests this change is graded by; no stage reads or edits them.')
-if tool_name == "Read":
+if tool_name in ("Read", "Grep", "Glob"):
     sys.exit(0)
 
 if rel.startswith(".factory/runs/"):
@@ -327,8 +337,13 @@ if os.path.lexists(config_path):
 
 globs += [".claude/**", ".agents/**", ".factory/**"]
 
+# macOS ignores case, so `.Claude/x` is `.claude/x`: compare lowercased, and refuse anything
+# under the three always-protected roots by name, whatever the globs say.
+if rel.lower().split("/")[0] in (".claude", ".agents", ".factory"):
+    block(f'guard-paths: "{rel}" is under a protected root (compared without case) — this needs a human, not a stage edit')
+
 for g in globs:
-    if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(path, g):
+    if fnmatch.fnmatch(rel.lower(), g.lower()) or fnmatch.fnmatch(path.lower(), g.lower()):
         block(f'guard-paths: "{rel}" matches protected path "{g}" — this needs a human, not a stage edit')
 
 sys.exit(0)

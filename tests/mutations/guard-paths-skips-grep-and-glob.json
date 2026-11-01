@@ -1,0 +1,1 @@
+{"name":"guard paths skips grep and glob","file":"template/.claude/hooks/guard-paths.sh","find":"if tool_name in (\"Grep\", \"Glob\"):\n    for key","replace":"if tool_name in (\"GrepX\", \"GlobX\"):\n    for key","test":"tests/init-guard.test.ts"}
