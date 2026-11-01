@@ -5,6 +5,7 @@ import { COMMENT_FILENAMES, JSON_FILENAMES, runDir } from "./artifacts";
 import { isHumanComment, parseChatOps } from "./chatops";
 import { latestDataFor, parseDataMarkers } from "./derive";
 import type { GhComment, GhIssue } from "./github";
+import { reviseScope, scopePrompt } from "./revise-scope";
 
 export interface Revision {
   previousRun: string;
@@ -86,5 +87,8 @@ export async function writeRevision(
   const revision = buildRevision(worktree, issue, comment, feedback);
   const inputs = Object.fromEntries(Object.keys(revision.artifacts).map((alias) => [alias, `${dir}/${alias}`]));
   await Bun.write(`${dir}/revise.md`, feedback);
-  await Bun.write(`${dir}/revision.md`, revisionPrompt(revision, inputs).trimStart());
+  await Bun.write(
+    `${dir}/revision.md`,
+    (revisionPrompt(revision, inputs) + scopePrompt(reviseScope(issue.comments))).trimStart(),
+  );
 }
