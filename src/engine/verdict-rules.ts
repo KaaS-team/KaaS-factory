@@ -44,8 +44,19 @@ export function verdictPost(
   if (!verdict?.result) return comment;
   const body = withVerdictHeading(comment, verdictHeading(verdict.result, round, limit));
   const runner = verdict.findings.filter(isRunner);
-  if (runner.length === 0) return body;
-  return `${body.trimEnd()}\n\n### Runner findings\n${runner.map((f) => `- ${f.what}`).join("\n")}\n`;
+  const table = criteriaTable(verdict.criteria);
+  const withTable = table ? `${body.trimEnd()}\n\n${table}\n` : body;
+  if (runner.length === 0) return withTable;
+  return `${withTable.trimEnd()}\n\n### Runner findings\n${runner.map((f) => `- ${f.what}`).join("\n")}\n`;
+}
+
+const STATUS_WORD = { pass: "met", fail: "not met", unverified: "unverified" } as const;
+
+// Every requirement ID the verdict carries, with its status, so none is lost in free text.
+export function criteriaTable(criteria: VerdictArtifact["criteria"]): string {
+  if (!criteria?.length) return "";
+  const rows = criteria.map((c) => `| ${c.id} | ${STATUS_WORD[c.status]} | ${c.gap ?? ""} |`);
+  return `### Requirement IDs\n\n| ID | Status | Gap |\n| --- | --- | --- |\n${rows.join("\n")}`;
 }
 
 const runnerFinding = (what: string): Finding => ({ severity: "must", confidence: 5, what, where: "runner" });
@@ -112,11 +123,17 @@ export function applyPlanCriteria(
 ): VerdictArtifact {
   if (verdict.result !== "pass" || !planned?.length) return verdict;
   const said = new Map((verdict.criteria ?? []).map((c) => [c.id, c.status]));
+  const known = new Set(planned.map((c) => c.id));
+  const unmatched = [...said.keys()].filter((id) => !known.has(id));
   const open = planned.map((c) => c.id).filter((id) => said.get(id) !== "pass");
-  if (!open.length) return verdict;
+  if (!open.length && !unmatched.length) return verdict;
   const gap = "the verdict does not mark it met";
   const added = open.filter((id) => !said.has(id)).map((id) => ({ id, status: "unverified" as const, gap }));
-  const what = `Plan criteria not marked met: ${open.join(", ")}`;
+  const parts = [
+    open.length ? `Plan criteria not marked met: ${open.join(", ")}` : "",
+    unmatched.length ? `Verdict names IDs the plan does not have: ${unmatched.join(", ")}` : "",
+  ];
+  const what = parts.filter(Boolean).join(". ");
   return {
     ...verdict,
     result: "uncertain",

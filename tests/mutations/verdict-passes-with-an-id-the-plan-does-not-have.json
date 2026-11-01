@@ -1,0 +1,1 @@
+{"name":"verdict passes with an id the plan does not have","file":"src/engine/verdict-rules.ts","find":"if (!open.length && !unmatched.length) return verdict;","replace":"if (!open.length) return verdict;","test":"tests/verdict-criteria.test.ts"}
