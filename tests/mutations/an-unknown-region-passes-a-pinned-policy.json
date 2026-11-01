@@ -1,0 +1,1 @@
+{"name":"an unknown region passes a pinned policy","file":"src/residency.ts","find":"if (region === undefined) return { ok: false, reason: `${host} names no region, so ${policy} cannot be shown` };","replace":"if (region === undefined) return { ok: true, region: \"\" };","test":"tests/residency.test.ts"}
