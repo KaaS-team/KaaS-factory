@@ -1,0 +1,1 @@
+{"name":"tmpdir recreated","file":"tests/engine-harness.ts","find":"  mkdirSync(tmpdir(), { recursive: true });\n  const workspacesDir","replace":"  const workspacesDir","test":"tests/tmpdir-recreated.test.ts"}

@@ -52,7 +52,9 @@ export function engine(
   extra: Partial<WatchDeps> = {},
   opts: EngineOpts = {},
 ) {
+  mkdirSync(tmpdir(), { recursive: true });
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
+  mkdirSync(tmpdir(), { recursive: true });
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   dirs.push(workspacesDir, cloneDir);
   for (const [name, content] of Object.entries(base)) {
