@@ -1,0 +1,1 @@
+{"name":"independent review allows a shared session","file":"src/review-independence.ts","find":"const shared = required ? sharedSessions(runs) : [];","replace":"const shared: string[] = [];","test":"tests/review-independence.test.ts"}
