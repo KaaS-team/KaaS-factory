@@ -1,0 +1,1 @@
+{"name":"a changelog step is not registered as a workflow step","file":"src/engine/registry.ts","find":"  changelog: changelogStep,\n","replace":"","test":"tests/changelog.test.ts"}
