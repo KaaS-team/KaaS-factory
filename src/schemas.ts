@@ -126,29 +126,36 @@ export function replySchema(stage: ArtifactStage, types: readonly string[] = TYP
 // Checks a parsed artifact against its own schema: required fields, types and
 // enums. A step that reports blocked or failed owes only its outcome, so the
 // required list is skipped for it.
+export function schemaProblems(
+  stage: ArtifactStage,
+  o: Record<string, unknown>,
+  types: readonly string[] = TYPE_LABELS,
+): string[] {
+  const schema = stageSchema(stage, types) as { properties: Record<string, Prop>; required: readonly string[] };
+  const out: string[] = [];
+  if (o.outcome !== "blocked" && o.outcome !== "failed")
+    for (const k of schema.required) if (o[k] === undefined) out.push(`"${k}" is required`);
+  for (const [k, prop] of Object.entries(schema.properties)) {
+    if (o[k] !== undefined && !fits(prop, o[k])) out.push(`"${k}" has the wrong type or value`);
+  }
+  const combos = COMBINATIONS[stage];
+  for (const [k, needs] of Object.entries(combos?.needs ?? {})) {
+    const missing = o[k] === undefined ? undefined : needs.find((n) => o[n] === undefined);
+    if (missing) out.push(`"${k}" needs "${missing}"`);
+  }
+  for (const fields of combos?.apart ?? []) {
+    if (fields.every((k) => o[k] !== undefined))
+      out.push(`${fields.map((k) => `"${k}"`).join(" and ")} cannot appear together`);
+  }
+  return out;
+}
+
 export function schemaProblem(
   stage: ArtifactStage,
   o: Record<string, unknown>,
   types: readonly string[] = TYPE_LABELS,
 ): string | undefined {
-  const schema = stageSchema(stage, types) as { properties: Record<string, Prop>; required: readonly string[] };
-  if (o.outcome !== "blocked" && o.outcome !== "failed") {
-    const missing = schema.required.find((k) => o[k] === undefined);
-    if (missing) return `"${missing}" is required`;
-  }
-  for (const [k, prop] of Object.entries(schema.properties)) {
-    if (o[k] !== undefined && !fits(prop, o[k])) return `"${k}" has the wrong type or value`;
-  }
-  const combos = COMBINATIONS[stage];
-  for (const [k, needs] of Object.entries(combos?.needs ?? {})) {
-    const missing = o[k] === undefined ? undefined : needs.find((n) => o[n] === undefined);
-    if (missing) return `"${k}" needs "${missing}"`;
-  }
-  for (const fields of combos?.apart ?? []) {
-    if (fields.every((k) => o[k] !== undefined))
-      return `${fields.map((k) => `"${k}"`).join(" and ")} cannot appear together`;
-  }
-  return undefined;
+  return schemaProblems(stage, o, types)[0];
 }
 
 // Exported for src/api/: checks a value against one JSON Schema node (type, enum, anyOf, items).

@@ -1,0 +1,1 @@
+{"name":"a stage retry prompt lists only the first problem","file":"src/engine/stage-retry.ts","find":"${problems.map((p) => `- ${p}`).join(\"\\n\")}","replace":"- ${problems[0]}","test":"tests/stage-retry.test.ts"}
