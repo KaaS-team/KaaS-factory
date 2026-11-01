@@ -6,7 +6,8 @@ const GATE_FILE = /^(GNUmakefile|[Mm]akefile|justfile|Justfile|Taskfile\.ya?ml)$
 
 // A build file at any depth that only runs the tests, never the code they cover.
 export function isGateFile(path: string): boolean {
-  return GATE_FILE.test(path.split("/").pop() ?? "");
+  const name = path.split("/").pop() ?? "";
+  return GATE_FILE.test(name) || name.endsWith(".mk");
 }
 
 // Output of a runner that found nothing to run: bun, jest, vitest, pytest, go, make, rspec.

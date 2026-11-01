@@ -1,8 +1,7 @@
-// The built-in step types a workflow's `uses:` names. Each handler is one
-// stage of what used to be watch.ts's driveFromStage, unchanged in what it
-// checks and posts. It returns "next" (the engine follows the step's edges
-// and moves the label), "reject" (the engine follows `reject:`), or "stop"
-// once it has parked or finished the issue itself, from `step.label`.
+// The built-in step types a workflow's `uses:` names. Each handler is one stage of what used to be
+// watch.ts's driveFromStage, unchanged in what it checks and posts. It returns "next" (the engine follows
+// the step's edges and moves the label), "reject" (it follows `reject:`), or "stop" once it has parked
+// or finished the issue itself, from `step.label`.
 
 import { readRunJson, settleVerdict, verdictPost } from "./verdict-rules";
 import { prPreflight } from "./pr-preflight";
@@ -31,7 +30,7 @@ import {
 } from "../artifacts";
 import { isChecked } from "../recheck";
 import { rejectedNote, rejectLimit } from "../review-cap";
-import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
+import { hasNoGates, NO_GATES_COMMENT, runGates, scopeGateRun } from "../gates";
 import { runProof, type ProofResult } from "../proof";
 import { touchesProtectedPath } from "../boundary";
 import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
@@ -57,6 +56,7 @@ import {
 import { issueRef, postRunDetails, prBody, prExtras, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { failPush, failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
+import { parkLowConfidence } from "../triage-confidence";
 import { runStageChecked } from "./stage-retry";
 import { checkedPlan } from "./plan-critic";
 import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
@@ -149,7 +149,7 @@ const triage: StepType = {
       return stop("needs-human");
     }
     if (json.disposition === "needs-info") return askOrHandOver(sc, art.question);
-    return { kind: "next", facts: json };
+    return (await parkLowConfidence(sc, json, art.question)) ?? { kind: "next", facts: json };
   },
 };
 
@@ -545,7 +545,7 @@ const check: StepType = {
     const name = step.runtime ?? config.runtime?.check;
     const runtime = name ? deps.runtimes?.[name] : (deps.setupRunner ?? new ShellSetupRunner());
     if (!runtime) throw new RuntimeMissing(`no runtime "${name}" on this machine`);
-    const out = await runtime.run(step.run!, worktree);
+    const out = await runtime.run(await scopeGateRun(step.run!, deps.git, worktree, config), worktree);
     if (out.code === 0) return { kind: "next", facts: { ok: true } };
     const tail = `${out.stdout}\n${out.stderr}`.trim().slice(-4000);
     await postComment(

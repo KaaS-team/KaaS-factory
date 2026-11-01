@@ -2,9 +2,12 @@
 // the runner that starts the app is injected, so tests never start one. Off unless FACTORY_QA=1.
 import { finish, moveLabel, postComment } from "./engine/common";
 import type { StepCtx, StepResult, StepType } from "./engine/steps";
+import { runDir } from "./artifacts";
 import { LABEL } from "./labels";
 import { readQa } from "./qa";
 import { ShellSetupRunner } from "./setup";
+import { compareShotDirs } from "./visual-compare";
+import { join } from "node:path";
 
 export interface QaCriterion {
   readonly id: string;
@@ -97,8 +100,14 @@ export const qaStep: StepType = {
       outcome = { ran: true, ok: false };
       error = e instanceof Error ? e.message : String(e);
     }
+    // The tolerant screenshot report rides in the same comment; it informs, the route verdict decides.
+    const visual = compareShotDirs(
+      join(worktree, ".factory/visual/baseline"),
+      join(worktree, runDir(issue.number), "visual"),
+    );
     if (outcome.ok) {
-      await postComment(deps, config, issue.number, outcome.section ?? "", { stage: step.id, json: { ok: true } });
+      const body = visual ? `${outcome.section ?? ""}\n\n${visual.section}` : (outcome.section ?? "");
+      await postComment(deps, config, issue.number, body, { stage: step.id, json: { ok: true } });
       return { kind: "next", facts: { ok: true } };
     }
     const body = outcome.section ?? `Step \`${step.id}\` failed: ${error ?? "no route was visited"}.`;

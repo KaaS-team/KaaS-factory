@@ -9,7 +9,8 @@ import { join } from "node:path";
 import type { ExecutionPort } from "./ports/execution";
 import type { GateResult, GateRunner } from "./ports/check";
 import { LocalExecution } from "./adapters/local/execution";
-import { gateCount } from "./config";
+import { type FactoryConfig, type GateSpec, gateCount, testGate } from "./config";
+import type { Git } from "./git";
 import { worktreePort } from "./port";
 export type { GateResult, GateRunner };
 
@@ -86,3 +87,33 @@ export function hasNoGates(worktreeDir: string): boolean {
 export const NO_GATES_COMMENT = `This repo has no gates in \`.factory/config.json\`, so no build here can be checked, and the factory parked this issue instead of building it.
 
 Add a gate: run \`factory init\` to detect the stack and write them, or add one by hand. A docs-only repo can ship with one lint or link-check gate. Then move this issue back to \`factory:ready\`.`;
+
+// A workflow stage's `gates: [names]` runs only those gates (it becomes `FACTORY_GATES_ONLY=a,b`).
+// A build that edits template/** can break a test in another file (#497), so such a diff adds the test
+// gate, which runs the whole suite, to the list.
+const ONLY = "FACTORY_GATES_ONLY=";
+
+export function touchesTemplate(changed: readonly string[]): boolean {
+  return changed.some((f) => f.startsWith("template/"));
+}
+
+// The gate names to run: `names`, plus the test gate when the diff touches template/**.
+export function gateList(names: readonly string[], changed: readonly string[], gates: readonly GateSpec[]): string[] {
+  const test = testGate(gates)?.name;
+  return touchesTemplate(changed) && test !== undefined && !names.includes(test) ? [...names, test] : [...names];
+}
+
+// A check step's command, with the test gate added to a named-gates run when the diff needs it. Any
+// other command comes back as it was, and the diff is read only for a named-gates run.
+export async function scopeGateRun(
+  run: string,
+  git: Pick<Git, "changedFiles">,
+  worktree: string,
+  config: Pick<FactoryConfig, "base" | "gates">,
+): Promise<string> {
+  if (!run.startsWith(ONLY)) return run;
+  const space = run.indexOf(" ");
+  const names = run.slice(ONLY.length, space < 0 ? run.length : space).split(",");
+  const list = gateList(names, await git.changedFiles(worktree, config.base), config.gates);
+  return `${ONLY}${list.join(",")}${space < 0 ? "" : run.slice(space)}`;
+}

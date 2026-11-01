@@ -44,6 +44,8 @@ export interface Step {
   readonly tool?: string;
   readonly with?: Readonly<Record<string, unknown>>;
   readonly env?: readonly string[];
+  // A lite-lane change skips this step (src/engine/lane.ts); a full-lane change runs it.
+  readonly optional?: boolean;
 }
 
 // `on: cron:` files an issue labelled factory:ready on a schedule, which the

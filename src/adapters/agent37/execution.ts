@@ -187,7 +187,12 @@ export class Agent37Execution implements ExecutionPort {
       return (await res.json()) as Record<string, unknown>;
     };
     try {
-      const [instance, billing] = await Promise.all([get(`/v1/instances/${inst}`), get("/v1/billing")]);
+      // Both are awaited so the reason never depends on which 401 lands first: the instance one wins.
+      const [i, b] = await Promise.allSettled([get(`/v1/instances/${inst}`), get("/v1/billing")]);
+      if (i.status === "rejected") throw i.reason;
+      if (b.status === "rejected") throw b.reason;
+      const instance = i.value;
+      const billing = b.value;
       if (typeof instance.status !== "string" || typeof billing.balance !== "number")
         return { reason: "unexpected answer shape" };
       return { status: instance.status, balance: billing.balance };

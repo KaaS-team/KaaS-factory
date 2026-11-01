@@ -1,0 +1,1 @@
+{"name":"gate file mk","file":"src/proof-keep.ts","find":" || name.endsWith(\".mk\")","replace":"","test":"tests/proof-keep.test.ts"}
