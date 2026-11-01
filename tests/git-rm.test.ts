@@ -21,7 +21,7 @@ describe("build allow-list for git rm (#52)", () => {
 describe("gitRmProblem", () => {
   test("accepts named files inside the worktree", () => {
     expect(gitRmProblem("git rm apps/a/src/inbound.ts apps/b/src/inbound.ts", ROOT, PROTECTED)).toEqual(undefined);
-    expect(gitRmProblem("git rm -r -- old/dir", ROOT, PROTECTED)).toEqual(undefined);
+    expect(gitRmProblem("git rm -f -- old/file.ts", ROOT, PROTECTED)).toEqual(undefined);
   });
 
   test("refuses paths outside the worktree", () => {
@@ -34,8 +34,10 @@ describe("gitRmProblem", () => {
     expect(gitRmProblem("git rm src/payments/charge.ts", ROOT, PROTECTED)).toBe(
       "src/payments/charge.ts is a protected path",
     );
-    expect(gitRmProblem("git rm -r .claude", ROOT, PROTECTED)).toBe(".claude is a protected path");
-    expect(gitRmProblem("git rm -r src", ROOT, PROTECTED)).toBe("src is a protected path");
+    expect(gitRmProblem("git rm -r .claude", ROOT, PROTECTED)).toBe("flag -r is not allowed");
+    expect(gitRmProblem("git rm :(top)src/payments/charge.ts", ROOT, PROTECTED)).toBe(
+      ":(top)src/payments/charge.ts is a pattern, name each file",
+    );
     expect(gitRmProblem("git rm src/x/../payments/charge.ts", ROOT, PROTECTED)).toBe(
       "src/x/../payments/charge.ts is a protected path",
     );
@@ -74,6 +76,6 @@ describe("guard-paths.sh on git rm", () => {
     expect(await run("git rm src/payments/charge.ts", dir)).toBe(2);
     expect(await run("git rm src/*.ts", dir)).toBe(2);
     expect(await run("git rm -r .claude", dir)).toBe(2);
-    expect(await run("git rm -r src", dir)).toBe(2);
+    expect(await run("git rm :(top)src/payments/charge.ts", dir)).toBe(2);
   });
 });
