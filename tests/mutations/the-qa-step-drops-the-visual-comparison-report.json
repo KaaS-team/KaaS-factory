@@ -1,0 +1,1 @@
+{"name":"the qa step drops the visual comparison report","file":"src/qa-step.ts","find":"const body = visual ? `${outcome.section ?? \"\"}\\n\\n${visual.section}` : (outcome.section ?? \"\");","replace":"const body = outcome.section ?? \"\";","test":"tests/visual-compare.test.ts"}
