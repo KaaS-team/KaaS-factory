@@ -1,0 +1,7 @@
+{
+  "name": "a plain http url is accepted",
+  "file": "src/extension/manifest.ts",
+  "find": "const secure = u.protocol === \"https:\" || (u.protocol === \"http:\" && LOOPBACK.includes(u.hostname));",
+  "replace": "const secure = true;",
+  "test": "tests/extension-manifest.test.ts"
+}

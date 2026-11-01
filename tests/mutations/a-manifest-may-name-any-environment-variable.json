@@ -1,0 +1,7 @@
+{
+  "name": "a manifest may name any environment variable",
+  "file": "src/extension/manifest.ts",
+  "find": "export const EXT_VAR = /^FACTORY_EXT_\\w+$/;",
+  "replace": "export const EXT_VAR = /^\\w+$/;",
+  "test": "tests/extension-manifest.test.ts"
+}
