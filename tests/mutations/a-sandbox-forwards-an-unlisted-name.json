@@ -1,0 +1,1 @@
+{"name":"a sandbox forwards an unlisted name","file":"src/sandbox-env.ts","find":"for (const name of names) {","replace":"for (const name of Object.keys(env)) {","test":"tests/sandbox-env.test.ts"}

@@ -33,6 +33,7 @@ import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 import { portEnv } from "../port";
+import { forwardSettings } from "../sandbox-env";
 import { guestGit } from "../adapters/microsandbox/execution";
 import { type AgentSandbox, forGateway, removeSandbox, sandboxArgv } from "./agent-sandbox";
 
@@ -281,11 +282,10 @@ export class CommandExecutor implements Executor {
     const via = key && this.gateway ? agent.preset?.gateway : undefined;
     const gatewayUrl = via ? { [via.baseUrl]: `${this.gateway!.url.replace(/\/$/, "")}${via.path ?? ""}` } : {};
     const vm = via && this.vm ? forGateway(this.vm) : this.vm;
-    // In a VM the guest gets only stageEnv; msb reads the keys it injects from its own env.
     const vmName = vm && `factory-${opts.stage}-${opts.issue}-${crypto.randomUUID()}`;
     if (vm && stdin !== undefined) writeFileSync(join(scratch, "stdin"), stdin);
     const guestEnv = vm
-      ? { ...stageEnv, ...gatewayUrl, ...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? []) }
+      ? { ...forwardSettings(stageEnv), ...gatewayUrl, ...guestGit(opts.cwd, scratch, opts.hiddenPaths ?? []) }
       : stageEnv;
     const proc = Bun.spawn(
       vm && vmName
