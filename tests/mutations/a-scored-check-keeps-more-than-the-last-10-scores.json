@@ -1,0 +1,1 @@
+{"name":"a scored check keeps more than the last 10 scores","file":"src/scored-checks.ts","find":"const scores = [...(history[key]?.scores ?? []), score].slice(-HISTORY_LIMIT);","replace":"const scores = [...(history[key]?.scores ?? []), score];","test":"tests/scored-checks.test.ts"}
