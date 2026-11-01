@@ -1,0 +1,1 @@
+{"name":"a-lane: the runner does not count the build's changed lines","file":"src/engine/runner.ts","find":"const changedLines = stat.reduce((n, f) => n + f.additions + f.deletions, 0);","replace":"const changedLines = 0;","test":"tests/lane.test.ts"}
