@@ -24,7 +24,9 @@ export function reviseScope(comments: readonly GhComment[]): ReviseScope | undef
     | undefined;
   const sha = verdict?.reviewedSha;
   if (typeof sha !== "string" || !SHA_RE.test(sha)) return undefined;
-  const findings = Array.isArray(verdict?.findings) ? verdict.findings.map(findingText).filter((t) => t !== undefined) : [];
+  const findings = Array.isArray(verdict?.findings)
+    ? verdict.findings.map(findingText).filter((t) => t !== undefined)
+    : [];
   return { sha, findings };
 }
 

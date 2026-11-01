@@ -87,5 +87,8 @@ export async function writeRevision(
   const revision = buildRevision(worktree, issue, comment, feedback);
   const inputs = Object.fromEntries(Object.keys(revision.artifacts).map((alias) => [alias, `${dir}/${alias}`]));
   await Bun.write(`${dir}/revise.md`, feedback);
-  await Bun.write(`${dir}/revision.md`, (revisionPrompt(revision, inputs) + scopePrompt(reviseScope(issue.comments))).trimStart());
+  await Bun.write(
+    `${dir}/revision.md`,
+    (revisionPrompt(revision, inputs) + scopePrompt(reviseScope(issue.comments))).trimStart(),
+  );
 }
