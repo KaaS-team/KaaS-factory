@@ -1,0 +1,1 @@
+{"name":"a-boundary: protected paths compare without case","file":"src/boundary.ts","find":"new Bun.Glob(pattern.toLowerCase()).match(file.toLowerCase())","replace":"new Bun.Glob(pattern).match(file)","test":"tests/boundary-scaffold.test.ts"}
