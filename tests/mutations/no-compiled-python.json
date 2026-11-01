@@ -1,0 +1,1 @@
+{"name":"no-compiled-python","file":"tests/no-compiled-python.test.ts","find":"p.endsWith(\".pyc\") || ","replace":"","test":"tests/no-compiled-python.test.ts"}
