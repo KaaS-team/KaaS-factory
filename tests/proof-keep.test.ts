@@ -83,4 +83,11 @@ describe("proof keeps the gate", () => {
     expect(ranZeroTests("make: *** No rule to make target 'test'.  Stop.")).toBe(true);
     expect(ranZeroTests("3 pass\n0 fail")).toBe(false);
   });
+  test("one gate passing does not hide another that found nothing to run", () => {
+    expect(ranZeroTests("12 pass\n0 fail\nmake: *** No rule to make target 'test'.  Stop.")).toBe(true);
+  });
+  test("a lone failing test is a real result, not an empty run", () => {
+    expect(ranZeroTests(" 0 pass\n 1 fail\nRan 1 test across 1 file.")).toBe(false);
+    expect(ranZeroTests(" 0 pass\n 0 fail\nRan 0 tests across 0 files.")).toBe(true);
+  });
 });

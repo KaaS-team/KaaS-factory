@@ -277,3 +277,15 @@ test("factory-plan dispatches factory-plan-critic once, a read-only Sonnet agent
   for (const item of ["traces to the issue", "release-age cooldown", "Changes a repo gate needs"])
     expect(agent).toContain(item);
 });
+
+describe("the plan template the planner copies", () => {
+  test("filled in, it still carries the lines the critic and the verifier parse", () => {
+    const tpl = readFileSync("template/.claude/skills/factory-comment/assets/plan.md", "utf8");
+    const filled = tpl
+      .replace(/\{\{#each ac\}\}[\s\S]*?\{\{\/each\}\}/, "- **AC-1:** It works, checked by `make check`\n")
+      .replace(/\{\{#each tests\}\}[\s\S]*?\{\{\/each\}\}/, "- `works test`\n");
+    expect(planMustFix(filled, {}, ALLOW)).toEqual([]);
+    expect(filled).toContain("### Files to touch");
+    expect(filled).toContain("**NG-");
+  });
+});

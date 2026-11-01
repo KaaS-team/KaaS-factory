@@ -213,35 +213,42 @@ def names_hidden(command):
 
 
 def git_rm_problem(command):
-    # Mirrors src/git-rm.ts: build may delete only named files inside the worktree and outside protectedPaths.
+    # The one implementation of the git rm rules (#52): build may delete only named plain files inside
+    # the worktree and outside protectedPaths. Refuses by default and fails closed.
     root = os.path.realpath(project_dir)
-    globs = [".claude/**", ".agents/**", ".factory/**"]
+    globs = []
     try:
         with open(f"{root}/.factory/config.json") as f:
-            globs += json.load(f).get("protectedPaths", [])
+            globs = json.load(f).get("protectedPaths", [])
     except FileNotFoundError:
         pass
     except Exception:
         return "config.json cannot be read (fails closed)"
+    if not (isinstance(globs, list) and all(isinstance(g, str) for g in globs)):
+        return "protectedPaths is not a list of strings (fails closed)"
     if any("{" in g for g in globs):
         return "a brace glob in protectedPaths cannot be matched here (fails closed)"
     for segment in re.split(SEPARATORS, unquoted(command)):
         words = segment.split()
+        if words[:1] == ["git"] and words[1:2] and words[1].startswith("-") and "rm" in words[1:]:
+            return "options before rm are not allowed"
         if words[:2] != ["git", "rm"]:
             continue
+        if re.search(r"[\\'\"$`]", command):
+            return "name each plain file, no patterns (quotes and escapes are masked, so they are refused)"
         flags = [w for w in words[2:] if w.startswith("-") and w != "--"]
         if any(not re.fullmatch(r"-[fq]+|--(quiet|ignore-unmatch)", w) for w in flags):
             return "only -f, -q, --quiet and --ignore-unmatch are allowed"
-        paths = [w for w in words[2:] if w not in flags]
-        if not paths or any(w != "--" and not re.fullmatch(r"[\w@%+=,./-]+", w) for w in paths):
+        paths = [w for w in words[2:] if w not in flags and w != "--"]
+        if not paths or any(not re.fullmatch(r"[\w@%+=,./-]+", w) for w in paths):
             return "name each plain file, no patterns"
         for w in paths:
-            if w == "--":
-                continue
             rel = os.path.relpath(os.path.realpath(os.path.join(root, w)), root)
             if rel == "." or rel.startswith(".."):
                 return f"{w} is outside the worktree"
-            if any(fnmatch.fnmatch(rel, g) for g in globs):
+            # Compared without case: SRC/payments/x.ts is src/payments/x.ts on macOS and Windows.
+            low = rel.lower()
+            if low.split("/")[0] in (".claude", ".agents", ".factory") or any(fnmatch.fnmatchcase(low, g.lower()) for g in globs):
                 return f"{w} is a protected path"
     return None
 
