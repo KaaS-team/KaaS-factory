@@ -1,0 +1,1 @@
+{"name":"a template diff does not add the test gate to the gate list","file":"src/gates.ts","find":"return changed.some((f) => f.startsWith(\"template/\"));","replace":"return false;","test":"tests/gate-scope.test.ts"}
