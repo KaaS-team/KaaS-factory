@@ -7,16 +7,25 @@
 
 import { type GateSpec, type PackageSpec, testGate } from "./config";
 import type { CommandResult } from "./github";
+import { isGateFile, ranZeroTests } from "./proof-keep";
 import { touchedPackages } from "./risk";
 
 // "unavailable": the repo has no test gate, so nothing could prove the change. It is shown
 // in the PR's run summary rather than passing silently.
-export type ProofStatus = "bites" | "passes-without" | "no-tests" | "skipped" | "unavailable" | "compile-only";
+export type ProofStatus =
+  | "bites"
+  | "passes-without"
+  | "no-tests"
+  | "skipped"
+  | "unavailable"
+  | "compile-only"
+  | "did-not-run";
 
 const COMPILE_ERROR = /Cannot find module|Could not resolve|error TS\d+|SyntaxError|ModuleNotFoundError|ImportError/;
 
 // A revert that fails only to compile shows the code exists, not what it does (#116).
 export function classifyProof(proof: ProofResult, added: number): ProofResult {
+  if (ranZeroTests(proof.tail)) return { ...proof, status: "did-not-run" };
   return proof.status === "bites" && added === 0 && COMPILE_ERROR.test(proof.tail)
     ? { ...proof, status: "compile-only" }
     : proof;
@@ -88,7 +97,7 @@ export async function runProof(
     };
   const changes = (await git.changes(worktree, base)).filter((c) => !FACTORY_OWNED.test(c.path));
   const tests = changes.filter((c) => isTestPath(c.path) && c.status !== "D").map((c) => c.path);
-  const impl = changes.filter((c) => !isTestPath(c.path));
+  const impl = changes.filter((c) => !isTestPath(c.path) && !isGateFile(c.path));
   if (tests.length === 0)
     return { status: "no-tests", reverted: [], tests, cmd, tail: "the diff adds or changes no test file" };
   const added = impl.filter((c) => c.status === "A").map((c) => c.path);
