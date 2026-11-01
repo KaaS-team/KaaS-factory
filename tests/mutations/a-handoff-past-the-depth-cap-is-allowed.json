@@ -1,0 +1,1 @@
+{"name":"a handoff past the depth cap is allowed","file":"src/engine/handoff.ts","find":"if (handoff.depth >= caps.depth)","replace":"if (handoff.depth > caps.depth + 100)","test":"tests/handoff.test.ts"}
