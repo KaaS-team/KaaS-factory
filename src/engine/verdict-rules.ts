@@ -104,6 +104,27 @@ export function applyPriorFindings(verdict: VerdictArtifact, prior: readonly str
   return verdict;
 }
 
+// A plan criterion the verdict never names is unverified, and unverified is not a pass; the
+// schema only catches criteria the verdict lists, so a verdict that drops one would pass.
+export function applyPlanCriteria(
+  verdict: VerdictArtifact,
+  planned: readonly { readonly id: string }[] | undefined,
+): VerdictArtifact {
+  if (verdict.result !== "pass" || !planned?.length) return verdict;
+  const said = new Map((verdict.criteria ?? []).map((c) => [c.id, c.status]));
+  const open = planned.map((c) => c.id).filter((id) => said.get(id) !== "pass");
+  if (!open.length) return verdict;
+  const gap = "the verdict does not mark it met";
+  const added = open.filter((id) => !said.has(id)).map((id) => ({ id, status: "unverified" as const, gap }));
+  const what = `Plan criteria not marked met: ${open.join(", ")}`;
+  return {
+    ...verdict,
+    result: "uncertain",
+    criteria: [...(verdict.criteria ?? []), ...added],
+    findings: [...verdict.findings, { severity: "could", confidence: 5, what, where: "runner" }],
+  };
+}
+
 // Set once a run has sent its off-plan rebuild, so the next round does not repeat it.
 const offPlanSentRuns = new WeakSet<RunCtx>();
 
@@ -127,6 +148,7 @@ export async function settleVerdict(sc: StepCtx, verdict: VerdictArtifact): Prom
   const offPlanSent = offPlanSentRuns.has(ctx) || sentBefore;
   let out = applyVerdictRules(verdict, { proof: proof?.status, plan, changed, offPlanSent });
   out = applyPriorFindings(out, prior);
+  out = applyPlanCriteria(out, plan?.criteria);
   if (out.findings.some((f) => typeof f !== "string" && f.what.startsWith(OFF_PLAN))) offPlanSentRuns.add(ctx);
   const file = `${worktree}/${runDir(issue.number)}/prior-findings.json`;
   if (out.result === "reject") writeFileSync(file, JSON.stringify(mustWhats(out), null, 2));
