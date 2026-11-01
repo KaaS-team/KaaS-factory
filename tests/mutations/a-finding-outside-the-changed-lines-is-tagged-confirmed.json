@@ -1,0 +1,1 @@
+{"name":"a finding outside the changed lines is tagged confirmed","file":"src/finding-check.ts","find":"return hunks?.some(([a, b]) => at.from <= b && at.to >= a) ? \"confirmed\" : \"pre-existing\";","replace":"return hunks?.some(([a, b]) => at.from <= b && at.to >= a) || true ? \"confirmed\" : \"pre-existing\";","test":"tests/finding-check.test.ts"}
