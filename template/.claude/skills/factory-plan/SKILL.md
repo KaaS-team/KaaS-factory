@@ -31,8 +31,8 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
 ## 2. Research through Explore, not yourself
 
 Delegate codebase questions ("where does X live", "what calls it", "what tests cover it") to the
-built-in `Explore` subagent. Ask it targeted questions, tell it to answer with file:line evidence
-using Grep, Glob and Read only (it does not get the shell rules), and use its conclusions.
+built-in `Explore` subagent. Ask targeted questions, tell it to answer with file:line evidence
+using Grep, Glob and Read only (it does not get the shell rules), then use them.
 
 ## 3. Write the plan
 
@@ -52,9 +52,8 @@ lint, a link check); build runs that command, and no test file is expected.
 when the toggle is on. **medium, high, a dependency major, or near a protected path** always
 waits for a human's `/factory approve`.
 
-If triage's `done_when` turns out unplannable (genuinely ambiguous, not just
-inconvenient), you may still post a question and hand back to needs-info;
-that escape hatch exists here too, not only in `factory-build`.
+If triage's `done_when` is unplannable (genuinely ambiguous, not just inconvenient),
+you may still post a question and hand back to needs-info.
 
 ## 4. Write the outputs
 
@@ -79,12 +78,12 @@ item it returns in `plan-comment.md`, and never dispatch it again. Then write
 The PR body's What changed and Acceptance come from `goal` and `criteria` alone. Add
 `"spec": "<stem>"` only when the issue implements a `specs/` file, to show its holdouts.
 
-Add `"boundaryChange": true` for an API, schema or config-format change; pr needs a `docs/decisions/*.md`.
+Add `"boundaryChange": true` for an API, schema or config change; pr needs a `docs/decisions/*.md`.
 `outcome` is optional: `complete` (the default), `blocked` (you cannot go on and a human must
 look; put the reason in `summary`), or `failed`. No other fields are allowed [enforced: stop-artifact.sh].
 
-`autoApproveEligible` is your judgment call, not just a mirror of `risk`:
-set it false for anything you'd want a second look at even at low risk.
+`autoApproveEligible` is a judgment call, not a mirror of `risk`:
+set it false for anything you'd want a second look at.
 
 If you stop to ask a question instead (see the escape hatch in step 3), write
 `question-comment.md` with the `factory-comment` skill's `question.md`
