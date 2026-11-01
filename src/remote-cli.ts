@@ -14,6 +14,7 @@ import { factoryHome, livePath } from "./paths";
 import { encodeQr, qrToTerminal } from "./qr";
 import { dialOut, type RunnerCreds, type RunnerJob, type RunnerWork, registerRunner } from "./runner-channel";
 import { makeScm } from "./scm";
+import { controlCommand } from "./ssh-control";
 import { readLive, stopRunningStage } from "./takeover";
 
 export const RUNNER_FILE = "runner.json";
@@ -100,6 +101,7 @@ async function checkoutsOf(argv: readonly string[]): Promise<Map<string, string>
 }
 
 async function cmdRunner(argv: readonly string[]): Promise<void> {
+  if (argv[1] === "control" || argv[1] === "control-serve") return controlCommand(argv.slice(1));
   const file = runnerFile();
   if (argv[1] === "register") {
     const url = flagOf(argv, "url");
