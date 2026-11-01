@@ -1,0 +1,1 @@
+{"name":"a pushed follow-up may rerun ci","file":"src/ci-rerun.ts","find":"if (state.pushed) return \"pushed-commit\";","replace":"","test":"tests/ci-rerun.test.ts"}
