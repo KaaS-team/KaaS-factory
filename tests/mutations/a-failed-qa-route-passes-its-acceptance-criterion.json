@@ -1,0 +1,1 @@
+{"name":"a failed qa route passes its acceptance criterion","file":"src/qa-step.ts","find":"every((p) => results.some((r) => r.path === p && r.ok)) ? \"pass\"","replace":"every((p) => results.some((r) => r.path === p)) ? \"pass\"","test":"tests/qa-step.test.ts"}
