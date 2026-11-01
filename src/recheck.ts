@@ -51,7 +51,7 @@ export function changedLines(diff: string): Map<string, [number, number][]> {
 }
 
 // `path:line` or `path:start-end`, with an optional leading `./`.
-function parseWhere(where: string | undefined): { path: string; from: number; to: number } | undefined {
+export function parseWhere(where: string | undefined): { path: string; from: number; to: number } | undefined {
   const m = /^(?:\.\/)?([^\s:]+):(\d+)(?:-(\d+))?\b/.exec(where?.trim() ?? "");
   if (!m) return undefined;
   const from = Number(m[2]);
