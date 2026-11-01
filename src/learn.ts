@@ -9,6 +9,7 @@ import { outsideAllowedPaths } from "./boundary";
 import { loopRefusals } from "./loop-guard";
 import { capLessons, LESSONS_PATH } from "./context";
 import type { Git } from "./git";
+import { type LessonSink, lessonSinkFromEnv } from "./lesson-sink";
 import type { ScmPort } from "./github";
 import type { FactoryState, RetroRow } from "./state";
 
@@ -22,6 +23,8 @@ export interface LearnDeps {
   readonly state: FactoryState;
   readonly cloneDir: string;
   readonly workspacesDir: string;
+  // Defaults to the brain sink the environment names, if any.
+  readonly sink?: LessonSink;
 }
 
 export interface LearnResult {
@@ -138,5 +141,6 @@ export async function runLearn(
     pending.map((r) => r.id),
     now.toISOString(),
   );
+  await (deps.sink ?? lessonSinkFromEnv(process.env))?.push(repo, pending);
   return { batched: pending.length, prUrl, branch };
 }
