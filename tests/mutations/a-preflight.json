@@ -1,0 +1,1 @@
+{"name":"a preflight","file":"src/boundary-record.ts","find":"if (plan.boundaryChange === true) return true;\n  return (plan.files ?? []).some((f) => DECISION_PATHS.some((d) => f.startsWith(d)));","replace":"return plan.boundaryChange === true;","test":"tests/pr-preflight.test.ts"}

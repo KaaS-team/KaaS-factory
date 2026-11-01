@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { boundaryRecordMissing } from "../src/boundary-record";
+import { boundaryRecordMissing, isDecisionRecord } from "../src/boundary-record";
 import { stageSchema } from "../src/schemas";
 
 test("a plan flagging a boundary change with no decision record is refused", () => {
@@ -21,4 +21,12 @@ test("a non-markdown file under docs/decisions does not count", () => {
 
 test("the plan schema knows boundaryChange", () => {
   expect(JSON.stringify(stageSchema("plan"))).toContain("boundaryChange");
+});
+
+test("only a named record counts: README, index and nested files do not", () => {
+  expect(isDecisionRecord("docs/decisions/0007-title.md")).toBe(true);
+  expect(isDecisionRecord("docs/decisions/title.md")).toBe(true);
+  expect(isDecisionRecord("docs/decisions/README.md")).toBe(false);
+  expect(isDecisionRecord("docs/decisions/index.md")).toBe(false);
+  expect(isDecisionRecord("docs/decisions/sub/x.md")).toBe(false);
 });

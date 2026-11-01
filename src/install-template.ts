@@ -61,6 +61,9 @@ const REPO_OWNED = new Set([
 ]);
 // Files an earlier release installed and this one no longer ships; `update` removes them.
 const RETIRED = [".claude/agents/factory-verifier.md", ".claude/agents/factory-explorer.md"];
+// Offered, never written: install does not create files under .github/workflows beyond the inert --ci example.
+export const RELEASE_OFFER =
+  "factory install: offer: a release workflow (tag and generated notes on a merged PR) is not installed; add .github/workflows/release.yml yourself if you want one.";
 const CI_DEST_REL = ".github/workflows/factory.yml.example";
 
 function walk(dir: string, prefix = ""): string[] {
@@ -262,6 +265,7 @@ export function installTemplate(
   }
 
   lines.push("");
+  lines.push(RELEASE_OFFER);
   lines.push(
     `factory install: ${dry ? "would write" : "wrote"} ${wrote} item(s), skipped ${skipped.length} existing item(s), ${unchanged} unchanged in ${base}`,
   );
