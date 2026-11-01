@@ -189,6 +189,7 @@ describe("approval paths", () => {
         workflow: "feature-to-pr",
         sha: expect.any(String),
         step: "plan",
+        startedBy: "person",
         outcome: "awaiting-approval",
       },
     ]);
