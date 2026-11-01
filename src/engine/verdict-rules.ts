@@ -59,6 +59,9 @@ const flag = (v: VerdictArtifact, result: "reject" | "uncertain", f: Finding): V
 const COMPILE_ONLY =
   "The proof failed only because the reverted tree does not compile; add a test that fails on the change's behaviour without it.";
 
+const PASSES_WITHOUT =
+  "The new tests still pass with the implementation reverted, so they do not prove the change; write a test that fails without it.";
+
 export function applyVerdictRules(
   verdict: VerdictArtifact,
   facts: {
@@ -70,6 +73,8 @@ export function applyVerdictRules(
 ): VerdictArtifact {
   if (facts.proof === "compile-only" && verdict.result === "pass")
     verdict = flag(verdict, "reject", runnerFinding(COMPILE_ONLY));
+  if (facts.proof === "passes-without" && verdict.result === "pass")
+    verdict = flag(verdict, "reject", runnerFinding(PASSES_WITHOUT));
   if (facts.plan?.source === "issue") {
     const planned = new Set(facts.plan.files ?? []);
     const off = facts.changed.filter((f) => !f.startsWith(".factory/") && !planned.has(f));

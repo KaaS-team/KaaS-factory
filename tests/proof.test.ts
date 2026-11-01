@@ -23,6 +23,10 @@ import {
 } from "./harness";
 
 const dirs: string[] = [];
+const tmp = () => {
+  mkdirSync(tmpdir(), { recursive: true });
+  return tmpdir();
+};
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
@@ -50,8 +54,8 @@ function write(dir: string, path: string, body: string): void {
 
 // A repo whose `test` passes only when src/add.ts returns the sum. Base has a wrong add.
 function repo(): string {
-  const origin = mkdtempSync(join(tmpdir(), "proof-origin-"));
-  const work = mkdtempSync(join(tmpdir(), "proof-work-"));
+  const origin = mkdtempSync(join(tmp(), "proof-origin-"));
+  const work = mkdtempSync(join(tmp(), "proof-work-"));
   dirs.push(origin, work);
   run(["git", "init", "-q", "--bare", "-b", "main"], origin);
   run(["git", "init", "-q", "-b", "main"], work);
@@ -178,8 +182,8 @@ describe("watch.ts runs the proof before verify", () => {
   } as const;
 
   test("proof.json carries the result the verify stage reads", async () => {
-    const workspacesDir = mkdtempSync(join(tmpdir(), "proof-ws-"));
-    const cloneDir = mkdtempSync(join(tmpdir(), "proof-clone-"));
+    const workspacesDir = mkdtempSync(join(tmp(), "proof-ws-"));
+    const cloneDir = mkdtempSync(join(tmp(), "proof-clone-"));
     dirs.push(workspacesDir, cloneDir);
     const github = new FakeGitHub([baseIssue(1, [LABEL.ready])]);
     const inner = new MultiStageExecutor();
@@ -238,5 +242,68 @@ describe("watch.ts runs the proof before verify", () => {
       cmd: "make test",
     });
     expect(github.createdPrs[0]!.body).toContain("Fails without it: `tests/a.test.ts`, red with `src/a.ts` reverted");
+  });
+  test("a proof that passes without the change makes verify reject, and the comment says so", async () => {
+    const workspacesDir = mkdtempSync(join(tmp(), "proof-ws-"));
+    const cloneDir = mkdtempSync(join(tmp(), "proof-clone-"));
+    dirs.push(workspacesDir, cloneDir);
+    const github = new FakeGitHub([baseIssue(1, [LABEL.ready])]);
+    const inner = new MultiStageExecutor();
+    let seen: unknown;
+    const executor = {
+      async runStage(opts: { stage: StageName; issue: number; cwd: string; maxBudgetUsd: number }) {
+        if (opts.stage === "verify") seen = JSON.parse(readFileSync(join(opts.cwd, runDir(1), "proof.json"), "utf8"));
+        return inner.runStage(opts);
+      },
+    };
+    const calls: string[] = [];
+    const proofGit: ProofGit = {
+      async changes() {
+        return [
+          { status: "M", path: "src/a.ts" },
+          { status: "A", path: "tests/a.test.ts" },
+        ];
+      },
+      async restoreFromBase(_w, _b, paths) {
+        calls.push(`restore ${paths.join(",")}`);
+      },
+      async remove() {},
+      async restoreHead() {
+        calls.push("head");
+      },
+      async dirty() {
+        return [];
+      },
+      async test(_w, cmd) {
+        calls.push(`test ${cmd}`);
+        return { stdout: "1 pass", stderr: "", code: 0 };
+      },
+    };
+    const state = new FactoryState(":memory:");
+    state.setToggle("auto_approve_low_risk", true);
+    const config = mergeConfig({ repo: "acme/widgets", gates: [{ name: "test", cmd: "make test", required: true }] });
+    const deps = {
+      github,
+      git: new FakeGit(),
+      state,
+      executor,
+      gateRunner: new FakeGateRunner(),
+      holdoutRunner: new FakeHoldoutRunner(),
+      proofGit,
+      cloneDir,
+      workspacesDir,
+    };
+    for (const stage of ["triage", "plan", "build", "verify", "pr"] as const)
+      inner.push(stage, 1, fixtureFor(stage, 1), stageFiles[stage]);
+    for (let round = 0; round < 6; round++)
+      for (const stage of ["build", "verify"] as const) inner.push(stage, 1, fixtureFor(stage, 1), stageFiles[stage]);
+    expect(await advanceIssue(deps, config, github.issues.get(1)!)).not.toBe("shipped");
+    expect(seen).toMatchObject({ status: "passes-without", reverted: ["src/a.ts"] });
+    const posted = github.issues
+      .get(1)!
+      .comments.map((c) => c.body)
+      .find((b) => b.includes("factory:verdict"))!;
+    expect(posted).toContain("## Verdict: reject (round 1 of");
+    expect(posted).toContain("still pass with the implementation reverted");
   });
 });
