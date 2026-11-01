@@ -8,5 +8,8 @@ status here is `accepted`.
 - [0003 One merge at a time per repo](0003-serial-merge-queue.md)
 - [0004 Planned specs are checked before a run starts](0004-planned-specs-and-stub-guard.md)
 - [0005 Issues that plan the same files wait for each other](0005-overlap-serialisation.md)
+- [0006 Policy ceiling: hard-deny and soft-deny marks](0006-policy-deny-marks-and-ceiling.md)
+- [0007 A plan criterion the verdict omits is unverified](0007-unverified-plan-criteria.md)
+- [0008 Mutation tests are anchored to a file and a slug](0008-mutation-tests-anchored-by-slug.md)
 
 The walkthroughs in [../walkthroughs/](../walkthroughs/README.md) show these decisions in use.
