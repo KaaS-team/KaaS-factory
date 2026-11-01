@@ -1,0 +1,1 @@
+{"name":"a unit over the cap is not split at a task boundary","file":"src/plan-slice.ts","find":"used + task.minutes > capMinutes","replace":"false","test":"tests/plan-slice.test.ts"}
