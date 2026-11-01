@@ -458,6 +458,25 @@ describe("agent37", () => {
     }
   });
 
+  test("account() with both endpoints refused reports the instance reason though billing answers first", async () => {
+    const server = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      async fetch(req) {
+        if (new URL(req.url).pathname === "/v1/billing") return new Response("no", { status: 401 });
+        await Bun.sleep(150);
+        return new Response("no", { status: 401 });
+      },
+    });
+    try {
+      const url = `http://127.0.0.1:${server.port}`;
+      const s = { ...spec(url, "/tmp/x"), apiUrl: url };
+      expect(await a37(s, { K: "wrong" }).account()).toEqual({ reason: "/v1/instances/i1 answered 401" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("runs over several instances go to the least busy, and naming both forms is refused", async () => {
     const box = startAgent37("k", ["i1", "i2"]);
     const root = tmp("factory-a37-multi-");
