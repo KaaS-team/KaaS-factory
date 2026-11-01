@@ -1,0 +1,1 @@
+{"name":"a-lane: the runner sizes a change without the protected paths","file":"src/engine/runner.ts","find":"chooseLane({ files, changedLines }, config.protectedPaths)","replace":"chooseLane({ files, changedLines }, [])","test":"tests/lane.test.ts"}
