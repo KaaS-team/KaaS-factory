@@ -1,0 +1,1 @@
+{"name":"a dismissal without a reason counts as dismissed","file":"src/finding-disposition.ts","find":"if (d && d.reason.trim() !== \"\") return \"dismissed\";","replace":"if (d) return \"dismissed\";","test":"tests/finding-disposition.test.ts"}
