@@ -22,3 +22,11 @@ tag with no entry or an expired one.
 
 The core is Apache-2.0 (LICENSE) and there is no CLA. Code under `ee/` is written by the KaaS team
 only and is not open for contributions. `make check` must pass with zero errors and zero warnings.
+
+## Who opens what
+
+Bugs and ideas go through issues, in the planned format of `.github/ISSUE_TEMPLATE/`. Implementation pull
+requests come from maintainers (owner, member, collaborator) and the logins in `.github/approved-contributors.json`.
+A pull request from anyone else is closed with a pointer back here: `bun scripts/pr-author-gate.ts <login>
+<author_association>` prints `keep`, or `close` and that pointer. A maintainer labels new issues by hand.
+Report a vulnerability as in SECURITY.md.

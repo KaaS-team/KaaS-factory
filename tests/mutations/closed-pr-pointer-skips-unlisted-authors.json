@@ -1,0 +1,1 @@
+{"name":"closed pr pointer skips unlisted authors","file":"src/contributor-policy.ts","find":"return approved.includes(author.login.toLowerCase()) ? \"keep\" : \"close\";","replace":"return \"keep\";","test":"tests/contributor-policy.test.ts"}
