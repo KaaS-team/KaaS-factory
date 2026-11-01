@@ -7,6 +7,7 @@ import { shipStage } from "./blobs";
 import type { FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
+import { settle } from "../run-transitions";
 import { costFor } from "../pricing";
 import {
   OPERATOR_TAKEOVER,
@@ -277,11 +278,7 @@ export function finish(
   status: "needs-info" | "awaiting-approval" | "needs-human" | "failed" | "shipped" | "cancelled",
   reason?: string,
 ): void {
-  deps.state.updateRun(config.repo, issueNumber, { status, reason: reason ?? null });
-  // Parked issues keep their window, so the operator can still read it.
-  if (deps.view && (status === "shipped" || status === "cancelled" || status === "failed")) {
-    deps.view.close(issueNumber).catch((e) => console.error(`[tmux] close #${issueNumber}: ${e}`));
-  }
+  settle(deps.state, deps.view, config.repo, issueNumber, status, reason);
 }
 
 // Skills never call `gh` (only the runner talks to GitHub), so the current

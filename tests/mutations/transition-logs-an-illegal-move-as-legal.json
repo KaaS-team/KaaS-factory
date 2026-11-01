@@ -1,0 +1,1 @@
+{"name":"transition logs an illegal move as legal","file":"src/run-transitions.ts","find":"const kind = isLegal(run.status, to) ? TRANSITION_KIND : ILLEGAL_TRANSITION_KIND;","replace":"const kind = TRANSITION_KIND;","test":"tests/run-transitions.test.ts"}
