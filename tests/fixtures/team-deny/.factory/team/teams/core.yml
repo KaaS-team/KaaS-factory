@@ -1,0 +1,7 @@
+name: core
+repos: [acme/core-api]
+approvers: [alice]
+policy:
+  risk_max: medium
+  preapprove:
+    risk_max: alice

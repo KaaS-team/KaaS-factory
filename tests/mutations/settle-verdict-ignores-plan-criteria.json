@@ -1,0 +1,1 @@
+{"name":"settle verdict ignores plan criteria","file":"src/engine/verdict-rules.ts","find":"out = applyPlanCriteria(out, plan?.criteria);","replace":"out = applyPlanCriteria(out, undefined);","test":"tests/verdict-criteria.test.ts"}
