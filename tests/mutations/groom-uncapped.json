@@ -1,0 +1,7 @@
+{
+  "name": "groom-uncapped",
+  "file": "src/orchestrate/pick.ts",
+  "find": "Math.min(input.perTick",
+  "replace": "Math.max(input.perTick",
+  "test": "tests/orchestrate-pick.test.ts"
+}
