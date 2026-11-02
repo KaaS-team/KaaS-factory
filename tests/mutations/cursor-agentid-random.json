@@ -1,0 +1,7 @@
+{
+  "name": "cursor-agentid-random",
+  "file": "src/cloud/cursor.ts",
+  "find": "agentId = agentIdFor(",
+  "replace": "agentId = String(Math.random()) || agentIdFor(",
+  "test": "tests/cloud-cursor.test.ts"
+}
