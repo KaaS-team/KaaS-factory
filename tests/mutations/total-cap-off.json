@@ -1,0 +1,1 @@
+{"name":"total-cap-off","file":"src/review-coverage.ts","find":"total > maxTotal","replace":"false","test":"tests/review-coverage.test.ts"}
