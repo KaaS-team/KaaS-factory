@@ -1,0 +1,1 @@
+{"name":"unknown-counts-merged","file":"src/change-set.ts","find":"state.get(key) !== \"merged\"","replace":"state.get(key) === \"open\"","test":"tests/change-set.test.ts"}
