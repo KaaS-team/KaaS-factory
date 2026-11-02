@@ -1,0 +1,7 @@
+{
+  "name": "test-failures: names unfinished files",
+  "file": "scripts/test-failures.ts",
+  "find": "return headerFiles(log).filter((f) => !have.has(f));",
+  "replace": "return [];",
+  "test": "tests/test-failures.test.ts"
+}
