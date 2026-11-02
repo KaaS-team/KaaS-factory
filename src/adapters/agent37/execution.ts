@@ -13,7 +13,7 @@
 // read from the environment by name when the step runs, so it is never in
 // machine.json, an argv or a log.
 
-import { capOutput } from "../../output-cap";
+import { dropMarker } from "../../output-cap";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface Agent37Spec {
@@ -33,8 +33,21 @@ export interface Agent37Spec {
 
 export const AGENT37_API_URL = "https://api.agent37.com";
 const TAIL = 512 * 1024;
+const HEAD = TAIL / 4;
 const PARTS_IN_FLIGHT = 8;
 const GATES = "FACTORY_GATES";
+
+// The box prints the size on a line, then (over TAIL) HEAD bytes of head, then the rest; join them around a marker.
+function joinRead(raw: string): string {
+  const nl = raw.indexOf("\n");
+  const size = Number.parseInt(raw.slice(0, nl), 10);
+  const body = raw.slice(nl + 1);
+  if (!(size > TAIL)) return body;
+  const bytes = new TextEncoder().encode(body);
+  const dec = new TextDecoder();
+  const head = dec.decode(bytes.subarray(0, HEAD));
+  return `${head}${dropMarker(head, size - TAIL)}${dec.decode(bytes.subarray(HEAD))}`;
+}
 
 export const AGENT37_URL = "https://sandbox.agent37.app";
 // Base64 per exec, under the 128 KB body cap with room for the JSON around it.
@@ -305,16 +318,19 @@ export class Agent37Execution implements ExecutionPort {
       const done = await x(`cat ${f("code")}`, signal, { spent: 0 });
       if (typeof done === "string") return fail(done);
       if (done.code !== 0 || !done.stdout.trim()) continue;
-      const tail = (ext: string) =>
-        `t=${f(`${ext}.t`)}; tail -c ${TAIL} ${f(ext)} > "$t"; grep -q '^${GATES}' "$t" || grep '^${GATES}' ${f(ext)} | tail -n 1 >> "$t"; cat "$t"`;
+      // Over TAIL bytes the box sends its size, the first HEAD bytes, then the last TAIL - HEAD; a gates line in neither is appended.
+      const read = (ext: string) =>
+        `t=${f(`${ext}.t`)}; s=$(wc -c < ${f(ext)}); if [ "$s" -le ${TAIL} ]; then cp ${f(ext)} "$t"; else tail -c ${TAIL - HEAD} ${f(ext)} > "$t"; fi; ` +
+        `grep -q '^${GATES}' "$t" || { [ "$s" -gt ${TAIL} ] && head -c ${HEAD} ${f(ext)} | grep -q '^${GATES}'; } || grep '^${GATES}' ${f(ext)} | tail -n 1 >> "$t"; echo "$s"; ` +
+        `if [ "$s" -gt ${TAIL} ]; then head -c ${HEAD} ${f(ext)}; fi; cat "$t"`;
       const [out, err] = await Promise.all([
-        x(tail("out"), signal, { spent: 0 }),
-        x(tail("err"), signal, { spent: 0 }),
+        x(read("out"), signal, { spent: 0 }),
+        x(read("err"), signal, { spent: 0 }),
       ]);
       if (typeof out === "string") return fail(out);
       if (typeof err === "string") return fail(err);
-      const stdout = capOutput(out.stdout, TAIL).text;
-      const stderr = capOutput(err.stdout, TAIL).text;
+      const stdout = joinRead(out.stdout);
+      const stderr = joinRead(err.stdout);
       const note = out.truncated || err.truncated ? "agent37: output truncated at 512 KB per stream" : "";
       return {
         stdout,

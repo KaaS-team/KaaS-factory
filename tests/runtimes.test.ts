@@ -412,8 +412,9 @@ describe("agent37", () => {
     try {
       const cmd = "echo 'FACTORY_GATES first'; seq 1 150000";
       const r = await a37(spec(box.url, root), { K: "k" }).run(cmd, dir());
+      expect(r.stdout.startsWith("FACTORY_GATES first\n1\n")).toBe(true);
       expect(r.stdout).toContain("bytes dropped ...]");
-      expect(r.stdout.endsWith("FACTORY_GATES first\n")).toBe(true);
+      expect(r.stdout.endsWith("\n150000\n")).toBe(true);
     } finally {
       box.stop();
     }

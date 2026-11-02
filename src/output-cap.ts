@@ -24,6 +24,12 @@ function tailStart(bytes: Uint8Array, budget: number, floor: number): number {
   return nl >= 0 ? start + nl + 1 : start;
 }
 
+// The line that stands where bytes were cut; `head` is what came before it.
+export function dropMarker(head: string, droppedBytes: number): string {
+  const sep = head === "" || head.endsWith("\n") ? "" : "\n";
+  return `${sep}[... ${droppedBytes} bytes dropped ...]\n`;
+}
+
 export function capOutput(text: string, max: number, headShare = 0.25): { text: string; droppedBytes: number } {
   const bytes = enc.encode(text);
   if (bytes.length <= max) return { text, droppedBytes: 0 };
@@ -35,6 +41,5 @@ export function capOutput(text: string, max: number, headShare = 0.25): { text: 
   const tailAt = text.length - dec.decode(bytes.subarray(tailFrom)).length;
   const droppedBytes = tailFrom - headBytes;
   const head = text.slice(0, headEnd);
-  const sep = head === "" || head.endsWith("\n") ? "" : "\n";
-  return { text: `${head}${sep}[... ${droppedBytes} bytes dropped ...]\n${text.slice(tailAt)}`, droppedBytes };
+  return { text: `${head}${dropMarker(head, droppedBytes)}${text.slice(tailAt)}`, droppedBytes };
 }
