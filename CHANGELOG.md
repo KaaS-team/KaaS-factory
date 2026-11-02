@@ -1,5 +1,34 @@
 # Changelog
 
+## v6.3.0
+
+A stricter verify and review loop, a safer runner, and the groundwork for building on cloud agents.
+
+- Verify rejects a pass whose new tests also pass with the implementation reverted, tracks findings
+  across rounds in a ledger, and marks a plan criterion the verdict omits as unverified. Gate and
+  judge errors report unknown and stay out of the rates.
+- Review caps its rounds per PR and hands off to a person, reviews only the diff since the last
+  reviewed sha, and records how often review comments were acted on.
+- The runner scopes the GitHub App token to one repository, neutralises git config on every call,
+  signs commits, strips operator detail from posted comments, and scans comments and pushes for
+  secrets. The Docker and wrap runtimes go through the egress proxy.
+- Teams: hard-deny and soft-deny policy rules, team capability resolution under an org ceiling, and
+  an `orchestrate` block with `preset` values (`split`, `all-claude`, `all-cursor`) resolved from
+  org, team and repo files.
+- Runs record who started them, bind approvals to the plan digest and head sha, and a human can
+  hold a run. Events are append-only with a hash chain, and each carries the actor kind.
+- Planning: plans an epic as stacked per-task PRs, refuses a boundary change with no decision
+  record, refuses a run whose Deps are not merged, and takes area locks from each issue's Files.
+- QA and PR bodies: an optional `qa` step, screenshot pair tables, accessibility rules for changed
+  routes, a tolerant screenshot comparison, and an optional Try it section.
+- `factory install --update` keeps files the repo edited, `factory onboard --json` and a live
+  doctor status, a read-only public board (off by default), and remote control over ssh stdio.
+- Local checks: `make fast` runs the first red CI step, test files run in four parallel workers,
+  and a failing `make test` prints the failing test names.
+- Groundwork, not yet wired to a launcher: the cloud provider port with Cursor and Claude adapters,
+  a cloud build step, and the pure pick, slot-fill and grooming logic for orchestration. Nothing
+  reserves a cloud agent by itself in this release.
+
 ## v6.2.0
 
 The first release with installable binaries, plus the team model and a steadier supervisor.
