@@ -1,0 +1,1 @@
+{"name":"unconfigured-kind-expires","file":"src/retention.ts","find":"if (limit === undefined) return false","replace":"if (limit === undefined) return true","test":"tests/retention.test.ts"}
