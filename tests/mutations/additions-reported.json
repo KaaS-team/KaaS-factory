@@ -1,0 +1,1 @@
+{"name":"additions-reported","file":"scripts/check-contract-diff.ts","find":"base.filter((x) => !head.includes(x))","replace":"head.filter((x) => !base.includes(x))","test":"tests/check-contract-diff.test.ts"}
