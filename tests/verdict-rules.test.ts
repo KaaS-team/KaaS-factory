@@ -2,11 +2,14 @@
 // prior-finding rule; the verify step posts what it settles.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
-import { validateVerdict, type VerdictArtifact } from "../src/artifacts";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { validateVerdict, runDir, type VerdictArtifact } from "../src/artifacts";
 import {
   applyPriorFindings,
   applyVerdictRules,
+  settleVerdict,
   verdictHeading,
   verdictPost,
   withVerdictHeading,
@@ -15,6 +18,7 @@ import { parseWorkflowText } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
 import { classifyProof, type ProofResult } from "../src/proof";
 import { engine, removeEngineDirs } from "./engine-harness";
+import type { StepCtx } from "../src/engine/steps";
 
 afterAll(removeEngineDirs);
 
@@ -84,6 +88,43 @@ describe("rules", () => {
     const done = { ...v("pass"), prior: [{ what: "breaks X", status: "resolved" as const }] };
     expect(applyPriorFindings(done, ["breaks X"]).result).toBe("pass");
     expect(applyPriorFindings(v("reject", [must]), ["breaks X"]).result).toBe("reject");
+  });
+});
+
+describe("settleVerdict ledger", () => {
+  const dirs: string[] = [];
+  afterAll(() => {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
+
+  test("settleVerdict keeps an earlier round's finding", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
+    const worktree = mkdtempSync(join(tmpdir(), "settle-ledger-"));
+    dirs.push(worktree);
+    mkdirSync(join(worktree, runDir(1)), { recursive: true });
+    const sc = {
+      worktree,
+      config: { base: "main" },
+      deps: { git: { changedFiles: async () => [] } },
+      issue: { number: 1, comments: [] },
+      ctx: {},
+    } as unknown as StepCtx;
+    const mustA = { severity: "must" as const, confidence: 5, what: "A" };
+    const mustB = { severity: "must" as const, confidence: 5, what: "B" };
+    const priorPath = join(worktree, runDir(1), "prior-findings.json");
+    await settleVerdict(sc, { result: "reject", rounds: 1, findings: [mustA] });
+    expect(JSON.parse(readFileSync(priorPath, "utf8"))).toEqual(["A"]);
+    await settleVerdict(sc, { result: "reject", rounds: 2, findings: [mustB] });
+    expect(JSON.parse(readFileSync(priorPath, "utf8"))).toEqual(["A", "B"]);
+    const out = await settleVerdict(sc, {
+      result: "pass",
+      rounds: 3,
+      findings: [],
+      prior: [{ what: "B", status: "resolved" }],
+    });
+    expect(out.result).toBe("uncertain");
+    const runnerWhats = out.findings.flatMap((f) => (typeof f === "string" || f.where !== "runner" ? [] : [f.what]));
+    expect(runnerWhats.some((w) => w.startsWith("Open findings from earlier rejects (1)"))).toBe(true);
   });
 });
 
