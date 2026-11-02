@@ -1,0 +1,7 @@
+{
+  "name": "orchestrate-preset-ignored",
+  "file": "src/orchestrate/config.ts",
+  "find": "expandPreset(",
+  "replace": "((s: OrchestrateSpec) => s)(",
+  "test": "tests/orchestrate-presets.test.ts"
+}
