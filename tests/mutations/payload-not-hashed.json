@@ -1,0 +1,1 @@
+{"name":"payload-not-hashed","file":"src/event-chain.ts","find":"prevHash + \"\\n\" + payload","replace":"prevHash","test":"tests/event-chain.test.ts"}
