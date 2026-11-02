@@ -13,6 +13,7 @@ setDefaultTimeout(30_000);
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CommandRunner } from "../src/github";
 import { Git, GitCommandRunner, issueOfPr, sparseCheckoutPatterns } from "../src/git";
 
 const roots: string[] = [];
@@ -334,6 +335,25 @@ describe("factory pushes pass --no-verify through a failing pre-push hook", () =
 
     const pushed = await new Git(new GitCommandRunner()).push(clone, 12);
     expect(pushed.code).toBe(0);
+  });
+
+  // The safe git config turns hooks off, so the hook tests above no longer see the flag; the argv does.
+  test("both push argvs carry --no-verify before the remote", async () => {
+    const calls: string[][] = [];
+    const recorder: CommandRunner = {
+      async run(args) {
+        calls.push([...args]);
+        return { stdout: args[0] === "rev-parse" || args[0] === "commit-tree" ? "abc123\n" : "", stderr: "", code: 0 };
+      },
+    };
+    const git = new Git(recorder);
+    await git.claim(tmpRoot(), 13, "main");
+    await git.pushBranch(tmpRoot(), "factory/issue-13");
+    const pushes = calls.filter((argv) => argv[0] === "push");
+    expect(pushes).toHaveLength(2);
+    for (const argv of pushes) {
+      expect(argv.indexOf("--no-verify") >= 0 && argv.indexOf("--no-verify") < argv.indexOf("origin")).toBe(true);
+    }
   });
 });
 

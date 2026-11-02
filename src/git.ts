@@ -15,11 +15,12 @@ import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
 import { describeFindings, scanText } from "./secret-scan";
 import { heldRefusal } from "./hold";
+import { safeArgs } from "./git-safe";
 import { type SigningConfig, withSigning } from "./commit-signing";
 import { type Person, type SignoffMode, signoffTrailers, withTrailers } from "./signoff";
 
 async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
-  const proc = Bun.spawn(["git", ...args], {
+  const proc = Bun.spawn(["git", ...safeArgs(args)], {
     cwd,
     env: env ? { ...process.env, ...env } : undefined,
     stdout: "pipe",

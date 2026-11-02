@@ -1,0 +1,1 @@
+{"name":"fingerprint-ignores-hooks","file":"src/git-safe.ts","find":"hooks/","replace":"hooks-none/","test":"tests/git-safe.test.ts"}
