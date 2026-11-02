@@ -103,7 +103,8 @@ export function cloudLedger(
     expire(liveIssues: ReadonlySet<number>, nowMs: number, maxAgeMs: number): number[] {
       const data = load(state, repo);
       const dropped: number[] = [];
-      for (const [k, r] of Object.entries(data.reservations)) {
+      const resMap = data.reservations;
+      for (const [k, r] of Object.entries(resMap)) {
         const issue = Number(k);
         if (!liveIssues.has(issue) || nowMs - r.at > maxAgeMs) {
           delete data.reservations[k];

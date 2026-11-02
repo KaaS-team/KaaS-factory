@@ -3,10 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CloudError, type CloudProvider, type CloudRun, type CloudStatus, type LaunchInput } from "./port";
 
-function substitute(argv: string[], vars: Record<string, string>): string[] {
+function substitute(
+  argv: string[],
+  vars: { promptFile?: string; branch?: string; repo?: string; session?: string },
+): string[] {
   return argv.map((a) => {
     let s = a;
-    for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(v);
+    if (vars.promptFile !== undefined) s = s.split("{promptFile}").join(vars.promptFile);
+    if (vars.branch !== undefined) s = s.split("{branch}").join(vars.branch);
+    if (vars.repo !== undefined) s = s.split("{repo}").join(vars.repo);
+    if (vars.session !== undefined) s = s.split("{session}").join(vars.session);
     return s;
   });
 }
