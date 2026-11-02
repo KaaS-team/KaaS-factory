@@ -3,6 +3,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { FactoryConfig, RouteConfig } from "../config";
+import { resolveOrchestrate } from "../orchestrate/config";
 import { loadOrg, loadTeams } from "./load";
 import { type Resolved, resolveTeam } from "./resolve";
 import { type PolicySpec, type Risk, RISKS } from "./schema";
@@ -54,6 +55,16 @@ export function applyTeam(input: ApplyInput): TeamApplied {
   const team = mine[0];
   const resolved = resolveTeam({ ...base, org: org.value, team });
   const p = (resolved.values.policy ?? {}) as PolicySpec;
+  const orch = resolveOrchestrate({
+    org: org.value.orchestrate,
+    team: team?.orchestrate,
+    repo: input.raw.orchestrate,
+    policyModels: p.models,
+    locked: org.value.locked,
+    teamName: team?.name,
+  });
+  for (const [k, v] of Object.entries(orch.origin)) resolved.origin[`orchestrate.${k}`] = v;
+  resolved.problems.push(...orch.problems);
 
   const merge =
     p.auto_merge?.allowed === false && config.merge.policy === "auto"
@@ -73,6 +84,7 @@ export function applyTeam(input: ApplyInput): TeamApplied {
     merge,
     riskPolicy,
     protectedPaths: [...new Set([...config.protectedPaths, ...(p.protected_paths ?? [])])],
+    orchestrate: orch.spec,
   };
   return {
     config: next,

@@ -62,3 +62,7 @@ export function mergeProblems(merge: Record<string, unknown>): string[] {
 export interface ReviewFields {
   readonly review?: { readonly alwaysHumanPaths?: readonly string[]; readonly maxRounds?: number };
 }
+
+export interface OrchestrateFields {
+  readonly orchestrate?: import("./orchestrate/config").OrchestrateSpec;
+}

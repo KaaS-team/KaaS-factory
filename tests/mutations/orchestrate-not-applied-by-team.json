@@ -1,0 +1,7 @@
+{
+  "name": "orchestrate-not-applied-by-team",
+  "file": "src/team/apply.ts",
+  "find": "orchestrate: orch.spec",
+  "replace": "orchestrate: input.raw.orchestrate as never",
+  "test": "tests/orchestrate-config.test.ts"
+}
