@@ -1,0 +1,7 @@
+{
+  "name": "token-unscoped",
+  "file": "src/github-app.ts",
+  "find": "{ repositories: [name] }",
+  "replace": "undefined",
+  "test": "tests/github-app-scope.test.ts"
+}

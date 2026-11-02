@@ -97,7 +97,7 @@ function recorder() {
 afterEach(() => feedServedRepos(null));
 
 describe("GitHub App installation tokens", () => {
-  test("one token per owner, shared by its repos, and minted again 5 minutes before it expires", async () => {
+  test("one token per repo, cached, and minted again 5 minutes before it expires", async () => {
     const { clock, gh, app: a } = app();
     const inner = recorder();
     const runner = new AppTokenRunner(a, inner);
@@ -105,15 +105,15 @@ describe("GitHub App installation tokens", () => {
     await runner.run(["api", "repos/acme/b/collaborators/bob/permission"]);
     await runner.run(["api", "graphql", "-f", "query=q", "-F", "owner=beta", "-F", "name=x"]);
     await runner.run(["api", "user"]);
-    expect(inner.runs.map((r) => r.token)).toEqual([gh.minted[0], gh.minted[0], gh.minted[1], undefined]);
-    expect(gh.minted.length).toBe(2);
+    expect(inner.runs.map((r) => r.token)).toEqual([gh.minted[0], gh.minted[1], gh.minted[2], undefined]);
+    expect(gh.minted.length).toBe(3);
     clock.t += HOUR - TOKEN_MARGIN_MS - 1000;
     await runner.run(["issue", "list", "--repo", "acme/a"]);
-    expect(gh.minted.length).toBe(2);
+    expect(gh.minted.length).toBe(3);
     clock.t += 2000;
     await runner.run(["issue", "list", "--repo", "acme/a"]);
-    expect(gh.minted.length).toBe(3);
-    expect(inner.runs.at(-1)!.token).toBe(gh.minted[2]);
+    expect(gh.minted.length).toBe(4);
+    expect(inner.runs.at(-1)!.token).toBe(gh.minted[3]);
   });
 
   test("an installation outside the named owners is never served or minted for", async () => {
