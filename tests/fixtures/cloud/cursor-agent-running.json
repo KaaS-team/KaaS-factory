@@ -1,0 +1,13 @@
+{
+  "_note": "hand-written fixture, not captured from the live API",
+  "id": "bc-01020304-0506-0708-090a-0b0c0d0e0f10",
+  "status": "RUNNING",
+  "git": {
+    "branches": [
+      {
+        "name": "feat/work",
+        "prUrl": "https://github.com/o/r/pull/9"
+      }
+    ]
+  }
+}

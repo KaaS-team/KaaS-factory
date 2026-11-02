@@ -190,6 +190,8 @@ describe("approval paths", () => {
         sha: expect.any(String),
         step: "plan",
         startedBy: "person",
+        onBehalfOf: "person",
+        actorKind: "runner",
         outcome: "awaiting-approval",
       },
     ]);
@@ -1153,7 +1155,9 @@ describe("merge policy on an in-review PR", () => {
     expect(await advanceIssue(deps, c.config, c.github.issues.get(1)!)).toBe("shipped");
     expect(c.github.closed).toEqual([1]);
     expect(labels(c.github, 1)).not.toContain(LABEL.inReview);
-    expect(mergedEvents(c)).toEqual([{ repo: c.config.repo, issue: 1, pr: pr.number, by: "human" }]);
+    expect(mergedEvents(c)).toEqual([
+      { repo: c.config.repo, issue: 1, pr: pr.number, by: "human", actorKind: "runner" },
+    ]);
     expect(c.state.listRetros(c.config.repo).map((r) => r.outcome)).toEqual(["merged"]);
     // The branch keeps the work; the workspace goes once the PR merged.
     expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(false);

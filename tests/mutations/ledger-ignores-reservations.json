@@ -1,0 +1,7 @@
+{
+  "name": "ledger-ignores-reservations",
+  "file": "src/cloud/ledger.ts",
+  "find": "reservations)",
+  "replace": "{})",
+  "test": "tests/cloud-ledger.test.ts"
+}

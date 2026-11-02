@@ -1,0 +1,7 @@
+{
+  "name": "cursor-autocreate-default-on",
+  "file": "src/cloud/cursor.ts",
+  "find": "opts.autoCreatePr ?? false",
+  "replace": "opts.autoCreatePr ?? true",
+  "test": "tests/cloud-cursor.test.ts"
+}
