@@ -225,7 +225,7 @@ describe("end to end on an http tracker", () => {
         .busEvents()
         .filter((e) => e.type === "factory.pr.merged")
         .map((e) => JSON.parse(e.data));
-    expect(merged()).toEqual([{ repo, issue: n, pr: 1, by: "human" }]);
+    expect(merged()).toEqual([{ repo, issue: n, pr: 1, by: "human", actorKind: "runner" }]);
     expect(state.listRetros(repo).map((r) => r.outcome)).toEqual(["merged"]);
     await pollOnce(deps, mergeConfig({ repo }));
     expect(merged()).toHaveLength(1);
