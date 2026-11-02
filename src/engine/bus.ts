@@ -11,6 +11,7 @@ import {
   LEGACY_EVENT_SIGNATURE_HEADER,
   makeEvent,
   signEvent,
+  stampActor,
   type CloudEvent,
   type EventType,
   type FactoryEventType,
@@ -231,7 +232,7 @@ export class EventBus {
 export function emitEvent(bus: EventBus | undefined, type: FactoryEventType, data: unknown, subject?: string): void {
   if (!bus) return;
   try {
-    bus.emit(type, data, subject);
+    bus.emit(type, stampActor(type, data), subject);
   } catch (e) {
     console.error(`emit ${type} failed: ${String(e)}`);
   }

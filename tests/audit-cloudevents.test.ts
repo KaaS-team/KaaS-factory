@@ -48,7 +48,7 @@ describe("audit rows as CloudEvents", () => {
     expect(ev.specversion).toBe("1.0");
     expect(ev.type).toBe("factory.audit.recorded");
     expect(ev.subject).toBe("POST /api/toggles");
-    expect(ev.data).toEqual({ ...row, outcome: "success" });
+    expect(ev.data).toEqual({ ...row, outcome: "success", actorKind: "human" });
   });
 
   test("outcome separates success, refusal and failure", () => {

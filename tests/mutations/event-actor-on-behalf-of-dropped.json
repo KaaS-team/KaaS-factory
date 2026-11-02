@@ -1,0 +1,7 @@
+{
+  "name": "event actor: on behalf of dropped",
+  "file": "src/core/event.ts",
+  "find": "if (typeof data.startedBy === \"string\" && !(\"onBehalfOf\" in data)) stamped.onBehalfOf = data.startedBy;",
+  "replace": "",
+  "test": "tests/event-actor.test.ts"
+}
