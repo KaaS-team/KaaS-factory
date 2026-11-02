@@ -38,6 +38,37 @@ export const EVENT_TYPES = [...FACTORY_EVENTS, ...EXTERNAL_EVENTS] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 export type FactoryEventType = (typeof FACTORY_EVENTS)[number];
 
+export const ACTOR_KINDS = ["runner", "agent", "human"] as const;
+export type ActorKind = (typeof ACTOR_KINDS)[number];
+
+export const EVENT_ACTOR: Record<FactoryEventType, ActorKind> = {
+  "factory.issue.ready": "runner",
+  "factory.step.started": "agent",
+  "factory.step.completed": "agent",
+  "factory.step.failed": "agent",
+  "factory.issue.parked": "runner",
+  "factory.pr.opened": "runner",
+  "factory.pr.merged": "runner",
+  "factory.run.completed": "runner",
+  "factory.minion.completed": "agent",
+  "factory.approval.requested": "runner",
+  "factory.approval.resolved": "human",
+  "factory.workflow.emitted": "runner",
+  "factory.audit.recorded": "human",
+};
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+export function stampActor(type: FactoryEventType, data: unknown): unknown {
+  if (!isPlainObject(data)) return data;
+  const stamped = { ...data };
+  if (!("actorKind" in data)) stamped.actorKind = EVENT_ACTOR[type];
+  if (typeof data.startedBy === "string" && !("onBehalfOf" in data)) stamped.onBehalfOf = data.startedBy;
+  return stamped;
+}
+
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
 export function isEventType(t: unknown): t is EventType {
   return typeof t === "string" && KNOWN.has(t);

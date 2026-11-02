@@ -1,0 +1,7 @@
+{
+  "name": "event actor: stamp dropped",
+  "file": "src/engine/bus.ts",
+  "find": "stampActor(type, data)",
+  "replace": "data",
+  "test": "tests/event-actor.test.ts"
+}
