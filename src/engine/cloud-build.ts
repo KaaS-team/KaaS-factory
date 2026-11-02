@@ -1,7 +1,7 @@
 // Cloud build path: hand the planned body to a provider, pull its commits, grade locally.
 
-import { EnvSecrets } from "../adapters/env/secrets";
 import { cloudLedger, cloudProvider, CloudError, TERMINAL, type CloudProvider, type CloudStatus } from "../cloud";
+import { defaultCloudIo } from "../cloud-io";
 import { runGates } from "../gates";
 import { orchestrateActive, orchestrateOf, type Orchestrate } from "../orchestrate/config";
 import type { StageRunResult } from "../ports/agent";
@@ -37,16 +37,6 @@ export interface CloudIo {
   provider?: (name: string, orch: Orchestrate) => CloudProvider | undefined;
   /** When set, overrides orchestrateActive for tests. */
   orchestrate?: boolean;
-}
-
-export function defaultCloudIo(): CloudIo {
-  return {
-    secrets: new EnvSecrets(),
-    fetch: globalThis.fetch.bind(globalThis),
-    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-    now: () => Date.now(),
-    pollMs: 30_000,
-  };
 }
 
 export function cloudPrompt(issueBody: string, branch: string, protectedPaths: readonly string[]): string {
