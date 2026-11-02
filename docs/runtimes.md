@@ -79,8 +79,11 @@ same kit as microsandbox; the http and wrap kinds are proven with it in `tests/s
 
 `src/egress.ts` is the same rule as msb's proxy for a guest without one: the guest reaches only the
 hosts on an allow-list, through the proxy, and holds a placeholder that the proxy swaps for the real
-key only on a request to that key's hosts. No adapter routes through it yet; `docker` with no
-`network` and `microsandbox` with no `allow` already deny egress.
+key only on a request to that key's hosts. When a command sets `allow`, the `docker` kind runs it on an
+internal network behind the proxy and never falls back to the bridge, and the `wrap` kind sets proxy
+environment variables only, so it relies on the command to honour them. A `docker` agent stage does not
+use `allow`; it uses `network`, which defaults to `none`. `microsandbox` uses msb's own proxy. With no
+`allow` or `network`, `docker` and `microsandbox` already deny egress.
 
 ## A pool of free tiers
 
