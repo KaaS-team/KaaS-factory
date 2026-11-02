@@ -1,0 +1,7 @@
+{
+  "name": "finding ledger: a resolved finding never reopens",
+  "file": "src/finding-ledger.ts",
+  "find": "      status: \"open\",\n      lastRound: round,\n      reopened,",
+  "replace": "      status: prev.status,\n      lastRound: round,\n      reopened,",
+  "test": "tests/finding-ledger.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "orchestrate-unchecked-in-config",
+  "file": "src/profile-rules.ts",
+  "find": "orchestrateProblems(cfg.orchestrate, \"orchestrate\")",
+  "replace": "[].concat(cfg.orchestrate, \"orchestrate\")",
+  "test": "tests/orchestrate-config.test.ts"
+}

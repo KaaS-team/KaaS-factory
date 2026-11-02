@@ -1,0 +1,7 @@
+{
+  "name": "settle verdict: forgets an earlier round",
+  "file": "src/engine/verdict-rules.ts",
+  "find": "writeFileSync(file, JSON.stringify(openWhats(merged), null, 2));",
+  "replace": "writeFileSync(file, JSON.stringify(mustWhats(out), null, 2));",
+  "test": "tests/verdict-rules.test.ts"
+}

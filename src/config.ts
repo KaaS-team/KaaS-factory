@@ -10,7 +10,7 @@ import { type Toolchain, toolchainProblems } from "./images";
 import * as keys from "./config-merge";
 import { isEventType } from "./core/event";
 import type { AgentConfig, StageAgents } from "./agents/types";
-import { LABEL } from "./labels";
+import { labelMapProblems } from "./labels";
 import { profileProblems } from "./profile-rules";
 import { applyTeam, type TeamApplied } from "./team/apply";
 
@@ -93,7 +93,7 @@ export interface RouteConfig {
   readonly workflow?: string;
 }
 
-export interface FactoryConfig extends keys.ReviewFields {
+export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
   readonly postEditCommand: readonly string[]; // argv the post-edit-check hook runs on each build edit; {file} is the path; [] is off
@@ -281,7 +281,7 @@ export interface MergeConfig extends keys.MergeAutonomyFields {
 // (src/boundary.ts); verify restores them from the base commit into a
 // separate scratch copy and runs `cmd`, rejecting on failure with the test
 // name and assertion message only, never the source. Off (the default) when
-// `cmd` is empty — the one place that decides on/off, so nothing else
+// `cmd` is empty; the one place that decides on/off, so nothing else
 // re-derives it.
 export interface HoldoutConfig {
   readonly paths: readonly string[];
@@ -398,6 +398,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   labels: "object",
   events: "object",
   commits: "object",
+  orchestrate: "object",
   riskCriteria: "object",
 };
 
@@ -544,27 +545,6 @@ function trackerProblems(raw: unknown): string[] {
     problems.push(`tracker.tokenEnv: expected an env var name, got ${JSON.stringify(t.tokenEnv)}`);
   if (t.labelTrust !== undefined && t.labelTrust !== "none" && t.labelTrust !== "creator")
     problems.push(`tracker.labelTrust: expected "none" or "creator", got ${JSON.stringify(t.labelTrust)}`);
-  return problems;
-}
-
-// The map is inverted on the way back in, so two factory labels may not share a
-// team name, and a team name may not be a factory label that keeps its own name.
-function labelMapProblems(raw: unknown): string[] {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return ["labels: expected an object"];
-  const problems: string[] = [];
-  const entries = Object.entries(raw as Record<string, unknown>).filter(([k]) => !k.startsWith("_"));
-  const seen = new Map<string, string>();
-  const unmapped = new Set<string>(Object.values(LABEL).filter((l) => !entries.some(([k]) => k === l)));
-  for (const [from, to] of entries) {
-    if (typeof to !== "string" || to.trim() === "") {
-      problems.push(`labels.${from}: expected a label name, got ${JSON.stringify(to)}`);
-      continue;
-    }
-    if (seen.has(to)) problems.push(`labels.${from}: "${to}" is already the name for ${seen.get(to)}`);
-    else if (unmapped.has(to) || (to !== from && entries.some(([k]) => k === to)))
-      problems.push(`labels.${from}: "${to}" is itself a factory label name`);
-    seen.set(to, from);
-  }
   return problems;
 }
 

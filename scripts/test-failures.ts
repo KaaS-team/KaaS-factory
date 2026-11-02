@@ -53,6 +53,60 @@ export function report(path: string, stepSummary?: string): string {
   return text;
 }
 
+function headerFiles(log: string): string[] {
+  const out: string[] = [];
+  for (const line of log.split("\n")) {
+    if (line.endsWith(".test.ts:") && line.startsWith("tests/")) out.push(line.slice(0, -1));
+  }
+  return out;
+}
+
+function junitTestFiles(xml: string): string[] {
+  const files = new Set<string>();
+  for (const m of xml.matchAll(/<testcase\b([^>]*)/g)) {
+    const v = /\bfile="([^"]*)"/.exec(m[1]!)?.[1];
+    if (v !== undefined) files.add(unXml(v));
+  }
+  return [...files];
+}
+
+export function unfinished(log: string, junitFiles: readonly string[]): string[] {
+  const have = new Set(junitFiles);
+  return headerFiles(log).filter((f) => !have.has(f));
+}
+
+export function reportWithLog(junitPath: string, logPath: string | undefined, stepSummary?: string): string {
+  if (!logPath) return report(junitPath, stepSummary);
+  const text = report(junitPath, undefined);
+  const log = readFileSync(logPath, "utf8");
+  const missing = !existsSync(junitPath) || readFileSync(junitPath, "utf8").trim() === "";
+  let extra = "";
+  if (missing) {
+    const started = headerFiles(log);
+    const last = started[started.length - 1];
+    if (last !== undefined) extra = `\nlast test file started: ${last}`;
+  } else {
+    const unfin = unfinished(log, junitTestFiles(readFileSync(junitPath, "utf8")));
+    const lines: string[] = [];
+    for (const f of unfin.slice(0, CAP)) lines.push(`unfinished: ${f}`);
+    if (unfin.length > CAP) lines.push(`and ${unfin.length - CAP} more`);
+    if (lines.length > 0) extra = `\n${lines.join("\n")}`;
+  }
+  const out = text + extra;
+  if (stepSummary) appendFileSync(stepSummary, `### Failing tests\n\n\`\`\`\n${out}\n\`\`\`\n`);
+  return out;
+}
+
 if (import.meta.main) {
-  console.log(report(process.argv[2] ?? "reports/junit.xml", process.env.GITHUB_STEP_SUMMARY));
+  const args = process.argv.slice(2);
+  let logPath: string | undefined;
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--log" && args[i + 1]) {
+      logPath = args[++i];
+    } else {
+      rest.push(args[i]!);
+    }
+  }
+  console.log(reportWithLog(rest[0] ?? "reports/junit.xml", logPath, process.env.GITHUB_STEP_SUMMARY));
 }
