@@ -1,7 +1,7 @@
 {
   "name": "orchestrate-preset-raises-ceiling",
   "file": "src/orchestrate/presets.ts",
-  "find": "\"claude-cloud\": { max: 0 }",
-  "replace": "\"claude-cloud\": { max: 8 }",
+  "find": "\"cursor-cloud\": { max: 0 }",
+  "replace": "\"cursor-cloud\": { max: 8 }",
   "test": "tests/orchestrate-presets.test.ts"
 }
