@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  schedule:
+    - cron: "41 4 * * *"
 
 # A newer push to the same ref cancels the run it supersedes, so minutes go to the latest tree only.
 concurrency:
@@ -63,7 +65,16 @@ jobs:
       # An empty HOME, so a check that passes only with one machine's ~/.claude or caches fails here.
       # The runner's own Rust toolchain stays reachable: make lint and the relay and verify tests need cargo.
       - name: make check
-        run: RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make check
+        shell: bash
+        timeout-minutes: 8
+        env:
+          MAKEFLAGS: -k
+        run: |
+          mkdir -p reports
+          RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make check | tee reports/check-output.log
+      - name: Summarize failing or unfinished tests
+        if: failure()
+        run: bun scripts/test-failures.ts reports/junit.xml --log reports/check-output.log
       - uses: actions/cache/save@v4
         if: always()
         with:
@@ -145,7 +156,18 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decide whether the image needs a build
+        id: inputs
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bun scripts/docker-inputs.ts "origin/${{ github.base_ref }}" HEAD >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: docker/build-push-action@v6
+        if: steps.inputs.outputs.build == 'true'
         with:
           context: .
           push: false
@@ -154,6 +176,7 @@ jobs:
       # The image's default command must serve /health with the relay beside it, and stay under the
       # idle memory budget (src/deploy/rss.ts measures every process in the container).
       - name: Smoke the image and assert idle RSS
+        if: steps.inputs.outputs.build == 'true'
         run: |
           docker run -d --name factory kaas-factory:ci
           for _ in $(seq 1 30); do docker exec factory curl -fsS http://127.0.0.1:4100/health && break; sleep 1; done
@@ -164,5 +187,5 @@ jobs:
           sleep 5
           docker exec factory bun src/deploy/rss.ts 1
       - name: Container log on failure
-        if: failure()
+        if: failure() && steps.inputs.outputs.build == 'true'
         run: docker logs factory || true

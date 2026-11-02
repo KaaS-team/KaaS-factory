@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CAP, report, summarize } from "../scripts/test-failures";
+import { CAP, report, reportWithLog, summarize, unfinished } from "../scripts/test-failures";
 
 const wrap = (cases: string): string =>
   `<?xml version="1.0"?>\n<testsuites><testsuite name="s">${cases}</testsuite></testsuites>`;
@@ -77,5 +77,25 @@ describe("test failures summary", () => {
   test("make test names the failing tests when the run fails", () => {
     const mk = readFileSync(join(import.meta.dir, "..", "Makefile"), "utf8");
     expect(mk.includes("bun scripts/test-failures.ts reports/junit.xml")).toBe(true);
+  });
+
+  test("a file the log started but junit lacks is unfinished", () => {
+    const log = ["tests/a.test.ts:", "  ok", "tests/b.test.ts:", "  hang"].join("\n");
+    expect(unfinished(log, ["tests/a.test.ts"])).toEqual(["tests/b.test.ts"]);
+  });
+
+  test("a missing report names the last started file", () => {
+    const dir = tmp();
+    const logPath = join(dir, "run.log");
+    const missingPath = join(dir, "none.xml");
+    writeFileSync(logPath, "tests/a.test.ts:\ntests/b.test.ts:\n");
+    expect(reportWithLog(missingPath, logPath)).toContain("last test file started: tests/b.test.ts");
+  });
+
+  test("no log keeps the old output", () => {
+    const dir = tmp();
+    const p = join(dir, "j.xml");
+    writeFileSync(p, wrap(ok("one")));
+    expect(reportWithLog(p, undefined)).toBe(report(p));
   });
 });

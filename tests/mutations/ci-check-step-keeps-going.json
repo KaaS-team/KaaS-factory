@@ -1,0 +1,7 @@
+{
+  "name": "ci: check step keeps going",
+  "file": "ci/ci.yml",
+  "find": "MAKEFLAGS: -k",
+  "replace": "MAKEFLAGS: \"\"",
+  "test": "tests/ci-gate-shape.test.ts"
+}

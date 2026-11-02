@@ -1,0 +1,7 @@
+{
+  "name": "docker-inputs: ignores copy sources",
+  "file": "scripts/docker-inputs.ts",
+  "find": "if (path === src) return true;\n      if (path.startsWith(`${src}/`)) return true;",
+  "replace": "void path; void src;",
+  "test": "tests/docker-inputs.test.ts"
+}
