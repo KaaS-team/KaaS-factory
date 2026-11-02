@@ -21,20 +21,20 @@ test("a raw value that is not an object returns ok false", () => {
 
 test("an unknown status returns ok false naming the field", () => {
   const r = parseExtensionResult({ ...base, status: "great" }, want);
-  expect(r.ok).toBe(false);
-  if (!r.ok) expect(r.reason.includes("status")).toBe(true);
+  if (r.ok) throw new Error("expected a rejection");
+  expect(r.reason.includes("status")).toBe(true);
 });
 
 test("a missing costUsd stays undefined", () => {
   const r = parseExtensionResult(base, want);
-  expect(r.ok).toBe(true);
-  if (r.ok) expect(r.result.metrics.costUsd).toBeUndefined();
+  if (!r.ok) throw new Error(r.reason);
+  expect(r.result.metrics.costUsd ?? "absent").toBe("absent");
 });
 
 test("a given costUsd is kept", () => {
   const r = parseExtensionResult({ ...base, metrics: { costUsd: 0 } }, want);
-  if (r.ok) expect(r.result.metrics.costUsd).toBe(0);
-  else throw new Error(r.reason);
+  if (!r.ok) throw new Error(r.reason);
+  expect(r.result.metrics.costUsd).toBe(0);
 });
 
 test("a hidden html comment in the summary is removed", () => {
