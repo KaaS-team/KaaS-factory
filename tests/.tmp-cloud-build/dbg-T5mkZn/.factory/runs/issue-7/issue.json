@@ -1,0 +1,11 @@
+{
+  "number": 7,
+  "title": "Issue 7",
+  "body": "do the thing",
+  "labels": [
+    {
+      "name": "factory:ready"
+    }
+  ],
+  "comments": []
+}

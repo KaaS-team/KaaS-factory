@@ -357,6 +357,32 @@ describe("factory pushes pass --no-verify through a failing pre-push hook", () =
   });
 });
 
+describe("Git.pullBranch", () => {
+  test("fast-forwards the worktree from origin", async () => {
+    const root = tmpRoot();
+    const { bare, clones } = await bareOriginWithClones(root, ["wt"]);
+    const wt = clones[0]!;
+    const git = new Git(new GitCommandRunner());
+    await git.claim(wt, 5, "main");
+    const pushClone = join(root, "push");
+    await run(["git", "clone", bare, pushClone], root);
+    await run(["git", "config", "commit.gpgsign", "false"], pushClone);
+    await run(["git", "config", "user.email", "t@example.com"], pushClone);
+    await run(["git", "config", "user.name", "t"], pushClone);
+    await run(["git", "checkout", "factory/issue-5"], pushClone);
+    writeFileSync(join(pushClone, "cloud.txt"), "x\n");
+    await run(["git", "add", "cloud.txt"], pushClone);
+    await run(["git", "commit", "-m", "cloud"], pushClone);
+    await run(["git", "push", "origin", "factory/issue-5"], pushClone);
+    const before = await git.headSha(wt);
+    const pulled = await git.pullBranch(wt, 5);
+    expect(pulled.code).toBe(0);
+    const after = await git.headSha(wt);
+    expect(after).not.toBe(before);
+    expect(existsSync(join(wt, "cloud.txt"))).toBe(true);
+  });
+});
+
 describe("issueOfPr", () => {
   test("a factory branch names its issue", () => {
     expect(issueOfPr({ headRefName: "factory/issue-42", closingIssuesReferences: [{ number: 7 }] })).toBe(42);
