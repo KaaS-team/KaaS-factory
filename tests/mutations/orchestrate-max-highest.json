@@ -1,0 +1,7 @@
+{
+  "name": "orchestrate-max-highest",
+  "file": "src/orchestrate/resolve.ts",
+  "find": "Math.min(",
+  "replace": "Math.max(",
+  "test": "tests/orchestrate-config.test.ts"
+}

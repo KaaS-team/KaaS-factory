@@ -1,4 +1,5 @@
 // The shapes of an org file and a team file, and the plain-sentence checks that a loaded file has them.
+import { orchestrateProblems, type OrchestrateSpec } from "../orchestrate/config";
 
 export type Risk = "low" | "medium" | "high";
 
@@ -57,6 +58,7 @@ export interface TeamFile {
   policy?: PolicySpec;
   budget_usd_month?: number;
   concurrency?: number;
+  orchestrate?: OrchestrateSpec;
 }
 
 export interface OrgFile {
@@ -65,6 +67,7 @@ export interface OrgFile {
   workflows?: Record<string, unknown>;
   policy?: PolicySpec;
   locked?: string[];
+  orchestrate?: OrchestrateSpec;
 }
 
 export const RISKS: readonly Risk[] = ["low", "medium", "high"];
@@ -166,6 +169,7 @@ export function teamProblems(raw: unknown, kind: "org" | "team"): string[] {
       const problem = strs("locked", raw.locked);
       if (problem) out.push(problem);
     }
+    if (raw.orchestrate !== undefined) out.push(...orchestrateProblems(raw.orchestrate, `${kind}.orchestrate`));
     return out;
   }
   fields(
@@ -183,5 +187,6 @@ export function teamProblems(raw: unknown, kind: "org" | "team"): string[] {
     out,
   );
   if (raw.source !== undefined) source("source", raw.source, out);
+  if (raw.orchestrate !== undefined) out.push(...orchestrateProblems(raw.orchestrate, `${kind}.orchestrate`));
   return out.map((p) => p.replace(/^team\./, ""));
 }

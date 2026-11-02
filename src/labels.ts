@@ -13,7 +13,7 @@ export interface FactoryLabel {
 
 // The only place a `factory:*` label string is spelled out. Every other file
 // (watch.ts, scan.ts, the dashboard) imports LABEL.* instead of writing the
-// string itself — tests/labels.test.ts greps the rest of the tree for that.
+// string itself; tests/labels.test.ts greps the rest of the tree for that.
 export const LABEL = {
   ready: "factory:ready",
   blocked: "factory:blocked",
@@ -204,4 +204,25 @@ export function issueType(
 ): string | undefined {
   const types = new Set(typesFor(routes));
   return labelNames.find((n) => types.has(n));
+}
+
+// The map is inverted on the way back in, so two factory labels may not share a
+// team name, and a team name may not be a factory label that keeps its own name.
+export function labelMapProblems(raw: unknown): string[] {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return ["labels: expected an object"];
+  const problems: string[] = [];
+  const entries = Object.entries(raw as Record<string, unknown>).filter(([k]) => !k.startsWith("_"));
+  const seen = new Map<string, string>();
+  const unmapped = new Set<string>(Object.values(LABEL).filter((l) => !entries.some(([k]) => k === l)));
+  for (const [from, to] of entries) {
+    if (typeof to !== "string" || to.trim() === "") {
+      problems.push(`labels.${from}: expected a label name, got ${JSON.stringify(to)}`);
+      continue;
+    }
+    if (seen.has(to)) problems.push(`labels.${from}: "${to}" is already the name for ${seen.get(to)}`);
+    else if (unmapped.has(to) || (to !== from && entries.some(([k]) => k === to)))
+      problems.push(`labels.${from}: "${to}" is itself a factory label name`);
+    seen.set(to, from);
+  }
+  return problems;
 }
