@@ -18,7 +18,7 @@ function setup() {
     if (path === "/installation/repositories") return reply({ repositories: [] });
     if (path === "/app/installations/7/access_tokens") {
       const raw = init?.body;
-      posts.push({ path, body: typeof raw === "string" ? JSON.parse(raw) : undefined });
+      posts.push({ path, body: typeof raw === "string" ? JSON.parse(raw) : "no body" });
       return reply({ token: `tok-${posts.length}`, expires_at: new Date(Date.now() + 3_600_000).toISOString() }, 201);
     }
     return reply({}, 404);
@@ -46,7 +46,7 @@ test("listing installed repos posts no repositories field", async () => {
   const { app, posts } = setup();
   await app.installedRepos();
   expect(posts).toHaveLength(1);
-  expect(posts[0]!.body).toBeUndefined();
+  expect(posts[0]!.body).toBe("no body");
 });
 
 test("concurrent callers for one repo share one mint", async () => {
