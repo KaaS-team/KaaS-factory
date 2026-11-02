@@ -1,0 +1,7 @@
+{
+  "name": "groom-trusts-anyone",
+  "file": "src/orchestrate/groom.ts",
+  "find": "TRUSTED_ROLES.includes(",
+  "replace": "true || TRUSTED_ROLES.includes(",
+  "test": "tests/orchestrate-groom.test.ts"
+}
