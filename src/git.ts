@@ -214,6 +214,14 @@ export class Git {
     return result.code === 0;
   }
 
+  // Fast-forward the issue branch from origin after a cloud agent pushed there.
+  async pullBranch(worktreeDir: string, issue: number): Promise<CommandResult> {
+    const branch = this.branchName(issue);
+    const fetched = await this.runner.run(["fetch", "origin", branch], { cwd: worktreeDir });
+    if (fetched.code !== 0) return fetched;
+    return this.runner.run(["merge", "--ff-only", "FETCH_HEAD"], { cwd: worktreeDir });
+  }
+
   // Regular push only; the guard hook and settings.json refuse --force and merge.
   async push(worktreeDir: string, issue: number): Promise<CommandResult> {
     return this.pushBranch(worktreeDir, this.branchName(issue));

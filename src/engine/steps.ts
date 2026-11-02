@@ -9,7 +9,6 @@ import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
   acceptanceProven,
-  hiddenPaths,
   planAcceptance,
   renderAcceptanceTable,
   renderPlanAcceptance,
@@ -32,7 +31,6 @@ import { isChecked } from "../recheck";
 import { rejectedNote, rejectLimit } from "../review-cap";
 import { hasNoGates, NO_GATES_COMMENT, runGates, scopeGateRun } from "../gates";
 import { runProof, type ProofResult } from "../proof";
-import { touchesProtectedPath } from "../boundary";
 import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
@@ -54,7 +52,8 @@ import {
   scopeOf,
 } from "./epic";
 import { issueRef, postRunDetails, prBody, prExtras, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
-import { failPush, failStage, failureLine, stageCause } from "./failure";
+import { finishBuild } from "./build-tail";
+import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { parkLowConfidence } from "../triage-confidence";
 import { runStageChecked } from "./stage-retry";
@@ -274,30 +273,7 @@ const build: StepType = {
     // Defense in depth behind the guard hook: a Bash-made edit to a
     // protected path never reaches Edit/Write, so the hook never sees it
     // (audit finding #12). Diff the branch itself before pushing anything.
-    const changed = await deps.git.changedFiles(worktree, config.base);
-    // `.factory/**` is already always protected (ALWAYS_PROTECTED_PATHS), covering the default
-    // holdout location; this adds any holdout path a repo configured outside it.
-    const protectedPaths = [
-      ...config.protectedPaths,
-      ...(await hiddenPaths(deps.setupRunner ?? new ShellSetupRunner(), config, worktree)),
-    ];
-    const baseFiles = await deps.git.baseFiles(worktree, config.base);
-    const hits = touchesProtectedPath(changed, protectedPaths, { baseFiles });
-    if (hits.length) {
-      await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
-      finish(deps, config, issueNumber, "needs-human", `touched protected path(s): ${hits.join(", ")}`);
-      return stop("needs-human");
-    }
-
-    deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
-    await writeGateEvidence(worktree, issueNumber, {
-      line: gate.raw,
-      status: gate.status,
-      tree: await deps.git.treeHash(worktree),
-    });
-    const pushed = await deps.git.push(worktree, issueNumber);
-    if (pushed.code !== 0) return stop(await failPush(deps, config, issue, step.label, worktree, pushed.stderr));
-    return { kind: "next", facts: json };
+    return finishBuild(sc, gate, json);
   },
 };
 

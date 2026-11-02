@@ -1,0 +1,1 @@
+{"name":"cloud-build-skips-gates","file":"src/engine/cloud-build.ts","find":"await runGates(","replace":"await Promise.resolve({ raw: \"\", status: \"GREEN\" }) || runGates(","test":"tests/cloud-build.test.ts"}

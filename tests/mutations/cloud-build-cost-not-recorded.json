@@ -1,0 +1,1 @@
+{"name":"cloud-build-cost-not-recorded","file":"src/engine/cloud-build.ts","find":"cost_usd: cost","replace":"cost_usd: null","test":"tests/cloud-build.test.ts"}

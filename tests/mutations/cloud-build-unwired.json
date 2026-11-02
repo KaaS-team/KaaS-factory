@@ -1,0 +1,1 @@
+{"name":"cloud-build-unwired","file":"src/engine/registry.ts","find":"build: cloudAware(","replace":"buildUnused: cloudAware(","test":"tests/cloud-build.test.ts"}

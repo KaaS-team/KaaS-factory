@@ -130,7 +130,7 @@
     "src/config.ts": 787,
     "src/doctor.ts": 445,
     "src/engine/common.ts": 649,
-    "src/engine/steps.ts": 564,
+    "src/engine/steps.ts": 540,
     "src/github.ts": 505,
     "src/receipt.ts": 459,
     "src/state.ts": 746,
