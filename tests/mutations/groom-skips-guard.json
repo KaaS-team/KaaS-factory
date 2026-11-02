@@ -1,0 +1,7 @@
+{
+  "name": "groom-skips-guard",
+  "file": "src/orchestrate/groom.ts",
+  "find": "guardPlan(body, config)",
+  "replace": "({ ok: true } as const)",
+  "test": "tests/orchestrate-groom.test.ts"
+}
