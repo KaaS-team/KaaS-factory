@@ -1,0 +1,1 @@
+{"name":"output-cap: head-dropped","file":"src/output-cap.ts","find":"text.slice(0, headEnd)","replace":"\"\"","test":"tests/output-cap.test.ts"}

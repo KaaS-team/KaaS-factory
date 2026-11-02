@@ -1,0 +1,1 @@
+{"name":"output-cap: head-read-removed","file":"src/adapters/agent37/execution.ts","find":"then head -c ${HEAD}","replace":"then head -c 0","test":"tests/runtimes.test.ts"}

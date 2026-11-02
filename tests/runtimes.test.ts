@@ -406,6 +406,20 @@ describe("agent37", () => {
     }
   });
 
+  test("a result over the cap keeps head and tail and states the dropped bytes", async () => {
+    const box = startAgent37("k", "i1");
+    const root = tmp("factory-a37-cap-");
+    try {
+      const cmd = "echo 'FACTORY_GATES first'; seq 1 150000";
+      const r = await a37(spec(box.url, root), { K: "k" }).run(cmd, dir());
+      expect(r.stdout.startsWith("FACTORY_GATES first\n1\n")).toBe(true);
+      expect(r.stdout).toContain("bytes dropped ...]");
+      expect(r.stdout.endsWith("\n150000\n")).toBe(true);
+    } finally {
+      box.stop();
+    }
+  });
+
   test("tar runs with COPYFILE_DISABLE=1", async () => {
     const box = startAgent37("k", "i1");
     const root = tmp("factory-a37-env-");
