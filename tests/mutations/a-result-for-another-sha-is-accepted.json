@@ -1,0 +1,1 @@
+{"name":"a result for another sha is accepted","file":"src/extension/result.ts","find":"if (o.head !== want.head) return { ok: false, reason: \"result is for another sha\" };","replace":"void want;","test":"tests/extension-result.test.ts"}
