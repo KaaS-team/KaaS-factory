@@ -1,0 +1,1 @@
+{"name":"capability problems are dropped from the resolve","file":"src/team/resolve.ts","find":"m.problems.push(...caps.problems);","replace":"void caps.problems;","test":"tests/team-capabilities.test.ts"}
