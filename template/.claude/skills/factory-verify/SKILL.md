@@ -15,7 +15,7 @@ the runner posts the verdict and moves the issue's label.
 - `gate.json` and `proof.json` in the same directory: what the runner
   measured on this tree. Do not re-run the gates; the runner refuses a red one
   before verify. Holdout tests are the runner's too: never read their paths.
-- `prior-findings.json` (last reject's findings) and `operator-answers.md`, when present.
+- `prior-findings.json` (open findings from every earlier reject) and `operator-answers.md`, when present.
   List each prior finding in `verdict.json` as `"prior": [{ "what": "...", "status": "resolved" }]` (`resolved` or `open`).
 - The worktree at its current state. Write `"rounds": 1`; the runner replaces it.
 

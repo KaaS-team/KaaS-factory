@@ -7,6 +7,7 @@ import { runDir, type Finding, type PlanArtifact, type VerdictArtifact } from ".
 import { isTrusted } from "../chatops";
 import { parseDataMarkers } from "../derive";
 import type { ProofResult, ProofStatus } from "../proof";
+import { mergeLedger, openWhats, seedLedger, type LedgerRow } from "../finding-ledger";
 import type { RunCtx } from "./common";
 import type { StepCtx } from "./steps";
 
@@ -105,7 +106,7 @@ export function applyPriorFindings(verdict: VerdictArtifact, prior: readonly str
   const status = new Map((verdict.prior ?? []).map((p) => [p.what, p.status]));
   const open = prior.filter((w) => status.get(w) !== "resolved");
   if (open.length > 0 && verdict.result === "pass") {
-    const what = `Findings from the last reject are not marked resolved: ${open.join("; ")}`;
+    const what = `Open findings from earlier rejects (${open.length}) are not marked resolved: ${open.join("; ")}`;
     verdict = {
       ...verdict,
       findings: [...verdict.findings, { severity: "could", confidence: 5, what, where: "runner" }],
@@ -145,15 +146,14 @@ export function applyPlanCriteria(
 // Set once a run has sent its off-plan rebuild, so the next round does not repeat it.
 const offPlanSentRuns = new WeakSet<RunCtx>();
 
-const mustWhats = (v: VerdictArtifact): string[] =>
-  v.findings.flatMap((f) => (typeof f === "string" ? [f] : f.severity === "must" ? [f.what] : []));
-
 export async function settleVerdict(sc: StepCtx, verdict: VerdictArtifact): Promise<VerdictArtifact> {
   if (verdict.outcome === "blocked" || verdict.outcome === "failed") return verdict;
   const { worktree, config, deps, issue, ctx } = sc;
   const proof = readRunJson<ProofResult>(worktree, issue.number, "proof.json");
   const plan = readRunJson<PlanArtifact & { source?: string }>(worktree, issue.number, "plan.json");
   const prior = readRunJson<string[]>(worktree, issue.number, "prior-findings.json") ?? [];
+  let ledger = readRunJson<LedgerRow[]>(worktree, issue.number, "findings-ledger.json");
+  if (!ledger) ledger = seedLedger(prior);
   const changed = await deps.git.changedFiles(worktree, config.base);
   const sentBefore = parseDataMarkers(issue.comments.filter(isTrusted)).some(
     (m) =>
@@ -164,11 +164,14 @@ export async function settleVerdict(sc: StepCtx, verdict: VerdictArtifact): Prom
   );
   const offPlanSent = offPlanSentRuns.has(ctx) || sentBefore;
   let out = applyVerdictRules(verdict, { proof: proof?.status, plan, changed, offPlanSent });
-  out = applyPriorFindings(out, prior);
+  out = applyPriorFindings(out, openWhats(ledger));
   out = applyPlanCriteria(out, plan?.criteria);
   if (out.findings.some((f) => typeof f !== "string" && f.what.startsWith(OFF_PLAN))) offPlanSentRuns.add(ctx);
-  const file = `${worktree}/${runDir(issue.number)}/prior-findings.json`;
-  if (out.result === "reject") writeFileSync(file, JSON.stringify(mustWhats(out), null, 2));
+  const runPath = `${worktree}/${runDir(issue.number)}`;
+  const merged = mergeLedger(ledger, out);
+  writeFileSync(`${runPath}/findings-ledger.json`, JSON.stringify(merged, null, 2));
+  const file = `${runPath}/prior-findings.json`;
+  if (out.result === "reject") writeFileSync(file, JSON.stringify(openWhats(merged), null, 2));
   else if (out.result === "pass" && existsSync(file)) rmSync(file);
   return out;
 }
