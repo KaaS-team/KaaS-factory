@@ -1,0 +1,7 @@
+{
+  "name": "pick-priority-ignored",
+  "file": "src/orchestrate/pick.ts",
+  "find": "priority:p",
+  "replace": "priority:zz",
+  "test": "tests/orchestrate-pick.test.ts"
+}
