@@ -1,0 +1,1 @@
+{"name":"a deployment for another sha is picked","file":"src/preview/health.ts","find":".filter((d) => d.sha === head && d.environment.startsWith(environment))","replace":".filter((d) => d.environment.startsWith(environment))","test":"tests/preview-health.test.ts"}
