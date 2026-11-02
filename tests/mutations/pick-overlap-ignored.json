@@ -1,0 +1,7 @@
+{
+  "name": "pick-overlap-ignored",
+  "file": "src/orchestrate/pick.ts",
+  "find": "waiting.push(",
+  "replace": "void (",
+  "test": "tests/orchestrate-pick.test.ts"
+}

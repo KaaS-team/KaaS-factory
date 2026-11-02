@@ -1,0 +1,7 @@
+{
+  "name": "groom-epic-uncapped",
+  "file": "src/orchestrate/groom.ts",
+  "find": "units.length > 1",
+  "replace": "units.length > 99",
+  "test": "tests/orchestrate-groom.test.ts"
+}
