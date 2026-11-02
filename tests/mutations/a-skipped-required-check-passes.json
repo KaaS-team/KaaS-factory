@@ -1,0 +1,1 @@
+{"name":"a skipped required check passes","file":"src/extension/check-map.ts","find":"skipped: [\"timeout\", \"park-needs-human\"],","replace":"skipped: [\"pass\", \"continue\"],","test":"tests/extension-check-map.test.ts"}

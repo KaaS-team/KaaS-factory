@@ -1,0 +1,1 @@
+{"name":"allow-flag-ignored","file":"scripts/check-contract-diff.ts","find":"if (allow) process.exit(0)","replace":"","test":"tests/check-contract-diff.test.ts"}

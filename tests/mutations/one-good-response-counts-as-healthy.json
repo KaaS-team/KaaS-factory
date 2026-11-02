@@ -1,0 +1,1 @@
+{"name":"one good response counts as healthy","file":"src/preview/health.ts","find":"if (!ok) return { healthy: false, sha };","replace":"if (!ok) continue;","test":"tests/preview-health.test.ts"}

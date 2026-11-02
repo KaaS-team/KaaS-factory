@@ -1,0 +1,1 @@
+{"name":"a check from another app is read","file":"src/extension/check-map.ts","find":".filter((r) => r.name === want.name && r.appSlug === want.app && r.headSha === want.head)","replace":".filter((r) => r.name === want.name && r.headSha === want.head)","test":"tests/extension-check-map.test.ts"}

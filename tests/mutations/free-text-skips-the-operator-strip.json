@@ -1,0 +1,1 @@
+{"name":"free text skips the operator strip","file":"src/summary/render.ts","find":"const clean = (text: string) => stripOperatorDetail(text);","replace":"const clean = (text: string) => text;","test":"tests/summary-render.test.ts"}

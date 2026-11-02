@@ -1,6 +1,7 @@
 // Four rules decide a team's config. Preferences: the most local level wins. Policy: the strictest
 // value wins, so no level loosens what the one above set. Roles, workflows and routes: replaced by
 // name, except a name the org locked. Levels apply in the order builtin, org, team, repo.
+import { resolveCapabilities } from "./capabilities";
 import { DENY_RULES, type DenyKind, type OrgFile, RISKS, type TeamFile } from "./schema";
 
 export type Level = "builtin" | "org" | "team" | "repo";
@@ -177,6 +178,18 @@ export function resolveTeam(input: ResolveInput): Resolved {
     m.named(from, level, locked, who);
     m.preferences(from, level);
     m.policy(from.policy, level, union, deny, who);
+  }
+  const caps = resolveCapabilities({
+    org: input.org as unknown as Obj | undefined,
+    team: input.team as unknown as Obj | undefined,
+    repo: input.repo,
+    teamName: input.team?.name,
+  });
+  m.problems.push(...caps.problems);
+  for (const [c, v] of Object.entries(caps.values)) {
+    if (v.modeLevel !== "builtin") m.set(`capabilities.${c}.mode`, v.mode, v.modeLevel as Level);
+    if (v.provider !== undefined) m.set(`capabilities.${c}.provider`, v.provider, v.providerLevel as Level);
+    if (v.required) m.set(`capabilities.${c}.required`, true, v.requiredLevel as Level);
   }
   return { values: m.values, origin: m.origin, problems: m.problems, denied: deny.marks, lifted: deny.lifted };
 }

@@ -1,0 +1,1 @@
+{"name":"link-not-checked","file":"src/event-chain.ts","find":"row.prevHash !== prev","replace":"false","test":"tests/event-chain.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"a fork pull request gets a preview","file":"src/preview/contract.ts","find":"if (o.fork && !(o.forks === \"approved\" && o.approved)) return false;","replace":"void o.approved;","test":"tests/preview-contract.test.ts"}
