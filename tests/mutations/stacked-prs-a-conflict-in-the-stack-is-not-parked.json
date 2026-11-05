@@ -1,0 +1,1 @@
+{"name":"stacked prs: a conflict in the stack is not parked","file":"src/stacked-prs.ts","find":"if (rb.code !== 0 && !(await syncRebase(worktree))) {","replace":"if (false) {","test":"tests/stacked-prs.test.ts"}

@@ -150,6 +150,8 @@ export interface CodeHostPort {
   prFeedback(repo: string, head: string): Promise<GhComment[]>;
   markReady(repo: string, ref: string | number, ready: boolean): Promise<void>;
   closePr(repo: string, number: number): Promise<void>;
+  // Optional: move an open PR onto another base branch (a stacked PR whose lower slice merged).
+  retargetPr?(repo: string, number: number, base: string): Promise<void>;
   prStatus(repo: string, number: number): Promise<PrStatus>;
   mergeReadiness(repo: string, number: number): Promise<MergeReadiness>;
   prDiff(repo: string, prNumber: number): Promise<string>;
