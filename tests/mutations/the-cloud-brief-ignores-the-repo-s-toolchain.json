@@ -1,0 +1,7 @@
+{
+  "name": "the cloud brief ignores the repo's toolchain",
+  "file": "src/engine/cloud-build.ts",
+  "find": "${toolchainLines(toolchain).join(\"\\n\")}",
+  "replace": "",
+  "test": "tests/cloud-build.test.ts"
+}

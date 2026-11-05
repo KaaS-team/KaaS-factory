@@ -1,0 +1,7 @@
+{
+  "name": "a cloud build starts in a repo with no gate",
+  "file": "src/cloud/toolchain.ts",
+  "find": "if (i.toolchain.gate === undefined) return NO_GATE_REASON;",
+  "replace": "",
+  "test": "tests/cloud-toolchain.test.ts"
+}

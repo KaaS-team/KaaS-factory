@@ -1,7 +1,10 @@
 // Cloud build path: hand the planned body to a provider, pull its commits, grade locally.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { cloudLedger, cloudProvider, CloudError, TERMINAL, type CloudProvider, type CloudStatus } from "../cloud";
 import { defaultCloudIo } from "../cloud-io";
+import { launchRefusal, toolchainLines, toolchainOf, type Toolchain } from "../cloud/toolchain";
 import { runGates } from "../gates";
 import { orchestrateActive, orchestrateOf, type Orchestrate } from "../orchestrate/config";
 import type { StageRunResult } from "../ports/agent";
@@ -39,14 +42,19 @@ export interface CloudIo {
   orchestrate?: boolean;
 }
 
-export function cloudPrompt(issueBody: string, branch: string, protectedPaths: readonly string[]): string {
+export function cloudPrompt(
+  issueBody: string,
+  branch: string,
+  protectedPaths: readonly string[],
+  toolchain: Toolchain,
+): string {
   const paths =
     protectedPaths.length > 0 ? protectedPaths.map((p) => `- ${p}`).join("\n") : "- (none beyond .factory/)";
   return `${issueBody}
 
 Work only on branch \`${branch}\`.
 Commit and push there.
-Run the repo's gates before finishing.
+${toolchainLines(toolchain).join("\n")}
 Do not open a pull request.
 Do not edit \`.factory/\` or these protected paths:
 ${paths}`;
@@ -206,8 +214,18 @@ async function startCloudRun(
   const n = issue.number;
   const res = ledger.reservation(n)!;
   const branch = deps.git.branchName(n);
-  const prompt = cloudPrompt(issue.body ?? "", branch, config.protectedPaths);
   const sess = ledger.session(n);
+  const toolchain = toolchainOf((rel) => {
+    try {
+      return readFileSync(join(worktree, rel), "utf8");
+    } catch {
+      return undefined;
+    }
+  });
+  const seeded = sess !== undefined ? (await deps.git.remoteHeadSha(worktree, n)) !== undefined : true;
+  const refusal = launchRefusal({ toolchain, seed: sess ? { branch, onRemote: seeded } : undefined });
+  if (refusal) throw new Error(refusal);
+  const prompt = cloudPrompt(issue.body ?? "", branch, config.protectedPaths, toolchain);
   const before = sess?.baseSha ?? (await deps.git.remoteHeadSha(worktree, n)) ?? "";
   const key = `${config.repo}#${n}#${res.attempt}`;
   const launched = await provider.launch({

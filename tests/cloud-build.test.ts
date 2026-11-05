@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { agentIdFor } from "../src/cloud/cursor";
 import { CloudError, type CloudProvider, type CloudRun } from "../src/cloud/port";
@@ -27,6 +27,7 @@ class FakeCloud implements CloudProvider {
   polls = 0;
   usageCost = 0;
   lastKey = "";
+  lastPrompt = "";
   runId = "cloud-run-1";
   finishAfterPolls = 2;
   launchError: CloudError | undefined;
@@ -35,6 +36,7 @@ class FakeCloud implements CloudProvider {
   async launch(i: import("../src/cloud/port").LaunchInput): Promise<CloudRun> {
     this.launchCalls += 1;
     this.lastKey = i.key;
+    this.lastPrompt = i.prompt;
     if (this.launchError) throw this.launchError;
     return { id: this.runId, status: "running" };
   }
@@ -123,9 +125,11 @@ function reserveCloud(state: FactoryState, repo: string, issue: number): void {
   cloudLedger(state, repo).reserve(issue, "cursor-cloud");
 }
 
-function worktreeDir(): string {
+// A repo with a gate: a cloud build is refused before launch without one (#624).
+function worktreeDir(files: Record<string, string> = { Makefile: "check:\n\ttrue\n" }): string {
   const dir = mkdtempSync(join(tmpBase, "wt-"));
   roots.push(dir);
+  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
   mkdirSync(join(dir, ".factory", "runs", "issue-7"), { recursive: true });
   mkdirSync(join(dir, ".factory", "runs", "issue-3"), { recursive: true });
   return dir;
@@ -389,5 +393,57 @@ describe("cloud build step line count", () => {
   test("steps.ts stays under the baseline cap", () => {
     const lines = readFileSync(join(import.meta.dir, "../src/engine/steps.ts"), "utf8").split("\n").length;
     expect(lines).toBeLessThan(564);
+  });
+
+  async function runBuild(files: Record<string, string>, session?: boolean) {
+    const fake = new FakeCloud();
+    const git = new CloudGit();
+    fake.onPoll = () => {
+      git.remoteSha = "bbb111";
+    };
+    const state = new FactoryState(":memory:");
+    state.setToggle("orchestrate", true);
+    const repo = "acme/widgets";
+    const config = mergeConfig({ repo, base: "main", orchestrate: { enabled: true } });
+    reserveCloud(state, repo, 7);
+    if (session) {
+      cloudLedger(state, repo).started(7, "cursor-cloud", "old-run", "aaa000");
+      git.remoteHeadSha = async () => undefined;
+    }
+    state.upsertRun({ repo, issue: 7, title: "t", stage: "build", status: "running", config_hash: "x" });
+    const issue = baseIssue(7, [LABEL.ready]);
+    const sc = stepCtx(
+      { state, git, gateRunner: new FakeGateRunner(), github: new FakeGitHub([issue]) } as unknown as StepCtx["deps"],
+      config,
+      issue,
+      worktreeDir(files),
+    );
+    const out = await cloudAware(STEP_TYPES.build!, testIo(fake)).run(sc);
+    state.close();
+    return { out, fake };
+  }
+
+  test("the brief names the repo's own install, gate and mutation commands", async () => {
+    const { fake } = await runBuild({
+      "package.json": JSON.stringify({ scripts: { test: "vitest", mutation: "stryker run" } }),
+      "package-lock.json": "{}",
+    });
+    expect(fake.lastPrompt).toContain("`npm ci`");
+    expect(fake.lastPrompt).toContain("`npm run test`");
+    expect(fake.lastPrompt).toContain("`npm run mutation`");
+    expect(fake.lastPrompt).not.toContain("bun");
+    expect(fake.lastPrompt).not.toContain("make fast");
+  });
+
+  test("a repo with no gate config is refused before launch, with the reason", async () => {
+    const { out, fake } = await runBuild({ "README.md": "hi" });
+    expect(fake.launchCalls).toBe(0);
+    expect(out.kind).toBe("stop");
+  });
+
+  test("a retry whose seed branch is not on the remote is refused before launch", async () => {
+    const { out, fake } = await runBuild({ Makefile: "check:\n\ttrue\n" }, true);
+    expect(fake.launchCalls).toBe(0);
+    expect(out.kind).toBe("stop");
   });
 });

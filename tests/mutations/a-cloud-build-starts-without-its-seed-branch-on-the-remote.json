@@ -1,0 +1,7 @@
+{
+  "name": "a cloud build starts without its seed branch on the remote",
+  "file": "src/cloud/toolchain.ts",
+  "find": "if (i.seed && !i.seed.onRemote)",
+  "replace": "if (false)",
+  "test": "tests/cloud-toolchain.test.ts"
+}
