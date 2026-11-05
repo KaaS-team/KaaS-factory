@@ -1,0 +1,7 @@
+{
+  "name": "board check lets an issue with no milestone through",
+  "file": "scripts/board-check.ts",
+  "find": "if (!i.milestone && !i.labels.includes(LATER_LABEL))",
+  "replace": "if (false)",
+  "test": "tests/board-check.test.ts"
+}

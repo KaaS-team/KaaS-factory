@@ -1,0 +1,7 @@
+{
+  "name": "board check exits 0 when required and a finding exists",
+  "file": "scripts/board-check.ts",
+  "find": "args.includes(\"--required\") && findings.length ? 1 : 0",
+  "replace": "0",
+  "test": "tests/board-check.test.ts"
+}

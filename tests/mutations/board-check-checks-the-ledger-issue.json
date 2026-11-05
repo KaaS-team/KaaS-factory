@@ -1,0 +1,7 @@
+{
+  "name": "board check checks the ledger issue",
+  "file": "scripts/board-check.ts",
+  "find": " || isLedger(i)",
+  "replace": "",
+  "test": "tests/board-check.test.ts"
+}

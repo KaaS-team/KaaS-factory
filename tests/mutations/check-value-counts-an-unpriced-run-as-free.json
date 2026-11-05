@@ -1,0 +1,7 @@
+{
+  "name": "check value counts an unpriced run as free",
+  "file": "scripts/check-value.ts",
+  "find": "else a.unknown++;",
+  "replace": "",
+  "test": "tests/check-value.test.ts"
+}

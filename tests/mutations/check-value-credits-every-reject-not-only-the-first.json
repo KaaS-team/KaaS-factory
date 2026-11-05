@@ -1,0 +1,7 @@
+{
+  "name": "check value credits every reject not only the first",
+  "file": "scripts/check-value.ts",
+  "find": "ordered.find((s) => s.verdict === \"reject\")",
+  "replace": "ordered.filter((s) => s.verdict === \"reject\").pop()",
+  "test": "tests/check-value.test.ts"
+}
