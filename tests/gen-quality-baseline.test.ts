@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readBaseline, writeBaseline } from "../src/baseline-shards";
 import { regenerate } from "../scripts/gen-quality-baseline";
 
 const sizes = (m: Record<string, number>) => (f: string) => m[f];
@@ -29,9 +30,10 @@ test("drops a deleted file", () => {
 test("--check exits 1 on a stale baseline and writes nothing", async () => {
   const dir = mkdtempSync(join(tmpdir(), "qbaseline-"));
   writeFileSync(join(dir, "a.ts"), "x\ny\n");
-  const baseline = join(dir, "quality-baseline.json");
-  const stale = `${JSON.stringify({ comments: {}, lines: { "a.ts": 9 } }, null, 2)}\n`;
-  writeFileSync(baseline, stale);
+  const baseline = join(dir, "quality-baseline");
+  writeBaseline({ metrics: { lines: { "a.ts": 9 } } }, baseline);
+  const shard = join(baseline, "lines/a.ts.json");
+  const stale = readFileSync(shard, "utf8");
   const run = (...flags: string[]) =>
     Bun.spawnSync([
       "bun",
@@ -45,8 +47,30 @@ test("--check exits 1 on a stale baseline and writes nothing", async () => {
   const check = run("--check");
   expect(check.exitCode).toBe(1);
   expect(check.stderr.toString()).toContain("a.ts");
-  expect(await Bun.file(baseline).text()).toBe(stale);
+  expect(readFileSync(shard, "utf8")).toBe(stale);
   expect(run().exitCode).toBe(0);
   expect(run("--check").exitCode).toBe(0);
-  expect(JSON.parse(await Bun.file(baseline).text()).lines).toEqual({ "a.ts": 2 });
+  expect(readBaseline(dir, baseline).metrics.lines).toEqual({ "a.ts": 2 });
+});
+
+test("--check fails on a shard that is not in canonical form", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qbaseline-"));
+  writeFileSync(join(dir, "a.ts"), "x\ny\n");
+  const baseline = join(dir, "quality-baseline");
+  writeBaseline({ metrics: { lines: { "a.ts": 2 } } }, baseline);
+  writeFileSync(join(baseline, "lines/stray.json"), '{"file":"a.ts","max":2}\n');
+  const run = Bun.spawnSync(
+    [
+      "bun",
+      join(import.meta.dir, "../scripts/gen-quality-baseline.ts"),
+      "--root",
+      dir,
+      "--baseline",
+      baseline,
+      "--check",
+    ],
+    { stderr: "pipe" },
+  );
+  expect(run.exitCode).toBe(1);
+  expect(run.stderr.toString()).toContain("lines/stray.json");
 });

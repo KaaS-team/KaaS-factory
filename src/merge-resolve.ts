@@ -6,7 +6,7 @@ export interface Rule {
 }
 
 export const RULES: Rule[] = [
-  { match: (p) => p === "quality-baseline.json", action: "regenerate", cmd: "bun scripts/gen-quality-baseline.ts" },
+  { match: (p) => p.startsWith("quality-baseline/"), action: "regenerate", cmd: "bun scripts/gen-quality-baseline.ts" },
   { match: (p) => p === "tests/mutation-list.test.ts", action: "take-main" },
   { match: (p) => p === "tests/mutations.json", action: "take-main" },
 ];

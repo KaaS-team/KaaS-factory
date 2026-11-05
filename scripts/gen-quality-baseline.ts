@@ -1,11 +1,12 @@
-// quality-baseline.json pins each over-limit file's line count, and the count may only fall.
+// quality-baseline/ pins each over-limit file's line count, and the count may only fall.
 // This lowers the entries to the files' real sizes so a PR never edits them by hand.
 //
 //   bun scripts/gen-quality-baseline.ts                 write the lowered baseline in place
 //   bun scripts/gen-quality-baseline.ts --check         write nothing; exit 1 if the file is stale
 //   bun scripts/gen-quality-baseline.ts --allow-raise   also write entries that would rise
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { BASELINE_DIR, drift, readBaseline, writeBaseline } from "../src/baseline-shards";
 
 export type Sizes = Record<string, number>;
 
@@ -37,22 +38,25 @@ if (import.meta.main) {
   const flag = (name: string) => args.includes(name);
   const value = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
   const root = value("--root") ?? join(import.meta.dir, "..");
-  const path = value("--baseline") ?? join(root, "quality-baseline.json");
-  const baseline = JSON.parse(readFileSync(path, "utf8"));
+  const dir = value("--baseline") ?? join(root, BASELINE_DIR);
+  const baseline = readBaseline(root, dir);
+  const was = baseline.metrics.lines ?? {};
   const measure = (file: string) =>
     existsSync(join(root, file)) ? size(readFileSync(join(root, file), "utf8")) : undefined;
-  const { next, raised } = regenerate(baseline.lines, measure, flag("--allow-raise"));
-  const out = `${JSON.stringify({ ...baseline, lines: next }, null, 2)}\n`;
-  const stale = Object.keys(baseline.lines).filter((f) => next[f] !== baseline.lines[f]);
-  const dropped = Object.keys(baseline.lines).filter((f) => !(f in next));
+  const { next, raised } = regenerate(was, measure, flag("--allow-raise"));
+  const wanted = { ...baseline, metrics: { ...baseline.metrics, lines: next } };
+  const stale = Object.keys(was).filter((f) => next[f] !== was[f]);
+  const dropped = Object.keys(was).filter((f) => !(f in next));
   for (const f of raised)
     console.error(
-      `${f}: grew past ${baseline.lines[f]} (${flag("--allow-raise") ? "raised" : "not raised, fix the file or pass --allow-raise"})`,
+      `${f}: grew past ${was[f]} (${flag("--allow-raise") ? "raised" : "not raised, fix the file or pass --allow-raise"})`,
     );
-  for (const f of stale) console.error(`stale: ${f} ${baseline.lines[f]} -> ${next[f]}`);
+  for (const f of stale) console.error(`stale: ${f} ${was[f]} -> ${next[f]}`);
   for (const f of dropped) console.error(`stale: ${f} is gone`);
+  const off = drift(wanted, dir);
   if (flag("--check")) {
-    process.exit(readFileSync(path, "utf8") === out && raised.length === 0 ? 0 : 1);
+    for (const rel of off) console.error(`not in canonical form: ${rel}`);
+    process.exit(off.length === 0 && raised.length === 0 ? 0 : 1);
   }
-  writeFileSync(path, out);
+  writeBaseline(wanted, dir);
 }

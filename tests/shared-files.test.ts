@@ -33,8 +33,8 @@ test("a plan listing only a shard file passes", async () => {
 });
 
 test("sharedClaims returns only the unexcused shared paths", () => {
-  expect(sharedClaims(["Makefile", "src/a.ts", "quality-baseline.json"], ["Shared-ok: Makefile: wiring"])).toEqual([
-    "quality-baseline.json",
+  expect(sharedClaims(["Makefile", "src/a.ts", "tests/ci-wiring.test.ts"], ["Shared-ok: Makefile: wiring"])).toEqual([
+    "tests/ci-wiring.test.ts",
   ]);
 });
 

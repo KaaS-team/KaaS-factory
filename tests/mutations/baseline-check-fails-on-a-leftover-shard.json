@@ -1,0 +1,7 @@
+{
+  "name": "baseline: check fails on a leftover shard",
+  "file": "src/baseline-shards.ts",
+  "find": "...[...have].filter((rel) => !want.has(rel))",
+  "replace": "...[]",
+  "test": "tests/gen-quality-baseline.test.ts"
+}

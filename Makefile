@@ -61,7 +61,7 @@ check-anchors:
 check-mutations:
 	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null bun scripts/check-mutations.ts $(MUTATION_ARGS)
 
-# A stale quality-baseline.json fails here with the entries named; `bun scripts/gen-quality-baseline.ts` lowers them.
+# A stale quality-baseline/ entry fails here with the entries named; `bun scripts/gen-quality-baseline.ts` lowers them.
 check-baseline:
 	bun scripts/gen-quality-baseline.ts --check
 

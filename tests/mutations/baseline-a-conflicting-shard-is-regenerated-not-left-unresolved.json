@@ -1,0 +1,7 @@
+{
+  "name": "baseline: a conflicting shard is regenerated, not left unresolved",
+  "file": "src/merge-resolve.ts",
+  "find": "(p) => p.startsWith(\"quality-baseline/\")",
+  "replace": "(p) => p === \"quality-baseline\"",
+  "test": "tests/merge-resolve.test.ts"
+}

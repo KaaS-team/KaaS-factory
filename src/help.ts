@@ -174,6 +174,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code)",
   },
   {
+    name: "hotspots",
+    usage: "hotspots [--commits <n>] [--top <n>] [--json]",
+    does: "list the files that the most recent merged PRs (first-parent commits ending in (#N), default 200) changed more than once, most often first; a file listed there is where parallel PRs collide, so shard it",
+  },
+  {
     name: "backup",
     usage: "backup (now | list | restore (--id <id> | --date <YYYY-MM-DD>) [--to <dir>] [--force]) [--json]",
     does: "now: snapshot every state DB to the bucket with a sha256 manifest, then prune past FACTORY_BACKUP_KEEP_DAYS; list: the backups there; restore: check every sha256, then write the files (stop the stack first)",

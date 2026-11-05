@@ -1,0 +1,7 @@
+{
+  "name": "baseline: each entry is its own file",
+  "file": "src/baseline-shards.ts",
+  "find": "file.replace(/\\//g, \"__\")",
+  "replace": "\"all\"",
+  "test": "tests/baseline-shards.test.ts"
+}

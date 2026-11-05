@@ -32,16 +32,16 @@ function conflicted(file: string): string {
   return dir;
 }
 
-test("quality-baseline.json takes main's side and runs the regenerate cmd", () => {
-  const dir = conflicted("quality-baseline.json");
+test("a quality-baseline shard takes main's side and runs the regenerate cmd", () => {
+  const dir = conflicted("quality-baseline/lines/a.ts.json");
   const calls: string[] = [];
   const run = (cwd: string, argv: string[]) => {
     calls.push(argv.join(" "));
     return defaultRun(cwd, argv[0] === "bash" ? ["true"] : argv);
   };
   const r = resolveConflicts(dir, run);
-  expect(r).toEqual({ resolved: ["quality-baseline.json"], unresolved: [] });
-  expect(readFileSync(join(dir, "quality-baseline.json"), "utf8")).toBe("main\n");
+  expect(r).toEqual({ resolved: ["quality-baseline/lines/a.ts.json"], unresolved: [] });
+  expect(readFileSync(join(dir, "quality-baseline/lines/a.ts.json"), "utf8")).toBe("main\n");
   expect(calls.some((c) => c.includes("bun scripts/gen-quality-baseline.ts"))).toBe(true);
 });
 

@@ -1,0 +1,7 @@
+{
+  "name": "hotspots: a commit with no PR number is not a PR",
+  "file": "src/hotspots.ts",
+  "find": "return pr ? { pr, files } : undefined;",
+  "replace": "return { pr: pr ?? subject, files };",
+  "test": "tests/baseline-shards.test.ts"
+}

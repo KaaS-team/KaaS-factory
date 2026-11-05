@@ -5,7 +5,6 @@ export const SHARED_FILES: readonly string[] = [
   "tests/ci-wiring.test.ts",
   "tests/mutation-list.test.ts",
   "tests/skip-count.test.ts",
-  "quality-baseline.json",
   "Makefile",
 ];
 

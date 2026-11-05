@@ -1,0 +1,7 @@
+{
+  "name": "hotspots: a file one PR changed is not a hotspot",
+  "file": "src/hotspots.ts",
+  "find": ".filter((h) => h.prs >= min)",
+  "replace": ".filter((h) => h.prs >= 0)",
+  "test": "tests/baseline-shards.test.ts"
+}
