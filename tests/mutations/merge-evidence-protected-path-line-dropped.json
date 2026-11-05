@@ -1,0 +1,1 @@
+{"name": "merge evidence: protected path line dropped", "file": "src/merge-evidence.ts", "find": "lines.push(`  ${glob}: ${hit.length ? rate(hit) : \"no reviewed PRs\"}`);", "replace": "void hit;", "test": "tests/metrics-evidence.test.ts"}

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -66,4 +66,52 @@ test("the script logs a row and prints the globs to add", () => {
     .split("\n");
   expect(JSON.parse(rows[rows.length - 1] ?? "{}").failed).toBe(1);
   rmSync(join(import.meta.dir, "..", "reports", "affected-misses.jsonl"));
+});
+
+test("a skipped check that fails writes a miss row and the issue names the check and the files", () => {
+  const cfgPath = join(root, "repo.json");
+  const log = join(root, "misses.jsonl");
+  writeFileSync(cfgPath, JSON.stringify(cfg));
+  const run = () =>
+    Bun.spawnSync(
+      [
+        py,
+        script,
+        "--before",
+        "abc",
+        "--failed",
+        "unit,docs",
+        "--files",
+        "src/a.ts",
+        "--config",
+        cfgPath,
+        "--log",
+        log,
+      ],
+      {
+        cwd: join(import.meta.dir, ".."),
+      },
+    );
+  const p = run();
+  expect(p.stdout.toString()).toContain("affected-misses: 1 of 2 failures this push");
+  expect(p.stdout.toString()).toContain("- docs: add");
+  const row = JSON.parse(readFileSync(log, "utf8").trim().split("\n")[0] ?? "{}");
+  expect(row.misses).toEqual(["docs"]);
+  expect(row.failed).toBe(2);
+  // The second push adds a row and the printed rate covers both: 2 misses over 4 failures.
+  expect(run().stdout.toString()).toContain("Miss rate across 2 pushes: 0.5");
+});
+
+test("the issue body names the check, the changed files and the globs to add", () => {
+  const driver = `
+import importlib.util, json
+spec = importlib.util.spec_from_file_location("am", ${JSON.stringify(script)})
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+print(json.dumps([m.title("docs"), m.body("docs", "abc123", ["src/a.ts", "src/b.ts"], ["src/a.ts"])]))`;
+  const [title, body] = JSON.parse(run(driver)) as [string, string];
+  expect(title).toBe("Affected-check miss: docs");
+  expect(body).toContain("failed `docs`");
+  expect(body).toContain("- `src/a.ts`");
+  expect(body).toContain("- `src/b.ts`");
+  expect(body).toContain('["src/a.ts"]');
 });

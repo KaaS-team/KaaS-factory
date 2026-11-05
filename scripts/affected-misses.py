@@ -3,7 +3,8 @@
 same diff would not have run. Each push appends a row; a miss opens an issue naming the `when` globs to add.
 
 Needs Python 3.12 (check-affected.py does).
-Usage: affected-misses.py --before SHA (--failed a,b | --report FILE) [--files x,y] [--open-issues]
+Usage: affected-misses.py --before SHA (--failed a,b | --report FILE) [--files x,y] [--config FILE] [--log FILE] [--open-issues]
+  --config and --log swap the repo.json and the miss log (tests use them).
   --report is JSON with a `failed` list of check names; --files skips git (a checkout with no history).
 Why: docs/decisions/scripts.md#check-affectedpy
 """
@@ -74,7 +75,9 @@ def main() -> int:
     else:
         print("affected-misses: no failed-check list to compare")
         return 0
-    cfg = json.loads(ca.repo_json(ROOT).read_text())
+    given_cfg, given_log = flag(args, "--config"), flag(args, "--log")
+    log = Path(given_log) if given_log else ROOT / LOG
+    cfg = json.loads((Path(given_cfg) if given_cfg else ca.repo_json(ROOT)).read_text())
     if given is not None:
         files = [f for f in given.split(",") if f]
     else:
@@ -82,10 +85,10 @@ def main() -> int:
     sha = ca.git(ROOT, "rev-parse", "HEAD").stdout.strip()
     found = misses(cfg, files, failed)
     row = {"at": datetime.now(timezone.utc).isoformat(), "sha": sha, "before": before, "failed": len(failed), "misses": found}
-    (ROOT / LOG).parent.mkdir(parents=True, exist_ok=True)
-    with open(ROOT / LOG, "a") as fh:
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with open(log, "a") as fh:
         fh.write(json.dumps(row) + "\n")
-    rows = [json.loads(l) for l in (ROOT / LOG).read_text().splitlines() if l]
+    rows = [json.loads(l) for l in log.read_text().splitlines() if l]
     total, hit = sum(r["failed"] for r in rows), sum(len(r["misses"]) for r in rows)
     print(f"affected-misses: {len(found)} of {len(failed)} failures this push")
     for name in found:

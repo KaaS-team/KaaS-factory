@@ -39,3 +39,31 @@ describe("metricsFor merge evidence", () => {
     done();
   });
 });
+
+describe("evidence report is a read-only summary", () => {
+  test("reading it changes no setting and lists each gap by name", () => {
+    const { state, done } = open();
+    const full = mergeConfig({
+      repo: REPO,
+      protectedPaths: ["infra/**"],
+      merge: { ...CONFIG.merge, smokeUrl: "https://x.test/health", previewUrl: "https://{pr}.x.test" },
+    });
+    for (let pr = 1; pr <= 10; pr++) {
+      recordEvidence(state, full, { pr, review: pass, decision: "APPROVED", paths: ["infra/a.tf"] });
+    }
+    const before = JSON.stringify(state.getSetting(`merge-evidence:${REPO}`));
+    const report = metricsFor([{ repo: REPO, state, config: full }], { operator: false }).mergeEvidence?.[0]?.report;
+    expect(report).toContain("Readiness gaps: none");
+    expect(report).toContain("infra/**: 10/10 agree");
+    expect(JSON.stringify(state.getSetting(`merge-evidence:${REPO}`))).toBe(before);
+    done();
+  });
+
+  test("an unset gate and a thin protected path are both listed", () => {
+    const { state, done } = open();
+    const report = metricsFor([{ repo: REPO, state, config: CONFIG }], { operator: false }).mergeEvidence?.[0]?.report;
+    expect(report).toContain("merge.previewUrl is not set");
+    expect(report).toContain("thin review evidence on infra/**: 0 of 10");
+    done();
+  });
+});
