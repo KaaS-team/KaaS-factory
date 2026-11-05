@@ -1,3 +1,4 @@
+# staged: new (no live copy yet; a lander moves it to .github/workflows and deletes this one)
 name: escaped-defects
 
 on:

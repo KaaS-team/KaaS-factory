@@ -1,0 +1,7 @@
+{
+  "name": "a staged copy may stay after it moved live",
+  "file": "scripts/check-ci-staged.ts",
+  "find": "if (f.live === f.text)",
+  "replace": "if (false)",
+  "test": "tests/ci-staged.test.ts"
+}

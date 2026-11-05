@@ -1,0 +1,7 @@
+{
+  "name": "a staged file with no live twin needs no note",
+  "file": "scripts/check-ci-staged.ts",
+  "find": "return NEW_NOTE.test(f.text)",
+  "replace": "return true",
+  "test": "tests/ci-staged.test.ts"
+}
