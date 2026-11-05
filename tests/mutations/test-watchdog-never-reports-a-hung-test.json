@@ -1,0 +1,7 @@
+{
+  "name": "test-watchdog never reports a hung test",
+  "file": "scripts/test-watchdog.ts",
+  "find": "if (now - m.start > limitMs)",
+  "replace": "if (false)",
+  "test": "tests/test-watchdog.test.ts"
+}

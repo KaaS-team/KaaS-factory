@@ -1,0 +1,7 @@
+{
+  "name": "board check accepts an epic child that does not exist",
+  "file": "scripts/board-check.ts",
+  "find": "if (!child) add(",
+  "replace": "if (false) add(",
+  "test": "tests/board-check.test.ts"
+}

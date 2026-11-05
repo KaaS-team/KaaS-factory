@@ -1,0 +1,7 @@
+{
+  "name": "gates test forgets to recreate the temp root",
+  "file": "tests/gates.test.ts",
+  "find": "    mkdirSync(tmpdir(), { recursive: true });\n    const dir = mkdtempSync(join(tmpdir(), \"gates-mono-\"));",
+  "replace": "    const dir = mkdtempSync(join(tmpdir(), \"gates-mono-\"));",
+  "test": "tests/rerun-state.test.ts"
+}

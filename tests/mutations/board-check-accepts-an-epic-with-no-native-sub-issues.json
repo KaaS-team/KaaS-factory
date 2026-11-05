@@ -1,0 +1,7 @@
+{
+  "name": "board check accepts an epic with no native sub-issues",
+  "file": "scripts/board-check.ts",
+  "find": "if (!i.subIssues.length) add(",
+  "replace": "if (false) add(",
+  "test": "tests/board-check.test.ts"
+}

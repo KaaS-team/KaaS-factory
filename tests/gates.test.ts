@@ -4,7 +4,7 @@
 // stderr output, or missing entirely (a misconfigured target's gates.sh).
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseGateLine, runGates, ShellGateRunner, type GateRunner } from "../src/gates";
@@ -121,6 +121,7 @@ describe("gates.sh packages", () => {
 
   // A main commit (with the seed files), then a branch that adds the touch files.
   function repo(touch: string[], seed: string[] = []): string {
+    mkdirSync(tmpdir(), { recursive: true });
     const dir = mkdtempSync(join(tmpdir(), "gates-mono-"));
     dirs.push(dir);
     cpSync(join(root, "tests", "fixtures", "monorepo"), dir, { recursive: true });

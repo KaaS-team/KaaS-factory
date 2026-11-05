@@ -1,0 +1,7 @@
+{
+  "name": "up --tmux does not forward the port to the dashboard window",
+  "file": "src/tmux.ts",
+  "find": "...repoDir, ...pass, ...port].join(\" \")",
+  "replace": "...repoDir, ...pass].join(\" \")",
+  "test": "tests/cli-ports.test.ts"
+}

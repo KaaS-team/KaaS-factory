@@ -1,4 +1,4 @@
-.PHONY: agent-matrix install check check-anchors check-baseline check-cli-reference check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks
+.PHONY: agent-matrix install check check-anchors check-baseline check-cli-reference check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks rerun
 include $(wildcard make/*.mk)
 
 install:
@@ -41,12 +41,19 @@ typecheck:
 # Test files run in 4 worker processes; a --rerun-each run (the three-times check) stays serial.
 TEST_PAR ?= $(if $(findstring --rerun-each,$(TEST_ARGS)),,--parallel=4)
 GIT_ENV = GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true
+# One test running past TEST_HANG_LIMIT seconds is killed and named (scripts/test-watchdog.ts, #478); the push job's make check step stops at 8 minutes.
+TEST_HANG_LIMIT ?= 300
 # Every temp file a test, or a process it starts, makes lands in one dir, removed when the run ends (#270).
 test:
 	@mkdir -p reports
 	@root=$$(mktemp -d "$${TMPDIR:-/tmp}/factory-test-run.XXXXXX"); \
-	$(GIT_ENV) TMPDIR=$$root $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_PAR) $(TEST_ARGS) $(FILES) || { c=$$?; bun scripts/test-failures.ts reports/junit.xml || true; (exit $$c); }; \
+	$(GIT_ENV) TMPDIR=$$root bun scripts/test-watchdog.ts --limit $(TEST_HANG_LIMIT) -- $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --preload ./scripts/test-hang-marker.ts --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_PAR) $(TEST_ARGS) $(FILES) || { c=$$?; bun scripts/test-failures.ts reports/junit.xml || true; (exit $$c); }; \
 	code=$$?; rm -rf "$$root"; exit $$code
+
+# Files that failed the three-times check on main and were fixed (#566, #585); ci.yml runs this on every push.
+RERUN_FILES = tests/git.test.ts tests/gates.test.ts
+rerun:
+	$(MAKE) test FILES="$(RERUN_FILES)" TEST_ARGS="--rerun-each 3"
 
 quarantine:
 	@f=$$(grep -rl @quarantine tests --include='*.test.ts'); if [ -z "$$f" ]; then echo "quarantine: no @quarantine tests"; \

@@ -1,0 +1,1 @@
+{"name":"event ingress ignores events.accept","file":"dashboard/plane/integrations.ts","find":"acceptsEvent(e.type, await deps.acceptFor?.(target))","replace":"acceptsEvent(e.type, undefined)","test":"tests/events.test.ts"}

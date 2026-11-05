@@ -92,6 +92,27 @@ describe("test failures summary", () => {
     expect(reportWithLog(missingPath, logPath)).toContain("last test file started: tests/b.test.ts");
   });
 
+  test("a failed test step with no failing test says so and names the last file started", () => {
+    const dir = tmp();
+    const j = join(dir, "j.xml");
+    const logPath = join(dir, "run.log");
+    writeFileSync(j, wrap(ok("one")));
+    writeFileSync(logPath, "tests/a.test.ts:\nmake: *** [Makefile:40: test] Error 137\n");
+    const out = reportWithLog(j, logPath);
+    expect(out).toContain(
+      "test step exited non-zero (Error 137) and no test failed; last test file started: tests/a.test.ts",
+    );
+  });
+
+  test("a log with no failed test step adds no abort line", () => {
+    const dir = tmp();
+    const j = join(dir, "j.xml");
+    const logPath = join(dir, "run.log");
+    writeFileSync(j, wrap(ok("one")));
+    writeFileSync(logPath, "tests/a.test.ts:\nmake: *** [Makefile:30: lint] Error 1\n");
+    expect(reportWithLog(j, logPath)).not.toContain("no test failed");
+  });
+
   test("no log keeps the old output", () => {
     const dir = tmp();
     const p = join(dir, "j.xml");

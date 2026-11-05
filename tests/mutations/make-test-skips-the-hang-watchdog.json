@@ -1,0 +1,7 @@
+{
+  "name": "make test skips the hang watchdog",
+  "file": "Makefile",
+  "find": "bun scripts/test-watchdog.ts --limit $(TEST_HANG_LIMIT) -- $(CACHE) test",
+  "replace": "$(CACHE) test",
+  "test": "tests/test-watchdog.test.ts"
+}

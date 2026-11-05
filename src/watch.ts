@@ -198,6 +198,13 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
   return runFromStage(deps, config, issue, start, worktree);
 }
 
+// A chat command counts once: a runner comment after it (the cancel notice, a failure, a retry's
+// acknowledgement) means it was handled, so neither a reopen nor a second park replays it.
+function handled(issue: GhIssue, command: GhComment): boolean {
+  const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
+  return !!lastRunner && Date.parse(lastRunner.createdAt) >= Date.parse(command.createdAt);
+}
+
 // `/factory cancel` in any waiting state: drop the lifecycle labels, close the
 // PR and the issue, and remove the worktree, so what the README says is what
 // happens. The branch stays, so nothing already pushed is lost.
@@ -260,7 +267,8 @@ export async function resumeNeedsInfo(
   if (!question) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, question.createdAt);
   if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
-  if (parseChatOps(reply.body).type === "cancel") return cancelRun(issue, deps, config);
+  if (parseChatOps(reply.body).type === "cancel")
+    return handled(issue, reply) ? "waiting" : cancelRun(issue, deps, config);
 
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
   const worktree = worktreeFor(deps, issue.number);
@@ -296,7 +304,7 @@ export async function resumeAwaitingApproval(
   const command = reply ? parseChatOps(reply.body) : ({ type: "approve" } as const);
   const worktree = worktreeFor(deps, issue.number);
 
-  if (command.type === "cancel") return cancelRun(issue, deps, config);
+  if (command.type === "cancel") return reply && handled(issue, reply) ? "waiting" : cancelRun(issue, deps, config);
   if (!edge) return "waiting";
   const resumeAt = async (stepId: string): Promise<Outcome> => {
     if (
@@ -331,7 +339,8 @@ export async function resumeOverlap(
   config: FactoryConfig,
 ): Promise<Outcome | undefined> {
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
-  if (latest && parseChatOps(latest.body).type === "cancel") return cancelRun(issue, deps, config);
+  if (latest && !handled(issue, latest) && parseChatOps(latest.body).type === "cancel")
+    return cancelRun(issue, deps, config);
   if ((await overlapsOf(deps, config, issue.number, plannedFiles(issue))).length > 0) return "waiting";
   const build = Object.values(workflowOf(deps, issue).steps).find((s) => s.uses === "build");
   if (!build) return "waiting";
@@ -341,7 +350,8 @@ export async function resumeOverlap(
   return runFromStage(deps, config, issue, build.id, worktree, ctxFrom(deps, issue));
 }
 
-// `/factory retry` on a `failed` or `needs-human` issue (audit finding #18): resumes from whichever stage last
+// `/factory retry` on a `failed` or `needs-human` issue (audit finding #18), or `/factory revise <text>` on a
+// `needs-human` one, which goes to build with the text as `revise.md`. A retry resumes from whichever stage last
 // posted a data marker (deriveIssueState), unless the same failure repeated with nothing changed (#86).
 export async function resumeParked(
   issue: GhIssue,
@@ -352,20 +362,29 @@ export async function resumeParked(
   if (!latest) return undefined;
   // The caller hands over a writers-only thread (trustedThread), so this command is a writer's.
   const command = parseChatOps(latest.body);
+  if (handled(issue, latest)) return undefined;
   if (command.type === "cancel") return cancelRun(issue, deps, config);
-  if (command.type !== "retry") return undefined;
-  // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
-  const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
-  if (lastRunner && Date.parse(lastRunner.createdAt) >= Date.parse(latest.createdAt)) return undefined;
+  if (command.type !== "retry" && command.type !== "revise") return undefined;
   const currentLabel = labelsOf(issue).find((n) => n === LABEL.failed || n === LABEL.needsHuman);
   if (!currentLabel) return undefined;
-  if (await refuseRepeat(deps, config, issue, command.force === true)) return "waiting";
+  // A revise sends a reviewer's text to build, so it needs a run parked on a person, not a failure.
+  const build = Object.values(workflowOf(deps, issue).steps).find((s) => s.uses === "build");
+  if (command.type === "revise" && (currentLabel !== LABEL.needsHuman || !build)) return undefined;
+  if (command.type === "retry" && (await refuseRepeat(deps, config, issue, command.force === true))) return "waiting";
 
   const derived = deriveIssueState(issue, workflowOf(deps, issue));
-  const stage = Object.hasOwn(workflowOf(deps, issue).steps, command.step ?? "") ? command.step! : derived.resumeStage;
+  const retryAt = (step?: string) =>
+    Object.hasOwn(workflowOf(deps, issue).steps, step ?? "") ? step! : derived.resumeStage;
+  const stage = command.type === "revise" ? build!.id : retryAt(command.step);
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
-  await deps.github.commentIssue(config.repo, issue.number, `Retrying from ${stage}.\n\n<!-- factory:retry v1 -->`);
+  if (command.type === "revise") await writeRevision(worktree, issue, latest, command.text);
+  const verb = command.type === "revise" ? "Revising" : "Retrying";
+  await deps.github.commentIssue(
+    config.repo,
+    issue.number,
+    `${verb} from ${stage}.\n\n<!-- factory:${command.type} v1 -->`,
+  );
   await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, issue, stage));
   return runFromStage(deps, config, issue, stage, worktree, {
     rejectRound: derived.rejectRounds,

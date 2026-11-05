@@ -4,7 +4,7 @@
 // wiped) still has every earlier stage's artifact available. This is what
 // makes an issue resumable from any machine (plan section "Core refactor").
 
-import { existsSync } from "node:fs";
+import { lstatSync, rmSync } from "node:fs";
 import { isHumanComment, parseChatOps } from "./chatops";
 import { runDir, COMMENT_FILENAMES, JSON_FILENAMES, type ArtifactStage } from "./artifacts";
 import { parseDataMarkers } from "./derive";
@@ -61,7 +61,18 @@ export async function rehydrate(worktree: string, issue: GhIssue): Promise<void>
       typeof f === "string" ? [f] : f.severity === "must" && f.what ? [f.what] : [],
     );
     const priorPath = `${dir}/prior-findings.json`;
-    if (prior.length > 0 && !existsSync(priorPath)) await Bun.write(priorPath, JSON.stringify(prior, null, 2));
+    // lstat, not exists: a dangling symlink reads as absent and Bun.write would follow it out of the tree.
+    const haveFile = (() => {
+      try {
+        return lstatSync(priorPath).isFile();
+      } catch {
+        return false;
+      }
+    })();
+    if (prior.length > 0 && !haveFile) {
+      rmSync(priorPath, { force: true, recursive: true });
+      await Bun.write(priorPath, JSON.stringify(prior, null, 2));
+    }
   }
   const answers = issue.comments
     .filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "answer")

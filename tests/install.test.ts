@@ -19,7 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctor, sha256 } from "../src/doctor";
-import { installTemplate, RELEASE_OFFER, type InstallOptions } from "../src/install-template";
+import { installTemplate, RELEASE_DEST_REL, type InstallOptions } from "../src/install-template";
 
 const CLI = join(import.meta.dir, "..", "src", "cli.ts");
 
@@ -46,11 +46,24 @@ function scratchTarget(): string {
 }
 
 describe("installTemplate (default)", () => {
-  test("offers the release workflow in its output and writes no release.yml", () => {
+  test("writes the release workflow into a fresh repo and changes nothing on a second run", () => {
     const target = scratchTarget();
-    const { stdout } = run([target]);
-    expect(stdout).toContain(RELEASE_OFFER);
-    expect(existsSync(join(target, ".github", "workflows", "release.yml"))).toBe(false);
+    const dest = join(target, RELEASE_DEST_REL);
+    expect(run([target]).stdout).toContain(`wrote: ${RELEASE_DEST_REL}`);
+    const first = readFileSync(dest, "utf8");
+    expect(first).toContain("--generate-notes");
+    const second = run([target]).stdout;
+    expect(second).toContain(`skip (exists): ${RELEASE_DEST_REL}`);
+    expect(readFileSync(dest, "utf8")).toBe(first);
+    rmSync(target, { recursive: true, force: true });
+  });
+
+  test("leaves a repo's own release workflow alone", () => {
+    const target = scratchTarget();
+    mkdirSync(join(target, ".github", "workflows"), { recursive: true });
+    writeFileSync(join(target, RELEASE_DEST_REL), "mine\n");
+    run([target]);
+    expect(readFileSync(join(target, RELEASE_DEST_REL), "utf8")).toBe("mine\n");
     rmSync(target, { recursive: true, force: true });
   });
 
@@ -361,6 +374,20 @@ describe("install manifest and doctor drift", () => {
     const target = scratchTarget();
     expect(run([target, "--dry-run"]).code).toBe(0);
     expect(existsSync(join(target, ".factory", "manifest.json"))).toBe(false);
+    rmSync(target, { recursive: true, force: true });
+  });
+});
+
+describe("factory init release workflow", () => {
+  test("init writes it into a repo that is already installed, and twice changes nothing", async () => {
+    const target = scratchTarget();
+    run([target]);
+    rmSync(join(target, RELEASE_DEST_REL));
+    const cmd = () =>
+      Bun.spawnSync(["bun", CLI, "init", "--repo-dir", target, "--dry-run"], { stdout: "pipe", stderr: "pipe" });
+    expect(cmd().stdout.toString()).toContain(`write: ${RELEASE_DEST_REL}`);
+    run([target]);
+    expect(cmd().stdout.toString()).toContain(`skip (exists): ${RELEASE_DEST_REL}`);
     rmSync(target, { recursive: true, force: true });
   });
 });

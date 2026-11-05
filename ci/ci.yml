@@ -124,6 +124,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # After the report step, so it does not overwrite the junit report that step reads.
+      - name: Files fixed for rerun-each stay fixed (make rerun)
+        run: RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" HOME="$(mktemp -d)" make rerun
       - name: New and changed tests run three times
         if: github.event_name == 'pull_request'
         run: |

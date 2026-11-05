@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor } from "../src/agents/executor";
@@ -31,6 +31,7 @@ const run = (over: Partial<StageRun>): StageRun => ({
   session_id: null,
   verdict: null,
   config_hash: null,
+  refused_calls: 0,
   ...over,
 });
 
@@ -74,6 +75,7 @@ describe("verify-agent", () => {
   });
 
   test("the executor records each stage's scrubbed stdout beside a fixture.json", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const dir = mkdtempSync(join(tmpdir(), "rec-"));
     const cwd = mkdtempSync(join(tmpdir(), "rec-cwd-"));
     cpSync(join(import.meta.dir, "../template/.claude/skills"), join(cwd, ".claude/skills"), { recursive: true });
@@ -119,6 +121,7 @@ describe("verify-agent", () => {
   });
 
   test("a recording replaces a synthetic fixture instead of appending to it, and keeps extra keys", () => {
+    mkdirSync(tmpdir(), { recursive: true });
     const dir = mkdtempSync(join(tmpdir(), "rec-"));
     writeFileSync(join(dir, "triage.jsonl"), "synthetic\n");
     writeFileSync(join(dir, "fixture.json"), JSON.stringify({ agent: "x", synthetic: true, reportsUsage: false }));

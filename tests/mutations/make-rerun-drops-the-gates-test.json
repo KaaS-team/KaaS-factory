@@ -1,0 +1,7 @@
+{
+  "name": "make rerun drops the gates test",
+  "file": "Makefile",
+  "find": "RERUN_FILES = tests/git.test.ts tests/gates.test.ts",
+  "replace": "RERUN_FILES = tests/git.test.ts",
+  "test": "tests/rerun-state.test.ts"
+}

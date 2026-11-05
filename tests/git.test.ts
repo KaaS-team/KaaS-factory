@@ -19,6 +19,7 @@ import { Git, GitCommandRunner, issueOfPr, sparseCheckoutPatterns } from "../src
 const roots: string[] = [];
 
 function tmpRoot(): string {
+  mkdirSync(tmpdir(), { recursive: true });
   const root = mkdtempSync(join(tmpdir(), "factory-git-"));
   roots.push(root);
   return root;
@@ -393,5 +394,75 @@ describe("issueOfPr", () => {
       issueOfPr({ headRefName: "fix-thing", closingIssuesReferences: [{ number: 7 }, { number: 8 }] }),
     ).toBeUndefined();
     expect(issueOfPr({ headRefName: "factory/issue-42-extra" })).toBeUndefined();
+  });
+});
+
+// A run must never start on an earlier run's tree (#73): each case reuses a workspace path an
+// earlier run left behind, and ensureWorktree must hand back a checkout of origin's branch.
+describe("Git.ensureWorktree recreates a missing or stale workspace", () => {
+  async function claimed(issue: number) {
+    const root = tmpRoot();
+    const { bare, clones } = await bareOriginWithClones(root, ["clone"]);
+    const clone = clones[0]!;
+    const git = new Git(new GitCommandRunner());
+    expect(await git.claim(clone, issue, "main")).toBe(true);
+    return { root, bare, clone, git, wt: join(root, "ws", `issue-${issue}`) };
+  }
+
+  test("a workspace deleted from disk but still registered is checked out again", async () => {
+    const { clone, git, wt } = await claimed(11);
+    await git.ensureWorktree(clone, wt, 11);
+    rmSync(wt, { recursive: true, force: true });
+    await git.ensureWorktree(clone, wt, 11);
+    expect(existsSync(join(wt, "README.md"))).toBe(true);
+  });
+
+  test("a leftover directory that is not a worktree is replaced by a checkout", async () => {
+    const { clone, git, wt } = await claimed(12);
+    mkdirSync(wt, { recursive: true });
+    writeFileSync(join(wt, "stale.txt"), "old run\n");
+    await git.ensureWorktree(clone, wt, 12);
+    expect(existsSync(join(wt, "stale.txt"))).toBe(false);
+    expect(existsSync(join(wt, "README.md"))).toBe(true);
+  });
+
+  test("a fresh claim after the branch was deleted replaces the earlier run's workspace with origin's branch", async () => {
+    const { root, bare, clone, git, wt } = await claimed(13);
+    await git.ensureWorktree(clone, wt, 13);
+    const old = await git.headSha(wt);
+    await run(["git", "push", "origin", "--delete", "factory/issue-13"], clone);
+    const other = join(root, "other");
+    await run(["git", "clone", bare, other], root);
+    expect(await git.claim(other, 13, "main")).toBe(true);
+    const fresh = (await run(["git", "ls-remote", bare, "refs/heads/factory/issue-13"], root)).split("\t")[0];
+    await git.ensureWorktree(clone, wt, 13);
+    expect(await git.headSha(wt)).toBe(fresh!);
+    expect(fresh).not.toBe(old);
+  });
+
+  test("a workspace only behind origin is the same run resuming, and keeps its uncommitted work", async () => {
+    const { root, bare, clone, git, wt } = await claimed(14);
+    await git.ensureWorktree(clone, wt, 14);
+    writeFileSync(join(wt, "wip.txt"), "in progress\n");
+    const pushClone = join(root, "push");
+    await run(["git", "clone", bare, pushClone], root);
+    await run(["git", "config", "user.email", "t@example.com"], pushClone);
+    await run(["git", "config", "user.name", "t"], pushClone);
+    await run(["git", "checkout", "factory/issue-14"], pushClone);
+    await run(["git", "commit", "--allow-empty", "-m", "ahead"], pushClone);
+    await run(["git", "push", "origin", "factory/issue-14"], pushClone);
+    await git.ensureWorktree(clone, wt, 14);
+    expect(existsSync(join(wt, "wip.txt"))).toBe(true);
+  });
+
+  test("a workspace reached through a symlink is the same run resuming, and keeps its uncommitted work", async () => {
+    const { root, clone, git } = await claimed(15);
+    mkdirSync(join(root, "real"));
+    symlinkSync(join(root, "real"), join(root, "link"));
+    const wt = join(root, "link", "issue-15");
+    await git.ensureWorktree(clone, wt, 15);
+    writeFileSync(join(wt, "wip.txt"), "in progress\n");
+    await git.ensureWorktree(clone, wt, 15);
+    expect(existsSync(join(wt, "wip.txt"))).toBe(true);
   });
 });

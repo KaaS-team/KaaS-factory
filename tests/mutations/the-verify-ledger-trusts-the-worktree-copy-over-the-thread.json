@@ -1,0 +1,7 @@
+{
+  "name": "the verify ledger trusts the worktree copy over the thread",
+  "file": "src/engine/verdict-rules.ts",
+  "find": "const rows = posted.reduce<LedgerRow[]>((acc, v) => mergeLedger(acc, v), []);",
+  "replace": "const rows: LedgerRow[] = [];",
+  "test": "tests/verdict-rules.test.ts"
+}

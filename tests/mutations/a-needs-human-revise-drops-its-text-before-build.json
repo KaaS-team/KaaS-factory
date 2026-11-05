@@ -1,0 +1,7 @@
+{
+  "name": "a needs-human revise drops its text before build",
+  "file": "src/watch.ts",
+  "find": "if (command.type === \"revise\") await writeRevision(worktree, issue, latest, command.text);",
+  "replace": "",
+  "test": "tests/chat-commands.test.ts"
+}

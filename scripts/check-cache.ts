@@ -163,5 +163,6 @@ if (import.meta.main) {
     console.error(USAGE);
     process.exit(2);
   }
-  process.exit(await runCached({ ...parsed, root: process.cwd(), env: process.env }));
+  // exitCode, not exit(): exit() drops whatever of the replayed output a pipe has not yet taken, so CI showed a cut log.
+  process.exitCode = await runCached({ ...parsed, root: process.cwd(), env: process.env });
 }

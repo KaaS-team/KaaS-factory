@@ -2,7 +2,7 @@
 // a proof that failed only to compile, a reject of should findings alone, and files changed
 // outside an imported plan. It also holds the last reject's findings until verify resolves each.
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { runDir, type Finding, type PlanArtifact, type VerdictArtifact } from "../artifacts";
 import { isTrusted } from "../chatops";
 import { parseDataMarkers } from "../derive";
@@ -17,6 +17,66 @@ export function readRunJson<T>(worktree: string, issueNumber: number, name: stri
   } catch {
     return undefined; // the stage that writes it did not run
   }
+}
+
+type Safe<T> = { ok: true; value?: T } | { ok: false; why: string };
+
+// The agent can write the run directory, so a path that is not a regular file (a symlink would send
+// the runner's write outside the tree) or content of the wrong shape is refused, not trusted.
+function readSafeJson<T>(path: string, valid: (v: unknown) => v is T): Safe<T> {
+  let st: ReturnType<typeof lstatSync>;
+  try {
+    st = lstatSync(path);
+  } catch {
+    return { ok: true };
+  }
+  if (!st.isFile()) return { ok: false, why: "is not a regular file" };
+  try {
+    const value = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    return valid(value) ? { ok: true, value } : { ok: false, why: "does not have the expected shape" };
+  } catch {
+    return { ok: false, why: "is not valid JSON" };
+  }
+}
+
+const isStatus = (s: unknown) => s === "open" || s === "resolved";
+const isRow = (r: unknown): r is LedgerRow => {
+  const o = r as Record<string, unknown> | null;
+  return (
+    typeof o === "object" &&
+    o !== null &&
+    typeof o.id === "string" &&
+    typeof o.what === "string" &&
+    isStatus(o.status) &&
+    typeof o.firstRound === "number" &&
+    typeof o.lastRound === "number" &&
+    typeof o.reopened === "number"
+  );
+};
+const isRows = (v: unknown): v is LedgerRow[] => Array.isArray(v) && v.every(isRow);
+const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+
+// Remove the entry first so a symlink is replaced, never followed, then rename a temp file over it.
+function writeSafe(path: string, body: string): void {
+  const tmp = `${path}.${process.pid}.tmp`;
+  rmSync(tmp, { force: true });
+  writeFileSync(tmp, body, { flag: "wx" });
+  rmSync(path, { force: true, recursive: true });
+  renameSync(tmp, path);
+}
+
+// The ledger the thread proves: every posted verify verdict replayed in order. The worktree copy and
+// prior-findings.json can only add open rows to it, so editing either never hides a finding.
+export function ledgerFor(
+  posted: readonly VerdictArtifact[],
+  file: readonly LedgerRow[] | undefined,
+  prior: readonly string[],
+): LedgerRow[] {
+  const rows = posted.reduce<LedgerRow[]>((acc, v) => mergeLedger(acc, v), []);
+  const byWhat = new Map(rows.map((r) => [r.what, r]));
+  for (const r of file ?? []) if (!byWhat.has(r.what)) byWhat.set(r.what, r);
+  for (const r of seedLedger(prior)) byWhat.set(r.what, { ...(byWhat.get(r.what) ?? r), status: "open" });
+  return [...byWhat.values()];
 }
 
 export function verdictHeading(result: string, round: number, limit: number): string {
@@ -151,9 +211,22 @@ export async function settleVerdict(sc: StepCtx, verdict: VerdictArtifact): Prom
   const { worktree, config, deps, issue, ctx } = sc;
   const proof = readRunJson<ProofResult>(worktree, issue.number, "proof.json");
   const plan = readRunJson<PlanArtifact & { source?: string }>(worktree, issue.number, "plan.json");
-  const prior = readRunJson<string[]>(worktree, issue.number, "prior-findings.json") ?? [];
-  let ledger = readRunJson<LedgerRow[]>(worktree, issue.number, "findings-ledger.json");
-  if (!ledger) ledger = seedLedger(prior);
+  const runPath = `${worktree}/${runDir(issue.number)}`;
+  const priorRead = readSafeJson(`${runPath}/prior-findings.json`, isStrings);
+  const ledgerRead = readSafeJson(`${runPath}/findings-ledger.json`, isRows);
+  const refused = [
+    ...(priorRead.ok ? [] : [`prior-findings.json ${priorRead.why}`]),
+    ...(ledgerRead.ok ? [] : [`findings-ledger.json ${ledgerRead.why}`]),
+  ];
+  const posted = parseDataMarkers(issue.comments.filter(isTrusted))
+    .filter((m) => m.stage === "verify")
+    .map((m) => m.json as Partial<VerdictArtifact> | undefined)
+    .filter((j): j is VerdictArtifact => !!j?.result && Array.isArray(j.findings));
+  const ledger = ledgerFor(
+    posted,
+    ledgerRead.ok ? ledgerRead.value : undefined,
+    priorRead.ok ? (priorRead.value ?? []) : [],
+  );
   const changed = await deps.git.changedFiles(worktree, config.base);
   const sentBefore = parseDataMarkers(issue.comments.filter(isTrusted)).some(
     (m) =>
@@ -166,12 +239,17 @@ export async function settleVerdict(sc: StepCtx, verdict: VerdictArtifact): Prom
   let out = applyVerdictRules(verdict, { proof: proof?.status, plan, changed, offPlanSent });
   out = applyPriorFindings(out, openWhats(ledger));
   out = applyPlanCriteria(out, plan?.criteria);
+  if (refused.length > 0 && out.result === "pass")
+    out = {
+      ...out,
+      result: "uncertain",
+      findings: [...out.findings, runnerFinding(`The findings ledger was refused: ${refused.join("; ")}`)],
+    };
   if (out.findings.some((f) => typeof f !== "string" && f.what.startsWith(OFF_PLAN))) offPlanSentRuns.add(ctx);
-  const runPath = `${worktree}/${runDir(issue.number)}`;
   const merged = mergeLedger(ledger, out);
-  writeFileSync(`${runPath}/findings-ledger.json`, JSON.stringify(merged, null, 2));
+  writeSafe(`${runPath}/findings-ledger.json`, JSON.stringify(merged, null, 2));
   const file = `${runPath}/prior-findings.json`;
-  if (out.result === "reject") writeFileSync(file, JSON.stringify(openWhats(merged), null, 2));
-  else if (out.result === "pass" && existsSync(file)) rmSync(file);
+  if (out.result === "reject") writeSafe(file, JSON.stringify(openWhats(merged), null, 2));
+  else if (out.result === "pass") rmSync(file, { force: true });
   return out;
 }

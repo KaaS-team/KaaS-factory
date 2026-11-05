@@ -8,7 +8,7 @@ import { DEFAULT_CONFIG, loadConfig, repoFromRemoteUrl } from "./config";
 import { fixDoctor } from "./doctor";
 import { describeStack, initConfig, isFilledIn, writeCharter } from "./init";
 import { openInitPr } from "./init-pr";
-import { installTemplate } from "./install-template";
+import { bundledFiles, installReleaseWorkflow, installTemplate } from "./install-template";
 import { templateDir } from "./template-root";
 import { makeScm } from "./scm";
 import { detectStack, diskFiles } from "./stack";
@@ -58,6 +58,7 @@ export async function cmdInit(cli: CliContext): Promise<void> {
   const dir = resolve(cli.flag("repo-dir") ?? ".");
   const dry = cli.has("dry-run");
   if (!existsSync(join(dir, ".factory", "gates.sh")) && !dry) runInstall(dir, cli);
+  else console.log(`factory init: ${installReleaseWorkflow(dir, dry, bundledFiles().release)}`);
   const stack = detectStack(diskFiles(dir));
   for (const line of describeStack(stack)) console.log(`factory init: ${line}`);
   const target = join(dir, ".factory", "config.json");
