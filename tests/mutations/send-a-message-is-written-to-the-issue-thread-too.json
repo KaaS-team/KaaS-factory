@@ -1,7 +1,0 @@
-{
-  "name": "send: a message is written to the issue thread too",
-  "file": "src/integrations/steer.ts",
-  "find": "  await line.tracker.commentIssue(repo, issue, signedBy(`Message to the run: ${words}`, by));\n",
-  "replace": "\n",
-  "test": "tests/ask-steer.test.ts"
-}

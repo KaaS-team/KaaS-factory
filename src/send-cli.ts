@@ -16,12 +16,11 @@ export async function cmdSend(argv: readonly string[]): Promise<void> {
   const issue = Number((words.shift() ?? "").replace(/^#/, ""));
   if (!Number.isInteger(issue) || issue < 1 || !words.length)
     throw new UsageError("send: factory send <N> <words> (--repo <owner/name> | --repo-dir <path>)");
-  const { repo, github } = await repoOf(argv, "send");
+  const { repo } = await repoOf(argv, "send");
   const by = process.env.USER ?? "operator";
   const line = {
-    tracker: github,
     deliver: (n: number, text: string) => appendMessage(worktreeOf(repo, n), n, text, by),
   };
-  await sendToRun(line, repo, issue, words.join(" "), by);
+  await sendToRun(line, issue, words.join(" "), by);
   console.log(argv.includes("--json") ? successJson({ issue, sent: true }, true) : `#${issue}: sent`);
 }

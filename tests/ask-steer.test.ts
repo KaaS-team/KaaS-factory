@@ -118,18 +118,12 @@ describe("steering a run", () => {
     expect(prompt).toContain("mind the legacy API");
   });
 
-  test("sendToRun writes the thread and the run, and the composer route and the CLI both call it", async () => {
+  test("sendToRun trims and delivers, and the composer route and the CLI both call it", async () => {
     const sent: string[] = [];
-    const posted: string[] = [];
-    const line = {
-      tracker: { commentIssue: async (_r: string, _n: number, b: string) => void posted.push(b) },
-      deliver: (_n: number, text: string) => void sent.push(text),
-    };
-    await sendToRun(line, "acme/widgets", 3, " add a test ", "ana");
+    const line = { deliver: (_n: number, text: string) => void sent.push(text) };
+    await sendToRun(line, 3, " add a test ", "ana");
     expect(sent).toEqual(["add a test"]);
-    expect(posted[0]).toContain("add a test");
-    expect(posted[0]).toContain("ana");
-    await expect(sendToRun(line, "acme/widgets", 3, "  ", "ana")).rejects.toThrow("1 to 4000");
+    await expect(sendToRun(line, 3, "  ", "ana")).rejects.toThrow("1 to 4000");
     for (const file of ["src/send-cli.ts", "dashboard/plane/runner-routes.ts"])
       expect(readFileSync(join(import.meta.dir, "..", file), "utf8")).toContain("sendToRun(");
     const composer = readFileSync(join(import.meta.dir, "../dashboard/public/lib/view-inbox.js"), "utf8");

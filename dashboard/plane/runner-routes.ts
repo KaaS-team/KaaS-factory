@@ -183,10 +183,9 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
         try {
           const id = await sendToRun(
             line,
-            job.repo,
             job.issue,
             String((await body(req)).text ?? ""),
-            senderName(deps.actorOf(req)),
+            deps.actorOf(req)?.login ?? "",
           );
           return json({ ok: true, id });
         } catch (err) {
