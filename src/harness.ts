@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { FactoryConfig } from "./config";
 import type { Workflow } from "./core/workflow";
-import { BUNDLED_DIR, loadWorkflow, parseWorkflowText } from "./engine/workflows";
+import { BUNDLED_DIR, loadWorkflow, parseWorkflowText, parseWorkflowWithImports } from "./engine/workflows";
 
 export interface HarnessEntry {
   readonly name: string;
@@ -37,6 +37,9 @@ const workflowsIn = (dir: string): Map<string, string> => {
   }
 };
 
+const readText = async (path: string): Promise<string | undefined> =>
+  (await Bun.file(path).exists()) ? Bun.file(path).text() : undefined;
+
 export async function harnessReport(
   cloneDir: string,
   config: Pick<FactoryConfig, "workflow" | "routes">,
@@ -51,8 +54,8 @@ export async function harnessReport(
   const repoFiles = workflowsIn(repoDir);
   const entries: HarnessEntry[] = [];
   const problems: string[] = [];
-  const add = (name: string, source: HarnessEntry["source"], file: string, text: string) => {
-    const parsed = parseWorkflowText(text);
+  const add = async (name: string, source: HarnessEntry["source"], file: string, text: string) => {
+    const parsed = await parseWorkflowWithImports(text, cloneDir, readText);
     const own = parsed.ok
       ? parsed.workflow.name === name
         ? []
@@ -67,10 +70,10 @@ export async function harnessReport(
     });
     for (const p of own) problems.push(`${source === "repo" ? ".factory/workflows" : "runner"}/${file}: ${p}`);
   };
-  for (const [name, file] of repoFiles) add(name, "repo", file, await Bun.file(join(repoDir, file)).text());
+  for (const [name, file] of repoFiles) await add(name, "repo", file, await Bun.file(join(repoDir, file)).text());
   // A runner workflow the repo overrides is not what runs, so it is not listed.
   for (const [name, file] of workflowsIn(bundledDir))
-    if (!repoFiles.has(name)) add(name, "runner", file, await Bun.file(join(bundledDir, file)).text());
+    if (!repoFiles.has(name)) await add(name, "runner", file, await Bun.file(join(bundledDir, file)).text());
   for (const [name, types] of routed) {
     if (entries.some((e) => e.name === name)) continue;
     const loaded = await loadWorkflow(cloneDir, name);
@@ -167,7 +170,7 @@ export function evalRuns(rows: readonly EventRow[], repo: string, costOf: (issue
     } catch {
       continue;
     }
-    if (d.repo !== repo || typeof d.workflow !== "string") continue;
+    if (d.repo !== repo || typeof d.workflow !== "string" || d.preview === true) continue;
     const w = by.get(d.workflow) ?? { outcomes: {}, failed: {}, issues: new Set<number>() };
     by.set(d.workflow, w);
     if (r.type === "factory.step.failed") w.failed[String(d.step)] = (w.failed[String(d.step)] ?? 0) + 1;

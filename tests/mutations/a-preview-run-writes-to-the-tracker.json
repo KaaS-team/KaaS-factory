@@ -1,0 +1,1 @@
+{"name":"a preview run writes to the tracker","file":"src/workflow-preview.ts","find":"if (name in TRACKER_WRITES)","replace":"if (false as boolean)","test":"tests/workflow-preview.test.ts"}

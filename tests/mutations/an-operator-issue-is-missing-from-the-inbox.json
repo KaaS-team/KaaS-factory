@@ -1,0 +1,1 @@
+{"name":"an operator issue is missing from the inbox","file":"src/inbox.ts","find":"issue.labels.some((l) => l.name === LABEL.ready) && isOperatorIssue(issue)","replace":"false","test":"tests/operator-runner.test.ts"}

@@ -79,7 +79,9 @@ describe("phone intake", () => {
 
     const filed = await p.call("POST", "/api/tasks", phone, { title: "Export invoices as CSV" });
     const { issue } = (await filed.json()) as { issue: number };
-    expect(github.created[0]).toMatchObject({ labels: [LABEL.ready], body: expect.stringContaining("@ana") });
+    // Two plain asserts: toMatchObject with expect.stringContaining overwrites the received body on Bun 1.3.
+    expect(github.created[0]?.labels).toEqual([LABEL.ready]);
+    expect(github.created[0]?.body).toContain("@ana");
     const board = (await (await p.call("GET", "/api/board", phone)).json()) as {
       cards: { issue: number; title: string }[];
     };

@@ -1,0 +1,1 @@
+{"name":"the registry watcher polls only the first repo","file":"src/registry-watch.ts","find":"      out[entry.repo] = await pollOnce(deps, configForEntry(entry, own), claimed);","replace":"      out[entry.repo] = await pollOnce(deps, configForEntry(entry, own), claimed);\n      break;","test":"tests/repo-registry.test.ts"}

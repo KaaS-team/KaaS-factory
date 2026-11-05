@@ -1,0 +1,1 @@
+{"name":"a missing shared fragment is not named","file":"src/engine/workflow-imports.ts","find":"if (text === undefined) return `imports: ${ref} not found (${where})`;\n      const raw","replace":"if (text === undefined) return `imports: missing`;\n      const raw","test":"tests/workflow-imports.test.ts"}

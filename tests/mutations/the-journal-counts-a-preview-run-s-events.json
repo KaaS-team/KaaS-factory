@@ -1,0 +1,1 @@
+{"name":"the journal counts a preview run's events","file":"src/engine/journal.ts","find":"if (d.preview === true) continue;","replace":"","test":"tests/workflow-preview.test.ts"}

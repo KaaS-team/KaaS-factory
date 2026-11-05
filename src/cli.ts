@@ -78,10 +78,8 @@ function has(name: string): boolean {
 
 const cli = { args, flag, has, resolveCloneDir: () => resolveCloneDir(), watchDeps: buildWatchDeps };
 
-// `--repo-dir <path>` (local mode: the clone already exists) or `--repo
-// owner/name` (VM/CI modes: nothing is on disk yet, clone it under
-// FACTORY_HOME/repos and fetch+fast-forward on every later call). Exactly
-// one of the two is required; `--repo-dir` wins if both are given.
+// `--repo-dir <path>` uses an existing clone; `--repo owner/name` clones under FACTORY_HOME/repos and
+// fast-forwards on every call. One is required, and `--repo-dir` wins if both are given.
 async function resolveCloneDir(): Promise<string> {
   const repoDir = flag("repo-dir");
   if (repoDir) return resolve(repoDir);
@@ -748,7 +746,6 @@ async function cmdLearn(): Promise<void> {
   console.log(`factory learn: batched ${result.batched} proposal(s) on ${result.branch} -> ${result.prUrl}`);
 }
 
-// `factory harness` and `factory teach` live in src/harness-cli.ts.
 const harnessCtx = (): CliContext => ({
   args,
   flag,
@@ -846,6 +843,8 @@ async function main(): Promise<void> {
       return cmdDoctor();
     case "onboard":
       return cmdOnboard();
+    case "plan-order":
+      return (await import("./plan-order")).cmdPlanOrder(cli);
     case "explain":
       return (await import("./explain-cli")).cmdExplain(cli);
     case "install":
@@ -861,6 +860,7 @@ async function main(): Promise<void> {
     case "daemon":
       return cmdDaemon();
     case "harness":
+    case "workflow":
       return cmdHarness(harnessCtx());
     case "teach":
       return cmdTeach(harnessCtx());

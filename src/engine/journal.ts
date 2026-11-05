@@ -46,6 +46,7 @@ export function readJournal(
   const approved = new Set<string>();
   for (const r of rows) {
     const d = dataOf(r);
+    if (d.preview === true) continue;
     if (r.type === "factory.run.completed" && ENDED.has(String(d.outcome))) finished.clear(), approved.clear();
     if (d.workflow !== workflow.name || d.sha !== workflow.sha) continue;
     const step = String(d.step);

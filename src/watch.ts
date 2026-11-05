@@ -21,6 +21,8 @@ import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, parkWindowStart } from "./derive";
 import { decideMerge, mergePolicyMarker } from "./merge-policy";
 import { unlockedReady } from "./area-locks";
+import { schedulerOrder } from "./dispatch-order";
+import { isOperatorIssue as operatorWork } from "./inbox";
 import { admitReady } from "./org-caps";
 import { capsFor, codeownerCheck } from "./profile-rules";
 import { runPool } from "./pool";
@@ -660,28 +662,27 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const { clear } = await resolveBlockers(deps.github, config.repo, intake(LABEL.ready), intake(LABEL.blocked));
   // Per-team and org caps hold back new pickups while work waits on people (src/org-caps.ts).
   const admitted = admitReady(clear, [...awaitingApproval, ...inReview], capsFor(config));
-  const ready = await unlockedReady(deps, config, admitted);
+  const ready = await unlockedReady(
+    deps,
+    config,
+    admitted.filter((i) => !operatorWork(i)),
+  );
   const buckets = [ready, needsInfo, awaitingApproval, overlapped, failed, needsHuman, inReview];
 
   const seen = new Set<number>();
-  const candidates = buckets
-    .flat()
-    .filter((issue) => {
+  const candidates = schedulerOrder(
+    buckets.flat().filter((issue) => {
       if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
       if (!canServe(deps.machine?.config.capabilities, issue.labels)) return false;
       const released = inFlight ? releasedAt.get(inFlight)?.get(issue.number) : undefined;
       if (released !== undefined && released > listedAt) return false;
       seen.add(issue.number);
       return true;
-    })
-    // Oldest ticket first: tickets are filed in dependency order, and gh's
-    // own list order is otherwise unspecified (audit: newest-first in
-    // practice), which raced dependents ahead of what they were blocked on.
-    .sort((a, b) => a.number - b.number);
+    }),
+    labelled(LABEL.blocked),
+  );
 
-  // candidates was filtered against inFlight above; mark them before any
-  // await so an overlapping poll's own candidates filter (same check) never
-  // sees this batch as still unclaimed.
+  // Mark the batch before any await, so an overlapping poll's filter never sees it as unclaimed.
   for (const issue of candidates) inFlight?.add(issue.number);
 
   // Drains retros the dashboard's operator-merge route queued (v2.10.0 item
@@ -689,9 +690,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   await runQueuedRetros(deps, config);
 
   try {
-    // A pool of `concurrency` workers, not one-at-a-time and not
-    // Promise.all-everything: before this, issue #4 never started until #1's
-    // whole five-stage chain finished (audit finding #2).
+    // A pool of `concurrency` workers: issue #4 never waits for #1's whole chain (audit finding #2).
     // Each issue leaves inFlight when its own dispatch ends: one that parks
     // (awaiting approval, a question) must be visible to the next poll while
     // a slower batch-mate still builds, or its human's reply sits unread.

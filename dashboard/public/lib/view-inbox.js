@@ -35,6 +35,7 @@ export const KIND_LABEL = {
   failed: "Failed",
   budget: "Over budget",
   "stale-pr": "Quiet pull request",
+  operator: "Needs you",
 };
 const INBOX_ICON = "M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5";
 
