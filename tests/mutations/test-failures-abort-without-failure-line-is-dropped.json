@@ -1,0 +1,7 @@
+{
+  "name": "test-failures: abort without failure line is dropped",
+  "file": "scripts/test-failures.ts",
+  "find": "if (abort && last && !text.includes(\"FAILED \")) {",
+  "replace": "if (false) {",
+  "test": "tests/test-failures.test.ts"
+}

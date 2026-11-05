@@ -1,0 +1,7 @@
+{
+  "name": "app-agnostic walk reads python caches",
+  "file": "tests/app-agnostic.test.ts",
+  "find": "if (name === \"node_modules\" || name.startsWith(\".\") || isCache(path)) return [];",
+  "replace": "if (name === \"node_modules\" || name.startsWith(\".\")) return [];",
+  "test": "tests/app-agnostic.test.ts"
+}
