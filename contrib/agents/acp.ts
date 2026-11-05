@@ -2,12 +2,13 @@
 // drives it, taking the prompt on stdin and printing StageEvents. Read-only stages are held by the
 // bridge refusing every permission request that is not a read, so they rely on the agent asking.
 
+import { agents } from "../../src/plugins/registry";
 import { fileURLToPath } from "node:url";
-import type { StageEvent } from "../../executor";
-import { PROVIDER_KEYS } from "../env";
-import { type AgentPreset, stagePolicy } from "../types";
+import type { StageEvent } from "../../src/executor";
+import { PROVIDER_KEYS } from "../../src/agents/env";
+import { type AgentPreset, stagePolicy } from "../../src/agents/types";
 
-const BRIDGE = fileURLToPath(new URL("../acp-bridge.ts", import.meta.url));
+const BRIDGE = fileURLToPath(new URL("../../src/agents/acp-bridge.ts", import.meta.url));
 const KINDS = new Set(["tool_use", "text", "usage", "result"]);
 
 export function parseAcpLine(line: string): StageEvent[] {
@@ -41,3 +42,5 @@ export const acpPreset: AgentPreset = {
   parseLine: parseAcpLine,
   isUsageCandidate: (line) => line.includes('"kind":"usage"'),
 };
+
+agents.register("acp", acpPreset);

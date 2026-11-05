@@ -12,7 +12,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { aggregateStageEvents, ReplayExecutor } from "../src/executor";
-import { claudeArgs, parseStreamJsonLine, refusedBy } from "../src/agents/presets/claude";
+import { claudeArgs, parseStreamJsonLine, refusedBy } from "../contrib/agents/claude";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
 import { readSeal, sealKey } from "../src/receipt";

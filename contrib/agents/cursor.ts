@@ -2,6 +2,7 @@
 // stdin prompt is documented, so the prompt is the last argument; stream-json reports no token usage in
 // 2026.01.23. Read-only stages run with `--mode plan` and return their artifacts as the final message.
 
+import { agents } from "../../src/plugins/registry";
 import type { StageEvent } from "../../src/executor";
 import { type AgentPreset, stagePolicy } from "../../src/agents/types";
 
@@ -65,3 +66,5 @@ export const cursorPreset: AgentPreset = {
   parseLine: parseCursorLine,
   isUsageCandidate: () => false,
 };
+
+agents.register("cursor", cursorPreset);

@@ -1,0 +1,1 @@
+{"name":"the claude preset returns to the core presets directory","file":"src/agents/presets/index.ts","find":"export const PRESETS","replace":"const SHIPPED = {};\nexport const PRESETS","test":"tests/agent-plugins.test.ts"}

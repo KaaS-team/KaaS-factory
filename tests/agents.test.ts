@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/executor";
 import { artifactContract, renderPrompt, stripFrontmatter } from "../src/agents/prompt";
-import { CLAUDE_STAGE_DEFAULTS, claudeArgs, parseStreamJsonLine } from "../src/agents/presets/claude";
+import { CLAUDE_STAGE_DEFAULTS, claudeArgs, parseStreamJsonLine } from "../contrib/agents/claude";
 import { readUsage } from "../src/agents/usage";
 import { aggregateStageEvents } from "../src/executor";
 import { PRESETS } from "../src/agents/presets";

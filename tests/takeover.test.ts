@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor } from "../src/agents/executor";
-import { parseStreamJsonLine } from "../src/agents/presets/claude";
+import { parseStreamJsonLine } from "../contrib/agents/claude";
 import { OPERATOR_TAKEOVER } from "../src/executor";
 import { livePath, takeoverMarker, transcriptPath } from "../src/paths";
 import { renderRunSummary } from "../src/run-summary";

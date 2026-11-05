@@ -3,17 +3,18 @@
 // prompt, so this preset ignores the rendered one.
 // Flags checked against `claude --help` on 2026-10-05 (2.1.289), --effort and --tools included.
 
+import { agents } from "../../src/plugins/registry";
 import { readFileSync } from "node:fs";
-import type { StageEvent, StageName, StageRunOptions } from "../../executor";
+import type { StageEvent, StageName, StageRunOptions } from "../../src/executor";
 import {
   projectPlugins,
   STAGE_DISALLOWED_TOOLS,
   STAGE_GUIDANCE,
   STAGE_TOOLS,
   stageSettings,
-} from "../../stage-permissions";
-import type { AgentPreset } from "../types";
-import { isUsageResultCandidate, readUsage } from "../usage";
+} from "../../src/stage-permissions";
+import type { AgentPreset } from "../../src/agents/types";
+import { isUsageResultCandidate, readUsage } from "../../src/agents/usage";
 
 // One line of Claude Code's --output-format stream-json. Only the fields this
 // runner needs; the real stream carries more.
@@ -245,3 +246,5 @@ export const claudePreset: AgentPreset = {
   parseLine: parseStreamJsonLine,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "result"),
 };
+
+agents.register("claude", claudePreset);

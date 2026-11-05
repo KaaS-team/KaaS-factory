@@ -12,7 +12,7 @@ const walk = (d: string): string[] =>
   );
 
 // The only files that may import a shipped agent: the presets themselves and the one list that registers them.
-const OWN = (f: string) => f.includes("/src/agents/presets/");
+const OWN = (f: string) => f.endsWith("/src/agents/presets/index.ts");
 const SHIPPED_AGENT_IMPORT = /(?:from|import)\s+"[^"]*(?:agents\/presets\/(?!index)|contrib\/agents\/)/;
 
 describe("core names no shipped agent", () => {

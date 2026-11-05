@@ -1,0 +1,1 @@
+{"name":"a preset module does not register itself","file":"contrib/agents/pi.ts","find":"agents.register(\"pi\", piPreset);","replace":"","test":"tests/agent-plugins.test.ts"}
