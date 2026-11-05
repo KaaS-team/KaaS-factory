@@ -1,0 +1,1 @@
+{"name": "a preview run still calls the code host", "file": "src/workflow-preview.ts", "find": "if (name in CODE_HOST_WRITES)", "replace": "if (false as boolean)", "test": "tests/workflow-preview.test.ts"}

@@ -12,6 +12,7 @@ import { STEP_LABELS } from "../labels";
 import { PLANNED_WORKFLOW } from "./import-plan";
 import { templateDir } from "../template-root";
 import { ALL_STEP_TYPES } from "./registry";
+import { type ReadFile, resolveImports } from "./workflow-imports";
 
 export const DEFAULT_WORKFLOW = DEFAULT_CONFIG.workflow;
 // What an edge's `if:` may read besides the step ids.
@@ -21,22 +22,46 @@ export const BUNDLED_DIR = join(templateDir(), ".factory", "workflows");
 
 // A .md file (frontmatter `stages:`) or a .yml one; either way the result carries the text's sha,
 // which every run's events and receipt pin, so a resume never replays steps of an edited file.
-export function parseWorkflowText(text: string): WorkflowResult {
-  let raw: unknown;
+function rawOf(text: string): { ok: true; raw: unknown } | { ok: false; problems: string[] } {
   if (isWorkflowMd(text)) {
     const md = workflowMdToRaw(text, (s) => Bun.YAML.parse(s), STEP_LABELS);
-    if (!md.ok) return md;
-    raw = md.raw;
-  } else
-    try {
-      raw = Bun.YAML.parse(text);
-    } catch (e) {
-      return { ok: false, problems: [`not valid YAML: ${(e as Error).message}`] };
-    }
+    return md.ok ? { ok: true, raw: md.raw } : md;
+  }
+  try {
+    return { ok: true, raw: Bun.YAML.parse(text) };
+  } catch (e) {
+    return { ok: false, problems: [`not valid YAML: ${(e as Error).message}`] };
+  }
+}
+
+function build(raw: unknown, shaOf: string): WorkflowResult {
   const parsed = parseWorkflowFull(raw, ALL_STEP_TYPES, EXPR_ROOTS);
   if (!parsed.ok) return parsed;
-  const sha = new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 12);
+  const sha = new Bun.CryptoHasher("sha256").update(shaOf).digest("hex").slice(0, 12);
   return { ok: true, workflow: { ...parsed.workflow, sha } };
+}
+
+const hasImports = (raw: unknown): raw is Record<string, unknown> =>
+  typeof raw === "object" && raw !== null && "imports" in raw;
+
+export function parseWorkflowText(text: string): WorkflowResult {
+  const raw = rawOf(text);
+  if (!raw.ok) return raw;
+  if (hasImports(raw.raw)) return { ok: false, problems: ["imports: resolved only where the repo's files are read"] };
+  return build(raw.raw, text);
+}
+
+// Same, with `imports:` resolved against the clone. The sha covers the fragments too.
+export async function parseWorkflowWithImports(
+  text: string,
+  cloneDir: string,
+  read: ReadFile,
+): Promise<WorkflowResult> {
+  const raw = rawOf(text);
+  if (!raw.ok) return raw;
+  if (!hasImports(raw.raw)) return build(raw.raw, text);
+  const merged = await resolveImports(raw.raw, cloneDir, read);
+  return merged.ok ? build(merged.raw, [text, ...merged.texts].join("\n---\n")) : merged;
 }
 
 let bundled: Workflow | undefined;
@@ -50,7 +75,6 @@ export function defaultWorkflow(): Workflow {
   return bundled;
 }
 
-type ReadFile = (path: string) => Promise<string | undefined>;
 const readIfThere: ReadFile = async (path) => {
   const file = Bun.file(path);
   return (await file.exists()) ? file.text() : undefined;
@@ -68,7 +92,7 @@ export async function loadWorkflow(
   for (const dir of [join(cloneDir, ".factory", "workflows"), BUNDLED_DIR]) {
     for (const ext of [".yml", ".md"]) {
       const text = await read(join(dir, `${name}${ext}`));
-      if (text !== undefined) return parseWorkflowText(text);
+      if (text !== undefined) return parseWorkflowWithImports(text, cloneDir, read);
     }
   }
   return {

@@ -756,7 +756,6 @@ async function cmdLearn(): Promise<void> {
   console.log(`factory learn: batched ${result.batched} proposal(s) on ${result.branch} -> ${result.prUrl}`);
 }
 
-// `factory harness` and `factory teach` live in src/harness-cli.ts.
 const harnessCtx = (): CliContext => ({
   args,
   flag,
@@ -869,6 +868,7 @@ async function main(): Promise<void> {
     case "daemon":
       return cmdDaemon();
     case "harness":
+    case "workflow":
       return cmdHarness(harnessCtx());
     case "teach":
       return cmdTeach(harnessCtx());

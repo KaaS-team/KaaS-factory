@@ -1,0 +1,1 @@
+{"name":"an import cycle is not refused at once","file":"src/engine/workflow-imports.ts","find":"if (chain.includes(ref))","replace":"if (chain.length > 20 && chain.includes(ref))","test":"tests/workflow-imports.test.ts"}

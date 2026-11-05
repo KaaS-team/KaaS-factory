@@ -1,0 +1,1 @@
+{"name":"a preview run does not list the writes it skipped","file":"src/workflow-preview.ts","find":"writes.push({ op, target: spec.target(args), ...(body === undefined ? {} : { body: String(body) }) });","replace":"void body;","test":"tests/workflow-preview.test.ts"}

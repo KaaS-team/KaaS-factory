@@ -48,6 +48,14 @@ const parse = (data: string): unknown => {
   }
 };
 
+const isPreview = (data: string): boolean => {
+  try {
+    return (JSON.parse(data) as { preview?: unknown }).preview === true;
+  } catch {
+    return false;
+  }
+};
+
 export function eventsView(state: Pick<FactoryState, "busEvents" | "busDeliveries">, limit: number, after: number) {
   return state.busEvents(Math.min(Math.max(1, limit), MAX_EVENTS), after).map((r) => ({
     seq: r.seq ?? 0,
@@ -57,6 +65,7 @@ export function eventsView(state: Pick<FactoryState, "busEvents" | "busDeliverie
     subject: r.subject === null ? null : plain(r.subject),
     time: r.time,
     data: parse(r.data),
+    preview: isPreview(r.data),
     deliveries: state.busDeliveries(r.id).map((d) => ({ sink: d.sink, status: d.status, attempts: d.attempts })),
   }));
 }
