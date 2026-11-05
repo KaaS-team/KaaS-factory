@@ -15,6 +15,7 @@ import { parseChatOps } from "../src/chatops";
 import { LABEL } from "../src/labels";
 import { createMcpServer } from "../src/mcp-server";
 import { runnerWork } from "../src/remote-cli";
+import { worktreeOf } from "../src/run-messages";
 import { dialOut, registerRunner, type RunnerWork } from "../src/runner-channel";
 import { FactoryState } from "../src/state";
 import { AWAY, BASE, cookieOf, makePlane, owner, TrackerGitHub } from "./remote-plane";
@@ -116,7 +117,7 @@ describe("control from anywhere", () => {
     expect((await p.call("POST", "/api/issues/41/dispatch", phone)).status).toBe(200);
     await until(() => p.remote.hub.holder({ repo: "acme/widgets", issue: 41 }) === creds.id);
     expect((await p.call("POST", "/api/issues/41/message", phone, { text: "keep the old palette" })).status).toBe(200);
-    const notes = join(repoDir, runDir(41), "messages.md");
+    const notes = join(worktreeOf("acme/widgets", 41), runDir(41), "messages.md");
     await until(() => existsSync(notes) && readFileSync(notes, "utf8").includes("keep the old palette"));
     expect((await p.call("POST", "/api/issues/41/stop", browser)).status).toBe(403);
     expect((await p.call("POST", "/api/issues/41/stop", phone)).status).toBe(200);

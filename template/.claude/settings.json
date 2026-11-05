@@ -36,17 +36,6 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/operator-messages.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [

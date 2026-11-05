@@ -103,6 +103,7 @@ The issue's label is the state. Everything else is derived from the thread.
 | `factory:needs-human` | refused or out of rounds | `/factory retry` |
 | `factory:monitor` | filed by `factory scan` from a production signal; a provenance label, not a stage | nothing, it stays on the issue |
 | `factory:ledger` | the one issue that holds the spend ledger when spend is kept on GitHub: one comment per worker per UTC day | leave it open; caps read it |
+| `factory:ask` | a question about the code; with `factory:ready`, it is answered in one comment citing file and line, then closed, with no branch or PR | nothing, it comes off when the answer lands |
 
 ## Where a human acts
 

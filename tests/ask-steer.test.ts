@@ -85,7 +85,7 @@ describe("steering a run", () => {
     const wt = dir("wt-");
     appendMessage(wt, 7, "keep the old palette", "ana");
     expect(takeMessages(wt, 7)).toContain("keep the old palette");
-    expect(takeMessages(wt, 7)).toBeUndefined();
+    expect(takeMessages(wt, 7) ?? "none").toBe("none");
     appendMessage(wt, 7, "and no new deps");
     const second = takeMessages(wt, 7)!;
     expect(second).toContain("no new deps");
@@ -96,7 +96,7 @@ describe("steering a run", () => {
     const wt = dir("hook-");
     appendMessage(wt, 7, "use a map", "ana");
     const run = () =>
-      Bun.spawnSync([join(import.meta.dir, "../template/.claude/hooks/operator-messages.sh")], {
+      Bun.spawnSync([join(import.meta.dir, "..", "template", ".claude", "hooks", "operator-messages.sh")], {
         stdin: new TextEncoder().encode('{"hook_event_name":"PreToolUse"}'),
         env: { ...process.env, FACTORY_STAGE: "build", FACTORY_ARTIFACT_DIR: join(wt, runDir(7)) },
         timeout: 10_000,

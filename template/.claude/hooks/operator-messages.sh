@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse and UserPromptSubmit hook. Inside a factory stage, hands the agent what the operator
+# PreToolUse hook. Inside a factory stage, hands the agent what the operator
 # sent to this run since its last step, once. Any error lets the step through unchanged.
 set -uo pipefail
 
