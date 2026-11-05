@@ -9,6 +9,7 @@ import { parseCron } from "./core/cron";
 import type { FactoryConfig } from "./config";
 import { type SpendDeps, spendCapHit, type WatchDeps } from "./engine/common";
 import type { GhPr } from "./github";
+import { isOperatorIssue } from "./inbox";
 import { LABEL } from "./labels";
 import { canServe } from "./machine";
 
@@ -73,7 +74,7 @@ export async function dispatchJobs(
           await github.listIssuesByLabel(repo, LABEL.ready),
           await github.listIssuesByLabel(repo, LABEL.blocked),
         )
-      ).clear
+      ).clear.filter((i) => !isOperatorIssue(i))
     : [];
   const resumed = await Promise.all(RESUME_LABELS.map((l) => github.listIssuesByLabel(repo, l)));
   const capabilities = deps.machine?.config.capabilities;

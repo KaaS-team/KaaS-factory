@@ -1,0 +1,15 @@
+Order
+1. #10 Schema
+2. #11 API
+3. #12 UI
+4. #13 Docs
+5. #14 Deploy
+
+Critical path: #10 -> #11 -> #12
+
+Waiting
+#11 waits on #10
+#12 waits on #11
+#14 operator work: needs you
+#15 on a cycle: #15 -> #16 -> #15
+#16 on a cycle: #15 -> #16 -> #15

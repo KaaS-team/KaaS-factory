@@ -172,6 +172,14 @@ factory explain <N> (--repo-dir <path> | --repo <owner/name>)
 
 print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems.
 
+### plan-order
+
+```
+factory plan-order (--repo-dir <path> | --repo <owner/name>)
+```
+
+print the order the scheduler dispatches open issues in, the critical path and why each waiting issue waits.
+
 ### verify-agent
 
 ```

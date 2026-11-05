@@ -4,6 +4,7 @@
 // through chatops.ts and its trust rule instead of a second command path.
 
 import { parseChatOps, signedBy } from "./chatops";
+import { parseMeta } from "./core/schedule";
 import { parseDataMarkers } from "./derive";
 import { plain } from "./display";
 import { epicProgress } from "./engine/epic";
@@ -21,7 +22,8 @@ export type InboxKind =
   | "failed"
   | "budget"
   | "learning-pr"
-  | "stale-pr";
+  | "stale-pr"
+  | "operator";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
 
 // Actions that carry the human's own words.
@@ -53,6 +55,10 @@ export const WAITING: Readonly<Record<string, { kind: InboxKind; actions: readon
 export const WAITING_LABELS: readonly string[] = [LABEL.awaitingApproval, LABEL.inReview, ...PARKED_LABELS];
 
 const ASK_LIMIT = 1200;
+
+// An issue whose preface says `Runner: operator` is work for a person, never for the watcher.
+export const isOperatorIssue = (issue: Pick<GhIssue, "body">): boolean =>
+  parseMeta(issue.body ?? "").runner === "operator";
 
 function stripMarkers(body: string): string {
   return body.replace(/<!--[\s\S]*?-->/g, "").trim();
@@ -107,7 +113,20 @@ export function buildInbox(issues: readonly GhIssue[], reasons?: ReadonlyMap<num
   const items: InboxItem[] = [];
   for (const issue of issues) {
     const label = issue.labels.map((l) => l.name).find((n) => WAITING[n]);
-    if (!label) continue;
+    if (!label) {
+      if (issue.labels.some((l) => l.name === LABEL.ready) && isOperatorIssue(issue))
+        items.push({
+          id: `issue-${issue.number}`,
+          kind: "operator",
+          issue: issue.number,
+          title: plain(issue.title),
+          label: LABEL.ready,
+          waitingSince: undefined,
+          ask: "Operator work (Runner: operator). The factory skips it; it needs you.",
+          actions: [],
+        });
+      continue;
+    }
     const { kind: labelKind, actions } = WAITING[label]!;
     const comment = latestRunnerComment(issue.comments);
     const kind = isBudgetPark(label, issue) ? "budget" : isMergeDryRun(label, comment) ? "merge-dry-run" : labelKind;

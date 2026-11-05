@@ -1,0 +1,1 @@
+{"name":"a ready issue marked Runner: operator is dispatched","file":"src/watch.ts","find":"admitted.filter((i) => !operatorWork(i)),","replace":"admitted,","test":"tests/operator-runner.test.ts"}
