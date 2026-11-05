@@ -3,7 +3,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import type { CloudEvent } from "../src/core/event";
 import { LinkStore } from "../src/integrations/links";
-import { OTEL_ENV, otlpHeaders, runTrace } from "../src/integrations/otel";
+import { auditTrace, OTEL_ENV, otlpHeaders, runTrace } from "../src/integrations/otel";
 import { wireIntegrations } from "../src/integrations/wire";
 import type { StageRun } from "../src/state";
 
@@ -93,5 +93,63 @@ describe("OTel gen_ai trace", () => {
     expect(spansOf(a)[1]!.attributes.map((x) => x.key)).not.toContain("gen_ai.request.model");
     expect(runTrace({ repo: "acme/shop", issue: 5, outcome: "failed" }, [])).toBeUndefined();
     expect(otlpHeaders("a=1, b=x%3Dy")).toEqual({ a: "1", b: "x=y" });
+  });
+});
+
+describe("audit events as OTel spans", () => {
+  const auditEv = (id: string, actor: string, issue: number | null) =>
+    ({
+      specversion: "1.0",
+      id,
+      type: "factory.audit.recorded",
+      source: "f",
+      subject: "POST /api/toggles",
+      time: "2026-10-26T10:00:00.000Z",
+      data: { at: "2026-10-26T10:00:00.000Z", actor, role: "owner", route: "POST /api/toggles", issue, status: 200 },
+    }) as CloudEvent;
+  const wire = (env: Record<string, string>) => {
+    const subs: ((e: CloudEvent) => Promise<void>)[] = [];
+    wireIntegrations({
+      subscribe: (_t, fn) => subs.push(fn),
+      links: new LinkStore(":memory:"),
+      stageRuns: () => [],
+      env,
+    });
+    return subs;
+  };
+
+  test("the fixture exporter receives one span per event, with event type, actor and issue", async () => {
+    got.length = 0;
+    const subs = wire({ [OTEL_ENV.endpoint]: collector.url.origin });
+    for (const e of [auditEv("a1", "ada", 7), auditEv("a2", "bob", null)]) for (const fn of subs) await fn(e);
+    expect(got.map((g) => g.path)).toEqual(["/v1/traces", "/v1/traces"]);
+    const spans = got.map((g) => spansOf(g.body));
+    expect(spans.every((s) => s.length === 1)).toBe(true);
+    const attrs = (i: number) =>
+      Object.fromEntries(
+        (spans[i]![0]!.attributes as { key: string; value: Record<string, string> }[]).map((a) => [
+          a.key,
+          Object.values(a.value)[0],
+        ]),
+      );
+    expect(spans[0]![0]!.name).toBe("factory.audit.recorded");
+    expect(attrs(0)).toMatchObject({
+      "factory.event.type": "factory.audit.recorded",
+      "factory.actor": "ada",
+      "factory.issue": "7",
+    });
+    expect(Object.keys(attrs(1))).not.toContain("factory.issue");
+    expect(spans[0]![0]!.spanId).not.toBe(spans[1]![0]!.spanId);
+  });
+
+  test("with no exporter configured, nothing is sent", async () => {
+    got.length = 0;
+    const subs = wire({});
+    for (const fn of subs) await fn(auditEv("a3", "ada", 7));
+    expect(got).toEqual([]);
+  });
+
+  test("the same event gives the same ids", () => {
+    expect(auditTrace(auditEv("a1", "ada", 7))).toEqual(auditTrace(auditEv("a1", "ada", 7)));
   });
 });
