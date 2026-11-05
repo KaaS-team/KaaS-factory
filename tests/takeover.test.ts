@@ -153,6 +153,7 @@ describe("renderRunSummary", () => {
     session_id: null,
     verdict: null,
     config_hash: null,
+    refused_calls: 0,
     ...over,
   });
 

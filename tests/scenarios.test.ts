@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { type DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
 import { signedBy } from "../src/chatops";
+import { readLedger } from "../src/failure-ledger";
 import { OPERATOR_TAKEOVER, type StageName, type StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
@@ -771,6 +772,33 @@ describe("failure paths", () => {
     c.push("triage", {}, { exitCode: 0, permissionDenials: ["Write .factory/runs/issue-1/triage.json"] });
     expect(await c.step()).toBe("failed");
     expect(c.state.getRun("acme/widgets", 1)!.reason).toContain("Write .factory/runs/issue-1/triage.json");
+    done(c);
+  });
+
+  test("14l. a failed run writes one failure-ledger row with its cause (#164)", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", {}, { exitCode: 0, permissionDenials: ["Write .factory/runs/issue-1/triage.json"] });
+    expect(await c.step()).toBe("failed");
+    const rows = readLedger(join(c.workspacesDir, ".failure-ledger"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: "open", fix: "", failedRun: c.state.getRun("acme/widgets", 1)!.id });
+    expect(rows[0]!.failure).toContain("Write .factory/runs/issue-1/triage.json");
+    expect(rows[0]!.failure).not.toContain("spent $");
+    done(c);
+  });
+
+  test("14r. every refused tool call of a stage is counted on its stage_runs row (#173)", async () => {
+    const c = setup([LABEL.ready]);
+    c.push(
+      "triage",
+      {},
+      {
+        exitCode: 0,
+        permissionDenials: ["Bash git grep foo", "Write .factory/runs/issue-1/triage.json"],
+      },
+    );
+    await c.step();
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 })[0]!.refused_calls).toBe(2);
     done(c);
   });
 

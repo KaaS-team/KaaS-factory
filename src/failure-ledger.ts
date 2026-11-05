@@ -12,6 +12,7 @@ export interface LedgerRow {
   readonly fix: string;
   readonly status: LedgerStatus;
   readonly failedRun: number; // the latest run that hit this failure
+  readonly check?: string; // the test or gate that proves the fix; set with the fix
 }
 
 export const LEDGER_FILE = "failure-ledger.json";
@@ -24,6 +25,7 @@ const isRow = (r: unknown): r is LedgerRow => {
     typeof o.failure === "string" &&
     typeof o.fix === "string" &&
     typeof o.failedRun === "number" &&
+    (o.check === undefined || typeof o.check === "string") &&
     LEDGER_STATUSES.includes(o.status as LedgerStatus)
   );
 };
@@ -57,10 +59,11 @@ export function recordFailure(rows: readonly LedgerRow[], failure: string, run: 
 }
 
 // Names the fix. An open or regressed row becomes fixed. A row already fixed or verified keeps its status.
-export function recordFix(rows: readonly LedgerRow[], failure: string, fix: string): LedgerRow[] {
+export function recordFix(rows: readonly LedgerRow[], failure: string, fix: string, check?: string): LedgerRow[] {
   return replaceRow(rows, failure, (r) => ({
     ...r,
     fix,
+    ...(check === undefined ? {} : { check }),
     status: r.status === "open" || r.status === "regressed" ? "fixed" : r.status,
   }));
 }

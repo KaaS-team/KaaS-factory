@@ -1,0 +1,7 @@
+{
+  "name": "a ledger row drops the check that proves its fix",
+  "file": "src/failure-ledger.ts",
+  "find": "...(check === undefined ? {} : { check }),",
+  "replace": "",
+  "test": "tests/failure-ledger.test.ts"
+}
