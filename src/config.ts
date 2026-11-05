@@ -93,7 +93,7 @@ export interface RouteConfig {
   readonly workflow?: string;
 }
 
-export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields {
+export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields, keys.PolicyFields {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
   readonly postEditCommand: readonly string[]; // argv the post-edit-check hook runs on each build edit; {file} is the path; [] is off
@@ -364,6 +364,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   protectedPaths: "strings",
   postEditCommand: "strings",
   riskPolicy: "object",
+  policy: "object",
   maxOpenFactoryPrs: "posInt",
   concurrency: "posInt",
   pollIntervalSeconds: "posInt",
@@ -464,8 +465,7 @@ export function configProblems(raw: unknown): string[] {
   nested("review", { maxRounds: "posInt", alwaysHumanPaths: "strings" });
   nested("runtime", { gates: "string", check: "string" });
   nested("merge", keys.MERGE_KEYS);
-  // policy and autonomy are enums: a typo there would read as the default, which for autonomy
-  // is a different merge rule, so boot refuses it (src/config-merge.ts).
+  problems.push(...keys.policyProblems(cfg.policy));
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
     problems.push(...keys.mergeProblems(cfg.merge as Record<string, unknown>));
   }

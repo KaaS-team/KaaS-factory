@@ -1,0 +1,1 @@
+{"name":"polling reserves cloud slots while orchestration is off","file":"src/orchestrate/refill.ts","find":"if (!orchestrateActive(deps.state, config)) return undefined;","replace":"","test":"tests/cloud-runtimes.test.ts"}

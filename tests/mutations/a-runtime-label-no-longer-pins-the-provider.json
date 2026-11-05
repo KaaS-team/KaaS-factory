@@ -1,0 +1,1 @@
+{"name":"a runtime label no longer pins the provider","file":"src/orchestrate/refill.ts","find":"if (label) return [label.slice(RUNTIME_LABEL.length)];","replace":"","test":"tests/cloud-runtimes.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"a branch that already holds the issue's commits is launched again","file":"src/engine/cloud-build.ts","find":"(await deps.git.hasCommits(worktree, config.base))","replace":"(await deps.git.hasCommits(worktree, config.base)) && false","test":"tests/cloud-build.test.ts"}

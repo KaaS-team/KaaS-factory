@@ -1,0 +1,1 @@
+{"name":"the refill reserves a run over the daily spend cap","file":"src/orchestrate/refill.ts","find":"if (held > orch.cost.perDayUsd) {","replace":"if (false) {","test":"tests/cloud-runtimes.test.ts"}

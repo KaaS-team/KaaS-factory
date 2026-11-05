@@ -169,6 +169,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "print a Claude Code cloud routine (name, cron, prompt) that runs `factory tick` on a schedule",
   },
   {
+    name: "cloud",
+    usage: "cloud status (--repo-dir <path> | --repo <owner/name>) [--json]",
+    does: "list each cloud reservation and session the runner holds: issue, runtime, state and the spend held back",
+  },
+  {
     name: "receipt",
     usage: "receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <key.pub>) [--json]",
     does: "keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code)",

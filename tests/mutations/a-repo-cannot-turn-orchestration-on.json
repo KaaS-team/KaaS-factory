@@ -1,0 +1,1 @@
+{"name":"a repo cannot turn orchestration on","file":"src/orchestrate/resolve.ts","find":"origin.enabled = \"builtin\";","replace":"origin.enabled = \"org\";","test":"tests/cloud-runtimes.test.ts"}

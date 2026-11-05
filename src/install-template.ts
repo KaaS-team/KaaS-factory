@@ -29,6 +29,8 @@ export interface InstallOptions {
   update?: boolean;
   ci?: boolean;
   agents?: string[];
+  // "agent" drops the plain `git push` deny from .claude/settings.json; default is the target's policy.push, else "runner".
+  push?: "runner" | "agent";
 }
 
 export interface BundledFiles {
@@ -99,6 +101,22 @@ const isExecutable = (rel: string): boolean =>
   rel.startsWith(".claude/hooks/") || rel === ".factory/gates.sh" || rel === ".factory/mutate.sh";
 const sha = (b: Buffer): string => createHash("sha256").update(b).digest("hex");
 
+const PLAIN_PUSH_DENY = "Bash(git push*)";
+
+export function allowAgentPush(settings: Buffer): Buffer {
+  const json = JSON.parse(settings.toString("utf8"));
+  json.permissions.deny = json.permissions.deny.filter((d: string) => d !== PLAIN_PUSH_DENY);
+  return Buffer.from(`${JSON.stringify(json, null, 2)}\n`);
+}
+
+function targetPushPolicy(base: string): string | undefined {
+  try {
+    return JSON.parse(readFileSync(join(base, ".factory", "config.json"), "utf8"))?.policy?.push;
+  } catch {
+    return undefined;
+  }
+}
+
 export function installTemplate(
   target: string,
   opts: InstallOptions = {},
@@ -120,8 +138,10 @@ export function installTemplate(
   const manifest = opts.update ? readManifest(base) : new Map<string, string>();
   const kept = new Set<string>();
 
-  for (const [rel, content] of files.template) {
+  const agentPushes = (opts.push ?? targetPushPolicy(base)) === "agent";
+  for (const [rel, template] of files.template) {
     const dest = join(base, rel);
+    const content = rel === ".claude/settings.json" && agentPushes ? allowAgentPush(template) : template;
 
     // settings.json may carry repo-specific allow/deny entries; update never overwrites it silently.
     if (rel === ".claude/settings.json" && opts.update && lexists(dest)) {

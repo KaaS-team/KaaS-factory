@@ -1,7 +1,7 @@
 import { PRIORITY_RULES } from "./types";
 
-const BUILTIN = ["cursor-cloud", "claude-cloud"] as const;
-const OK_PH = new Set(["{promptFile}", "{branch}", "{repo}", "{session}"]);
+const BUILTIN = ["cursor-cloud", "claude-cloud", "cursor-local"] as const;
+const OK_PH = new Set(["{promptFile}", "{branch}", "{repo}", "{session}", "{issue}"]);
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const whole = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
 const pos = (v: unknown) => typeof v === "number" && Number.isFinite(v) && (v as number) > 0;
@@ -26,7 +26,9 @@ export function orchestrateProblems(raw: unknown, where: string): string[] {
   if (raw === undefined) return [];
   if (!isObj(raw)) return [`${where}: expected an object`];
   const out: string[] = [];
-  uk(raw, ["enabled", "providers", "roles", "priority", "groom", "cost"], where, out);
+  uk(raw, ["enabled", "providers", "roles", "priority", "groom", "cost", "promptMaxBytes"], where, out);
+  if (raw.promptMaxBytes !== undefined && !(Number.isInteger(raw.promptMaxBytes) && (raw.promptMaxBytes as number) > 0))
+    out.push(`${where}.promptMaxBytes: expected a positive whole number`);
   if (raw.enabled !== undefined && typeof raw.enabled !== "boolean")
     out.push(`${where}.enabled: expected true or false`);
   if (Array.isArray(raw.priority))

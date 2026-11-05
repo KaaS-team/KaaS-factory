@@ -3,6 +3,7 @@
 import { hiddenPaths } from "../acceptance";
 import { writeGateEvidence } from "../artifacts";
 import { touchesProtectedPath } from "../boundary";
+import { pushPolicy } from "../config-merge";
 import { LABEL } from "../labels";
 import { ShellSetupRunner } from "../setup";
 import { finish, moveLabel, type Outcome } from "./common";
@@ -38,7 +39,8 @@ export async function finishBuild(
     status: gate.status,
     tree: await deps.git.treeHash(worktree),
   });
-  const pushed = await deps.git.push(worktree, issueNumber);
+  // With policy.push "agent" the agent already pushed; a second push is the runner holding a right it gave away.
+  const pushed = pushPolicy(config) === "agent" ? { code: 0, stderr: "" } : await deps.git.push(worktree, issueNumber);
   if (pushed.code !== 0) return stop(await failPush(deps, config, issue, step.label, worktree, pushed.stderr));
   return { kind: "next", facts };
 }

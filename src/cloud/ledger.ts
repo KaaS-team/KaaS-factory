@@ -1,6 +1,6 @@
 import { TERMINAL, type CloudStatus } from "./port";
 
-type Reservation = { provider: string; attempt: number; at: number };
+type Reservation = { provider: string; attempt: number; at: number; usd?: number };
 type Session = { provider: string; id: string; startedAt: number; status: CloudStatus; baseSha: string };
 
 export type CloudLedgerJson = {
@@ -35,13 +35,14 @@ export function cloudLedger(
   repo: string,
 ) {
   return {
-    reserve(issue: number, provider: string): number {
+    // `usd` is the spend held back for the run until it settles.
+    reserve(issue: number, provider: string, usd?: number): number {
       const data = load(state, repo);
       const k = String(issue);
       const prior = data.reservations[k];
       let attempt = 1;
       if (prior && prior.provider === "") attempt = prior.attempt + 1;
-      data.reservations[k] = { provider, attempt, at: Date.now() };
+      data.reservations[k] = { provider, attempt, at: Date.now(), ...(usd === undefined ? {} : { usd }) };
       save(state, repo, data);
       return attempt;
     },
@@ -84,6 +85,17 @@ export function cloudLedger(
       const data = load(state, repo);
       delete data.reservations[String(issue)];
       save(state, repo, data);
+    },
+
+    reservedUsd(): number {
+      const held = load(state, repo).reservations;
+      let total = 0;
+      for (const k in held) total += held[k]?.usd ?? 0;
+      return total;
+    },
+
+    all(): CloudLedgerJson {
+      return load(state, repo);
     },
 
     active(): Record<string, number> {
