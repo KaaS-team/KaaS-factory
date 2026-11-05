@@ -90,7 +90,6 @@
   "stack.test.ts",
   "state.test.ts",
   "stop-artifact.test.ts",
-  "takeover.test.ts",
   "teach.test.ts",
   "team-explain.test.ts",
   "team-load.test.ts",

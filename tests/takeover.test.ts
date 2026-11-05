@@ -15,6 +15,7 @@ import { FactoryState, type StageRun } from "../src/state";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "../src/takeover";
 import { defaultFixtureDir } from "../src/verify-agent";
 
+mkdirSync(tmpdir(), { recursive: true });
 const scratch = mkdtempSync(join(tmpdir(), "factory-takeover-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
