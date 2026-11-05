@@ -3,9 +3,9 @@
 // differs by more than `channelTolerance`, and the shot fails when the changed share of pixels is above
 // `maxChangedRatio`. Decoding uses node:zlib only, so no dependency is added. Pure apart from the
 // directory reader, which compareShotDirs calls from the qa step (src/qa-step.ts).
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { inflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 
 export interface Rgba {
   readonly width: number;
@@ -187,4 +187,87 @@ export function compareShotDirs(
       "\n",
     ),
   };
+}
+
+const crcTable = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+function pngChunk(type: string, body: Buffer): Buffer {
+  const t = Buffer.from(type, "latin1");
+  let c = 0xffffffff;
+  for (const x of Buffer.concat([t, body])) c = (crcTable[(c ^ x) & 255] ?? 0) ^ (c >>> 8);
+  const head = Buffer.alloc(4);
+  head.writeUInt32BE(body.length);
+  const tail = Buffer.alloc(4);
+  tail.writeUInt32BE((c ^ 0xffffffff) >>> 0);
+  return Buffer.concat([head, t, body, tail]);
+}
+
+// The after image with every changed pixel painted red, so a reviewer sees where it moved.
+export function diffPng(a: Rgba, b: Rgba, opts: CompareOptions = DEFAULT_COMPARE): Buffer {
+  const stride = b.width * 4;
+  const raw = Buffer.alloc((stride + 1) * b.height);
+  for (let y = 0; y < b.height; y++) {
+    for (let x = 0; x < b.width; x++) {
+      const o = (y * b.width + x) * 4;
+      let d = 0;
+      for (let k = 0; k < 4; k++) d = Math.max(d, Math.abs((a.data[o + k] ?? 0) - (b.data[o + k] ?? 0)));
+      const px =
+        d > opts.channelTolerance ? [255, 0, 0, 255] : [b.data[o] ?? 0, b.data[o + 1] ?? 0, b.data[o + 2] ?? 0, 96];
+      for (let k = 0; k < 4; k++) raw[y * (stride + 1) + 1 + x * 4 + k] = px[k] ?? 0;
+    }
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(b.width, 0);
+  ihdr.writeUInt32BE(b.height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return Buffer.concat([
+    SIGNATURE,
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", deflateSync(raw)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+
+// Writes <out>/<name>.diff.png for each failing shot of the same size and <out>/report.html listing every
+// shot. Returns the report path, or undefined when there is nothing to compare.
+export function writeVisualReport(
+  baseline: string,
+  current: string,
+  out: string,
+  opts: CompareOptions = DEFAULT_COMPARE,
+): string | undefined {
+  if (!existsSync(current)) return undefined;
+  const names = readdirSync(current)
+    .filter((f) => f.endsWith(".png"))
+    .sort();
+  if (names.length === 0) return undefined;
+  mkdirSync(out, { recursive: true });
+  const rows = names.map((name) => {
+    const base = join(baseline, name);
+    if (!existsSync(base)) return `<tr><td>${esc(name)}</td><td>pass</td><td>new shot, no baseline</td></tr>`;
+    try {
+      const a = decodePng(readFileSync(base));
+      const b = decodePng(readFileSync(join(current, name)));
+      const r = compareImages(a, b, opts);
+      if ("reason" in r) return `<tr><td>${esc(name)}</td><td>fail</td><td>${esc(r.reason)}</td></tr>`;
+      if (r.ok) return `<tr><td>${esc(name)}</td><td>pass</td><td>${(r.ratio * 100).toFixed(3)}% changed</td></tr>`;
+      const diff = `${name.replace(/\.png$/, "")}.diff.png`;
+      writeFileSync(join(out, diff), diffPng(a, b, opts));
+      return `<tr><td>${esc(name)}</td><td>fail</td><td>${(r.ratio * 100).toFixed(3)}% changed<br><img src="${esc(diff)}" alt="diff of ${esc(name)}"></td></tr>`;
+    } catch (e) {
+      return `<tr><td>${esc(name)}</td><td>fail</td><td>${esc(e instanceof Error ? e.message : String(e))}</td></tr>`;
+    }
+  });
+  const file = join(out, "report.html");
+  writeFileSync(
+    file,
+    `<!doctype html><meta charset="utf-8"><title>Visual report</title><table border="1"><tr><th>Shot</th><th>Result</th><th>Detail</th></tr>${rows.join("")}</table>\n`,
+  );
+  return file;
 }

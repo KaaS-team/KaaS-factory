@@ -1,0 +1,1 @@
+{"name":"the before screenshot is read from the change instead of the base branch","file":"src/assets-branch.ts","find":"baseDir ?? join(worktree","replace":"join(worktree","test":"tests/assets-branch.test.ts"}

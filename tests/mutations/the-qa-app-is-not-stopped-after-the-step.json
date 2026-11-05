@@ -1,0 +1,1 @@
+{"name":"the qa app is not stopped after the step","file":"src/qa-step.ts","find":"  } finally {\n    await app.stop();\n  }","replace":"  } finally {\n  }","test":"tests/qa-step.test.ts"}
