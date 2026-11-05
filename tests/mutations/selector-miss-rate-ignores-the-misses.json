@@ -1,0 +1,1 @@
+{"name": "selector miss rate ignores the misses", "file": "scripts/selector-misses.ts", "find": "rows.reduce((n, r) => n + r.misses.length, 0) / failed", "replace": "0 / failed", "test": "tests/selector-misses.test.ts"}

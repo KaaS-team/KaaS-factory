@@ -1,1 +1,0 @@
-{"name": "affected misses issue body omits the changed files", "file": "scripts/affected-misses.py", "find": "*[f\"- `{f}`\" for f in files],", "replace": "*[],", "test": "tests/affected-misses.test.ts"}

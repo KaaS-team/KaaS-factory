@@ -31,6 +31,21 @@ export function suggestedInputs(test: string, changed: readonly string[], root: 
   return inside.length ? inside : changed.slice(0, 10);
 }
 
+export function missRow(
+  sha: string,
+  before: string,
+  failed: readonly string[],
+  misses: readonly string[],
+  at: string,
+): MissRow {
+  return { at, sha, before, failed: failed.length, misses: [...misses] };
+}
+
+export function missRate(rows: readonly MissRow[]): number {
+  const failed = rows.reduce((n, r) => n + r.failed, 0);
+  return failed ? rows.reduce((n, r) => n + r.misses.length, 0) / failed : 0;
+}
+
 export const missTitle = (name: string): string => `Selector miss: ${name}`;
 
 export function missBody(
@@ -76,7 +91,7 @@ if (import.meta.main) {
   const sha = git("rev-parse", "HEAD").stdout.toString().trim();
   const failed: string[] = JSON.parse(readFileSync(reportPath, "utf8")).failed ?? [];
   const misses = selectorMisses(all, failed, changed, baseList);
-  const row: MissRow = { at: new Date().toISOString(), sha, before, failed: failed.length, misses };
+  const row = missRow(sha, before, failed, misses, new Date().toISOString());
   const log = join(ROOT, "reports", "selector-misses.jsonl");
   mkdirSync(dirname(log), { recursive: true });
   appendFileSync(log, `${JSON.stringify(row)}\n`);
@@ -84,8 +99,6 @@ if (import.meta.main) {
     .split("\n")
     .filter(Boolean)
     .map((l) => JSON.parse(l));
-  const totalFailed = rows.reduce((n, r) => n + r.failed, 0);
-  const totalMisses = rows.reduce((n, r) => n + r.misses.length, 0);
   console.log(`selector-misses: ${misses.length} of ${failed.length} failures this push`);
   if (misses.length) {
     console.log("\n| Mutation | Inputs line |\n| --- | --- |");
@@ -94,7 +107,7 @@ if (import.meta.main) {
       console.log(`| ${name} | \`"inputs": ${JSON.stringify(suggestedInputs(m.test, changed, ROOT))}\` |`);
     }
   }
-  console.log(`\nMiss rate across ${rows.length} pushes: ${totalFailed ? totalMisses / totalFailed : 0}`);
+  console.log(`\nMiss rate across ${rows.length} pushes: ${missRate(rows)}`);
   if (args.includes("--open-issues")) {
     for (const name of misses) {
       const m = all.find((e) => e.name === name)!;

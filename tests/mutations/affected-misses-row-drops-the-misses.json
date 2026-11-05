@@ -1,1 +1,0 @@
-{"name": "affected misses row drops the misses", "file": "scripts/affected-misses.py", "find": "\"failed\": len(failed), \"misses\": found}", "replace": "\"failed\": len(failed), \"misses\": []}", "test": "tests/affected-misses.test.ts"}
