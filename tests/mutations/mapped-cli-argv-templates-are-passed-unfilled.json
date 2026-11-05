@@ -1,0 +1,7 @@
+{
+  "name": "mapped cli: argv templates are passed unfilled",
+  "file": "src/adapters/trackers/mapped-cli.ts",
+  "find": "argvText(fillTemplate(a, vars))",
+  "replace": "argvText(a)",
+  "test": "tests/tracker-mapped-cli.test.ts"
+}

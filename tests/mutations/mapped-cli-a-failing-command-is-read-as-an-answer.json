@@ -1,0 +1,7 @@
+{
+  "name": "mapped cli: a failing command is read as an answer",
+  "file": "src/adapters/trackers/mapped-cli.ts",
+  "find": "if (!r.ok)\n",
+  "replace": "if (false as boolean)\n",
+  "test": "tests/tracker-mapped-cli.test.ts"
+}

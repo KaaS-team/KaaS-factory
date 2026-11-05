@@ -1,0 +1,7 @@
+{
+  "name": "mapped cli: a label list is passed with the wrong separator",
+  "file": "src/adapters/trackers/mapped-cli.ts",
+  "find": "? v.join(\",\")",
+  "replace": "? v.join(\" \")",
+  "test": "tests/tracker-mapped-cli.test.ts"
+}

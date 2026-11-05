@@ -1,0 +1,7 @@
+{
+  "name": "mapped cli: a mapping naming a CLI tool still talks to an MCP server",
+  "file": "src/adapters/trackers/mapped-make.ts",
+  "find": "const transport: CallTransport = mapping.cli\n",
+  "replace": "const transport: CallTransport = (false as boolean)\n",
+  "test": "tests/tracker-mapped-cli.test.ts"
+}
