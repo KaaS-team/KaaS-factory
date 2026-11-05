@@ -42,7 +42,6 @@
   "intake-trust.test.ts",
   "json-schema-hook.test.ts",
   "language-images.test.ts",
-  "learn-export.test.ts",
   "learn.test.ts",
   "lease.test.ts",
   "ledger-public.test.ts",

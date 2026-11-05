@@ -36,8 +36,8 @@ export function noteFinding(repo: string, issue: number, f: CheckFinding): void 
 export function ensureCheckColumns(state: FactoryState): void {
   state.write((db) => {
     const have = (db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name);
-    for (const col of ["checks", "findings"])
-      if (!have.includes(col)) db.exec(`ALTER TABLE stage_runs ADD COLUMN ${col} TEXT`);
+    if (!have.includes("checks")) db.exec("ALTER TABLE stage_runs ADD COLUMN checks TEXT");
+    if (!have.includes("findings")) db.exec("ALTER TABLE stage_runs ADD COLUMN findings TEXT");
   });
 }
 
