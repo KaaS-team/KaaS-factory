@@ -19,6 +19,7 @@ import { Git, GitCommandRunner, issueOfPr, sparseCheckoutPatterns } from "../src
 const roots: string[] = [];
 
 function tmpRoot(): string {
+  mkdirSync(tmpdir(), { recursive: true });
   const root = mkdtempSync(join(tmpdir(), "factory-git-"));
   roots.push(root);
   return root;

@@ -1,0 +1,7 @@
+{
+  "name": "check value drops the removal-is-its-own-issue line",
+  "file": "scripts/check-value.ts",
+  "find": "A removal is its own issue and cites this report.",
+  "replace": ".",
+  "test": "tests/check-value.test.ts"
+}

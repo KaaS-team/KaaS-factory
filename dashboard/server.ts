@@ -142,7 +142,6 @@ export function createDashboard(
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
   // Read by name on every request; the value is never logged or returned.
   const eventsSecret = () => process.env[eventsInboundSecretEnv(project?.config)] ?? "";
-  const eventsSecretFor = async (r: string) => process.env[eventsInboundSecretEnv((await projectFor(r))?.config)] ?? "";
   const integrations = integrationRoutes({
     stateFor: (r) => stateFor(r),
     access,
@@ -282,7 +281,8 @@ export function createDashboard(
     eventsRoute({
       repo,
       served: inboxRepos,
-      secretFor: eventsSecretFor,
+      secretFor: async (r) => process.env[eventsInboundSecretEnv((await projectFor(r))?.config)] ?? "",
+      acceptFor: async (r) => (await projectFor(r))?.config.events.accept,
       defaultSecret: eventsSecret,
       stateFor: (r) => stateFor(r, true)!,
     }),

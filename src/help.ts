@@ -4,7 +4,7 @@
 export const COMMANDS: { name: string; usage: string; does: string }[] = [
   {
     name: "up",
-    usage: "up [--repo-dir <path> | --repo <owner/name>] [--tmux]",
+    usage: "up [--repo-dir <path> | --repo <owner/name>] [--tmux] [--port <n>]",
     does: "no repo: control plane + relay (the image default); with a repo: watch + dashboard in one process; --tmux: each in a tmux window, plus one per issue",
   },
   {
@@ -199,7 +199,10 @@ export const OPTIONS: [string, string][] = [
   ],
   ["--tmux", "watch and up: show each issue's live transcript in a tmux window (config tmux.enabled does the same)"],
   ["-h, --help", "print this help; after a command, that command's usage"],
-  ["--port <n>", "dashboard port (default FACTORY_DASHBOARD_PORT or 4100)"],
+  [
+    "--port <n>",
+    "dashboard port (default FACTORY_DASHBOARD_PORT or 4100; with no port given, the next free one is used when 4100 is taken)",
+  ],
 ];
 
 export const ENV: [string, string][] = [
@@ -243,4 +246,11 @@ export function skillText(): string {
     "flags:",
     ...OPTIONS.map(([k, v]) => `  ${k}: ${v}`),
   ].join("\n");
+}
+
+// Commands that start a long-running process print usage on --help or -h and start nothing.
+const LONG_RUNNING = ["up", "watch", "dashboard", "serve", "daemon", "runner", "mcp", "pair"];
+
+export function wantsHelp(command: string | undefined, args: readonly string[]): boolean {
+  return !!command && LONG_RUNNING.includes(command) && (args.includes("--help") || args.includes("-h"));
 }

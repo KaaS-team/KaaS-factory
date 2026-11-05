@@ -12,7 +12,7 @@ const row = (name: string): DoctorCheck => ({ name, ok: true, detail: "stub", fi
 
 describe("doctor check registry", () => {
   test("the live checks keep their order: core rows, then the merge method row", () => {
-    expect(DOCTOR_CHECKS.map((source) => source.name)).toEqual(["coreChecks", "mergeMethod"]);
+    expect(DOCTOR_CHECKS.map((source) => source.name)).toEqual(["coreChecks", "mergeMethod", "ciBaseline"]);
   });
 
   test("every source declared in src/doctor-checks.ts is registered", () => {

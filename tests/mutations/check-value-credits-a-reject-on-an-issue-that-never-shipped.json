@@ -1,0 +1,7 @@
+{
+  "name": "check value credits a reject on an issue that never shipped",
+  "file": "scripts/check-value.ts",
+  "find": "const shipped = latest.get(issue)?.status === \"shipped\";",
+  "replace": "const shipped = true;",
+  "test": "tests/check-value.test.ts"
+}

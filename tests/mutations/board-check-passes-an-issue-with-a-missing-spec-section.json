@@ -1,0 +1,7 @@
+{
+  "name": "board check passes an issue with a missing spec section",
+  "file": "scripts/board-check.ts",
+  "find": "if (!planned && !have.some(",
+  "replace": "if (false && !have.some(",
+  "test": "tests/board-check.test.ts"
+}

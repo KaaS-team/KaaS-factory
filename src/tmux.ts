@@ -107,3 +107,19 @@ export function tmuxIssueView(tmux: Tmux, repo: string, factory: string): IssueV
     close: (issue) => tmux.killWindow(issueWindow(repo, issue)),
   };
 }
+
+// The commands `up --tmux` puts in its two windows. --db and --workspaces go to both;
+// --port goes to the dashboard only, and the watcher is left as it was.
+export function upWindows(
+  self: string,
+  cloneDir: string,
+  flags: { db?: string; workspaces?: string; port?: string },
+): { watch: string; dashboard: string } {
+  const pass = (["db", "workspaces"] as const).flatMap((f) => (flags[f] ? [`--${f}`, shellQuote(flags[f]!)] : []));
+  const repoDir = ["--repo-dir", shellQuote(cloneDir)];
+  const port = flags.port ? ["--port", shellQuote(flags.port)] : [];
+  return {
+    watch: [self, "watch", ...repoDir, "--tmux", ...pass].join(" "),
+    dashboard: [self, "dashboard", ...repoDir, ...pass, ...port].join(" "),
+  };
+}

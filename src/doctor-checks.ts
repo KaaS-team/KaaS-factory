@@ -1,7 +1,9 @@
 // The live doctor checks, in output order. A feature adds its check by appending one entry here,
 // so src/cli.ts never changes when a check does (tests/doctor-checks.test.ts pins both).
-import { accessSync, constants } from "node:fs";
+import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { FactoryConfig } from "./config";
+import { ciBaselineChecks } from "./ci-baseline-check";
 import { type DoctorCheck, runDoctor } from "./doctor";
 import { GitCommandRunner } from "./git";
 import { mergeMethodCheck } from "./merge-method";
@@ -65,7 +67,16 @@ const coreChecks: DoctorCheckSource = (config, { cloneDir, github }) =>
 
 const mergeMethod: DoctorCheckSource = async (config) => [await mergeMethodCheck(config)];
 
-export const DOCTOR_CHECKS: readonly DoctorCheckSource[] = [coreChecks, mergeMethod];
+const ciBaseline: DoctorCheckSource = async (config, { cloneDir }) => {
+  const dir = join(cloneDir, ".github", "workflows");
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)) : [];
+  return ciBaselineChecks(
+    config.repo,
+    files.map((f) => ({ path: `.github/workflows/${f}`, content: readFileSync(join(dir, f), "utf8") })),
+  );
+};
+
+export const DOCTOR_CHECKS: readonly DoctorCheckSource[] = [coreChecks, mergeMethod, ciBaseline];
 
 export async function liveDoctorChecks(
   config: FactoryConfig,

@@ -71,6 +71,41 @@ describe("openInitPr", () => {
       expect(calls).toEqual([
         { repo: "o/r", base: "trunk", head: "factory/init", title: "factory: init", body: "- a\n- b" },
       ]);
+      const tree = Bun.spawnSync(["git", "ls-tree", "-r", "--name-only", "HEAD"], { cwd: work }).stdout.toString();
+      expect(tree).not.toContain(".github/workflows/release.yml");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("commits release.yml on factory/init when init wrote it", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
+    const root = mkdtempSync(join(tmpdir(), "init-pr-rel-"));
+    try {
+      const run = (cwd: string, ...a: string[]) => {
+        const r = Bun.spawnSync(["git", ...a], { cwd, stdout: "pipe", stderr: "pipe" });
+        expect(r.exitCode).toBe(0);
+      };
+      const remote = join(root, "remote.git");
+      const work = join(root, "work");
+      mkdirSync(remote);
+      mkdirSync(join(work, ".github", "workflows"), { recursive: true });
+      run(remote, "init", "--bare", "-b", "trunk");
+      run(work, "init", "-b", "trunk");
+      run(work, "config", "user.email", "t@example.com");
+      run(work, "config", "user.name", "t");
+      run(work, "remote", "add", "origin", remote);
+      writeFileSync(join(work, "AGENTS.md"), "x\n");
+      run(work, "add", "AGENTS.md");
+      run(work, "commit", "-m", "base");
+      run(work, "push", "-u", "origin", "trunk");
+      mkdirSync(join(work, ".factory"));
+      writeFileSync(join(work, ".factory", "config.json"), "{}\n");
+      writeFileSync(join(work, ".github", "workflows", "release.yml"), "name: release\n");
+      await openInitPr(work, "o/r", { name: "bun", lines: [] }, { createPr: async () => "u" });
+      const tree = Bun.spawnSync(["git", "ls-tree", "-r", "--name-only", "HEAD"], { cwd: work }).stdout.toString();
+      expect(tree).toContain(".github/workflows/release.yml");
+      expect(tree).toContain(".factory/config.json");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -91,6 +91,11 @@ export function reportWithLog(junitPath: string, logPath: string | undefined, st
     for (const f of unfin.slice(0, CAP)) lines.push(`unfinished: ${f}`);
     if (unfin.length > CAP) lines.push(`and ${unfin.length - CAP} more`);
     if (lines.length > 0) extra = `\n${lines.join("\n")}`;
+    const abort = /\[Makefile:\d+: test\] (Error \d+)/.exec(log)?.[1];
+    const last = headerFiles(log).at(-1);
+    if (abort && last && !text.includes("FAILED ")) {
+      extra += `\ntest step exited non-zero (${abort}) and no test failed; last test file started: ${last}`;
+    }
   }
   const out = text + extra;
   if (stepSummary) appendFileSync(stepSummary, `### Failing tests\n\n\`\`\`\n${out}\n\`\`\`\n`);

@@ -1,4 +1,9 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { CodeHostPort } from "./ports/scm";
+
+// What init may write; only the ones on disk are staged, since release.yml is written only when absent.
+const INIT_PATHS = [".factory", ".claude", ".agents", "AGENTS.md", ".github/workflows/release.yml"];
 
 function git(dir: string, ...a: string[]): string {
   const r = Bun.spawnSync(["git", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" });
@@ -22,7 +27,7 @@ export async function openInitPr(
   scm: Pick<CodeHostPort, "createPr">,
 ): Promise<string> {
   git(dir, "switch", "-c", "factory/init");
-  git(dir, "add", "-A", ".factory", ".claude", ".agents", "AGENTS.md");
+  git(dir, "add", "-A", ...INIT_PATHS.filter((p) => existsSync(join(dir, p))));
   git(dir, "commit", "-m", `factory: init for a ${summary.name} repo`);
   git(dir, "push", "-u", "origin", "factory/init");
   return scm.createPr({

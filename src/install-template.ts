@@ -34,6 +34,7 @@ export interface InstallOptions {
 export interface BundledFiles {
   template: ReadonlyMap<string, Buffer>;
   ci: Buffer | undefined;
+  release?: Buffer | undefined;
 }
 
 export interface InstallResult {
@@ -61,9 +62,8 @@ const REPO_OWNED = new Set([
 ]);
 // Files an earlier release installed and this one no longer ships; `update` removes them.
 const RETIRED = [".claude/agents/factory-verifier.md", ".claude/agents/factory-explorer.md"];
-// Offered, never written: install does not create files under .github/workflows beyond the inert --ci example.
-export const RELEASE_OFFER =
-  "factory install: offer: a release workflow (tag and generated notes on a merged PR) is not installed; add .github/workflows/release.yml yourself if you want one.";
+// The release workflow (a tag publishes a release, and needs a changelog entry) is written once and never edited.
+export const RELEASE_DEST_REL = ".github/workflows/release.yml";
 const CI_DEST_REL = ".github/workflows/factory.yml.example";
 
 function walk(dir: string, prefix = ""): string[] {
@@ -84,7 +84,23 @@ export function bundledFiles(): BundledFiles {
       .map((rel) => [rel, readFileSync(join(dir, rel))] as const),
   );
   const ciPath = join(root, "template-ci", "factory.yml.example");
-  return { template, ci: existsSync(ciPath) ? readFileSync(ciPath) : undefined };
+  const releasePath = join(root, "template-ci", "release.yml");
+  return {
+    template,
+    ci: existsSync(ciPath) ? readFileSync(ciPath) : undefined,
+    release: existsSync(releasePath) ? readFileSync(releasePath) : undefined,
+  };
+}
+
+// Writes .github/workflows/release.yml unless the repo already has one; an existing file is never edited.
+export function installReleaseWorkflow(base: string, dry: boolean, release: Buffer | undefined): string {
+  if (!release) throw new Error("template-ci/release.yml is missing");
+  const dest = join(base, RELEASE_DEST_REL);
+  if (lexists(dest)) return `skip (exists): ${RELEASE_DEST_REL}`;
+  if (dry) return `write: ${RELEASE_DEST_REL}`;
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, release);
+  return `wrote: ${RELEASE_DEST_REL}`;
 }
 
 const lexists = (p: string): boolean => {
@@ -264,8 +280,11 @@ export function installTemplate(
     wrote++;
   }
 
+  const releaseLine = installReleaseWorkflow(base, dry, files.release);
+  lines.push(releaseLine);
+  if (releaseLine.startsWith("write")) wrote++;
+  else skipped.push(RELEASE_DEST_REL);
   lines.push("");
-  lines.push(RELEASE_OFFER);
   lines.push(
     `factory install: ${dry ? "would write" : "wrote"} ${wrote} item(s), skipped ${skipped.length} existing item(s), ${unchanged} unchanged in ${base}`,
   );

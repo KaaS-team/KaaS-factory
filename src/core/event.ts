@@ -81,6 +81,12 @@ export function isExternalEventType(t: unknown): boolean {
   return typeof t === "string" && EXTERNAL.has(t);
 }
 
+// The factory's own types: a caller must never be able to fake one, whatever `events.accept` lists.
+const FACTORY: ReadonlySet<string> = new Set(FACTORY_EVENTS);
+export function isFactoryEventType(t: unknown): boolean {
+  return typeof t === "string" && FACTORY.has(t);
+}
+
 export interface CloudEvent {
   readonly specversion: "1.0";
   readonly id: string;
@@ -155,7 +161,7 @@ export function eventSignature(headers: { get(name: string): string | null }): s
 // Unset `accept` keeps the fixed list; a list of globs (`*` is any run of characters) widens it.
 export function acceptsEvent(type: unknown, accept: readonly string[] | undefined): boolean {
   if (accept === undefined) return isExternalEventType(type);
-  if (typeof type !== "string") return false;
+  if (typeof type !== "string" || isFactoryEventType(type)) return false;
   return accept.some((g) => new RegExp(`^${g.split("*").map(escapeRe).join(".*")}$`).test(type));
 }
 const escapeRe = (s: string) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
