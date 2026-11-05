@@ -1,0 +1,1 @@
+{"name":"layers: a changed path no longer routes to its team","file":"src/team/route.ts","find":"if (byPath) return","replace":"if (false as boolean && byPath) return","test":"tests/team-layers.test.ts"}

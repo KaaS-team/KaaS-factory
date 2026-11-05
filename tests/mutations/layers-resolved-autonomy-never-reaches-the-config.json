@@ -1,0 +1,1 @@
+{"name":"layers: resolved autonomy never reaches the config","file":"src/team/apply.ts","find":"merge: resolved.values.autonomy ?","replace":"merge: false as boolean ?","test":"tests/team-layers.test.ts"}
