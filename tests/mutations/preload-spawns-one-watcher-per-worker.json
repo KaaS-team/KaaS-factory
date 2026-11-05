@@ -1,0 +1,7 @@
+{
+  "name": "preload spawns one watcher per worker",
+  "file": "tests/preload.ts",
+  "find": "if (fresh) {\n  const watch",
+  "replace": "{\n  const watch",
+  "test": "tests/preload-one-watcher.test.ts"
+}
