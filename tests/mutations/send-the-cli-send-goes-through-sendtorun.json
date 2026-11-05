@@ -1,7 +1,7 @@
 {
   "name": "send: the CLI send goes through sendToRun",
   "file": "src/send-cli.ts",
-  "find": "await sendToRun(line, repo, issue, words.join(\" \"), by);",
+  "find": "await sendToRun(line, issue, words.join(\" \"), by);",
   "replace": "line.deliver(issue, words.join(\" \"), by);",
   "test": "tests/ask-steer.test.ts"
 }
