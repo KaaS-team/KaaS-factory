@@ -1,0 +1,7 @@
+{
+  "name": "a taken default dashboard port is not retried on the next port",
+  "file": "src/dashboard-port.ts",
+  "find": "if (!isAddrInUse(err)) throw err;",
+  "replace": "throw err;",
+  "test": "tests/cli-ports.test.ts"
+}

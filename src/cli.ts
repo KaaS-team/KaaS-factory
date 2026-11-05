@@ -41,13 +41,14 @@ import {
   livePath,
   transcriptPath,
 } from "./paths";
-import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
+import { serveOnFreePort } from "./dashboard-port";
+import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView, upWindows } from "./tmux";
 import { followStream } from "./view";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
 import { LABEL } from "./labels";
 import { ensureRepoClone } from "./repo";
 import { daemonPlatform, installDaemon, uninstallDaemon } from "./daemon";
-import { helpText, skillText } from "./help";
+import { helpText, skillText, wantsHelp } from "./help";
 import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
@@ -496,14 +497,10 @@ function serveDashboard(
   fleet?: Pick<FactoryConfig, "agents" | "stages">,
   project?: DashboardProject,
 ): number {
-  const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
+  const given = flag("port") ?? process.env.FACTORY_DASHBOARD_PORT;
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
   const app = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet, undefined, project, plane());
-  const server = Bun.serve({
-    port,
-    hostname,
-    fetch: (req: Request): Promise<Response> => app.handle(req, server.requestIP(req)?.address),
-  });
+  const { port } = serveOnFreePort(given, hostname, (req, ip) => app.handle(req, ip));
   console.log(`factory dashboard: http://${hostname}:${port} (repo=${repo || "unset"})`);
   app.remote.start();
   return port;
@@ -574,10 +571,9 @@ function selfCommand(): string {
 async function upInTmux(cloneDir: string, config: FactoryConfig): Promise<void> {
   const tmux = new Tmux(new ShellTmuxRunner(), config.tmux.session);
   const self = selfCommand();
-  const pass = ["db", "workspaces"].flatMap((f) => (flag(f) ? [`--${f}`, shellQuote(flag(f)!)] : [])).join(" ");
-  const repoDir = `--repo-dir ${shellQuote(cloneDir)}`;
-  await tmux.ensureWindow("watch", `${self} watch ${repoDir} --tmux ${pass}`.trim(), cloneDir);
-  await tmux.ensureWindow("dashboard", `${self} dashboard ${repoDir} ${pass}`.trim(), cloneDir);
+  const w = upWindows(self, cloneDir, { db: flag("db"), workspaces: flag("workspaces"), port: flag("port") });
+  await tmux.ensureWindow("watch", w.watch, cloneDir);
+  await tmux.ensureWindow("dashboard", w.dashboard, cloneDir);
   console.log(`factory up: tmux session "${config.tmux.session}" has windows watch and dashboard.`);
   console.log(`attach: factory attach --repo ${config.repo}   (or: tmux attach -t ${config.tmux.session})`);
 }
@@ -821,6 +817,7 @@ async function cmdMinion(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  if (wantsHelp(command, args)) return void console.log(helpText());
   switch (command === "--version" || command === "--skill" ? "version" : command) {
     case "version":
       return void console.log(command === "--skill" ? skillText() : RUNNER_VERSION);

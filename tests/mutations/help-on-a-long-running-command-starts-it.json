@@ -1,0 +1,7 @@
+{
+  "name": "help on a long-running command starts it",
+  "file": "src/help.ts",
+  "find": "(args.includes(\"--help\") || args.includes(\"-h\"))",
+  "replace": "false",
+  "test": "tests/cli-ports.test.ts"
+}
