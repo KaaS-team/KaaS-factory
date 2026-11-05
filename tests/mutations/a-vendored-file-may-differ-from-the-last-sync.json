@@ -1,0 +1,7 @@
+{
+  "name": "a vendored file may differ from the last sync",
+  "file": "scripts/check-kaas-vendored.ts",
+  "find": "return recorded[f] === actual[f]\n      ? []",
+  "replace": "return true\n      ? []",
+  "test": "tests/kaas-vendored.test.ts"
+}

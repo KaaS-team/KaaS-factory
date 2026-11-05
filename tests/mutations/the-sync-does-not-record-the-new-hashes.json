@@ -1,0 +1,7 @@
+{
+  "name": "the sync does not record the new hashes",
+  "file": "scripts/check-kaas-vendored.ts",
+  "find": "JSON.stringify(hashDir(root), null, 2)",
+  "replace": "JSON.stringify({}, null, 2)",
+  "test": "tests/kaas-vendored.test.ts"
+}

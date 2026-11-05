@@ -1,0 +1,13 @@
+{
+  "scripts/kaas/check-affected.py": "78c3a5cd293509df5b94f8d493d82b2e57c846df03891dbe5a2230f50533db77",
+  "scripts/kaas/check-prose.py": "0fac914f669d1bab318584da1db2a103a2cda0351a8c129cfd14346d6c513662",
+  "scripts/kaas/check-quality.py": "2bf204e6e738201780982e5bb01fecc3d70cb2ff64d8e6d39640d53e72539131",
+  "scripts/kaas/check-repo.py": "eee46f6afe6c6ca695658c521750057f4b082323a46bdaf8017939c63f83ee7f",
+  "scripts/kaas/check-security.py": "0065dd80e5a11bfc31c3b26bb0cae864f1cec10ac45db6370cd0ed303eefeb6b",
+  "scripts/kaas/gate-stamp.py": "a30ac8d212062aee89d44f314cd032a53f4717f113a02cf6a9166eb992a3c390",
+  "scripts/kaas/house-rules.md": "1608a648955b1a8f8a6219902a1a5fe439bdab5a1f5a0d4dea22b6587c078bf3",
+  "scripts/kaas/house_rules.py": "33a0d05792e9e9aff0ea9cf8cd0a900634fd71f591fffb770151ee36b5edb1a2",
+  "scripts/kaas/pre-push.sh": "e0d1b23f1ab0e6f2c0f674b76b5e71ed333deb9a658a3299a7dc769a7e46af93",
+  "scripts/kaas/repo.schema.json": "bdc14148fb0761f2222636b0f8075f9f89c75e86963b0d0605ee23e7dc4661f9",
+  "scripts/kaas/semgrep.yml": "19b41a3df608453840a4ff64897abc9fd75749b71fd705ee7a7895a8859a9afe"
+}

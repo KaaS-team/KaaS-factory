@@ -1,4 +1,4 @@
-.PHONY: agent-matrix install check check-anchors check-baseline check-cli-reference check-ci-staged check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks rerun
+.PHONY: agent-matrix install check check-anchors check-baseline check-cli-reference check-ci-staged check-kaas-vendored check-mutations quarantine lint typecheck test skills-check up watch dashboard reset doctor scan hooks rerun
 include $(wildcard make/*.mk)
 
 install:
@@ -11,7 +11,7 @@ hooks:
 # make check = lint (biome, and rustfmt plus clippy on verify/ and relay/) + typecheck + test + skills validation. Hard-fails if uvx is
 # missing rather than skipping skills-ref: an unwired or silently-skipped
 # check did not ship (see the kaas-eng plugin's engineering.md, Rule 0).
-check: lint typecheck test skills-check check-anchors check-baseline check-cli-reference check-ci-staged $(CHECK_EXTRA)
+check: lint typecheck test skills-check check-anchors check-baseline check-cli-reference check-ci-staged check-kaas-vendored $(CHECK_EXTRA)
 	@echo "make check: ok"
 
 # reuse lint checks every file's licence against REUSE.toml (tests/licensing.test.ts checks what it says).
@@ -78,6 +78,10 @@ check-cli-reference:
 # ci/ holds workflow changes a cloud run could not push; prints each diff against .github/workflows (#635).
 check-ci-staged:
 	bun scripts/check-ci-staged.ts
+
+# A file under scripts/kaas/ must match the hash recorded at the last kit sync (#623).
+check-kaas-vendored:
+	bun scripts/check-kaas-vendored.ts
 
 skills-check:
 	@command -v uvx >/dev/null 2>&1 || { \

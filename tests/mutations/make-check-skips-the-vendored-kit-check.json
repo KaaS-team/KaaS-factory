@@ -1,0 +1,7 @@
+{
+  "name": "make check skips the vendored kit check",
+  "file": "Makefile",
+  "find": "check-ci-staged check-kaas-vendored $(CHECK_EXTRA)",
+  "replace": "check-ci-staged $(CHECK_EXTRA)",
+  "test": "tests/kaas-vendored.test.ts"
+}

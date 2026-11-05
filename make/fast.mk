@@ -10,6 +10,7 @@ fast:
 	bun scripts/check-mutations.ts --base $(BASE)
 	bun scripts/gen-quality-baseline.ts --check
 	bun scripts/check-generated-docs.ts $(BASE)
+	bun scripts/check-kaas-vendored.ts
 	bun scripts/check-mutation-anchors.ts
 	@echo "make fast: ok"
 

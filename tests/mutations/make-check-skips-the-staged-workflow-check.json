@@ -1,7 +1,7 @@
 {
   "name": "make check skips the staged workflow check",
   "file": "Makefile",
-  "find": "check-cli-reference check-ci-staged $(CHECK_EXTRA)",
-  "replace": "check-cli-reference $(CHECK_EXTRA)",
+  "find": "check-cli-reference check-ci-staged check-kaas-vendored $(CHECK_EXTRA)",
+  "replace": "check-cli-reference check-kaas-vendored $(CHECK_EXTRA)",
   "test": "tests/ci-staged.test.ts"
 }
