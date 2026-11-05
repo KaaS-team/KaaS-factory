@@ -138,7 +138,11 @@ export interface BusDeliveryRow {
 export class FactoryState {
   private readonly db: Database;
 
-  constructor(path: string = DEFAULT_DB_PATH) {
+  constructor(path: string = DEFAULT_DB_PATH, opts: { readonly?: boolean } = {}) {
+    if (opts.readonly) {
+      this.db = new Database(path, { readonly: true });
+      return;
+    }
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     // The runner and the dashboard open a fresh database at the same moment after a reset.

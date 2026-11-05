@@ -1,0 +1,1 @@
+{"name": "daily learn runs again on the same day", "file": "src/learn.ts", "find": "  if (deps.state.getToggle(key, false)) return;\n", "replace": "", "test": "tests/learn-loop.test.ts"}

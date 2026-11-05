@@ -1,0 +1,1 @@
+{"name": "a throwing lesson sink fails the learn run", "file": "src/learn.ts", "find": "?.push(repo, pending).catch(() => 0);", "replace": "?.push(repo, pending);", "test": "tests/learn-loop.test.ts"}

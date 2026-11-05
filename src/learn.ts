@@ -141,6 +141,20 @@ export async function runLearn(
     pending.map((r) => r.id),
     now.toISOString(),
   );
-  await (deps.sink ?? lessonSinkFromEnv(process.env))?.push(repo, pending);
+  // The lessons are already in the PR; a sink that throws must not turn that into a failed run.
+  await (deps.sink ?? lessonSinkFromEnv(process.env))?.push(repo, pending).catch(() => 0);
   return { batched: pending.length, prUrl, branch };
+}
+
+// The watcher's once-a-day run. The day is stamped only after a PR opened, so a failed attempt
+// (or a poll with nothing pending) tries again on the next poll, and a failure never reaches intake.
+export async function runLearnDaily(deps: LearnDeps, repo: string, base: string, now: Date): Promise<void> {
+  const key = `learn-daily:${branchNameFor(now)}`;
+  if (deps.state.getToggle(key, false)) return;
+  try {
+    const result = await runLearn(deps, repo, base, now);
+    if (result.batched > 0) deps.state.setToggle(key, true);
+  } catch (err) {
+    console.error("factory watch: daily learn failed, retrying next poll", err);
+  }
 }

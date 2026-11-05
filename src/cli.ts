@@ -51,7 +51,7 @@ import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
-import { runExport } from "./learn-export";
+import { runExport, runExportRegistry } from "./learn-export";
 import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
 import { type CliContext, cmdHarness, cmdTeach } from "./harness-cli";
 import { GitLeases } from "./adapters/git-lease/lease";
@@ -736,11 +736,11 @@ async function cmdVerifyAgent(): Promise<void> {
 }
 
 async function cmdLearn(): Promise<void> {
+  if (has("all") && has("export")) return runExportRegistry(flag("export"), flag("since"));
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   if (has("export")) return runExport(stateDbPath(config.repo), config.repo, flag("export"), flag("since"));
-  const deps = await buildWatchDeps(cloneDir, config);
-  const result = await runLearn(deps, config.repo, config.base);
+  const result = await runLearn(await buildWatchDeps(cloneDir, config), config.repo, config.base);
   if (has("json")) return console.log(successJson(result, true));
   if (result.batched === 0) return void console.log("factory learn: nothing pending.");
   console.log(`factory learn: batched ${result.batched} proposal(s) on ${result.branch} -> ${result.prUrl}`);

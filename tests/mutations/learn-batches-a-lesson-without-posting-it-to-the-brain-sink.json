@@ -1,1 +1,1 @@
-{"name":"learn batches a lesson without posting it to the brain sink","file":"src/learn.ts","find":"await (deps.sink ?? lessonSinkFromEnv(process.env))?.push(repo, pending);","replace":"","test":"tests/lesson-sink.test.ts"}
+{"name":"learn batches a lesson without posting it to the brain sink","file":"src/learn.ts","find":"await (deps.sink ?? lessonSinkFromEnv(process.env))?.push(repo, pending).catch(() => 0);","replace":"","test":"tests/lesson-sink.test.ts"}

@@ -49,6 +49,7 @@ import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { defaultWorkflow } from "./engine/workflows";
 
+import { runLearnDaily } from "./learn";
 import { cronStore, fireCron, fireEvent } from "./engine/triggers";
 import { chosenWorkflow, recordedWorkflow, WORKFLOW_MARKER } from "./engine/late-route";
 import { refuseRepeat } from "./engine/failure";
@@ -688,6 +689,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // Drains retros the dashboard's operator-merge route queued (v2.10.0 item
   // 3); independent of intake, so it runs even while intake is paused.
   await runQueuedRetros(deps, config);
+  await runLearnDaily(deps, config.repo, config.base, deps.now?.() ?? new Date());
 
   try {
     // A pool of `concurrency` workers: issue #4 never waits for #1's whole chain (audit finding #2).

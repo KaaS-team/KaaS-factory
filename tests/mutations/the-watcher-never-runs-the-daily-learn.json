@@ -1,0 +1,1 @@
+{"name": "the watcher never runs the daily learn", "file": "src/watch.ts", "find": "  await runLearnDaily(deps, config.repo, config.base, deps.now?.() ?? new Date());\n", "replace": "", "test": "tests/learn-loop.test.ts"}

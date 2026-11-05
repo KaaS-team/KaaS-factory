@@ -1,0 +1,1 @@
+{"name": "a failed daily learn stops the poll", "file": "src/learn.ts", "find": "console.error(\"factory watch: daily learn failed, retrying next poll\", err);", "replace": "throw err;", "test": "tests/learn-loop.test.ts"}

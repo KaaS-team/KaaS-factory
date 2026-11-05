@@ -1,0 +1,1 @@
+{"name": "the all-repos export creates a missing repo database", "file": "src/learn-export.ts", "find": "    if (!existsSync(path)) continue;\n", "replace": "", "test": "tests/learn-loop.test.ts"}

@@ -191,10 +191,10 @@ run one issue on that agent, record a scrubbed fixture, print pass/fail, cost an
 ### learn
 
 ```
-factory learn (--repo-dir <path> | --repo <owner/name>) [--export <file|-> [--since <date>]]
+factory learn (--repo-dir <path> | --repo <owner/name> | --all) [--export <file|-> [--since <date>]]
 ```
 
-batch pending retro lessons and skill-edit proposals into one factory/learning-<date> PR; --export writes runs, stages and retros as v1 JSONL instead.
+batch pending retro lessons and skill-edit proposals into one factory/learning-<date> PR; --export writes runs, stages and retros as v1 JSONL instead; --all exports every repo in machine.json read-only.
 
 ### init
 
