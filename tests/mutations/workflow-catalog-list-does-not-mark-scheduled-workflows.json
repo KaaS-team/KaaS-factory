@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: list does not mark scheduled workflows",
+  "file": "src/workflow-catalog.ts",
+  "find": "scheduled: parsed.ok && parsed.workflow.triggers.cron.length > 0",
+  "replace": "scheduled: false",
+  "test": "tests/workflow-catalog.test.ts"
+}

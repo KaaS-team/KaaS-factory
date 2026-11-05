@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: docs-drift does not tell triage to refuse",
+  "file": "template/.factory/workflows/docs-drift.md",
+  "find": "docs match the code",
+  "replace": "anything",
+  "test": "tests/workflow-catalog.test.ts"
+}

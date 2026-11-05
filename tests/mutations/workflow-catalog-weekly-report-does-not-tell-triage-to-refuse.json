@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: weekly-report does not tell triage to refuse",
+  "file": "template/.factory/workflows/weekly-report.md",
+  "find": "no runs\n        this week",
+  "replace": "anything",
+  "test": "tests/workflow-catalog.test.ts"
+}
