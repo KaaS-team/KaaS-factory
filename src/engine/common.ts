@@ -360,6 +360,7 @@ export async function runStage(
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
     ...scopeOf(issue, stage),
+    ...(config.modelAllow ? { allowedModels: config.modelAllow } : {}),
     ...files,
     ...rest,
     ...(mcp ? { mcp } : {}),

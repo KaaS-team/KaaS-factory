@@ -68,6 +68,11 @@ export interface StageRunOptions {
   readonly rejects?: number;
   // A model the runner picked itself; only a claude-preset agent takes it, and it wins over the tier.
   readonly model?: string;
+  // A workflow step's `model:`: "auto" picks by step from the agent's `models`, else one model id.
+  // Unset keeps the tier or the agent's own model.
+  readonly stepModel?: string;
+  // The team policy's allowed models. A model outside it is refused before the agent starts.
+  readonly allowedModels?: readonly string[];
   // Which verify reviewer this session is: 0 (unset) the first, 1 the high-risk second on a third model.
   readonly reviewer?: number;
 }

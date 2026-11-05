@@ -4,11 +4,13 @@
 
 import { parseWorkflow, type Step, type StepKind, type WorkflowResult } from "./workflow";
 
-const STEP_EXTRAS = ["agent", "timeout", "retries", "tool", "with", "env", "optional"] as const;
+const STEP_EXTRAS = ["agent", "model", "timeout", "retries", "tool", "with", "env", "optional"] as const;
 const NAME = /^[\w.-]{1,64}$/;
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 
-type Extras = Partial<Pick<Step, "agent" | "timeoutMinutes" | "retries" | "tool" | "with" | "env" | "optional">>;
+type Extras = Partial<
+  Pick<Step, "agent" | "model" | "timeoutMinutes" | "retries" | "tool" | "with" | "env" | "optional">
+>;
 
 export function parseWorkflowFull(
   raw: unknown,
@@ -68,6 +70,12 @@ function stepExtras(where: string, s: Record<string, unknown>, kind: StepKind | 
       problems.push(`${where}.agent: an agent name from config.agents`);
     else if (kind && !kind.agent) problems.push(`${where}.agent: a ${s.uses} step runs no agent`);
     else out.agent = s.agent;
+  }
+  if (s.model !== undefined) {
+    if (typeof s.model !== "string" || !/^[\w.:/-]{1,100}$/.test(s.model))
+      problems.push(`${where}.model: "auto", or a model id from your team's allowed models`);
+    else if (kind && !kind.agent) problems.push(`${where}.model: a ${s.uses} step runs no agent`);
+    else out.model = s.model;
   }
   if (s.timeout !== undefined) {
     const m = typeof s.timeout === "string" ? /^([1-9]\d*)m$/.exec(s.timeout) : null;

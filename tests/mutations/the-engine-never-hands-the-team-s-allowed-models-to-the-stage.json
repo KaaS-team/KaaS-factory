@@ -1,0 +1,7 @@
+{
+  "name": "the engine never hands the team's allowed models to the stage",
+  "file": "src/engine/common.ts",
+  "find": "...(config.modelAllow ? { allowedModels: config.modelAllow } : {}),",
+  "replace": "",
+  "test": "tests/model-routing.test.ts"
+}

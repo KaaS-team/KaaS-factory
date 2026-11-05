@@ -1,0 +1,7 @@
+{
+  "name": "a workflow step's model is dropped before the stage runs",
+  "file": "src/core/workflow.ts",
+  "find": "...(step.model ? { stepModel: step.model } : {}),",
+  "replace": "",
+  "test": "tests/model-routing.test.ts"
+}

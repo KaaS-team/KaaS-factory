@@ -22,7 +22,19 @@ const STAGE_KEYS = new Set([
   "env",
 ]);
 const TOP_KEYS = new Set(["name", "description", "on", "limits", "emit", "stages"]);
-const PASS = ["agent", "retries", "timeout", "run", "runtime", "reject", "revise", "tool", "with", "env"] as const;
+const PASS = [
+  "agent",
+  "model",
+  "retries",
+  "timeout",
+  "run",
+  "runtime",
+  "reject",
+  "revise",
+  "tool",
+  "with",
+  "env",
+] as const;
 const RISKS = ["low", "medium", "high"] as const;
 
 export type MdResult = { ok: true; raw: Record<string, unknown>; body: string } | { ok: false; problems: string[] };

@@ -1,0 +1,7 @@
+{
+  "name": "the team policy's models never reach the config",
+  "file": "src/team/apply.ts",
+  "find": "...(p.models ? { modelAllow: p.models } : {}),",
+  "replace": "",
+  "test": "tests/model-routing.test.ts"
+}

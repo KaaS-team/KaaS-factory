@@ -3,6 +3,7 @@
 import { trackStep } from "../process-tree";
 import { crossModel } from "../review-models";
 import { tierFor } from "../core/model-tier";
+import { refuseModel, stepModelFor } from "../core/model-tier";
 import { DEFAULT_AGENT } from "./default";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -129,6 +130,12 @@ function withTier(agent: ResolvedAgent, opts: Pick<StageRunOptions, "scope" | "r
   return model ? { ...agent, config: { ...agent.config, model } } : agent;
 }
 
+function withStepModel(agent: ResolvedAgent, o: StageRunOptions, stage = o.stage): ResolvedAgent {
+  const m =
+    stage === o.stage && o.stepModel && stepModelFor(o.stepModel, agent.config.models, o.stage, o.scope, o.rejects);
+  return m ? { ...agent, config: { ...agent.config, model: m } } : agent;
+}
+
 // Placeholders in a config command. Anything else is passed through verbatim.
 export function renderCommand(
   command: readonly string[],
@@ -160,10 +167,11 @@ export class CommandExecutor implements Executor {
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
     const route = (s: StageRunOptions["stage"]) =>
-      withTier(resolveRoute(this.agents, this.stages, this.routes, s, opts.type), opts);
+      withStepModel(withTier(resolveRoute(this.agents, this.stages, this.routes, s, opts.type), opts), opts, s);
     const agent = opts.agent
-      ? withTier(resolveAgentByName(this.agents, opts.agent, opts.stage), { model: opts.model })
+      ? withStepModel(withTier(resolveAgentByName(this.agents, opts.agent, opts.stage), { model: opts.model }), opts)
       : crossModel(route(opts.stage), opts.stage === "verify" ? route("build") : undefined, opts.reviewer);
+    refuseModel(agent.name, agent.config.model, opts.allowedModels);
     if (this.gateway && !agent.preset?.gateway) {
       const able = Object.values(PRESETS)
         .filter((p) => p.gateway)

@@ -1,0 +1,7 @@
+{
+  "name": "a model on a step that runs no agent is accepted",
+  "file": "src/core/workflow-extras.ts",
+  "find": "else if (kind && !kind.agent) problems.push(`${where}.model:",
+  "replace": "else if (false) problems.push(`${where}.model:",
+  "test": "tests/model-routing.test.ts"
+}
