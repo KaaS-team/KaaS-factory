@@ -1,0 +1,1 @@
+{"name":"a leftover workspace link is not a missing package","file":"src/plugins/loader.ts","find":"(/ENOENT/.test(text) && text.includes(`node_modules/${name}`))","replace":"false","test":"tests/plugin-loader.test.ts"}

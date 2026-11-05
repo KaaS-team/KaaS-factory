@@ -1,7 +1,7 @@
 {
   "name": "quality: a line baseline cannot keep slack",
   "file": "quality-baseline/lines/src__cli.ts.json",
-  "find": "\"max\":911",
+  "find": "\"max\":903",
   "replace": "\"max\":977",
   "test": "tests/quality.test.ts"
 }

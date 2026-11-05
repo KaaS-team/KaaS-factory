@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseChatOps } from "../src/chatops";
 import { LABEL } from "../src/labels";
-import { createMcpServer, serveStdio } from "../src/mcp-server";
+import { createMcpServer, serveStdio } from "@kaas-team/factory-mcp-server";
 import { TrackerGitHub } from "./remote-plane";
 
 type Result = { capabilities?: unknown; tools?: { name: string }[]; content?: { text: string }[]; isError?: boolean };

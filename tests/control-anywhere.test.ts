@@ -13,7 +13,7 @@ import { SseEventSource } from "../src/adapters/sse/event-source";
 import { runDir } from "../src/artifacts";
 import { parseChatOps } from "../src/chatops";
 import { LABEL } from "../src/labels";
-import { createMcpServer } from "../src/mcp-server";
+import { createMcpServer } from "@kaas-team/factory-mcp-server";
 import { runnerWork } from "../src/remote-cli";
 import { dialOut, registerRunner, type RunnerWork } from "../src/runner-channel";
 import { FactoryState } from "../src/state";

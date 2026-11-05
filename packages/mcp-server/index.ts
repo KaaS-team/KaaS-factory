@@ -1,11 +1,7 @@
 // The factory as an MCP server: newline-delimited JSON-RPC on stdio, so any agent or IDE can
 // start, read and approve tasks. Every write goes through the same tracker-first path as the
 // CLI inbox and the plane (act(), signedBy), so the tracker stays the one record.
-import { act, buildInbox, InboxError } from "./inbox";
-import { LABEL } from "./labels";
-import { signedBy } from "./chatops";
-import { prItems } from "./stale-pr";
-import type { ScmPort } from "./ports/scm";
+import { act, buildInbox, InboxError, LABEL, prItems, type ScmPort, signedBy } from "../../src/sdk";
 
 export const MCP_PROTOCOL = "2025-06-18";
 

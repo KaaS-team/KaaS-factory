@@ -6,10 +6,20 @@
       "name": "kaas-factory",
       "devDependencies": {
         "@biomejs/biome": "2.5.14",
+        "@kaas-team/factory-dashboard": "workspace:*",
+        "@kaas-team/factory-mcp-server": "workspace:*",
         "@kaas-team/factory-protocol": "workspace:*",
         "@types/bun": "^1.3.4",
         "typescript": "^5.9.3",
       },
+    },
+    "dashboard": {
+      "name": "@kaas-team/factory-dashboard",
+      "version": "0.0.0",
+    },
+    "packages/mcp-server": {
+      "name": "@kaas-team/factory-mcp-server",
+      "version": "0.0.0",
     },
     "packages/protocol": {
       "name": "@kaas-team/factory-protocol",
@@ -34,6 +44,10 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@2.5.14", "", { "os": "win32", "cpu": "arm64" }, "sha512-pHgAFffmZtaYoxavEsWEYNvcA7NwOIjLyqw2HXyLbt16xYryX0L4fMV2u0G9ag6LNYPIoqWaWqzUcnc6rLGGXg=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.14", "", { "os": "win32", "cpu": "x64" }, "sha512-oJWmBhoHsnhUKIke+0gXDX0mltJrWHA1UyHsrTlXwX0TL64ilVZAo+TYZm97baecV0esBdpzy3k96q+09JaZUQ=="],
+
+    "@kaas-team/factory-dashboard": ["@kaas-team/factory-dashboard@workspace:dashboard"],
+
+    "@kaas-team/factory-mcp-server": ["@kaas-team/factory-mcp-server@workspace:packages/mcp-server"],
 
     "@kaas-team/factory-protocol": ["@kaas-team/factory-protocol@workspace:packages/protocol"],
 
