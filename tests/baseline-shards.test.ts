@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Baseline, readBaseline, writeBaseline } from "../src/baseline-shards";
@@ -112,7 +112,9 @@ test("factory hotspots lists the files several merged PRs changed", () => {
 test("the vendored check-quality defers to this ratchet through the exclude-only marker", () => {
   const marker = JSON.parse(readFileSync(join(import.meta.dir, "..", "quality-baseline.json"), "utf8"));
   expect(Object.keys(marker)).toEqual(["exclude"]);
-  const p = Bun.spawnSync(["python3", "scripts/kaas/check-quality.py"], { cwd: join(import.meta.dir, "..") });
+  const p = Bun.spawnSync(["python3", "scripts/kaas/check-quality.py", "src/cli.ts"], {
+    cwd: join(import.meta.dir, ".."),
+  });
   expect(p.stdout.toString()).toContain("belongs to another ratchet");
   expect(p.exitCode).toBe(0);
 });
