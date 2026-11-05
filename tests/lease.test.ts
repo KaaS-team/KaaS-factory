@@ -35,10 +35,22 @@ describe("lease record", () => {
   });
 });
 
+// Waits for a condition instead of a fixed sleep, so CI load only slows the test, never fails it (#621).
+async function until(cond: () => boolean, limitMs = 20_000): Promise<void> {
+  const end = performance.now() + limitMs;
+  while (!cond()) {
+    if (performance.now() > end) throw new Error("condition not reached within the time limit");
+    await new Promise((r) => setTimeout(r, 1));
+  }
+}
+
 describe("withLease", () => {
   test("renews on the heartbeat while work runs, then releases", async () => {
     const port = new FakeLeases();
-    expect(await withLease(port, "1", "me", async () => (await Bun.sleep(40), "done"), { everyMs: 5 })).toBe("done");
+    let tick = 0;
+    const beats = () => port.log.filter((l) => l === "acquire 1 me").length;
+    const work = async () => (await until(() => beats() >= 3), "done");
+    expect(await withLease(port, "1", "me", work, { everyMs: 5, now: () => ++tick })).toBe("done");
     expect(port.log.filter((l) => l === "acquire 1 me").length).toBeGreaterThanOrEqual(3);
     expect(port.log.at(-1)).toBe("release 1 me");
   });
@@ -57,7 +69,7 @@ describe("withLease", () => {
       "me",
       async (held) => {
         port.table.set("1", { holder: "other", expiresAt: Date.now() + 60_000 });
-        await Bun.sleep(30);
+        await until(() => held.lost);
         return held.lost;
       },
       { everyMs: 5 },
