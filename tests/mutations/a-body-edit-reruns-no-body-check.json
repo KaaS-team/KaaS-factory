@@ -1,0 +1,1 @@
+{"name":"a body edit reruns no body check","file":"ci/pr-body.yml","find":"types: [opened, edited, reopened, synchronize]","replace":"types: [opened, reopened, synchronize]","test":"tests/ci-body-edit.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"a merged branch with newer commits is deleted","file":"src/merged-branches.ts","find":"if (!merged.some((p) => p.head.sha === tip.commit.sha)) return \"kept\";","replace":"","test":"tests/merged-branches.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"the branch workflow runs for a pr closed without merging","file":"ci/merged-branches.yml","find":"(github.event.pull_request.merged == true && ","replace":"(","test":"tests/merged-branches.test.ts"}

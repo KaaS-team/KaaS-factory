@@ -1,0 +1,1 @@
+{"name":"the sqlite store exec is flagged by semgrep","file":"src/adapters/sqlite/store.ts","find":"    // nosemgrep: js-shell-exec-interpolated -- SQL, not a shell; the regex above limits table to word characters\n","replace":"","test":"tests/semgrep-exec-marks.test.ts"}

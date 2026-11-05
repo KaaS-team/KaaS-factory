@@ -1,0 +1,1 @@
+{"name":"a stalled gh call is never killed","file":"src/gh-runner.ts","find":"proc.kill(\"SIGKILL\");","replace":"void 0;","test":"tests/github-rest-timeout.test.ts"}

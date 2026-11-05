@@ -1,0 +1,1 @@
+{"name":"an unmerged branch is deleted","file":"src/merged-branches.ts","find":"const merged = prs.filter((p) => p.merged_at);","replace":"const merged = prs;","test":"tests/merged-branches.test.ts"}

@@ -38,6 +38,13 @@ jobs:
       - name: checksums
         working-directory: assets
         run: sha256sum factory-* > SHA256SUMS
+      # Recompute every checksum from the files about to be published. A file that differs, a file the
+      # sums omit, or a sum with no file fails the release before anything is uploaded.
+      - name: verify checksums
+        working-directory: assets
+        run: |
+          sha256sum -c SHA256SUMS
+          test "$(ls factory-* | wc -l)" -eq "$(wc -l < SHA256SUMS)"
       - name: attach to the release
         env:
           GH_TOKEN: ${{ github.token }}

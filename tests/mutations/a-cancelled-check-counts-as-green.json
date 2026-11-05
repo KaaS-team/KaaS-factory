@@ -1,0 +1,1 @@
+{"name":"a cancelled check counts as green","file":"src/ci.ts","find":"const PASSING_CONCLUSIONS = new Set([\"SUCCESS\", \"NEUTRAL\", \"SKIPPED\"]);","replace":"const PASSING_CONCLUSIONS = new Set([\"SUCCESS\", \"NEUTRAL\", \"SKIPPED\", \"CANCELLED\"]);","test":"tests/ci-cancelled.test.ts"}

@@ -31,17 +31,27 @@ async function mergeArgvFor(settings?: MergeSettings): Promise<string[]> {
   return seen[0]!;
 }
 
-describe("gh pr merge argv", () => {
+describe("merge call", () => {
+  const rest = (method: string) => [
+    "api",
+    "-X",
+    "PUT",
+    "repos/o/r/pulls/7/merge",
+    "-f",
+    `merge_method=${method}`,
+    "-f",
+    "sha=abc123",
+  ];
   const base = (flags: string[]) => ["pr", "merge", "7", "--repo", "o/r", ...flags, "--match-head-commit", "abc123"];
-  test("no settings is today's squash", async () => {
-    expect(await mergeArgvFor()).toEqual(base(["--squash"]));
+  test("no settings is today's squash, over REST with the head sha", async () => {
+    expect(await mergeArgvFor()).toEqual(rest("squash"));
   });
   test("each method merges as configured", async () => {
-    expect(await mergeArgvFor({ method: "squash" })).toEqual(base(["--squash"]));
-    expect(await mergeArgvFor({ method: "rebase" })).toEqual(base(["--rebase"]));
-    expect(await mergeArgvFor({ method: "merge" })).toEqual(base(["--merge"]));
+    expect(await mergeArgvFor({ method: "squash" })).toEqual(rest("squash"));
+    expect(await mergeArgvFor({ method: "rebase" })).toEqual(rest("rebase"));
+    expect(await mergeArgvFor({ method: "merge" })).toEqual(rest("merge"));
   });
-  test("host method only enables auto-merge", async () => {
+  test("host method only enables auto-merge (REST has no call for it)", async () => {
     expect(await mergeArgvFor({ method: "host" })).toEqual(base(["--auto"]));
   });
   test("host queue keeps the method and adds auto-merge", async () => {

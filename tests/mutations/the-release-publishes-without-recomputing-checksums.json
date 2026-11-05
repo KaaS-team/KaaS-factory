@@ -1,0 +1,1 @@
+{"name":"the release publishes without recomputing checksums","file":"ci/release-binaries.yml","find":"          sha256sum -c SHA256SUMS\n","replace":"          true\n","test":"tests/release-checksums.test.ts"}

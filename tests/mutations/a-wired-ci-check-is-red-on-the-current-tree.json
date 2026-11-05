@@ -1,0 +1,1 @@
+{"name":"a wired ci check is red on the current tree","file":"tests/ci-wiring/check-tests-only.json","find":"[ ! -e .git ] || bun scripts/check-tests-only.ts HEAD HEAD","replace":"exit 1","test":"tests/ci-wiring-green.test.ts"}
