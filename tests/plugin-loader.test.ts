@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadMachineConfig } from "../src/machine";
 import { parseWorkflowText } from "../src/engine/workflows";
-import { loadPlugin, loadPlugins, startPlugins } from "../src/plugins/loader";
+import { isMissingPackage, loadPlugin, loadPlugins, startPlugins } from "../src/plugins/loader";
 import { marketplaceProblems } from "../src/plugins/marketplace";
 import { manifestProblems } from "../src/plugins/manifest";
 import { agents, steps, trackers } from "../src/plugins/registry";
@@ -130,4 +130,13 @@ describe("startup", () => {
     const boot = await Bun.file(join(import.meta.dir, "..", "src", "plugins", "boot.ts")).text();
     expect(boot).toContain("await startPlugins(loadMachineConfig())");
   });
+});
+
+test("a missing optional package is told apart from a broken one, in all three shapes", () => {
+  const name = "@kaas-team/factory-dashboard";
+  expect(isMissingPackage(Object.assign(new Error("x"), { code: "ERR_MODULE_NOT_FOUND" }), name)).toBe(true);
+  expect(isMissingPackage(new Error(`Cannot find package '${name}'`), name)).toBe(true);
+  expect(isMissingPackage(new Error(`BuildMessage: ENOENT reading "/r/node_modules/${name}"`), name)).toBe(true);
+  expect(isMissingPackage(new Error(`BuildMessage: ENOENT reading "/r/node_modules/other"`), name)).toBe(false);
+  expect(isMissingPackage(new SyntaxError("Unexpected token"), name)).toBe(false);
 });

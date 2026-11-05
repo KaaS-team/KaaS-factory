@@ -87,6 +87,8 @@ describe("dashboard package", () => {
         Bun.spawnSync(["bun", join(dir, "bin", "factory"), ...args], {
           cwd: dir,
           env: { ...process.env, FACTORY_HOME: join(dir, "home") },
+          // A dashboard that starts instead of refusing would serve forever; the cap turns that into a failure.
+          timeout: 20_000,
         });
       const help = run("help");
       expect(help.exitCode).toBe(0);

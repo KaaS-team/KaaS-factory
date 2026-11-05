@@ -7,6 +7,7 @@ import type { MachineConfig, MachineLeases } from "./machine";
 import type { ScmPort } from "./ports/scm";
 import type { Health } from "./runtime-kit";
 import type { FactoryState } from "./state";
+import { isMissingPackage } from "./plugins/loader";
 
 export const DASHBOARD_PACKAGE = "@kaas-team/factory-dashboard";
 
@@ -52,7 +53,7 @@ export async function loadDashboard(importer: Importer = (name) => import(name))
   try {
     mod = await importer(DASHBOARD_PACKAGE);
   } catch (err) {
-    if ((err as { code?: string }).code === "ERR_MODULE_NOT_FOUND" || /cannot find (module|package)/i.test(String(err)))
+    if (isMissingPackage(err, DASHBOARD_PACKAGE))
       throw new DashboardMissing(`the dashboard package ${DASHBOARD_PACKAGE} is not installed`);
     throw err;
   }

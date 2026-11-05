@@ -13,6 +13,7 @@ import { factoryHome, livePath } from "./paths";
 import { encodeQr, qrToTerminal } from "./qr";
 import { dialOut, type RunnerCreds, type RunnerJob, type RunnerWork, registerRunner } from "./runner-channel";
 import type { ScmPort } from "./ports/scm";
+import { isMissingPackage } from "./plugins/loader";
 import { makeScm } from "./scm";
 import { controlCommand } from "./ssh-control";
 import { readLive, stopRunningStage } from "./takeover";
@@ -158,7 +159,7 @@ async function loadMcpServer(): Promise<McpPackage> {
   try {
     return await import(MCP_PACKAGE);
   } catch (err) {
-    if (/cannot find (module|package)/i.test(String(err))) throw new UsageError(`mcp: ${MCP_PACKAGE} is not installed`);
+    if (isMissingPackage(err, MCP_PACKAGE)) throw new UsageError(`mcp: ${MCP_PACKAGE} is not installed`);
     throw err;
   }
 }
