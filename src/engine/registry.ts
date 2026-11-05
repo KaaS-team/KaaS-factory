@@ -7,6 +7,7 @@ import { LABEL } from "../labels";
 import { callMcpTool } from "../mcp-call";
 import { ShellSetupRunner } from "../setup";
 import { finish, moveLabel, postComment } from "./common";
+import { cliStep } from "./cli-step";
 import { importPlanStep } from "./import-plan-step";
 import { changelogStep } from "../changelog";
 import { qaStep } from "../qa-step";
@@ -102,6 +103,7 @@ const SHIPPED: Record<string, StepType> = {
   build: cloudAware(STEP_TYPES.build!),
   check,
   tool,
+  cli: cliStep,
   report,
   "import-plan": importPlanStep,
   qa: qaStep,

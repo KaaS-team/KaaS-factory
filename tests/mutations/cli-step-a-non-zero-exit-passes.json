@@ -1,0 +1,7 @@
+{
+  "name": "cli step: a non-zero exit passes",
+  "file": "src/cli-tools.ts",
+  "find": "if (code !== 0) return { ok: false, code, stdout, stderr, reason: `exited ${code}` };",
+  "replace": "",
+  "test": "tests/cli-step.test.ts"
+}

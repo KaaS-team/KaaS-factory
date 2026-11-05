@@ -1,0 +1,7 @@
+{
+  "name": "cli step: output that misses the declared expectation passes",
+  "file": "src/cli-tools.ts",
+  "find": "if (tool.expect !== undefined && !stdout.includes(tool.expect))",
+  "replace": "if (false as boolean)",
+  "test": "tests/cli-step.test.ts"
+}

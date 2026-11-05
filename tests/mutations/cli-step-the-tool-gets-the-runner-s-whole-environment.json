@@ -1,0 +1,7 @@
+{
+  "name": "cli step: the tool gets the runner's whole environment",
+  "file": "src/cli-tools.ts",
+  "find": "env: { ...child, ...vars },",
+  "replace": "env: { ...process.env, ...child, ...vars } as Record<string, string>,",
+  "test": "tests/cli-step.test.ts"
+}

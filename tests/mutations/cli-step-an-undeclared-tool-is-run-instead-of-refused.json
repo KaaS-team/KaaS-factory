@@ -1,0 +1,7 @@
+{
+  "name": "cli step: an undeclared tool is run instead of refused",
+  "file": "src/cli-tools.ts",
+  "find": "  if (!tool)\n    throw",
+  "replace": "  if (false as boolean)\n    throw",
+  "test": "tests/cli-step.test.ts"
+}

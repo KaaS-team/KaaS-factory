@@ -1,0 +1,7 @@
+{
+  "name": "cli step: the cli step type is not registered",
+  "file": "src/engine/registry.ts",
+  "find": "  cli: cliStep,\n",
+  "replace": "",
+  "test": "tests/cli-step.test.ts"
+}
