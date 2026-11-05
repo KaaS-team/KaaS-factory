@@ -5,6 +5,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { validateStepJson } from "../src/artifacts";
 import { loadWorkflow } from "../src/engine/workflows";
 import { DEFAULT_TRIAGE_MIN_CONFIDENCE, triageMinConfidence, triageParking } from "../src/triage-confidence";
 import { engine, removeEngineDirs } from "./engine-harness";
@@ -45,6 +46,20 @@ describe("triage confidence gate", () => {
     expect(triageParking({ confidence: 0.4 }, "Which file?", 0.5)?.comment).toContain("Which file?");
     expect(triageParking({ confidence: 0.5 }, undefined, 0.5)).toBe(undefined);
     expect(triageParking({}, undefined, 0.5)).toBe(undefined);
+  });
+
+  test("the parked comment lists the reasons triage gave for its confidence", () => {
+    const c = triageParking(
+      { confidence: 0.3, confidence_reasons: ["no file named", "two readings"] },
+      "Which?",
+      0.5,
+    )?.comment;
+    expect(c).toContain("Why: no file named; two readings");
+  });
+
+  test("triage.json accepts confidence_reasons and rejects a non-array", () => {
+    expect(validateStepJson("triage", { ...good, confidence_reasons: ["a"] })).toEqual({ ok: true });
+    expect(validateStepJson("triage", { ...good, confidence_reasons: "a" }).ok).toBe(false);
   });
 
   test("a low confidence parks the issue and never reaches a later stage", async () => {

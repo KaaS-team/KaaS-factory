@@ -24,7 +24,7 @@ export interface TriageParking {
 
 // undefined means dispatch goes on: confidence missing, not a number, or at or above the threshold.
 export function triageParking(
-  json: { readonly confidence?: unknown; readonly done_when?: string },
+  json: { readonly confidence?: unknown; readonly confidence_reasons?: readonly string[]; readonly done_when?: string },
   questions: string | undefined,
   threshold: number,
 ): TriageParking | undefined {
@@ -32,8 +32,10 @@ export function triageParking(
   if (typeof c !== "number" || !Number.isFinite(c) || c >= threshold) return undefined;
   const reason = `triage confidence ${c} is below the threshold ${threshold}`;
   const asked = questions?.trim();
+  const why = (json.confidence_reasons ?? []).map((r) => r.trim()).filter(Boolean);
   const lines = [
     `Triage is not confident enough to start a build (${c} against a threshold of ${threshold}), so this issue is parked for a human.`,
+    ...(why.length ? ["", `Why: ${why.join("; ")}`] : []),
     "",
     asked
       ? `Open questions:\n\n${asked}`
@@ -47,7 +49,7 @@ export function triageParking(
 // The triage step's call: parks a low-confidence proceed for a human, or returns undefined to go on.
 export async function parkLowConfidence(
   sc: StepCtx,
-  json: { readonly confidence?: unknown; readonly done_when?: string },
+  json: { readonly confidence?: unknown; readonly confidence_reasons?: readonly string[]; readonly done_when?: string },
   questions: string | undefined,
 ): Promise<StepResult | undefined> {
   const { deps, config, issue, step } = sc;

@@ -69,7 +69,8 @@ Use the `factory-comment` skill's `triage.md` template to write
   "done_when": "one sentence, checkable by a command or test",
   "files_expected": ["src/…"],
   "gate_level": "full",
-  "confidence": 0.8
+  "confidence": 0.8,
+  "confidence_reasons": ["the issue names the file and the failing case"]
 }
 ```
 
@@ -80,6 +81,9 @@ If `disposition` is `needs-info`, also write
 `.factory/runs/issue-<N>/question-comment.md` using the `question.md`
 template: at most 3 numbered questions, 2-3 lettered options each, a
 recommended default, and what you will do if nobody answers.
+
+`confidence_reasons` lists one to three short reasons for the number, such as what is
+missing when it is low.
 
 Confidence below 0.5 is a signal you should be asking a question instead of
 guessing; prefer needs-info over a low-confidence proceed.

@@ -26,6 +26,7 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       files_expected: strings,
       gate_level: str,
       confidence: { type: "number", minimum: 0, maximum: 1 },
+      confidence_reasons: strings,
     },
     plan: {
       status: { enum: ["needs-info"] },
