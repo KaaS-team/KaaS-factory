@@ -31,6 +31,7 @@ describe("claude cloud command adapter", () => {
       model: "opus",
       key: "k",
       title: "t",
+      issueRef: "o/r#1",
     });
     for (const r of runs) {
       for (const a of r.argv) expect(a.includes(prompt)).toBe(false);
@@ -54,7 +55,7 @@ describe("claude cloud command adapter", () => {
     const p = claudeCloudProvider({ launch: [], status: [], cancel: [] });
     let msg = "";
     try {
-      await p.launch({ repoUrl: "r", branch: "b", prompt: "p", model: "m", key: "k", title: "t" });
+      await p.launch({ repoUrl: "r", branch: "b", prompt: "p", model: "m", key: "k", title: "t", issueRef: "o/r#1" });
     } catch (e) {
       msg = String(e instanceof Error ? e.message : e);
     }

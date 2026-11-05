@@ -1,0 +1,1 @@
+{"name":"the launch drops the issue reference","file":"src/engine/cloud-build.ts","find":"issueRef: `${config.repo}#${n}`","replace":"issueRef: \"\"","test":"tests/cloud-build.test.ts"}

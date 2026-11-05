@@ -66,3 +66,25 @@ export interface ReviewFields {
 export interface OrchestrateFields {
   readonly orchestrate?: import("./orchestrate/config").OrchestrateSpec;
 }
+
+export type PushPolicy = "runner" | "agent";
+
+// Who pushes the build branch. Absent is the runner, so the agent holds no push right.
+export interface PolicyFields {
+  readonly policy?: { readonly push?: PushPolicy };
+}
+
+export const pushPolicy = (config: PolicyFields): PushPolicy => config.policy?.push ?? "runner";
+
+export function policyProblems(policy: unknown): string[] {
+  if (typeof policy !== "object" || policy === null || Array.isArray(policy)) return [];
+  const { push, ...rest } = policy as Record<string, unknown>;
+  return [
+    ...Object.keys(rest)
+      .filter((k) => !k.startsWith("_"))
+      .map((k) => `policy.${k}: unknown key (allowed: push)`),
+    ...(push === undefined || push === "runner" || push === "agent"
+      ? []
+      : [`policy.push: expected "runner" or "agent", got ${JSON.stringify(push)}`]),
+  ];
+}

@@ -9,6 +9,12 @@ export interface LaunchInput {
   model: string;
   key: string;
   title: string;
+  // `owner/name#N`: the agent reads the issue body from this over REST.
+  issueRef: string;
+  // The issue's worktree, for a runtime that works on this machine.
+  cwd?: string;
+  // policy.push "agent": the agent pushes its own branch, so the runtime does not push again.
+  agentPushes?: boolean;
 }
 
 export interface CloudRun {

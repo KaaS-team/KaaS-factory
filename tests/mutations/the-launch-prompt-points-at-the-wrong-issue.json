@@ -1,0 +1,1 @@
+{"name":"the launch prompt points at the wrong issue","file":"src/engine/cloud-build.ts","find":"/issues/${issue} (the body","replace":"/issues/0 (the body","test":"tests/cloud-build.test.ts"}

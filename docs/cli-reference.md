@@ -276,6 +276,14 @@ factory routine (--repo <owner/name> | --repo-dir <path>) [--cron <expr>] [--jso
 
 print a Claude Code cloud routine (name, cron, prompt) that runs `factory tick` on a schedule.
 
+### cloud
+
+```
+factory cloud status (--repo-dir <path> | --repo <owner/name>) [--json]
+```
+
+list each cloud reservation and session the runner holds: issue, runtime, state and the spend held back.
+
 ### receipt
 
 ```

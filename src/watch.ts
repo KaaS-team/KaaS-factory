@@ -10,6 +10,7 @@
 // comment thread alone, so a restarted watcher, a fresh CI job, or a runner
 // on a different machine can all resume any issue.
 
+import { reserveForPoll } from "./orchestrate/refill";
 import { mergeContext, settleMerge, tierInput } from "./merge-autonomy";
 import { resolveBlockers } from "./blockers";
 import { intakeGate } from "./dispatch";
@@ -679,10 +680,9 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     // practice), which raced dependents ahead of what they were blocked on.
     .sort((a, b) => a.number - b.number);
 
-  // candidates was filtered against inFlight above; mark them before any
-  // await so an overlapping poll's own candidates filter (same check) never
-  // sees this batch as still unclaimed.
+  // Marked before any await so an overlapping poll never sees this batch as unclaimed.
   for (const issue of candidates) inFlight?.add(issue.number);
+  await reserveForPoll(deps, config, ready);
 
   // Drains retros the dashboard's operator-merge route queued (v2.10.0 item
   // 3); independent of intake, so it runs even while intake is paused.

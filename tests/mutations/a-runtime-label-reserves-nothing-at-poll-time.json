@@ -1,0 +1,1 @@
+{"name":"a runtime label reserves nothing at poll time","file":"src/orchestrate/refill.ts","find":"ledger.reserve(issue.number, pick.provider, orch.cost.perRunUsd);","replace":"","test":"tests/cloud-build.test.ts"}

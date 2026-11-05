@@ -1,0 +1,1 @@
+{"name":"claude-cloud gets no command runner","file":"src/cloud/claude.ts","find":"const run = opts.run ?? spawnRun;","replace":"const run = opts.run ?? (async () => ({ code: 1, stdout: \"\" }));","test":"tests/cloud-runtimes.test.ts"}

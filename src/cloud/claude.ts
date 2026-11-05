@@ -2,16 +2,18 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CloudError, type CloudProvider, type CloudRun, type CloudStatus, type LaunchInput } from "./port";
+import { type RunCommand, spawnRun } from "./spawn";
 
 function substitute(
   argv: string[],
-  vars: { promptFile?: string; branch?: string; repo?: string; session?: string },
+  vars: { promptFile?: string; branch?: string; repo?: string; session?: string; issue?: string },
 ): string[] {
   return argv.map((a) => {
     let s = a;
     if (vars.promptFile !== undefined) s = s.split("{promptFile}").join(vars.promptFile);
     if (vars.branch !== undefined) s = s.split("{branch}").join(vars.branch);
     if (vars.repo !== undefined) s = s.split("{repo}").join(vars.repo);
+    if (vars.issue !== undefined) s = s.split("{issue}").join(vars.issue);
     if (vars.session !== undefined) s = s.split("{session}").join(vars.session);
     return s;
   });
@@ -53,10 +55,10 @@ export function claudeCloudProvider(opts: {
   launch: string[];
   status: string[];
   cancel: string[];
-  run?: (argv: string[]) => Promise<{ code: number; stdout: string }>;
+  run?: RunCommand;
   tmpDir?: string;
 }): CloudProvider {
-  const run = opts.run ?? (async () => ({ code: 1, stdout: "" }));
+  const run = opts.run ?? spawnRun;
   const tmpRoot = opts.tmpDir ?? mkdtempSync(join(tmpdir(), "claude-cloud-"));
 
   if (opts.launch.length === 0) {
@@ -83,6 +85,7 @@ export function claudeCloudProvider(opts: {
           promptFile: promptPath,
           branch: i.branch,
           repo: i.repoUrl,
+          issue: i.issueRef,
         });
         const result = await run(argv);
         stdout = result.stdout;
