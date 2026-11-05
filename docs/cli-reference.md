@@ -18,7 +18,7 @@ no repo: control plane + relay (the image default); with a repo: watch + dashboa
 factory watch (--repo-dir <path> | --repo <owner/name>) [--once] [--shadow]
 ```
 
-poll and drive the loop; --once = one pass; --shadow = triage and plan each ready issue, post the result, make no branch or PR.
+poll and drive the loop; --once = one pass; --shadow = triage, plan, build and verify each ready issue in a throwaway worktree, post the result, push nothing and make no branch or PR.
 
 ### run
 

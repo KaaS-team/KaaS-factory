@@ -1,0 +1,1 @@
+{"name":"shadow mode keeps its worktree after the run","file":"src/shadow.ts","find":"await deps.git.removeWorktree(deps.cloneDir, worktree).catch(() => undefined);","replace":"","test":"tests/shadow.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"shadow mode lets the build push its branch","file":"src/shadow.ts","find":"if (key === \"push\" || key === \"pushBranch\")","replace":"if (key === \"never\")","test":"tests/shadow.test.ts"}

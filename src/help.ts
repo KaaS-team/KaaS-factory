@@ -10,7 +10,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   {
     name: "watch",
     usage: "watch (--repo-dir <path> | --repo <owner/name>) [--once] [--shadow]",
-    does: "poll and drive the loop; --once = one pass; --shadow = triage and plan each ready issue, post the result, make no branch or PR",
+    does: "poll and drive the loop; --once = one pass; --shadow = triage, plan, build and verify each ready issue in a throwaway worktree, post the result, push nothing and make no branch or PR",
   },
   {
     name: "run",

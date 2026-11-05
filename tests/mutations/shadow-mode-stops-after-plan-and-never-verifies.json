@@ -1,0 +1,1 @@
+{"name":"shadow mode stops after plan and never verifies","file":"src/shadow.ts","find":"for (const uses of [\"triage\", \"plan\", \"build\", \"verify\"])","replace":"for (const uses of [\"triage\", \"plan\"])","test":"tests/shadow.test.ts"}

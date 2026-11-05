@@ -24,6 +24,10 @@ const sh = (cwd: string, ...args: string[]) =>
 
 class ShadowGit extends FakeGit {
   detached: string[] = [];
+  removed: string[] = [];
+  override async removeWorktree(_c: string, worktreeDir: string): Promise<void> {
+    this.removed.push(worktreeDir);
+  }
   override async ensureDetachedWorktree(_c: string, worktreeDir: string): Promise<void> {
     this.detached.push(worktreeDir);
     mkdirSync(worktreeDir, { recursive: true });
@@ -31,7 +35,7 @@ class ShadowGit extends FakeGit {
 }
 
 describe("shadow mode", () => {
-  test("a ready issue is planned and commented on, with no claim, push or PR", async () => {
+  async function shadowRun(verdict?: string) {
     const issue = baseIssue(1, [LABEL.ready]);
     const github = new FakeGitHub([issue]);
     const git = new ShadowGit();
@@ -47,16 +51,76 @@ describe("shadow mode", () => {
       workspacesDir: dir("ws-"),
       shadow: true,
     };
-    expect(await processReadyIssue(issue, deps, config)).toBe("waiting");
+    const prev = process.env.FAKE_VERDICT;
+    if (verdict) process.env.FAKE_VERDICT = verdict;
+    const outcome = await processReadyIssue(issue, deps, config);
+    if (prev === undefined) delete process.env.FAKE_VERDICT;
+    else process.env.FAKE_VERDICT = prev;
+    return { outcome, git, github, state };
+  }
+
+  test("a ready issue is planned, built and verified in a throwaway worktree, with no claim, push or PR", async () => {
+    const { outcome, git, github, state } = await shadowRun();
+    expect(outcome).toBe("waiting");
     expect(git.claims).toBe(0);
     expect(git.pushed).toEqual([]);
-    expect(git.committed).toEqual([]);
+    expect(git.committed).toHaveLength(1);
     expect(git.detached).toHaveLength(1);
+    expect(git.removed).toEqual(git.detached);
     expect(github.createdPrs).toEqual([]);
     const bodies = github.issues.get(1)!.comments.map((c) => c.body);
     expect(bodies.some((b) => b.includes("factory:plan"))).toBe(true);
-    expect(bodies.some((b) => b.includes("Shadow run") && b.includes("No branch or pull request"))).toBe(true);
+    expect(bodies.some((b) => b.includes("factory:verdict"))).toBe(true);
+    const summary = bodies.find((b) => b.includes("Shadow run"))!;
+    expect(summary).toContain("triage, plan, build, verify");
+    expect(summary).toContain("no branch, push or pull request");
     expect(github.issues.get(1)!.labels.map((l) => l.name)).not.toContain(LABEL.ready);
+    state.close();
+  });
+
+  test("a reject verdict is posted and ends the run, still with nothing pushed", async () => {
+    const reject = JSON.stringify({
+      result: "reject",
+      rounds: 1,
+      findings: [{ severity: "must", confidence: 5, what: "drops a cent" }],
+    });
+    const { outcome, git, github, state } = await shadowRun(reject);
+    expect(outcome).toBe("waiting");
+    expect(git.pushed).toEqual([]);
+    expect(git.committed).toHaveLength(1);
+    const summary = github.issues
+      .get(1)!
+      .comments.map((c) => c.body)
+      .find((b) => b.includes("Shadow run"))!;
+    expect(summary).toContain("verify sent the build back");
+    state.close();
+  });
+
+  test("a whole shadow run on a real clone leaves no branch locally or on the origin", async () => {
+    const origin = dir("origin-");
+    sh(origin, "init", "-q", "-b", "main");
+    writeFileSync(join(origin, "a.txt"), "a");
+    sh(origin, "add", "-A");
+    sh(origin, "commit", "-qm", "init");
+    const clone = dir("c-");
+    Bun.spawnSync(["git", "clone", "-q", origin, clone], { env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
+    const heads = (cwd: string) => sh(cwd, "branch", "-a", "--format=%(refname)").stdout.toString();
+    const before = [heads(clone), heads(origin)];
+    const config = mergeConfig({
+      repo: "acme/widgets",
+      agents: { scripted: { command: [join(import.meta.dir, "fixtures/agents/fake-agent.sh")] } },
+      stages: { default: "scripted" },
+    });
+    const issue = baseIssue(1, [LABEL.ready]);
+    const state = new FactoryState(":memory:");
+    const deps = {
+      ...{ github: new FakeGitHub([issue]), git: new Git(), state, cloneDir: clone },
+      ...{ executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner() },
+      ...{ holdoutRunner: new FakeHoldoutRunner(), workspacesDir: dir("ws-"), shadow: true },
+    };
+    await processReadyIssue(issue, deps, config);
+    expect(deps.github.issues.get(1)!.comments.some((c) => c.body.includes("Shadow run"))).toBe(true);
+    expect([heads(clone), heads(origin)]).toEqual(before);
     state.close();
   });
 
