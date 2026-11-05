@@ -1,0 +1,1 @@
+{"name":"a team level below merge-on-green leaves the repo tier alone","file":"src/team/apply.ts","find":"approval && approval.level !== \"merge-on-green\" ?","replace":"false ?","test":"tests/team-approval.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"an approval chain with a missing approver still merges","file":"src/team/approval.ts","find":"if (at < 0) {","replace":"if (false) {","test":"tests/team-approval.test.ts"}

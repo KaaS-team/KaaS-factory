@@ -30,7 +30,7 @@ async function docker(argv: string[]): Promise<string> {
 // Runs `fn` with an internal network and a proxy on its gateway; both are gone afterwards.
 export async function withInternalEgress<T>(
   allow: readonly string[],
-  fn: (network: string, env: Record<string, string>) => Promise<T>,
+  fn: (network: string, env: Record<string, string>, refused: readonly string[]) => Promise<T>,
 ): Promise<T> {
   const name = `factory-egress-${crypto.randomUUID().slice(0, 12)}`;
   await docker(createNetworkArgs(name));
@@ -38,7 +38,7 @@ export async function withInternalEgress<T>(
   try {
     const gateway = await docker(gatewayArgs(name));
     proxy = startEgressProxy({ allow, hostname: gateway });
-    return await fn(name, egressEnv(proxy.url, allow));
+    return await fn(name, egressEnv(proxy.url, allow), proxy.refused);
   } finally {
     proxy?.stop();
     await docker(removeNetworkArgs(name)).catch(() => undefined);

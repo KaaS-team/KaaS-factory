@@ -1,0 +1,1 @@
+{"name":"an unlisted host stays in the runtime allow list","file":"src/team/egress-policy.ts","find":"(allow ?? []).filter((h) => p.hosts.includes(h))","replace":"(allow ?? [])","test":"tests/team-egress-policy.test.ts"}

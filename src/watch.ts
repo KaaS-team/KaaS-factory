@@ -420,7 +420,7 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
 
     const fresh = !issue.comments.some((c) => c.body.includes(mergePolicyMarker(decision.headSha)));
     const post = fresh ? (body: string) => postComment(deps, config, issueNumber, body) : undefined;
-    const run = { worktree, pr: pr.number, branch: head, issue: issueNumber, post };
+    const run = { worktree, pr: pr.number, branch: head, issue: issueNumber, post, by: readiness.approvedBy };
     const merged = await settleMerge(deps, config, auto, decision, run);
     if (merged) return await recordMerge(deps, config, issue, pr.number, "factory");
   } catch (err) {

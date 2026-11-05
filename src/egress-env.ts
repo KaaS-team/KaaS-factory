@@ -27,12 +27,19 @@ export function egressEnv(proxyUrl: string, allow: readonly string[]): Record<st
 export async function withEgress<T>(
   allow: readonly string[],
   reach: (loopback: string) => string,
-  fn: (env: Record<string, string>) => Promise<T>,
+  fn: (env: Record<string, string>, refused: readonly string[]) => Promise<T>,
 ): Promise<T> {
   const proxy: EgressProxy = startEgressProxy({ allow });
   try {
-    return await fn(egressEnv(reach(proxy.url), allow));
+    return await fn(egressEnv(reach(proxy.url), allow), proxy.refused);
   } finally {
     proxy.stop();
   }
+}
+
+// A blocked call is named in the command's own stderr, so the run log says which host was refused.
+export function withRefusals<R extends { readonly stderr: string }>(result: R, refused: readonly string[]): R {
+  return refused.length
+    ? { ...result, stderr: `${result.stderr}${refused.map((r) => `egress blocked: ${r}\n`).join("")}` }
+    : result;
 }

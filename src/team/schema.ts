@@ -1,6 +1,7 @@
 // The shapes of an org file and a team file, and the plain-sentence checks that a loaded file has them.
 import { statusMapProblems } from "../ports/tracker-status";
 import { orchestrateProblems, type OrchestrateSpec } from "../orchestrate/config";
+import { type ApprovalChain, isLevel, LEVELS, type Level } from "./approval";
 
 export type Risk = "low" | "medium" | "high";
 
@@ -27,6 +28,11 @@ export interface PolicySpec {
   models?: string[];
   protected_paths?: string[];
   approvals?: { requester_cannot_approve?: boolean };
+  // Hosts and secrets a run may use; a level can only narrow what the level above listed.
+  egress?: { hosts?: string[]; secrets?: string[] };
+  // How far the factory goes alone, and who must approve a sensitive path, in order.
+  autonomy_level?: Level;
+  approval_chains?: ApprovalChain[];
   budget_usd_month?: number;
   extend?: boolean;
   // Org only: a rule named here is hard-deny (no one lifts it) or soft-deny (a named approver can).
@@ -128,6 +134,19 @@ const role = (path: string, v: unknown, out: string[]) =>
   fields(path, v, { harness: str, model: str, skills: strs, tools: strs, runtime: str, locked: bool }, out);
 const roles = dict(role);
 
+const chains: Check = (path, v) => {
+  if (!Array.isArray(v)) return `${path} must be a list of chains.`;
+  const bad = v.findIndex(
+    (c) =>
+      !isObject(c) ||
+      !isStrings(c.paths) ||
+      !isStrings(c.approvers) ||
+      !(c.paths as unknown[]).length ||
+      !(c.approvers as unknown[]).length,
+  );
+  return bad < 0 ? undefined : `${path}[${bad}] needs paths and approvers, each a non-empty list of strings.`;
+};
+
 function policy(path: string, v: unknown, out: string[]): void {
   fields(
     path,
@@ -140,6 +159,10 @@ function policy(path: string, v: unknown, out: string[]): void {
       extend: bool,
       auto_merge: map,
       approvals: map,
+      egress: map,
+      autonomy_level: (path, v) =>
+        isLevel(v) ? undefined : `${path} must be ${LEVELS.join(", ")}, got ${JSON.stringify(v)}.`,
+      approval_chains: chains,
       deny: map,
       preapprove: map,
     },
@@ -148,6 +171,7 @@ function policy(path: string, v: unknown, out: string[]): void {
   if (!isObject(v)) return;
   if (isObject(v.auto_merge)) fields(`${path}.auto_merge`, v.auto_merge, { allowed: bool, max_risk: risk }, out);
   if (isObject(v.approvals)) fields(`${path}.approvals`, v.approvals, { requester_cannot_approve: bool }, out);
+  if (isObject(v.egress)) fields(`${path}.egress`, v.egress, { hosts: strs, secrets: strs }, out);
 }
 
 // deny belongs to the org and preapprove to a team: a file cannot mark its own rules or lift its own.

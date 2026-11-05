@@ -1,0 +1,1 @@
+{"name":"the audit comment records the wrong person","file":"src/team/approval.ts","find":"person=${token(a.person)} -->`","replace":"person=nobody -->`","test":"tests/team-approval.test.ts"}

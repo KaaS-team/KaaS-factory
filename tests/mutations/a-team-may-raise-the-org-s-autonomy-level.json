@@ -1,0 +1,1 @@
+{"name":"a team may raise the org's autonomy level","file":"src/team/resolve.ts","find":"levelRank(v as AutonomyLevel) < levelRank(cur as AutonomyLevel) ? v : cur","replace":"levelRank(v as AutonomyLevel) > levelRank(cur as AutonomyLevel) ? v : cur","test":"tests/team-approval.test.ts"}

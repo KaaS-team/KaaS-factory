@@ -1,0 +1,1 @@
+{"name":"the audit comment is posted without its actor","file":"src/merge-autonomy.ts","find":"renderAuditComment(decision, actorFor(run.by))","replace":"renderAuditComment(decision)","test":"tests/team-approval.test.ts"}

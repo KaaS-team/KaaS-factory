@@ -19,6 +19,7 @@ import { CMD, WrapExecution, type WrapSpec } from "./adapters/wrap/execution";
 import { existsSync } from "node:fs";
 import { factoryHome } from "./paths";
 import type { ExecutionPort } from "./ports/execution";
+import { type EgressPolicy, restrictSpec } from "./team/egress-policy";
 
 export type RuntimeSpec =
   | { readonly kind: "local" }
@@ -253,9 +254,10 @@ export function runtimesFrom(
   machine: Readonly<Record<string, RuntimeSpec>> = {},
   env: NodeJS.ProcessEnv = process.env,
   probe: HostProbe = hostProbe,
+  policy?: EgressPolicy,
 ): Readonly<Record<string, ExecutionPort>> {
   const ports: Record<string, ExecutionPort> = {};
-  const all = Object.entries(runtimeSpecs(machine, probe));
+  const all = Object.entries(runtimeSpecs(machine, probe)).map(([n, s]) => [n, restrictSpec(s, policy)] as const);
   for (const [name, spec] of all) if (spec.kind !== "pool") ports[name] = executionFor(spec);
   let store: SqliteUsageStore | undefined;
   for (const [name, spec] of all)

@@ -6,6 +6,7 @@
 
 import { resolveImage } from "../../images";
 import type { AgentInVm, ExecResult, ExecutionPort } from "../../ports/execution";
+import { withRefusals } from "../../egress-env";
 import { withInternalEgress } from "./egress-network";
 
 export interface DockerSpec {
@@ -117,7 +118,9 @@ export class DockerExecution implements ExecutionPort {
   async run(cmd: string, cwd: string): Promise<ExecResult> {
     const { allow } = this.spec;
     if (allow)
-      return withInternalEgress(allow, (net, env) => this.spawn(withProxyNetwork(this.spec, net), cmd, cwd, env));
+      return withInternalEgress(allow, async (net, env, refused) =>
+        withRefusals(await this.spawn(withProxyNetwork(this.spec, net), cmd, cwd, env), refused),
+      );
     return this.spawn(this.spec, cmd, cwd, {});
   }
   private async spawn(spec: DockerSpec, cmd: string, cwd: string, egress: Record<string, string>): Promise<ExecResult> {

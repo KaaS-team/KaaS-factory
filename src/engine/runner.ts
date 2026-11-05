@@ -28,6 +28,7 @@ import { ALL_STEP_TYPES as STEP_TYPES } from "./registry";
 import { bindingFields } from "./approval-binding";
 import { emitEvent } from "./bus";
 import { readJournal } from "./journal";
+import { mayBuild } from "../team/approval";
 import { chooseLane, type LaneDecision } from "./lane";
 import { lateRoute } from "./late-route";
 import { holdForOverlap } from "../overlap";
@@ -201,6 +202,11 @@ async function walk(
           { stage: "budget", json: { reason: overBudget } },
         );
         return await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: overBudget });
+      }
+      if (step.uses === "build" && config.approval && !mayBuild(config.approval.level)) {
+        const why = "the team's autonomy level is suggest, so the plan stands as a suggestion and no change is built";
+        await postComment(deps, config, issueNumber, `Parked: ${why}.`, { stage: "autonomy", json: { reason: why } });
+        return await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: why });
       }
       at.step = step.id;
       emitEvent(deps.bus, "factory.step.started", { ...base(), step: step.id, uses: step.uses }, subject);

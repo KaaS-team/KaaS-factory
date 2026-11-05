@@ -1,0 +1,1 @@
+{"name":"the team egress policy is not applied to the config","file":"src/team/apply.ts","find":"...(egress ? { egress } : {}),","replace":"","test":"tests/team-egress-policy.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"a team cap counts spend from repos outside the team","file":"src/team/budget.ts","find":"budget.repos.reduce((sum, repo) => sum + state.spendSummary(repo, since).costUsd, 0)","replace":"state.spendSummary('a/one', since).costUsd + state.spendSummary('b/docs', since).costUsd","test":"tests/team-budget.test.ts"}
