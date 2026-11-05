@@ -1,6 +1,6 @@
 // Keyed scored checks: each row holds a check's key, score, max, previous score and last 10 scores.
-// recordScore appends to a history file; readChecks is what the merge step can call. Nothing calls
-// either yet.
+// recordScore appends to a history file; readChecks is what the merge step reads (mergeContext), and
+// scoredRefusals turns a required check's missing or low row into a merge refusal.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -53,4 +53,25 @@ export function readChecks(file: string): readonly CheckRow[] {
   return Object.entries(load(file))
     .filter(([, h]) => Array.isArray(h.scores) && h.scores.length > 0)
     .map(([key, h]) => row(key, h));
+}
+
+export const SCORES_FILE = ".factory/scores.json";
+
+// A required check: its key and the lowest score that lets a merge through.
+export type RequiredChecks = Readonly<Record<string, number>>;
+
+export interface ScoredFacts {
+  readonly required: RequiredChecks;
+  readonly rows: readonly CheckRow[];
+}
+
+// One reason per required check that has no row or scores under its threshold.
+export function scoredRefusals(facts: ScoredFacts): string[] {
+  const out: string[] = [];
+  for (const [key, min] of Object.entries(facts.required)) {
+    const r = facts.rows.find((x) => x.key === key);
+    if (!r) out.push(`required check "${key}" has no score`);
+    else if (r.score < min) out.push(`check "${key}" scored ${r.score} of ${r.max}, under its threshold ${min}`);
+  }
+  return out;
 }

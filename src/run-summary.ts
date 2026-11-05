@@ -15,7 +15,7 @@ export interface RunSummaryCtx {
   readonly proof?: ProofStatus;
 }
 
-const PROOF_LINE: Record<ProofStatus, string> = {
+export const PROOF_LINE: Record<ProofStatus, string> = {
   bites: "the new test fails without the change",
   "passes-without": "the new test also passes without the change",
   "no-tests": "the diff adds no test",

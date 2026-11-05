@@ -62,3 +62,56 @@ test("a score above max or a blank key is refused and nothing is written", () =>
   expect(() => recordScore(file, "", 1, 10)).toThrow("bad scored check");
   expect(readChecks(file)).toEqual([]);
 });
+
+import { mergeContext } from "../src/merge-autonomy";
+import { factRefusals, type PrFacts } from "../src/pr-facts";
+import { writeVerifyFacts } from "../src/pr-facts-collect";
+import { SCORES_FILE, scoredRefusals } from "../src/scored-checks";
+import { FactoryState } from "../src/state";
+
+const rows = [
+  { key: "judge", score: 8, max: 10, previous: 7, last: [7, 8] },
+  { key: "qa", score: 2, max: 4, previous: undefined, last: [2] },
+];
+
+test("scoredRefusals: a passing row is quiet, a failing row and a missing row each block", () => {
+  expect(scoredRefusals({ required: { judge: 7 }, rows })).toEqual([]);
+  expect(scoredRefusals({ required: { qa: 3 }, rows })).toEqual(['check "qa" scored 2 of 4, under its threshold 3']);
+  expect(scoredRefusals({ required: { lint: 1 }, rows })).toEqual(['required check "lint" has no score']);
+});
+
+test("factRefusals carries scored refusals as signal 11", () => {
+  const facts = {
+    cleanRoom: null,
+    changedLines: null,
+    tamper: [],
+    supplyChain: null,
+    risk: { level: "low", blastRadius: { owners: [], protected: [] } },
+    review: null,
+    ui: { changed: false, preview: false, smoke: false, unreviewedDiffs: 0, qaSpec: false },
+    postMergeWatch: true,
+    scored: { required: { qa: 3 }, rows },
+  } as unknown as PrFacts;
+  expect(factRefusals(facts, "full").filter((r) => r.detail.startsWith("11:"))).toHaveLength(1);
+  expect(factRefusals({ ...facts, scored: undefined }, "full").filter((r) => r.detail.startsWith("11:"))).toHaveLength(
+    0,
+  );
+});
+
+test("mergeContext reads the recorded rows for the required checks", async () => {
+  const d = dir();
+  const state = new FactoryState(join(d, "state.db"));
+  recordScore(join(d, SCORES_FILE), "judge", 5, 10);
+  await writeVerifyFacts(d, 3, { tamper: [], review: null } as never);
+  const config = {
+    repo: "o/r",
+    base: "main",
+    protectedPaths: [],
+    packages: [],
+    merge: { policy: "auto", autonomy: "full", maxFiles: 10, maxLines: 200, requiredChecks: { judge: 7, qa: 1 } },
+  };
+  const github = { listIssuesByLabel: async () => [], currentLogin: async () => "bot", roleOf: async () => "admin" };
+  const ctx = await mergeContext({ github: github as never, state }, config as never, d, 3, [], 3);
+  expect(ctx?.facts?.scored?.rows.map((r) => r.key)).toEqual(["judge"]);
+  expect(scoredRefusals(ctx!.facts!.scored!)).toHaveLength(2);
+});

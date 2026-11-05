@@ -1,0 +1,1 @@
+{"name":"the verify comment drops the proof result","file":"src/engine/verdict-rules.ts","find":"const parts = [table, proofSection(proof)]","replace":"const parts = [table]","test":"tests/prove-test.test.ts"}

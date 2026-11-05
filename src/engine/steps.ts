@@ -3,7 +3,7 @@
 // the step's edges and moves the label), "reject" (it follows `reject:`), or "stop" once it has parked
 // or finished the issue itself, from `step.label`.
 
-import { readRunJson, settleVerdict, verdictPost } from "./verdict-rules";
+import { readRunJson, settleVerdict, verdictPostFor } from "./verdict-rules";
 import { prPreflight } from "./pr-preflight";
 import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
@@ -391,7 +391,7 @@ const verify: StepType = {
       recheckNote = rechecked.note;
     }
     if (json) json = await settleVerdict(sc, json);
-    const posted = art.comment && `${verdictPost(art.comment, json, ctx.rejectRound + 1, maxRejects)}${recheckNote}`;
+    const posted = art.comment && `${verdictPostFor(sc, art.comment, json, maxRejects)}${recheckNote}`;
     deps.state.setVerifyVerdict(config.repo, issueNumber, json && result.exitCode === 0 ? json.result : "unknown"); // judge error
     if (checked && !checked.ok) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);

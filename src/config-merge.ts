@@ -10,6 +10,8 @@ export interface MergeAutonomyFields {
   // How `gh pr merge` merges, and who queues it (src/merge-method.ts); absent is squash, factory-run.
   readonly method?: "squash" | "rebase" | "merge" | "host";
   readonly queue?: "factory" | "host" | "none";
+  // Scored checks a merge needs, by key: the lowest score that passes (src/scored-checks.ts).
+  readonly requiredChecks?: Readonly<Record<string, number>>;
 }
 
 export interface PackageOwnership {
@@ -29,6 +31,7 @@ export const MERGE_KEYS = {
   previewUrl: "string",
   method: "string",
   queue: "string",
+  requiredChecks: "object",
 } as const;
 
 export const PACKAGE_KEYS = {
@@ -50,7 +53,17 @@ const oneOf = (key: string, v: unknown, allowed: readonly string[]) =>
       ];
 
 export function mergeProblems(merge: Record<string, unknown>): string[] {
+  const rc = merge.requiredChecks;
+  const badChecks =
+    rc === undefined ||
+    (rc !== null &&
+      typeof rc === "object" &&
+      !Array.isArray(rc) &&
+      Object.values(rc).every((v) => typeof v === "number" && Number.isFinite(v)))
+      ? []
+      : ["merge.requiredChecks: expected an object of check key to minimum score"];
   return [
+    ...badChecks,
     ...oneOf("policy", merge.policy, ["off", "dry-run", "auto"]),
     ...oneOf("autonomy", merge.autonomy, ["supervised", "semi", "full"]),
     ...oneOf("method", merge.method, ["squash", "rebase", "merge", "host"]),

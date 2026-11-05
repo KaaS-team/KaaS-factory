@@ -8,6 +8,7 @@ import { isTrusted } from "../chatops";
 import { parseDataMarkers } from "../derive";
 import type { ProofResult, ProofStatus } from "../proof";
 import { mergeLedger, openWhats, seedLedger, type LedgerRow } from "../finding-ledger";
+import { PROOF_LINE } from "../run-summary";
 import type { RunCtx } from "./common";
 import type { StepCtx } from "./steps";
 
@@ -41,14 +42,29 @@ export function verdictPost(
   verdict: VerdictArtifact | undefined,
   round: number,
   limit: number,
+  proof?: ProofResult,
 ): string {
   if (!verdict?.result) return comment;
   const body = withVerdictHeading(comment, verdictHeading(verdict.result, round, limit));
   const runner = verdict.findings.filter(isRunner);
   const table = criteriaTable(verdict.criteria);
-  const withTable = table ? `${body.trimEnd()}\n\n${table}\n` : body;
+  const parts = [table, proofSection(proof)].filter(Boolean);
+  const withTable = parts.length ? `${body.trimEnd()}\n\n${parts.join("\n\n")}\n` : body;
   if (runner.length === 0) return withTable;
   return `${withTable.trimEnd()}\n\n### Runner findings\n${runner.map((f) => `- ${f.what}`).join("\n")}\n`;
+}
+
+// The verify comment for this run: the round from ctx and the proof the runner wrote to proof.json.
+export function verdictPostFor(sc: StepCtx, comment: string, verdict: VerdictArtifact | undefined, limit: number) {
+  const proof = readRunJson<ProofResult>(sc.worktree, sc.issue.number, "proof.json");
+  return verdictPost(comment, verdict, sc.ctx.rejectRound + 1, limit, proof);
+}
+
+// What the revert-and-run showed, with the reverted files and tests it ran, so the comment carries it.
+export function proofSection(proof: ProofResult | undefined): string {
+  if (!proof) return "";
+  const list = (xs: readonly string[]) => (xs.length ? xs.map((x) => `\`${x}\``).join(", ") : "none");
+  return `### Proof\n\n${PROOF_LINE[proof.status]}. Reverted: ${list(proof.reverted)}. Tests: ${list(proof.tests)}.`;
 }
 
 const STATUS_WORD = { pass: "met", fail: "not met", unverified: "unverified" } as const;

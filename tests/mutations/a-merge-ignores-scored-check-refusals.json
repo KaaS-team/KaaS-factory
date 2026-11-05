@@ -1,0 +1,1 @@
+{"name":"a merge ignores scored check refusals","file":"src/pr-facts.ts","find":"if (facts.scored) for","replace":"if (false) for","test":"tests/scored-checks.test.ts"}
