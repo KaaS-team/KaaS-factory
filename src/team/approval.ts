@@ -69,7 +69,8 @@ export interface Actor {
   readonly person: string;
 }
 
-const ACTOR = /<!-- factory:actor agent=(\S+) person=(\S+) -->/;
+// A constructor, not a literal: semgrep reads "<!--" in a regex literal as an HTML comment and stops parsing.
+const ACTOR = new RegExp("<!-- factory:actor agent=(\\S+) person=(\\S+) -->");
 const token = (s: string): string => s.replace(/[^\w.@-]/g, "_") || "unknown";
 
 export const actorMarker = (a: Actor): string =>
