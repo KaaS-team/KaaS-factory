@@ -135,7 +135,7 @@ describe("acting on the stack", () => {
     await commit(work, "t1.txt", "t1\n", "squash t1");
     await git(work, "push", "-q", "origin", "main");
     const out = await retargetAfterMerge(host, work, "o/r", plan, ["t1"], "main", t1Head);
-    expect(out.parked).toBeUndefined();
+    expect("parked" in out).toBe(false);
     expect(out.retargeted?.task).toBe("t2");
     expect(host.retargets).toEqual([{ number: 2, base: "main" }]);
     const remoteT2 = await git(work, "ls-remote", "origin", "refs/heads/e-t2");
@@ -150,7 +150,7 @@ describe("acting on the stack", () => {
     await git(work, "checkout", "-q", "e-t1");
     await commit(work, "fix.txt", "fix\n", "review fix");
     const out = await carryUp(work, plan, "t1", old);
-    expect(out.parked).toBeUndefined();
+    expect("parked" in out).toBe(false);
     expect(out.carried).toEqual(["t2", "t3"]);
     for (const b of ["e-t2", "e-t3"]) {
       await git(work, "merge-base", "--is-ancestor", "e-t1", b);
