@@ -1,0 +1,1 @@
+{"name":"merge: the requester can approve their own merge","file":"src/merge-policy.ts","find":"if (!approval?.requesterCannotApprove) return [];","replace":"return [];","test":"tests/merge-requester.test.ts"}
