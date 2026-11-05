@@ -1,0 +1,7 @@
+{
+  "name": "an audit event is not exported as an OTel span",
+  "file": "src/integrations/wire.ts",
+  "find": "if (e.type === \"factory.audit.recorded\")",
+  "replace": "if (false && e.type === \"factory.audit.recorded\")",
+  "test": "tests/otel.test.ts"
+}

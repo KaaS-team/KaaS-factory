@@ -1,0 +1,1 @@
+{"name":"layers: an org lock on a preference is ignored","file":"src/team/resolve.ts","find":"if (v !== undefined && level !== \"org\" && locked.includes(key) && this.orgHolds(key)) {","replace":"if (false) {","test":"tests/team-layers.test.ts"}

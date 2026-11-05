@@ -11,7 +11,7 @@ import { EventBus } from "../engine/bus";
 import type { FactoryState } from "../state";
 import { LinkStore } from "./links";
 import { bearer, MCP_ENV, McpClient, notifyMcp, recordMcpEvents } from "./mcp-client";
-import { exportTrace, OTEL_ENV, runTrace } from "./otel";
+import { auditTrace, exportTrace, OTEL_ENV, runTrace } from "./otel";
 import { progressOf } from "./progress";
 import { SURFACE as SLACK, SLACK_ENV, SlackClient, slackProgress } from "./slack";
 
@@ -71,6 +71,8 @@ export function wireIntegrations(deps: WireDeps): string[] {
   // A run's stages are those that started after its first step event, so a retry is its own trace.
   const since = new Map<string, string>();
   use("otel", [OTEL_ENV.endpoint], async (e) => {
+    if (e.type === "factory.audit.recorded")
+      return exportTrace(env[OTEL_ENV.endpoint]!, env[OTEL_ENV.headers], auditTrace(e));
     const p = progressOf(e);
     if (!p) return;
     const key = `${p.repo}#${p.issue}`;

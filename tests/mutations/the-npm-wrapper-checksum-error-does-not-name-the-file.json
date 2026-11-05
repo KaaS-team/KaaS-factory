@@ -1,0 +1,7 @@
+{
+  "name": "the npm wrapper checksum error does not name the file",
+  "file": "npm/install.js",
+  "find": "checksum mismatch for ${file}:",
+  "replace": "checksum mismatch:",
+  "test": "tests/npm-wrapper.test.ts"
+}

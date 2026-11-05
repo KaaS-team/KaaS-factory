@@ -108,6 +108,12 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems",
   },
   {
+    name: "config",
+    usage:
+      "config explain <key> (--repo-dir <path> | --repo <owner/name>) [--team <name>] [--label <l,l>] [--path <p,p>]",
+    does: "print one config key (workflow, autonomy, model, budget_usd_month, models or any dotted key), its value and the level that set it, and say when the org locked it; --team, --label or --path pick the team when several list the repo",
+  },
+  {
     name: "verify-agent",
     usage: "verify-agent <name> --repo-dir <path> --issue <N> [--out <dir>]",
     does: "run one issue on that agent, record a scrubbed fixture, print pass/fail, cost and tokens",

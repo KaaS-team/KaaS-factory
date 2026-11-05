@@ -1,6 +1,7 @@
 // Four rules decide a team's config. Preferences: the most local level wins. Policy: the strictest
 // value wins, so no level loosens what the one above set. Roles, workflows and routes: replaced by
-// name, except a name the org locked. Levels apply in the order builtin, org, team, repo.
+// name, except a name the org locked. The org can also lock workflow, autonomy, model and any policy
+// rule (budget_usd_month, models, ...): a lower level cannot change a locked value the org set. Levels apply in the order builtin, org, team, repo.
 import { resolveCapabilities } from "./capabilities";
 import { DENY_RULES, type DenyKind, type OrgFile, RISKS, type TeamFile } from "./schema";
 
@@ -24,6 +25,7 @@ interface Deny {
 interface Prefs {
   model?: string;
   workflow?: string;
+  autonomy?: string;
   labels?: Record<string, string>;
   timeouts?: Record<string, number>;
 }
@@ -35,7 +37,7 @@ export interface ResolveInput {
   repo?: Obj;
 }
 
-const PREFERENCES = ["model", "workflow", "labels", "timeouts"];
+const PREFERENCES = ["model", "workflow", "autonomy", "labels", "timeouts"];
 const NAMED = ["roles", "workflows", "routes"];
 
 // The caller passes the org value as a, the ceiling. The line stays as written: tests/mutations.json matches it.
@@ -81,21 +83,36 @@ class Merge {
     return node;
   }
 
-  preferences(from: Obj, level: Level): void {
+  // The org set this path and no lower level has replaced it yet.
+  private orgHolds(path: string): boolean {
+    return Object.keys(this.origin).some((k) => (k === path || k.startsWith(`${path}.`)) && this.origin[k] === "org");
+  }
+
+  preferences(from: Obj, level: Level, locked: readonly string[] = [], who = ""): void {
     for (const key of PREFERENCES) {
       const v = from[key];
+      if (v !== undefined && level !== "org" && locked.includes(key) && this.orgHolds(key)) {
+        if (JSON.stringify(v) !== JSON.stringify(this.get(key)))
+          this.problems.push(`${who} tried to set ${key}, which the org locked; the org's value stays.`);
+        continue;
+      }
       if (isObj(v)) for (const [k, x] of Object.entries(v)) this.set(`${key}.${k}`, x, level);
       else if (v !== undefined) this.set(key, v, level);
     }
   }
 
-  policy(from: unknown, level: Level, union: boolean, deny: Deny, who: string): void {
+  policy(from: unknown, level: Level, union: boolean, deny: Deny, who: string, locked: readonly string[] = []): void {
     if (!isObj(from)) return;
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     const pick = (path: string, v: unknown, wins: (cur: unknown, v: unknown) => unknown) => {
       if (v === undefined) return;
       const cur = this.get(path);
       const rule = path.slice("policy.".length);
+      if (level !== "org" && locked.includes(rule) && this.orgHolds(path)) {
+        if (!same(cur, v))
+          this.problems.push(`${who} tried to set ${rule}, which the org locked; the org's value stays.`);
+        return;
+      }
       const kind = level === "org" ? undefined : deny.marks[rule];
       if (kind === "hard" && !(cur !== undefined && same(cur, v))) {
         this.problems.push(
@@ -176,8 +193,8 @@ export function resolveTeam(input: ResolveInput): Resolved {
   for (const [level, from, who] of levels) {
     if (!from) continue;
     m.named(from, level, locked, who);
-    m.preferences(from, level);
-    m.policy(from.policy, level, union, deny, who);
+    m.preferences(from, level, locked, who);
+    m.policy(from.policy, level, union, deny, who, locked);
   }
   const caps = resolveCapabilities({
     org: input.org as unknown as Obj | undefined,

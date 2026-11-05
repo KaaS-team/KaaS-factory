@@ -1,7 +1,7 @@
 {
   "name": "otel",
   "kind": "notifier",
-  "summary": "Exports one OpenTelemetry trace per run, a gen_ai span per stage.",
+  "summary": "Exports one OpenTelemetry trace per run, a gen_ai span per stage, and one span per audit event.",
   "env": [
     "OTEL_EXPORTER_OTLP_ENDPOINT",
     "OTEL_EXPORTER_OTLP_HEADERS"

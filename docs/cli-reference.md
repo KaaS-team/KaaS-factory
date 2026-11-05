@@ -172,6 +172,14 @@ factory explain <N> (--repo-dir <path> | --repo <owner/name>)
 
 print each config key for #N, its value and the level that set it (builtin, org, team or repo), the config hash and any team problems.
 
+### config
+
+```
+factory config explain <key> (--repo-dir <path> | --repo <owner/name>) [--team <name>] [--label <l,l>] [--path <p,p>]
+```
+
+print one config key (workflow, autonomy, model, budget_usd_month, models or any dotted key), its value and the level that set it, and say when the org locked it; --team, --label or --path pick the team when several list the repo.
+
 ### verify-agent
 
 ```

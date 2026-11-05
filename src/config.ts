@@ -699,7 +699,11 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
 }
 
 // loadConfig plus the team resolution behind it, for `factory explain`.
-export async function loadConfigExplained(targetRepoDir: string): Promise<TeamApplied> {
+// `route` names the issue's labels and changed paths, or a team, when several teams list the repo.
+export async function loadConfigExplained(
+  targetRepoDir: string,
+  route: { issue?: { labels: string[]; paths: string[] }; team?: string } = {},
+): Promise<TeamApplied> {
   const path = `${targetRepoDir}/.factory/config.json`;
   const file = Bun.file(path);
   if (!(await file.exists())) {
@@ -734,6 +738,7 @@ export async function loadConfigExplained(targetRepoDir: string): Promise<TeamAp
     defaults: mergeConfig({ profile: config.profile }),
     raw: raw as Record<string, unknown>,
     check: configProblems,
+    ...route,
   });
   if (team.problems.length > 0)
     throw new ConfigError(`${targetRepoDir}/.factory/team does not fit ${path}:\n  - ${team.problems.join("\n  - ")}`);
