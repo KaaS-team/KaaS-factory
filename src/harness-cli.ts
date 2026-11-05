@@ -22,6 +22,13 @@ const USAGE =
 // Every run.completed of a busy repo fits; older runs are what --since leaves out anyway.
 const EVAL_WINDOW = 100_000;
 
+// cli.ts routes harness, teach and workflow here so its own line count stays put.
+export async function cmdHarnessFamily(c: CliContext): Promise<void> {
+  if (c.args[0] === "teach") return cmdTeach(c);
+  if (c.args[0] === "workflow") return (await import("./workflow-cli")).cmdWorkflow(c);
+  return cmdHarness(c);
+}
+
 export async function cmdHarness(c: CliContext): Promise<void> {
   const sub = c.args[1];
   const dir = resolve(c.flag("repo-dir") ?? ".");

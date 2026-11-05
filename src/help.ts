@@ -128,6 +128,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types; scaffold: write a starting .factory/workflows/<name>.md; eval: runs, shipped rate, failed steps and cost per workflow from the event log",
   },
   {
+    name: "workflow",
+    usage: "workflow (list [--catalog] | add <name>) [--repo-dir <path>] [--json]",
+    does: "list: the repo's workflow files, or with --catalog the bundled workflows, one line each; add: copy a bundled workflow into .factory/workflows/ after it loads clean, never overwriting a file",
+  },
+  {
     name: "teach",
     usage: 'teach "<how we ship>" (--repo-dir <path> | --repo <owner/name>) [--json]',
     does: "one agent reads the repo, its CI and the brain MCP server, and opens a PR with the workflows, minions and skills it proposes, each checked first",

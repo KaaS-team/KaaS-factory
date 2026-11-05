@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: add writes a workflow that does not parse",
+  "file": "src/workflow-catalog.ts",
+  "find": "if (!parsed.ok) return { problems: parsed.problems.map",
+  "replace": "if (false as boolean) return { problems: parsed.problems.map",
+  "test": "tests/workflow-catalog.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: add overwrites an existing repo workflow",
+  "file": "src/workflow-catalog.ts",
+  "find": "if (taken) return",
+  "replace": "if (false as boolean) return",
+  "test": "tests/workflow-catalog.test.ts"
+}
