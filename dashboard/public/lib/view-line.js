@@ -35,6 +35,7 @@ export const KIND_HEADLINE = {
   failed: "A run failed",
   budget: "A run hit its budget",
   "stale-pr": "A pull request has gone quiet",
+  operator: "Operator work needs you",
 };
 const REPO_ICON = "M5 5h14v14H5zM9 5v14";
 const TYPES = [

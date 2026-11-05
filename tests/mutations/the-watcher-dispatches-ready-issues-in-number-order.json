@@ -1,0 +1,1 @@
+{"name":"the watcher dispatches ready issues in number order","file":"src/dispatch-order.ts","find":"return orderIssues(candidates, plan, (i) => metas.get(i.number)!.declared);","replace":"return [...candidates].sort((a, b) => a.number - b.number);","test":"tests/dispatch-order.test.ts"}
