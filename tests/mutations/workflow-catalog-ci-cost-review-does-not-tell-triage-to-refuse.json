@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: ci-cost-review does not tell triage to refuse",
+  "file": "template/.factory/workflows/ci-cost-review.md",
+  "find": "ci is steady",
+  "replace": "anything",
+  "test": "tests/workflow-catalog.test.ts"
+}

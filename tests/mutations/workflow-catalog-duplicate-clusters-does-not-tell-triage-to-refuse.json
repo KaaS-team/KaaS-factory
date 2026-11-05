@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: duplicate-clusters does not tell triage to refuse",
+  "file": "template/.factory/workflows/duplicate-clusters.md",
+  "find": "no\n        duplicates",
+  "replace": "anything",
+  "test": "tests/workflow-catalog.test.ts"
+}

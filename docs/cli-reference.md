@@ -204,6 +204,14 @@ factory harness (validate | inventory | scaffold <name> | eval [--since <days>])
 
 validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types; scaffold: write a starting .factory/workflows/<name>.md; eval: runs, shipped rate, failed steps and cost per workflow from the event log.
 
+### workflow
+
+```
+factory workflow (list [--catalog] | add <name>) [--repo-dir <path>] [--json]
+```
+
+list: the repo's workflow files, or with --catalog the bundled workflows, one line each; add: copy a bundled workflow into .factory/workflows/ after it loads clean, never overwriting a file.
+
 ### teach
 
 ```

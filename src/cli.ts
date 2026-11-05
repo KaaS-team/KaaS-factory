@@ -54,7 +54,7 @@ import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
 import { runExport } from "./learn-export";
 import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
-import { type CliContext, cmdHarness, cmdTeach } from "./harness-cli";
+import { type CliContext, cmdHarnessFamily } from "./harness-cli";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { spendPolicy } from "./ports/spend";
@@ -869,9 +869,9 @@ async function main(): Promise<void> {
     case "daemon":
       return cmdDaemon();
     case "harness":
-      return cmdHarness(harnessCtx());
     case "teach":
-      return cmdTeach(harnessCtx());
+    case "workflow":
+      return cmdHarnessFamily(harnessCtx());
     case "minion":
       return cmdMinion();
     case "events":

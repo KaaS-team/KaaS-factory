@@ -30,14 +30,22 @@ The runner ships these. Each one stops a bad output at a different rung:
 | `ui-component` | triage, plan, build, verify, pr | a medium or high risk plan parks; lint and unit gates |
 | `spec-to-plan` | triage, plan, report | no PR: the plan comment is the output |
 | `backlog-triage` | triage, report | no PR: findings as comments; files itself daily |
+| `ci-cost-review` | triage, report | no PR: slow and costly CI jobs; files itself weekly |
+| `docs-drift` | triage, report | no PR: docs the code no longer backs; files itself weekly |
+| `duplicate-clusters` | triage, report | no PR: open issues that repeat each other; files itself weekly |
+| `api-breaking-changes` | triage, report | no PR: public API changes since the last release; files itself weekly |
+| `weekly-report` | triage, report | no PR: runs by outcome and spend; files itself weekly |
 
 The rows from `pr-review` down are `.md` files. A `report` step closes the issue with no PR, and
 `gates:` holds a stage to the named gates. `dependency-update`, `security-audit`, `flaky-tests`,
-`coverage-gap`, `release-notes`, `harness-learn` and `backlog-triage` carry their own `on: cron:` schedule. A schedule fires only for `config.workflow` and
+`coverage-gap`, `release-notes`, `harness-learn`, `backlog-triage`, `ci-cost-review`, `docs-drift`, `duplicate-clusters`, `api-breaking-changes` and `weekly-report` carry their own `on: cron:` schedule. A schedule fires only for `config.workflow` and
 the workflows a route names, so route a type to one to turn it on. The issue it files records that
 workflow, so pickup runs it and not `config.workflow`. Each one's body tells triage to refuse when
 there is nothing to do: the issue parks as `factory:needs-human` with no PR, and the schedule files no
 new one until a maintainer closes it.
+
+`factory workflow list --catalog` prints every bundled workflow on one line, and `factory workflow add <name>`
+copies one into `.factory/workflows/` after it loads clean. It never overwrites a file you already have.
 
 `routes.<type>.workflow` runs a type on its own workflow, for example
 `"routes": { "docs": { "workflow": "docs-to-pr" } }`. The type comes from the label the issue was

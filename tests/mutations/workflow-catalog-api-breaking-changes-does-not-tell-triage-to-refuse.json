@@ -1,0 +1,7 @@
+{
+  "name": "workflow catalog: api-breaking-changes does not tell triage to refuse",
+  "file": "template/.factory/workflows/api-breaking-changes.md",
+  "find": "no public change",
+  "replace": "anything",
+  "test": "tests/workflow-catalog.test.ts"
+}
