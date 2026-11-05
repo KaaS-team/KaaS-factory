@@ -1,7 +1,7 @@
 {
   "name": "skill step: a missing skill is not refused",
   "file": "src/engine/skill-step.ts",
-  "find": "if (!found) return fail(",
-  "replace": "if (false) return fail(",
+  "find": "if (!found)\n      return fail(",
+  "replace": "if (false)\n      return fail(",
   "test": "tests/skill-gate-steps.test.ts"
 }
