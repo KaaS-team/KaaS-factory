@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CAP, report, reportWithLog, summarize, unfinished } from "../scripts/test-failures";
+import { CAP, report, reportWithLog, summarize, unfinished, unhandledErrors } from "../scripts/test-failures";
 
 const wrap = (cases: string): string =>
   `<?xml version="1.0"?>\n<testsuites><testsuite name="s">${cases}</testsuite></testsuites>`;
@@ -118,5 +118,78 @@ describe("test failures summary", () => {
     const p = join(dir, "j.xml");
     writeFileSync(p, wrap(ok("one")));
     expect(reportWithLog(p, undefined)).toBe(report(p));
+  });
+
+  // Fixtures below come from a real `bun test` run (bun 1.4.4), see fixtureRun.
+  const fixtureRun = (files: Record<string, string>, args: string[], env: Record<string, string> = {}) => {
+    const dir = tmp();
+    for (const [n, src] of Object.entries(files)) writeFileSync(join(dir, n), src);
+    const junit = join(dir, "j.xml");
+    const p = Bun.spawnSync(
+      [
+        "bun",
+        "test",
+        ...Object.keys(files).map((f) => `./${f}`),
+        "--reporter=junit",
+        `--reporter-outfile=${junit}`,
+        ...args,
+      ],
+      { cwd: dir, env: { ...process.env, ...env } },
+    );
+    const log = `${p.stdout.toString()}${p.stderr.toString()}`;
+    return { dir, junit, log, code: p.exitCode };
+  };
+  const betweenSrc = `import { test } from "bun:test";\ntest("a", () => {});\nPromise.reject(new Error("between boom"));\n`;
+  const okSrc = `import { test } from "bun:test";\ntest("fine", () => {});\n`;
+
+  test("a non-zero exit with a clean report never says no failing tests and names the exit code", () => {
+    const out = summarize(wrap(ok("one")), 3);
+    expect(out).not.toContain("no failing tests");
+    expect(out).toContain("exit code 3");
+  });
+
+  test("a zero exit with a clean report still says no failing tests", () => {
+    expect(summarize(wrap(ok("one")), 0)).toBe("no failing tests (1 ran)");
+  });
+
+  test("the CLI takes --exit and prints the exit code", () => {
+    const dir = tmp();
+    const j = join(dir, "j.xml");
+    writeFileSync(j, wrap(ok("one")));
+    const p = Bun.spawnSync(["bun", "scripts/test-failures.ts", j, "--exit", "2"]);
+    expect(p.stdout.toString()).toContain("exit code 2");
+    expect(p.stdout.toString()).not.toContain("no failing tests");
+  });
+
+  test("an unhandled error between tests is named with its file (real bun run)", () => {
+    const r = fixtureRun({ "ok.test.ts": okSrc, "between.test.ts": betweenSrc }, []);
+    expect(r.code).not.toBe(0);
+    expect(readFileSync(r.junit, "utf8")).not.toContain("<failure");
+    expect(unhandledErrors(r.log)).toEqual([{ file: "between.test.ts", message: "error: between boom" }]);
+    const logPath = join(r.dir, "run.log");
+    writeFileSync(logPath, r.log);
+    const out = reportWithLog(r.junit, logPath);
+    expect(out).toContain("unhandled error between tests in between.test.ts: error: between boom");
+    expect(out).not.toContain("no failing tests");
+  });
+
+  test("a log without an unhandled error section names none", () => {
+    expect(unhandledErrors("tests/a.test.ts:\n(pass) x\n")).toEqual([]);
+  });
+
+  test("a test that fails on one pass of three is reported as failing (real bun run)", () => {
+    const dir = tmp();
+    const cnt = join(dir, "cnt");
+    const src = `import { test, expect } from "bun:test";\nimport { appendFileSync, readFileSync } from "node:fs";\ntest("flips", () => { appendFileSync(process.env.CNT!, "x"); expect(readFileSync(process.env.CNT!, "utf8").length).not.toBe(2); });\n`;
+    const r = fixtureRun({ "flaky.test.ts": src }, ["--rerun-each", "3"], { CNT: cnt });
+    expect(r.code).not.toBe(0);
+    const xml = readFileSync(r.junit, "utf8");
+    expect(xml.match(/<testcase\b/g)?.length).toBe(3);
+    expect(summarize(xml, r.code)).toContain("FAILED flaky.test.ts > flips");
+  });
+
+  test("a failing case in one of several rows is a failure even when the other rows pass", () => {
+    const xml = wrap(ok("t") + bad("t", "m") + ok("t"));
+    expect(summarize(xml)).toContain("FAILED tests/a.test.ts > t");
   });
 });

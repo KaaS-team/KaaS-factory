@@ -1,0 +1,1 @@
+{"name":"an unhandled error between tests is not named in the summary","file":"scripts/test-failures.ts","find":"const named = unhandled.map(","replace":"const named = [].map(","test":"tests/test-failures.test.ts"}

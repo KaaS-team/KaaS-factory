@@ -47,7 +47,7 @@ TEST_HANG_LIMIT ?= 300
 test:
 	@mkdir -p reports
 	@root=$$(mktemp -d "$${TMPDIR:-/tmp}/factory-test-run.XXXXXX"); \
-	$(GIT_ENV) TMPDIR=$$root bun scripts/test-watchdog.ts --limit $(TEST_HANG_LIMIT) -- $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --preload ./scripts/test-hang-marker.ts --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_PAR) $(TEST_ARGS) $(FILES) || { c=$$?; bun scripts/test-failures.ts reports/junit.xml || true; (exit $$c); }; \
+	$(GIT_ENV) TMPDIR=$$root bun scripts/test-watchdog.ts --limit $(TEST_HANG_LIMIT) -- $(CACHE) test --out reports/junit.xml -- bun test -t '^(?!.*@quarantine)' --preload ./scripts/test-hang-marker.ts --reporter=junit --reporter-outfile=reports/junit.xml $(TEST_PAR) $(TEST_ARGS) $(FILES) || { c=$$?; bun scripts/test-failures.ts reports/junit.xml --exit $$c || true; (exit $$c); }; \
 	code=$$?; rm -rf "$$root"; exit $$code
 
 # Files that failed the three-times check on main and were fixed (#566, #585); ci.yml runs this on every push.

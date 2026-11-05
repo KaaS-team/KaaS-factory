@@ -27,11 +27,15 @@ function messages(xml: string): Map<string, string> {
   return out;
 }
 
-export function summarize(xml: string): string {
+export function summarize(xml: string, exitCode?: number | null): string {
   const runs = parseJunit(xml);
   if (runs.size === 0) return "no testcases found in the junit report";
   const failed = [...runs].filter(([, r]) => r.fail > 0).map(([key]) => key);
-  if (failed.length === 0) return `no failing tests (${runs.size} ran)`;
+  if (failed.length === 0) {
+    if (exitCode)
+      return `test step exited non-zero (exit code ${exitCode}) and the report shows no failing case (${runs.size} ran)`;
+    return `no failing tests (${runs.size} ran)`;
+  }
   const msgs = messages(xml);
   const lines: string[] = [];
   for (const key of failed.slice(0, CAP)) {
@@ -44,11 +48,11 @@ export function summarize(xml: string): string {
   return lines.join("\n");
 }
 
-export function report(path: string, stepSummary?: string): string {
+export function report(path: string, stepSummary?: string, exitCode?: number | null): string {
   const missing = !existsSync(path) || readFileSync(path, "utf8").trim() === "";
   const text = missing
     ? `no junit report at ${path}; the test step ended before writing one`
-    : summarize(readFileSync(path, "utf8"));
+    : summarize(readFileSync(path, "utf8"), exitCode);
   if (stepSummary) appendFileSync(stepSummary, `### Failing tests\n\n\`\`\`\n${text}\n\`\`\`\n`);
   return text;
 }
@@ -75,9 +79,32 @@ export function unfinished(log: string, junitFiles: readonly string[]): string[]
   return headerFiles(log).filter((f) => !have.has(f));
 }
 
-export function reportWithLog(junitPath: string, logPath: string | undefined, stepSummary?: string): string {
-  if (!logPath) return report(junitPath, stepSummary);
-  const text = report(junitPath, undefined);
+// bun prints "# Unhandled error between tests" for an error outside any test; the junit file has no case for it.
+export function unhandledErrors(log: string): { file: string; message: string }[] {
+  const out: { file: string; message: string }[] = [];
+  let file = "";
+  const lines = log.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (/^\S.*\.test\.ts:$/.test(line)) file = line.slice(0, -1);
+    if (line.trim() !== "# Unhandled error between tests") continue;
+    const msg = lines.slice(i + 1).find((l) => /^error: /.test(l)) ?? "error: (no message)";
+    out.push({ file: file || "(unknown file)", message: msg.trim() });
+  }
+  return out;
+}
+
+export function reportWithLog(
+  junitPath: string,
+  logPath: string | undefined,
+  stepSummary?: string,
+  exitCode?: number | null,
+): string {
+  if (!logPath) return report(junitPath, stepSummary, exitCode);
+  const log0 = readFileSync(logPath, "utf8");
+  const unhandled = unhandledErrors(log0);
+  let text = report(junitPath, undefined, exitCode);
+  if (unhandled.length > 0 && text.startsWith("no failing tests")) text = "";
   const log = readFileSync(logPath, "utf8");
   const missing = !existsSync(junitPath) || readFileSync(junitPath, "utf8").trim() === "";
   let extra = "";
@@ -97,7 +124,8 @@ export function reportWithLog(junitPath: string, logPath: string | undefined, st
       extra += `\ntest step exited non-zero (${abort}) and no test failed; last test file started: ${last}`;
     }
   }
-  const out = text + extra;
+  const named = unhandled.map((u) => `unhandled error between tests in ${u.file}: ${u.message}`).join("\n");
+  const out = [text, named].filter(Boolean).join("\n") + extra;
   if (stepSummary) appendFileSync(stepSummary, `### Failing tests\n\n\`\`\`\n${out}\n\`\`\`\n`);
   return out;
 }
@@ -105,13 +133,16 @@ export function reportWithLog(junitPath: string, logPath: string | undefined, st
 if (import.meta.main) {
   const args = process.argv.slice(2);
   let logPath: string | undefined;
+  let exitCode: number | undefined;
   const rest: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--log" && args[i + 1]) {
       logPath = args[++i];
+    } else if (args[i] === "--exit" && args[i + 1]) {
+      exitCode = Number(args[++i]);
     } else {
       rest.push(args[i]!);
     }
   }
-  console.log(reportWithLog(rest[0] ?? "reports/junit.xml", logPath, process.env.GITHUB_STEP_SUMMARY));
+  console.log(reportWithLog(rest[0] ?? "reports/junit.xml", logPath, process.env.GITHUB_STEP_SUMMARY, exitCode));
 }

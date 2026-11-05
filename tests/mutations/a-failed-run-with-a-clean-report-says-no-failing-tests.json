@@ -1,0 +1,1 @@
+{"name":"a failed run with a clean report says no failing tests","file":"scripts/test-failures.ts","find":"if (exitCode)\n","replace":"if (false as boolean)\n","test":"tests/test-failures.test.ts"}

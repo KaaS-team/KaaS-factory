@@ -1,0 +1,1 @@
+{"name":"a test that fails on one pass of three reads as passing","file":"scripts/test-failures.ts","find":"r.fail > 0","replace":"r.pass === 0","test":"tests/test-failures.test.ts"}
