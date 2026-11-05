@@ -1,0 +1,1 @@
+{"name":"a footer without the kaas team link is accepted","file":"src/brand.ts","find":"? [] : [`footer: must link to ${BRAND_URL}`]","replace":"? [] : []","test":"tests/brand.test.ts"}

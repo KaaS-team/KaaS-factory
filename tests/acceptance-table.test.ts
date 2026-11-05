@@ -1,3 +1,4 @@
+import { DEFAULT_FOOTER } from "../src/brand";
 // The PR body's Acceptance table (src/acceptance.ts). The fixture is real output of the kit's
 // check-acceptance.py --json on a repo where AC-1 already held and AC-2 is new, so a change to the
 // script's shape breaks this test rather than the table quietly. Also: an unproven verdict rejects
@@ -167,7 +168,7 @@ describe("prBody", () => {
     const acceptance = renderAcceptanceTable(fixture);
     const body = prBody("Closes #1", { acceptance });
     expect(body.startsWith("Closes #1\n\n## Acceptance")).toBe(true);
-    expect(prBody("Closes #1")).toBe("Closes #1");
+    expect(prBody("Closes #1")).toBe(`Closes #1\n\n---\n${DEFAULT_FOOTER}`);
   });
 });
 

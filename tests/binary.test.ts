@@ -30,7 +30,9 @@ describe("host binary", () => {
 
     const version = run("--version");
     expect(version.exitCode).toBe(0);
-    expect(version.stdout.toString().trim()).toBe(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version);
+    expect(version.stdout.toString().trim()).toBe(
+      `${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version} (https://kaas.team)`,
+    );
 
     const repo = join(tmp, "repo");
     mkdirSync(repo);

@@ -8,7 +8,7 @@ import { homedir, hostname } from "node:os";
 import { join, resolve } from "node:path";
 import type { ScmPort } from "./github";
 import { makeScm } from "./scm";
-import { RUNNER_VERSION } from "./version";
+import { VERSION_TEXT } from "./version";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { tokenEnvNames } from "./agents/env";
@@ -823,7 +823,7 @@ async function cmdMinion(): Promise<void> {
 async function main(): Promise<void> {
   switch (command === "--version" || command === "--skill" ? "version" : command) {
     case "version":
-      return void console.log(command === "--skill" ? skillText() : RUNNER_VERSION);
+      return void console.log(command === "--skill" ? skillText() : VERSION_TEXT);
     case "up":
       return flag("repo") || flag("repo-dir") ? cmdUp() : (await import("./deploy/stack")).startStack(cmdDashboard);
     case "init":

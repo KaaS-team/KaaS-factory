@@ -8,6 +8,7 @@ import type { ChangedFile, MergeRefusal } from "./merge-policy";
 import type { CodeHostPort } from "./ports/scm";
 import { capsProblems, type OrgCaps } from "./org-caps";
 import { orchestrateProblems } from "./orchestrate/config";
+import { brandProblems } from "./brand";
 import { commitsProblems } from "./signoff";
 
 export interface ProfileRules {
@@ -134,6 +135,7 @@ export function codeownerCheck(
 export function profileProblems(cfg: Record<string, unknown>): string[] {
   const problems = [
     ...capsProblems(cfg.caps),
+    ...brandProblems(cfg.brand),
     ...commitsProblems(cfg.commits),
     ...(cfg.orchestrate !== undefined ? orchestrateProblems(cfg.orchestrate, "orchestrate") : []),
   ];

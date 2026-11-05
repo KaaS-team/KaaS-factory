@@ -493,6 +493,7 @@ const pr: StepType = {
           ),
           closes: config.tracker.kind === "github" && children.length ? closingLine(issueNumber, children) : undefined,
           template: prTemplate(worktree),
+          footer: config.brand?.footer,
           ...(await prExtras(worktree, config, issueNumber, await deps.git.changedFiles(worktree, config.base))),
         }),
         draft: true,

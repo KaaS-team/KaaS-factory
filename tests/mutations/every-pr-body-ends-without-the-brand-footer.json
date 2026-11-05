@@ -1,0 +1,1 @@
+{"name":"every pr body ends without the brand footer","file":"src/engine/pr-body.ts","find":"return `${body}\\n\\n---\\n${brandFooter(parts.footer)}`;","replace":"return body;","test":"tests/brand.test.ts"}

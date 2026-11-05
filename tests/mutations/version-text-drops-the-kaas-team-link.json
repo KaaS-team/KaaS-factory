@@ -1,0 +1,1 @@
+{"name":"version text drops the kaas team link","file":"src/brand.ts","find":"`${version} (${BRAND_URL})`","replace":"version","test":"tests/brand.test.ts"}

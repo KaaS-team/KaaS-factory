@@ -1,0 +1,1 @@
+{"name":"a factory commit drops the shipped-with trailer","file":"src/git.ts","find":"? withTrailers(args, [SHIPPED_WITH])","replace":"? args","test":"tests/brand.test.ts"}

@@ -6,6 +6,7 @@ import { configProblems } from "../src/config";
 import { GitCommandRunner, withSignoff } from "../src/git";
 
 const ME = { name: "Test Author", email: "test@example.com" };
+const SHIP = "Shipped-with: KaaS Factory (https://kaas.team)";
 const SIGNED = "Signed-off-by: Test Author <test@example.com>";
 const CO = "Co-authored-by: Rae Quester <rae@example.com>";
 const AI = "Assisted-by: KaaS Factory";
@@ -31,26 +32,26 @@ async function commitBody(
 }
 
 describe("commits.signoff", () => {
-  test("unset is byte-identical to today's single Signed-off-by", async () => {
+  test("unset adds the Shipped-with trailer and the single Signed-off-by", async () => {
     const { body } = await commitBody({});
-    expect(body).toBe(`subject\n\n${SIGNED}`);
+    expect(body).toBe(`subject\n\n${SHIP}\n${SIGNED}`);
     expect(withSignoff(["-m", "subject"], ME)).toEqual(["-m", `subject\n\n${SIGNED}`]);
   });
 
   test("human adds the requester as co-author", async () => {
     expect(
       (await commitBody({ signoff: "human", requester: { name: "Rae Quester", email: "rae@example.com" } })).body,
-    ).toBe(`subject\n\n${SIGNED}\n${CO}`);
+    ).toBe(`subject\n\n${SHIP}\n${SIGNED}\n${CO}`);
   });
 
   test("bot adds the AI-assistance trailer after the co-author", async () => {
     expect(
       (await commitBody({ signoff: "bot", requester: { name: "Rae Quester", email: "rae@example.com" } })).body,
-    ).toBe(`subject\n\n${SIGNED}\n${CO}\n${AI}`);
+    ).toBe(`subject\n\n${SHIP}\n${SIGNED}\n${CO}\n${AI}`);
   });
 
-  test("none leaves the message bare", async () => {
-    expect((await commitBody({ signoff: "none" })).body).toBe("subject");
+  test("none leaves only the Shipped-with trailer", async () => {
+    expect((await commitBody({ signoff: "none" })).body).toBe(`subject\n\n${SHIP}`);
   });
 
   test("config accepts the three modes and refuses a typo", () => {

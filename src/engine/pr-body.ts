@@ -5,6 +5,7 @@
 import { problems } from "../../scripts/check-pr-body";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { brandFooter } from "../brand";
 import type { FactoryConfig } from "../config";
 import type { ExecutionPort } from "../ports/execution";
 import type { ProofResult } from "../proof";
@@ -82,6 +83,8 @@ export interface PrParts {
   readonly shots?: readonly ShotUrls[];
   // One command and its expected output (src/try-it.ts); the section is absent without it.
   readonly tryIt?: TryIt;
+  // The closing brand line (config.brand.footer); the default links to kaas.team.
+  readonly footer?: string;
 }
 
 // `#n` links on GitHub; a PR body must not carry it for another tracker, whose n is not a GitHub issue.
@@ -115,7 +118,7 @@ function assemble(body: string, parts: PrParts): string {
   if (out.length) body = `${body}\n\n${out.join("\n\n")}`;
   if (parts.closes) body = `${body}\n\n${parts.closes}`;
   if (parts.runDetails) body = `${body}\n\nThe receipt is in the run-details comment on ${parts.runDetails}.`;
-  return body;
+  return `${body}\n\n---\n${brandFooter(parts.footer)}`;
 }
 
 export const prBody = (body: string, parts: PrParts = {}): string =>

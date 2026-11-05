@@ -149,6 +149,7 @@ export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields
   readonly labels: Readonly<Record<string, string>>;
   // The v4 event bus: where emitted events are POSTed, and the secret inbound POST /events checks.
   readonly events: EventsConfig;
+  readonly brand?: { readonly footer?: string }; // the PR body footer; it must link to kaas.team
   readonly commits?: { readonly signoff?: import("./signoff").SignoffMode }; // trailers; unset is today's
 }
 
@@ -398,6 +399,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   labels: "object",
   events: "object",
   commits: "object",
+  brand: "object",
   orchestrate: "object",
   riskCriteria: "object",
 };

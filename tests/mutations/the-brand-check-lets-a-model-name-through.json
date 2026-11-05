@@ -1,0 +1,1 @@
+{"name":"the brand check lets a model name through","file":"src/brand.ts","find":"if (MODEL_NAME.test(line))","replace":"if (false as boolean)","test":"tests/brand.test.ts"}

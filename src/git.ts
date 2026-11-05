@@ -9,6 +9,7 @@
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SHIPPED_WITH } from "./brand";
 import { claimCommitMessage } from "./commit-message";
 import type { CommandResult, CommandRunner } from "./github";
 import type { GhPr } from "./ports/scm";
@@ -68,12 +69,14 @@ export class GitCommandRunner implements CommandRunner {
       // commit-tree has no -s, and the claim commit is in the PR, so CI's DCO check reads it.
       const who = known ? { name, email } : FALLBACK_SIGNER;
       const { signoff, requester } = this.commits;
+      // Shipped-with leads the block, so `commit -s` and the sign-off lines land in the same trailer block.
       const signed =
         args[0] !== "commit-tree"
-          ? args
-          : signoff
-            ? withTrailers(args, signoffTrailers(signoff, who, requester))
-            : withSignoff(args, who);
+          ? withTrailers(args, [SHIPPED_WITH])
+          : withTrailers(args, [
+              SHIPPED_WITH,
+              ...(signoff ? signoffTrailers(signoff, who, requester) : [`Signed-off-by: ${who.name} <${who.email}>`]),
+            ]);
       const final = withSigning(signed, this.commits.signing);
       return spawnGit(known ? final : [...FALLBACK_IDENTITY, ...final], opts?.cwd, opts?.env);
     }
