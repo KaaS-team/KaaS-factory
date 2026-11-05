@@ -125,6 +125,22 @@ export function renderNav() {
           ),
         ]
       : []),
+    ...(state.teams.length
+      ? [
+          h("div", { class: "nav-heading" }, "Team"),
+          h(
+            "select",
+            {
+              id: "team-filter",
+              class: "nav-item",
+              "aria-label": "Show one team",
+              onchange: (e) => shell.setTeam(e.target.value),
+            },
+            h("option", { value: "", selected: !state.teamFilter }, "All teams"),
+            state.teams.map((t) => h("option", { value: t, selected: t === state.teamFilter }, t)),
+          ),
+        ]
+      : []),
     h("div", { class: "nav-spacer" }),
     ...nav.slice(PRIMARY).map(item),
   );

@@ -11,6 +11,9 @@ export const state = {
   repo: "",
   repos: [],
   repoFilter: "",
+  // The team the lists are narrowed to, and the teams the server knows.
+  teamFilter: "",
+  teams: [],
   selected: null,
   thread: null,
   review: null,
@@ -32,6 +35,7 @@ export const shell = {
   loadInbox: async () => {},
   loadView: async () => {},
   setRepo: () => {},
+  setTeam: () => {},
   showLogin: () => {},
   startFollowing: () => {},
 };
@@ -151,7 +155,15 @@ export const runKey = (jobID) => {
 };
 export const runHref = (repo, issue) => `#/runs/${repo ? `${repo}/` : ""}${issue}`;
 
+// A read of runs, spend or the inbox carries the team in focus; other paths ignore it.
+const TEAM_PATHS = /^\/api\/(runs|analytics|inbox)(\?|$)/;
+export const withTeam = (path) =>
+  state.teamFilter && TEAM_PATHS.test(path)
+    ? `${path}${path.includes("?") ? "&" : "?"}team=${encodeURIComponent(state.teamFilter)}`
+    : path;
+
 export async function api(path, init) {
+  path = withTeam(path);
   // A request that never answers would leave a view on Loading forever.
   const res = await fetch(path, { signal: AbortSignal.timeout(20_000), ...init });
   if (res.status === 401) {

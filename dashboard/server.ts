@@ -34,7 +34,7 @@ import { createAccess, type Route } from "./plane/access";
 import { planeExtensions } from "./plane/extension";
 import { boardCache } from "./plane/board-cache";
 import { readAccess, runIn } from "./plane/repo-scope";
-import { narrowToTeam } from "./team-filter";
+import { issueInTeam, narrowToTeam, teamNames } from "./team-filter";
 import { PlaneStore } from "./plane/store";
 import { senderName } from "./plane/commands";
 import { planeRoutes } from "./plane/mode";
@@ -181,6 +181,36 @@ export function createDashboard(
       return st ? allStageRuns(st, r) : [];
     });
 
+  // `?team=` also splits a repo several teams list, issue by issue; open issues' labels decide.
+  const teamOf = (req: Request) => new URL(req.url).searchParams.get("team");
+  const labelsByRepo = async (repos: string[]) =>
+    new Map(
+      await Promise.all(
+        repos.map(
+          async (r) =>
+            [r, new Map((await cachedIssuesFor(r)).map((i) => [i.number, i.labels.map((l) => l.name)]))] as const,
+        ),
+      ),
+    );
+  const teamScope = async (req: Request) => {
+    const team = teamOf(req);
+    const repos = reposFor(req);
+    if (team === null) return { repos, keep: (_repo: string, _issue: number) => true };
+    const labels = await labelsByRepo(repos);
+    return {
+      repos,
+      keep: (r: string, issue: number) => issueInTeam(project?.cloneDir, team, r, labels.get(r)?.get(issue)),
+    };
+  };
+  const scopedRuns = async (req: Request) => {
+    const { keep } = await teamScope(req);
+    return runsOf(req).filter((r) => keep(r.repo, r.issue));
+  };
+  const scopedStages = async (req: Request) => {
+    const { keep } = await teamScope(req);
+    return stagesOf(req).filter((s) => keep(s.repo, s.issue));
+  };
+
   // The default repo's workspaces dir is the `workspaces` param (tests point it at a scratch dir);
   // any other served repo resolves its own under FACTORY_HOME.
   function workspacesFor(r: string): string {
@@ -291,11 +321,18 @@ export function createDashboard(
     }),
     {
       method: "GET",
+      pattern: /^\/api\/teams$/,
+      label: "GET /api/teams",
+      role: "viewer",
+      handler: () => json({ teams: teamNames(project?.cloneDir) }),
+    },
+    {
+      method: "GET",
       pattern: /^\/api\/runs$/,
       label: "GET /api/runs",
       role: "viewer",
       repo: "filter",
-      handler: (req) => json({ repo: homeOf(req), runs: runsOf(req).map(plainRun) }),
+      handler: async (req) => json({ repo: homeOf(req), runs: (await scopedRuns(req)).map(plainRun) }),
     },
     {
       method: "GET",
@@ -528,7 +565,7 @@ export function createDashboard(
           await Promise.all(reposFor(req).map(async (r) => [r, (await projectFor(r))?.config] as const)),
         );
         return json(
-          analytics(runsOf(req), stagesOf(req), new Date(), (agent, r) => {
+          analytics(await scopedRuns(req), await scopedStages(req), new Date(), (agent, r) => {
             const a = configs.get(r)?.agents[agent];
             return a?.models?.large ?? a?.model;
           }),
@@ -555,7 +592,7 @@ export function createDashboard(
       // narrowed to one with ?repo=. Each item carries its own repo so the
       // frontend can render and act on a mixed list.
       handler: async (req) => {
-        const repos = reposFor(req);
+        const { repos, keep } = await teamScope(req);
         if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
         const perRepo = await Promise.all(
           repos.map(async (r) => [
@@ -568,6 +605,7 @@ export function createDashboard(
         );
         const items = perRepo
           .flat()
+          .filter((i) => keep(i.repo, i.issue))
           .sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
         return json({ repos: access.visibleRepos(req, inboxRepos()), repo: homeOf(req), items });
       },

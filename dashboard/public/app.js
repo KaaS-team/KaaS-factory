@@ -68,6 +68,12 @@ function setRepo(repo) {
   loadView();
 }
 
+function setTeam(team) {
+  state.teamFilter = team;
+  loadInbox().then(render);
+  loadView();
+}
+
 // The toast repeats the action's own word ("Approve plan" comes back as "Plan approved").
 function renderToast() {
   const el = document.getElementById("toast");
@@ -199,11 +205,14 @@ function onRoute() {
   loadView();
 }
 
-Object.assign(shell, { render, go, loadInbox, loadView, setRepo, showLogin, startFollowing });
+Object.assign(shell, { render, go, loadInbox, loadView, setRepo, setTeam, showLogin, startFollowing });
 
 // Installable as an app; registration fails over plain http off localhost, and the page works the same.
 navigator.serviceWorker?.register("/sw.js").catch(() => {});
 window.addEventListener("hashchange", onRoute);
+api("/api/teams")
+  .then((r) => (state.teams = r.teams))
+  .catch(() => {});
 api("/api/me")
   .then((me) => (state.me = me))
   .catch(() => {})

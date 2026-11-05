@@ -1,0 +1,1 @@
+{"name": "dashboard: a shared repo is no longer split by issue", "file": "dashboard/team-filter.ts", "find": "return routeTeam(listing, repo, { labels, paths: [] })?.team === team;", "replace": "return true;", "test": "tests/dashboard-team-issue.test.ts"}

@@ -1,0 +1,1 @@
+{"name": "dashboard: the team is not sent with runs and the inbox", "file": "dashboard/public/lib/core.js", "find": "(runs|analytics|inbox)", "replace": "(analytics)", "test": "tests/dashboard-team-issue.test.ts"}

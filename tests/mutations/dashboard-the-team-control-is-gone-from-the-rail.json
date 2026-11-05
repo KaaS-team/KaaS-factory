@@ -1,0 +1,1 @@
+{"name": "dashboard: the team control is gone from the rail", "file": "dashboard/public/lib/rail.js", "find": "...(state.teams.length", "replace": "...(false", "test": "tests/dashboard-team-issue.test.ts"}
