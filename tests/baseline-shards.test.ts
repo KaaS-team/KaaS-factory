@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Baseline, readBaseline, writeBaseline } from "../src/baseline-shards";
@@ -18,7 +18,9 @@ const git = (cwd: string, ...a: string[]) => {
   });
   return { code: p.exitCode, out: p.stdout.toString() + p.stderr.toString() };
 };
+// tests/preload.ts removes its temp root after each run, so a rerun must make it again.
 const tmp = () => {
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(tmpdir(), "shards-"));
   roots.push(d);
   return d;

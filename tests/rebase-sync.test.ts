@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { rebaseOnBase } from "../src/merge-autonomy";
@@ -38,6 +38,7 @@ const put = async (dir: string, file: string, text: string, msg: string) => {
 };
 
 async function twoBranches(conflictC = false) {
+  mkdirSync(tmpdir(), { recursive: true });
   const root = mkdtempSync(join(tmpdir(), "rebase-sync-"));
   roots.push(root);
   const remote = join(root, "remote.git");
@@ -63,6 +64,7 @@ async function twoBranches(conflictC = false) {
 }
 
 test("branches that each append a mutation and move a line cap rebase with both", async () => {
+  mkdirSync(tmpdir(), { recursive: true });
   const root = mkdtempSync(join(tmpdir(), "rebase-sync-"));
   roots.push(root);
   const remote = join(root, "remote.git");
@@ -130,6 +132,7 @@ test("mergeMutationList conflicts on a doubly edited name and drops a deleted on
 });
 
 test("mergeShard re-measures a line cap and gives up on one whose file is gone", () => {
+  mkdirSync(tmpdir(), { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), "rebase-sync-"));
   roots.push(dir);
   writeFileSync(join(dir, "a.ts"), lines(3));
