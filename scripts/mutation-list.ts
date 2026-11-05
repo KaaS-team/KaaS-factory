@@ -1,6 +1,7 @@
 // The mutation list: the old tests/mutations.json plus one file per entry in tests/mutations/.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readBaseline } from "../src/baseline-shards";
 
 export interface Mutation {
   readonly name: string;
@@ -27,11 +28,30 @@ export const mutationSlug = (name: string): string =>
 
 export const shardPath = (name: string): string => `${MUTATIONS_DIR}/${mutationSlug(name)}.json`;
 
+// {{lines:src/cli.ts}} is that file's cap in quality-baseline/lines, {{lines:src/cli.ts+69}} is the cap plus 69.
+// A mutation names the cap instead of copying it, so a size change to the file edits one shard (#634).
+const CAP = /\{\{lines:([^}+]+)(?:\+(\d+))?\}\}/g;
+
+export function resolveCaps(text: string, lines: Readonly<Record<string, number>>, where: string): string {
+  return text.replace(CAP, (_, file: string, plus?: string) => {
+    const cap = lines[file];
+    if (cap === undefined) throw new Error(`${where}: no line baseline for ${file}`);
+    return String(cap + Number(plus ?? 0));
+  });
+}
+
+// The line caps a mutation copies as plain numbers, which go stale when the baseline shard is lowered.
+export function pinnedCaps(m: Mutation, lines: Readonly<Record<string, number>>): string[] {
+  const caps = new Set(Object.values(lines).map(String));
+  return [m.find, m.replace].flatMap((t) => (t.match(/(?<![\w.])\d+(?![\w.])/g) ?? []).filter((n) => caps.has(n)));
+}
+
 export function loadMutations(root: string): Mutation[] {
   const legacyPath = join(root, LEGACY_LIST);
   const legacy: Mutation[] = existsSync(legacyPath) ? JSON.parse(readFileSync(legacyPath, "utf8")) : [];
   const dir = join(root, MUTATIONS_DIR);
   const shards: Mutation[] = [];
+  const lines = readBaseline(root).metrics.lines ?? {};
   if (existsSync(dir)) {
     for (const f of readdirSync(dir)
       .filter((n) => n.endsWith(".json"))
@@ -40,7 +60,7 @@ export function loadMutations(root: string): Mutation[] {
       const m: unknown = JSON.parse(readFileSync(join(dir, f), "utf8"));
       if (!isMutation(m)) throw new Error(`${rel}: not a mutation`);
       if (rel !== shardPath(m.name)) throw new Error(`${rel}: file name must be ${shardPath(m.name)}`);
-      shards.push(m);
+      shards.push({ ...m, find: resolveCaps(m.find, lines, rel), replace: resolveCaps(m.replace, lines, rel) });
     }
   }
   const all = [...legacy, ...shards];

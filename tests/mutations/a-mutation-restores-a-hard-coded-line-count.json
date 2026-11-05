@@ -1,0 +1,7 @@
+{
+  "name": "a mutation restores a hard-coded line count",
+  "file": "tests/mutations/quality-a-line-baseline-cannot-keep-slack.json",
+  "find": "{{lines:src/cli.ts}",
+  "replace": "{{lines:src/cli.ts}}",
+  "test": "tests/mutation-pins.test.ts"
+}
