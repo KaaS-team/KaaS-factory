@@ -150,6 +150,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
       - name: Decide whether the image needs a build
         id: inputs
         run: |
