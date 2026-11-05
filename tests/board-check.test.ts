@@ -93,7 +93,10 @@ describe("board-check cli", () => {
     const f = join(dir, "board.json");
     writeFileSync(f, JSON.stringify(board));
     try {
-      return Bun.spawnSync(["bun", "scripts/board-check.ts", "--file", f, ...args], { cwd: `${import.meta.dir}/..` });
+      return Bun.spawnSync(["bun", "scripts/board-check.ts", "--file", f, ...args], {
+        timeout: 60_000,
+        cwd: `${import.meta.dir}/..`,
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

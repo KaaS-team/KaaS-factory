@@ -44,7 +44,8 @@ describe("the proof panel", () => {
       ]),
     );
     expect(proof.result).toBe("pass");
-    expect(proof.findings[0]).toMatchObject({ severity: "could", fix: expect.stringContaining("5 cents") });
+    expect(proof.findings[0]).toMatchObject({ severity: "could" });
+    expect(proof.findings[0]?.fix).toContain("5 cents");
   });
 
   test("a run with nothing yet shows nothing", () => {

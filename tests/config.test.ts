@@ -63,7 +63,7 @@ describe("loadConfig", () => {
 // resolve this, so loadConfig has to do it itself.
 describe('base branch defaults to origin/HEAD, not the hard-coded "main"', () => {
   function git(cwd: string, ...args: string[]): void {
-    const r = Bun.spawnSync(["git", ...args], { cwd, stderr: "pipe" });
+    const r = Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd, stderr: "pipe" });
     if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.toString()}`);
   }
 

@@ -37,7 +37,8 @@ describe("docker egress network", () => {
 
   // Needs a docker daemon, pulls busybox and waits on the network, so it flaked on PRs that touched nothing near
   // it (#567). Tagged: it runs in the non-blocking quarantine job. The other tests here pin the same argv.
-  const hasDocker = Bun.spawnSync(["docker", "info"], { stdout: "ignore", stderr: "ignore" }).exitCode === 0;
+  const hasDocker =
+    Bun.spawnSync(["docker", "info"], { timeout: 60_000, stdout: "ignore", stderr: "ignore" }).exitCode === 0;
   test("a direct connection from the container has no route @quarantine", async () => {
     if (!hasDocker) return;
     const probe = await withInternalEgress(["a.test"], async (net) => {

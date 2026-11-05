@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 function run(args: string[]) {
-  const p = Bun.spawnSync(["bun", script, ...args]);
+  const p = Bun.spawnSync(["bun", script, ...args], { timeout: 60_000 });
   return { code: p.exitCode, out: p.stdout.toString(), err: p.stderr.toString() };
 }
 

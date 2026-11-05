@@ -79,7 +79,7 @@ describe("GitLeases through a failing pre-push hook", () => {
     writeFileSync(join(clone, ".git", "hooks", "pre-push"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
 
     expect(await new GitLeases(clone).acquire("1", "me", 60_000, Date.now())).toBe(true);
-    const ls = Bun.spawnSync(["git", "ls-remote", bare, "refs/factory/lease/1"], { cwd: root });
+    const ls = Bun.spawnSync(["git", "ls-remote", bare, "refs/factory/lease/1"], { timeout: 60_000, cwd: root });
     expect(ls.stdout.toString()).toContain("refs/factory/lease/1");
   });
 });

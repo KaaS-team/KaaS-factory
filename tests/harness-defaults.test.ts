@@ -29,6 +29,7 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 const dir = (p: string) => mkdtempSync(join(scratch, p));
 const git = (cwd: string, ...args: string[]) =>
   Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], {
+    timeout: 60_000,
     cwd,
     stdout: "pipe",
     env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" },

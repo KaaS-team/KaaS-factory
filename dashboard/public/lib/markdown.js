@@ -69,7 +69,7 @@ function list(rows) {
 
 export function parseMarkdown(source) {
   const lines = String(source ?? "")
-    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/[<]!--[\s\S]*?-->/g, "")
     .replace(/\r/g, "")
     .split("\n");
   const blocks = [];

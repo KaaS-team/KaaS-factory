@@ -14,6 +14,7 @@ afterEach(() => {
 
 function run(args: string[], cwd: string): void {
   const r = Bun.spawnSync(args, {
+    timeout: 60_000,
     cwd,
     env: {
       ...process.env,

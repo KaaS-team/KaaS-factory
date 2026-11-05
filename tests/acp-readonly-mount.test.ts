@@ -56,7 +56,7 @@ describe("acp read-only mount", () => {
       name: `factory-ro-${crypto.randomUUID()}`,
       readOnly: true,
     });
-    const r = Bun.spawnSync(argv, { stderr: "pipe", stdout: "pipe" });
+    const r = Bun.spawnSync(argv, { timeout: 60_000, stderr: "pipe", stdout: "pipe" });
     expect(r.exitCode).not.toBe(0);
     expect(r.stderr.toString()).toContain("Read-only file system");
   });

@@ -13,7 +13,11 @@ import type { ExecutionPort } from "../src/ports/execution";
 const roots: string[] = [];
 afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
 const git = (cwd: string, ...args: string[]) =>
-  Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, stdout: "pipe" });
+  Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], {
+    timeout: 60_000,
+    cwd,
+    stdout: "pipe",
+  });
 
 // A clone with two linked worktrees, like the factory's per-issue ones.
 function clone(): { main: string; a: string; b: string } {

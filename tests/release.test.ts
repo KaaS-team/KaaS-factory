@@ -129,21 +129,21 @@ const markdownFiles = (dir: string): string[] => {
   const skip =
     /^(node_modules|\.git|\.worktrees|\.factory-state|\.factory\/runs|workspaces|artifacts|reports)\/|\/target\/|\/node_modules\//;
   if (existsSync(join(dir, ".git"))) {
-    const out = Bun.spawnSync(["git", "ls-files", "-z", "*.md"], { cwd: dir });
+    const out = Bun.spawnSync(["git", "ls-files", "-z", "*.md"], { timeout: 60_000, cwd: dir });
     if (out.exitCode !== 0) throw new Error(`git ls-files failed: ${out.stderr}`);
     return `${out.stdout}`.split("\0").filter((p) => p && !skip.test(p) && existsSync(join(dir, p)));
   }
   return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => p.endsWith(".md") && !skip.test(p));
 };
 const checkProse = (cwd: string, files: string[]) => {
-  const out = Bun.spawnSync(["python3", join(ROOT, "scripts/kaas/check-prose.py"), ...files], { cwd });
+  const out = Bun.spawnSync(["python3", join(ROOT, "scripts/kaas/check-prose.py"), ...files], { timeout: 60_000, cwd });
   return { text: `${out.stdout}${out.stderr}`, exitCode: out.exitCode };
 };
 
 test("the Markdown list leaves out untracked files and lists tracked ones", () => {
   const dir = mkdtempSync(join(tmpdir(), "prose-"));
   try {
-    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: dir });
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd: dir });
     git("init", "-q");
     mkdirSync(join(dir, ".factory/runs/issue-1"), { recursive: true });
     const note = ".factory/runs/issue-1/plan-comment.md";
@@ -167,7 +167,7 @@ test("the Markdown list leaves out untracked files and lists tracked ones", () =
 test("the Markdown list applies the skip list and drops tracked files deleted from the tree", () => {
   const dir = mkdtempSync(join(tmpdir(), "prose-"));
   try {
-    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: dir });
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd: dir });
     git("init", "-q");
     mkdirSync(join(dir, "workspaces/w"), { recursive: true });
     writeFileSync(join(dir, "workspaces/w/A.md"), "x\n");
@@ -184,7 +184,7 @@ test("the Markdown list applies the skip list and drops tracked files deleted fr
 test("the Markdown list returns a tracked non-ASCII path unquoted", () => {
   const dir = mkdtempSync(join(tmpdir(), "prose-"));
   try {
-    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: dir });
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd: dir });
     git("init", "-q");
     writeFileSync(join(dir, "café.md"), "x\n");
     git("add", "café.md");

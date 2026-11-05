@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const checkLine = (dir: string): string[] => {
-  const out = Bun.spawnSync(["make", "-pn", "check"], { cwd: dir }).stdout.toString();
+  const out = Bun.spawnSync(["make", "-pn", "check"], { timeout: 60_000, cwd: dir }).stdout.toString();
   const line = out.split("\n").find((l) => l.startsWith("check:"));
   return line?.slice("check:".length).trim().split(/\s+/) ?? [];
 };

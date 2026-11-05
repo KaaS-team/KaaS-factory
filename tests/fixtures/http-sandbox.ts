@@ -19,7 +19,7 @@ export function startSandbox(token: string): { url: string; stop: () => void; re
       const dir = mkdtempSync(join(tmpdir(), "factory-sandbox-"));
       try {
         writeFileSync(join(dir, ".in.tgz"), Buffer.from(archive, "base64"));
-        Bun.spawnSync(["tar", "-xzf", ".in.tgz"], { cwd: dir });
+        Bun.spawnSync(["tar", "-xzf", ".in.tgz"], { timeout: 60_000, cwd: dir });
         rmSync(join(dir, ".in.tgz"));
         const p = Bun.spawn(["bash", "-c", cmd], { cwd: dir, stdout: "pipe", stderr: "pipe" });
         const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);

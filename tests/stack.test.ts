@@ -93,11 +93,15 @@ describe("factory init", () => {
       ["git", "init", "-q", "-b", "main"],
       ["git", "remote", "add", "origin", "https://github.com/acme/widgets.git"],
     ])
-      Bun.spawnSync(argv, { cwd: dir });
+      Bun.spawnSync(argv, { timeout: 60_000, cwd: dir });
     return dir;
   }
   const init = (dir: string, ...extra: string[]) =>
-    Bun.spawnSync(["bun", cli, "init", "--repo-dir", dir, ...extra], { stdout: "pipe", stderr: "pipe" });
+    Bun.spawnSync(["bun", cli, "init", "--repo-dir", dir, ...extra], {
+      timeout: 60_000,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
 
   for (const name of ["bun", "no-tests"]) {
     test(`${name}: the written config is valid, filled in, and its gates go green`, () => {
@@ -111,7 +115,7 @@ describe("factory init", () => {
       expect(config.repo).toBe("acme/widgets");
       expect(config.agentCommands.read).toEqual(readCommands(stackOf(name)));
       expect(config.agentCommands.read).toContain("npm ls");
-      const gate = Bun.spawnSync(["bash", ".factory/gates.sh"], { cwd: dir, stdout: "pipe" });
+      const gate = Bun.spawnSync(["bash", ".factory/gates.sh"], { timeout: 60_000, cwd: dir, stdout: "pipe" });
       expect(gate.stdout.toString()).toContain("FACTORY_GATES: status=GREEN");
       // init and the gate each spawn a process (npm for no-tests); on a loaded CI runner that took ~10s
     }, 30_000);

@@ -37,7 +37,7 @@ beforeAll(async () => {
       "--target-dir",
       TARGET,
     ],
-    { stderr: "pipe" },
+    { timeout: 60_000, stderr: "pipe" },
   );
   if (built.exitCode !== 0) throw new Error(`cargo build of relay/ failed: ${built.stderr.toString()}`);
   relay = start({
@@ -84,7 +84,11 @@ describe("kaas-relay", () => {
       { KAAS_RELAY_PUBLISH_TOKEN: PUBLISH, KAAS_RELAY_SUBSCRIBE_TOKEN: "short" },
       { KAAS_RELAY_PUBLISH_TOKEN: PUBLISH, KAAS_RELAY_SUBSCRIBE_TOKEN: PUBLISH },
     ]) {
-      const r = Bun.spawnSync([BIN], { env: { ...env, KAAS_RELAY_ADDR: "127.0.0.1:0" }, stderr: "pipe" });
+      const r = Bun.spawnSync([BIN], {
+        timeout: 60_000,
+        env: { ...env, KAAS_RELAY_ADDR: "127.0.0.1:0" },
+        stderr: "pipe",
+      });
       expect(r.exitCode).toBe(2);
     }
   });

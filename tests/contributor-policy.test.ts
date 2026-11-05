@@ -22,7 +22,7 @@ describe("pull request author gate", () => {
   });
   test("the script prints the pointer for a stranger", () => {
     const run = (...a: string[]) =>
-      Bun.spawnSync(["bun", "scripts/pr-author-gate.ts", ...a], { cwd: root }).stdout.toString();
+      Bun.spawnSync(["bun", "scripts/pr-author-gate.ts", ...a], { timeout: 60_000, cwd: root }).stdout.toString();
     expect(run("stranger", "NONE")).toContain("close\n");
     expect(run("stranger", "NONE")).toContain("CONTRIBUTING.md");
     expect(run("Param-Harrison", "NONE")).toBe("keep\n");

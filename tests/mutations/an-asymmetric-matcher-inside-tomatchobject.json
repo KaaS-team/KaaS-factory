@@ -1,0 +1,7 @@
+{
+  "name": "an asymmetric matcher inside toMatchObject",
+  "file": "tests/phone-intake.test.ts",
+  "find": "toMatchObject({ labels: [LABEL.ready] });",
+  "replace": "toMatchObject({ labels: [LABEL.ready], body: expect.stringContaining(\"@ana\") });",
+  "test": "tests/source-traps.test.ts"
+}

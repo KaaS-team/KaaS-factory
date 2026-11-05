@@ -25,10 +25,10 @@ function runVerify(tamper: (dir: string) => void): number {
   dirs.push(dir);
   writeFileSync(join(dir, "factory-bun-linux-x64"), "linux binary");
   writeFileSync(join(dir, "factory-bun-darwin-arm64"), "mac binary");
-  const sums = Bun.spawnSync(["sh", "-c", "sha256sum factory-* > SHA256SUMS"], { cwd: dir });
+  const sums = Bun.spawnSync(["sh", "-c", "sha256sum factory-* > SHA256SUMS"], { timeout: 60_000, cwd: dir });
   expect(sums.exitCode).toBe(0);
   tamper(dir);
-  return Bun.spawnSync(["bash", "-eo", "pipefail", "-c", verify!.run!], { cwd: dir }).exitCode;
+  return Bun.spawnSync(["bash", "-eo", "pipefail", "-c", verify!.run!], { timeout: 60_000, cwd: dir }).exitCode;
 }
 
 describe("release checksum verification", () => {

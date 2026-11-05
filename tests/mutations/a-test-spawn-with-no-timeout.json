@@ -1,0 +1,7 @@
+{
+  "name": "a test spawn with no timeout",
+  "file": "tests/post-merge.test.ts",
+  "find": "{ timeout: 60_000, cwd }",
+  "replace": "{ cwd }",
+  "test": "tests/source-traps.test.ts"
+}

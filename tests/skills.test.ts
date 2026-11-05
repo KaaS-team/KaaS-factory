@@ -209,7 +209,9 @@ describe("every inline shell command in the template passes the stage shell rule
   const HOOK = join(root, "hooks", "guard-paths.sh");
   const COMMAND =
     /^(git|bun|make|npm|npx|pnpm|bash|cat|ls|grep|find|echo|head|tail|cd|\.factory\/(?:gates|mutate)\.sh)\b/;
-  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"])
+  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"], {
+    timeout: 60_000,
+  })
     .stdout.toString()
     .trim()
     .split("\n");
@@ -221,6 +223,7 @@ describe("every inline shell command in the template passes the stage shell rule
   for (const [command, file] of commands)
     test(`${file}: ${command}`, () => {
       const run = Bun.spawnSync([HOOK], {
+        timeout: 60_000,
         stdin: new TextEncoder().encode(JSON.stringify({ tool_name: "Bash", tool_input: { command } })),
         env: { ...process.env, FACTORY_STAGE: "verify" },
       });
@@ -252,7 +255,9 @@ describe("every inline command in verify's prove reference is on the verify allo
 // style of their own instructions. The template ships to other machines, so it names none of ours.
 describe("template prose and paths", () => {
   const root = join(import.meta.dir, "..");
-  const files = Bun.spawnSync(["find", join(root, "template"), join(root, "template-ci"), "-type", "f"])
+  const files = Bun.spawnSync(["find", join(root, "template"), join(root, "template-ci"), "-type", "f"], {
+    timeout: 60_000,
+  })
     .stdout.toString()
     .trim()
     .split("\n");
@@ -270,7 +275,9 @@ describe("template prose and paths", () => {
 // the template ships, so it never claims a check that is not there.
 describe("every [enforced:] tag names a shipped hook", () => {
   const root = join(import.meta.dir, "..", "template", ".claude");
-  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"])
+  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"], {
+    timeout: 60_000,
+  })
     .stdout.toString()
     .trim()
     .split("\n");

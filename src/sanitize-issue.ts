@@ -7,7 +7,7 @@ import type { GhIssue } from "./ports/scm";
 // Zero-width (200B-200D, 2060, FEFF, 180E), bidi marks and overrides (200E-200F, 202A-202E, 2066-2069).
 const INVISIBLE = /[᠎​-‏‪-‮⁠⁦-⁩﻿]/g;
 // An unterminated comment hides the rest of the text, so it is cut to the end.
-const HTML_COMMENT = /<!--[\s\S]*?(?:-->|$)/g;
+const HTML_COMMENT = /[<]!--[\s\S]*?(?:-->|$)/g;
 
 export function cleanText(text: string): string {
   let out = text;

@@ -22,7 +22,7 @@ test(".gitignore ignores __pycache__ and .pyc", () => {
 // A mutation copy has no .git, so the tracked-file walk only runs in a real checkout.
 test("git ls-files lists no .pyc and no __pycache__ path", () => {
   if (!existsSync(join(root, ".git"))) return;
-  const out = Bun.spawnSync(["git", "ls-files"], { cwd: root });
+  const out = Bun.spawnSync(["git", "ls-files"], { timeout: 60_000, cwd: root });
   expect(out.exitCode).toBe(0);
   expect(compiledPython(out.stdout.toString().split("\n").filter(Boolean))).toEqual([]);
 });

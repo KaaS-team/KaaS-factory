@@ -6,7 +6,6 @@ import {
   type SessionAdapter,
   type SessionCaps,
   type SessionEvent,
-  type SessionRef,
   SessionUnsupported,
 } from "../ports/session";
 

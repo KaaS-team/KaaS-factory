@@ -57,12 +57,12 @@ function onFakePath(run: () => void): () => void {
 // Each worker gets its own clone of one bare remote, as separate machines would.
 function gitLeases() {
   const root = tmp("factory-lease-");
-  Bun.spawnSync(["git", "init", "-q", "--bare", join(root, "origin.git")]);
+  Bun.spawnSync(["git", "init", "-q", "--bare", join(root, "origin.git")], { timeout: 60_000 });
   let n = 0;
   const clone = () => {
     const dir = join(root, `w${n++}`);
-    Bun.spawnSync(["git", "init", "-q", dir]);
-    Bun.spawnSync(["git", "remote", "add", "origin", join(root, "origin.git")], { cwd: dir });
+    Bun.spawnSync(["git", "init", "-q", dir], { timeout: 60_000 });
+    Bun.spawnSync(["git", "remote", "add", "origin", join(root, "origin.git")], { timeout: 60_000, cwd: dir });
     return new GitLeases(dir);
   };
   return { port: clone(), peer: clone };
@@ -269,8 +269,8 @@ describe("git-lease held()", () => {
   // An empty list would read as "nobody holds anything"; the Settings page has to say it could not look.
   test("a remote it cannot read throws instead of reporting no leases", async () => {
     const dir = tmp("factory-lease-");
-    Bun.spawnSync(["git", "init", "-q", dir]);
-    Bun.spawnSync(["git", "remote", "add", "origin", join(dir, "missing.git")], { cwd: dir });
+    Bun.spawnSync(["git", "init", "-q", dir], { timeout: 60_000 });
+    Bun.spawnSync(["git", "remote", "add", "origin", join(dir, "missing.git")], { timeout: 60_000, cwd: dir });
     await expect(new GitLeases(dir).held()).rejects.toThrow(/ls-remote/);
   });
 });

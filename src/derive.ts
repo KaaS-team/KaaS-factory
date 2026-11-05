@@ -19,7 +19,7 @@ export interface DataMarker {
   readonly json: unknown;
 }
 
-const DATA_MARKER_RE = /<!-- factory:data (\{.*?\}) -->/gs;
+const DATA_MARKER_RE = /[<]!-- factory:data (\{.*?\}) -->/gs;
 
 export function parseDataMarkers(comments: readonly GhComment[]): DataMarker[] {
   const out: DataMarker[] = [];

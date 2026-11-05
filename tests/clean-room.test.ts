@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { noNetworkPrefix, runCleanRoom } from "../src/clean-room";
 
 const git = (cwd: string, ...args: string[]) => {
-  const r = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd });
+  const r = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { timeout: 60_000, cwd });
   if (r.exitCode !== 0) throw new Error(r.stderr.toString());
   return r.stdout.toString().trim();
 };
@@ -53,7 +53,7 @@ test("verify runs in a fresh checkout with no network, and holdouts come in from
         ["env"],
       ),
     ).toMatchObject({ ran: true, exitCode: 0 });
-    const usable = Bun.spawnSync([...(noNetworkPrefix() ?? ["false"]), "true"]).exitCode === 0;
+    const usable = Bun.spawnSync([...(noNetworkPrefix() ?? ["false"]), "true"], { timeout: 60_000 }).exitCode === 0;
     if (usable) expect(run).toMatchObject({ ran: true, exitCode: 0 });
     else expect(run.ran).toBe(false);
     expect(

@@ -17,6 +17,7 @@ afterEach(() => {
 
 function git(cwd: string, ...args: string[]): { code: number; out: string } {
   const r = Bun.spawnSync(["git", ...args], {
+    timeout: 60_000,
     cwd,
     env: { ...process.env, GIT_DIR: undefined, GIT_WORK_TREE: undefined, GIT_INDEX_FILE: undefined },
   });
@@ -108,7 +109,7 @@ describe("install-hooks", () => {
   test("sets core.hooksPath to .githooks, twice over", () => {
     const root = tmpRepo();
     for (let i = 0; i < 2; i++) {
-      const r = Bun.spawnSync(["bun", join(REPO, "scripts/install-hooks.ts")], { cwd: root });
+      const r = Bun.spawnSync(["bun", join(REPO, "scripts/install-hooks.ts")], { timeout: 60_000, cwd: root });
       expect(r.exitCode).toBe(0);
       expect(r.stdout.toString().trim().split("\n")).toHaveLength(1);
       expect(git(root, "config", "core.hooksPath").out.trim()).toBe(".githooks");

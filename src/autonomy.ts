@@ -46,7 +46,7 @@ export function autonomyOf(merge: Pick<MergeConfig, "policy" | "autonomy">, webM
 
 export const CONTROL_LABEL = "factory:control";
 export const modeMarker = (mode: Autonomy) => `<!-- factory:mode ${mode} -->`;
-const MODE_RE = /<!-- factory:mode (supervised|semi|full) -->/;
+const MODE_RE = /[<]!-- factory:mode (supervised|semi|full) -->/;
 
 // The latest mode the runner's own account wrote; the plane posts under that account, so a
 // marker from anyone else is text, not a command.

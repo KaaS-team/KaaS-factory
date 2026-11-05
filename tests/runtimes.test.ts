@@ -31,11 +31,14 @@ const tmp = (prefix: string) => {
 
 describe("frame", () => {
   test("carries stdout, stderr and the code through one merged, noisy log", () => {
-    const p = Bun.spawnSync([
-      "bash",
-      "-c",
-      `echo "[runtime] start"; bash -c ${shq(framed("echo out; echo err >&2; printf 'x'; exit 4"))} 2>&1; echo "[runtime] end"`,
-    ]);
+    const p = Bun.spawnSync(
+      [
+        "bash",
+        "-c",
+        `echo "[runtime] start"; bash -c ${shq(framed("echo out; echo err >&2; printf 'x'; exit 4"))} 2>&1; echo "[runtime] end"`,
+      ],
+      { timeout: 60_000 },
+    );
     expect(p.exitCode).toBe(0);
     expect(unframe(p.stdout.toString(), p.exitCode)).toEqual({ stdout: "out\nx", stderr: "err\n", code: 4 });
   });
@@ -150,7 +153,7 @@ describe("http sandbox", () => {
   const dir = () => {
     const d = tmp("factory-http-");
     for (const sub of [".git", "node_modules", "dist"]) {
-      Bun.spawnSync(["mkdir", "-p", join(d, sub)]);
+      Bun.spawnSync(["mkdir", "-p", join(d, sub)], { timeout: 60_000 });
       writeFileSync(join(d, sub, "f"), sub);
     }
     return d;
@@ -321,7 +324,7 @@ describe("agent37", () => {
   const dir = () => {
     const d = tmp("factory-a37-");
     for (const sub of [".git", "node_modules", "dist"]) {
-      Bun.spawnSync(["mkdir", "-p", join(d, sub)]);
+      Bun.spawnSync(["mkdir", "-p", join(d, sub)], { timeout: 60_000 });
       writeFileSync(join(d, sub, "f"), sub);
     }
     return d;
@@ -371,7 +374,7 @@ describe("agent37", () => {
       expect((await run).runtimeFailed).toStartWith("agent37 i1: cut off");
       expect(readdirSync(root)).toEqual([]);
       // SIGKILL is delivered at once but the process table empties a moment later.
-      const left = () => Bun.spawnSync(["pgrep", "-af", mark]).stdout.toString();
+      const left = () => Bun.spawnSync(["pgrep", "-af", mark], { timeout: 60_000 }).stdout.toString();
       for (let i = 0; i < 40 && left(); i++) await Bun.sleep(50);
       expect(left()).toBe("");
     } finally {
@@ -744,9 +747,7 @@ describe("microsandbox", () => {
     writeFileSync(join(d, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
     Bun.spawnSync(
       ["sh", "-c", "git init -q -b main && git add . && git -c user.email=t@t -c user.name=t commit -qm i"],
-      {
-        cwd: d,
-      },
+      { timeout: 60_000, cwd: d },
     );
     const argvFile = join(d, "msb-argv");
     const saved = { PATH: process.env.PATH, MSB_ARGV_FILE: process.env.MSB_ARGV_FILE };
@@ -772,7 +773,7 @@ describe("microsandbox", () => {
   // A repo with a committed holdout and a sparse worktree that hides it, as the runner makes one.
   function holdoutWorktree(): string {
     const d = tmp("factory-msb-git-");
-    const sh = (c: string) => expect(Bun.spawnSync(["bash", "-c", c], { cwd: d }).exitCode).toBe(0);
+    const sh = (c: string) => expect(Bun.spawnSync(["bash", "-c", c], { timeout: 60_000, cwd: d }).exitCode).toBe(0);
     sh(
       "git init -q -b main main && cd main && echo a > a && mkdir holdout && echo secret-7m1 > holdout/t && git add . && " +
         "git -c user.email=t@t -c user.name=t commit -qm i && git worktree add -q -b work ../wt && cd ../wt && " +
@@ -787,7 +788,7 @@ describe("microsandbox", () => {
       ...process.env,
       ...guestGit(wt, tmp("factory-msb-scratch-"), ["holdout/**"]),
     };
-    const git = (...a: string[]) => Bun.spawnSync(["git", ...a], { cwd: wt, env });
+    const git = (...a: string[]) => Bun.spawnSync(["git", ...a], { timeout: 60_000, cwd: wt, env });
     expect(git("status", "--short").stdout.toString()).toBe(" M a\n");
     expect(git("log", "--format=%s", "-1").stdout.toString()).toBe("i\n");
     expect(git("show", "main:a").stdout.toString()).toBe("a\n");

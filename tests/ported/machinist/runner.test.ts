@@ -14,7 +14,7 @@ afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true }))
 function repo(): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "factory-runner-")));
   roots.push(dir);
-  Bun.spawnSync(["git", "init", "-q"], { cwd: dir });
+  Bun.spawnSync(["git", "init", "-q"], { timeout: 60_000, cwd: dir });
   mkdirSync(join(dir, ".claude/skills/factory-plan"), { recursive: true });
   writeFileSync(join(dir, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
   return dir;

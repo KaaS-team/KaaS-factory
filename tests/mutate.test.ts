@@ -42,7 +42,10 @@ const dirs: string[] = [];
 afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
 function git(dir: string, ...args: string[]) {
-  const r = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", ...args], { cwd: dir });
+  const r = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", ...args], {
+    timeout: 60_000,
+    cwd: dir,
+  });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.toString()}`);
 }
 
@@ -100,6 +103,7 @@ function treeHash(dir: string): string {
 
 function mutate(dir: string, ...args: string[]) {
   const r = Bun.spawnSync(["bash", ".factory/mutate.sh", ...args], {
+    timeout: 60_000,
     cwd: dir,
     env: { ...process.env, FAKE_SECRET: "s3cret", GH_TOKEN: "t0ken" },
   });
@@ -299,7 +303,10 @@ describe("mutate.sh", () => {
     expect(r.out).toContain("commits=1");
     expect(r.out).toContain(`common=${realpathSync(join(dir, ".git"))}`);
     expect(r.out).toContain("tmp=outside");
-    const list = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], { cwd: dir }).stdout.toString();
+    const list = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], {
+      timeout: 60_000,
+      cwd: dir,
+    }).stdout.toString();
     expect(list.match(/^worktree /gm)).toHaveLength(1);
     expect(treeHash(dir)).toBe(before);
   });

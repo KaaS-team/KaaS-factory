@@ -25,7 +25,7 @@ beforeAll(() => {
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 function run(driver: string): string {
-  const p = Bun.spawnSync([py, "-I", "-c", driver], { cwd: root });
+  const p = Bun.spawnSync([py, "-I", "-c", driver], { timeout: 60_000, cwd: root });
   expect(p.stderr.toString()).toBe("");
   return p.stdout.toString().trim();
 }
@@ -58,6 +58,7 @@ test("a change no check claims runs the whole gate, so nothing is missed", () =>
 
 test("the script logs a row and prints the globs to add", () => {
   const p = Bun.spawnSync([py, script, "--before", "abc", "--failed", "unit", "--files", "docs/x.md"], {
+    timeout: 60_000,
     cwd: join(import.meta.dir, ".."),
   });
   expect(p.stdout.toString()).toContain("affected-misses: 0 of 1 failures this push");

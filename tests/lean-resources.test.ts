@@ -9,7 +9,7 @@ const root = join(import.meta.dir, "..");
 
 function start(argv: string[]) {
   const t = performance.now();
-  const r = Bun.spawnSync([process.execPath, ...argv], { cwd: root, stdout: "pipe", stderr: "pipe" });
+  const r = Bun.spawnSync([process.execPath, ...argv], { timeout: 60_000, cwd: root, stdout: "pipe", stderr: "pipe" });
   return { ok: r.exitCode === 0, rss: r.resourceUsage.maxRSS, ms: performance.now() - t };
 }
 

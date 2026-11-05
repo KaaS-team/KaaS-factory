@@ -89,7 +89,7 @@ export function encodeBody(body: string, seal: Seal, field: Field): string {
 // What the humans see. A new issue is created with this first, since its description can be sealed
 // only once the tracker has given it a number.
 export const visibleOf = (body: string) =>
-  body.includes("<!--") ? body.replace(/<!--[\s\S]*?-->\n?/g, "").trimEnd() : body;
+  body.includes("<!--") ? body.replace(/[<]!--[\s\S]*?-->\n?/g, "").trimEnd() : body;
 
 // The original body when the runner wrote it (`ours`), its seal holds and the text above it is
 // unchanged. Anyone else's footer stays as written, so an agent reads exactly what the humans see;

@@ -50,7 +50,7 @@ beforeAll(() => {
       "--target-dir",
       TARGET,
     ],
-    { stderr: "pipe" },
+    { timeout: 60_000, stderr: "pipe" },
   );
   if (built.exitCode !== 0) throw new Error(`cargo build of verify/ failed: ${built.stderr.toString()}`);
 }, 300_000);
@@ -110,7 +110,7 @@ writeFileSync(join(dir, "key.pub"), key.publicKeyPem);
 function kaasVerify(envelope: Envelope | string, ...args: string[]): { code: number; out: string } {
   const file = join(dir, `e-${crypto.randomUUID()}.json`);
   writeFileSync(file, typeof envelope === "string" ? envelope : JSON.stringify(envelope));
-  const r = Bun.spawnSync([BIN, file, ...args], { stdout: "pipe", stderr: "pipe" });
+  const r = Bun.spawnSync([BIN, file, ...args], { timeout: 60_000, stdout: "pipe", stderr: "pipe" });
   return { code: r.exitCode ?? -1, out: `${r.stdout.toString()}${r.stderr.toString()}`.trim() };
 }
 
@@ -319,7 +319,11 @@ describe("writeRunReceipt", () => {
   function worktree() {
     const repo = mkdtempSync(join(tmpdir(), "factory-receipt-repo-"));
     const git = (cmd: string) =>
-      Bun.spawnSync(["sh", "-c", cmd], { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
+      Bun.spawnSync(["sh", "-c", cmd], {
+        timeout: 60_000,
+        cwd: repo,
+        env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" },
+      });
     git(
       "git init -q -b main && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base && git update-ref refs/remotes/origin/main HEAD",
     );

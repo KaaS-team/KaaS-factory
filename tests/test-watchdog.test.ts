@@ -44,7 +44,7 @@ describe("test watchdog", () => {
         join(ROOT, "scripts", "test-hang-marker.ts"),
         join(dir, "hang.test.ts"),
       ],
-      { cwd: dir, env, stdout: "pipe", stderr: "pipe" },
+      { timeout: 60_000, cwd: dir, env, stdout: "pipe", stderr: "pipe" },
     );
     expect(p.stderr.toString()).toMatch(/HUNG: .*hang\.test\.ts > deliberate hang ran \d+s, over the 1s limit; killed/);
     expect(p.exitCode).toBe(124);

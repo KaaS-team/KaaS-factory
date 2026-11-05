@@ -48,7 +48,7 @@ function check(jsonl: string) {
   const dir = scratch("factory-metrics-");
   try {
     writeFileSync(join(dir, "export.jsonl"), jsonl);
-    const p = Bun.spawnSync(["bun", script, join(dir, "export.jsonl"), "--check"]);
+    const p = Bun.spawnSync(["bun", script, join(dir, "export.jsonl"), "--check"], { timeout: 60_000 });
     return { code: p.exitCode, out: p.stdout.toString() + p.stderr.toString() };
   } finally {
     rmSync(dir, { recursive: true, force: true });

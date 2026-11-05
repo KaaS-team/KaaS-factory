@@ -97,11 +97,8 @@ describe("runDoctor", () => {
       authStatus: async () => ({ ok: false, detail: "tracker GET /me answered 401: bad token" }),
     };
     const http = (await runDoctor({ ...deps(), tracker: down }, ctx)).find((c) => c.name.startsWith("tracker:"))!;
-    expect(http).toMatchObject({
-      name: "tracker: http, authenticated",
-      ok: false,
-      detail: expect.stringContaining("401"),
-    });
+    expect(http).toMatchObject({ name: "tracker: http, authenticated", ok: false });
+    expect(http.detail).toContain("401");
   });
 
   test("flags a config with no gates", async () => {

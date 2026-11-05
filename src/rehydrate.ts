@@ -17,7 +17,7 @@ const VISIBLE_MARKER: Partial<Record<ArtifactStage, string>> = {
 };
 
 function stripDataMarker(body: string): string {
-  return body.replace(/\n*<!-- factory:data \{.*?\} -->\s*$/s, "").trimEnd();
+  return body.replace(/\n*[<]!-- factory:data \{.*?\} -->\s*$/s, "").trimEnd();
 }
 
 function findComment(comments: readonly GhComment[], needle: string) {

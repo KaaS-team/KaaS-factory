@@ -138,7 +138,7 @@ describe("a Python repo on a trunk branch", () => {
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
   function git(cwd: string, ...args: string[]): void {
-    const r = Bun.spawnSync(["git", ...args], { cwd, stderr: "pipe" });
+    const r = Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd, stderr: "pipe" });
     if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.toString()}`);
   }
 
@@ -160,7 +160,12 @@ describe("a Python repo on a trunk branch", () => {
   const gates = [{ name: "unit", cmd: "python3 -B -m unittest discover -s tests", required: true }];
 
   function runGatesSh(dir: string): string {
-    const r = Bun.spawnSync(["bash", ".factory/gates.sh"], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+    const r = Bun.spawnSync(["bash", ".factory/gates.sh"], {
+      timeout: 60_000,
+      cwd: dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     return parseGateLine(r.stdout.toString() + r.stderr.toString())?.status ?? "no-line";
   }
 

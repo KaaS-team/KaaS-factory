@@ -182,7 +182,7 @@ describe("a stage ships only files inside its worktree", () => {
     writeFileSync(join(run, "plan.json"), "{}");
     symlinkSync(secret, join(run, "secrets.txt"));
     // A FIFO with no writer would block a plain open forever.
-    expect(spawnSync("mkfifo", [join(run, "pipe.log")]).status).toBe(0);
+    expect(spawnSync("mkfifo", [join(run, "pipe.log")], { timeout: 60_000 }).status).toBe(0);
     expect(await shipStage(store, "acme/widgets", 1, wt)).toBe(1);
     expect(await store.get(blobKeys.artifact("acme/widgets", 1, "secrets.txt"))).toBeUndefined();
 

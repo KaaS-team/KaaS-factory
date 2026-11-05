@@ -202,8 +202,8 @@ describe("installTemplate scaffold", () => {
     for (const f of ["gates.sh", "mutate.sh", "config.example.json", "charter.md"]) {
       expect(existsSync(join(target, ".factory", f))).toBe(true);
     }
-    expect(Bun.spawnSync(["test", "-x", join(target, ".factory", "gates.sh")]).exitCode).toBe(0);
-    expect(Bun.spawnSync(["test", "-x", join(target, ".factory", "mutate.sh")]).exitCode).toBe(0);
+    expect(Bun.spawnSync(["test", "-x", join(target, ".factory", "gates.sh")], { timeout: 60_000 }).exitCode).toBe(0);
+    expect(Bun.spawnSync(["test", "-x", join(target, ".factory", "mutate.sh")], { timeout: 60_000 }).exitCode).toBe(0);
     expect(existsSync(join(target, ".factory", "config.json"))).toBe(false);
     rmSync(target, { recursive: true, force: true });
   });
@@ -239,7 +239,7 @@ describe("installTemplate scaffold", () => {
     expect(readFileSync(join(target, ".factory", "gates.sh"), "utf8")).not.toBe("old");
     // A repo installed before mutate.sh shipped gets it, executable, from --update (#42).
     expect(readFileSync(join(target, ".factory", "mutate.sh"), "utf8")).not.toBe("old");
-    expect(Bun.spawnSync(["test", "-x", join(target, ".factory", "mutate.sh")]).exitCode).toBe(0);
+    expect(Bun.spawnSync(["test", "-x", join(target, ".factory", "mutate.sh")], { timeout: 60_000 }).exitCode).toBe(0);
     rmSync(target, { recursive: true, force: true });
   });
 
@@ -318,7 +318,8 @@ describe("installTemplate --agents", () => {
     // a flag is not an agent list: the CLI refuses before the installer runs
     for (const argv of [["--agents", "--dry-run"], ["--agents"]])
       expect(
-        Bun.spawnSync(["bun", CLI, "install", target, ...argv], { stdout: "pipe", stderr: "pipe" }).exitCode,
+        Bun.spawnSync(["bun", CLI, "install", target, ...argv], { timeout: 60_000, stdout: "pipe", stderr: "pipe" })
+          .exitCode,
       ).not.toBe(0);
     expect(existsSync(join(target, ".claude"))).toBe(false);
     const dry = scratchTarget();
@@ -384,7 +385,11 @@ describe("factory init release workflow", () => {
     run([target]);
     rmSync(join(target, RELEASE_DEST_REL));
     const cmd = () =>
-      Bun.spawnSync(["bun", CLI, "init", "--repo-dir", target, "--dry-run"], { stdout: "pipe", stderr: "pipe" });
+      Bun.spawnSync(["bun", CLI, "init", "--repo-dir", target, "--dry-run"], {
+        timeout: 60_000,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
     expect(cmd().stdout.toString()).toContain(`write: ${RELEASE_DEST_REL}`);
     run([target]);
     expect(cmd().stdout.toString()).toContain(`skip (exists): ${RELEASE_DEST_REL}`);

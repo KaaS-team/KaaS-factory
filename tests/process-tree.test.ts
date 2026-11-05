@@ -9,7 +9,7 @@ const FIXTURE = (pids: string) =>
   `sleep 60 & echo $! >> ${pids}; setsid sleep 60 & echo $! >> ${pids}; sleep 0.1; wait`;
 
 function isAlive(pid: number): boolean {
-  const out = Bun.spawnSync(["ps", "-p", String(pid), "-o", "stat="])
+  const out = Bun.spawnSync(["ps", "-p", String(pid), "-o", "stat="], { timeout: 60_000 })
     .stdout.toString()
     .trim();
   return out !== "" && !out.startsWith("Z");

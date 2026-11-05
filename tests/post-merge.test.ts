@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { changeFailureRate, revertBranch, tightenThresholds, watchAfterMerge } from "../src/post-merge";
 
 const git = (cwd: string, ...args: string[]) =>
-  Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd })
+  Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { timeout: 60_000, cwd })
     .stdout.toString()
     .trim();
 

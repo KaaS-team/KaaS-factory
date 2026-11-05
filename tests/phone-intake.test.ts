@@ -79,7 +79,8 @@ describe("phone intake", () => {
 
     const filed = await p.call("POST", "/api/tasks", phone, { title: "Export invoices as CSV" });
     const { issue } = (await filed.json()) as { issue: number };
-    expect(github.created[0]).toMatchObject({ labels: [LABEL.ready], body: expect.stringContaining("@ana") });
+    expect(github.created[0]).toMatchObject({ labels: [LABEL.ready] });
+    expect(github.created[0]?.body).toContain("@ana");
     const board = (await (await p.call("GET", "/api/board", phone)).json()) as {
       cards: { issue: number; title: string }[];
     };

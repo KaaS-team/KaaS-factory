@@ -16,7 +16,7 @@ import { LABEL, LABELS } from "../../labels";
 import type { GhComment } from "../../ports/scm";
 import type { SpendEntry, SpendStore, SpendTotal } from "../../ports/spend";
 
-const MARKER_RE = /<!-- factory:spend (\{.*?\}) -->/g;
+const MARKER_RE = /[<]!-- factory:spend (\{.*?\}) -->/g;
 const SPEND_NOTE = "Factory usage record (operator data, hidden).";
 
 interface Tally {

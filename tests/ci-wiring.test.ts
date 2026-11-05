@@ -21,7 +21,7 @@ const checkEntry = (entry: Entry): void => {
 };
 
 const prerequisites = (): string[] => {
-  const out = Bun.spawnSync(["make", "-pn", "check"]).stdout.toString();
+  const out = Bun.spawnSync(["make", "-pn", "check"], { timeout: 60_000 }).stdout.toString();
   const line = out.split("\n").find((l) => l.startsWith("check:"));
   return line?.slice("check:".length).trim().split(/\s+/) ?? [];
 };

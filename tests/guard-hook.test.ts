@@ -15,7 +15,7 @@ const HOOK = join(import.meta.dir, "..", "template", ".claude", "hooks", "guard-
 function pathWithoutPython3(): string {
   const binDir = mkdtempSync(join(tmpdir(), "factory-nopython-bin-"));
   for (const tool of ["bash", "mktemp", "cat", "rm", "sh"]) {
-    const real = Bun.spawnSync(["which", tool]).stdout.toString().trim();
+    const real = Bun.spawnSync(["which", tool], { timeout: 60_000 }).stdout.toString().trim();
     if (real) symlinkSync(real, join(binDir, tool));
   }
   return binDir;
@@ -271,6 +271,7 @@ describe("guard-paths.sh", () => {
   test("protects paths relative to the git worktree that holds the file, not CLAUDE_PROJECT_DIR", async () => {
     const git = (...args: string[]) =>
       Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", projectDir, ...args], {
+        timeout: 60_000,
         stderr: "pipe",
       });
     git("init", "-q");

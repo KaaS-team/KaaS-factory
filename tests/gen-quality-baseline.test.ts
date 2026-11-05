@@ -35,15 +35,18 @@ test("--check exits 1 on a stale baseline and writes nothing", async () => {
   const shard = join(baseline, "lines/a.ts.json");
   const stale = readFileSync(shard, "utf8");
   const run = (...flags: string[]) =>
-    Bun.spawnSync([
-      "bun",
-      join(import.meta.dir, "../scripts/gen-quality-baseline.ts"),
-      "--root",
-      dir,
-      "--baseline",
-      baseline,
-      ...flags,
-    ]);
+    Bun.spawnSync(
+      [
+        "bun",
+        join(import.meta.dir, "../scripts/gen-quality-baseline.ts"),
+        "--root",
+        dir,
+        "--baseline",
+        baseline,
+        ...flags,
+      ],
+      { timeout: 60_000 },
+    );
   const check = run("--check");
   expect(check.exitCode).toBe(1);
   expect(check.stderr.toString()).toContain("a.ts");
@@ -69,7 +72,7 @@ test("--check fails on a shard that is not in canonical form", () => {
       baseline,
       "--check",
     ],
-    { stderr: "pipe" },
+    { timeout: 60_000, stderr: "pipe" },
   );
   expect(run.exitCode).toBe(1);
   expect(run.stderr.toString()).toContain("lines/stray.json");

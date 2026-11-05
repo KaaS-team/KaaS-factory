@@ -12,7 +12,7 @@ const repo = join(root, "repo");
 const saved = { HOME: process.env.HOME, XDG: process.env.XDG_CONFIG_HOME, G: process.env.GIT_CONFIG_GLOBAL };
 
 function sh(cwd: string, ...args: string[]) {
-  const r = Bun.spawnSync(["git", ...args], { cwd });
+  const r = Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd });
   if (r.exitCode !== 0) throw new Error(r.stderr.toString());
   return r.stdout.toString();
 }
@@ -55,7 +55,7 @@ describe("GitCommandRunner", () => {
     expect(res.code).toBe(0);
     expect(existsSync(marker)).toBe(false);
     // control: without the safe flags the planted script does run
-    Bun.spawnSync(["git", "status"], { cwd: repo });
+    Bun.spawnSync(["git", "status"], { timeout: 60_000, cwd: repo });
     expect(existsSync(marker)).toBe(true);
   });
 

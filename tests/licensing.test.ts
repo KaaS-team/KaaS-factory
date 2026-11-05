@@ -113,7 +113,7 @@ test("the core runs on open source only, with no runtime npm package", () => {
   for (const crate of ["verify", "relay"]) {
     const out = Bun.spawnSync(
       ["cargo", "metadata", "--format-version", "1", "--locked", "--manifest-path", `${crate}/Cargo.toml`],
-      { cwd: root },
+      { timeout: 60_000, cwd: root },
     );
     expect(out.exitCode).toBe(0);
     for (const p of JSON.parse(out.stdout.toString()).packages as { name: string; license: string | null }[]) {

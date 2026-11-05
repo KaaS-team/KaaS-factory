@@ -31,7 +31,10 @@ function childRun(cmd: string[], env: Record<string, string>): { code: number; l
     // check-cache lists inputs with `git ls-files`, which fails where the repo is a copy with no .git (a mutant under /tmp).
     // Point git at a throwaway dir for the work tree so the child behaves the same wherever the repo sits.
     const gitDir = join(outer, "git");
-    const init = Bun.spawnSync(["git", "init", "-q", gitDir], { env: { ...process.env, TMPDIR: tmp } });
+    const init = Bun.spawnSync(["git", "init", "-q", gitDir], {
+      timeout: 60_000,
+      env: { ...process.env, TMPDIR: tmp },
+    });
     if (init.exitCode !== 0) throw new Error(`git init: ${init.stderr}`);
     // A mutant's node_modules is a symlink, which .gitignore's `node_modules/` does not match, and git cannot hash it.
     mkdirSync(join(gitDir, ".git", "info"), { recursive: true });
@@ -42,6 +45,7 @@ function childRun(cmd: string[], env: Record<string, string>): { code: number; l
     const res = Bun.spawnSync(
       cmd.map((c) => c.replace("<file>", file)),
       {
+        timeout: 60_000,
         cwd: repoRoot,
         env: {
           ...base,

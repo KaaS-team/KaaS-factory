@@ -23,6 +23,7 @@ const tmp = (p: string) => {
 };
 const git = (cwd: string, ...args: string[]) =>
   Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], {
+    timeout: 60_000,
     cwd,
     env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" },
   });

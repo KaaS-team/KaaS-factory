@@ -62,6 +62,7 @@ describe("qa.sh", () => {
       writeFileSync(join(dir, ".factory/runs/issue-9/plan.json"), JSON.stringify({ routes: ["/", "/bad"] }));
       const run = (cmd: string[]) =>
         Bun.spawnSync(cmd, {
+          timeout: 60_000,
           cwd: dir,
           env: {
             ...process.env,
@@ -70,7 +71,7 @@ describe("qa.sh", () => {
             FACTORY_ISSUE: "9",
           },
         });
-      Bun.spawnSync(["git", "init", "-q"], { cwd: dir });
+      Bun.spawnSync(["git", "init", "-q"], { timeout: 60_000, cwd: dir });
       const res = run(["bash", join(import.meta.dir, "../template/.factory/qa.sh")]);
       expect(res.exitCode).toBe(1);
       const qa = JSON.parse(readFileSync(join(dir, ".factory/runs/issue-9/qa.json"), "utf8"));

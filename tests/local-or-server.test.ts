@@ -44,10 +44,17 @@ describe("local or server", () => {
     const image = mkdtempSync(join(tmpdir(), "factory-image-"));
     for (const c of [...copied, "package.json"]) cpSync(join(root, c), join(image, c), { recursive: true });
     symlinkSync(join(root, "node_modules"), join(image, "node_modules"));
-    const help = Bun.spawnSync([process.execPath, "bin/factory", "--help"], { cwd: image, stderr: "pipe" });
+    const help = Bun.spawnSync([process.execPath, "bin/factory", "--help"], {
+      timeout: 60_000,
+      cwd: image,
+      stderr: "pipe",
+    });
     expect(help.stderr.toString()).toBe("");
     expect(help.exitCode).toBe(0);
-    const dash = Bun.spawnSync([process.execPath, "-e", 'await import("./dashboard/server.ts")'], { cwd: image });
+    const dash = Bun.spawnSync([process.execPath, "-e", 'await import("./dashboard/server.ts")'], {
+      timeout: 60_000,
+      cwd: image,
+    });
     expect(dash.exitCode).toBe(0);
     // On a machine without Docker, the same CLI installs itself as a launchd or systemd service.
     expect([daemonPlatform("darwin"), daemonPlatform("linux")]).toEqual(["launchd", "systemd"]);

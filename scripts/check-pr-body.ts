@@ -12,7 +12,7 @@ const sections = (body: string): Map<string, string> => {
     const nl = part.indexOf("\n");
     const name = (nl < 0 ? part : part.slice(0, nl)).trim();
     const text = nl < 0 ? "" : part.slice(nl + 1);
-    out.set(name, text.replace(/<!--[\s\S]*?-->/g, "").trim());
+    out.set(name, text.replace(/[<]!--[\s\S]*?-->/g, "").trim());
   }
   return out;
 };

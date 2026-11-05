@@ -22,7 +22,7 @@ function tmp(): string {
 }
 
 function sh(cwd: string, ...args: string[]): void {
-  const p = Bun.spawnSync(["git", ...args], { cwd });
+  const p = Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd });
   if (p.exitCode !== 0) throw new Error(p.stderr.toString());
 }
 
@@ -63,12 +63,12 @@ describe("hold", () => {
     const refused = await git.pushBranch(work, "factory/issue-7");
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain("a human holds this run");
-    const none = Bun.spawnSync(["git", "branch", "--list", "factory/issue-7"], { cwd: remote });
+    const none = Bun.spawnSync(["git", "branch", "--list", "factory/issue-7"], { timeout: 60_000, cwd: remote });
     expect(none.stdout.toString()).toBe("");
     releaseRun(work);
     const ok = await git.pushBranch(work, "factory/issue-7");
     expect(ok.code).toBe(0);
-    const some = Bun.spawnSync(["git", "branch", "--list", "factory/issue-7"], { cwd: remote });
+    const some = Bun.spawnSync(["git", "branch", "--list", "factory/issue-7"], { timeout: 60_000, cwd: remote });
     expect(some.stdout.toString()).toContain("factory/issue-7");
   });
 

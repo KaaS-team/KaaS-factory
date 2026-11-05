@@ -470,7 +470,11 @@ describe("backup", () => {
 
   test("the CLI says when backups are off", () => {
     const env = { ...process.env, FACTORY_BACKUP_BUCKET: "", FACTORY_BLOB_BUCKET: "" };
-    const r = Bun.spawnSync(["bun", "bin/factory", "backup", "list"], { cwd: join(import.meta.dir, ".."), env });
+    const r = Bun.spawnSync(["bun", "bin/factory", "backup", "list"], {
+      timeout: 60_000,
+      cwd: join(import.meta.dir, ".."),
+      env,
+    });
     expect(r.exitCode).toBe(1);
     expect(r.stderr.toString()).toContain("backups are off");
   });

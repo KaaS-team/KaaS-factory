@@ -570,7 +570,7 @@ describe("hardening from the verifier report", () => {
     const ex = new CommandExecutor({ x: { command: [script] } }, { default: "x" });
     const t0 = Date.now();
     const r = await ex.runStage({ stage: "triage", issue: 1, cwd, maxBudgetUsd: 1, timeoutMinutes: 0.02 });
-    Bun.spawnSync(["pkill", "-f", "sleep 4719"]);
+    Bun.spawnSync(["pkill", "-f", "sleep 4719"], { timeout: 60_000 });
     expect(r.killedReason).toMatch(/stageTimeoutMinutes/);
     expect(Date.now() - t0).toBeLessThan(6000);
   });

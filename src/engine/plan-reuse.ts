@@ -25,7 +25,7 @@ export function reusablePlan(issue: GhIssue): { json: HashedPlan; comment: strin
     if (comments.slice(i + 1).some((c) => isHumanComment(c) && parseChatOps(c.body).type !== "approve"))
       return undefined;
     if (json.bodyHash !== sha256(issue.body)) return undefined;
-    return { json, comment: plan.body.replace(/\n*<!-- factory:data \{.*?\} -->\s*$/s, "").trimEnd() };
+    return { json, comment: plan.body.replace(/\n*[<]!-- factory:data \{.*?\} -->\s*$/s, "").trimEnd() };
   }
   return undefined;
 }

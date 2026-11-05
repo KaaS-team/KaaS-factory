@@ -214,7 +214,7 @@ export async function scan(deps: ScanDeps, repo: string, cloneDir: string): Prom
 async function fileFindings(github: ScmPort, repo: string, findings: ScanFinding[]) {
   const open = await github.listOpenIssues(repo);
   const openMarkers = new Set(
-    open.flatMap((i) => [...i.body.matchAll(/<!-- factory:scan id=([^\s]+) -->/g)].map((m) => m[1])),
+    open.flatMap((i) => [...i.body.matchAll(/[<]!-- factory:scan id=([^\s]+) -->/g)].map((m) => m[1])),
   );
 
   const filed: string[] = [];

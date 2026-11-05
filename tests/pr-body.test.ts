@@ -173,7 +173,11 @@ describe("the run-details comment", () => {
     mkdirSync(tmpdir(), { recursive: true });
     const repo = mkdtempSync(join(tmpdir(), "factory-run-details-"));
     const sh = (cmd: string) =>
-      Bun.spawnSync(["sh", "-c", cmd], { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
+      Bun.spawnSync(["sh", "-c", cmd], {
+        timeout: 60_000,
+        cwd: repo,
+        env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" },
+      });
     sh(
       "git init -q -b main && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base && git update-ref refs/remotes/origin/main HEAD",
     );

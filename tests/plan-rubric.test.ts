@@ -30,7 +30,7 @@ class SkillGit extends FakeGit {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, SKILL);
     if (!this.commit) return;
-    const sh = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: worktreeDir });
+    const sh = (...args: string[]) => Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd: worktreeDir });
     sh("init", "-q");
     sh("add", "-A");
     sh("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "seed");

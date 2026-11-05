@@ -11,6 +11,7 @@ let counter = "";
 
 function git(...args: string[]) {
   const p = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], {
+    timeout: 60_000,
     cwd: repo,
     env: { ...process.env, ...GIT_ENV },
   });

@@ -174,7 +174,7 @@ describe("per-provider env allow-list", () => {
 describe("the executor applies the env allow-list", () => {
   test("a stage on a preset sees only that preset's provider keys", async () => {
     const cwd = realpathSync(mkdtempSync(join(tmpdir(), "factory-envkeys-")));
-    Bun.spawnSync(["git", "init", "-q"], { cwd });
+    Bun.spawnSync(["git", "init", "-q"], { timeout: 60_000, cwd });
     mkdirSync(join(cwd, ".claude/skills/factory-plan"), { recursive: true });
     writeFileSync(join(cwd, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
     PRESETS.envprobe = {
@@ -221,7 +221,7 @@ describe("the executor applies the env allow-list", () => {
       tokenEnvNames({ events: { inboundSecretEnv: "HOOK_SECRET" }, x: { apiKeyEnv: "K", tokenEnvs: "no" } }).sort(),
     ).toEqual(["HOOK_SECRET", "K"]);
     const cwd = realpathSync(mkdtempSync(join(tmpdir(), "factory-tokenenv-")));
-    Bun.spawnSync(["git", "init", "-q"], { cwd });
+    Bun.spawnSync(["git", "init", "-q"], { timeout: 60_000, cwd });
     mkdirSync(join(cwd, ".claude/skills/factory-plan"), { recursive: true });
     writeFileSync(join(cwd, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
     const probe =

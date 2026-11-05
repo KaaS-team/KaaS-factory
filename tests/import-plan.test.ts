@@ -24,7 +24,11 @@ test("a planned issue round-trips into a plan and a plan comment", async () => {
 
 test("lint-planned exits 0 on the fixture and 1 on a broken body", async () => {
   const run = (f: string) =>
-    Bun.spawnSync(["bun", "scripts/lint-planned.ts", f], { cwd: `${import.meta.dir}/..`, stderr: "pipe" });
+    Bun.spawnSync(["bun", "scripts/lint-planned.ts", f], {
+      timeout: 60_000,
+      cwd: `${import.meta.dir}/..`,
+      stderr: "pipe",
+    });
   expect(run("tests/fixtures/planned-issue.md").exitCode).toBe(0);
   const broken = `${import.meta.dir}/fixtures/planned-broken.tmp.md`;
   await Bun.write(broken, await unmapped());

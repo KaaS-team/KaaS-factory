@@ -177,7 +177,12 @@ describe("dashboard with FACTORY_DASHBOARD_TOKEN set", () => {
     const scriptPath = join(tmpdir(), `factory-dashboard-token-${Date.now()}.ts`);
     writeFileSync(scriptPath, script);
     try {
-      const proc = Bun.spawnSync(["bun", "run", scriptPath], { cwd: repoRoot, stdout: "pipe", stderr: "pipe" });
+      const proc = Bun.spawnSync(["bun", "run", scriptPath], {
+        timeout: 60_000,
+        cwd: repoRoot,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       const out = proc.stdout.toString().trim().split("\n").pop() ?? "{}";
       if (!out.startsWith("{")) throw new Error(`subprocess failed: ${proc.stderr.toString()}`);
       const result = JSON.parse(out) as { ok: number; bad: number };

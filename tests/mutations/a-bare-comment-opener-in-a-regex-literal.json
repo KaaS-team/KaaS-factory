@@ -1,0 +1,7 @@
+{
+  "name": "a bare comment opener in a regex literal",
+  "file": "src/inbox.ts",
+  "find": "/[<]!--[\\s\\S]*?-->/g",
+  "replace": "/<!--[\\s\\S]*?-->/g",
+  "test": "tests/source-traps.test.ts"
+}

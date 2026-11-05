@@ -82,7 +82,7 @@ describe("diff coverage CLI", () => {
     const git = (...a: string[]) =>
       Bun.spawnSync(
         ["git", "-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@example.com", ...a],
-        { cwd: dir },
+        { timeout: 60_000, cwd: dir },
       );
     git("init", "-q");
     writeFileSync(join(dir, "f.ts"), "a\n");
@@ -92,7 +92,7 @@ describe("diff coverage CLI", () => {
     const lcov = join(dir, "lcov.info");
     writeFileSync(lcov, "SF:f.ts\nDA:2,1\nDA:3,0\nend_of_record\n");
     const script = join(process.cwd(), "scripts/diff-coverage.ts");
-    return Bun.spawnSync(["bun", script, lcov, "HEAD", "--min", min], { cwd: dir }).exitCode;
+    return Bun.spawnSync(["bun", script, lcov, "HEAD", "--min", min], { timeout: 60_000, cwd: dir }).exitCode;
   };
 
   test("below --min the CLI exits 1 and at or above it exits 0", () => {

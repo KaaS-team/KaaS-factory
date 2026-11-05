@@ -57,18 +57,12 @@ describe("daemon", () => {
     if (process.platform === "darwin") {
       const dir = mkdtempSync(join(tmpdir(), "plist-"));
       await Bun.write(join(dir, "a.plist"), plist);
-      const lint = Bun.spawnSync(["plutil", "-lint", join(dir, "a.plist")]);
+      const lint = Bun.spawnSync(["plutil", "-lint", join(dir, "a.plist")], { timeout: 60_000 });
       expect(lint.exitCode).toBe(0);
       const args = JSON.parse(
-        Bun.spawnSync([
-          "plutil",
-          "-extract",
-          "ProgramArguments",
-          "json",
-          "-o",
-          "-",
-          join(dir, "a.plist"),
-        ]).stdout.toString(),
+        Bun.spawnSync(["plutil", "-extract", "ProgramArguments", "json", "-o", "-", join(dir, "a.plist")], {
+          timeout: 60_000,
+        }).stdout.toString(),
       );
       expect(args).toEqual(spec().argv);
     }

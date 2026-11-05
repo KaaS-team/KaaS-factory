@@ -87,7 +87,7 @@ describe("check-pr-body --file", () => {
     const file = join(dir, "body.md");
     writeFileSync(file, body);
     const args = ["bun", "scripts/check-pr-body.ts", ...(env.PR_BODY === undefined ? ["--file", file] : [])];
-    return Bun.spawnSync(args, { env: { ...process.env, ...env } });
+    return Bun.spawnSync(args, { timeout: 60_000, env: { ...process.env, ...env } });
   };
   test("a placeholder verdict exits 1 with the placeholder message", () => {
     const r = run(filled({ "Verify verdict": "Pending CI" }));

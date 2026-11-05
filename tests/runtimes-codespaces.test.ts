@@ -16,7 +16,7 @@ const env = (extra: Record<string, string> = {}) => ({
 const worktree = () => {
   const d = mkdtempSync(join(tmpdir(), "factory-cs-"));
   for (const sub of [".git", "node_modules", "dist"]) {
-    Bun.spawnSync(["mkdir", "-p", join(d, sub)]);
+    Bun.spawnSync(["mkdir", "-p", join(d, sub)], { timeout: 60_000 });
     writeFileSync(join(d, sub, "f"), sub);
   }
   return d;

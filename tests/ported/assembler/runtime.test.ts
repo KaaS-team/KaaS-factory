@@ -12,7 +12,7 @@ afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true }))
 function repo(): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "factory-runtime-")));
   roots.push(dir);
-  Bun.spawnSync(["git", "init", "-q"], { cwd: dir });
+  Bun.spawnSync(["git", "init", "-q"], { timeout: 60_000, cwd: dir });
   mkdirSync(join(dir, ".claude/skills/factory-plan"), { recursive: true });
   writeFileSync(
     join(dir, ".claude/skills/factory-plan/SKILL.md"),
@@ -20,7 +20,7 @@ function repo(): string {
   );
   // Committed, so the repo's skill wins over the default (src/harness-defaults.ts).
   const git = (...a: string[]) =>
-    Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir });
+    Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { timeout: 60_000, cwd: dir });
   git("add", ".");
   git("commit", "-qm", "skill");
   return dir;
@@ -40,7 +40,7 @@ test("prompts remain literal arguments, including shell syntax", async () => {
   await run(cwd, ["sh", "-c", 'printf %s "$1" > "$FACTORY_ARTIFACT_DIR/arg.txt"', "agent", "{{prompt}}"]);
   const arg = readFileSync(join(cwd, ".factory/runs/issue-7/arg.txt"), "utf8");
   expect(arg).toContain('PLAN-BODY `touch bad` $(echo bad) "quotes"\nline');
-  expect(Bun.spawnSync(["test", "-e", join(cwd, "bad")]).exitCode).not.toBe(0);
+  expect(Bun.spawnSync(["test", "-e", join(cwd, "bad")], { timeout: 60_000 }).exitCode).not.toBe(0);
 });
 
 test("stdin, stderr and nonzero exit are preserved", async () => {

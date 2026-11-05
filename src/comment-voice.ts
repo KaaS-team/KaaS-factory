@@ -1,7 +1,7 @@
 // A pure check for the voice of a factory comment (#145): a maintainer reads one plain
 // sentence first, and never sees a model id, a dollar amount or a run id.
 
-const MARKER = /^<!--\s*factory:[^>]*-->\s*$/;
+const MARKER = /^[<]!--\s*factory:[^>]*-->\s*$/;
 const MODEL_ID = /\b(claude-[a-z0-9.-]+|gpt-\d[\w.-]*|gemini-[\w.-]+|(?:fable|opus|sonnet|haiku)(?:[ -]\d[\d.]*)?)\b/i;
 // A dollar, euro or pound sign before a digit, or a number next to a currency word or code.
 const MONEY = /[$€£]\s?\d|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|EUR|GBP|dollars?|euros?)\b|\b(?:USD|EUR|GBP)\s?\d/i;

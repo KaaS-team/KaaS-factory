@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 function git(cwd: string, ...args: string[]): string {
-  const p = Bun.spawnSync(["git", ...args], { cwd });
+  const p = Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd });
   if (p.exitCode !== 0) throw new Error(p.stderr.toString());
   return p.stdout.toString();
 }

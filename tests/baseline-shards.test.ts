@@ -11,6 +11,7 @@ afterAll(() => roots.forEach((d) => rmSync(d, { recursive: true, force: true }))
 const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
 const git = (cwd: string, ...a: string[]) => {
   const p = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...a], {
+    timeout: 60_000,
     cwd,
     env,
     stdout: "pipe",
@@ -105,7 +106,11 @@ test("factory hotspots lists the files several merged PRs changed", () => {
     git(dir, "add", "-A");
     git(dir, "commit", "-q", "-m", `change ${n} (#${n})`);
   }
-  const p = Bun.spawnSync(["bun", join(import.meta.dir, "../src/cli.ts"), "hotspots", "--json"], { cwd: dir, env });
+  const p = Bun.spawnSync(["bun", join(import.meta.dir, "../src/cli.ts"), "hotspots", "--json"], {
+    timeout: 60_000,
+    cwd: dir,
+    env,
+  });
   const out = JSON.parse(p.stdout.toString()).data;
   expect(out.hotspots).toEqual([{ file: "hot.ts", prs: 3, shared: false }]);
 });
@@ -115,6 +120,7 @@ test("the vendored check-quality defers to this ratchet through the exclude-only
   const marker = JSON.parse(readFileSync(join(import.meta.dir, "..", "quality-baseline.json"), "utf8"));
   expect(Object.keys(marker)).toEqual(["exclude"]);
   const p = Bun.spawnSync(["python3", "scripts/kaas/check-quality.py", "src/cli.ts"], {
+    timeout: 60_000,
     cwd: join(import.meta.dir, ".."),
   });
   expect(p.stdout.toString()).toContain("belongs to another ratchet");

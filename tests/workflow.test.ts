@@ -698,7 +698,11 @@ describe("factory harness", () => {
       gates: [{ name: "t", cmd: "true", required: true, role: "test" }],
     });
     const run = (dir: string) =>
-      Bun.spawnSync(["bun", cli, "harness", "validate", "--repo-dir", dir], { stdout: "pipe", stderr: "pipe" });
+      Bun.spawnSync(["bun", cli, "harness", "validate", "--repo-dir", dir], {
+        timeout: 60_000,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
     expect(run(repo({ ".factory/config.json": conf })).exitCode).toBe(0);
     const bad = run(
       repo({ ".factory/config.json": conf, ".factory/workflows/broken.yml": "name: broken\nsteps: {}\n" }),
@@ -715,7 +719,7 @@ describe("factory harness", () => {
         "--repo-dir",
         repo({ ".factory/config.json": conf, ".factory/workflows/broken.yml": "name: broken\nsteps: {}\n" }),
       ],
-      { stdout: "pipe" },
+      { timeout: 60_000, stdout: "pipe" },
     );
     expect(json.exitCode).toBe(4);
     expect(JSON.parse(json.stdout.toString()).ok).toBe(false);

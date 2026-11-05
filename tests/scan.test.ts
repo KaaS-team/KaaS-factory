@@ -152,11 +152,11 @@ describe("scan()", () => {
     const result = await scan({ github, runner }, "acme/widgets", pyDir);
     rmSync(pyDir, { recursive: true, force: true });
     expect(runner.calls).toEqual([OSV_ARGV]);
-    expect(result).toMatchObject({
-      source: "osv-scanner",
-      filed: [expect.stringContaining("nanoid")],
-      skipped: [expect.stringContaining("hono")],
-    });
+    expect(result.source).toBe("osv-scanner");
+    expect(result.filed.length).toBe(1);
+    expect(result.filed[0]).toContain("nanoid");
+    expect(result.skipped.length).toBe(1);
+    expect(result.skipped[0]).toContain("hono");
   });
 
   test("osv-scanner with no lockfile it reads, or an error, skips: its output is never read as zero findings", async () => {

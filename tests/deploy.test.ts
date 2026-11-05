@@ -118,6 +118,7 @@ describe("one image carries ee", () => {
     mkdirSync(join(cwd, "ee"), { recursive: true });
     if (opts.ee) writeFileSync(join(cwd, "ee/register.ts"), "");
     const run = Bun.spawnSync(["bash", join(ROOT, "docker-entrypoint.sh"), ...args], {
+      timeout: 60_000,
       cwd,
       env: { PATH: `${stubs}:${process.env.PATH ?? ""}`, ...opts.env },
     });
@@ -140,7 +141,7 @@ describe("kaas-factory up with no repo", () => {
   beforeAll(async () => {
     const built = Bun.spawnSync(
       ["cargo", "build", "--release", "--locked", "--quiet", "--manifest-path", join(ROOT, "relay/Cargo.toml")],
-      { stderr: "pipe", env: { ...process.env, CARGO_TARGET_DIR: TARGET } },
+      { timeout: 60_000, stderr: "pipe", env: { ...process.env, CARGO_TARGET_DIR: TARGET } },
     );
     if (built.exitCode !== 0) throw new Error(`cargo build of relay/ failed: ${built.stderr.toString()}`);
     const [planePort, relayPort] = [freePort(), freePort()];

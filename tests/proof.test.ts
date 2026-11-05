@@ -33,6 +33,7 @@ afterEach(() => {
 
 function run(args: string[], cwd: string): string {
   const r = Bun.spawnSync(args, {
+    timeout: 60_000,
     cwd,
     env: {
       ...process.env,

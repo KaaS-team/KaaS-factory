@@ -72,7 +72,9 @@ test("every hook file has a test that runs it", () => {
 
 // The template ships to other people's repos: a path into this machine breaks there.
 test("nothing in template/ or template-ci/ points at one machine's home", () => {
-  const files = Bun.spawnSync(["find", join(ROOT, "template"), join(ROOT, "template-ci"), "-type", "f"])
+  const files = Bun.spawnSync(["find", join(ROOT, "template"), join(ROOT, "template-ci"), "-type", "f"], {
+    timeout: 60_000,
+  })
     .stdout.toString()
     .trim()
     .split("\n");

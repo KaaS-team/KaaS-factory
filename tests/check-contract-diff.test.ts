@@ -95,11 +95,11 @@ describe("cli surface", () => {
 });
 
 describe("cli", () => {
-  const run = (cwd: string, ...args: string[]) => Bun.spawnSync(["bun", SCRIPT, ...args], { cwd });
+  const run = (cwd: string, ...args: string[]) => Bun.spawnSync(["bun", SCRIPT, ...args], { timeout: 60_000, cwd });
   const git = (cwd: string, ...args: string[]) =>
     Bun.spawnSync(
       ["git", "-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@example.com", ...args],
-      { cwd },
+      { timeout: 60_000, cwd },
     );
 
   function repo(withBase: boolean): string {

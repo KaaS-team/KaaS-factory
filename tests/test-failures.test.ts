@@ -64,13 +64,14 @@ describe("test failures summary", () => {
     const dir = tmp();
     const summary = join(dir, "s.md");
     const withVar = Bun.spawnSync(["bun", "scripts/test-failures.ts", join(dir, "none.xml")], {
+      timeout: 60_000,
       env: { ...process.env, GITHUB_STEP_SUMMARY: summary },
     });
     expect(withVar.exitCode).toBe(0);
     expect(readFileSync(summary, "utf8").includes("no junit report at")).toBe(true);
     const env = { ...process.env };
     delete env.GITHUB_STEP_SUMMARY;
-    const without = Bun.spawnSync(["bun", "scripts/test-failures.ts", join(dir, "none.xml")], { env });
+    const without = Bun.spawnSync(["bun", "scripts/test-failures.ts", join(dir, "none.xml")], { timeout: 60_000, env });
     expect(without.exitCode).toBe(0);
     expect(without.stdout.toString().includes("no junit report at")).toBe(true);
   });

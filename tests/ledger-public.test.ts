@@ -165,6 +165,7 @@ test("the export script writes the ledger from a state DB and leaves no operator
     state.close();
     const out = join(home, "shipped.json");
     const r = Bun.spawnSync(["bun", "scripts/ledger-public.ts", "--repo", REPO, "--out", out], {
+      timeout: 60_000,
       env: { ...process.env, FACTORY_HOME: home },
     });
     expect(r.exitCode, r.stderr.toString()).toBe(0);
@@ -188,13 +189,17 @@ test("the export script writes the ledger from a state DB and leaves no operator
     });
     priv.close();
     const named = Bun.spawnSync(["bun", "scripts/ledger-public.ts", "--repo", REPO], {
+      timeout: 60_000,
       env: { ...process.env, FACTORY_HOME: home },
     });
     expect(named.exitCode).toBe(0);
     expect(named.stdout.toString()).not.toContain("acme/secret");
     expect(named.stdout.toString()).not.toContain("Private roadmap");
     // With no --repo it publishes nothing: a repo's titles go public only when it is named.
-    const none = Bun.spawnSync(["bun", "scripts/ledger-public.ts"], { env: { ...process.env, FACTORY_HOME: home } });
+    const none = Bun.spawnSync(["bun", "scripts/ledger-public.ts"], {
+      timeout: 60_000,
+      env: { ...process.env, FACTORY_HOME: home },
+    });
     expect(none.exitCode).toBe(2);
     expect(none.stdout.toString()).toBe("");
   } finally {

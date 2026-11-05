@@ -10,6 +10,7 @@ describe("host binary", () => {
   test("prints the version, runs init and install --ci outside the repo", () => {
     const tmp = mkdtempSync(join(tmpdir(), "factory-binary-"));
     const build = Bun.spawnSync(["bun", join(root, "scripts", "build-binary.ts"), "--host", "--out", tmp], {
+      timeout: 60_000,
       cwd: root,
       stdout: "pipe",
       stderr: "pipe",
@@ -22,6 +23,7 @@ describe("host binary", () => {
     mkdirSync(home);
     const run = (...args: string[]) =>
       Bun.spawnSync([bin, ...args], {
+        timeout: 60_000,
         cwd: tmp,
         env: { ...process.env, FACTORY_HOME: home },
         stdout: "pipe",

@@ -98,7 +98,7 @@ test("check-mutations writes that result to the step summary", () => {
   const out = join(tmp(), "summary.md");
   const r = Bun.spawnSync(
     ["bun", join(ROOT, "scripts", "check-mutations.ts"), "the anchor check reads the per-entry mutation files too"],
-    { cwd: ROOT, env: { ...process.env, GITHUB_STEP_SUMMARY: out, MUTATION_WORKERS: "1" } },
+    { timeout: 60_000, cwd: ROOT, env: { ...process.env, GITHUB_STEP_SUMMARY: out, MUTATION_WORKERS: "1" } },
   );
   expect(r.exitCode).toBe(0);
   expect(readFileSync(out, "utf8")).toBe("check-mutations: 1 ran, 1 held, 0 did not\n");

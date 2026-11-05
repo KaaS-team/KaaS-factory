@@ -30,7 +30,8 @@ function repo(): string {
   return cwd;
 }
 
-const holdout = (cwd: string) => Bun.spawnSync(["bash", "holdout/01-totals/AC-1.sh"], { cwd }).exitCode;
+const holdout = (cwd: string) =>
+  Bun.spawnSync(["bash", "holdout/01-totals/AC-1.sh"], { timeout: 60_000, cwd }).exitCode;
 
 async function build(agent: AgentConfig, env: Record<string, string> = {}) {
   const cwd = repo();

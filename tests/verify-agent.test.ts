@@ -81,7 +81,7 @@ describe("verify-agent", () => {
     cpSync(join(import.meta.dir, "../template/.claude/skills"), join(cwd, ".claude/skills"), { recursive: true });
     const script = join(cwd, "agent.sh");
     await Bun.write(script, `#!/bin/sh\necho '{"type":"x","text":"sk-abcdefghijklmnopqrstuv"}'\n`);
-    Bun.spawnSync(["chmod", "+x", script]);
+    Bun.spawnSync(["chmod", "+x", script], { timeout: 60_000 });
     const ex = new CommandExecutor({ x: { command: [script] } }, { default: "x" }, {}, new FixtureRecorder(dir, "x"));
     await ex.runStage({ stage: "triage", issue: 1, cwd, maxBudgetUsd: 1 });
     const lines = readFileSync(join(dir, "triage.jsonl"), "utf8");

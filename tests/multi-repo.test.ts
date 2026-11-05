@@ -360,8 +360,9 @@ describe("each repo's own config", () => {
         (a) => a.name === "codex",
       )?.stages.length,
     });
-    expect(await view(A)).toMatchObject({
-      workflows: expect.arrayContaining(["a-flow"]),
+    const a = await view(A);
+    expect(a.workflows).toContain("a-flow");
+    expect(a).toMatchObject({
       minions: ["a-min"],
       usedBy: ["runtime.check"],
       leasesError: null,
@@ -373,8 +374,8 @@ describe("each repo's own config", () => {
     // B's config came through the bucket, so the plane runs none of the binaries it names.
     expect(asked).toEqual([]);
     expect(b.workflows).not.toContain("a-flow");
+    expect(b.workflows).toContain("b-flow");
     expect(b).toMatchObject({
-      workflows: expect.arrayContaining(["b-flow"]),
       minions: ["b-min"],
       usedBy: ["runtime.gates"],
       leasesError: "leases are listed on the repo's runner, not this plane",

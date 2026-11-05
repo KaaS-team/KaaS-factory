@@ -55,7 +55,7 @@ export const WAITING_LABELS: readonly string[] = [LABEL.awaitingApproval, LABEL.
 const ASK_LIMIT = 1200;
 
 function stripMarkers(body: string): string {
-  return body.replace(/<!--[\s\S]*?-->/g, "").trim();
+  return body.replace(/[<]!--[\s\S]*?-->/g, "").trim();
 }
 
 // The runner's latest comment is what the human is being asked about.

@@ -77,7 +77,7 @@ describe("signingProblems", () => {
 describe("GitCommandRunner signing", () => {
   async function repo(): Promise<{ dir: string; env: Record<string, string>; log: string }> {
     const dir = tmpRoot();
-    const sh = (args: string[]) => Bun.spawnSync(["git", ...args], { cwd: dir });
+    const sh = (args: string[]) => Bun.spawnSync(["git", ...args], { timeout: 60_000, cwd: dir });
     sh(["init", "-q"]);
     sh(["config", "commit.gpgsign", "false"]);
     sh(["config", "user.name", "t"]);
@@ -113,7 +113,7 @@ describe("GitCommandRunner signing", () => {
     await expect(runner.run(["commit", "--allow-empty", "-m", "x"], { cwd: dir })).rejects.toThrow(
       SigningRequiredError,
     );
-    const head = Bun.spawnSync(["git", "rev-parse", "--verify", "HEAD"], { cwd: dir });
+    const head = Bun.spawnSync(["git", "rev-parse", "--verify", "HEAD"], { timeout: 60_000, cwd: dir });
     expect(head.exitCode).toBe(128);
   });
 

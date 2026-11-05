@@ -95,18 +95,21 @@ describe("cron dedupe", () => {
   test("two watchers on clones of one remote file one scheduled issue through git lease refs", async () => {
     for (const together of [true, false]) {
       const remote = join(root, `origin-${together}.git`);
-      Bun.spawnSync(["git", "init", "-q", "--bare", remote]);
+      Bun.spawnSync(["git", "init", "-q", "--bare", remote], { timeout: 60_000 });
       const clone = (n: number) => {
         const dir = join(root, `w${n}-${together}`);
-        Bun.spawnSync(["git", "init", "-q", dir]);
-        Bun.spawnSync(["git", "remote", "add", "origin", remote], { cwd: dir });
+        Bun.spawnSync(["git", "init", "-q", dir], { timeout: 60_000 });
+        Bun.spawnSync(["git", "remote", "add", "origin", remote], { timeout: 60_000, cwd: dir });
         return new GitLeases(dir);
       };
       const ports = [clone(0), clone(1)];
       const { gh, filed } = await twoWatchers((n) => ports[n]!, together);
       expect(filed.flat()).toHaveLength(1);
       expect(gh.issues.size).toBe(1);
-      const refs = Bun.spawnSync(["git", "for-each-ref", "--format=%(refname)", "refs/factory/lease"], { cwd: remote });
+      const refs = Bun.spawnSync(["git", "for-each-ref", "--format=%(refname)", "refs/factory/lease"], {
+        timeout: 60_000,
+        cwd: remote,
+      });
       expect(refs.stdout.toString().trim()).toBe("refs/factory/lease/cron.nightly.0.29858520");
     }
   });

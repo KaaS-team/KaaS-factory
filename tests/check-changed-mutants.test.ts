@@ -65,6 +65,7 @@ test("the summary counts each outcome", () => {
 
 test("the CLI exits 2 with a usage line when --base is missing", () => {
   const run = Bun.spawnSync(["bun", join(import.meta.dir, "../scripts/check-changed-mutants.ts")], {
+    timeout: 60_000,
     stdout: "pipe",
     stderr: "pipe",
   });

@@ -7,6 +7,7 @@ import { defaultRun, resolveConflicts } from "../src/merge-resolve";
 const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" };
 const git = (cwd: string, ...a: string[]) =>
   Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], {
+    timeout: 60_000,
     cwd,
     env,
     stdout: "pipe",

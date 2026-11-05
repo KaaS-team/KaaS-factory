@@ -73,6 +73,7 @@ describe("check-value", () => {
     try {
       writeFileSync(join(dir, "export.jsonl"), data);
       const p = Bun.spawnSync(["bun", "scripts/check-value.ts", join(dir, "export.jsonl")], {
+        timeout: 60_000,
         cwd: `${import.meta.dir}/..`,
       });
       expect(p.exitCode).toBe(0);

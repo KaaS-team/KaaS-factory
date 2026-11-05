@@ -117,7 +117,7 @@ describe("gates.sh packages", () => {
   afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
   const root = resolve(import.meta.dir, "..");
   const git = (dir: string, ...args: string[]) =>
-    Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir });
+    Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { timeout: 60_000, cwd: dir });
 
   // A main commit (with the seed files), then a branch that adds the touch files.
   function repo(touch: string[], seed: string[] = []): string {
@@ -138,6 +138,7 @@ describe("gates.sh packages", () => {
   }
   const gates = (dir: string, base = "main") => {
     const r = Bun.spawnSync(["bash", ".factory/gates.sh"], {
+      timeout: 60_000,
       cwd: dir,
       stdout: "pipe",
       env: { ...process.env, FACTORY_GATES_BASE: base },

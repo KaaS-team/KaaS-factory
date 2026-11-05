@@ -34,7 +34,7 @@ describe("openInitPr", () => {
     const root = mkdtempSync(join(tmpdir(), "init-pr-"));
     try {
       const run = (cwd: string, ...a: string[]) => {
-        const r = Bun.spawnSync(["git", ...a], { cwd, stdout: "pipe", stderr: "pipe" });
+        const r = Bun.spawnSync(["git", ...a], { timeout: 60_000, cwd, stdout: "pipe", stderr: "pipe" });
         expect(r.exitCode).toBe(0);
       };
       const remote = join(root, "remote.git");
@@ -71,7 +71,10 @@ describe("openInitPr", () => {
       expect(calls).toEqual([
         { repo: "o/r", base: "trunk", head: "factory/init", title: "factory: init", body: "- a\n- b" },
       ]);
-      const tree = Bun.spawnSync(["git", "ls-tree", "-r", "--name-only", "HEAD"], { cwd: work }).stdout.toString();
+      const tree = Bun.spawnSync(["git", "ls-tree", "-r", "--name-only", "HEAD"], {
+        timeout: 60_000,
+        cwd: work,
+      }).stdout.toString();
       expect(tree).not.toContain(".github/workflows/release.yml");
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -83,7 +86,7 @@ describe("openInitPr", () => {
     const root = mkdtempSync(join(tmpdir(), "init-pr-rel-"));
     try {
       const run = (cwd: string, ...a: string[]) => {
-        const r = Bun.spawnSync(["git", ...a], { cwd, stdout: "pipe", stderr: "pipe" });
+        const r = Bun.spawnSync(["git", ...a], { timeout: 60_000, cwd, stdout: "pipe", stderr: "pipe" });
         expect(r.exitCode).toBe(0);
       };
       const remote = join(root, "remote.git");
@@ -103,7 +106,10 @@ describe("openInitPr", () => {
       writeFileSync(join(work, ".factory", "config.json"), "{}\n");
       writeFileSync(join(work, ".github", "workflows", "release.yml"), "name: release\n");
       await openInitPr(work, "o/r", { name: "bun", lines: [] }, { createPr: async () => "u" });
-      const tree = Bun.spawnSync(["git", "ls-tree", "-r", "--name-only", "HEAD"], { cwd: work }).stdout.toString();
+      const tree = Bun.spawnSync(["git", "ls-tree", "-r", "--name-only", "HEAD"], {
+        timeout: 60_000,
+        cwd: work,
+      }).stdout.toString();
       expect(tree).toContain(".github/workflows/release.yml");
       expect(tree).toContain(".factory/config.json");
     } finally {
