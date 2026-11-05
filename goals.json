@@ -1433,7 +1433,7 @@
       "owner": "agent",
       "proof": {
         "test": "tests/contrib-agents.test.ts",
-        "name": "every non-Claude, non-ACP preset lives in contrib/agents, and the core stays in place",
+        "name": "every preset lives in contrib/agents, and the core stays in place",
         "mutation": "contrib: only the registry reaches a vendor preset"
       }
     },
