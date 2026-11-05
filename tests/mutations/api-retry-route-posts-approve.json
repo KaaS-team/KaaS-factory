@@ -1,0 +1,1 @@
+{"name": "api retry route posts approve", "file": "src/api/writes.ts", "find": "\"runs.retry\": \"retry\"", "replace": "\"runs.retry\": \"approve\"", "test": "tests/api-writes.test.ts"}

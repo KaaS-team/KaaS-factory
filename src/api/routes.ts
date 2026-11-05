@@ -11,6 +11,8 @@ export interface ApiRoute {
   auth: "none" | "token";
   /** Query parameters, as an object schema. */
   req?: JsonSchema;
+  /** The JSON request body of a write route, as an object schema. */
+  body?: JsonSchema;
   res: JsonSchema;
   /** The response is a Server-Sent Events stream, not JSON. */
   sse?: true;
@@ -76,6 +78,9 @@ const SPEND_SCHEMA: JsonSchema = object({
   },
 });
 
+// What a write route answers: the issue it touched and the /factory command it posted there.
+const WRITE_SCHEMA: JsonSchema = object({ issue: int, posted: str });
+
 export const ROUTES: readonly ApiRoute[] = [
   { id: "health", method: "GET", path: "/api/health", auth: "none", res: object({ ok: { type: "boolean" } }) },
   {
@@ -107,6 +112,28 @@ export const ROUTES: readonly ApiRoute[] = [
     auth: "token",
     req: object({ after: int }, []),
     res: object({ events: { type: "array", items: RUN_EVENT_SCHEMA } }),
+  },
+  {
+    id: "runs.approve",
+    method: "POST",
+    path: "/api/runs/:repo/:issue/approve",
+    auth: "token",
+    res: WRITE_SCHEMA,
+  },
+  {
+    id: "runs.steer",
+    method: "POST",
+    path: "/api/runs/:repo/:issue/steer",
+    auth: "token",
+    body: object({ text: str }),
+    res: WRITE_SCHEMA,
+  },
+  {
+    id: "runs.retry",
+    method: "POST",
+    path: "/api/runs/:repo/:issue/retry",
+    auth: "token",
+    res: WRITE_SCHEMA,
   },
   {
     id: "spend.get",

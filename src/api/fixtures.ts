@@ -1,9 +1,12 @@
 // Seeded in-memory state for `factory serve --fixture` and the generated client's fake: two repos, three runs.
 
+import { LABEL } from "../labels";
+import type { GhIssue } from "../ports/scm";
 import type { Run, RunEvent, StageRun } from "../state";
 import { tokenAuth } from "./auth";
 import type { ApiState, CoreDeps } from "./core";
 import { LiveFeed } from "./stream";
+import type { WriteTracker } from "./writes";
 
 export const FIXTURE_TOKEN = "fixture-token";
 
@@ -56,6 +59,30 @@ class FixtureState implements ApiState {
   }
 }
 
+// The tracker behind the write routes: an issue wears the label its run's status maps to, and a
+// posted comment is only recorded, so a test reads `posted` to see what a route wrote.
+const WAITING_LABEL: Partial<Record<Run["status"], string>> = {
+  "awaiting-approval": LABEL.awaitingApproval,
+  "needs-human": LABEL.needsHuman,
+  failed: LABEL.failed,
+  "needs-info": LABEL.needsInfo,
+};
+
+export class FixtureTracker implements WriteTracker {
+  readonly posted: { repo: string; issue: number; body: string }[] = [];
+  constructor(private readonly state: ApiState) {}
+  async getIssue(repo: string, number: number): Promise<GhIssue> {
+    const run = this.state.getRun(repo, number);
+    if (!run) throw new Error(`no issue ${number}`);
+    const label = WAITING_LABEL[run.status];
+    return { number, title: run.title, body: "", labels: label ? [{ name: label }] : [], comments: [] };
+  }
+  async commentIssue(repo: string, number: number, body: string): Promise<number | undefined> {
+    this.posted.push({ repo, issue: number, body });
+    return this.posted.length;
+  }
+}
+
 export const FIXTURES = ["two-repos"] as const;
 
 export function fixture(name: string, token = FIXTURE_TOKEN): CoreDeps {
@@ -81,8 +108,10 @@ export function fixture(name: string, token = FIXTURE_TOKEN): CoreDeps {
       [event(3, 3, "pr", "text", "opened the pull request")],
     ),
   };
+  const trackers = new Map(Object.entries(states).map(([repo, st]) => [repo, new FixtureTracker(st)]));
   return {
     repos: () => Object.keys(states),
+    tracker: (repo) => trackers.get(repo) ?? null,
     state: (repo) => states[repo] ?? null,
     feed: new LiveFeed(),
     auth: tokenAuth({ FACTORY_API_TOKEN: token }),

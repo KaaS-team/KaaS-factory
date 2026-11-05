@@ -495,6 +495,180 @@
         }
       }
     },
+    "/api/runs/{repo}/{issue}/approve": {
+      "post": {
+        "operationId": "runs.approve",
+        "parameters": [
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issue": {
+                      "type": "integer"
+                    },
+                    "posted": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "issue",
+                    "posted"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{repo}/{issue}/steer": {
+      "post": {
+        "operationId": "runs.steer",
+        "parameters": [
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issue": {
+                      "type": "integer"
+                    },
+                    "posted": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "issue",
+                    "posted"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{repo}/{issue}/retry": {
+      "post": {
+        "operationId": "runs.retry",
+        "parameters": [
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issue": {
+                      "type": "integer"
+                    },
+                    "posted": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "issue",
+                    "posted"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/spend": {
       "get": {
         "operationId": "spend.get",

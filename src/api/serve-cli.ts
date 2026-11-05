@@ -3,6 +3,8 @@
 import { existsSync } from "node:fs";
 import type { CliContext } from "../cli-runtime";
 import { defaultRepo, defaultStatePath, servedRepos } from "../paths";
+import { DEFAULT_CONFIG } from "../config";
+import { makeScm } from "../scm";
 import { FactoryState } from "../state";
 import { tokenAuth } from "./auth";
 import { coreRoutes, startFeedPoller, type CoreDeps } from "./core";
@@ -23,6 +25,8 @@ function liveDeps(): CoreDeps {
       return states.get(repo)!;
     },
     feed: new LiveFeed(),
+    // The same GitHub the `factory inbox` command posts through.
+    tracker: () => makeScm(DEFAULT_CONFIG),
     auth: tokenAuth(process.env),
     operator: tokenAuth({ FACTORY_API_TOKEN: process.env.FACTORY_API_OPERATOR_TOKEN }),
   };

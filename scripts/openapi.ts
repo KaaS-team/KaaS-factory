@@ -40,6 +40,9 @@ export function buildOpenApi(routes: readonly ApiRoute[], events: Events): Recor
     paths[url][route.method.toLowerCase()] = {
       operationId: route.id,
       parameters: parameters(route),
+      ...(route.body
+        ? { requestBody: { required: true, content: { "application/json": { schema: route.body } } } }
+        : {}),
       ...(route.auth === "token" ? { security: [{ [SCHEME]: [] }] } : {}),
       responses: { "200": { description: "OK", content } },
     };

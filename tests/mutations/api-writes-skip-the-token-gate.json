@@ -1,0 +1,1 @@
+{"name": "api writes skip the token gate", "file": "src/api/core.ts", "find": "if (route.auth === \"token\" && !deps.auth(req)", "replace": "if (route.auth === \"token\" && req.method === \"GET\" && !deps.auth(req)", "test": "tests/api-writes.test.ts"}

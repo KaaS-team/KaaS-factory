@@ -6,6 +6,7 @@ import { ROUTES } from "./routes";
 import type { Run, RunEvent } from "../state";
 
 export type Params = Record<string, string | number | undefined>;
+type Written = { issue: number; posted: string };
 type Spend = { since: string; repos: { repo: string; costUsd: number; unreportedRuns: number }[] };
 
 export interface ApiClient {
@@ -15,6 +16,12 @@ export interface ApiClient {
     list(p?: { repo?: string }): Promise<{ runs: Run[] }>;
     get(p: { repo: string; issue: number }): Promise<{ run: Run }>;
     events(p: { repo: string; issue: number; after?: number }): Promise<{ events: RunEvent[] }>;
+    /** Posts `/factory approve`; a run that is not awaiting approval throws an ApiError with status 409. */
+    approve(p: { repo: string; issue: number }): Promise<Written>;
+    /** Posts `/factory revise <text>`. */
+    steer(p: { repo: string; issue: number; text: string }): Promise<Written>;
+    /** Posts `/factory retry` on a parked or failed run. */
+    retry(p: { repo: string; issue: number }): Promise<Written>;
   };
   spend: { get(p?: { since?: string }): Promise<Spend> };
   /** The raw SSE response; pass `lastEventId` to resume. */
@@ -41,13 +48,23 @@ export function createClient(baseUrl: string, token: string, fetchImpl: typeof f
         return encodeURIComponent(String(p[name]));
       });
       const query = new URLSearchParams();
-      for (const [k, v] of Object.entries(p))
-        if (!used.has(k) && k !== "lastEventId" && v !== undefined) query.set(k, String(v));
+      const bodyKeys = Object.keys((route.body?.properties as object | undefined) ?? {});
+      const payload: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(p)) {
+        if (used.has(k) || k === "lastEventId" || v === undefined) continue;
+        if (bodyKeys.includes(k)) payload[k] = v;
+        else query.set(k, String(v));
+      }
       const headers: Record<string, string> = {};
+      if (route.body) headers["content-type"] = "application/json";
       if (route.auth === "token") headers.authorization = `Bearer ${token}`;
       if (route.sse && p.lastEventId !== undefined) headers["last-event-id"] = String(p.lastEventId);
       const qs = query.size ? `?${query}` : "";
-      const res = await fetchImpl(`${baseUrl.replace(/\/$/, "")}${path}${qs}`, { method: route.method, headers });
+      const res = await fetchImpl(`${baseUrl.replace(/\/$/, "")}${path}${qs}`, {
+        method: route.method,
+        headers,
+        ...(route.body ? { body: JSON.stringify(payload) } : {}),
+      });
       if (route.sse) return res;
       const body = (await res.json()) as { error?: string };
       if (!res.ok) throw new ApiError(res.status, body.error ?? res.statusText);

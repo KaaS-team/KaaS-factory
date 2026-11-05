@@ -1,0 +1,1 @@
+{"name": "api writes post without checking run state", "file": "src/api/writes.ts", "find": "posted: await act(tracker, run.repo, item, action, text)", "replace": "posted: (await tracker.commentIssue(run.repo, run.issue, `/factory ${action} ${text}`.trim()), `/factory ${action} ${text}`.trim())", "test": "tests/api-writes.test.ts"}

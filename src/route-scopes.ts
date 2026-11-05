@@ -1,7 +1,7 @@
 // The two token scopes (#312). Every route declares exactly one; tests/route-scopes.test.ts walks ROUTES.
 //   read-act       read runs, spend and metrics and act on them (view the stream).
-//   edit-structure change structure: repos, config, labels. No route needs it yet, so no
-//                  token can reach one until a route declares it.
+//   edit-structure change structure: repos, config, labels, and write to a run (approve, steer, retry).
+//                  Every route that is not a GET declares it.
 // The scopes are independent: holding one never implies the other.
 
 import { ROUTES } from "./api/routes";
@@ -15,6 +15,9 @@ export const ROUTE_SCOPES: Readonly<Record<string, Scope>> = {
   "runs.list": "read-act",
   "runs.get": "read-act",
   "runs.events": "read-act",
+  "runs.approve": "edit-structure",
+  "runs.steer": "edit-structure",
+  "runs.retry": "edit-structure",
   "spend.get": "read-act",
   "metrics.get": "read-act",
   stream: "read-act",

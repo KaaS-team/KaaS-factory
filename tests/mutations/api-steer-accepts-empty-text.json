@@ -1,0 +1,1 @@
+{"name": "api steer accepts empty text", "file": "src/api/writes.ts", "find": "|| !given.text.trim())", "replace": "|| false)", "test": "tests/api-writes.test.ts"}

@@ -5,6 +5,7 @@ import type { ApiAuth } from "./auth";
 import { metricsFor, type MetricsState } from "../metrics-get";
 import { type ApiRoute, ROUTES } from "./routes";
 import { type LiveFeed, sseResponse } from "./stream";
+import { applyWrite, type WriteTracker } from "./writes";
 
 /** The slice of FactoryState the API reads. */
 export interface ApiState extends MetricsState {
@@ -18,6 +19,8 @@ export interface CoreDeps {
   repos(): string[];
   state(repo: string): ApiState | null;
   feed: LiveFeed;
+  /** Where the write routes read an issue and post a command; without it they answer 501. */
+  tracker?(repo: string): WriteTracker | null;
   auth: ApiAuth;
   /** Passes for callers who may see cost; without it metrics.get omits cost. */
   operator?: ApiAuth;
@@ -85,6 +88,20 @@ export function coreRoutes(deps: CoreDeps): { fetch(req: Request): Promise<Respo
         const after = Number(query(url, "after") ?? 0);
         if (!Number.isInteger(after) || after < 0) return err(400, "after must be a non-negative integer");
         return json({ events: t.state.listEvents(run.id, { after }) });
+      }
+      case "runs.approve":
+      case "runs.steer":
+      case "runs.retry": {
+        const issue = issueOf();
+        if (issue === null) return err(400, "issue must be a positive integer");
+        const t = target();
+        if (t instanceof Response) return t;
+        const run = t.state.getRun(t.repo, issue);
+        if (!run) return err(404, "no such run");
+        const tracker = deps.tracker?.(t.repo);
+        if (!tracker) return err(501, "this server cannot post commands");
+        const done = await applyWrite(route.id, tracker, run, req);
+        return json(done.body, done.status);
       }
       case "spend.get": {
         const since = query(url, "since") ?? new Date(Date.now() - SPEND_WINDOW_MS).toISOString();
