@@ -1,0 +1,7 @@
+{
+  "name": "an audit span drops the actor",
+  "file": "src/integrations/otel.ts",
+  "find": "attr(\"factory.actor\", String(d.actor ?? \"\")),",
+  "replace": "",
+  "test": "tests/otel.test.ts"
+}

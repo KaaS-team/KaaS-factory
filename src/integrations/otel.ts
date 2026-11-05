@@ -4,6 +4,7 @@
 
 import { createHash } from "node:crypto";
 import { agentSpanName, GENAI_OP, modelSpanName } from "../otel-genai";
+import type { CloudEvent } from "../core/event";
 import type { StageRun } from "../state";
 
 export const OTEL_ENV = { endpoint: "OTEL_EXPORTER_OTLP_ENDPOINT", headers: "OTEL_EXPORTER_OTLP_HEADERS" } as const;
@@ -111,6 +112,38 @@ export function runTrace(run: { repo: string; issue: number; outcome: string }, 
       {
         resource: { attributes: [attr("service.name", "kaas-factory")] },
         scopeSpans: [{ scope: { name: "kaas-factory" }, spans }],
+      },
+    ],
+  };
+}
+
+// One span for one audit event: its type, the actor and the issue. Ids come from the event id, so a
+// redelivered event is the same span.
+export function auditTrace(e: CloudEvent) {
+  const d = (e.data ?? {}) as { actor?: unknown; issue?: unknown; status?: unknown; route?: unknown };
+  const at = e.time || new Date(0).toISOString();
+  const traceId = hex(`audit/${e.id}`, 32);
+  const failed = typeof d.status === "number" && d.status >= 400;
+  const span: OtlpSpan = {
+    traceId,
+    spanId: hex(`${traceId}/span`, 16),
+    name: e.type,
+    kind: 1,
+    startTimeUnixNano: nanos(at),
+    endTimeUnixNano: nanos(at),
+    attributes: [
+      attr("factory.event.type", e.type),
+      attr("factory.actor", String(d.actor ?? "")),
+      ...(typeof d.issue === "number" ? [attr("factory.issue", d.issue)] : []),
+      ...(typeof d.route === "string" ? [attr("factory.route", d.route)] : []),
+    ],
+    status: { code: failed ? 2 : 1 },
+  };
+  return {
+    resourceSpans: [
+      {
+        resource: { attributes: [attr("service.name", "kaas-factory")] },
+        scopeSpans: [{ scope: { name: "kaas-factory" }, spans: [span] }],
       },
     ],
   };

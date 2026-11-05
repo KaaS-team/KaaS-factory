@@ -1,0 +1,7 @@
+{
+  "name": "the npm wrapper installs a binary without checking its checksum",
+  "file": "npm/install.js",
+  "find": "verifyChecksum(bin, sums.toString(\"utf8\"), file);",
+  "replace": "",
+  "test": "tests/npm-wrapper.test.ts"
+}
