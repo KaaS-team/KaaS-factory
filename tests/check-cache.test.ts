@@ -128,6 +128,23 @@ describe("check-cache", () => {
   });
 });
 
+describe("output through a pipe", () => {
+  test("a failing command's whole stderr reaches a pipe before the wrapper exits", async () => {
+    const script = join(import.meta.dir, "..", "scripts", "check-cache.ts");
+    const cmd = "head -c 2000000 /dev/zero | tr '\\0' x >&2; echo END >&2; exit 1";
+    const p = Bun.spawn(["bun", script, "demo", "--", "bash", "-c", cmd], {
+      cwd: repo,
+      env: { ...process.env, ...GIT_ENV, CHECK_CACHE_DIR: store },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [err, code] = await Promise.all([new Response(p.stderr).text(), p.exited]);
+    expect(code).toBe(1);
+    expect(err.trimEnd().endsWith("END")).toBe(true);
+    expect(err.length).toBeGreaterThan(2_000_000);
+  });
+});
+
 describe("the gate runs through the cache", () => {
   const root = join(import.meta.dir, "..");
   const make = readFileSync(join(root, "Makefile"), "utf8");
