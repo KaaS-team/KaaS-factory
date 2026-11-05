@@ -12,6 +12,7 @@ const roots: string[] = [];
 afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
 
 function repo(): string {
+  mkdirSync(tmpdir(), { recursive: true });
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "factory-runner-")));
   roots.push(dir);
   Bun.spawnSync(["git", "init", "-q"], { timeout: 60_000, cwd: dir });
