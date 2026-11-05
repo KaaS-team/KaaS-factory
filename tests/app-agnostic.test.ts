@@ -21,10 +21,13 @@ import { defaultStatePath, workspacesDir, worktreePath } from "../src/paths";
 
 const ROOT = join(import.meta.dir, "..");
 
+// Compiled Python caches hold source strings and are rewritten by any run, so they are never judged.
+const isCache = (path: string): boolean => /(^|[\\/])__pycache__([\\/]|$)|\.pyc$/.test(path);
+
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
-    if (name === "node_modules" || name.startsWith(".")) return [];
+    if (name === "node_modules" || name.startsWith(".") || isCache(path)) return [];
     return statSync(path).isDirectory() ? walk(path) : [path];
   });
 }
@@ -49,6 +52,19 @@ describe("runtime code does not name the demo app", () => {
   });
 });
 
+describe("Python cache files", () => {
+  test("walk skips __pycache__ and .pyc, so a cache holding the app name does not fail the check", () => {
+    mkdirSync(tmpdir(), { recursive: true });
+    const dir = mkdtempSync(join(tmpdir(), "app-agnostic-"));
+    mkdirSync(join(dir, "__pycache__"));
+    writeFileSync(join(dir, "__pycache__", "x.cpython-312.pyc"), "splitbill");
+    writeFileSync(join(dir, "y.pyc"), "splitbill");
+    writeFileSync(join(dir, "real.py"), "# fine\n");
+    expect(walk(dir).map((f) => relative(dir, f))).toEqual(["real.py"]);
+    expect(isCache("src/__pycache__/a.pyc")).toBe(true);
+  });
+});
+
 describe("no company name in src or template", () => {
   const COMPANY = /learnwithparam/i;
   const ALLOWED: Record<string, number> = {};
@@ -60,6 +76,7 @@ describe("no company name in src or template", () => {
       for (const e of readdirSync(join(ROOT, d), { recursive: true, withFileTypes: true })) {
         if (!e.isFile()) continue;
         const file = relative(ROOT, join(e.parentPath, e.name));
+        if (isCache(file)) continue;
         const n = readFileSync(join(ROOT, file), "utf8")
           .split("\n")
           .filter((line) => COMPANY.test(line)).length;
