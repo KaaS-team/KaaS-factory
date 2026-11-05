@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { readBaseline } from "../src/baseline-shards";
 
-// Files over the limits are frozen at their size in quality-baseline.json, so each phase can only
+// Files over the limits are frozen at their size in quality-baseline/, so each phase can only
 // shrink them. The file list is walked here, not taken from git, so the mutation copy runs it too.
 const ROOT = join(import.meta.dir, "..");
 const SKIP = /(^|\/)(node_modules|target|reports|\.git)$|^scripts\/lwp$|^tests\/fixtures$/;
@@ -28,7 +29,7 @@ test("no source file grows past its quality baseline", () => {
 
 // A baseline above a file's size leaves slack the file can grow back into, so each one is the size.
 test("every line baseline is the file's current size", () => {
-  const { lines } = JSON.parse(readFileSync(join(ROOT, "quality-baseline.json"), "utf8"));
+  const lines = readBaseline(ROOT).metrics.lines ?? {};
   const size = (text: string) => text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
   const drift = Object.entries(lines as Record<string, number>)
     .map(([file, n]) => [file, n, size(readFileSync(join(ROOT, file), "utf8"))])

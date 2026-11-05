@@ -1,0 +1,7 @@
+{
+  "name": "baseline: a rebase re-measures a line cap",
+  "file": "src/rebase-sync.ts",
+  "find": "path.startsWith(\"quality-baseline/lines/\")",
+  "replace": "false",
+  "test": "tests/rebase-sync.test.ts"
+}

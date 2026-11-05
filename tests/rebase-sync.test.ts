@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { rebaseOnBase } from "../src/merge-autonomy";
-import { mergeBaseline, mergeMutationList, pick3 } from "../src/rebase-sync";
+import { mergeMutationList, mergeShard, pick3 } from "../src/rebase-sync";
 
 const roots: string[] = [];
 afterAll(() => roots.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -25,8 +25,12 @@ async function clone(root: string, name: string, remote: string): Promise<string
 const lines = (n: number) => `${Array.from({ length: n }, (_, i) => `line ${i}`).join("\n")}\n`;
 const entry = (name: string) => JSON.stringify({ name, file: "f", find: "a", replace: "b", test: "t" });
 const list = (...names: string[]) => `[\n${names.map((n) => `  ${entry(n)}`).join(",\n")}\n]\n`;
-const baseline = (a: number, b: number) =>
-  `${JSON.stringify({ comments: {}, lines: { "a.ts": a, "b.ts": b }, names: {}, exclude: [] }, null, 2)}\n`;
+const shard = (file: string, max: number) => `${JSON.stringify({ file, max })}\n`;
+const writeShards = (dir: string, a: number, b: number) => {
+  require("node:fs").mkdirSync(join(dir, "quality-baseline/lines"), { recursive: true });
+  writeFileSync(join(dir, "quality-baseline/lines/a.ts.json"), shard("a.ts", a));
+  writeFileSync(join(dir, "quality-baseline/lines/b.ts.json"), shard("b.ts", b));
+};
 const put = async (dir: string, file: string, text: string, msg: string) => {
   writeFileSync(join(dir, file), text);
   await git(dir, "add", "-A");
@@ -43,7 +47,7 @@ async function twoBranches(conflictC = false) {
   writeFileSync(join(seed, "a.ts"), lines(401));
   writeFileSync(join(seed, "b.ts"), lines(401));
   writeFileSync(join(seed, "c.txt"), "base\n");
-  writeFileSync(join(seed, "quality-baseline.json"), baseline(401, 401));
+  writeShards(seed, 401, 401);
   await git(seed, "add", "-A");
   await git(seed, "commit", "-q", "-m", "base");
   await git(seed, "push", "-q", "origin", "HEAD:main");
@@ -68,7 +72,7 @@ test("branches that each append a mutation and move a line cap rebase with both"
   const mk = async (dir: string, a: number, b: number, names: string[]) => {
     writeFileSync(join(dir, "a.ts"), lines(a));
     writeFileSync(join(dir, "b.ts"), lines(b));
-    writeFileSync(join(dir, "quality-baseline.json"), baseline(a, b));
+    writeShards(dir, a, b);
     require("node:fs").mkdirSync(join(dir, "tests"), { recursive: true });
     writeFileSync(join(dir, "tests/mutations.json"), list(...names));
   };
@@ -89,13 +93,13 @@ test("branches that each append a mutation and move a line cap rebase with both"
 
   const head = await rebaseOnBase(work, "main", "feature");
   expect(await git(remote, "rev-parse", "feature")).toBe(head);
-  const base = JSON.parse(readFileSync(join(work, "quality-baseline.json"), "utf8"));
-  expect(base.lines).toEqual({ "a.ts": 402, "b.ts": 405 });
+  const read = (f: string) => JSON.parse(readFileSync(join(work, `quality-baseline/lines/${f}.json`), "utf8")).max;
+  expect([read("a.ts"), read("b.ts")]).toEqual([402, 405]);
   const names = (JSON.parse(readFileSync(join(work, "tests/mutations.json"), "utf8")) as { name: string }[]).map(
     (m) => m.name,
   );
   expect(names).toEqual(["Base", "Y", "X"]);
-  for (const f of ["quality-baseline.json", "tests/mutations.json"])
+  for (const f of ["quality-baseline/lines/a.ts.json", "tests/mutations.json"])
     expect(readFileSync(join(work, f), "utf8")).not.toContain("<<<<<<<");
   expect(existsSync(join(work, await git(work, "rev-parse", "--git-path", "rebase-merge")))).toBe(false);
 });
@@ -125,10 +129,11 @@ test("mergeMutationList conflicts on a doubly edited name and drops a deleted on
   expect(merged).toBe(wrap(edited("A", "t0")));
 });
 
-test("mergeBaseline drops a line cap whose file is gone", () => {
+test("mergeShard re-measures a line cap and gives up on one whose file is gone", () => {
   const dir = mkdtempSync(join(tmpdir(), "rebase-sync-"));
   roots.push(dir);
   writeFileSync(join(dir, "a.ts"), lines(3));
-  const out = mergeBaseline(baseline(401, 401), baseline(402, 401), baseline(401, 401), dir);
-  expect(JSON.parse(out!).lines).toEqual({ "a.ts": 3 });
+  const path = "quality-baseline/lines/a.ts.json";
+  expect(mergeShard(shard("a.ts", 401), shard("a.ts", 402), shard("a.ts", 410), dir, path)).toBe(shard("a.ts", 3));
+  expect(mergeShard(shard("gone.ts", 5), shard("gone.ts", 4), shard("gone.ts", 6), dir, path)).toBeUndefined();
 });

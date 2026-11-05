@@ -284,6 +284,14 @@ factory receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <k
 
 keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code).
 
+### hotspots
+
+```
+factory hotspots [--commits <n>] [--top <n>] [--json]
+```
+
+list the files that the most recent merged PRs (first-parent commits ending in (#N), default 200) changed more than once, most often first; a file listed there is where parallel PRs collide, so shard it.
+
 ### backup
 
 ```

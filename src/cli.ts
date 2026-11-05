@@ -752,10 +752,7 @@ async function cmdLearn(): Promise<void> {
   const deps = await buildWatchDeps(cloneDir, config);
   const result = await runLearn(deps, config.repo, config.base);
   if (has("json")) return console.log(successJson(result, true));
-  if (result.batched === 0) {
-    console.log("factory learn: nothing pending.");
-    return;
-  }
+  if (result.batched === 0) return void console.log("factory learn: nothing pending.");
   console.log(`factory learn: batched ${result.batched} proposal(s) on ${result.branch} -> ${result.prUrl}`);
 }
 
@@ -891,6 +888,8 @@ async function main(): Promise<void> {
       return cmdRoutine(cli);
     case "receipt":
       return (await import("./receipt-cli")).cmdReceipt(cli);
+    case "hotspots":
+      return (await import("./hotspots-cli")).cmdHotspots(cli);
     case "backup":
       return (await import("./backup-cli")).cmdBackup(cli);
     case "mcp":
