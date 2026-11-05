@@ -1,0 +1,7 @@
+{
+  "name": "a merged retro records the test tiers",
+  "file": "src/engine/common.ts",
+  "find": "if (outcome === \"merged\") recordMergedTestTiers(",
+  "replace": "if (false) recordMergedTestTiers(",
+  "test": "tests/retro.test.ts"
+}

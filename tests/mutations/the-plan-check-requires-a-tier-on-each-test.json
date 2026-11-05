@@ -1,0 +1,7 @@
+{
+  "name": "the plan check requires a tier on each test",
+  "file": "src/engine/plan-critic.ts",
+  "find": "for (const t of testTiers(comment).filter((x) => !x.tier))",
+  "replace": "for (const t of testTiers(comment).filter((x) => false && !x.tier))",
+  "test": "tests/test-tiers.test.ts"
+}

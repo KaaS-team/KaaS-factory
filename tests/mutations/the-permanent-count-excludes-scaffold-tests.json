@@ -1,0 +1,7 @@
+{
+  "name": "the permanent count excludes scaffold tests",
+  "file": "src/test-tiers.ts",
+  "find": "permanent: tiers.filter((t) => t.tier !== \"scaffold\").length,",
+  "replace": "permanent: tiers.length,",
+  "test": "tests/test-tiers.test.ts"
+}

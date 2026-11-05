@@ -1,0 +1,7 @@
+{
+  "name": "the run result is written to the step summary",
+  "file": "scripts/check-mutations.ts",
+  "find": "if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(",
+  "replace": "if (false) appendFileSync(",
+  "test": "tests/mutation-list.test.ts"
+}

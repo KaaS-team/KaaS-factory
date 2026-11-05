@@ -1,0 +1,7 @@
+{
+  "name": "the anchor check reads the per-entry mutation files too",
+  "file": "scripts/check-mutation-anchors.ts",
+  "find": "const entries: Entry[] = loadMutations(root);",
+  "replace": "const entries: Entry[] = [];",
+  "test": "tests/check-mutation-anchors.test.ts"
+}

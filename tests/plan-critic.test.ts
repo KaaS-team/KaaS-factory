@@ -35,7 +35,7 @@ const AGENT_COMMANDS = {
 };
 const ALLOW = proofAllowRules(mergeConfig({ repo: "acme/widgets", agentCommands: AGENT_COMMANDS }), 1);
 
-const plan = (acs: string[], tests = "- `test/readme.test.mjs`") =>
+const plan = (acs: string[], tests = "- `test/readme.test.mjs` (permanent)") =>
   [
     "<!-- factory:plan v1 rev=1 -->",
     "## Plan (rev 1)",
@@ -283,7 +283,7 @@ describe("the plan template the planner copies", () => {
     const tpl = readFileSync("template/.claude/skills/factory-comment/assets/plan.md", "utf8");
     const filled = tpl
       .replace(/\{\{#each ac\}\}[\s\S]*?\{\{\/each\}\}/, "- **AC-1:** It works, checked by `make check`\n")
-      .replace(/\{\{#each tests\}\}[\s\S]*?\{\{\/each\}\}/, "- `works test`\n");
+      .replace(/\{\{#each tests\}\}[\s\S]*?\{\{\/each\}\}/, "- `works test` (permanent)\n");
     expect(planMustFix(filled, {}, ALLOW)).toEqual([]);
     expect(filled).toContain("### Files to touch");
     expect(filled).toContain("**NG-");

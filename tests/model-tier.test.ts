@@ -69,7 +69,7 @@ describe("build model with a step-pinned agent", () => {
       "### Acceptance criteria",
       "- **AC-1:** x: checked by `make test`",
       "### Tests to write first",
-      "- `tests/x.test.ts`",
+      "- `tests/x.test.ts` (permanent)",
     ].join("\n"),
     "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["a"], autoApproveEligible: true }),
   };

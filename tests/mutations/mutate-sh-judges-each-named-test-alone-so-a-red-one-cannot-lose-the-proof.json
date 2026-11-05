@@ -1,0 +1,7 @@
+{
+  "name": "mutate.sh judges each named test alone so a red one cannot lose the proof",
+  "file": "template/.factory/mutate.sh",
+  "find": "units = [[t] for t in tests] if (gate or {}).get(\"fileCmd\") else [tests]",
+  "replace": "units = [tests]",
+  "test": "tests/mutate.test.ts"
+}

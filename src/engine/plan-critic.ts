@@ -14,6 +14,7 @@ import { pathProblem } from "./import-plan-step";
 import { planRubric } from "./plan-rubric";
 import { reusablePlan, reusedPlan, stampBodyHash } from "./plan-reuse";
 import { flooredPlan } from "./verify-facts";
+import { testTiers } from "../test-tiers";
 
 const AC_LINE = /^\s*-\s*\*\*(AC-\d+):\*\*(.*)$/;
 
@@ -64,6 +65,9 @@ export function planMustFix(comment: string, plan: Pick<PlanArtifact, "proof">, 
   const tests = section(comment, "Tests to write first");
   if ((plan.proof ?? "test") === "test" && tests !== undefined && !/`[^`]+`/.test(tests))
     found.push("Tests to write first names no test: name each one in backticks.");
+  if ((plan.proof ?? "test") === "test")
+    for (const t of testTiers(comment).filter((x) => !x.tier))
+      found.push(`Tests to write first: \`${t.test}\` has no tier: end its line with (scaffold) or (permanent).`);
   return found;
 }
 
