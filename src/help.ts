@@ -9,8 +9,8 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   },
   {
     name: "watch",
-    usage: "watch (--repo-dir <path> | --repo <owner/name>) [--once]",
-    does: "poll and drive the loop; --once = one pass",
+    usage: "watch (--repo-dir <path> | --repo <owner/name>) [--once] [--shadow]",
+    does: "poll and drive the loop; --once = one pass; --shadow = triage and plan each ready issue, post the result, make no branch or PR",
   },
   {
     name: "run",
@@ -99,8 +99,8 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   },
   {
     name: "onboard",
-    usage: "onboard [--repo-dir <path>] [--json]",
-    does: "report onboarding as completed, blocked or failed with the next action, and doctor as Ready, Not checked or Needs setup from a live check",
+    usage: "onboard [--repo-dir <path>] [--dry-run] [--json]",
+    does: "detect the stack, write a starter .factory/config.json unless one is filled in (--dry-run writes nothing), list what is missing, then report onboarding as completed, blocked or failed with the next action, and doctor as Ready, Not checked or Needs setup from a live check",
   },
   {
     name: "explain",
@@ -178,6 +178,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     name: "receipt",
     usage: "receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <key.pub>) [--json]",
     does: "keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code)",
+  },
+  {
+    name: "audit",
+    usage: "audit [--repo-dir <path>] [--file-issues] [--json]",
+    does: "score the repo on three lenses (repo, process, PR history, from the last 200 first-parent commits) and print one report: findings, fixes, plan; --file-issues files each finding as an issue, once while one is open",
   },
   {
     name: "hotspots",

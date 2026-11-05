@@ -46,6 +46,7 @@ import {
 import { byRank } from "./prioritize";
 import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
+import { processShadowIssue } from "./shadow";
 import { defaultWorkflow } from "./engine/workflows";
 
 import { cronStore, fireCron, fireEvent } from "./engine/triggers";
@@ -178,12 +179,11 @@ async function readyIsTrusted(issue: GhIssue, deps: WatchDeps, config: FactoryCo
 
 export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome> {
   if (!(await readyIsTrusted(issue, deps, config))) return "untrusted";
+  if (deps.shadow) return processShadowIssue(issue, deps, config, workflowOf(deps, issue));
   const claimed = await deps.git.claim(deps.cloneDir, issue.number, config.base);
   if (!claimed) {
-    // Another runner may have claimed it first, or `factory:ready` was
-    // re-applied to an issue whose branch already exists from an earlier,
-    // now-parked run. Either way, silently dropping it would strand the
-    // issue — say so instead of losing the claim quietly.
+    // Another runner claimed it first, or `factory:ready` was re-applied to an issue whose branch
+    // already exists from a parked run. Silently dropping it would strand the issue, so say so.
     await postComment(
       deps,
       config,

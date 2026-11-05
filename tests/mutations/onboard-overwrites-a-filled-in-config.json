@@ -1,0 +1,7 @@
+{
+  "name": "onboard overwrites a filled-in config",
+  "file": "src/onboard.ts",
+  "find": "if (!isFilledIn(current)) {",
+  "replace": "if (true) {",
+  "test": "tests/onboard.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "shadow mode still claims a branch",
+  "file": "src/watch.ts",
+  "find": "if (deps.shadow) return processShadowIssue",
+  "replace": "if (false as boolean) return processShadowIssue",
+  "test": "tests/shadow.test.ts"
+}

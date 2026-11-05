@@ -1,0 +1,1 @@
+{"name":"stacked prs: openStack opens a PR as ready instead of draft","file":"src/stacked-prs.ts","find":"base: slice.base, head: slice.branch, title, body, draft: true","replace":"base: slice.base, head: slice.branch, title, body, draft: false","test":"tests/stacked-prs.test.ts"}

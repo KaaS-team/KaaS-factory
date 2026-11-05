@@ -1,0 +1,7 @@
+{
+  "name": "audit passes a repo with no CI",
+  "file": "src/audit.ts",
+  "find": "\"repo-ci\": (i) =>\n    has(",
+  "replace": "\"repo-ci\": (i) =>\n    true || has(",
+  "test": "tests/audit.test.ts"
+}

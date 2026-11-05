@@ -1,0 +1,1 @@
+{"name":"stacked prs: a carried fix stops after the first slice above","file":"src/stacked-prs.ts","find":"    lower = above;\n  }\n  return { carried };","replace":"    break;\n  }\n  return { carried };","test":"tests/stacked-prs.test.ts"}
