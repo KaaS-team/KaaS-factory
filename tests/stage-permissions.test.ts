@@ -126,6 +126,19 @@ describe("project plugins stay out of a stage", () => {
   });
 });
 
+describe("read-only inspection (#173)", () => {
+  test("build and verify may run git grep; no write form of it exists", () => {
+    for (const stage of ["build", "verify"] as const) {
+      const allow = JSON.parse(stageSettings(stage, 1)).permissions.allow as string[];
+      expect(bashAllowed(allow, "git grep -n foo src")).toBe(true);
+    }
+  });
+
+  test("the guidance names the read-only commands a stage may use", () => {
+    expect(STAGE_GUIDANCE).toContain("Read-only commands allowed: git status, diff, log, show, grep");
+  });
+});
+
 describe("STAGE_GUIDANCE", () => {
   test("tells a stage to rewrite a refused test command into make or the gate script", () => {
     expect(STAGE_GUIDANCE).toContain('make test FILES="<files>"');

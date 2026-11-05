@@ -1,0 +1,7 @@
+{
+  "name": "an old cancel replays on a reopened needs-human issue",
+  "file": "src/watch.ts",
+  "find": "  if (handled(issue, latest)) return undefined;\n  if (command.type === \"cancel\") return cancelRun(issue, deps, config);\n",
+  "replace": "  if (command.type === \"cancel\") return cancelRun(issue, deps, config);\n  if (handled(issue, latest)) return undefined;\n",
+  "test": "tests/chat-commands.test.ts"
+}

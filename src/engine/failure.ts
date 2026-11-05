@@ -3,12 +3,14 @@
 // times into one hook refusal, $0.30 each, under a reason that named neither the part nor the hook.
 
 import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { homedir } from "node:os";
 import { scrubLine } from "../agents/record";
 import type { FactoryConfig } from "../config";
 import { parseDataMarkers } from "../derive";
 import type { Refusal, StageName, StageRunResult } from "../executor";
 import type { GhIssue } from "../github";
+import { readLedger, recordFailure, writeLedger } from "../failure-ledger";
 import { LABEL } from "../labels";
 import { stageAllowRules, uncoveredPart } from "../stage-permissions";
 import { EPOCH, finish, moveLabel, postComment, type WatchDeps } from "./common";
@@ -22,7 +24,7 @@ const cap = (text: string, n: number) => {
 };
 
 // A denial no preset classified (a test fixture, another agent) is "Tool target", refused by the allow list.
-function refusalsOf(result: StageRunResult): readonly Refusal[] {
+export function refusalsOf(result: StageRunResult): readonly Refusal[] {
   if (result.refusals?.length) return result.refusals;
   return result.permissionDenials.map((d) => {
     const at = d.indexOf(" ");
@@ -75,6 +77,21 @@ export async function failureLine(
     visible,
     fingerprint: `${stage}: ${cap(cause, 200)}`,
   };
+}
+
+// A failed or parked run writes one ledger row (#164), keyed by the cause with the attempt and spend
+// stripped so a repeat lands on the same row. The fix link and check are named later with recordFix.
+// A ledger that cannot be written must not keep the run from parking.
+export function recordRunFailure(deps: WatchDeps, config: FactoryConfig, issueNumber: number, reason = ""): void {
+  const failure = reason.replace(/; spent \$[\d.]+ on this issue$/, "").replace(/^(\w+) attempt \d+: /, "$1: ");
+  const run = deps.state.getRun(config.repo, issueNumber);
+  if (!failure || !run) return;
+  try {
+    const dir = join(deps.workspacesDir, ".failure-ledger");
+    writeLedger(dir, recordFailure(readLedger(dir), failure, run.id));
+  } catch (e) {
+    console.error(`failure ledger for #${issueNumber} not written:`, e);
+  }
 }
 
 // What an operator changes to fix a cause: the repo's config.json, the issue body, this machine's machine.json.

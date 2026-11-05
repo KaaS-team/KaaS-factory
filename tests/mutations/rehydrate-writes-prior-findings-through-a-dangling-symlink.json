@@ -1,0 +1,7 @@
+{
+  "name": "rehydrate writes prior findings through a dangling symlink",
+  "file": "src/rehydrate.ts",
+  "find": "rmSync(priorPath, { force: true, recursive: true });",
+  "replace": "",
+  "test": "tests/rehydrate.test.ts"
+}

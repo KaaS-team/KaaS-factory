@@ -1,0 +1,7 @@
+{
+  "name": "a refused tool call is not counted on the stage run",
+  "file": "src/engine/common.ts",
+  "find": "refused_calls: refusalsOf(result).length,",
+  "replace": "refused_calls: 0,",
+  "test": "tests/scenarios.test.ts"
+}

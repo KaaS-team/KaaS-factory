@@ -1,0 +1,7 @@
+{
+  "name": "a workspace behind origin is recreated and loses its work",
+  "file": "src/git.ts",
+  "find": "    if ((await run([\"merge-base\", \"--is-ancestor\", \"HEAD\", remote])).code === 0) return false;\n",
+  "replace": "",
+  "test": "tests/git.test.ts"
+}

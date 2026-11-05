@@ -1,0 +1,7 @@
+{
+  "name": "a workspace on a recreated branch is kept",
+  "file": "src/git.ts",
+  "find": "if (!(await this.diverged(worktreeDir, `origin/${branch}`))) return;",
+  "replace": "return;",
+  "test": "tests/git.test.ts"
+}

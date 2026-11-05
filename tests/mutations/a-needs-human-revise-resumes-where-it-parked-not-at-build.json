@@ -1,0 +1,7 @@
+{
+  "name": "a needs-human revise resumes where it parked, not at build",
+  "file": "src/watch.ts",
+  "find": "const stage = command.type === \"revise\" ? build!.id : retryAt(command.step);",
+  "replace": "const stage = retryAt(undefined);",
+  "test": "tests/chat-commands.test.ts"
+}

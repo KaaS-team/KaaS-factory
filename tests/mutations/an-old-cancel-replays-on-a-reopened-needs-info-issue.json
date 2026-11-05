@@ -1,0 +1,7 @@
+{
+  "name": "an old cancel replays on a reopened needs-info issue",
+  "file": "src/watch.ts",
+  "find": "return handled(issue, reply) ? \"waiting\" : cancelRun(issue, deps, config);",
+  "replace": "return cancelRun(issue, deps, config);",
+  "test": "tests/chat-commands.test.ts"
+}
