@@ -115,11 +115,12 @@ describe("pollOnce's inFlight set makes overlapping polls (what startWatch now r
   test("a newly-surfaced issue is picked up by an overlapping poll without waiting for an earlier poll's batch to finish", async () => {
     // #1 is deliberately much slower than #2, so #2's dispatch (started by
     // the later, overlapping poll) can finish while #1's is still running.
-    const { deps, config, github, executor, workspacesDir, cloneDir } = setup((n) => (n === 1 ? 200 : 10));
+    const { deps, config, github, executor, workspacesDir, cloneDir } = setup((n) => (n === 1 ? 1500 : 10));
     const inFlight = new Set<number>();
 
-    const first = pollOnce(deps, config, inFlight); // dispatches #1, takes 200ms
-    await Bun.sleep(5);
+    const first = pollOnce(deps, config, inFlight); // dispatches #1, takes 1500ms
+    // Waits for #1 to start, not a fixed sleep, which a loaded runner outran.
+    for (let t = 0; t < 1000 && !executor.active.has(1); t += 5) await Bun.sleep(5);
     github.issues.set(2, baseIssue(2, ["factory:ready"])); // surfaces mid-batch
     const second = pollOnce(deps, config, inFlight); // must not wait on `first`
 
