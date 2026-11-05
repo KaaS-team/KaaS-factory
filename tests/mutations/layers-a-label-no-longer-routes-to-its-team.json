@@ -1,0 +1,1 @@
+{"name":"layers: a label no longer routes to its team","file":"src/team/route.ts","find":"if (byLabel) return","replace":"if (false as boolean && byLabel) return","test":"tests/team-layers.test.ts"}

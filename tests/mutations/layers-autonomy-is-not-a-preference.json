@@ -1,0 +1,1 @@
+{"name":"layers: autonomy is not a preference","file":"src/team/resolve.ts","find":"[\"model\", \"workflow\", \"autonomy\", \"labels\", \"timeouts\"]","replace":"[\"model\", \"workflow\", \"labels\", \"timeouts\"]","test":"tests/team-layers.test.ts"}

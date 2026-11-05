@@ -51,6 +51,15 @@ export const DENY_RULES: readonly string[] = [
   "budget_usd_month",
 ];
 
+export type AutonomyLevel = "supervised" | "semi" | "full";
+export const AUTONOMY_LEVELS: readonly AutonomyLevel[] = ["supervised", "semi", "full"];
+
+// Which issues a team takes when several teams list one repo.
+export interface OwnsSpec {
+  labels?: string[];
+  paths?: string[];
+}
+
 export interface TeamFile {
   name: string;
   mission?: string;
@@ -65,10 +74,13 @@ export interface TeamFile {
   budget_usd_month?: number;
   concurrency?: number;
   orchestrate?: OrchestrateSpec;
+  autonomy?: AutonomyLevel;
+  owns?: OwnsSpec;
 }
 
 export interface OrgFile {
   name: string;
+  autonomy?: AutonomyLevel;
   roles?: Record<string, RoleSpec>;
   workflows?: Record<string, unknown>;
   policy?: PolicySpec;
@@ -93,6 +105,11 @@ const strs = typed("a list of strings", isStrings);
 const map = typed("a mapping", isObject);
 const risk: Check = (path, v) =>
   RISKS.includes(v as Risk) ? undefined : `${path} must be low, medium or high, got ${JSON.stringify(v)}.`;
+
+const autonomy: Check = (path, v) =>
+  AUTONOMY_LEVELS.includes(v as AutonomyLevel)
+    ? undefined
+    : `${path} must be supervised, semi or full, got ${JSON.stringify(v)}.`;
 
 function fields(path: string, raw: unknown, shape: Record<string, Check>, out: string[]): void {
   if (!isObject(raw)) {
@@ -186,6 +203,10 @@ export function teamProblems(raw: unknown, kind: "org" | "team"): string[] {
   if (typeof raw.name !== "string" || raw.name === "") out.push("name is required and must be a non-empty string.");
   if (raw.roles !== undefined) roles("roles", raw.roles, out);
   if (raw.workflows !== undefined && !isObject(raw.workflows)) out.push("workflows must be a mapping.");
+  if (raw.autonomy !== undefined) {
+    const problem = autonomy("autonomy", raw.autonomy);
+    if (problem) out.push(problem);
+  }
   if (raw.policy !== undefined) policy("policy", raw.policy, out);
   if (raw.policy !== undefined) denyProblems("policy", raw.policy, kind, out);
   if (kind === "org") {
@@ -211,6 +232,7 @@ export function teamProblems(raw: unknown, kind: "org" | "team"): string[] {
     out,
   );
   if (raw.source !== undefined) source("source", raw.source, out);
+  if (raw.owns !== undefined) fields("owns", raw.owns, { labels: strs, paths: strs }, out);
   if (raw.orchestrate !== undefined) out.push(...orchestrateProblems(raw.orchestrate, `${kind}.orchestrate`));
   return out.map((p) => p.replace(/^team\./, ""));
 }

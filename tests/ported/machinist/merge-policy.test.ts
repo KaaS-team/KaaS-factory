@@ -12,7 +12,9 @@ import {
   checkReadiness,
   decideMerge,
   type DecideMergeInput,
+  decideOperatorMerge,
   renderAuditComment,
+  teamApprovalRefusals,
 } from "../../../src/merge-policy";
 import type { PrFacts } from "../../../src/pr-facts";
 import { riskObject } from "../../../src/risk";
@@ -270,4 +272,17 @@ test("a low-risk change with every proof green merges with no human, and one red
   expect(tier({ facts: facts({ risk: medium }) }).outcome).toBe("refuse");
   expect(tier({ facts: undefined }).outcome).toBe("refuse");
   expect(tier({ changedFiles: Array.from({ length: 11 }, (_, i) => file(`lib/f${i}.ts`)) }).outcome).toBe("refuse");
+});
+
+test("approval-chain: a click on a chained path with no file list is refused", () => {
+  const chains = { chains: [{ paths: ["db/**"], approvers: ["alice"] }], files: undefined };
+  const d = decideOperatorMerge(readiness(), ci(), undefined, chains);
+  expect(d.outcome).toBe("refuse");
+  expect(d.outcome === "refuse" && d.refusals.map((r) => r.reason)).toEqual(["approval-chain"]);
+});
+
+test("autonomy-level: a team below merge-on-green is refused with the level named", () => {
+  const r = teamApprovalRefusals({ level: "change-with-approval", chains: [] }, [], undefined);
+  expect(r.map((x) => x.reason)).toEqual(["autonomy-level"]);
+  expect(teamApprovalRefusals({ level: "merge-on-green", chains: [] }, [], undefined)).toEqual([]);
 });

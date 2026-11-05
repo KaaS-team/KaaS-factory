@@ -1,0 +1,11 @@
+{
+  "name": "@kaas-team/factory",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "description": "Installs the released KaaS Factory binary for this platform and checks its sha256.",
+  "type": "module",
+  "bin": { "factory": "bin/factory.js" },
+  "scripts": { "postinstall": "node install.js" },
+  "files": ["install.js", "bin/factory.js"],
+  "engines": { "node": ">=18" }
+}
