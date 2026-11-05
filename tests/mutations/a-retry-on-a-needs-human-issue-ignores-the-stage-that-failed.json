@@ -1,0 +1,7 @@
+{
+  "name": "a retry on a needs-human issue ignores the stage that failed",
+  "file": "src/watch.ts",
+  "find": "? step! : derived.resumeStage",
+  "replace": "? step! : \"build\"",
+  "test": "tests/chat-commands.test.ts"
+}

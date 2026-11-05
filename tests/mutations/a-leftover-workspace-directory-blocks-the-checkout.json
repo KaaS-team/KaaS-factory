@@ -1,0 +1,7 @@
+{
+  "name": "a leftover workspace directory blocks the checkout",
+  "file": "src/git.ts",
+  "find": "    rmSync(worktreeDir, { recursive: true, force: true });\n    await this.runner.run([\"worktree\", \"add\", \"-B\"",
+  "replace": "    await this.runner.run([\"worktree\", \"add\", \"-B\"",
+  "test": "tests/git.test.ts"
+}
