@@ -15,10 +15,10 @@ no repo: control plane + relay (the image default); with a repo: watch + dashboa
 ### watch
 
 ```
-factory watch (--repo-dir <path> | --repo <owner/name>) [--once]
+factory watch (--repo-dir <path> | --repo <owner/name>) [--once] [--shadow]
 ```
 
-poll and drive the loop; --once = one pass.
+poll and drive the loop; --once = one pass; --shadow = triage and plan each ready issue, post the result, make no branch or PR.
 
 ### run
 
@@ -159,10 +159,10 @@ check the loop can run; --fix creates missing labels.
 ### onboard
 
 ```
-factory onboard [--repo-dir <path>] [--json]
+factory onboard [--repo-dir <path>] [--dry-run] [--json]
 ```
 
-report onboarding as completed, blocked or failed with the next action, and doctor as Ready, Not checked or Needs setup from a live check.
+detect the stack, write a starter .factory/config.json unless one is filled in (--dry-run writes nothing), list what is missing, then report onboarding as completed, blocked or failed with the next action, and doctor as Ready, Not checked or Needs setup from a live check.
 
 ### explain
 
@@ -283,6 +283,14 @@ factory receipt (keygen --out <key.pem> | verify <receipt.dsse.json> --pubkey <k
 ```
 
 keygen: an Ed25519 key that signs each run's acceptance receipt; verify: check one here (kaas-verify checks it with no factory code).
+
+### audit
+
+```
+factory audit [--repo-dir <path>] [--file-issues] [--json]
+```
+
+score the repo on three lenses (repo, process, PR history, from the last 200 first-parent commits) and print one report: findings, fixes, plan; --file-issues files each finding as an issue, once while one is open.
 
 ### hotspots
 

@@ -166,7 +166,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     holdoutRunner: new ShellHoldoutRunner(),
     rechecker: new DiffAnchorRechecker(),
     proofGit: new ShellProofGit(),
-    cloneDir,
+    ...{ cloneDir, shadow: has("shadow") },
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
     setupRunner: new ShellSetupRunner(),
     // Every CLI invocation shares FACTORY_HOME/machine.db, so a second repo's watcher here is respected.
@@ -419,27 +419,23 @@ async function cmdRebaseline(): Promise<void> {
 //      the ones from before the fix, so run doctor again to see the repaired state.
 //
 // --json prints the same rows as machine-readable output (doctorOutput owns the shape).
-//
 // onboard (cmdOnboard below) calls the same liveDoctorChecks, but only once the template and a
 // filled-in config exist, so the two commands cannot disagree about what a live check is.
 //
 // A row is { name, ok, detail, fixable } and may add warn. Keep detail to one line an operator can
 // act on. Doctor output is pasted into issues, so tokens, hosts and stack traces stay out of it.
-//
 // A check that cannot reach GitHub returns a warn row naming what went unchecked, as
 // mergeMethodCheck does, rather than failing. A failing row says the setup is wrong.
 //
-// Order matters only for reading: core rows come first, then one entry per feature, in the order
-// the entries sit in DOCTOR_CHECKS. A check that depends on another's row belongs in the same
-// entry, because separate entries run one after the other and share nothing.
+// Order matters only for reading: core rows first, then one entry per feature in DOCTOR_CHECKS order.
+// A check that depends on another's row belongs in the same entry: entries share nothing.
 //
 // Nothing in this comment is enforced except the part tests/doctor-checks.test.ts asserts.
 // The fs import above keeps accessSync and constants unused on purpose: the legacy mutation list
 // anchors on that exact line, and the list is read-only until scripts/split-mutations.ts moves it.
 // Drop them from the line when that mutation has moved to tests/mutations/.
 //
-// Not here: probing agents and runtimes (agentChecks in src/doctor.ts), the label fixer (fixDoctor),
-// and the onboard report shape (src/onboard-json.ts).
+// Not here: agent probes (src/doctor.ts agentChecks), the label fixer (fixDoctor), the onboard report (src/onboard-json.ts).
 //
 // Adding a check:
 //   1. Write `async (config, env) => DoctorCheck[]` in the feature's own file.
@@ -474,8 +470,10 @@ async function cmdDoctor(): Promise<void> {
 // Doctor runs live inside onboard only once the template and a filled-in config exist.
 async function cmdOnboard(): Promise<void> {
   const dir = await resolveCloneDir();
-  const report = await buildOnboardReport(dir, () =>
-    loadConfig(dir).then((config) => liveDoctorChecks(config, { cloneDir: dir, github: makeScm(config) })),
+  const report = await buildOnboardReport(
+    dir,
+    () => loadConfig(dir).then((config) => liveDoctorChecks(config, { cloneDir: dir, github: makeScm(config) })),
+    !has("dry-run"),
   );
   console.log(onboardOutput(report, has("json")));
   if (report.status !== "completed") process.exit(EXIT.checksFailed);
@@ -888,6 +886,8 @@ async function main(): Promise<void> {
       return cmdRoutine(cli);
     case "receipt":
       return (await import("./receipt-cli")).cmdReceipt(cli);
+    case "audit":
+      return (await import("./audit-cli")).cmdAudit(cli);
     case "hotspots":
       return (await import("./hotspots-cli")).cmdHotspots(cli);
     case "backup":
