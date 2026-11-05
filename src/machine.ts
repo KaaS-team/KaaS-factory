@@ -15,6 +15,7 @@ import type { AgentSandbox } from "./agents/agent-sandbox";
 import type { Agent37Spec } from "./adapters/agent37/execution";
 import { type Connection, connectionProblems } from "./mc/connections";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
+import { type RepoRegistry, registryProblems } from "./repo-registry";
 import { GATEWAY_KEY_ENV, isProviderHost, type LlmGateway } from "./agents/gateway";
 
 export interface MachineConfig {
@@ -30,6 +31,8 @@ export interface MachineConfig {
   readonly capabilities?: readonly string[];
   // Mission control connections: each names the environment variable holding its key, never the key.
   readonly sessions?: { readonly connections: Readonly<Record<string, Connection>> };
+  // The repos this machine serves; see src/repo-registry.ts.
+  readonly repos?: RepoRegistry;
 }
 
 const DEFAULT_SLOTS = 2;
@@ -87,8 +90,13 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     const problems = connectionProblems(raw.sessions).map((p) => `${path}: ${p}`);
     if (problems.length) throw new Error(problems.join("\n"));
   }
+  if (raw.repos !== undefined) {
+    const problems = registryProblems(raw.repos, path);
+    if (problems.length) throw new Error(problems.join("\n"));
+  }
   return {
     slots,
+    ...(raw.repos ? { repos: raw.repos as RepoRegistry } : {}),
     ...(raw.sessions ? { sessions: raw.sessions as { connections: Record<string, Connection> } } : {}),
     ...(raw.llmGateway ? { llmGateway: raw.llmGateway as { url: string } } : {}),
     dailyUsd: raw.dailyUsd as number | undefined,

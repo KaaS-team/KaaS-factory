@@ -1,0 +1,1 @@
+{"name":"a registry cap can raise a repo's own concurrency","file":"src/repo-registry.ts","find":"Math.min(merged.concurrency, entry.concurrency ?? merged.concurrency)","replace":"entry.concurrency ?? merged.concurrency","test":"tests/repo-registry.test.ts"}
