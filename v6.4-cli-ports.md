@@ -22,6 +22,7 @@ Treat it as a starting point and read the code before you trust it. If an issue 
 - A repo hook refuses edits under `.factory/`, `.claude/`, `.agents/` and `.github/`. Never work around it. If an issue needs a change there, put the exact unified diff in your report under "Staged workflow changes" and the supervisor applies it.
 - Do not edit `scripts/kaas/`: those files are vendored from a shared kit and the next sync overwrites any edit. If an issue seems to need it, design around it or record it as blocked.
 - Do not run the whole `bun test tests/` in the foreground: it takes over two minutes and passes the tool's 120s limit. Run the test files you touched. `tests/lean-resources.test.ts` can fail on memory under load; retry it alone before you blame your change.
+- CI runs every new or changed test file three times with `make test FILES="<files>" TEST_ARGS="--rerun-each 3"`, and `make fast` does not. Run that before each push. `tests/preload.ts` removes its temp root after each run, so a test that calls `mkdtempSync(join(tmpdir(), ...))` must call `mkdirSync(tmpdir(), { recursive: true })` first.
 - Keep `AGENTS.md`'s "things that change together" in step when you touch one of those pairs.
 - Never run `make agent-matrix`. Never run the `factory` watcher against a real repo. No real tokens or model calls in tests.
 - Do not comment on, label or close any issue, and do not open a PR. The supervisor does that.
