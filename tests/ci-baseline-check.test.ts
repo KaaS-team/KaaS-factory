@@ -34,7 +34,7 @@ describe("doctor: shared CI baseline", () => {
   });
 
   test("the staged reusable workflow is callable and runs the gate", () => {
-    const text = readFileSync(join(import.meta.dir, "../ci/ci-baseline.yml"), "utf8");
+    const text = readFileSync(join(import.meta.dir, "../.github/workflows/ci-baseline.yml"), "utf8");
     const doc = Bun.YAML.parse(text) as {
       on: { workflow_call: unknown };
       jobs: Record<string, { steps: { run?: string }[] }>;
