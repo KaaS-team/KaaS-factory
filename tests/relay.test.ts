@@ -254,7 +254,7 @@ describe("the cockpit follows it", () => {
 
 describe("wiring", () => {
   test("both ways of starting the dashboard start the publisher", () => {
-    for (const file of ["src/cli.ts", "dashboard/server.ts"])
+    for (const file of ["dashboard/index.ts", "dashboard/server.ts"])
       expect(readFileSync(join(ROOT, file), "utf8")).toMatch(/^ {2}(dashboard|app)\.remote\.start\(\);$/m);
     // The plane's remote half owns the publisher, and seals what it sends.
     expect(readFileSync(join(ROOT, "dashboard/plane/remote.ts"), "utf8")).toContain(

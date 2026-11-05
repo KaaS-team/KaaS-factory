@@ -1,0 +1,1 @@
+{"name":"dashboard package: the host comes from the environment","file":"src/dashboard-host.ts","find":"hostname: env.FACTORY_DASHBOARD_HOST ?? \"127.0.0.1\"","replace":"hostname: \"127.0.0.1\"","test":"tests/dashboard-package.test.ts"}

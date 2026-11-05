@@ -1,0 +1,13 @@
+{
+  "name": "@kaas-team/factory-mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The factory as an MCP server on stdio. The core starts it by name and runs without it.",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

@@ -38,18 +38,19 @@ const WRITERS: Record<string, { sites: number; driver: string } | { sites: numbe
     sites: 1,
     echoes: "the escaped-defect issue states the sha, the smoke failure and the revert link",
   },
-  "mcp-server.ts": { sites: 1, echoes: "start_task files the title and body its MCP caller wrote" },
+  "../packages/mcp-server/index.ts": { sites: 1, echoes: "start_task files the title and body its MCP caller wrote" },
   "integrations/steer.ts": { sites: 1, echoes: "a board's new task files the title and body its sender wrote" },
 };
 
 function writeSites(): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const d of readdirSync(SRC, { recursive: true, withFileTypes: true })) {
-    if (!d.isFile() || !d.name.endsWith(".ts")) continue;
-    const file = join(d.parentPath, d.name);
-    const n = [...readFileSync(file, "utf8").matchAll(WRITE_RE)].length;
-    if (n > 0) out[relative(SRC, file)] = n;
-  }
+  for (const dir of [SRC, join(ROOT, "packages")])
+    for (const d of readdirSync(dir, { recursive: true, withFileTypes: true })) {
+      if (!d.isFile() || !d.name.endsWith(".ts") || d.parentPath.includes("node_modules")) continue;
+      const file = join(d.parentPath, d.name);
+      const n = [...readFileSync(file, "utf8").matchAll(WRITE_RE)].length;
+      if (n > 0) out[relative(SRC, file)] = n;
+    }
   return out;
 }
 

@@ -1,0 +1,1 @@
+{"name":"dashboard package: the core imports the dashboard","file":"src/cli.ts","find":"serveDashboard as startDashboard } from \"./dashboard-host\";","replace":"serveDashboard as startDashboard } from \"./dashboard-host\";\nimport \"../dashboard/server\";","test":"tests/dashboard-package.test.ts"}

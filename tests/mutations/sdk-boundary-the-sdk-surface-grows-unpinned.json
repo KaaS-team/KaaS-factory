@@ -1,0 +1,1 @@
+{"name":"sdk boundary: the sdk surface grows unpinned","file":"src/sdk.ts","find":"export { LABEL } from \"./labels\";","replace":"export { LABEL, LABELS } from \"./labels\";","test":"tests/sdk-boundary.test.ts"}

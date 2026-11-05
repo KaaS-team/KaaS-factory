@@ -65,6 +65,7 @@ RUN set -e; for agent in $AGENTS; do \
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages ./packages
+COPY dashboard/package.json ./dashboard/package.json
 RUN bun install --frozen-lockfile
 
 COPY bin ./bin

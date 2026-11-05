@@ -31,9 +31,8 @@ import { fixDoctor } from "./doctor";
 import { liveDoctorChecks } from "./doctor-checks";
 import { buildOnboardReport, doctorOutput, onboardOutput, unusableConfigCheck } from "./onboard-json";
 import { agentVm, loadMachineConfig, machineGateway, MachineLeases, MachineSpend } from "./machine";
-import { createDashboard, servingAccess as plane } from "../dashboard/server";
+import { type DashboardProject, DashboardMissing, serveDashboard as startDashboard } from "./dashboard-host";
 import { runnerBlobStore } from "./blobs";
-import type { DashboardProject } from "../dashboard/project";
 import {
   workspacesDir as defaultWorkspacesDir,
   defaultStatePath,
@@ -481,32 +480,24 @@ async function cmdOnboard(): Promise<void> {
   if (report.status !== "completed") process.exit(EXIT.checksFailed);
 }
 
-// `dashboard/server.ts`'s own `if (import.meta.main)` block never fires
-// here: this file is the process entry point, so that module is always
-// imported, not run directly. Call createDashboard + Bun.serve ourselves,
-// mirroring that block exactly (audit finding #16): loopback by default,
-// and remoteAddress passed through so handle() can enforce it. Shared by
-// `dashboard` (cockpit only, any mode) and `up` (Docker's single-process
-// entrypoint: watch + dashboard together).
-function serveDashboard(
+// The dashboard is its own package, started through the factory it exports (src/dashboard-host.ts).
+// `dashboard` needs it; `up` carries on without it and says so.
+async function serveDashboard(
   state: FactoryState,
   github: ScmPort,
   repo: string,
   autoApproveDefault = false,
   fleet?: Pick<FactoryConfig, "agents" | "stages">,
   project?: DashboardProject,
-): number {
+  required = true,
+): Promise<void> {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
-  const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
-  const app = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet, undefined, project, plane());
-  const server = Bun.serve({
-    port,
-    hostname,
-    fetch: (req: Request): Promise<Response> => app.handle(req, server.requestIP(req)?.address),
-  });
-  console.log(`factory dashboard: http://${hostname}:${port} (repo=${repo || "unset"})`);
-  app.remote.start();
-  return port;
+  try {
+    await startDashboard({ state, github, repo, autoApproveDefault, fleet, project }, port);
+  } catch (err) {
+    if (!(err instanceof DashboardMissing) || required) throw err;
+    console.log(`factory up: no dashboard (${err.message})`);
+  }
 }
 
 // The repo the Workflows and Settings pages describe.
@@ -523,7 +514,7 @@ async function cmdDashboard(): Promise<void> {
     flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH);
   const state = new FactoryState(dbPath);
   const github = makeScm(config ?? DEFAULT_CONFIG);
-  serveDashboard(
+  await serveDashboard(
     state,
     github,
     repo,
@@ -551,13 +542,14 @@ async function cmdUp(): Promise<void> {
     if (r.paused) console.log(`factory up: paused — ${r.reason}`);
     else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
   });
-  serveDashboard(
+  await serveDashboard(
     deps.state,
     deps.github,
     config.repo,
     config.riskPolicy.autoApproveLowRisk,
     config,
     dashboardProject(cloneDir, config),
+    false,
   );
   console.log(`factory up: polling ${config.repo} every ${config.pollIntervalSeconds}s. Ctrl+C to stop.`);
   await new Promise(() => {}); // keep the process alive
