@@ -1,0 +1,7 @@
+{
+  "name": "board check requires a milestone of a later issue",
+  "file": "scripts/board-check.ts",
+  "find": " && !i.labels.includes(LATER_LABEL)",
+  "replace": "",
+  "test": "tests/board-check.test.ts"
+}
