@@ -1,0 +1,1 @@
+{"name":"the team file monthly cap is not applied to the config","file":"src/team/apply.ts","find":"team && monthlyUsd !== undefined","replace":"false","test":"tests/team-budget.test.ts"}

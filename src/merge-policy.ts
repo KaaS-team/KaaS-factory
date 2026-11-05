@@ -5,6 +5,7 @@ import { type Autonomy, mergeAutoAllowed } from "./autonomy";
 import { touchesProtectedPath } from "./boundary";
 import type { CiResult } from "./ci";
 import type { MergeConfig } from "./config";
+import { type Actor, actorLine, type ApprovalPolicy, chainRefusals, mayMerge } from "./team/approval";
 import { humanPathRefusals } from "./human-paths";
 import type { GitHub, MergeReadiness } from "./github";
 import type { MergeSettings } from "./merge-method";
@@ -41,7 +42,9 @@ export type MergeRefusalReason =
   | "policy-not-auto"
   | "codeowner-approval"
   | "autonomy-supervised"
-  | "signal-failed";
+  | "signal-failed"
+  | "approval-chain"
+  | "autonomy-level";
 
 export interface MergeRefusal {
   readonly reason: MergeRefusalReason;
@@ -159,6 +162,19 @@ export function autoEligible(
   return refusals;
 }
 
+// A level below merge-on-green never merges; a chain names the first approver still missing.
+export function teamApprovalRefusals(
+  approval: ApprovalPolicy | undefined,
+  files: readonly ChangedFile[],
+  approvedBy: readonly string[] | undefined,
+): MergeRefusal[] {
+  if (!approval) return [];
+  const level = mayMerge(approval.level)
+    ? []
+    : [{ reason: "autonomy-level" as const, detail: `the team's level is "${approval.level}", a person merges` }];
+  return [...level, ...chainRefusals(approval.chains, files, approvedBy)];
+}
+
 export interface DecideMergeInput {
   readonly readiness: MergeReadiness;
   readonly ci: CiResult;
@@ -174,6 +190,8 @@ export interface DecideMergeInput {
   readonly facts?: PrFacts;
   // review.alwaysHumanPaths: added to the defaults in src/human-paths.ts.
   readonly humanPaths?: readonly string[];
+  // The team's autonomy level and approval chains (src/team/approval.ts).
+  readonly approval?: ApprovalPolicy;
 }
 
 // Authority is explicit only (herdr SKILL.md:18-23): "merge" is returned only
@@ -192,6 +210,7 @@ export function decideMerge(input: DecideMergeInput): MergeDecision {
     ...eligibilityRefusals,
     ...ownerRefusals,
     ...humanPathRefusals(input.changedFiles, input.humanPaths),
+    ...teamApprovalRefusals(input.approval, input.changedFiles, input.readiness.approvedBy),
   ];
   if (mode !== undefined) {
     if (mode === "supervised")
@@ -259,9 +278,18 @@ export function decideOperatorMerge(
     readonly files: readonly ChangedFile[] | undefined;
     readonly approvedBy: readonly string[];
   },
+  // A click still waits for the chain; files undefined fails closed like the owner check.
+  chains?: { readonly chains: ApprovalPolicy["chains"]; readonly files: readonly ChangedFile[] | undefined },
 ): MergeDecision {
   const headSha = readiness.headRefOid;
   const refusals = checkReadiness(readiness, ci, readiness.baseRefName);
+  if (chains?.chains.length) {
+    refusals.push(
+      ...(chains.files
+        ? chainRefusals(chains.chains, chains.files, readiness.approvedBy)
+        : [{ reason: "approval-chain" as const, detail: "the PR's file list was unavailable" }]),
+    );
+  }
   if (owners) {
     refusals.push(
       ...(owners.files
@@ -276,23 +304,25 @@ export function decideOperatorMerge(
 // A separate function from renderAuditComment, so the ported test's exact
 // "auto"/"dry-run" wording assertions never have to account for a third,
 // operator-triggered source.
-export function renderOperatorAuditComment(decision: MergeDecision): string {
+export function renderOperatorAuditComment(decision: MergeDecision, actor?: Actor): string {
   const marker = mergePolicyMarker(decision.headSha);
+  const who = actor ? `\n${actorLine(actor)}` : "";
   if (decision.outcome === "merge") {
-    return `${marker}\nMerge policy: **operator**, approved and merged \`${decision.headSha.slice(0, 7)}\` from the dashboard.`;
+    return `${marker}\nMerge policy: **operator**, approved and merged \`${decision.headSha.slice(0, 7)}\` from the dashboard.${who}`;
   }
   const lines = decision.refusals.map((r) => `- **${r.reason}**: ${r.detail}`);
-  return [marker, "Merge policy: **operator**, blocked.", ...(lines.length ? ["", "Refusals:", ...lines] : [])].join(
-    "\n",
-  );
+  return [marker, "Merge policy: **operator**, blocked.", ...(lines.length ? ["", "Refusals:", ...lines] : [])]
+    .join("\n")
+    .concat(who);
 }
 
 // The comment posted to the PR either way: what was decided, and why, so a
 // human reviewing a "dry-run" or "refuse" outcome sees every reason at once.
-export function renderAuditComment(decision: MergeDecision): string {
+export function renderAuditComment(decision: MergeDecision, actor?: Actor): string {
   const marker = mergePolicyMarker(decision.headSha);
+  const who = actor ? `\n${actorLine(actor)}` : "";
   if (decision.outcome === "merge") {
-    return `${marker}\nMerge policy: **auto** — all gates passed, merging \`${decision.headSha.slice(0, 7)}\`.`;
+    return `${marker}\nMerge policy: **auto** — all gates passed, merging \`${decision.headSha.slice(0, 7)}\`.${who}`;
   }
   const label = decision.outcome === "dry-run" ? "dry-run" : "auto";
   const verdict =
@@ -302,9 +332,7 @@ export function renderAuditComment(decision: MergeDecision): string {
         : "would NOT auto-merge"
       : "blocked";
   const lines = decision.refusals.map((r) => `- **${r.reason}**: ${r.detail}`);
-  return [
-    marker,
-    `Merge policy: **${label}** — ${verdict}.`,
-    ...(lines.length ? ["", "Refusals:", ...lines] : []),
-  ].join("\n");
+  return [marker, `Merge policy: **${label}** — ${verdict}.`, ...(lines.length ? ["", "Refusals:", ...lines] : [])]
+    .join("\n")
+    .concat(who);
 }

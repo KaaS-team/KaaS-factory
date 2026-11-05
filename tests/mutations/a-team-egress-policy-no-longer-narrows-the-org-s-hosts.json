@@ -1,0 +1,1 @@
+{"name":"a team egress policy no longer narrows the org's hosts","file":"src/team/resolve.ts","find":"pick(\"policy.egress.hosts\", eg.hosts, list);","replace":"","test":"tests/team-egress-policy.test.ts"}

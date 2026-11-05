@@ -1,0 +1,1 @@
+{"name":"the suggest level still builds","file":"src/engine/runner.ts","find":"&& !mayBuild(config.approval.level)) {","replace":"&& false) {","test":"tests/team-approval.test.ts"}

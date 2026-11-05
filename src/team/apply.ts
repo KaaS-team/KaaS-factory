@@ -4,6 +4,9 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { FactoryConfig, RouteConfig } from "../config";
 import { resolveOrchestrate } from "../orchestrate/config";
+import { approvalPolicyOf } from "./approval";
+import { teamCapUsd } from "./budget";
+import { egressPolicyOf } from "./egress-policy";
 import { loadOrg, loadTeams } from "./load";
 import { type Resolved, resolveTeam } from "./resolve";
 import { type PolicySpec, type Risk, RISKS } from "./schema";
@@ -66,18 +69,30 @@ export function applyTeam(input: ApplyInput): TeamApplied {
   for (const [k, v] of Object.entries(orch.origin)) resolved.origin[`orchestrate.${k}`] = v;
   resolved.problems.push(...orch.problems);
 
-  const merge =
+  const approval = approvalPolicyOf(p);
+  const held =
     p.auto_merge?.allowed === false && config.merge.policy === "auto"
       ? { ...config.merge, policy: "dry-run" as const }
       : config.merge;
+  // Below merge-on-green a person approves the plan and the merge: the tier is pulled back to supervised.
+  const merge = approval && approval.level !== "merge-on-green" ? { ...held, autonomy: "supervised" as const } : held;
   const rank = (r: string | undefined) => (r === undefined ? RISKS.length : RISKS.indexOf(r as Risk));
   const cap = Math.min(rank(p.risk_max), rank(p.auto_merge?.max_risk));
   const riskPolicy =
     cap < rank(config.riskPolicy.autoApproveMaxRisk)
       ? { ...config.riskPolicy, autoApproveMaxRisk: RISKS[cap] as "low" | "medium" }
       : config.riskPolicy;
+  const egress = egressPolicyOf(p);
+  const monthlyUsd = teamCapUsd(p.budget_usd_month, team?.budget_usd_month);
+  const spend =
+    team && monthlyUsd !== undefined
+      ? { ...config.spend, team: { name: team.name, monthlyUsd, repos: team.repos ?? [] } }
+      : config.spend;
   const next: FactoryConfig = {
     ...config,
+    spend,
+    ...(egress ? { egress } : {}),
+    ...(approval ? { approval } : {}),
     workflow: resolved.values.workflow as string,
     labels: resolved.values.labels as Record<string, string>,
     routes: resolved.values.routes as Record<string, RouteConfig>,

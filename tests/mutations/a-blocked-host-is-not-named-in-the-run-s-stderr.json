@@ -1,0 +1,1 @@
+{"name":"a blocked host is not named in the run's stderr","file":"src/egress-env.ts","find":"return refused.length\n    ? {","replace":"return false\n    ? {","test":"tests/team-egress-policy.test.ts"}

@@ -1,6 +1,7 @@
 // Four rules decide a team's config. Preferences: the most local level wins. Policy: the strictest
 // value wins, so no level loosens what the one above set. Roles, workflows and routes: replaced by
 // name, except a name the org locked. Levels apply in the order builtin, org, team, repo.
+import { type Level as AutonomyLevel, levelRank } from "./approval";
 import { resolveCapabilities } from "./capabilities";
 import { DENY_RULES, type DenyKind, type OrgFile, RISKS, type TeamFile } from "./schema";
 
@@ -117,6 +118,7 @@ class Merge {
     const lowestRisk = (cur: unknown, v: unknown) => (rank(v) < rank(cur) ? v : cur);
     const am = isObj(from.auto_merge) ? from.auto_merge : {};
     const ap = isObj(from.approvals) ? from.approvals : {};
+    const eg = isObj(from.egress) ? from.egress : {};
     pick("policy.risk_max", from.risk_max, lowestRisk);
     pick("policy.auto_merge.allowed", am.allowed, (cur, v) => stricter(cur as boolean, v as boolean));
     pick("policy.auto_merge.max_risk", am.max_risk, lowestRisk);
@@ -124,6 +126,15 @@ class Merge {
     pick("policy.budget_usd_month", from.budget_usd_month, lowest);
     const list = (cur: unknown, v: unknown) => (cur as string[]).filter((x) => (v as string[]).includes(x));
     pick("policy.models", from.models, list);
+    pick("policy.egress.hosts", eg.hosts, list);
+    const lowestLevel = (cur: unknown, v: unknown) =>
+      levelRank(v as AutonomyLevel) < levelRank(cur as AutonomyLevel) ? v : cur;
+    pick("policy.autonomy_level", from.autonomy_level, lowestLevel);
+    pick("policy.approval_chains", from.approval_chains, (cur, v) => [
+      ...(cur as unknown[]),
+      ...(v as unknown[]).filter((c) => !(cur as unknown[]).some((x) => same(x, c))),
+    ]);
+    pick("policy.egress.secrets", eg.secrets, list);
     pick("policy.protected_paths", from.protected_paths, (cur, v) =>
       union ? [...new Set([...(cur as string[]), ...(v as string[])])] : list(cur, v),
     );

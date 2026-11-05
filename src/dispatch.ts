@@ -10,6 +10,7 @@ import type { FactoryConfig } from "./config";
 import { type SpendDeps, spendCapHit, type WatchDeps } from "./engine/common";
 import type { GhPr } from "./github";
 import { LABEL } from "./labels";
+import { teamBudgetHit } from "./team/budget";
 import { canServe } from "./machine";
 
 // The labels pollOnce lists (src/watch.ts); tests/dispatch.test.ts pins the two together.
@@ -53,6 +54,8 @@ export async function intakeGate(
   // An issue already in flight keeps going: checkSpendCap parks it on its own next stage (plan v2.7.0 item 7).
   if ((await spendCapHit(deps, config)) !== undefined)
     return { open: false, paused: "budget: today's spend cap is hit, new pickups are paused" };
+  const teamHit = teamBudgetHit(deps.state, config);
+  if (teamHit !== undefined) return { open: false, paused: `budget: ${teamHit}` };
   return { open: deps.state.getToggle("auto_start", true) };
 }
 

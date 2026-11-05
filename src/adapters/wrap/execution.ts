@@ -4,7 +4,8 @@
 // "{cwd}" anywhere is replaced by the worktree path. The launcher must make
 // the worktree visible at that path and run `bash -c` on {cmd}'s element.
 
-import { withEgress } from "../../egress-env";
+import { withEgress, withRefusals } from "../../egress-env";
+import { scrubEnv } from "../../team/egress-policy";
 import type { ExecResult, ExecutionPort } from "../../ports/execution";
 
 export interface WrapSpec {
@@ -12,6 +13,8 @@ export interface WrapSpec {
   readonly argv: readonly string[];
   // Hosts the command may reach, through the egress proxy only; the launcher gets the proxy variables.
   readonly allow?: readonly string[];
+  // Set by a team egress policy: credential-shaped variables not named here stay out of the command's environment.
+  readonly keepSecrets?: readonly string[];
 }
 
 export const CMD = "{cmd}";
@@ -28,14 +31,14 @@ export class WrapExecution implements ExecutionPort {
       return withEgress(
         allow,
         (url) => url,
-        (env) => this.spawn(cmd, cwd, env),
+        async (env, refused) => withRefusals(await this.spawn(cmd, cwd, env), refused),
       );
     return this.spawn(cmd, cwd, {});
   }
   private async spawn(cmd: string, cwd: string, egress: Record<string, string>): Promise<ExecResult> {
     const proc = Bun.spawn(wrapArgs(this.spec, cmd, cwd), {
       cwd,
-      env: { ...process.env, ...egress },
+      env: { ...(this.spec.keepSecrets ? scrubEnv(process.env, this.spec.keepSecrets) : process.env), ...egress },
       stdout: "pipe",
       stderr: "pipe",
     });

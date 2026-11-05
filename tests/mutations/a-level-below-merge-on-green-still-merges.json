@@ -1,0 +1,1 @@
+{"name":"a level below merge-on-green still merges","file":"src/merge-policy.ts","find":"const level = mayMerge(approval.level)","replace":"const level = true","test":"tests/team-approval.test.ts"}

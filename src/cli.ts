@@ -23,6 +23,7 @@ import { DiffAnchorRechecker } from "./recheck";
 import { scan, scanLighthouse } from "./scan";
 import { streamLogs } from "./logs";
 import { plain } from "./display";
+import { teamBudgetItems } from "./team/budget";
 import { act, buildInbox, inboxPositionals, parkReasons, type InboxAction } from "./inbox";
 import { prItems } from "./stale-pr";
 import { remoteCommand } from "./remote-cli";
@@ -125,7 +126,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
   const workflow = await workflowFor(cloneDir, config);
   const routeWorkflows = await routeWorkflowsFor(cloneDir, config);
   const machineConfig = loadMachineConfig();
-  const runtimes = runtimesFrom(machineConfig.runtimes);
+  const runtimes = runtimesFrom(machineConfig.runtimes, undefined, undefined, config.egress);
   const unknown = [
     ...new Set(
       [workflow, ...Object.values(routeWorkflows)].flatMap((w) =>
@@ -269,9 +270,8 @@ async function cmdLogs(): Promise<void> {
   if (!Number.isInteger(issue) || issue < 1)
     throw new UsageError("logs: an issue number is required, e.g. `factory logs 12 --follow`");
   const repoDir = flag("repo-dir");
-  // With no --repo/--repo-dir/FACTORY_REPO hint, this stays on the legacy
-  // shared DB (pre-v2.6.2 installs); with one, it opens that repo's own DB
-  // (per-repo since v2.6.2) instead of guessing at the shared one.
+  // With no --repo/--repo-dir/FACTORY_REPO hint this stays on the legacy shared DB (pre-v2.6.2
+  // installs); with one it opens that repo's own DB (per-repo since v2.6.2).
   const repo =
     flag("repo") ?? process.env.FACTORY_REPO ?? (repoDir ? (await loadConfig(resolve(repoDir))).repo : undefined);
   const state = new FactoryState(
@@ -301,8 +301,7 @@ async function cmdView(): Promise<void> {
 
 async function cmdInbox(): Promise<void> {
   // --repo-dir reads the repo's config, so a non-GitHub tracker is asked; --repo alone means GitHub.
-  const repoDir = flag("repo-dir");
-  const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
+  const config = flag("repo-dir") ? await loadConfig(resolve(flag("repo-dir") ?? "")) : undefined;
   const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo;
   if (!repo) throw new UsageError("inbox: --repo <owner/name>, --repo-dir <path> or FACTORY_REPO is required");
   const github = makeScm(config ?? DEFAULT_CONFIG);
@@ -312,6 +311,7 @@ async function cmdInbox(): Promise<void> {
   const items = [
     ...buildInbox(await github.listOpenIssues(repo), reasons),
     ...prItems(await github.listPrs(repo, { state: "open" })),
+    ...teamBudgetItems(db, config),
   ];
   const [issueArg, actionArg] = inboxPositionals(args);
   if (issueArg) {

@@ -1,0 +1,1 @@
+{"name":"the operator merge ignores the approval chain","file":"src/merge-policy.ts","find":"if (chains?.chains.length) {","replace":"if (false) {","test":"tests/team-approval.test.ts"}

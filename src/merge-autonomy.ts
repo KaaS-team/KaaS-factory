@@ -8,6 +8,7 @@ import { readStageArtifacts, runDir } from "./artifacts";
 import { type Autonomy, webMode } from "./autonomy";
 import type { FactoryConfig, MergeConfig } from "./config";
 import { followUpIssue } from "./escaped-defect";
+import { actorFor } from "./team/approval";
 import { attemptMerge, type ChangedFile, type MergeDecision, renderAuditComment } from "./merge-policy";
 import { recordEvidence } from "./merge-evidence";
 import { mayRebase } from "./merge-method";
@@ -228,6 +229,7 @@ export function tierInput(auto: MergeContext | undefined, config: FactoryConfig,
     autonomy: auto?.mode,
     facts: auto?.facts,
     humanPaths: config.review?.alwaysHumanPaths,
+    approval: config.approval,
   };
 }
 
@@ -238,10 +240,17 @@ export async function settleMerge(
   config: FactoryConfig,
   auto: MergeContext | undefined,
   decision: MergeDecision,
-  run: { worktree: string; pr: number; branch: string; issue: number; post?: (body: string) => Promise<unknown> },
+  run: {
+    worktree: string;
+    pr: number;
+    branch: string;
+    issue: number;
+    by?: readonly string[];
+    post?: (body: string) => Promise<unknown>;
+  },
 ): Promise<boolean> {
   if (run.post) {
-    await run.post(renderAuditComment(decision));
+    await run.post(renderAuditComment(decision, actorFor(run.by)));
     const signed = auto && signedMergeRecord(config, run.issue, auto, decision);
     if (signed) await run.post(signed);
   }

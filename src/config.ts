@@ -120,16 +120,15 @@ export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields
   readonly stages: StageAgents;
   // Per-type overrides, keyed by the type label. See RouteConfig.
   readonly routes: Readonly<Record<string, RouteConfig>>;
-  // Checked before every stage: an issue's lifetime spend, the repo's since 00:00 UTC, and the runs with
-  // unknown cost, which no dollar sum can hold. A breach parks the issue with a "budget" inbox item.
+  // Checked before every stage: issue spend, repo spend since 00:00 UTC, runs of unknown cost. A breach parks the issue.
   readonly spend: SpendConfig;
+  readonly egress?: import("./team/egress-policy").EgressPolicy; // set by applyTeam from the team policy
+  readonly approval?: import("./team/approval").ApprovalPolicy; // likewise
   readonly merge: MergeConfig;
   readonly review: { readonly maxRounds: number; readonly alwaysHumanPaths?: readonly string[] }; // maxRounds: failed reviews before a person takes over
   readonly holdout: HoldoutConfig;
-  // The acceptance checker's path in the repo. "" turns the Acceptance table off.
-  readonly acceptance: AcceptanceConfig;
-  // One tmux window per issue in flight, tailing its transcript (`factory attach`).
-  readonly tmux: TmuxConfig;
+  readonly acceptance: AcceptanceConfig; // The checker's path in the repo. "" turns the Acceptance table off.
+  readonly tmux: TmuxConfig; // One tmux window per issue in flight, tailing its transcript (`factory attach`).
   // No longer read: the "Factory run" table never reaches the PR body or the customer-visible issue thread.
   readonly prRunSummary: boolean;
   // Installed template files this repo changed on purpose; doctor's drift check skips them.
@@ -144,8 +143,7 @@ export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields
   readonly runtime?: RuntimeConfig;
   // Where issues live: GitHub by default, "http" speaks Tracker API v1 (docs/tracker-api.md). PRs stay on GitHub.
   readonly tracker: TrackerConfig;
-  // A factory label to the team's own name for it, e.g. LABEL.ready to "ready-for-ai".
-  // Applied once, at the tracker boundary; everything inside still speaks LABEL.*.
+  // A factory label to the team's own name for it, e.g. LABEL.ready to "ready-for-ai"; applied once, at the tracker boundary.
   readonly labels: Readonly<Record<string, string>>;
   // The v4 event bus: where emitted events are POSTed, and the secret inbound POST /events checks.
   readonly events: EventsConfig;
@@ -261,6 +259,7 @@ export interface SpendConfig {
   readonly perIssueUsd?: number;
   readonly dailyUsd?: number;
   readonly maxUnreportedRuns?: number;
+  readonly team?: import("./team/budget").TeamBudget; // set by applyTeam, never read from repo config
 }
 
 // merge-policy.ts's inputs (plan v2.8.0 item 2). "off" (default) never looks at merging; "dry-run"
@@ -399,6 +398,8 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   events: "object",
   commits: "object",
   orchestrate: "object",
+  egress: "object",
+  approval: "object",
   riskCriteria: "object",
 };
 
@@ -464,8 +465,7 @@ export function configProblems(raw: unknown): string[] {
   nested("review", { maxRounds: "posInt", alwaysHumanPaths: "strings" });
   nested("runtime", { gates: "string", check: "string" });
   nested("merge", keys.MERGE_KEYS);
-  // policy and autonomy are enums: a typo there would read as the default, which for autonomy
-  // is a different merge rule, so boot refuses it (src/config-merge.ts).
+  // policy and autonomy are enums: a typo would read as the default, a different merge rule, so boot refuses it.
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
     problems.push(...keys.mergeProblems(cfg.merge as Record<string, unknown>));
   }

@@ -1,0 +1,1 @@
+{"name":"an approval chain accepts approvers out of order","file":"src/team/approval.ts","find":"if (at < after) {","replace":"if (false) {","test":"tests/team-approval.test.ts"}

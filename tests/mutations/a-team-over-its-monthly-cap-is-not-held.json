@@ -1,0 +1,1 @@
+{"name":"a team over its monthly cap is not held","file":"src/team/budget.ts","find":"if (spent < budget.monthlyUsd) return undefined;","replace":"if (true) return undefined;","test":"tests/team-budget.test.ts"}

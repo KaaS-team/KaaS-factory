@@ -1,0 +1,1 @@
+{"name":"intake ignores the team monthly cap","file":"src/dispatch.ts","find":"if (teamHit !== undefined) return","replace":"if (false) return","test":"tests/team-budget.test.ts"}

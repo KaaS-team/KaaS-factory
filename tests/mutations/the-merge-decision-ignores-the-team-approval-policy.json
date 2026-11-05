@@ -1,0 +1,1 @@
+{"name":"the merge decision ignores the team approval policy","file":"src/merge-autonomy.ts","find":"    approval: config.approval,\n","replace":"","test":"tests/team-approval.test.ts"}
