@@ -1,0 +1,10 @@
+{
+  "files": ["README.md", "package.json", "src/app.ts", "src/db.ts", ".env", ".gitignore", "tests/app.test.ts"],
+  "changes": [
+    { "pr": "1", "subject": "feat: add app (#1)", "files": ["src/app.ts", "tests/app.test.ts"] },
+    { "pr": "2", "subject": "fix: db (#2)", "files": ["src/db.ts"] },
+    { "pr": "3", "subject": "feat: more db (#3)", "files": ["src/db.ts", "src/app.ts"] },
+    { "pr": "4", "subject": "Revert \"feat: more db\" (#4)", "files": ["src/db.ts", "src/app.ts"] },
+    { "pr": "5", "subject": "docs: readme (#5)", "files": ["README.md"] }
+  ]
+}

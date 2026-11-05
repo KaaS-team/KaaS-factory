@@ -127,6 +127,8 @@ export interface TrackerPort {
   closeIssue(repo: string, number: number): Promise<void>;
   // Optional: a tracker that cannot edit a body leaves an epic's checklist as filed.
   editIssueBody?(repo: string, number: number, body: string): Promise<void>;
+  // Optional: makes `child` a sub-issue of `parent`; a tracker without the concept leaves decompose unavailable.
+  linkSubIssue?(repo: string, parent: number, child: number): Promise<void>;
   reopenIssue(repo: string, number: number): Promise<void>;
   createIssue(repo: string, title: string, body: string, labels: string[]): Promise<number>;
   listLabels(repo: string): Promise<string[]>;
@@ -150,6 +152,8 @@ export interface CodeHostPort {
   prFeedback(repo: string, head: string): Promise<GhComment[]>;
   markReady(repo: string, ref: string | number, ready: boolean): Promise<void>;
   closePr(repo: string, number: number): Promise<void>;
+  // Optional: move an open PR onto another base branch (a stacked PR whose lower slice merged).
+  retargetPr?(repo: string, number: number, base: string): Promise<void>;
   prStatus(repo: string, number: number): Promise<PrStatus>;
   mergeReadiness(repo: string, number: number): Promise<MergeReadiness>;
   prDiff(repo: string, prNumber: number): Promise<string>;

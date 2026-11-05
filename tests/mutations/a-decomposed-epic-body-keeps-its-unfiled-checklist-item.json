@@ -1,0 +1,1 @@
+{"name": "a decomposed epic body keeps its unfiled checklist item", "file": "src/engine/planning.ts", "find": "body = body.replace(`- [ ] ${item.text}`, `- [ ] #${n} ${item.text}`);", "replace": "", "test": "tests/planning-steps.test.ts"}

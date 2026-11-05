@@ -1,0 +1,1 @@
+{"name": "a config accepts any prioritize method", "file": "src/prioritize.ts", "find": "return m === \"rice\" || m === \"wsjf\" ? [] :", "replace": "return true ? [] :", "test": "tests/planning-steps.test.ts"}

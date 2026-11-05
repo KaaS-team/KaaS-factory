@@ -1,0 +1,1 @@
+{"name": "pickup ignores the configured priority method", "file": "src/watch.ts", "find": ".sort(byRank(config.prioritize?.method));", "replace": ".sort((a, b) => a.number - b.number);", "test": "tests/planning-steps.test.ts"}

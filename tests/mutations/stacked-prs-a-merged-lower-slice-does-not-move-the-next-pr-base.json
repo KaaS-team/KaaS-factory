@@ -1,0 +1,1 @@
+{"name":"stacked prs: a merged lower slice does not move the next PR base","file":"src/stacked-prs.ts","find":"if (open) await host.retargetPr(repo, open.number, next.retarget);","replace":"","test":"tests/stacked-prs.test.ts"}

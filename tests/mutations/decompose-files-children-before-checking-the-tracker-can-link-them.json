@@ -1,0 +1,1 @@
+{"name": "decompose files children before checking the tracker can link them", "file": "src/engine/planning.ts", "find": "if (!tracker.linkSubIssue) throw new Error(\"this tracker cannot link sub-issues\");", "replace": "", "test": "tests/planning-steps.test.ts"}

@@ -1,3 +1,4 @@
+import { type PriorityMethod, prioritizeProblems } from "./prioritize";
 // Ported from owainlewis/assembler@7cac671 src/index.ts:64-90 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: validateConfig's harness rules (executable not a {prompt} placeholder, a command must be non-empty) live in agentProblems; the codex/claude providers are presets; errors are collected, not thrown one at a time; the key table, boot refusal and defaults are the factory's own.
 // Shape of the target repo's `.factory/config.json`: the runner only reads it, `factory doctor`
 // checks it exists, and a missing field falls back to DEFAULT_CONFIG, so a minimal one works.
@@ -147,6 +148,7 @@ export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields
   readonly labels: Readonly<Record<string, string>>;
   // The v4 event bus: where emitted events are POSTed, and the secret inbound POST /events checks.
   readonly events: EventsConfig;
+  readonly prioritize?: { readonly method: PriorityMethod };
   readonly commits?: { readonly signoff?: import("./signoff").SignoffMode }; // trailers; unset is today's
 }
 
@@ -400,6 +402,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   orchestrate: "object",
   egress: "object",
   approval: "object",
+  prioritize: "object",
   riskCriteria: "object",
 };
 
@@ -515,6 +518,7 @@ export function configProblems(raw: unknown): string[] {
   problems.push(...agentProblems(cfg.agents, cfg.stages, cfg.routes));
   if (cfg.tracker !== undefined) problems.push(...trackerProblems(cfg.tracker));
   if (cfg.labels !== undefined) problems.push(...labelMapProblems(cfg.labels));
+  if (cfg.prioritize !== undefined) problems.push(...prioritizeProblems(cfg.prioritize));
   return problems;
 }
 

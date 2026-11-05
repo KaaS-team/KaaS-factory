@@ -9,6 +9,7 @@ import { finish, moveLabel, postComment } from "./common";
 import { importPlanStep } from "./import-plan-step";
 import { changelogStep } from "../changelog";
 import { qaStep } from "../qa-step";
+import { PLANNING_STEPS } from "./planning";
 import { cloudAware } from "./cloud-build";
 import { STEP_TYPES, type StepCtx, type StepResult, type StepType } from "./steps";
 
@@ -98,6 +99,7 @@ const check: StepType = {
 
 export const ALL_STEP_TYPES: Readonly<Record<string, StepType>> = {
   ...STEP_TYPES,
+  ...PLANNING_STEPS,
   build: cloudAware(STEP_TYPES.build!),
   check,
   tool,
