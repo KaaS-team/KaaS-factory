@@ -135,7 +135,7 @@ describe("read-only inspection (#173)", () => {
   });
 
   test("the guidance names the read-only commands a stage may use", () => {
-    expect(STAGE_GUIDANCE).toContain("Read-only inspection you may run: git status, diff, log, show, grep");
+    expect(STAGE_GUIDANCE).toContain("Read-only commands allowed: git status, diff, log, show, grep");
   });
 });
 
