@@ -41,7 +41,8 @@ export type MergeRefusalReason =
   | "policy-not-auto"
   | "codeowner-approval"
   | "autonomy-supervised"
-  | "signal-failed";
+  | "signal-failed"
+  | "requester_cannot_approve";
 
 export interface MergeRefusal {
   readonly reason: MergeRefusalReason;
@@ -159,6 +160,29 @@ export function autoEligible(
   return refusals;
 }
 
+// The team rule approvals.requester_cannot_approve: whoever asked for the change cannot be the one who
+// approves its merge. Unknown requester fails closed when the rule is on; logins compare without case.
+export function requesterRefusals(approval?: OperatorApproval): MergeRefusal[] {
+  if (!approval?.requesterCannotApprove) return [];
+  const requester = approval.requester?.toLowerCase();
+  if (requester !== undefined && requester !== "" && requester !== approval.approver.toLowerCase()) return [];
+  return [
+    {
+      reason: "requester_cannot_approve",
+      detail:
+        requester === undefined || requester === ""
+          ? "the team requires someone other than the requester to approve, and the requester is unknown"
+          : `${approval.approver} asked for this change, and the team requires someone else to approve it`,
+    },
+  ];
+}
+
+export interface OperatorApproval {
+  readonly approver: string;
+  readonly requester?: string;
+  readonly requesterCannotApprove: boolean;
+}
+
 export interface DecideMergeInput {
   readonly readiness: MergeReadiness;
   readonly ci: CiResult;
@@ -259,9 +283,10 @@ export function decideOperatorMerge(
     readonly files: readonly ChangedFile[] | undefined;
     readonly approvedBy: readonly string[];
   },
+  approval?: OperatorApproval,
 ): MergeDecision {
   const headSha = readiness.headRefOid;
-  const refusals = checkReadiness(readiness, ci, readiness.baseRefName);
+  const refusals = [...checkReadiness(readiness, ci, readiness.baseRefName), ...requesterRefusals(approval)];
   if (owners) {
     refusals.push(
       ...(owners.files

@@ -12,6 +12,8 @@ export interface GhIssue {
   comments: GhComment[];
   // Only populated by getIssue (blockers.ts is the one caller that needs
   // them); listIssuesByLabel and listOpenIssues leave both undefined.
+  // Who opened the issue: the requester. Only getIssue and the REST list fill it.
+  author?: string;
   state?: "OPEN" | "CLOSED";
   stateReason?: string | null;
 }

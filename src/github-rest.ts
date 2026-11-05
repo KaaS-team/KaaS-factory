@@ -9,6 +9,7 @@ interface RestIssue {
   body: string | null;
   state: string;
   state_reason?: string | null;
+  user?: { login?: string } | null;
   labels: ({ name: string } | string)[];
   comments: number;
   updated_at: string;
@@ -72,6 +73,7 @@ export class RestIssues {
       body: i.body ?? "",
       labels: i.labels.map((l) => (typeof l === "string" ? { name: l } : { name: l.name })),
       comments,
+      author: i.user?.login,
       state: i.state === "closed" ? "CLOSED" : "OPEN",
       // blockers.ts compares the GraphQL spelling.
       stateReason: i.state_reason ? i.state_reason.toUpperCase() : null,
