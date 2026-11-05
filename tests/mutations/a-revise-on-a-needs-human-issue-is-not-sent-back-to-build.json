@@ -1,0 +1,7 @@
+{
+  "name": "a revise on a needs-human issue is not sent back to build",
+  "file": "src/watch.ts",
+  "find": "if (command.type !== \"retry\" && command.type !== \"revise\") return undefined;",
+  "replace": "if (command.type !== \"retry\") return undefined;",
+  "test": "tests/chat-commands.test.ts"
+}

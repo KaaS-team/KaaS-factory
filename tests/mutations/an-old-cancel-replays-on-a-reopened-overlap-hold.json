@@ -1,0 +1,7 @@
+{
+  "name": "an old cancel replays on a reopened overlap hold",
+  "file": "src/watch.ts",
+  "find": "if (latest && !handled(issue, latest) && parseChatOps(latest.body).type === \"cancel\")",
+  "replace": "if (latest && parseChatOps(latest.body).type === \"cancel\")",
+  "test": "tests/chat-commands.test.ts"
+}
