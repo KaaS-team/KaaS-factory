@@ -1,0 +1,1 @@
+{"name":"a cancelled run a newer push superseded is rerun","file":"src/ci-cancelled.ts","find":"if (run.headSha !== prHeadSha) return { rerun: false, reason: \"a newer push superseded the run\" };","replace":"","test":"tests/ci-cancelled.test.ts"}

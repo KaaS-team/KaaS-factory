@@ -1,0 +1,1 @@
+{"name":"a merged branch with an open pr is deleted","file":"src/merged-branches.ts","find":"if (prs.some((p) => p.state === \"open\")) return \"kept\";","replace":"","test":"tests/merged-branches.test.ts"}

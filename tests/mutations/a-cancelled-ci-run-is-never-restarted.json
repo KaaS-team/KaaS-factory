@@ -1,0 +1,1 @@
+{"name":"a cancelled ci run is never restarted","file":"src/ci-cancelled.ts","find":"if (decision.rerun) await api","replace":"if (false) await api","test":"tests/ci-cancelled.test.ts"}

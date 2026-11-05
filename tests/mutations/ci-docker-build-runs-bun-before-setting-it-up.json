@@ -1,0 +1,1 @@
+{"name": "ci: docker-build runs bun before setting it up", "file": "ci/ci.yml", "find": "          fetch-depth: 0\n      - uses: oven-sh/setup-bun@v2\n      - name: Decide whether the image needs a build", "replace": "          fetch-depth: 0\n      - name: Decide whether the image needs a build", "test": "tests/ci-bun-setup.test.ts"}

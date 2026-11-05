@@ -1,0 +1,1 @@
+{"name":"a body edit reruns the whole ci workflow","file":"ci/ci.yml","find":"types: [opened, synchronize, reopened]","replace":"types: [opened, synchronize, reopened, edited]","test":"tests/ci-body-edit.test.ts"}

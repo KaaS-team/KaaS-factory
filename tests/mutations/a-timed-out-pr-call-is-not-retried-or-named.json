@@ -1,0 +1,1 @@
+{"name":"a timed-out pr call is not retried or named","file":"src/github.ts","find":"if (result.timedOut) continue;","replace":"if (result.timedOut) throw new Error(\"failed\");","test":"tests/github-rest-timeout.test.ts"}

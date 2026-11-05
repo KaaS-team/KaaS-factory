@@ -8,7 +8,7 @@ import type { CreatePrOptions } from "../src/ports/scm";
 const ROOT = join(import.meta.dir, "..");
 
 // Each entry is the gh adapter itself, the safe-output denylist, or a codespace ssh transport.
-const ALLOWED = ["src/adapters/codespaces/execution.ts", "src/github.ts", "src/safe-outputs.ts"];
+const ALLOWED = ["src/adapters/codespaces/execution.ts", "src/gh-runner.ts", "src/safe-outputs.ts"];
 
 function tsFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>

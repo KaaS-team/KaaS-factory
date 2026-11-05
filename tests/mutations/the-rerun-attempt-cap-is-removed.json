@@ -1,0 +1,1 @@
+{"name":"the rerun attempt cap is removed","file":"src/ci-cancelled.ts","find":"if (run.attempt >= MAX_ATTEMPTS)","replace":"if (false)","test":"tests/ci-cancelled.test.ts"}

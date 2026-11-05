@@ -53,13 +53,6 @@ describe("ci wiring", () => {
     expect(() => checkEntry({ script: "scripts/no-workflow-runs-this.ts", workflows: ["ci/ci.yml"] })).toThrow();
   });
 
-  test("the body check re-runs when the PR body is edited", () => {
-    const files = [".github/workflows/ci.yml", "ci/ci.yml"].filter((f) => existsSync(f));
-    expect(files.some((f) => /pull_request:\s*\n\s*types:\s*\[[^\]]*\bedited\b/.test(readFileSync(f, "utf8")))).toBe(
-      true,
-    );
-  });
-
   test("make check lists check-baseline", () => {
     expect(prerequisites()).toContain("check-baseline");
   });

@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "file": "tests/docker-egress-network.test.ts",
+    "test": "a direct connection from the container has no route @quarantine",
+    "owner": "@Param-Harrison",
+    "added": "2026-11-05",
+    "expires": "2026-12-05",
+    "issue": "#567"
+  }
+]

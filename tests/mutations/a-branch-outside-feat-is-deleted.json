@@ -1,0 +1,1 @@
+{"name":"a branch outside feat is deleted","file":"src/merged-branches.ts","find":"if (!isFeat(branch)) return \"skipped\";","replace":"","test":"tests/merged-branches.test.ts"}

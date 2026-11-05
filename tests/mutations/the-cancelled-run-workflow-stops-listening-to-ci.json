@@ -1,0 +1,1 @@
+{"name":"the cancelled-run workflow stops listening to ci","file":"ci/rerun-cancelled.yml","find":"workflows: [ci]","replace":"workflows: [other]","test":"tests/ci-cancelled.test.ts"}
