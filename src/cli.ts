@@ -117,9 +117,8 @@ function stateDbPath(repo: string): string {
   return flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, repo);
 }
 
-// Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
-// step, cron tick) resolve the exact same paths and construct the exact same
-// gate runner — one place, not three copies to drift (audit finding #1).
+// Shared by watch, run and tick so all three modes build the same paths and gate runner:
+// one place, not three copies to drift (audit finding #1).
 async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<WatchDeps> {
   const tmux = tmuxFor(config);
   const workflow = await workflowFor(cloneDir, config);
@@ -895,7 +894,8 @@ async function main(): Promise<void> {
     case "mcp":
     case "runner":
     case "pair":
-      return remoteCommand(args);
+    case "tools":
+      return command === "tools" ? (await import("./tools-cli")).cmdTools(cli) : remoteCommand(args);
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

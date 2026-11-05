@@ -32,6 +32,8 @@ import { ClickUpTracker } from "./adapters/trackers/clickup";
 import { JiraTracker } from "./adapters/trackers/jira";
 import { LinearTracker } from "./adapters/trackers/linear";
 import { PlaneTracker } from "./adapters/trackers/plane";
+import { makeMappedTracker } from "./adapters/trackers/mapped-make";
+import { trackers } from "./plugins/registry";
 
 export const PR_LINK_MARKER = "<!-- factory:pr-link v1 -->";
 
@@ -262,28 +264,32 @@ export class ComposedScm implements ScmPort {
   }
 }
 
-// The tracker config names, built. `env` is where http's token is read from.
+// Every shipped tracker registers by its config kind, so core looks one up by name and a plugin's
+// tracker sits in the same table. "github" is the code host's own client and is passed in.
+const shipped: Record<string, (config: never, env: NodeJS.ProcessEnv) => TrackerPort> = {
+  http: (c: ConstructorParameters<typeof HttpTracker>[0], env) => new HttpTracker(c, env),
+  linear: (c: ConstructorParameters<typeof LinearTracker>[0], env) => new LinearTracker(c, env),
+  plane: (c: ConstructorParameters<typeof PlaneTracker>[0], env) => new PlaneTracker(c, env),
+  jira: (c: ConstructorParameters<typeof JiraTracker>[0], env) => new JiraTracker(c, env),
+  clickup: (c: ConstructorParameters<typeof ClickUpTracker>[0], env) => new ClickUpTracker(c, env),
+  asana: (c: ConstructorParameters<typeof AsanaTracker>[0], env) => new AsanaTracker(c, env),
+  mapped: (c: Extract<TrackerConfig, { kind: "mapped" }>, env) => makeMappedTracker(c, process.cwd(), env),
+};
+for (const [kind, make] of Object.entries(shipped)) trackers.register(kind, make);
+
+// The tracker config names, built. `env` is where a token is read from.
 export function makeTracker(
   tracker: TrackerConfig,
   env: NodeJS.ProcessEnv = process.env,
   github: GitHub = new GitHub(),
 ): TrackerPort {
-  switch (tracker.kind) {
-    case "github":
-      return github;
-    case "http":
-      return new HttpTracker(tracker, env);
-    case "linear":
-      return new LinearTracker(tracker, env);
-    case "plane":
-      return new PlaneTracker(tracker, env);
-    case "jira":
-      return new JiraTracker(tracker, env);
-    case "clickup":
-      return new ClickUpTracker(tracker, env);
-    case "asana":
-      return new AsanaTracker(tracker, env);
-  }
+  if (tracker.kind === "github") return github;
+  const make = trackers.get(tracker.kind);
+  if (!make)
+    throw new Error(
+      `tracker.kind "${tracker.kind}" is not registered (registered: github, ${trackers.names().join(", ")})`,
+    );
+  return make(tracker as never, env);
 }
 
 export function makeScm(

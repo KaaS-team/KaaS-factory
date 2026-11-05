@@ -1,0 +1,7 @@
+{
+  "name": "mapped tracker: a closed issue is listed as open work",
+  "file": "src/adapters/trackers/mapped.ts",
+  "find": ".filter((i) => i.state !== \"CLOSED\")",
+  "replace": "",
+  "test": "tests/tracker-mapped.test.ts"
+}

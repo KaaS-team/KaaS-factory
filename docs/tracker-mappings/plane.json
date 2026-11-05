@@ -1,0 +1,11 @@
+{
+  "server": "plane",
+  "calls": {
+    "list": { "tool": "list_work_items", "args": { "project_id": "{{project}}", "label": "{{label}}" }, "items": "results" },
+    "read": { "tool": "retrieve_work_item_by_identifier", "args": { "project_id": "{{project}}", "sequence_id": "{{number}}" } },
+    "update": { "tool": "update_work_item", "args": { "project_id": "{{project}}", "sequence_id": "{{number}}", "labels": "{{labels}}", "state": "{{state}}", "description": "{{body}}" } },
+    "comment": { "tool": "create_work_item_comment", "args": { "project_id": "{{project}}", "sequence_id": "{{number}}", "comment": "{{comment}}" } }
+  },
+  "fields": { "number": "sequence_id", "title": "name", "body": "description_stripped", "labels": "labels", "state": "state.group" },
+  "states": { "open": "unstarted", "closed": "completed" }
+}

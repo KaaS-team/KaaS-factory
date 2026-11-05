@@ -1,0 +1,7 @@
+{
+  "name": "factory tools: the update call is always run, even without --write",
+  "file": "src/adapters/trackers/mapped.ts",
+  "find": "if (!write)\n",
+  "replace": "if (false as boolean)\n",
+  "test": "tests/tracker-mapped.test.ts"
+}

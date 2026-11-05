@@ -1,0 +1,7 @@
+{
+  "name": "mapped tracker: adding a label does not reach the server",
+  "file": "src/adapters/trackers/mapped.ts",
+  "find": "labels: [...new Set([...i.labels.map((l) => l.name), ...labels])]",
+  "replace": "labels: i.labels.map((l) => l.name)",
+  "test": "tests/tracker-mapped.test.ts"
+}

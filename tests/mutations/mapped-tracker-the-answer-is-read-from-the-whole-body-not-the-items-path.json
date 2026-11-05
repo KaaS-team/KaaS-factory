@@ -1,0 +1,7 @@
+{
+  "name": "mapped tracker: the answer is read from the whole body, not the items path",
+  "file": "src/adapters/trackers/mapped.ts",
+  "find": "return atPath(answer, call.items);",
+  "replace": "return answer;",
+  "test": "tests/tracker-mapped.test.ts"
+}

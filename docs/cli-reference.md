@@ -100,6 +100,14 @@ factory mcp (--repo <owner/name> | --repo-dir <path>) [--as <name>]
 
 serve MCP on stdio, so an agent or IDE can list, read, start and approve tasks.
 
+### tools
+
+```
+factory tools [--repo-dir <path>] [--write] [--json]
+```
+
+probe the mapped tracker's server and report which mapped calls (list, read, update) work.
+
 ### runner
 
 ```

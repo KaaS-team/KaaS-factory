@@ -1,0 +1,7 @@
+{
+  "name": "factory tools: the tools command is not dispatched",
+  "file": "src/cli.ts",
+  "find": "return command === \"tools\" ? (await import(\"./tools-cli\")).cmdTools(cli) : remoteCommand(args);",
+  "replace": "return remoteCommand(args);",
+  "test": "tests/tracker-mapped.test.ts"
+}

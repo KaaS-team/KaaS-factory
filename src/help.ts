@@ -63,6 +63,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "serve MCP on stdio, so an agent or IDE can list, read, start and approve tasks",
   },
   {
+    name: "tools",
+    usage: "tools [--repo-dir <path>] [--write] [--json]",
+    does: "probe the mapped tracker's server and report which mapped calls (list, read, update) work",
+  },
+  {
     name: "runner",
     usage: "runner register --url <plane> [--name <n>] (token on stdin) | runner start --repo-dir <path>",
     does: "register this machine with a control plane once, then dial out for work with heartbeats",

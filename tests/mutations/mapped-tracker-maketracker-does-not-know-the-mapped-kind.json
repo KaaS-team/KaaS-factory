@@ -1,0 +1,7 @@
+{
+  "name": "mapped tracker: makeTracker does not know the mapped kind",
+  "file": "src/scm.ts",
+  "find": "  mapped: (c: Extract<TrackerConfig, { kind: \"mapped\" }>, env) => makeMappedTracker(c, process.cwd(), env),\n",
+  "replace": "",
+  "test": "tests/tracker-mapped.test.ts"
+}

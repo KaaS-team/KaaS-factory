@@ -1,0 +1,12 @@
+{
+  "server": "linear",
+  "calls": {
+    "list": { "tool": "list_issues", "args": { "team": "{{project}}", "label": "{{label}}" }, "items": "issues" },
+    "read": { "tool": "get_issue", "args": { "id": "{{project}}-{{number}}" } },
+    "update": { "tool": "update_issue", "args": { "id": "{{project}}-{{number}}", "labels": "{{labels}}", "state": "{{state}}", "description": "{{body}}" } },
+    "comment": { "tool": "create_comment", "args": { "issueId": "{{project}}-{{number}}", "body": "{{comment}}" } },
+    "create": { "tool": "create_issue", "args": { "team": "{{project}}", "title": "{{title}}", "description": "{{body}}", "labels": "{{labels}}" } }
+  },
+  "fields": { "number": "number", "title": "title", "body": "description", "labels": "labels", "state": "state" },
+  "states": { "open": "Todo", "closed": "Done" }
+}

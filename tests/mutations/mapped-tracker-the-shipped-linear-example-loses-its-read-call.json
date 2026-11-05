@@ -1,0 +1,7 @@
+{
+  "name": "mapped tracker: the shipped linear example loses its read call",
+  "file": "docs/tracker-mappings/linear.json",
+  "find": "\"read\": {",
+  "replace": "\"reed\": {",
+  "test": "tests/tracker-mapped.test.ts"
+}

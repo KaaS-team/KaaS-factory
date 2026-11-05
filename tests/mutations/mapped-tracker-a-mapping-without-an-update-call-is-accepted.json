@@ -1,0 +1,7 @@
+{
+  "name": "mapped tracker: a mapping without an update call is accepted",
+  "file": "src/adapters/trackers/mapping.ts",
+  "find": "for (const name of REQUIRED_CALLS) if (raw.calls[name] === undefined)",
+  "replace": "for (const name of REQUIRED_CALLS) if (false as boolean)",
+  "test": "tests/tracker-mapped.test.ts"
+}

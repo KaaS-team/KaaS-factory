@@ -1,0 +1,11 @@
+{
+  "server": "jira",
+  "calls": {
+    "list": { "tool": "jira_search", "args": { "jql": "project = {{project}} AND labels = \"{{label}}\" AND statusCategory != Done" }, "items": "issues" },
+    "read": { "tool": "jira_get_issue", "args": { "issue_key": "{{project}}-{{number}}" } },
+    "update": { "tool": "jira_update_issue", "args": { "issue_key": "{{project}}-{{number}}", "labels": "{{labels}}", "status": "{{state}}", "description": "{{body}}" } },
+    "comment": { "tool": "jira_add_comment", "args": { "issue_key": "{{project}}-{{number}}", "body": "{{comment}}" } }
+  },
+  "fields": { "number": "key", "title": "fields.summary", "body": "fields.description", "labels": "fields.labels", "state": "fields.status.name" },
+  "states": { "open": "To Do", "closed": "Done" }
+}

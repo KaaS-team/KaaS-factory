@@ -181,6 +181,9 @@ export type TrackerConfig =
   // tokenEnv names the env var holding the bearer token, so the token is never in config.
   // project defaults to config.repo.
   | { readonly kind: "http"; readonly url: string; readonly tokenEnv: string; readonly project?: string }
+  // The generic tracker: .factory/trackers/<mapping>.json says how to list, read and update through an MCP
+  // server or a declared CLI tool. Its credentials belong to that server or tool, so there is no tokenEnv.
+  | { readonly kind: "mapped"; readonly mapping: string; readonly project?: string }
   // The native adapters (docs/trackers.md); url overrides the vendor's cloud endpoint.
   | { readonly kind: "linear"; readonly team: string; readonly tokenEnv: string; readonly url?: string }
   | {
@@ -216,6 +219,7 @@ export type TrackerConfig =
 // Each kind's keys beside kind and tokenEnv, true when required. trackerProblems reads only this.
 const TRACKER_KEYS: Record<Exclude<TrackerConfig["kind"], "github">, Record<string, boolean>> = {
   http: { url: true, project: false },
+  mapped: { mapping: true, project: false },
   linear: { team: true, url: false },
   plane: { workspace: true, project: true, url: false },
   jira: { url: true, project: true, issueType: false },
@@ -539,7 +543,10 @@ function trackerProblems(raw: unknown): string[] {
   // The token goes to this URL, so plain http only to loopback.
   if (typeof t.url === "string" && !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(t.url))
     problems.push(`tracker.url: https (plain http only to localhost), got ${JSON.stringify(t.url)}`);
-  if (typeof t.tokenEnv !== "string")
+  if (t.kind === "mapped") {
+    if (t.tokenEnv !== undefined)
+      problems.push("tracker.tokenEnv: a mapped tracker has none (its server or tool holds the credentials)");
+  } else if (typeof t.tokenEnv !== "string")
     problems.push("tracker.tokenEnv: required (the name of the env var holding the token)");
   else if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(t.tokenEnv))
     problems.push(`tracker.tokenEnv: expected an env var name, got ${JSON.stringify(t.tokenEnv)}`);
