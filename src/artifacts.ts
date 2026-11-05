@@ -30,6 +30,8 @@ export interface TriageArtifact {
   readonly files_expected: string[];
   readonly gate_level: string;
   readonly confidence: number;
+  // Why triage is that sure: short phrases a human can check. Shown when the issue is parked.
+  readonly confidence_reasons?: string[];
 }
 
 export interface PlanArtifact {
@@ -135,6 +137,7 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
     "files_expected",
     "gate_level",
     "confidence",
+    "confidence_reasons",
     "outcome",
     "summary",
   ],
