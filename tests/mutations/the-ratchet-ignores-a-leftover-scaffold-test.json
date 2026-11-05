@@ -1,0 +1,1 @@
+{"name":"the ratchet ignores a leftover scaffold test","file":"scripts/suite-ratchet.ts","find":"if (suite.scaffold > base.scaffold)","replace":"if (false as boolean)","test":"tests/suite-ratchet.test.ts"}

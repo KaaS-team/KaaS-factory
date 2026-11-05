@@ -118,7 +118,7 @@ describe("triage's type enum follows the repo's routes, not a fixed list", () =>
 describe("plan's proof field", () => {
   test('"test" and "check" both validate; a typo does not', () => {
     const base = { risk: "low", revision: 1, files: [] as string[], autoApproveEligible: true };
-    expect(validateStepJson("plan", { ...base, proof: "test" })).toEqual({ ok: true });
+    expect(validateStepJson("plan", { ...base, proof: "test", permanentTests: ["a"] })).toEqual({ ok: true });
     expect(validateStepJson("plan", { ...base, proof: "check" })).toEqual({ ok: true });
     expect(validateStepJson("plan", { ...base, proof: "vibes" }).ok).toBe(false);
   });
@@ -127,6 +127,25 @@ describe("plan's proof field", () => {
     expect(validateStepJson("plan", { risk: "low", revision: 1, files: [], autoApproveEligible: true })).toEqual({
       ok: true,
     });
+  });
+});
+
+describe("a plan tags each test it adds", () => {
+  const base = { risk: "low", revision: 1, files: [] as string[], autoApproveEligible: true, proof: "test" };
+  test("a test-proof plan with no tagged test is refused", () => {
+    const r = validateStepJson("plan", base);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("scaffoldTests or permanentTests");
+  });
+  test("scaffold and permanent tests both validate", () => {
+    expect(validateStepJson("plan", { ...base, scaffoldTests: ["a"], permanentTests: ["b"] })).toEqual({ ok: true });
+  });
+  test("one test under both tags is refused", () => {
+    const r = validateStepJson("plan", { ...base, scaffoldTests: ["a"], permanentTests: ["a"] });
+    expect(r.ok).toBe(false);
+  });
+  test("a plan that stops for a question needs no tests", () => {
+    expect(validateStepJson("plan", { ...base, status: "needs-info" })).toEqual({ ok: true });
   });
 });
 

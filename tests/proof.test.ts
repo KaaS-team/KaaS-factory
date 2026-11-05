@@ -168,6 +168,7 @@ describe("watch.ts runs the proof before verify", () => {
         files: ["src/a.ts"],
         autoApproveEligible: true,
         proof: "test",
+        permanentTests: ["tests/a.test.ts > a"],
       }),
     },
     build: {

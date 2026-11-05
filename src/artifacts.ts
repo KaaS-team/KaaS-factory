@@ -52,6 +52,9 @@ export interface PlanArtifact {
   readonly criteria?: readonly { readonly id: string; readonly text: string; readonly task?: string }[];
   readonly tasks?: readonly { readonly id: string; readonly title: string; readonly files: readonly string[] }[];
   readonly spec?: string;
+  // Tests the plan adds. Scaffold ones are pruned or graduated after the run; permanent ones stay.
+  readonly scaffoldTests?: readonly string[];
+  readonly permanentTests?: readonly string[];
   // The planner flags a public API, schema or config-format change; the pr step then needs a docs/decisions record.
   readonly boundaryChange?: boolean;
 }
@@ -152,6 +155,8 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
     "goal",
     "criteria",
     "spec",
+    "scaffoldTests",
+    "permanentTests",
     "boundaryChange",
     "outcome",
     "summary",

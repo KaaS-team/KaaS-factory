@@ -1,0 +1,1 @@
+{"name":"a test listed as scaffold and permanent is accepted","file":"src/schemas.ts","find":"if (both.length > 0) return","replace":"if (false) return","test":"tests/schemas.test.ts"}

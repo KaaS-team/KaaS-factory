@@ -1,0 +1,1 @@
+{"name":"the retro proposes no prune for scaffold tests","file":"src/engine/retro-finish.ts","find":"if (lesson) state.completeRetro(","replace":"if (false as boolean) state.completeRetro(","test":"tests/retro-prune.test.ts"}

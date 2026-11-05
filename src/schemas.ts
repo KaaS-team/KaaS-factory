@@ -43,6 +43,10 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       goal: str,
       criteria: { type: "array", items: { type: "object" } },
       spec: str,
+      // The tests the plan adds, tagged by the field they sit in: scaffold ones are pruned or
+      // graduated to permanent after the run (the retro proposes which); permanent ones stay.
+      scaffoldTests: strings,
+      permanentTests: strings,
       // Set only when the plan was written in the issue (engine/import-plan.ts), never by the planner.
       tasks: { type: "array", items: { type: "object" } },
       mutations: { type: "array", items: { type: "object" } },
@@ -148,7 +152,20 @@ export function schemaProblems(
     if (fields.every((k) => o[k] !== undefined))
       out.push(`${fields.map((k) => `"${k}"`).join(" and ")} cannot appear together`);
   }
+  if (stage === "plan") out.push(...testTagProblems(o));
   return out;
+}
+
+// A plan that proves by test names each test under exactly one tag.
+function testTagProblems(o: Record<string, unknown>): string[] {
+  const list = (k: string): string[] => (Array.isArray(o[k]) ? (o[k] as string[]) : []);
+  const [scaffold, permanent] = [list("scaffoldTests"), list("permanentTests")];
+  const both = scaffold.filter((t) => permanent.includes(t));
+  if (both.length > 0) return [`"${both[0]}" is in both scaffoldTests and permanentTests`];
+  const stops = o.status === "needs-info" || o.outcome === "blocked" || o.outcome === "failed";
+  if (o.proof === "test" && !stops && scaffold.length + permanent.length === 0)
+    return ['a plan with proof "test" lists its tests under scaffoldTests or permanentTests'];
+  return [];
 }
 
 export function schemaProblem(

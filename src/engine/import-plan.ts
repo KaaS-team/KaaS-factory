@@ -235,6 +235,7 @@ export function planFromIssue(p: PlannedIssue, issue: { body: string }, revision
     files: p.files.map((f) => f.path),
     autoApproveEligible: false,
     proof: "test" as const,
+    permanentTests: p.tests,
     goal: p.goal,
     criteria: p.criteria.map((c) => ({ id: c.id, text: c.text, task: c.task })),
     tasks: inDependencyOrder(p.tasks),

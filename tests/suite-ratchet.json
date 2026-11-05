@@ -1,0 +1,6 @@
+{
+  "tests": 2971,
+  "scaffold": 0,
+  "runtimeSeconds": 120,
+  "growth": [{ "tests": 2971, "reason": "first count, taken when the ratchet landed" }]
+}

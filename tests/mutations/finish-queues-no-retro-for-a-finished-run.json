@@ -1,0 +1,1 @@
+{"name":"finish queues no retro for a finished run","file":"src/engine/retro-finish.ts","find":"if (!hasRetro(state, repo, issue)) state.queueRetro(repo, issue, trigger);","replace":"void trigger;","test":"tests/retro-coverage.test.ts"}

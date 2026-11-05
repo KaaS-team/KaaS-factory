@@ -48,6 +48,7 @@ import type { Git } from "../git";
 import type { Workflow } from "../core/workflow";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
 import type { FactoryState, RetroTrigger, Stage } from "../state";
+import { queueFinishRetro, queuePrune } from "./retro-finish";
 import { LABEL, issueType } from "../labels";
 import { emitEvent, type EventBus } from "./bus";
 import { configHash } from "../team/hash";
@@ -278,6 +279,7 @@ export function finish(
   status: "needs-info" | "awaiting-approval" | "needs-human" | "failed" | "shipped" | "cancelled",
   reason?: string,
 ): void {
+  queueFinishRetro(deps.state, config.repo, issueNumber, status);
   settle(deps.state, deps.view, config.repo, issueNumber, status, reason);
 }
 
@@ -441,15 +443,10 @@ export async function stageFiles(
   return { transcriptFile, liveFile: deps.runFiles.live(issueNumber) };
 }
 
-// Plan v2.10.0 item 3: a read-only stage after a final outcome (merged,
-// rejected, or given up on after verify rejections). Never goes through
-// runStage: that wrapper's upsertRun would put an already-terminal run back
-// to "running", and retro's cost never rolls into runs.cost_usd (spendSummary
-// sums stage_runs, not runs, so the spend caps still see it via recordStageRun).
-// `existingId` is set only when a row was queued earlier (the dashboard's
-// operator-merge route, which has no Executor to run this itself) and is now
-// being drained by runQueuedRetros; the three watch.ts triggers queue and run
-// in the same call.
+// Plan v2.10.0 item 3: a read-only stage after a final outcome. Never goes through runStage: its
+// upsertRun would put a terminal run back to "running", and retro's cost stays out of runs.cost_usd
+// (recordStageRun still feeds the spend caps). `existingId` is a row queued earlier (the operator-merge
+// route, or finish() for a failed or cancelled run) that runQueuedRetros now drains.
 export async function runRetro(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -510,6 +507,7 @@ export async function runRetro(
     });
     const art = await readStageArtifacts(worktree, issueNumber, "retro");
     deps.state.completeRetro(id, art.json as RetroArtifact | undefined);
+    queuePrune(deps.state, config.repo, issueNumber, outcome, planOf(issue));
   } catch (err) {
     console.error(`retro failed for #${issue.number}:`, err);
     deps.state.completeRetro(id, undefined, "failed");

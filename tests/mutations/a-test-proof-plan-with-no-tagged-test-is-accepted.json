@@ -1,0 +1,1 @@
+{"name":"a test-proof plan with no tagged test is accepted","file":"src/schemas.ts","find":"scaffold.length + permanent.length === 0","replace":"false","test":"tests/schemas.test.ts"}

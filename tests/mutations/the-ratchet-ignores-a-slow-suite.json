@@ -1,0 +1,1 @@
+{"name":"the ratchet ignores a slow suite","file":"scripts/suite-ratchet.ts","find":"seconds !== undefined && seconds > base.runtimeSeconds","replace":"false","test":"tests/suite-ratchet.test.ts"}

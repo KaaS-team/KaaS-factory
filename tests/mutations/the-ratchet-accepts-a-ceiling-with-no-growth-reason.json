@@ -1,0 +1,1 @@
+{"name":"the ratchet accepts a ceiling with no growth reason","file":"scripts/suite-ratchet.ts","find":"if (!last || last.tests !== base.tests || !last.reason.trim())","replace":"if (false as boolean)","test":"tests/suite-ratchet.test.ts"}

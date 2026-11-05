@@ -1,0 +1,1 @@
+{"name":"the ratchet lets the suite grow past its ceiling","file":"scripts/suite-ratchet.ts","find":"if (suite.tests > base.tests)","replace":"if (false as boolean)","test":"tests/suite-ratchet.test.ts"}
