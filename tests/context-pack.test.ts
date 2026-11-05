@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeArgs } from "../src/agents/presets/claude";
+import { claudeArgs } from "../contrib/agents/claude";
 import { renderPrompt } from "../src/agents/prompt";
 import { runDir } from "../src/artifacts";
 import { buildContextPack, MAX_CONTEXT_PACK_BYTES, MAX_LESSONS_BYTES, STAGE_PACK } from "../src/context";

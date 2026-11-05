@@ -2,6 +2,7 @@
 // tool, `step_finish` parts carry `tokens {input, output, cache {read, write}}`. Read-only stages use
 // `--agent plan` (edit permission deny-all) and return the artifact as the final message.
 
+import { agents } from "../../src/plugins/registry";
 import type { StageEvent } from "../../src/executor";
 import { type AgentPreset, stagePolicy } from "../../src/agents/types";
 import { isUsageResultCandidate } from "../../src/agents/usage";
@@ -79,3 +80,5 @@ export const opencodePreset: AgentPreset = {
   parseLine: parseOpenCodeLine,
   isUsageCandidate: () => false,
 };
+
+agents.register("opencode", opencodePreset);

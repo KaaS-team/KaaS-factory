@@ -4,10 +4,12 @@
 
 import type { AgentPreset } from "../agents/types";
 import type { StepType } from "../engine/steps";
+import type { ExecutionPort } from "../ports/execution";
+import type { SandboxCapabilities } from "../ports/sandbox";
 import type { TrackerPort } from "../ports/scm";
 
-export type PluginKind = "agent" | "step" | "tracker";
-export const PLUGIN_KINDS: readonly PluginKind[] = ["agent", "step", "tracker"];
+export type PluginKind = "agent" | "step" | "tracker" | "runtime";
+export const PLUGIN_KINDS: readonly PluginKind[] = ["agent", "step", "tracker", "runtime"];
 
 export class Registry<T> {
   // The live table. Callers that index by name (`PRESETS[name]`) read this object, so a later
@@ -55,3 +57,17 @@ export type TrackerFactory = (config: never, env: Record<string, string | undefi
 export const agents = new Registry<AgentPreset>("agent");
 export const steps = new Registry<StepType>("step");
 export const trackers = new Registry<TrackerFactory>("tracker");
+
+// A runtime kind: the machine.json fields it accepts, what its sandbox can do, and how to run on it.
+// `builtin` also makes the kind's own name a runtime with an empty spec, as `local` is.
+export interface RuntimePlugin {
+  readonly shape: {
+    readonly required: readonly string[];
+    readonly fields: Readonly<Record<string, "string" | "posInt" | "boolean" | "strings">>;
+  };
+  readonly capabilities: SandboxCapabilities;
+  readonly builtin?: boolean;
+  create(spec: never): ExecutionPort;
+}
+
+export const runtimes = new Registry<RuntimePlugin>("runtime");

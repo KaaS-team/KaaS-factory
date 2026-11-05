@@ -1,26 +1,14 @@
+// Each agent preset lives in contrib/agents and registers itself when its module loads. This file
+// loads them all and exports the live table; core reads agents from here by name.
 import type { AgentPreset } from "../types";
 import { agents } from "../../plugins/registry";
-import { acpPreset } from "./acp";
-import { claudePreset } from "./claude";
-import { codexPreset } from "../../../contrib/agents/codex";
-import { cursorPreset } from "../../../contrib/agents/cursor";
-import { geminiPreset } from "../../../contrib/agents/gemini";
-import { mastracodePreset } from "../../../contrib/agents/mastracode";
-import { opencodePreset } from "../../../contrib/agents/opencode";
-import { piPreset } from "../../../contrib/agents/pi";
+import "../../../contrib/agents/claude";
+import "../../../contrib/agents/codex";
+import "../../../contrib/agents/gemini";
+import "../../../contrib/agents/opencode";
+import "../../../contrib/agents/cursor";
+import "../../../contrib/agents/pi";
+import "../../../contrib/agents/mastracode";
+import "../../../contrib/agents/acp";
 
-const SHIPPED: Record<string, AgentPreset> = {
-  claude: claudePreset,
-  codex: codexPreset,
-  gemini: geminiPreset,
-  opencode: opencodePreset,
-  cursor: cursorPreset,
-  pi: piPreset,
-  mastracode: mastracodePreset,
-  acp: acpPreset,
-};
-
-for (const [name, preset] of Object.entries(SHIPPED)) agents.register(name, preset);
-
-// The live agent table. Core reads agents from here by name; a plugin registered later shows up in it.
 export const PRESETS: Record<string, AgentPreset> = agents.table;

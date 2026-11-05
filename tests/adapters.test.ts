@@ -13,7 +13,7 @@ import { GitLeases } from "../src/adapters/git-lease/lease";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { LocalExecution } from "../src/adapters/local/execution";
-import { LwprExecution } from "../src/adapters/lwpr/execution";
+import { LwprExecution } from "../contrib/runtimes/lwpr";
 import { MicrosandboxExecution } from "../src/adapters/microsandbox/execution";
 import { PoolExecution, SqliteUsageStore } from "../src/adapters/pool/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";
@@ -203,7 +203,6 @@ const REGISTRY: Record<string, () => void> = {
     }),
   local: () => executionContract("local", () => new LocalExecution()),
   docker: onFakePath(() => executionContract("docker", () => new DockerExecution({ kind: "docker", image: "img" }))),
-  lwpr: onFakePath(() => executionContract("lwpr", () => new LwprExecution())),
   // A launcher that is just `env`: the argv templating is what is under test.
   wrap: () =>
     executionContract(
@@ -234,6 +233,11 @@ const REGISTRY: Record<string, () => void> = {
   ),
 };
 
+// Runtime plugins under contrib/ keep the same contract but are not core adapter directories.
+const PLUGINS: Record<string, () => void> = {
+  lwpr: onFakePath(() => executionContract("lwpr", () => new LwprExecution())),
+};
+
 describe("adapters", () => {
   test("every directory under src/adapters is registered", () => {
     const dirs = readdirSync(join(import.meta.dir, "..", "src", "adapters"), { withFileTypes: true })
@@ -243,7 +247,7 @@ describe("adapters", () => {
     expect(dirs).toEqual(Object.keys(REGISTRY).sort());
   });
 
-  for (const run of Object.values(REGISTRY)) run();
+  for (const run of [...Object.values(REGISTRY), ...Object.values(PLUGINS)]) run();
   executionContract("recording fake", () => new RecordingExecution());
   leaseContract("in-memory fake", () => {
     const port = new FakeLeases();

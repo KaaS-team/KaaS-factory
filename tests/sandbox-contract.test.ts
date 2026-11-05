@@ -12,19 +12,19 @@ import {
   DEFAULT_RUNTIME,
   DEFAULT_VM,
   defaultRuntime,
-  RUNTIME_KINDS,
+  runtimeKinds,
   runtimeProblems,
   runtimesFrom,
 } from "../src/runtimes";
-import { CAPABILITIES, sandboxProvider } from "../src/sandbox";
+import { allCapabilities, CAPABILITIES, sandboxProvider } from "../src/sandbox";
 import { startSandbox } from "./fixtures/http-sandbox";
 
 const failed = (checks: { name: string; ok: boolean }[]) => checks.filter((c) => !c.ok).map((c) => c.name);
 
 describe("sandbox contract", () => {
   test("every runtime kind reports its flags, and a sandbox does each verb", async () => {
-    expect(Object.keys(CAPABILITIES).sort()).toEqual([...RUNTIME_KINDS].sort());
-    for (const c of Object.values(CAPABILITIES))
+    expect(Object.keys(allCapabilities()).sort()).toEqual(runtimeKinds().sort());
+    for (const c of Object.values(allCapabilities()))
       expect(Object.keys(c).sort()).toEqual(["byo", "egress", "expose", "isolation", "memoryResume", "snapshot"]);
     const provider = sandboxProvider(new LocalExecution(), CAPABILITIES.local);
     const box = await provider.create({ env: { WHO: "it's me" } });

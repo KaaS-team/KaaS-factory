@@ -1,0 +1,1 @@
+{"name":"disabling the lwpr plugin is ignored","file":"src/runtimes-shipped.ts","find":"if (!off.has(\"lwpr\"))","replace":"if (true)","test":"tests/runtime-plugins.test.ts"}

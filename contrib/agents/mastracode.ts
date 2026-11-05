@@ -2,6 +2,7 @@
 // stdin. Each line is an AgentController event, shaped per @mastra/code-sdk's types (nothing from `ee/`).
 // Exit code 2 means the --timeout expired. Read-only stages use `--mode plan`.
 
+import { agents } from "../../src/plugins/registry";
 import type { StageEvent } from "../../src/executor";
 import { type AgentPreset, stagePolicy } from "../../src/agents/types";
 import { isUsageResultCandidate } from "../../src/agents/usage";
@@ -102,3 +103,5 @@ export const mastracodePreset: AgentPreset = {
   newParser: createMastraParser,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "usage_update"),
 };
+
+agents.register("mastracode", mastracodePreset);

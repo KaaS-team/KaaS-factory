@@ -1,1 +1,1 @@
-{"name":"a shipped agent is left out of the registry at startup","file":"src/agents/presets/index.ts","find":"agents.register(name, preset);","replace":"void [name, preset];","test":"tests/core-names-no-agent.test.ts"}
+{"name":"a shipped agent is left out of the registry at startup","file":"contrib/agents/codex.ts","find":"agents.register(\"codex\", codexPreset);","replace":"","test":"tests/core-names-no-agent.test.ts"}

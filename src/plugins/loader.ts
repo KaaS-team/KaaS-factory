@@ -7,7 +7,7 @@ import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { factoryHome } from "../paths";
 import { parseManifest, type PluginManifest } from "./manifest";
-import { agents, steps, trackers } from "./registry";
+import { agents, runtimes, steps, trackers } from "./registry";
 
 export const PLUGINS_DIRNAME = "plugins";
 
@@ -33,6 +33,7 @@ export async function loadPlugin(dir: string, expectName?: string): Promise<Plug
   const source = `plugin ${manifest.name} (${file})`;
   if (manifest.kind === "agent") agents.register(manifest.name, mod.default as never, source);
   else if (manifest.kind === "step") steps.register(manifest.name, mod.default as never, source);
+  else if (manifest.kind === "runtime") runtimes.register(manifest.name, mod.default as never, source);
   else {
     if (typeof mod.default !== "function")
       throw new Error(`${file}: entry: a tracker plugin default-exports a function`);

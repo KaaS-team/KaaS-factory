@@ -15,7 +15,8 @@ import type { versionOf, which } from "../src/probes";
 import { loadMachineConfig } from "../src/machine";
 import { configMirrorDir } from "../src/paths";
 import { cloneDirFor } from "../src/repo";
-import { BUILTIN_RUNTIMES, DEFAULT_RUNTIME, type RuntimeSpec, runtimeRefs, runtimeSpecs } from "../src/runtimes";
+import type { Health } from "../src/runtime-kit";
+import { builtinRuntimes, DEFAULT_RUNTIME, type RuntimeSpec, runtimeRefs, runtimeSpecs } from "../src/runtimes";
 import { fleetView, healthCache } from "./fleet";
 
 import type { DashboardProject } from "../src/dashboard-host";
@@ -128,7 +129,7 @@ export function settingsView(
     runtimes: Object.entries(specs).map(([name, spec]) => ({
       name: plain(name),
       kind: spec.kind,
-      builtin: name === DEFAULT_RUNTIME || Object.hasOwn(BUILTIN_RUNTIMES, name),
+      builtin: name === DEFAULT_RUNTIME || Object.hasOwn(builtinRuntimes(), name),
       target: plain(target(spec)),
       usedBy: refs.filter((r) => r.name === name).map((r) => plain(r.where)),
     })),

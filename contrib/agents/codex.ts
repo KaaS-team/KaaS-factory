@@ -3,6 +3,7 @@
 // Build and pr run workspace-write; triage, plan and verify run read-only and
 // return their artifacts as the final message, which the runner writes.
 
+import { agents } from "../../src/plugins/registry";
 import type { StageEvent } from "../../src/executor";
 import { type AgentPreset, stagePolicy } from "../../src/agents/types";
 import { isUsageResultCandidate, readUsage } from "../../src/agents/usage";
@@ -77,3 +78,5 @@ export const codexPreset: AgentPreset = {
   parseLine: parseCodexLine,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "turn.completed"),
 };
+
+agents.register("codex", codexPreset);

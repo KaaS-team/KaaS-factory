@@ -2,16 +2,10 @@
 // and untracked, minus ignored), runs the command there in its own sandbox and
 // mirrors the exit code. Its log merges both streams, so the command is framed.
 
-import { framed, unframe } from "../../core/frame";
-import type { ExecResult, ExecutionPort } from "../../ports/execution";
-
-export interface LwprSpec {
-  readonly kind: "lwpr";
-  readonly app?: string;
-  readonly timeoutMin?: number;
-  // Run the repo's own lwpr `setup` first (default true).
-  readonly setup?: boolean;
-}
+import { framed, unframe } from "../../src/core/frame";
+import type { ExecResult, ExecutionPort } from "../../src/ports/execution";
+import { runtimes } from "../../src/plugins/registry";
+import type { LwprSpec } from "../../src/runtimes";
 
 export function lwprArgs(spec: LwprSpec, cmd: string): string[] {
   return [
@@ -39,3 +33,10 @@ export class LwprExecution implements ExecutionPort {
     return unframe(`${stdout}\n${stderr}`, code);
   }
 }
+
+runtimes.register("lwpr", {
+  shape: { required: [], fields: { app: "string", timeoutMin: "posInt", setup: "boolean" } },
+  capabilities: { isolation: "remote", byo: true, snapshot: true, memoryResume: false, expose: false, egress: "open" },
+  builtin: true,
+  create: (spec: LwprSpec) => new LwprExecution(spec),
+});

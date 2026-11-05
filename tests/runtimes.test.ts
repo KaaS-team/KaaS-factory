@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { containerArgs } from "../src/adapters/docker/execution";
-import { lwprArgs } from "../src/adapters/lwpr/execution";
+import { lwprArgs } from "../contrib/runtimes/lwpr";
 import { agentArgs, guestGit, MicrosandboxExecution, sandboxArgs } from "../src/adapters/microsandbox/execution";
 import { CommandExecutor } from "../src/agents/executor";
 import { Agent37Execution, accountLine, CHUNK } from "../src/adapters/agent37/execution";
@@ -18,7 +18,7 @@ import { framed, shq, unframe } from "../src/core/frame";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { loadMachineConfig } from "../src/machine";
 import { probeBudgetMs, probeNamed } from "../src/runtime-kit";
-import { BUILTIN_RUNTIMES, runtimeProblems, runtimeRefs, runtimesFrom, unknownRuntimes } from "../src/runtimes";
+import { builtinRuntimes, runtimeProblems, runtimeRefs, runtimesFrom, unknownRuntimes } from "../src/runtimes";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -270,7 +270,7 @@ describe("names", () => {
       "runtimes.a b: a name is letters, digits, _ and -",
       "runtimes.d.image: required for docker",
       "runtimes.s.port: unknown key for ssh (allowed: kind, host, dir, exclude, image)",
-      "runtimes.x.kind: one of local, docker, ssh, lwpr, wrap, http, agent37, microsandbox, codespaces, pool",
+      "runtimes.x.kind: one of local, docker, ssh, wrap, http, agent37, microsandbox, codespaces, pool, lwpr",
     ]);
   });
   test("a bad machine.json runtime stops boot", () => {
@@ -295,7 +295,7 @@ describe("names", () => {
     expect(configProblems({ repo: "a/b", runtime: { gates: "docker1", check: "lwpr" } })).toEqual([]);
     expect(configProblems({ repo: "a/b", runtime: { verify: "x" } })[0]).toContain("runtime.verify: unknown key");
     const refs = runtimeRefs({ runtime: { gates: "box" } }, { lint: { runtime: "gpu" }, build: {} });
-    expect(unknownRuntimes(refs, { ...BUILTIN_RUNTIMES, box: {} })).toEqual([
+    expect(unknownRuntimes(refs, { ...builtinRuntimes(), box: {} })).toEqual([
       'steps.lint.runtime: no runtime "gpu" (have: local, lwpr, box; add it to FACTORY_HOME/machine.json runtimes)',
     ]);
   });

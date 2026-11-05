@@ -1,7 +1,7 @@
 // The connectors catalogue, walked whole: every manifest is valid and points at real files, every
 // tracker and runtime kind the runner builds has one, and docs/integrations.md's table is generated.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { KINDS, loadManifests, manifestProblems, renderIntegrationsDoc } from "../src/integrations/catalogue";
 import { LIVE_RUNTIMES } from "./live/runtimes";
@@ -11,6 +11,8 @@ const ROOT = join(import.meta.dir, "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const manifests = loadManifests();
 const byKind = (k: string) => manifests.filter((m) => m.kind === k);
+// Runtimes that ship as plugins (contrib/runtimes/<kind>.ts) are built by the plugin, not the switch.
+const pluginRuntimes = readdirSync(join(ROOT, "contrib/runtimes")).map((f) => f.replace(/\.ts$/, ""));
 // The names a switch builds, read from its source so a new case cannot skip its manifest.
 const casesIn = (file: string, fn: string) => {
   const body = read(file).split(`function ${fn}(`)[1]!.split("\n}\n")[0]!;
@@ -42,7 +44,7 @@ describe("integration manifests", () => {
     const kindOf = (m: (typeof manifests)[number]) => m.configKind ?? m.name;
     expect(byKind("tracker").map(kindOf).sort()).toEqual(casesIn("src/scm.ts", "makeTracker"));
     expect(byKind("runtime").map(kindOf).sort()).toEqual(
-      [...casesIn("src/runtimes.ts", "executionFor"), "pool"].sort(),
+      [...casesIn("src/runtimes.ts", "executionFor"), ...pluginRuntimes, "pool"].sort(),
     );
   });
 

@@ -84,3 +84,12 @@ test("a test sees a temp dir under its run's own root, and FACTORY_HOME inside i
   ).toBe(true);
   expect(process.env.FACTORY_HOME?.startsWith(tmpdir())).toBe(true);
 });
+
+test("every --rerun-each repeat can make a temp dir, though the last repeat removed the run root", () => {
+  const run = Bun.spawnSync(["bun", "test", "--rerun-each", "3", "./tests/fixtures/rerun/tmpdir.fixture.ts"], {
+    cwd: repoRoot,
+    timeout: 60_000,
+  });
+  expect(run.stderr.toString()).toContain(" 3 pass");
+  expect(run.exitCode).toBe(0);
+});

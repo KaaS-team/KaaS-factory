@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor } from "../../../src/agents/executor";
 import { MAX_FINAL_MESSAGE_BYTES } from "../../../src/agents/final-message";
-import { claudePreset } from "../../../src/agents/presets/claude";
+import { claudePreset } from "../../../contrib/agents/claude";
 import { codexPreset } from "../../../contrib/agents/codex";
 import { aggregateStageEvents } from "../../../src/executor";
 import type { AgentPreset } from "../../../src/agents/types";
@@ -55,8 +55,15 @@ test("a real child's final agent message is recorded", async () => {
       { default: "codex" },
     );
     const result = await executor.runStage({ stage: "triage", issue: 1, cwd, maxBudgetUsd: 1 });
-    expect(result.finalMessage).toBe("Triaged 9 issues.");
-    expect(result.agent).toBe("codex");
+    // One comparison of the fields that explain a miss, so a failure in CI prints the exit code and stderr.
+    const { finalMessage, agent, exitCode, killedReason, stderrTail } = result;
+    expect({ finalMessage, agent, exitCode, killedReason, stderrTail }).toEqual({
+      finalMessage: "Triaged 9 issues.",
+      agent: "codex",
+      exitCode: 0,
+      killedReason: undefined,
+      stderrTail: undefined,
+    });
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

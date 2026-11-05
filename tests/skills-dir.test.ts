@@ -2,14 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { DEFAULT_AGENT, skillsDirFor } from "../src/agents/default";
-import { claudePreset } from "../src/agents/presets/claude";
+import { claudePreset } from "../contrib/agents/claude";
 
 const SRC = join(import.meta.dir, "..", "src");
 
 // Each entry owns a claude-specific path or stage skill.
 const ALLOWED = [
   "src/agents/default.ts",
-  "src/agents/presets/claude.ts",
   "src/agents/prompt.ts",
   "src/config.ts",
   "src/context.ts",

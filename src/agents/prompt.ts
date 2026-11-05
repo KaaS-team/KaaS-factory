@@ -46,7 +46,7 @@ export function artifactContract(
 
 // `contextPack` (buildContextPack, plan v2.7.0 item 3) is inlined here for
 // every non-Claude agent; Claude gets the same text through
-// --append-system-prompt instead (see agents/presets/claude.ts).
+// --append-system-prompt instead (see contrib/agents/claude.ts).
 export async function renderPrompt(
   opts: StageRunOptions,
   readOnly = false,

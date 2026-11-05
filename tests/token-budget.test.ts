@@ -8,7 +8,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeArgs } from "../src/agents/presets/claude";
+import { claudeArgs } from "../contrib/agents/claude";
 import { runDir } from "../src/artifacts";
 import { buildContextPack, STAGE_PACK } from "../src/context";
 import type { StageName } from "../src/executor";
