@@ -1,0 +1,7 @@
+{
+  "name": "a taken explicit dashboard port moves to another port",
+  "file": "src/dashboard-port.ts",
+  "find": "if (requested !== undefined) {",
+  "replace": "if (false as boolean) {",
+  "test": "tests/cli-ports.test.ts"
+}
