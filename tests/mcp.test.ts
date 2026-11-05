@@ -6,7 +6,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor } from "../src/agents/executor";
-import { claudeArgs, claudePreset } from "../src/agents/presets/claude";
+import { claudeArgs, claudePreset } from "../contrib/agents/claude";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { McpError, mcpServersFor } from "../src/mcp";
 

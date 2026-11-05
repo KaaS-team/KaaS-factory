@@ -2,6 +2,7 @@
 // Shapes read from gemini-cli 0.61.0's docs and bundle (docs/agent-research/gemini/docs.md).
 // Read-only stages run in `plan` mode and return their artifacts as the final message.
 
+import { agents } from "../../src/plugins/registry";
 import type { StageEvent } from "../../src/executor";
 import { type AgentPreset, stagePolicy } from "../../src/agents/types";
 import { isUsageResultCandidate } from "../../src/agents/usage";
@@ -78,3 +79,5 @@ export const geminiPreset: AgentPreset = {
   newParser: createGeminiParser,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "result"),
 };
+
+agents.register("gemini", geminiPreset);

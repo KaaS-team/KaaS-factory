@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeArgs } from "../src/agents/presets/claude";
+import { claudeArgs } from "../contrib/agents/claude";
 import type { StageName } from "../src/executor";
 import {
   STAGE_GUIDANCE,

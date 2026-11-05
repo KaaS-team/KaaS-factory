@@ -18,7 +18,7 @@ import {
   MINIONS_DIR,
   UNTRUSTED_CLOSE,
 } from "../src/engine/minion";
-import { claudeArgs } from "../src/agents/presets/claude";
+import { claudeArgs } from "../contrib/agents/claude";
 import type { SpendEntry } from "../src/ports/spend";
 import { mergeConfig } from "../src/config";
 import { FactoryState } from "../src/state";

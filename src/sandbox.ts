@@ -14,6 +14,8 @@ import {
   type SandboxStatus,
   SandboxUnsupported,
 } from "./ports/sandbox";
+import { runtimes } from "./plugins/registry";
+import "./runtimes-shipped";
 import type { RuntimeSpec } from "./runtimes";
 
 const caps = (
@@ -24,11 +26,10 @@ const caps = (
 
 // "deny" only where the adapter itself turns the network off by default (docker `--network none`,
 // msb `--no-net`); a wrap launcher, a pool or a vendor decides for itself.
-export const CAPABILITIES: Readonly<Record<RuntimeSpec["kind"], SandboxCapabilities>> = {
+export const CAPABILITIES: Readonly<Record<Exclude<RuntimeSpec["kind"], "lwpr">, SandboxCapabilities>> = {
   local: caps("none", "open"),
   docker: caps("container", "deny"),
   ssh: caps("remote", "open", true),
-  lwpr: caps("remote", "open", true),
   wrap: caps("unknown", "provider", true),
   http: caps("remote", "provider", true),
   agent37: caps("remote", "provider", true),
@@ -37,11 +38,23 @@ export const CAPABILITIES: Readonly<Record<RuntimeSpec["kind"], SandboxCapabilit
   pool: caps("unknown", "provider", true),
 };
 
+const lwprCaps = (): SandboxCapabilities => {
+  const plugin = runtimes.get("lwpr");
+  if (!plugin) throw new Error('no runtime kind "lwpr" (is its plugin disabled?)');
+  return plugin.capabilities;
+};
+
+// Every kind's flags, runtime plugins included.
+export const allCapabilities = (): Readonly<Record<string, SandboxCapabilities>> => ({
+  ...CAPABILITIES,
+  ...Object.fromEntries(runtimes.names().map((n) => [n, runtimes.get(n)!.capabilities])),
+});
+
 export function capabilitiesOf(spec: RuntimeSpec): SandboxCapabilities {
   // A docker runtime that names a network has one.
   if (spec.kind === "docker" && spec.network && spec.network !== "none")
     return { ...CAPABILITIES.docker, egress: "open" };
-  return CAPABILITIES[spec.kind];
+  return spec.kind === "lwpr" ? lwprCaps() : CAPABILITIES[spec.kind];
 }
 
 class WorkdirSandbox implements Sandbox {

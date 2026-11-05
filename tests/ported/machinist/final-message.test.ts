@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor } from "../../../src/agents/executor";
 import { MAX_FINAL_MESSAGE_BYTES } from "../../../src/agents/final-message";
-import { claudePreset } from "../../../src/agents/presets/claude";
+import { claudePreset } from "../../../contrib/agents/claude";
 import { codexPreset } from "../../../contrib/agents/codex";
 import { aggregateStageEvents } from "../../../src/executor";
 import type { AgentPreset } from "../../../src/agents/types";

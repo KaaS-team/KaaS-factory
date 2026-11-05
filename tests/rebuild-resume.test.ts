@@ -5,7 +5,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeArgs } from "../src/agents/presets/claude";
+import { claudeArgs } from "../contrib/agents/claude";
 import { renderPrompt } from "../src/agents/prompt";
 
 const cwd = mkdtempSync(join(tmpdir(), "factory-rebuild-"));

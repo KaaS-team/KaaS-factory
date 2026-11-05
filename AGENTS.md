@@ -18,7 +18,7 @@ A GitHub-native loop for coding agents: triage, plan, build, verify, PR. `src/` 
 
 ## Things that change together
 
-- **Claude argv.** `src/agents/presets/claude.ts` is pinned byte for byte by `tests/agents.test.ts`.
+- **Claude argv.** `contrib/agents/claude.ts` is pinned byte for byte by `tests/agents.test.ts`.
   Check a new flag against `claude --help` first.
 - **Stage artifacts.** `stageSchema` in `src/schemas.ts` is the one source of truth.
   - `src/artifacts.ts` validates against it (`tests/schemas.test.ts`).

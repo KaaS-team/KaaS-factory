@@ -13,7 +13,7 @@ import { GitLeases } from "../src/adapters/git-lease/lease";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { LocalExecution } from "../src/adapters/local/execution";
-import { LwprExecution } from "../src/adapters/lwpr/execution";
+import { LwprExecution } from "../contrib/runtimes/lwpr";
 import { MicrosandboxExecution } from "../src/adapters/microsandbox/execution";
 import { PoolExecution, SqliteUsageStore } from "../src/adapters/pool/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";

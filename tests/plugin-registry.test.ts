@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { resolveAgentByName } from "../src/agents/executor";
 import { PRESETS } from "../src/agents/presets";
-import { claudePreset } from "../src/agents/presets/claude";
+import { claudePreset } from "../contrib/agents/claude";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { agents, type Registry, steps, trackers } from "../src/plugins/registry";
 import { configProblems } from "../src/config";

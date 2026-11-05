@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { decidePr, parseApproved } from "../src/contributor-policy";
 import { sanitizeEnv } from "../src/agents/env";
-import { CAPABILITIES } from "../src/sandbox";
+import { allCapabilities, CAPABILITIES } from "../src/sandbox";
 
 const root = join(import.meta.dir, "..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
@@ -43,7 +43,7 @@ describe("SECURITY.md matches the code", () => {
     expect(CAPABILITIES.microsandbox).toMatchObject({ isolation: "microvm", egress: "deny" });
     expect(line("microsandbox")).toContain("microVM with egress denied");
     for (const k of ["ssh", "lwpr", "http", "agent37", "codespaces"] as const) {
-      expect(CAPABILITIES[k].isolation).toBe("remote");
+      expect(allCapabilities()[k]!.isolation).toBe("remote");
       expect(text).toContain(`\`${k}\``);
     }
     expect(CAPABILITIES.wrap.isolation).toBe("unknown");

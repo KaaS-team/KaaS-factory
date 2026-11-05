@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderEvent } from "../src/agents/executor";
-import { parseStreamJsonLine } from "../src/agents/presets/claude";
+import { parseStreamJsonLine } from "../contrib/agents/claude";
 
 const scratch = mkdtempSync(join(tmpdir(), "factory-startup-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
