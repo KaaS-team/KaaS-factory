@@ -85,6 +85,7 @@ export function applyTeam(input: ApplyInput): TeamApplied {
     riskPolicy,
     protectedPaths: [...new Set([...config.protectedPaths, ...(p.protected_paths ?? [])])],
     orchestrate: orch.spec,
+    ...(p.models ? { modelAllow: p.models } : {}),
   };
   return {
     config: next,

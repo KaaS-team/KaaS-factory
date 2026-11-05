@@ -1,0 +1,7 @@
+{
+  "name": "a model outside the team's allowed models is dispatched",
+  "file": "src/core/model-tier.ts",
+  "find": "if (allowed && model && !allowed.includes(model))",
+  "replace": "if (false)",
+  "test": "tests/model-routing.test.ts"
+}

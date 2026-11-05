@@ -26,6 +26,38 @@ export function tierFor(scope: IssueScope | undefined, rejects = 0): Tier | unde
   return LADDER[Math.min(LADDER.length - 1, base + rejects)];
 }
 
+// `model: auto` on a workflow step: the cheap tier for the steps that only read and summarize, the
+// strong one for the steps that decide, and the size-and-risk tier for the build, as it always was.
+const AUTO_TIER: Readonly<Record<string, Tier>> = {
+  triage: "small",
+  pr: "small",
+  retro: "small",
+  plan: "large",
+  verify: "large",
+};
+
+export function autoTier(stage: string, scope: IssueScope | undefined, rejects = 0): Tier | undefined {
+  return AUTO_TIER[stage] ?? tierFor(scope, rejects);
+}
+
+// The model a step's `model:` names: "auto" is the agent's model for the step's tier, if it has one.
+export function stepModelFor(
+  want: string,
+  models: Readonly<Partial<Record<Tier, string>>> | undefined,
+  stage: string,
+  scope: IssueScope | undefined,
+  rejects?: number,
+): string | undefined {
+  const tier = want === "auto" ? autoTier(stage, scope, rejects) : undefined;
+  return want !== "auto" ? want : tier && models?.[tier];
+}
+
+// Refuses, before anything is spent, a model the team's policy does not list.
+export function refuseModel(agent: string, model: string | undefined, allowed: readonly string[] | undefined): void {
+  if (allowed && model && !allowed.includes(model))
+    throw new Error(`${agent}: model "${model}" is not in the team's allowed models (${allowed.join(", ") || "none"})`);
+}
+
 // The plan's risk and files win over the triage's guess, since the plan has read the code.
 export function scopeFrom(plan: unknown, triage: unknown): IssueScope | undefined {
   const read = (v: unknown, key: "files" | "files_expected"): IssueScope | undefined => {

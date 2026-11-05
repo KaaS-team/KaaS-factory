@@ -42,6 +42,8 @@ export interface Step {
   // Set by workflow-extras.ts: the agent and timeout an agent step runs with, a check or tool
   // step's extra attempts, and a tool step's `server/tool` and its arguments.
   readonly agent?: string;
+  // An agent step's model: "auto" (by step, from the agent's `models`) or one model id.
+  readonly model?: string;
   readonly timeoutMinutes?: number;
   readonly retries?: number;
   readonly tool?: string;
@@ -381,9 +383,15 @@ function reachable(steps: Readonly<Record<string, Step>>, start: string): Set<st
 }
 
 // What an agent step hands runStage: its MCP servers, and the agent and timeout a workflow pinned.
-export function stepOpts(step: Step): { mcp?: readonly string[]; agent?: string; timeoutMinutes?: number } {
+export function stepOpts(step: Step): {
+  mcp?: readonly string[];
+  agent?: string;
+  stepModel?: string;
+  timeoutMinutes?: number;
+} {
   return {
     mcp: step.mcp,
+    ...(step.model ? { stepModel: step.model } : {}),
     ...(step.agent ? { agent: step.agent } : {}),
     ...(step.timeoutMinutes ? { timeoutMinutes: step.timeoutMinutes } : {}),
   };

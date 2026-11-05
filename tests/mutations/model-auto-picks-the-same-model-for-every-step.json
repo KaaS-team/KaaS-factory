@@ -1,0 +1,7 @@
+{
+  "name": "model auto picks the same model for every step",
+  "file": "src/core/model-tier.ts",
+  "find": "const tier = want === \"auto\" ? autoTier(stage, scope, rejects) : undefined;",
+  "replace": "const tier = want === \"auto\" ? \"small\" : undefined;",
+  "test": "tests/model-routing.test.ts"
+}

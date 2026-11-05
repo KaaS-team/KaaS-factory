@@ -494,6 +494,8 @@ export class MultiStageExecutor {
   readonly rejects: Array<[StageName, StageRunOptions["rejects"]]> = [];
   // The agent and timeout a workflow step pinned, by stage.
   readonly pinned: Array<[StageName, string | undefined, number | undefined]> = [];
+  // The step model and the team's allowed models each run was handed, by stage.
+  readonly routing: Array<[StageName, string | undefined, readonly string[] | undefined]> = [];
 
   async runStage(opts: {
     stage: StageName;
@@ -507,7 +509,10 @@ export class MultiStageExecutor {
     agent?: string;
     model?: string;
     timeoutMinutes?: number;
+    stepModel?: string;
+    allowedModels?: readonly string[];
   }) {
+    this.routing.push([opts.stage, opts.stepModel, opts.allowedModels]);
     this.models.push([opts.stage, opts.model]);
     this.pinned.push([opts.stage, opts.agent, opts.timeoutMinutes]);
     this.resumed.push(opts.resume);

@@ -134,6 +134,8 @@ export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields
   readonly prRunSummary: boolean;
   // Installed template files this repo changed on purpose; doctor's drift check skips them.
   readonly templateOverrides: readonly string[];
+  // The team policy's `models` allow list (src/team/apply.ts). Unset: any model.
+  readonly modelAllow?: readonly string[];
   // The workflow an issue runs: .factory/workflows/<name>.yml, else the runner's copy.
   readonly workflow: string;
   // Defaults for a company size (PROFILES); any key set explicitly still wins.
@@ -400,6 +402,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   events: "object",
   commits: "object",
   orchestrate: "object",
+  modelAllow: "strings",
   riskCriteria: "object",
 };
 
