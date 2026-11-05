@@ -1,0 +1,1 @@
+{"name":"a tab indent style is not reported","file":"src/conventions.ts","find":"if (tabs) style.push(","replace":"if (false) style.push(","test":"tests/conventions.test.ts"}

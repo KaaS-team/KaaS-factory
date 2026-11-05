@@ -1,0 +1,1 @@
+{"name":"build gets no conventions profile","file":"src/context.ts","find":"build: [\"conventions\", \"profile\", \"charter\"","replace":"build: [\"conventions\", \"charter\"","test":"tests/conventions.test.ts"}

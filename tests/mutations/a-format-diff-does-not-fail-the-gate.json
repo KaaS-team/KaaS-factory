@@ -1,0 +1,1 @@
+{"name":"a format diff does not fail the gate","file":"src/gates.ts","find":"else failed.push(name);","replace":"else passed++;","test":"tests/conventions.test.ts"}

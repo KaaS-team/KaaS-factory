@@ -1,0 +1,1 @@
+{"name":"verify gets no conventions profile","file":"src/context.ts","find":"verify: [\"conventions\", \"profile\", \"routeSkills\"]","replace":"verify: [\"conventions\", \"routeSkills\"]","test":"tests/conventions.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"a configured format gate is run twice","file":"src/gates.ts","find":"if (roles.has(t.role) || seen.has(t.role)) return false;","replace":"if (seen.has(t.role)) return false;","test":"tests/conventions.test.ts"}

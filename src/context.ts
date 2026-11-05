@@ -10,6 +10,7 @@ import type { StageName } from "./executor";
 import { stripFrontmatter } from "./agents/prompt";
 import { readdirSync } from "node:fs";
 import { reviewMdSection } from "./review-md";
+import { conventionsSection } from "./conventions";
 
 export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
 
@@ -21,7 +22,15 @@ export const LESSONS_PATH = ".factory/memory/lessons.md";
 export const MAX_LESSONS_BYTES = 8 * 1024;
 export const CHARTER_PATH = ".factory/charter.md";
 
-type SectionKey = "conventions" | "charter" | "lessons" | "skillsIndex" | "routeSkills" | "architecture" | "planFiles";
+type SectionKey =
+  | "conventions"
+  | "profile"
+  | "charter"
+  | "lessons"
+  | "skillsIndex"
+  | "routeSkills"
+  | "architecture"
+  | "planFiles";
 
 // v3.0 token diet: every stage used to get every section. pr gets nothing
 // (its inputs are the run's own artifacts), retro only the lessons it must
@@ -30,8 +39,8 @@ type SectionKey = "conventions" | "charter" | "lessons" | "skillsIndex" | "route
 export const STAGE_PACK: Record<StageName, readonly SectionKey[]> = {
   triage: ["conventions", "charter", "lessons"],
   plan: ["conventions", "charter", "lessons", "skillsIndex", "architecture"],
-  build: ["conventions", "charter", "lessons", "routeSkills", "architecture", "planFiles"],
-  verify: ["conventions", "routeSkills"],
+  build: ["conventions", "profile", "charter", "lessons", "routeSkills", "architecture", "planFiles"],
+  verify: ["conventions", "profile", "routeSkills"],
   pr: [],
   retro: ["lessons"],
 };
@@ -123,6 +132,11 @@ async function sections(stage: StageName, issue: number, cwd: string, opts: Pack
   if (want.has("conventions")) {
     const review = reviewMdSection(cwd);
     if (review) out.push(review);
+  }
+
+  if (want.has("profile")) {
+    const profile = await conventionsSection(cwd);
+    if (profile) out.push(profile);
   }
 
   if (want.has("charter")) {
