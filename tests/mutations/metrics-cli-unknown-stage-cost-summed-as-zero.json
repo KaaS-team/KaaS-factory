@@ -1,0 +1,1 @@
+{"name": "metrics cli unknown stage cost summed as zero", "file": "src/metrics-cli.ts", "find": "rows.some((s) => s.cost_usd === null) ? null :", "replace": "false ? null :", "test": "tests/metrics-cli.test.ts"}

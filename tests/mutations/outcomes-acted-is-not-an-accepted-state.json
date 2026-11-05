@@ -1,0 +1,1 @@
+{"name": "outcomes acted is not an accepted state", "file": "src/outcomes.ts", "find": "[\"merged\", \"kept\", \"acted\"]", "replace": "[\"merged\", \"kept\"]", "test": "tests/outcomes.test.ts"}

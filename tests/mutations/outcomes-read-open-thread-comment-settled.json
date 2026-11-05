@@ -1,0 +1,1 @@
+{"name": "outcomes read open thread comment settled", "file": "src/outcomes-read.ts", "find": "if (issue.state === \"CLOSED\" && issue.closedAt) {\n      comments.forEach", "replace": "if (true) {\n      comments.forEach", "test": "tests/outcomes-read.test.ts"}

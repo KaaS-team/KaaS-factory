@@ -1,0 +1,1 @@
+{"name": "outcomes a lone variant is compared", "file": "src/outcomes.ts", "find": "if (groups.length < 2) continue;", "replace": "", "test": "tests/outcomes.test.ts"}

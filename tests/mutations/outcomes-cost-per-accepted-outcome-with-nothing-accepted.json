@@ -1,0 +1,1 @@
+{"name": "outcomes cost per accepted outcome with nothing accepted", "file": "src/outcomes.ts", "find": "if (accepted) g.costPerAccepted", "replace": "g.costPerAccepted", "test": "tests/outcomes.test.ts"}

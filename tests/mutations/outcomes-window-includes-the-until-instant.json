@@ -1,0 +1,1 @@
+{"name": "outcomes window includes the until instant", "file": "src/outcomes.ts", "find": "t >= lo && t < hi", "replace": "t >= lo && t <= hi", "test": "tests/outcomes.test.ts"}

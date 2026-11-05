@@ -1,0 +1,1 @@
+{"name": "outcomes read dismissed issue counted as kept", "file": "src/outcomes-read.ts", "find": "issue.stateReason === \"NOT_PLANNED\" ? \"dismissed\" : \"kept\"", "replace": "\"kept\"", "test": "tests/outcomes-read.test.ts"}

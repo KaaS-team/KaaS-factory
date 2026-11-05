@@ -1,0 +1,1 @@
+{"name": "outcomes cheapest variant is the dearest", "file": "src/outcomes.ts", "find": "a.costPerAccepted! - b.costPerAccepted!", "replace": "b.costPerAccepted! - a.costPerAccepted!", "test": "tests/outcomes.test.ts"}
