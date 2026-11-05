@@ -175,6 +175,7 @@ function load([name, path]) {
     apply: (r) => {
       if (r.kind === "success") {
         state.data[name] = r.status;
+        state.refreshedAt = new Date();
         state.error[name] = null;
       } else state.error[name] = r.message;
       render();

@@ -1,0 +1,7 @@
+{
+  "name": "the rail hides when the board last refreshed",
+  "file": "dashboard/public/lib/rail.js",
+  "find": "const stamp = state.refreshedAt",
+  "replace": "const stamp = false",
+  "test": "tests/dashboard-ui.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "recovery re-drives an issue this process is already working",
+  "file": "src/watch.ts",
+  "find": "(i) => !inFlight?.has(i.number) && canServe(",
+  "replace": "(i) => canServe(",
+  "test": "tests/watch-recover.test.ts"
+}

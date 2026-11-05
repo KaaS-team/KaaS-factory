@@ -41,7 +41,8 @@ export type RunStatus =
   | "shipped"
   | "failed"
   | "needs-human"
-  | "cancelled";
+  | "cancelled"
+  | "interrupted";
 
 export interface Run {
   id: number;
@@ -387,6 +388,14 @@ export class FactoryState {
       const id = this.getRun(repo, issue)?.id;
       if (id !== undefined) this.budgets.delete(id);
     }
+  }
+
+  // The newest of the run's own update and its latest event: what "recent" means for a live run.
+  lastActivity(run: Pick<Run, "id" | "updated_at">): string {
+    const row = this.db.query("SELECT MAX(ts) AS ts FROM events WHERE run_id = $id").get({ $id: run.id }) as {
+      ts: string | null;
+    };
+    return row.ts && row.ts > run.updated_at ? row.ts : run.updated_at;
   }
 
   // How many runs hold an in-memory event budget; tests watch it for leaks.

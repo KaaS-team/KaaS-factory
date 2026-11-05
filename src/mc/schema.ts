@@ -98,4 +98,5 @@ const RUN_STATE: Record<RunStatus, SessionState> = {
   rejected: "failed",
   failed: "failed",
   cancelled: "cancelled",
+  interrupted: "cancelled",
 };

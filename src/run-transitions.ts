@@ -8,7 +8,14 @@ export const TRANSITION_KIND = "transition";
 export const ILLEGAL_TRANSITION_KIND = "transition-illegal";
 
 const FINISHED: readonly RunStatus[] = ["shipped", "cancelled"];
-const PARKED: readonly RunStatus[] = ["needs-info", "awaiting-approval", "needs-human", "failed", "rejected"];
+const PARKED: readonly RunStatus[] = [
+  "needs-info",
+  "awaiting-approval",
+  "needs-human",
+  "failed",
+  "rejected",
+  "interrupted",
+];
 const ANY: readonly RunStatus[] = [...FINISHED, ...PARKED, "running", "verifying"];
 
 // Resuming goes through upsertRun("running"), so a finished run can only leave by running again.
@@ -22,6 +29,7 @@ export const LEGAL: Readonly<Record<RunStatus, readonly RunStatus[]>> = {
   rejected: ANY,
   shipped: ["running"],
   cancelled: ["running"],
+  interrupted: ANY,
 };
 
 export interface TransitionRecord {
