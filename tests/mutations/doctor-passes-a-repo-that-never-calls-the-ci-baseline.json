@@ -1,0 +1,1 @@
+{"name":"doctor passes a repo that never calls the ci baseline","file":"src/ci-baseline-check.ts","find":"if (calls.length === 0)","replace":"if (calls.length === -1)","test":"tests/ci-baseline-check.test.ts"}

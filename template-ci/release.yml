@@ -1,0 +1,27 @@
+# Written by `factory init`. Pushing a tag like v1.2.3 publishes a GitHub release with generated
+# notes, once CHANGELOG.md has a section for that version. Edit it freely: install never overwrites it.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require a changelog entry
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          grep -Eq "^## \[?${version//./\\.}\]?" CHANGELOG.md || {
+            echo "CHANGELOG.md has no section for ${version}"
+            exit 1
+          }
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --generate-notes --title "$TAG"

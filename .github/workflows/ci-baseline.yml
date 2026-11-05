@@ -1,0 +1,15 @@
+# Staged copy: the supervisor moves this to .github/workflows/ci-baseline.yml. It defines the
+# shared baseline (#349); every other KaaS-team repo calls it with
+#   jobs:
+#     baseline:
+#       uses: KaaS-team/KaaS-factory/.github/workflows/ci-baseline.yml@main
+name: ci-baseline
+on:
+  workflow_call:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: make check

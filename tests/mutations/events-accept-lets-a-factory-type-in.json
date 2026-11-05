@@ -1,0 +1,1 @@
+{"name":"events accept lets a factory type in","file":"src/core/event.ts","find":"if (typeof type !== \"string\" || isFactoryEventType(type)) return false;","replace":"if (typeof type !== \"string\") return false;","test":"tests/events.test.ts"}
