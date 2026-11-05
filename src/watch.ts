@@ -43,6 +43,7 @@ import {
   type WatchDeps,
   withDataMarker,
 } from "./engine/common";
+import { byRank } from "./prioritize";
 import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { processShadowIssue } from "./shadow";
@@ -674,10 +675,9 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
       seen.add(issue.number);
       return true;
     })
-    // Oldest ticket first: tickets are filed in dependency order, and gh's
-    // own list order is otherwise unspecified (audit: newest-first in
-    // practice), which raced dependents ahead of what they were blocked on.
-    .sort((a, b) => a.number - b.number);
+    // Highest rank first when prioritize is set, else oldest first: tickets are filed in dependency order,
+    // and gh's own list order raced dependents ahead of what they were blocked on.
+    .sort(byRank(config.prioritize?.method));
 
   // candidates was filtered against inFlight above; mark them before any
   // await so an overlapping poll's own candidates filter (same check) never

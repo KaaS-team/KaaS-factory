@@ -1,4 +1,5 @@
 // The shapes of an org file and a team file, and the plain-sentence checks that a loaded file has them.
+import { statusMapProblems } from "../ports/tracker-status";
 import { orchestrateProblems, type OrchestrateSpec } from "../orchestrate/config";
 
 export type Risk = "low" | "medium" | "high";
@@ -170,6 +171,7 @@ function denyProblems(path: string, v: unknown, kind: "org" | "team", out: strin
 function source(path: string, v: unknown, out: string[]): void {
   fields(path, v, { kind: str, project: str, ready: str, statuses: map, types: map }, out);
   if (isObject(v) && v.kind === undefined) out.push(`${path}.kind is required.`);
+  if (isObject(v)) out.push(...statusMapProblems(`${path}.statuses`, v.statuses));
 }
 
 // Never throws: a file that is not even a mapping comes back as one sentence.

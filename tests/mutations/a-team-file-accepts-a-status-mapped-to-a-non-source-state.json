@@ -1,0 +1,1 @@
+{"name":"a team file accepts a status mapped to a non-Source state","file":"src/team/schema.ts","find":"if (isObject(v)) out.push(...statusMapProblems(`${path}.statuses`, v.statuses));","replace":"","test":"tests/tracker-status.test.ts"}
