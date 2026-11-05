@@ -1,0 +1,7 @@
+{
+  "name": "the expiry sweep never runs",
+  "file": "src/engine/triggers.ts",
+  "find": "await sweepExpired(github, store, repo, workflow, now);",
+  "replace": "",
+  "test": "tests/workflow-outputs.test.ts"
+}

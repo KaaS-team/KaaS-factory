@@ -10,6 +10,7 @@ import type { ScmPort } from "../ports/scm";
 import { LABEL } from "../labels";
 import { isExternalEventType, type CloudEvent } from "../core/event";
 import type { LeasePort } from "../ports/lease";
+import { closeExpired } from "../safe-outputs";
 
 export const CRON_CATCHUP_MINUTES = 60;
 const MINUTE = 60_000;
@@ -61,6 +62,18 @@ function matchedMinute(t: Pick<CronTrigger, "cron" | "tz">, from: number, to: nu
   return to;
 }
 
+// `on: until:` is the last day, UTC, the schedule files an issue.
+export const scheduleStopped = (workflow: Workflow, now: Date): boolean =>
+  workflow.triggers.until !== undefined && now.getTime() >= Date.parse(workflow.triggers.until) + 24 * 60 * MINUTE;
+
+// Hourly, for a workflow whose issues expire: closes the ones nobody touched (src/safe-outputs.ts).
+async function sweepExpired(github: ScmPort, store: CronStore, repo: string, workflow: Workflow, now: Date) {
+  const key = `expire:last:${repo}:${workflow.name}`;
+  if (!workflow.outputs?.issue?.expiresDays || now.getTime() - Number(store.getSetting(key) ?? 0) < 60 * MINUTE) return;
+  store.setSetting(key, String(now.getTime()));
+  await closeExpired(github, repo, now).catch((err) => console.error("factory watch: expiry sweep failed", err));
+}
+
 // Returns the numbers of the issues it filed.
 export async function fireCron(
   github: ScmPort,
@@ -70,7 +83,8 @@ export async function fireCron(
   now: Date,
 ): Promise<number[]> {
   const claim = store.claim;
-  const triggers = workflow.triggers.cron;
+  await sweepExpired(github, store, repo, workflow, now);
+  const triggers = scheduleStopped(workflow, now) ? [] : workflow.triggers.cron;
   if (triggers.length === 0) return [];
   const key = `cron:last:${repo}:${workflow.name}`;
   const window = cronWindow(store, key, now);

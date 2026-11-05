@@ -1,0 +1,7 @@
+{
+  "name": "an issue gets no expiry line",
+  "file": "src/safe-outputs.ts",
+  "find": "days ? `${body}\\n\\n${expiryLine(days, now())}` : body,",
+  "replace": "body,",
+  "test": "tests/workflow-outputs.test.ts"
+}

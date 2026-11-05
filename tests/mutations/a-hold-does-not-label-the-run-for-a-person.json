@@ -1,0 +1,7 @@
+{
+  "name": "a hold does not label the run for a person",
+  "file": "src/engine/output-gate.ts",
+  "find": "status: \"needs-human\", reason }),",
+  "replace": "status: \"failed\", reason }),",
+  "test": "tests/write-screen.test.ts"
+}

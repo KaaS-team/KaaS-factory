@@ -1,0 +1,7 @@
+{
+  "name": "the build step does not offer the protected-path fallback",
+  "file": "src/engine/build-tail.ts",
+  "find": "const asIssue = await protectedAsIssue(sc, hits);",
+  "replace": "const asIssue = undefined;",
+  "test": "tests/workflow-outputs.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "a stage that stays under the refusal limit is stopped",
+  "file": "src/executor.ts",
+  "find": "if (refused.length < limit) return undefined;",
+  "replace": "if (refused.length < 1) return undefined;",
+  "test": "tests/refusal-stop.test.ts"
+}

@@ -6,6 +6,9 @@
 import { parseExpr, rootsOf, ExprError, type Expr } from "./expr";
 import { parseCron, wallClock, CronError, type Cron } from "./cron";
 import { isEventType } from "./event";
+import type { Outputs } from "./workflow-outputs";
+
+export const DEFAULT_MAX_REFUSALS = 5;
 
 export type ParkState = "awaiting-approval";
 
@@ -65,11 +68,18 @@ export interface Workflow {
     readonly event: readonly string[];
     // `on: emitted:`: another workflow's `emit:` name files an issue for this one.
     readonly emitted?: readonly string[];
+    // `on: until:`: the last day (YYYY-MM-DD, UTC) the cron triggers file an issue.
+    readonly until?: string;
   };
+  // `outputs:`: when present, the only writes a run may make (src/safe-outputs.ts).
+  readonly outputs?: Outputs;
+  // `allowed_hosts:`: hosts a run may link to beyond the built-in ones (src/write-screen.ts).
+  readonly allowedHosts?: readonly string[];
   // The name a shipped run announces (factory.workflow.emitted), and the file's sha, pinned into every run.
   readonly emit?: string;
   readonly sha?: string;
-  readonly limits: { readonly questions: number; readonly rejects: number };
+  // refusals: refused tool calls one stage may collect before it is stopped.
+  readonly limits: { readonly questions: number; readonly rejects: number; readonly refusals: number };
   readonly start: string;
   readonly steps: Readonly<Record<string, Step>>;
 }
@@ -118,13 +128,14 @@ export function parseWorkflow(
   const name = typeof raw.name === "string" && raw.name.trim() ? raw.name : (problems.push("name: required"), "");
 
   const limitsRaw = raw.limits === undefined ? {} : raw.limits;
-  const limits = { questions: 2, rejects: 2 };
+  const limits = { questions: 2, rejects: 2, refusals: DEFAULT_MAX_REFUSALS };
   if (!isObj(limitsRaw)) problems.push("limits: must be a mapping");
   else {
     for (const [k, v] of Object.entries(limitsRaw)) {
-      if (k !== "questions" && k !== "rejects") problems.push(`limits.${k}: unknown key (allowed: questions, rejects)`);
-      else if (!Number.isInteger(v) || (v as number) < 0)
-        problems.push(`limits.${k}: must be a whole number, 0 or more`);
+      if (k !== "questions" && k !== "rejects" && k !== "refusals")
+        problems.push(`limits.${k}: unknown key (allowed: questions, rejects, refusals)`);
+      else if (!Number.isInteger(v) || (v as number) < (k === "refusals" ? 1 : 0))
+        problems.push(`limits.${k}: must be a whole number, ${k === "refusals" ? "1" : "0"} or more`);
       else limits[k] = v as number;
     }
   }

@@ -1,0 +1,7 @@
+{
+  "name": "the declared title prefix is not applied",
+  "file": "src/safe-outputs.ts",
+  "find": "title !== undefined && prefix && !title.startsWith(prefix) ?",
+  "replace": "false ?",
+  "test": "tests/workflow-outputs.test.ts"
+}

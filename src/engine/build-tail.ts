@@ -8,6 +8,7 @@ import { LABEL } from "../labels";
 import { ShellSetupRunner } from "../setup";
 import { finish, moveLabel, type Outcome } from "./common";
 import { failPush } from "./failure";
+import { protectedAsIssue } from "./output-gate";
 import type { StepCtx, StepResult } from "./steps";
 
 const stop = (outcome: Outcome): StepResult => ({ kind: "stop", outcome });
@@ -28,6 +29,8 @@ export async function finishBuild(
   const baseFiles = await deps.git.baseFiles(worktree, config.base);
   const hits = touchesProtectedPath(changed, protectedPaths, { baseFiles });
   if (hits.length) {
+    const asIssue = await protectedAsIssue(sc, hits);
+    if (asIssue) return asIssue;
     await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
     finish(deps, config, issueNumber, "needs-human", `touched protected path(s): ${hits.join(", ")}`);
     return stop("needs-human");

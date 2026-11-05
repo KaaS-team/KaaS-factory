@@ -1,0 +1,7 @@
+{
+  "name": "a workflow's allowed hosts are ignored",
+  "file": "src/engine/output-gate.ts",
+  "find": "...(sc.workflow?.allowedHosts ?? [])",
+  "replace": "",
+  "test": "tests/write-screen.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "a refused write leaves no event on the run",
+  "file": "src/engine/output-gate.ts",
+  "find": "if (run) deps.state.appendEvent(run.id, step.uses as Stage, \"write_refused\"",
+  "replace": "if (false) deps.state.appendEvent(run.id, step.uses as Stage, \"write_refused\"",
+  "test": "tests/workflow-outputs.test.ts"
+}

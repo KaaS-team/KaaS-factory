@@ -29,6 +29,7 @@ interface StreamJsonLine {
       type: string;
       text?: string;
       name?: string;
+      id?: string;
       input?: Record<string, unknown>;
       // On a user line's tool_result: which call it answers, and whether it is an error.
       tool_use_id?: string;
@@ -107,11 +108,12 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
         events.push({ kind: "text", text: block.text });
       } else if (block.type === "tool_use" && block.name) {
         const target = toolTarget(block.input);
-        events.push(
-          target
-            ? { kind: "tool_use", toolName: block.name, toolTarget: target }
-            : { kind: "tool_use", toolName: block.name },
-        );
+        events.push({
+          kind: "tool_use",
+          toolName: block.name,
+          ...(target ? { toolTarget: target } : {}),
+          ...(block.id ? { toolUseId: block.id } : {}),
+        });
       }
     }
     if (parsed.message.usage) {

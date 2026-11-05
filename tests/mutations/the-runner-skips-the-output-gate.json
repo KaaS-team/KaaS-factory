@@ -1,0 +1,7 @@
+{
+  "name": "the runner skips the output gate",
+  "file": "src/engine/runner.ts",
+  "find": "await runGated(STEP_TYPES[step.uses]!, {",
+  "replace": "await STEP_TYPES[step.uses]!.run({",
+  "test": "tests/workflow-outputs.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "the executor applies a write past its per-run maximum",
+  "file": "src/safe-outputs.ts",
+  "find": "if (used >= decl.max) throw",
+  "replace": "if (used > decl.max) throw",
+  "test": "tests/workflow-outputs.test.ts"
+}
