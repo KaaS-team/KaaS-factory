@@ -31,8 +31,8 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
 ## 2. Research through Explore, not yourself
 
 Delegate codebase questions ("where does X live", "what calls it", "what tests cover it") to the
-built-in `Explore` subagent. Ask targeted questions; tell it to answer with file:line evidence
-using Grep, Glob and Read only, then use them.
+built-in `Explore` subagent. Ask targeted questions; have it answer with file:line evidence
+from Grep, Glob and Read only, then use them.
 
 ## 3. Write the plan
 
@@ -46,7 +46,7 @@ apply, or "none". Risk: low, medium, or high, with the charter rule that justifi
 
 When `proof` is `test` (the default): name the test to write first for each AC, ending its line `(scaffold)` or `(permanent)`. When `proof` is
 `check`: name the exact command that proves each AC instead (e.g. a repo audit script, a prose
-lint, a link check); build runs that command, and no test file is expected.
+lint, a link check); build runs it, and no test file is expected.
 
 **Risk policy:** **low** is docs, test-only, or one non-protected module, eligible for auto-approve
 when the toggle is on. **medium, high, a dependency major, or near a protected path** always
