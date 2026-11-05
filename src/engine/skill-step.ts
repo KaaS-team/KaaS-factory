@@ -39,7 +39,8 @@ export const skillStep: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const found = resolveSkill(deps.cloneDir, step.skill!);
-    if (!found) return fail(sc, `the skill \`${step.skill}\` is in neither the repo's skill directories nor the defaults`);
+    if (!found)
+      return fail(sc, `the skill \`${step.skill}\` is in neither the repo's skill directories nor the defaults`);
     const out = join(runDir(issue.number), `${step.id}.json`);
     mkdirSync(join(worktree, runDir(issue.number)), { recursive: true });
     const startedAt = new Date();
