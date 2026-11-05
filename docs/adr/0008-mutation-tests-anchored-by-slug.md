@@ -45,6 +45,11 @@ and no base list exists to compare against.
 - `.github/workflows/mutations.yml` runs `make check-mutations` on pull requests (with a base), on
   pushes to `main` that touch `tests/`, `src/`, the check script or the workflow, and nightly at
   03:17 UTC.
+- Every run prints, and writes to the job's step summary, one result: how many mutations ran, how many
+  held and which did not. A pull request runs only the entries its diff reaches, so the job fails when
+  a mutation it touches no longer turns its test red.
+- Owner step: the job blocks a merge only once it is required. In the repository settings, add the
+  `check-mutations` check of the `mutations` workflow under Branch protection, Require status checks.
 
 ## Alternatives considered
 

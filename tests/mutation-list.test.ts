@@ -1,14 +1,22 @@
 import { afterAll, expect, test } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadMutations, type Mutation, mutationSlug, shardPath, shardText } from "../scripts/mutation-list";
+import {
+  loadMutations,
+  type Mutation,
+  mutationSlug,
+  mutationSummary,
+  shardPath,
+  shardText,
+} from "../scripts/mutation-list";
 import { splitMutations } from "../scripts/split-mutations";
 
 const ROOT = join(import.meta.dir, "..");
 const roots: string[] = [];
 afterAll(() => roots.forEach((d) => rmSync(d, { recursive: true, force: true })));
 const tmp = (): string => {
+  mkdirSync(tmpdir(), { recursive: true });
   const d = mkdtempSync(join(tmpdir(), "mutation-list-"));
   roots.push(d);
   mkdirSync(join(d, "tests", "mutations"), { recursive: true });
@@ -79,4 +87,19 @@ test("two names that share a slug stop the migration before it writes", () => {
   putLegacy(root, [entry("A b"), entry("a-b")]);
   expect(() => splitMutations(root)).toThrow("share the slug");
   expect(require("node:fs").readdirSync(join(root, "tests/mutations"))).toEqual([]);
+});
+
+test("the run result counts what ran and held, and names each mutation that did not", () => {
+  expect(mutationSummary(["a", "b", "c"], ["b"])).toBe("check-mutations: 3 ran, 2 held, 1 did not\n- b");
+  expect(mutationSummary(["a"], [])).toBe("check-mutations: 1 ran, 1 held, 0 did not");
+});
+
+test("check-mutations writes that result to the step summary", () => {
+  const out = join(tmp(), "summary.md");
+  const r = Bun.spawnSync(
+    ["bun", join(ROOT, "scripts", "check-mutations.ts"), "the anchor check reads the per-entry mutation files too"],
+    { cwd: ROOT, env: { ...process.env, GITHUB_STEP_SUMMARY: out, MUTATION_WORKERS: "1" } },
+  );
+  expect(r.exitCode).toBe(0);
+  expect(readFileSync(out, "utf8")).toBe("check-mutations: 1 ran, 1 held, 0 did not\n");
 });

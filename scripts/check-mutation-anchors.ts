@@ -1,8 +1,9 @@
 // make check-anchors: a mutation whose `find` no longer matches its file exactly once never bites.
-// This is the cheap pass over tests/mutations.json; check-mutations.ts is the slow one that runs the tests.
+// This is the cheap pass over the whole list (tests/mutations.json and tests/mutations/*.json); check-mutations.ts is the slow one that runs the tests.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { loadMutations } from "./mutation-list";
 
 interface Entry {
   readonly name: string;
@@ -38,13 +39,18 @@ export const readRepoFile =
     }
   };
 
+// The per-entry files are part of the list: a moved target there must fail by name too.
+export function repoAnchorProblems(root: string): { problems: string[]; count: number } {
+  const entries: Entry[] = loadMutations(root);
+  return { problems: anchorProblems(entries, readRepoFile(root)), count: entries.length };
+}
+
 if (import.meta.main) {
   const root = join(import.meta.dir, "..");
-  const entries: Entry[] = JSON.parse(readFileSync(join(root, "tests", "mutations.json"), "utf8"));
-  const problems = anchorProblems(entries, readRepoFile(root));
+  const { problems, count } = repoAnchorProblems(root);
   if (problems.length > 0) {
     console.error(`check-mutation-anchors: ${problems.length} problem(s)\n${problems.join("\n")}`);
     process.exit(1);
   }
-  console.log(`check-mutation-anchors: ok (${entries.length} entries)`);
+  console.log(`check-mutation-anchors: ok (${count} entries)`);
 }

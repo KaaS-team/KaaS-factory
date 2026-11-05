@@ -44,7 +44,7 @@ const plan = (cmd: string) => ({
     "### Acceptance criteria",
     `- **AC-1:** x: checked by \`${cmd}\``,
     "### Tests to write first",
-    "- `test/a.test.ts`",
+    "- `test/a.test.ts` (permanent)",
     "### Risk: low",
   ].join("\n"),
   "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["a"], autoApproveEligible: true }),

@@ -54,3 +54,10 @@ export function loadMutations(root: string): Mutation[] {
 
 export const shardText = (m: Mutation): string =>
   `${JSON.stringify({ name: m.name, file: m.file, find: m.find, replace: m.replace, test: m.test }, null, 2)}\n`;
+
+// The one result a run posts: how many mutations ran, how many held (their test went red), which did not.
+export function mutationSummary(ran: readonly string[], failed: readonly string[]): string {
+  const held = ran.length - failed.length;
+  const head = `check-mutations: ${ran.length} ran, ${held} held, ${failed.length} did not`;
+  return failed.length ? `${head}\n${failed.map((n) => `- ${n}`).join("\n")}` : head;
+}

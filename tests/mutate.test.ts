@@ -49,6 +49,7 @@ function git(dir: string, ...args: string[]) {
 // A repo whose test checks a guard, reads an ignored dependency the copy must carry, and
 // writes into that dependency dir, which must never reach the worktree's own.
 function fixture(gateCmd = "bash", fileCmd?: string): string {
+  mkdirSync(tmpdir(), { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), "mutate-fixture-"));
   dirs.push(dir);
   for (const d of [".factory", "src", "tests", "node_modules"]) mkdirSync(join(dir, d));
@@ -103,7 +104,7 @@ function mutate(dir: string, ...args: string[]) {
     env: { ...process.env, FAKE_SECRET: "s3cret", GH_TOKEN: "t0ken" },
   });
   const out = r.stdout.toString();
-  return { code: r.exitCode, out, line: out.trim().split("\n").at(-1) ?? "" };
+  return { code: r.exitCode, out, err: r.stderr.toString(), line: out.trim().split("\n").at(-1) ?? "" };
 }
 
 describe("mutate.sh", () => {
@@ -171,6 +172,45 @@ describe("mutate.sh", () => {
     git(dir, "commit", "-qam", "break the guard");
     const r = mutate(dir, "src/guard.sh", ":;", "true", "tests/check.sh");
     expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "baseline-red"]);
+  });
+
+  describe("judges on the named tests that were green at baseline", () => {
+    const named = (dir: string, extra: Record<string, string>) => {
+      for (const [f, body] of Object.entries(extra)) writeFileSync(join(dir, "tests", f), body);
+      git(dir, "add", "-A");
+      git(dir, "commit", "-qm", "extra tests");
+    };
+
+    test("a red unrelated test is skipped and listed, and the green one still bites", () => {
+      const dir = fixture("no-such-whole-suite-runner", "bash");
+      named(dir, { "red.sh": 'echo "1 failed"; exit 1\n' });
+      const r = mutate(dir, "src/guard.sh", GUARD, "true", "tests/red.sh", "tests/check.sh");
+      expect(r.out).toContain("SKIPPED: tests/red.sh red at baseline");
+      expect([r.code, r.line]).toEqual([0, "MUTATION: file=src/guard.sh status=bites failed=1"]);
+    });
+
+    test("a test the sandbox cannot run is skipped and listed", () => {
+      const dir = fixture("no-such-whole-suite-runner", "bash");
+      named(dir, { "tool.sh": "exit 127\n" });
+      const r = mutate(dir, "src/guard.sh", GUARD, "true", "tests/tool.sh", "tests/check.sh");
+      expect(r.out).toContain("SKIPPED: tests/tool.sh unrunnable (exit 127)");
+      expect([r.code, r.line]).toEqual([0, "MUTATION: file=src/guard.sh status=bites failed=1"]);
+    });
+
+    test("a mutation no green test catches survives even when another test is skipped", () => {
+      const dir = fixture("no-such-whole-suite-runner", "bash");
+      named(dir, { "red.sh": 'echo "1 failed"; exit 1\n' });
+      const r = mutate(dir, "src/guard.sh", 'echo "guarded"', "true", "tests/red.sh", "tests/check.sh");
+      expect([r.code, r.line]).toEqual([1, "MUTATION: file=src/guard.sh status=survives failed=0"]);
+    });
+
+    test("when every named test is red the check fails with baseline-red", () => {
+      const dir = fixture("no-such-whole-suite-runner", "bash");
+      named(dir, { "red.sh": 'echo "1 failed"; exit 1\n', "red2.sh": "exit 2\n" });
+      const r = mutate(dir, "src/guard.sh", GUARD, "true", "tests/red.sh", "tests/red2.sh");
+      expect(r.err).toContain("every named test is red or unrunnable");
+      expect([r.code, r.line.split("reason=")[1]]).toEqual([2, "baseline-red"]);
+    });
   });
 
   // Fails closed: none of these may read as a caught mutation.
@@ -442,6 +482,7 @@ describe("verify with plan mutations", () => {
   }
 
   async function setup(mutationSection: string) {
+    mkdirSync(tmpdir(), { recursive: true });
     const workspacesDir = mkdtempSync(join(tmpdir(), "mut-ws-"));
     const cloneDir = mkdtempSync(join(tmpdir(), "mut-clone-"));
     dirs.push(workspacesDir, cloneDir);

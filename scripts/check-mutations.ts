@@ -2,10 +2,10 @@
 // file under tests/mutations/, breaks one thing in a temp copy of the repo; the named test must then fail.
 // A mutation that leaves the test green names a check that guards nothing.
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, join } from "node:path";
-import { type Mutation, loadMutations } from "./mutation-list";
+import { type Mutation, loadMutations, mutationSummary } from "./mutation-list";
 import { selectMutations } from "./mutation-select";
 import { copyRepo, ROOT } from "./repo-copy";
 
@@ -95,8 +95,15 @@ if (report) {
   mkdirSync(dirname(report), { recursive: true });
   writeFileSync(report, JSON.stringify({ selected: selected.map((m) => m.name), failed: failedNames }, null, 2));
 }
+const summary = mutationSummary(
+  selected.map((m) => m.name),
+  failedNames,
+);
+if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
 if (failures.length) {
-  console.error(`\ncheck-mutations: ${failures.length} of ${selected.length} failed\n${failures.join("\n")}`);
+  console.error(
+    `\ncheck-mutations: ${failures.length} of ${selected.length} failed\n${failures.join("\n")}\n\n${summary}`,
+  );
   process.exit(1);
 }
-console.log(`check-mutations: all ${selected.length} mutations bite`);
+console.log(`${summary}\ncheck-mutations: all ${selected.length} mutations bite`);

@@ -1,0 +1,7 @@
+{
+  "name": "the prune list drops a scaffold test a mutation guards",
+  "file": "src/test-tiers.ts",
+  "find": "!guarded.has(t.test.replace",
+  "replace": "!new Set<string>().has(t.test.replace",
+  "test": "tests/test-tiers.test.ts"
+}

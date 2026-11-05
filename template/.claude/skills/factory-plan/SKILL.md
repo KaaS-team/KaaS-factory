@@ -31,20 +31,20 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
 ## 2. Research through Explore, not yourself
 
 Delegate codebase questions ("where does X live", "what calls it", "what tests cover it") to the
-built-in `Explore` subagent. Ask targeted questions, tell it to answer with file:line evidence
-using Grep, Glob and Read only (it does not get the shell rules), then use them.
+built-in `Explore` subagent. Ask targeted questions; tell it to answer with file:line evidence
+using Grep, Glob and Read only, then use them.
 
 ## 3. Write the plan
 
 One line goal. Acceptance criteria `AC-1..n` (ids are never renumbered on a revision), each ending
-"checked by `<test or command>`"; explanation goes before "checked by", since build runs every
+"checked by `<test or command>`"; put explanation before "checked by", as build runs every
 backticked command after it. Name only commands build or verify may run: read-only git, the repo's
 `agentCommands` in `.factory/config.json` that do not start with an interpreter or wrapper (node,
 python3, npx, bash), and .factory/gates.sh for the gate. Non-goals `NG-1..n`: binding; the
 verifier fails a diff that crosses one, so write ones you mean. Files to touch. Repo skills to
 apply, or "none". Risk: low, medium, or high, with the charter rule that justifies it.
 
-When `proof` is `test` (the default): name the test to write first for each AC. When `proof` is
+When `proof` is `test` (the default): name the test to write first for each AC, ending its line `(scaffold)` or `(permanent)`. When `proof` is
 `check`: name the exact command that proves each AC instead (e.g. a repo audit script, a prose
 lint, a link check); build runs that command, and no test file is expected.
 
