@@ -1,0 +1,7 @@
+{
+  "name": "check value credits no check for a failed check",
+  "file": "scripts/check-value.ts",
+  "find": "touch(c.name, \"check\", share, bad.has(c.name));",
+  "replace": "touch(c.name, \"check\", share, false);",
+  "test": "tests/check-value.test.ts"
+}

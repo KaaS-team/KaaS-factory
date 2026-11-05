@@ -58,6 +58,7 @@ import { mcpStep } from "./mcp-step";
 import { parkLowConfidence } from "../triage-confidence";
 import { runStageChecked } from "./stage-retry";
 import { checkedPlan } from "./plan-critic";
+import * as chk from "../stage-checks";
 import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
 import {
   failureTail,
@@ -248,6 +249,7 @@ const build: StepType = {
       attempt += 1;
     }
     const problem = built.problem;
+    chk.closeBuild(deps.state, config.repo, issueNumber, gate.status);
     if (art.comment) await upsertStatusComment(deps, config, issue, art.comment, { build: json ?? null, gate });
 
     if (result.exitCode !== 0 || !json || gate.status !== "GREEN") {
@@ -305,6 +307,7 @@ const verify: StepType = {
       const fresh = await runGates(deps.gateRunner, worktree);
       deps.state.updateRun(config.repo, issueNumber, { gate_line: fresh.raw });
       await writeGateEvidence(worktree, issueNumber, { line: fresh.raw, status: fresh.status, tree });
+      chk.noteGate(config.repo, issueNumber, fresh.status);
       // Red evidence is a build problem, not something for the verifier to judge.
       if (fresh.status !== "GREEN") {
         ctx.rejectRound += 1;
@@ -335,6 +338,7 @@ const verify: StepType = {
         `${JSON.stringify({ ok: holdout.ok, cmd: config.holdout.cmd, tail: holdout.detail }, null, 2)}\n`,
       );
       const failed = `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``;
+      chk.noteCheck(config.repo, issueNumber, "holdout", holdout.ok, "holdout tests failed");
       if (!holdout.ok) return rejectToBuild(sc, failed, { holdout: holdout.detail }, "holdout tests failed");
     }
     if (deps.proofGit) {
@@ -355,6 +359,7 @@ const verify: StepType = {
       await recordVerifyFacts(worktree, config, issueNumber, testCmd, proof);
       const survived = await survivingMutations(deps.proofGit, worktree, config, mutations);
       const found = survived && { survivingMutations: survived.names };
+      chk.noteProof(config.repo, issueNumber, proof, survived);
       if (survived?.reject) return rejectToBuild(sc, survived.body, found!, "plan mutations survived");
       if (survived) await postComment(deps, config, issueNumber, survived.body, { stage: "verify", json: found });
     }
@@ -376,6 +381,7 @@ const verify: StepType = {
     const kitOwn =
       acceptance && planAcceptance(acceptance, readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json"));
     const ownAcceptance = kitOwn && withRepro(kitOwn, issueType(config.routes, labelsOf(issue)));
+    chk.noteAcceptance(config.repo, issueNumber, ownAcceptance ? acceptanceProven(ownAcceptance) : undefined);
     if (ownAcceptance && !acceptanceProven(ownAcceptance)) {
       const table = renderAcceptanceTable(ownAcceptance);
       return rejectToBuild(sc, table, { acceptance: ownAcceptance }, "acceptance not proven");
@@ -391,6 +397,7 @@ const verify: StepType = {
       recheckNote = rechecked.note;
     }
     if (json) json = await settleVerdict(sc, json);
+    chk.closeVerify(deps.state, config.repo, issueNumber, json);
     const posted = art.comment && `${verdictPost(art.comment, json, ctx.rejectRound + 1, maxRejects)}${recheckNote}`;
     deps.state.setVerifyVerdict(config.repo, issueNumber, json && result.exitCode === 0 ? json.result : "unknown"); // judge error
     if (checked && !checked.ok) {
@@ -443,6 +450,7 @@ const pr: StepType = {
     const unshipped = await prPreflight(deps, config, worktree, issueNumber);
     if (unshipped) return stop(await failStage(deps, config, issue, sc.step.label, "pr", unshipped));
     await runStage(deps, config, issue, "pr", worktree, stepOpts(sc.step));
+    chk.closePr(deps.state, config.repo, issueNumber, worktree);
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
     // A revise from in-review re-enters here with the PR open; build's push updated its branch.
     const head = deps.git.branchName(issueNumber);

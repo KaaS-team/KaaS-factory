@@ -1,7 +1,7 @@
 {
   "name": "check value lists a stage with no verdict as never catching",
   "file": "scripts/check-value.ts",
-  "find": "a.kind === \"round\" || withVerdict.has(name)",
+  "find": "a.kind !== \"stage\" || withVerdict.has(name)",
   "replace": "true",
   "test": "tests/check-value.test.ts"
 }

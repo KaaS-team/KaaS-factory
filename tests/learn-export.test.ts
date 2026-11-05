@@ -5,9 +5,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportLearning } from "../src/learn-export";
+import { setStageChecks } from "../src/stage-checks";
 import { FactoryState, type StageRunInput } from "../src/state";
 
 const cli = join(import.meta.dir, "..", "src", "cli.ts");
+mkdirSync(tmpdir(), { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), "factory-learn-export-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -59,6 +61,8 @@ describe("exportLearning", () => {
       v: 1,
       type: "stage",
       ...state.listStageRuns(repo)[0]!,
+      checks: [],
+      findings: [],
     });
     expect(rows.find((r) => r.type === "retro")).toEqual({ v: 1, type: "retro", ...state.listRetros(repo)[0]! });
   });
@@ -147,5 +151,27 @@ describe("factory learn --export", () => {
     expect(r.code).not.toBe(0);
     expect(r.err).toContain("--since");
     expect(r.out).toBe("");
+  });
+});
+
+describe("exported stage checks (#627)", () => {
+  test("a stage row lists its checks and each finding names its check", () => {
+    const state = new FactoryState(":memory:");
+    state.recordStageRun({ ...stage(repo, 1), stage: "verify" });
+    setStageChecks(
+      state,
+      { repo, issue: 1, stage: "verify" },
+      [
+        { name: "gates", result: "pass" },
+        { name: "reviewer", result: "fail" },
+      ],
+      [{ check: "reviewer", severity: "must", what: "x" }],
+    );
+    const row = parse(state).find((r) => r.type === "stage")!;
+    expect(row.checks).toEqual([
+      { name: "gates", result: "pass" },
+      { name: "reviewer", result: "fail" },
+    ]);
+    expect(row.findings).toEqual([{ check: "reviewer", severity: "must", what: "x" }]);
   });
 });

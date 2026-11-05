@@ -82,3 +82,66 @@ describe("check-value", () => {
     }
   });
 });
+
+describe("check-value per check", () => {
+  const checked = (
+    issue: number,
+    name: string,
+    at: string,
+    checks: [string, "pass" | "fail"][],
+    findings: { check: string }[] = [],
+    cost = 4,
+  ) =>
+    JSON.stringify({
+      v: 1,
+      type: "stage",
+      issue,
+      stage: name,
+      started_at: at,
+      cost_usd: cost,
+      checks: checks.map(([n, result]) => ({ name: n, result })),
+      findings,
+    });
+  const d = lines(
+    run(1, "shipped"),
+    checked(
+      1,
+      "verify",
+      t(1),
+      [
+        ["gates", "pass"],
+        ["proof", "fail"],
+        ["qa", "pass"],
+      ],
+      [{ check: "proof" }],
+      3,
+    ),
+    checked(
+      1,
+      "verify",
+      t(2),
+      [
+        ["gates", "pass"],
+        ["proof", "pass"],
+        ["qa", "pass"],
+      ],
+      [],
+      3,
+    ),
+  );
+
+  test("a check that failed first on a shipped issue is credited, with its share of cost", () => {
+    expect(row(d, "proof")).toMatchObject({ kind: "check", runs: 2, firstCatches: 1, costUsd: 2 });
+  });
+
+  test("a check that never catches is named in the report with its cost", () => {
+    const r = checkValue(d);
+    expect(r.neverFirst.filter((x) => x.kind === "check").map((x) => x.name)).toEqual(["gates", "qa"]);
+    expect(renderValue(r)).toContain("- qa (check): 2 runs, $2.00");
+  });
+
+  test("a failure on an issue that did not ship credits no check", () => {
+    const n = lines(run(2, "failed"), checked(2, "verify", t(1), [["gates", "fail"]]));
+    expect(row(n, "gates")?.firstCatches).toBe(0);
+  });
+});

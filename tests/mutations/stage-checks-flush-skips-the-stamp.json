@@ -1,0 +1,7 @@
+{
+  "name": "stage checks flush skips the stamp",
+  "file": "src/stage-checks.ts",
+  "find": "if (s?.checks.length) setStageChecks(",
+  "replace": "if (false) setStageChecks(",
+  "test": "tests/stage-checks.test.ts"
+}

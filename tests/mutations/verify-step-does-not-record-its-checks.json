@@ -1,0 +1,7 @@
+{
+  "name": "verify step does not record its checks",
+  "file": "src/engine/steps.ts",
+  "find": "chk.closeVerify(deps.state, config.repo, issueNumber, json);",
+  "replace": "",
+  "test": "tests/holdout.test.ts"
+}

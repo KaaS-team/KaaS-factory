@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { mergeConfig } from "../src/config";
 import type { StageName, StageRunResult } from "../src/executor";
 import { runHoldout, type HoldoutRunner } from "../src/holdout";
+import { checksOf } from "../src/stage-checks";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { advanceIssue } from "../src/watch";
@@ -165,6 +166,28 @@ describe("holdout on", () => {
       readFileSync(join(c.workspacesDir, `issue-${c.n}`, `.factory/runs/issue-${c.n}/holdout.json`), "utf8"),
     );
     expect(saved).toMatchObject({ ok: true, cmd: HOLDOUT_CONFIG.cmd });
+  });
+
+  test("each stage row lists the checks it ran, and a failed check's finding names it (#627)", async () => {
+    const c = setup([LABEL.ready], { repo: "acme/widgets", holdout: HOLDOUT_CONFIG });
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.holdoutRunner.next = [false];
+    c.push("triage", triage());
+    c.push("plan", plan());
+    c.push("build", build());
+    c.push("build", build());
+    c.push("verify", verdict("pass"));
+    c.push("pr", pr());
+    expect(await c.step()).toBe("shipped");
+    const rows = c.state.listStageRuns("acme/widgets", { issue: c.n });
+    const of = (stage: string) => checksOf(rows.filter((r) => r.stage === stage).pop()!);
+    expect(of("build").checks).toEqual([{ name: "gates", result: "pass" }]);
+    expect(of("verify").checks.map((x) => `${x.name}:${x.result}`)).toEqual([
+      "holdout:fail",
+      "holdout:pass",
+      "reviewer:pass",
+    ]);
+    expect(of("verify").findings).toEqual([{ check: "holdout", severity: "must", what: "holdout tests failed" }]);
   });
 
   test("a holdout path outside .factory/** in the diff parks before any push, same as any other protected path", async () => {

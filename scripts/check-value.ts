@@ -3,8 +3,10 @@
 //
 // A defect is real when the issue's latest run shipped after a verify reject, so the reject was fixed and
 // not given up on. The first reject on that issue is the one that caught it; every later one found nothing
-// new. The export records stages and verify rounds, not the checks inside one (gates, the reviewer, qa), so
-// the report is per stage and per verify round. A stage that records no verdict has no defect signal and is
+// new. A stage row also lists the checks it ran (gates, holdout, proof, the reviewer, qa), each with pass or
+// fail, and a finding names the check that raised it, so the report ranks per check too. A check catches
+// when it failed (or raised a finding) on the first stage row of a shipped issue that had any failure. A
+// stage row's cost is split evenly over the checks it ran. A stage that records no verdict has no defect signal and is
 // listed apart, never as one that caught nothing. This report removes nothing: a removal is its own issue,
 // and cites this report.
 
@@ -16,9 +18,11 @@ interface Row {
   started_at?: string;
   cost_usd?: number | null;
   verdict?: string | null;
+  checks?: { name: string; result: string }[];
+  findings?: { check?: string }[];
 }
 
-type Kind = "stage" | "round";
+type Kind = "check" | "stage" | "round";
 
 export interface ValueRow {
   readonly name: string;
@@ -81,8 +85,20 @@ export function checkValue(jsonl: string): ValueReport {
     const shipped = latest.get(issue)?.status === "shipped";
     const first = shipped ? ordered.find((s) => s.verdict === "reject") : undefined;
     if (first) realDefects++;
+    const failed = (s: Row) =>
+      new Set([
+        ...(s.checks ?? []).filter((c) => c.result === "fail").map((c) => c.name),
+        ...(s.findings ?? []).flatMap((f) => (f.check ? [f.check] : [])),
+      ]);
+    const firstBad = shipped ? ordered.find((s) => s.verdict === "reject" || failed(s).size > 0) : undefined;
     let round = 0;
     for (const s of ordered) {
+      const ran = s.checks ?? [];
+      const bad = s === firstBad ? failed(s) : new Set<string>();
+      for (const c of ran) {
+        const share = { ...s, cost_usd: typeof s.cost_usd === "number" ? s.cost_usd / ran.length : null };
+        touch(c.name, "check", share, bad.has(c.name));
+      }
       const stage = s.stage as string;
       stages.add(stage);
       if (s.verdict) withVerdict.add(stage);
@@ -92,7 +108,7 @@ export function checkValue(jsonl: string): ValueReport {
   }
 
   const out: ValueRow[] = [...acc]
-    .filter(([name, a]) => a.kind === "round" || withVerdict.has(name))
+    .filter(([name, a]) => a.kind !== "stage" || withVerdict.has(name))
     .map(([name, a]) => ({
       name,
       kind: a.kind,

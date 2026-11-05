@@ -1,0 +1,7 @@
+{
+  "name": "export drops the check a finding names",
+  "file": "src/stage-checks.ts",
+  "find": "findings: parseList(raw.findings)",
+  "replace": "findings: []",
+  "test": "tests/learn-export.test.ts"
+}

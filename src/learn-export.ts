@@ -2,6 +2,7 @@
 
 import { writeFileSync } from "node:fs";
 import { UsageError } from "./cli-output";
+import { checksOf, ensureCheckColumns } from "./stage-checks";
 import { FactoryState } from "./state";
 
 const PAGE = 200;
@@ -11,10 +12,11 @@ const line = (type: "run" | "stage" | "retro", row: object): string => JSON.stri
 // `since` is compared as an ISO string against started_at (runs, stages) and created_at (retros).
 export function* exportLearning(state: FactoryState, repo: string, since?: string): Generator<string> {
   const keep = (at: string): boolean => since === undefined || at >= since;
+  ensureCheckColumns(state);
   for (const run of state.listRuns(repo)) if (keep(run.started_at)) yield line("run", run);
   for (let after = 0; ; ) {
     const page = state.listStageRuns(repo, { after, limit: PAGE });
-    for (const s of page) if (keep(s.started_at)) yield line("stage", s);
+    for (const s of page) if (keep(s.started_at)) yield line("stage", { ...s, ...checksOf(s) });
     if (page.length < PAGE) break;
     after = page[page.length - 1]!.id;
   }
