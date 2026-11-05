@@ -135,5 +135,5 @@ test("mergeShard re-measures a line cap and gives up on one whose file is gone",
   writeFileSync(join(dir, "a.ts"), lines(3));
   const path = "quality-baseline/lines/a.ts.json";
   expect(mergeShard(shard("a.ts", 401), shard("a.ts", 402), shard("a.ts", 410), dir, path)).toBe(shard("a.ts", 3));
-  expect(mergeShard(shard("gone.ts", 5), shard("gone.ts", 4), shard("gone.ts", 6), dir, path)).toBeUndefined();
+  expect(mergeShard(shard("gone.ts", 5), shard("gone.ts", 4), shard("gone.ts", 6), dir, path) === undefined).toBe(true);
 });
