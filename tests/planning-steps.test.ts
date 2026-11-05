@@ -93,7 +93,7 @@ describe("decompose step (#610)", () => {
 describe("sub-issue support per adapter (#610)", () => {
   test("the HTTP tracker has no sub-issue concept, so decompose refuses by name before filing", async () => {
     const http = new HttpTracker({ kind: "http", url: "http://127.0.0.1:1", tokenEnv: "T" }, {});
-    expect(http.linkSubIssue).toBeUndefined();
+    expect("linkSubIssue" in http).toBe(false);
     await expect(decomposeEpic(http as never, "o/r", { number: 1, body: "- [ ] x" })).rejects.toThrow(
       "this tracker cannot link sub-issues",
     );

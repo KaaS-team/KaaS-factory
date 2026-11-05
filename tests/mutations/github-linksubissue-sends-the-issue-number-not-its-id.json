@@ -1,1 +1,1 @@
-{"name":"github linkSubIssue sends the issue number, not its id","file":"src/github.ts","find":"`sub_issue_id=${id}`","replace":"`sub_issue_id=${child}`","test":"tests/github.test.ts"}
+{"name":"github linkSubIssue sends the issue number, not its id","file":"src/github-rest.ts","find":"`sub_issue_id=${id}`","replace":"`sub_issue_id=${child}`","test":"tests/github.test.ts"}

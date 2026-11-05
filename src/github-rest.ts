@@ -118,4 +118,16 @@ export class RestIssues {
       if (result.code !== 0 && !/HTTP 404/.test(result.stderr)) throw await this.fail(args, result);
     }
   }
+
+  // The sub-issues endpoint takes the child's database id, not its number, so look that up first.
+  async linkSub(repo: string, parent: number, child: number): Promise<void> {
+    const run = async (args: string[]) => {
+      const result = await this.runner.run(args);
+      if (result.code !== 0) throw await this.fail(args, result);
+      return result.stdout.trim();
+    };
+    const id = await run(["api", `repos/${repo}/issues/${child}`, "--jq", ".id"]);
+    if (!/^\d+$/.test(id)) throw new Error(`could not read the id of ${repo}#${child}: ${id}`);
+    await run(["api", "-X", "POST", `repos/${repo}/issues/${parent}/sub_issues`, "-F", `sub_issue_id=${id}`]);
+  }
 }
