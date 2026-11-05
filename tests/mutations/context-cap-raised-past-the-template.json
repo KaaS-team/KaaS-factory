@@ -1,0 +1,7 @@
+{
+  "name": "context: cap raised past the template",
+  "file": "src/context.ts",
+  "find": "ALWAYS_LOADED_CAP_TOKENS = 800",
+  "replace": "ALWAYS_LOADED_CAP_TOKENS = 2000",
+  "test": "tests/context-budget.test.ts"
+}

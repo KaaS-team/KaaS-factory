@@ -4,11 +4,13 @@
 
 import { parseWorkflow, type Step, type StepKind, type WorkflowResult } from "./workflow";
 
-const STEP_EXTRAS = ["agent", "timeout", "retries", "tool", "with", "env", "optional"] as const;
+const STEP_EXTRAS = ["agent", "timeout", "retries", "tool", "with", "env", "optional", "skill", "gate"] as const;
 const NAME = /^[\w.-]{1,64}$/;
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 
-type Extras = Partial<Pick<Step, "agent" | "timeoutMinutes" | "retries" | "tool" | "with" | "env" | "optional">>;
+type Extras = Partial<
+  Pick<Step, "agent" | "timeoutMinutes" | "retries" | "tool" | "with" | "env" | "optional" | "skill" | "gate">
+>;
 
 export function parseWorkflowFull(
   raw: unknown,
@@ -49,6 +51,8 @@ export function parseWorkflowFull(
   if (!parsed.ok) return { ok: false, problems: [...parsed.problems, ...problems] };
   if (problems.length) return { ok: false, problems };
   const w = parsed.workflow;
+  const gateProblems = gateEdgeProblems(w.steps, extras);
+  if (gateProblems.length) return { ok: false, problems: gateProblems };
   const steps = Object.fromEntries(Object.entries(w.steps).map(([id, s]) => [id, { ...s, ...extras[id] }]));
   return {
     ok: true,
@@ -59,6 +63,22 @@ export function parseWorkflowFull(
       ...(typeof emit === "string" ? { emit } : {}),
     },
   };
+}
+
+// A gate pauses on one park edge that names all three exits; a park edge's `skip:` belongs to a gate alone.
+function gateEdgeProblems(steps: Readonly<Record<string, Step>>, extras: Readonly<Record<string, Extras>>): string[] {
+  const out: string[] = [];
+  for (const [id, step] of Object.entries(steps)) {
+    const isGate = extras[id]?.gate === "human";
+    const parks = step.next.filter((e) => "park" in e);
+    if (isGate && !(step.next.length === 1 && parks.length === 1 && !step.next[0]!.if))
+      out.push(`steps.${id}.next: a gate: human step has one park edge and no if:`);
+    else if (isGate && !parks.every((e) => "skip" in e && e.skip))
+      out.push(`steps.${id}.next[0].skip: required, the step /factory skip goes to`);
+    if (!isGate && parks.some((e) => "skip" in e && e.skip))
+      out.push(`steps.${id}.next: skip: is only for a gate: human step`);
+  }
+  return out;
 }
 
 function stepExtras(where: string, s: Record<string, unknown>, kind: StepKind | undefined, problems: string[]): Extras {
@@ -99,6 +119,18 @@ function stepExtras(where: string, s: Record<string, unknown>, kind: StepKind | 
       problems.push(`${where}.env: a list of env var names the tool's server may read`);
     else if (kind && !kind.tool) problems.push(`${where}.env: only a tool step passes env to its server`);
     else out.env = s.env as string[];
+  }
+  if (kind?.skill && typeof s.skill !== "string") problems.push(`${where}.skill: required, the skill it runs`);
+  if (s.skill !== undefined) {
+    if (typeof s.skill !== "string" || !NAME.test(s.skill)) problems.push(`${where}.skill: a skill name`);
+    else if (kind && !kind.skill) problems.push(`${where}.skill: a ${s.uses} step runs no skill`);
+    else out.skill = s.skill;
+  }
+  if (kind?.gate && s.gate !== "human") problems.push(`${where}.gate: required, "human"`);
+  if (s.gate !== undefined) {
+    if (s.gate !== "human") problems.push(`${where}.gate: "human" is the only kind`);
+    else if (kind && !kind.gate) problems.push(`${where}.gate: a ${s.uses} step is not a gate`);
+    else out.gate = "human";
   }
   if (s.optional !== undefined) {
     if (typeof s.optional !== "boolean") problems.push(`${where}.optional: true or false`);

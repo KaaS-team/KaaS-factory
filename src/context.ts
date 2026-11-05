@@ -5,10 +5,10 @@
 // in the pack, never silently truncated mid-file.
 
 import type { PlanArtifact } from "./artifacts";
-import { readStageArtifacts } from "./artifacts";
+import { readStageArtifacts, runDir } from "./artifacts";
 import type { StageName } from "./executor";
 import { stripFrontmatter } from "./agents/prompt";
-import { readdirSync } from "node:fs";
+import { mkdirSync, readdirSync } from "node:fs";
 import { reviewMdSection } from "./review-md";
 
 export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
@@ -20,6 +20,96 @@ export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
 export const LESSONS_PATH = ".factory/memory/lessons.md";
 export const MAX_LESSONS_BYTES = 8 * 1024;
 export const CHARTER_PATH = ".factory/charter.md";
+
+// A lesson is `- text (issue #N, learned YYYY-MM-DD)`. One older than this is dropped from the
+// context and from the file at the next learn PR. A line with no date cannot age, so it stays.
+export const LESSON_MAX_AGE_DAYS = 90;
+const LEARNED_ON = /\(issue #\d+, learned (\d{4}-\d{2}-\d{2})\)\s*$/;
+
+export interface ExpiredLessons {
+  readonly kept: string;
+  readonly expired: readonly string[];
+}
+
+// Splits a lessons file at LESSON_MAX_AGE_DAYS before `now`, line by line.
+export function expireLessons(raw: string, now: Date, maxAgeDays = LESSON_MAX_AGE_DAYS): ExpiredLessons {
+  const cutoff = now.getTime() - maxAgeDays * 86_400_000;
+  const kept: string[] = [];
+  const expired: string[] = [];
+  for (const line of raw.split("\n")) {
+    const day = LEARNED_ON.exec(line)?.[1];
+    if (day !== undefined && Date.parse(`${day}T00:00:00Z`) < cutoff) expired.push(line);
+    else kept.push(line);
+  }
+  return { kept: kept.join("\n"), expired };
+}
+
+// What every stage loads before it reads the issue: the agent's context file, the rules with no
+// `paths:` scope, each skill's description and the lessons file. Tokens are bytes / 4, an estimate
+// that is the same on every machine. The cap is for the files the factory ships (tests/context-budget.test.ts):
+// it may only go down, and the test fails when the cap sits more than 10% above what is measured.
+export const ALWAYS_LOADED_CAP_TOKENS = 800;
+export const CAP_SLACK = 0.1;
+export const tokensOf = (text: string): number => Math.ceil(Buffer.byteLength(text) / 4);
+
+export interface AlwaysLoaded {
+  readonly tokens: number;
+  readonly parts: {
+    readonly context: number;
+    readonly rules: number;
+    readonly skills: number;
+    readonly lessons: number;
+  };
+}
+
+async function unscopedRules(cwd: string): Promise<string> {
+  let names: string[];
+  try {
+    names = readdirSync(`${cwd}/.claude/rules`)
+      .filter((n) => n.endsWith(".md"))
+      .sort();
+  } catch {
+    return "";
+  }
+  const out: string[] = [];
+  for (const name of names) {
+    const text = await readOptional(`${cwd}/.claude/rules/${name}`);
+    if (text && !/^---\n[\s\S]*?\bpaths:/.test(text)) out.push(text);
+  }
+  return out.join("\n");
+}
+
+export async function measureAlwaysLoaded(cwd: string, opts: PackOptions & { now?: Date } = {}): Promise<AlwaysLoaded> {
+  const contextFile = opts.contextFile ?? "CLAUDE.md";
+  const own = (await readOptional(`${cwd}/${contextFile}`)) ?? "";
+  const agentsMd =
+    contextFile !== "AGENTS.md" && (await contextFileLoadsAgentsMd(cwd, contextFile))
+      ? ((await readOptional(`${cwd}/AGENTS.md`)) ?? "")
+      : "";
+  const lessonsRaw = (await readOptional(`${cwd}/${LESSONS_PATH}`)) ?? "";
+  const lessons = capLessons(expireLessons(lessonsRaw, opts.now ?? new Date()).kept);
+  const index = await skillsIndex(cwd, opts.skillsDir ?? ".claude/skills", true);
+  const parts = {
+    context: tokensOf(own + agentsMd),
+    rules: tokensOf(await unscopedRules(cwd)),
+    skills: tokensOf(index),
+    lessons: tokensOf(lessons),
+  };
+  return { tokens: parts.context + parts.rules + parts.skills + parts.lessons, parts };
+}
+
+export const CONTEXT_TOKENS_FILE = "context-tokens.json";
+
+// Written beside the run's other artifacts, so each run shows what it started with.
+export async function recordAlwaysLoaded(cwd: string, issue: number, opts: PackOptions = {}): Promise<AlwaysLoaded> {
+  const measured = await measureAlwaysLoaded(cwd, opts);
+  mkdirSync(`${cwd}/${runDir(issue)}`, { recursive: true });
+  await Bun.write(
+    `${cwd}/${runDir(issue)}/${CONTEXT_TOKENS_FILE}`,
+    `${JSON.stringify({ ...measured, cap: ALWAYS_LOADED_CAP_TOKENS, over: measured.tokens > ALWAYS_LOADED_CAP_TOKENS })}\n`,
+  );
+  return measured;
+}
 
 type SectionKey = "conventions" | "charter" | "lessons" | "skillsIndex" | "routeSkills" | "architecture" | "planFiles";
 
@@ -45,6 +135,8 @@ export interface PackOptions {
   readonly contextFile?: string;
   // Where the agent's repo skills live (its preset's skillsDir); default .claude/skills.
   readonly skillsDir?: string;
+  // The clock lessons age against; tests pass one.
+  readonly now?: Date;
 }
 
 interface Section {
@@ -91,11 +183,11 @@ export async function contextFileLoadsAgentsMd(cwd: string, contextFile: string 
 }
 
 // `- name: description` per repo skill (factory-* excluded), from frontmatter only.
-export async function skillsIndex(cwd: string, skillsDir = ".claude/skills"): Promise<string> {
+export async function skillsIndex(cwd: string, skillsDir = ".claude/skills", withFactory = false): Promise<string> {
   let names: string[];
   try {
     names = readdirSync(`${cwd}/${skillsDir}`)
-      .filter((n) => !n.startsWith("factory-"))
+      .filter((n) => withFactory || !n.startsWith("factory-"))
       .sort();
   } catch {
     return "";
@@ -157,7 +249,8 @@ async function sections(stage: StageName, issue: number, cwd: string, opts: Pack
   }
 
   if (want.has("lessons")) {
-    const lessons = await readOptional(`${cwd}/${LESSONS_PATH}`);
+    const raw = await readOptional(`${cwd}/${LESSONS_PATH}`);
+    const lessons = raw && expireLessons(raw, opts.now ?? new Date()).kept.trim();
     if (lessons) out.push({ label: "lessons learned", body: capLessons(lessons).trim() });
   }
 
@@ -194,5 +287,6 @@ export async function buildContextPack(
   cwd: string,
   opts: PackOptions = {},
 ): Promise<string> {
+  await recordAlwaysLoaded(cwd, issue, opts);
   return assemble(await sections(stage, issue, cwd, opts));
 }

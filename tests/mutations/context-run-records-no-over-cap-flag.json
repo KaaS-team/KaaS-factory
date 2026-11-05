@@ -1,0 +1,7 @@
+{
+  "name": "context: run records no over-cap flag",
+  "file": "src/context.ts",
+  "find": "over: measured.tokens > ALWAYS_LOADED_CAP_TOKENS",
+  "replace": "over: false",
+  "test": "tests/context-budget.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "gate: park edge needs no skip exit",
+  "file": "src/core/workflow-extras.ts",
+  "find": "!parks.every((e) => \"skip\" in e && e.skip)",
+  "replace": "false",
+  "test": "tests/skill-gate-steps.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "gate: skip verb not parsed",
+  "file": "src/chatops.ts",
+  "find": "if (verb === \"skip\") return { type: \"skip\" };",
+  "replace": "",
+  "test": "tests/skill-gate-steps.test.ts"
+}

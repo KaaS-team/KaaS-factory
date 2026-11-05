@@ -1,0 +1,7 @@
+{
+  "name": "context: expired lessons kept",
+  "file": "src/context.ts",
+  "find": "Date.parse(`${day}T00:00:00Z`) < cutoff",
+  "replace": "Date.parse(`${day}T00:00:00Z`) < 0",
+  "test": "tests/learn-hygiene.test.ts"
+}

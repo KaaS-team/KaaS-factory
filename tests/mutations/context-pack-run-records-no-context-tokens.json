@@ -1,0 +1,7 @@
+{
+  "name": "context pack: run records no context tokens",
+  "file": "src/context.ts",
+  "find": "  await recordAlwaysLoaded(cwd, issue, opts);\n",
+  "replace": "",
+  "test": "tests/context-budget.test.ts"
+}

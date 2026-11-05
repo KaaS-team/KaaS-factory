@@ -1,0 +1,7 @@
+{
+  "name": "learn: new lessons carry no date",
+  "file": "src/learn.ts",
+  "find": "(issue #${r.issue}, learned ${day})",
+  "replace": "(issue #${r.issue})",
+  "test": "tests/learn-hygiene.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "gate: skip allowed on any step",
+  "file": "src/core/workflow-extras.ts",
+  "find": "if (!isGate && parks.some(",
+  "replace": "if (false && parks.some(",
+  "test": "tests/skill-gate-steps.test.ts"
+}

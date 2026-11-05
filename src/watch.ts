@@ -333,7 +333,7 @@ export async function resumeAwaitingApproval(
     );
   if (command.type === "approve") return resumeAt(edge.approve);
   if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
-  // A plain reply that is not a command: nothing to do yet.
+  if (command.type === "skip" && edge.skip) return resumeAt(edge.skip);
   return "waiting";
 }
 

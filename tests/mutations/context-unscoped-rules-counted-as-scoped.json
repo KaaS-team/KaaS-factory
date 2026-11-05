@@ -1,0 +1,7 @@
+{
+  "name": "context: unscoped rules counted as scoped",
+  "file": "src/context.ts",
+  "find": "!/^---\\n[\\s\\S]*?\\bpaths:/.test(text)",
+  "replace": "/^---\\n[\\s\\S]*?\\bpaths:/.test(text)",
+  "test": "tests/context-budget.test.ts"
+}

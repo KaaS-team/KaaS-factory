@@ -1,0 +1,7 @@
+{
+  "name": "skill step: a not-ok answer goes on",
+  "file": "src/engine/skill-step.ts",
+  "find": "if (answer?.ok !== true) {",
+  "replace": "if (false) {",
+  "test": "tests/skill-gate-steps.test.ts"
+}

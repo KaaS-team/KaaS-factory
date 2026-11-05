@@ -17,6 +17,8 @@ export type Edge =
       readonly park: ParkState;
       readonly approve: string;
       readonly revise: string;
+      // A `gate: human` step's third exit: `/factory skip` goes here.
+      readonly skip?: string;
       // Human on the loop: with no trusted comment this many ms after the plan, the runner approves.
       readonly after?: number;
     };
@@ -32,6 +34,9 @@ export interface Step {
   readonly revise?: string;
   // A `check` step's shell command.
   readonly run?: string;
+  // A `skill` step's skill name, and a `gate` step's kind (only `human`).
+  readonly skill?: string;
+  readonly gate?: "human";
   // The MCP servers (names in .factory/mcp.json) an agent step starts with.
   readonly mcp?: readonly string[];
   // A `check` step's runtime by name, over config.runtime.check.
@@ -86,13 +91,17 @@ export interface StepKind {
   readonly agent?: boolean;
   // Calls one MCP tool with no agent, so it needs `tool:`.
   readonly tool?: boolean;
+  // Runs a named skill as an agent, so it needs `skill:`.
+  readonly skill?: boolean;
+  // Pauses for a person, so it needs `gate: human` and one park edge with `skip:`.
+  readonly gate?: boolean;
 }
 
 const STEP_KEYS = new Set(["uses", "label", "next", "reject", "revise", "run", "mcp", "runtime"]);
 const TOP_KEYS = new Set(["name", "description", "on", "limits", "steps"]);
 const ON_KEYS = new Set(["cron", "event"]);
 const CRON_KEYS = new Set(["schedule", "tz", "title", "body"]);
-const EDGE_KEYS = new Set(["if", "to", "park", "approve", "revise", "after"]);
+const EDGE_KEYS = new Set(["if", "to", "park", "approve", "revise", "skip", "after"]);
 const WINDOW_UNITS: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000 };
 
 // `30m`, `4h`, `2d`: a park edge's veto window, or undefined when it is not one.
@@ -206,9 +215,12 @@ export function parseWorkflow(
           park: e.park as ParkState,
           approve: String(e.approve ?? ""),
           revise: String(e.revise ?? ""),
+          ...(typeof e.skip === "string" ? { skip: e.skip } : {}),
           ...(after ? { after } : {}),
         });
       } else problems.push(`${ew}: needs exactly one of to or park`);
+      if (e.skip !== undefined && (e.park === undefined || typeof e.skip !== "string"))
+        problems.push(`${ew}.skip: a step id, only on a park edge`);
       if (e.after !== undefined && e.park === undefined) problems.push(`${ew}.after: only a park edge has a window`);
     }
     // /factory approve finds a parked step's window by its step, not by the edge it took.
@@ -330,7 +342,12 @@ export function targets(step: Step): [string, string][] {
   const out: [string, string][] = [];
   step.next.forEach((e, i) => {
     if ("to" in e) out.push([`next[${i}].to`, e.to]);
-    else out.push([`next[${i}].approve`, e.approve], [`next[${i}].revise`, e.revise]);
+    else
+      out.push(
+        [`next[${i}].approve`, e.approve],
+        [`next[${i}].revise`, e.revise],
+        ...(e.skip ? [[`next[${i}].skip`, e.skip] as [string, string]] : []),
+      );
   });
   if (step.reject) out.push(["reject", step.reject]);
   if (step.revise) out.push(["revise", step.revise]);

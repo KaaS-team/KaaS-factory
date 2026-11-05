@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { outsideAllowedPaths } from "./boundary";
 import { loopRefusals } from "./loop-guard";
-import { capLessons, LESSONS_PATH } from "./context";
+import { ALWAYS_LOADED_CAP_TOKENS, capLessons, expireLessons, LESSONS_PATH, measureAlwaysLoaded } from "./context";
 import type { Git } from "./git";
 import { type LessonSink, lessonSinkFromEnv } from "./lesson-sink";
 import type { ScmPort } from "./github";
@@ -48,13 +48,45 @@ async function readIfExists(path: string): Promise<string> {
 // Appends new lessons to the existing file and re-applies the same cap
 // buildContextPack's reader enforces (src/context.ts), so the file this
 // writes is never the thing that forces a trim at read time.
-async function appendLessons(worktreeDir: string, rows: readonly RetroRow[]): Promise<void> {
-  const lines = rows.filter((r) => r.lesson).map((r) => `- ${r.lesson} (issue #${r.issue})`);
+async function appendLessons(worktreeDir: string, rows: readonly RetroRow[], now: Date): Promise<void> {
+  const day = now.toISOString().slice(0, 10);
+  const lines = rows.filter((r) => r.lesson).map((r) => `- ${r.lesson} (issue #${r.issue}, learned ${day})`);
   if (lines.length === 0) return;
   const path = `${worktreeDir}/${LESSONS_PATH}`;
   const existing = (await readIfExists(path)).trim();
   const merged = existing ? `${existing}\n${lines.join("\n")}\n` : `${lines.join("\n")}\n`;
   await Bun.write(path, capLessons(merged));
+}
+
+// Hygiene: a lesson older than LESSON_MAX_AGE_DAYS leaves the file, and the PR names it so a person
+// can put it back. Returns the lines removed.
+async function expireOldLessons(worktreeDir: string, now: Date): Promise<readonly string[]> {
+  const path = `${worktreeDir}/${LESSONS_PATH}`;
+  const { kept, expired } = expireLessons(await readIfExists(path), now);
+  if (expired.length > 0) await Bun.write(path, `${kept.trim()}\n`);
+  return expired;
+}
+
+async function hygieneSection(worktreeDir: string, expired: readonly string[], now: Date): Promise<string[]> {
+  const loaded = await measureAlwaysLoaded(worktreeDir, { now });
+  const over = loaded.tokens > ALWAYS_LOADED_CAP_TOKENS;
+  if (expired.length === 0 && !over) return [];
+  return [
+    "",
+    "### Context hygiene",
+    "",
+    ...(expired.length
+      ? [
+          `Expired ${expired.length} lesson(s) past their age limit:`,
+          ...expired.map((l) => `- ~~${l.replace(/^- /, "")}~~`),
+        ]
+      : []),
+    ...(over
+      ? [
+          `Always-loaded context is ${loaded.tokens} tokens (context file ${loaded.parts.context}, rules ${loaded.parts.rules}, skill descriptions ${loaded.parts.skills}, lessons ${loaded.parts.lessons}), over the ${ALWAYS_LOADED_CAP_TOKENS} token cap. Trim the largest part.`,
+        ]
+      : []),
+  ];
 }
 
 // One proposal file per named skill, never the real SKILL.md: incorporating
@@ -75,7 +107,7 @@ async function appendProposedEdits(worktreeDir: string, rows: readonly RetroRow[
   }
 }
 
-function buildPrBody(rows: readonly RetroRow[]): string {
+function buildPrBody(rows: readonly RetroRow[], hygiene: readonly string[] = []): string {
   const lines = rows.map(
     (r) => `- #${r.issue} (${r.outcome}): ${r.lesson ?? `skill edit proposed for \`${r.skill_name}\``}`,
   );
@@ -83,6 +115,7 @@ function buildPrBody(rows: readonly RetroRow[]): string {
     `Batches ${rows.length} pending retro proposal(s) into repo-local memory and skill-edit proposals.`,
     "",
     ...lines,
+    ...hygiene,
     "",
     "Nothing here is applied automatically; review the lesson and any `PROPOSED_EDITS.md` files before merging.",
   ].join("\n");
@@ -103,16 +136,27 @@ export async function runLearn(
   now: Date = new Date(),
 ): Promise<LearnResult> {
   const pending = deps.state.pendingLessons(repo);
-  if (pending.length === 0) return { batched: 0 };
+  // With nothing pending, a learn PR is still due when the base branch holds a lesson past its age.
+  if (
+    pending.length === 0 &&
+    expireLessons(await readIfExists(join(deps.cloneDir, LESSONS_PATH)), now).expired.length === 0
+  )
+    return { batched: 0 };
 
   const branch = branchNameFor(now);
   const worktreeDir = `${deps.workspacesDir}/${branch.replace(/\//g, "-")}`;
   await deps.git.ensureBranchWorktree(deps.cloneDir, worktreeDir, branch, base);
 
-  await appendLessons(worktreeDir, pending);
+  const expired = await expireOldLessons(worktreeDir, now);
+  await appendLessons(worktreeDir, pending, now);
   await appendProposedEdits(worktreeDir, pending);
 
-  const committed = await deps.git.commitAll(worktreeDir, `factory: batch ${pending.length} retro proposal(s)`);
+  const committed = await deps.git.commitAll(
+    worktreeDir,
+    pending.length
+      ? `factory: batch ${pending.length} retro proposal(s)`
+      : `factory: expire ${expired.length} old lesson(s)`,
+  );
   if (!committed) return { batched: 0 };
 
   const changed = await deps.git.changedFiles(worktreeDir, base);
@@ -134,13 +178,14 @@ export async function runLearn(
         base,
         head: branch,
         title: `factory: learning batch ${branch.replace("factory/learning-", "")}`,
-        body: buildPrBody(pending),
+        body: buildPrBody(pending, await hygieneSection(worktreeDir, expired, now)),
       });
 
-  deps.state.markLearned(
-    pending.map((r) => r.id),
-    now.toISOString(),
-  );
+  if (pending.length)
+    deps.state.markLearned(
+      pending.map((r) => r.id),
+      now.toISOString(),
+    );
   await (deps.sink ?? lessonSinkFromEnv(process.env))?.push(repo, pending);
   return { batched: pending.length, prUrl, branch };
 }

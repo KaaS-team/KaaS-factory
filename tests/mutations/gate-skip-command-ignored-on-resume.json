@@ -1,0 +1,7 @@
+{
+  "name": "gate: skip command ignored on resume",
+  "file": "src/watch.ts",
+  "find": "command.type === \"skip\" && edge.skip",
+  "replace": "false",
+  "test": "tests/skill-gate-steps.test.ts"
+}

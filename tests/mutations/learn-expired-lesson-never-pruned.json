@@ -1,0 +1,7 @@
+{
+  "name": "learn: expired lesson never pruned",
+  "file": "src/learn.ts",
+  "find": "if (expired.length > 0) await Bun.write(path,",
+  "replace": "if (false) await Bun.write(path,",
+  "test": "tests/learn-hygiene.test.ts"
+}

@@ -70,13 +70,15 @@ them in the worktree's git exclude so no PR carries them. A skill or subagent th
 
 | key | meaning |
 |---|---|
-| `uses` | the step type: `triage`, `plan`, `build`, `verify`, `pr` or `check` |
+| `uses` | the step type: `triage`, `plan`, `build`, `verify`, `pr`, `check`, `skill` or `gate` |
 | `label` | the `factory:*` label the issue holds during the step; unique per workflow |
 | `next` | a step id, or a list of edges; `pr` ends the workflow, so it has none |
 | `reject` | where a rejection goes; required on `verify` |
 | `revise` | where `/factory revise` goes when the issue is parked on this step's label |
 | `run` | a `check` step's shell command; exit 0 moves on, anything else parks the issue as failed |
 | `runtime` | where a `check` step's command runs, by name ([runtimes.md](runtimes.md)); default `runtime.check` in config, else `local` |
+| `skill` | a `skill` step's skill name, from `.claude/skills`, `.agents/skills` or the runner's defaults; the agent runs it read-only and answers `{"ok": true}` to go on, else the issue parks as failed |
+| `gate` | `human` on a `gate` step: it pauses on its one park edge, which also names `skip:`; `/factory approve` goes to `approve`, `/factory revise <text>` to `revise`, `/factory skip` to `skip`. It resumes through the plan comment, so put a `plan` step before it |
 | `mcp` | MCP server names from `.factory/mcp.json` this step's agent may use; not on a `check` step |
 
 An edge is `{ to: <step> }` or `{ park: awaiting-approval, approve: <step>, revise: <step> }`,
