@@ -147,6 +147,15 @@ export class Git {
     await this.runner.run(["worktree", "add", worktreeDir, branch], { cwd: cloneDir });
   }
 
+  // Shadow mode: a detached checkout of base, so the run has a place to read and write artifacts
+  // and still creates no branch, local or remote.
+  async ensureDetachedWorktree(cloneDir: string, worktreeDir: string, base: string): Promise<void> {
+    await this.runner.run(["fetch", "origin", base], { cwd: cloneDir });
+    const list = await this.runner.run(["worktree", "list", "--porcelain"], { cwd: cloneDir });
+    if (list.stdout.includes(`worktree ${worktreeDir}\n`)) return;
+    await this.runner.run(["worktree", "add", "--detach", worktreeDir, `origin/${base}`], { cwd: cloneDir });
+  }
+
   /** @deprecated use ensureWorktree */
   async addWorktree(cloneDir: string, worktreeDir: string, issue: number): Promise<void> {
     return this.ensureWorktree(cloneDir, worktreeDir, issue);

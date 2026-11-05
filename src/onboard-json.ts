@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { successJson } from "./cli-output";
 import type { DoctorCheck } from "./doctor";
 import { isFilledIn } from "./init";
+import { scanForOnboard, scanLines } from "./onboard";
 
 export type DoctorStatus = "Ready" | "Not checked" | "Needs setup";
 export type StepState = "completed" | "blocked" | "failed";
@@ -21,6 +22,10 @@ export interface OnboardReport {
   readonly doctor: DoctorStatus;
   readonly steps: readonly OnboardStep[];
   readonly next: string;
+  // Set by `factory onboard` from src/onboard.ts: what it read, what it wrote, what a person must still supply.
+  readonly detected?: readonly string[];
+  readonly wrote?: readonly string[];
+  readonly missing?: readonly string[];
 }
 
 // No checks means doctor never ran live. A warning never fails a run, so it never means Needs setup.
@@ -32,7 +37,10 @@ export function doctorStatus(checks: readonly DoctorCheck[] | undefined): Doctor
 export async function buildOnboardReport(
   dir: string,
   runChecks: () => Promise<readonly DoctorCheck[]>,
+  writeStarter?: boolean,
 ): Promise<OnboardReport> {
+  // Before the steps, so the starter config it writes counts as filled in.
+  const scan = writeStarter === undefined ? {} : scanForOnboard(dir, writeStarter);
   const steps: OnboardStep[] = [];
   const installed = existsSync(join(dir, ".factory", "gates.sh"));
   steps.push(
@@ -73,6 +81,7 @@ export async function buildOnboardReport(
       : "completed";
   const open = steps.find((s) => s.state !== "completed");
   return {
+    ...scan,
     status,
     doctor,
     steps,
@@ -97,7 +106,12 @@ export function unusableConfigCheck(err: unknown): DoctorCheck {
 
 export function onboardOutput(report: OnboardReport, json: boolean): string {
   if (json) return successJson(report, report.status === "completed");
-  const lines = report.steps.map((s) => `  [${s.state}] ${s.name}${s.next ? ` - ${s.next}` : ""}`);
+  const lines = scanLines({
+    detected: report.detected ?? [],
+    wrote: report.wrote ?? [],
+    missing: report.missing ?? [],
+  });
+  lines.push(...report.steps.map((s) => `  [${s.state}] ${s.name}${s.next ? ` - ${s.next}` : ""}`));
   lines.push(`factory onboard: ${report.status}, doctor ${report.doctor}. next: ${report.next}`);
   return lines.join("\n");
 }

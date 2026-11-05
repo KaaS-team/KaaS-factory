@@ -77,6 +77,8 @@ export interface WatchDeps {
   // Runs the proof:test revert check before verify and writes proof.json; absent means verify does it by hand.
   readonly proofGit?: ProofGit;
   readonly cloneDir: string;
+  // Triage and plan only, posted as comments: no claim, branch or PR (src/shadow.ts).
+  readonly shadow?: boolean;
   readonly pushProbe?: (worktree: string, runId: string) => Promise<import("../push-probe").ProbeResult>;
   readonly workspacesDir: string;
   // Runs config.setup once per worktree; defaults to a real shell, so tests can inject a fake.
@@ -91,9 +93,7 @@ export interface WatchDeps {
     readonly opts?: LeaseOpts;
     readonly held: Map<number, Held>;
   };
-  // Absent: caps read this machine's SQLite. Present: every stage's spend is
-  // also recorded here and caps read the larger of the two, so they hold
-  // across every worker.
+  // Absent: caps read this machine's SQLite. Present: spend is also recorded here and caps read the larger.
   readonly spend?: SpendStore;
   // An org or fleet cap read with the repo's; absent means the repo and machine caps alone.
   readonly spendPolicy?: SpendPolicy;

@@ -1,0 +1,7 @@
+{
+  "name": "audit files a finding that is already open",
+  "file": "src/audit-cli.ts",
+  "find": "if (open.some((i) => i.body.includes(findingMarker(f.id)))) {",
+  "replace": "if (false) {",
+  "test": "tests/audit.test.ts"
+}
