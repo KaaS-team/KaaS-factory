@@ -1,0 +1,6 @@
+{
+  "exclude": [
+    ".claude/hooks/*",
+    ".factory/*.sh"
+  ]
+}

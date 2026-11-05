@@ -26,7 +26,6 @@ const tmp = () => {
 
 const seed: Baseline = {
   metrics: { lines: { "src/a.ts": 410, "src/z.ts": 450 }, comments: { "src/a.ts": 1 } },
-  exclude: ["x/*"],
 };
 
 test("a baseline survives a write and a read", () => {
@@ -107,4 +106,13 @@ test("factory hotspots lists the files several merged PRs changed", () => {
   const p = Bun.spawnSync(["bun", join(import.meta.dir, "../src/cli.ts"), "hotspots", "--json"], { cwd: dir, env });
   const out = JSON.parse(p.stdout.toString()).data;
   expect(out.hotspots).toEqual([{ file: "hot.ts", prs: 3, shared: false }]);
+});
+
+// The vendored check-quality.py must keep skipping this repo, or a kit sync turns on a second ratchet.
+test("the vendored check-quality defers to this ratchet through the exclude-only marker", () => {
+  const marker = JSON.parse(readFileSync(join(import.meta.dir, "..", "quality-baseline.json"), "utf8"));
+  expect(Object.keys(marker)).toEqual(["exclude"]);
+  const p = Bun.spawnSync(["python3", "scripts/kaas/check-quality.py"], { cwd: join(import.meta.dir, "..") });
+  expect(p.stdout.toString()).toContain("belongs to another ratchet");
+  expect(p.exitCode).toBe(0);
 });

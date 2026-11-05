@@ -1,0 +1,7 @@
+{
+  "name": "baseline: the marker keeps the vendored ratchet off",
+  "file": "quality-baseline.json",
+  "find": "\"exclude\"",
+  "replace": "\"lines\"",
+  "test": "tests/baseline-shards.test.ts"
+}

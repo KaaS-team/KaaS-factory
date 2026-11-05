@@ -2,8 +2,8 @@
 """Readable code, held by a ratchet: comment runs, narration comments, file length, banned names.
 
 Usage: check-quality.py [FILE...]   check the named files, or every tracked source file
-       check-quality.py --update    lower quality-baseline/ to today's numbers; never adds a file
-       check-quality.py --init      list every current offender in quality-baseline/ (adoption only)
+       check-quality.py --update    lower quality-baseline.json to today's numbers; never adds a file
+       check-quality.py --init      list every current offender in quality-baseline.json (adoption only)
 Why: docs/decisions/scripts.md#check-qualitypy
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 JS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"}
 HASH = {".py", ".sh", ".bash"}
 MAX_RUN, MAX_LINES = 3, 400
-BASELINE = Path("quality-baseline")
+BASELINE = Path("quality-baseline.json")
 sys.dont_write_bytecode = True
 _spec = importlib.util.spec_from_file_location("check_repo", Path(__file__).resolve().with_name("check-repo.py"))
 _repo = importlib.util.module_from_spec(_spec)
@@ -161,28 +161,9 @@ def tracked(exclude: list[str]) -> list[Path]:
     ]
 
 
-def load_baseline() -> dict:
-    """quality-baseline/<metric>/<slug>.json, one {"file", "max"} per entry; one file per entry so parallel PRs merge."""
-    base: dict = {}
-    for p in sorted(BASELINE.glob("*/*.json")) if BASELINE.is_dir() else []:
-        entry = json.loads(p.read_text())
-        base.setdefault(p.parent.name, {})[entry["file"]] = entry["max"]
-    return base
-
-
-def save_baseline(now: dict) -> None:
-    for old in BASELINE.glob("*/*.json"):
-        old.unlink()
-    for metric, entries in now.items():
-        for file, value in entries.items():
-            path = BASELINE / metric / f"{file.replace('/', '__')}.json"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps({"file": file, "max": value}, separators=(",", ":")) + "\n")
-
-
 def ours(base: dict) -> bool:
-    """A baseline with an exclude.json belongs to the TypeScript ratchet (gen-quality-baseline.ts); this one skips it."""
-    return not (BASELINE / "exclude.json").is_file() and set(base) <= METRICS
+    """aeosome keeps its own quality-baseline.json (tool -> rule -> file); two ratchets must not share one file."""
+    return set(base) <= METRICS and all(isinstance(v, int) for m in base.values() for v in m.values())
 
 
 def main() -> int:
@@ -194,7 +175,7 @@ def main() -> int:
     named = [Path(a) for a in args if not a.startswith("--")]
     files = [rel(p) for p in named if p.suffix in JS | HASH and p.is_file()] if named else tracked(exclude)
     files = [p for p in files if not any(fnmatch.fnmatch(p.as_posix(), g) for g in exclude)]
-    base = load_baseline()
+    base = json.loads(BASELINE.read_text()) if BASELINE.is_file() else {}
     if not ours(base):
         print(f"check-quality  skip  {BASELINE} belongs to another ratchet; it is never read or written here")
         return 0
@@ -216,7 +197,7 @@ def main() -> int:
     if mode == "--update":
         now = {m: {k: v for k, v in now[m].items() if k in base.get(m, {})} for m in now}
     if mode != "check":
-        save_baseline(now)
+        BASELINE.write_text(json.dumps({m: dict(sorted(v.items())) for m, v in now.items()}, indent=2) + "\n")
         print(f"check-quality  wrote  {BASELINE} ({sum(map(len, now.values()))} entries)")
         return 0
     for f in fails:

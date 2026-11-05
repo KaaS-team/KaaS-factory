@@ -31,7 +31,7 @@ test("--check exits 1 on a stale baseline and writes nothing", async () => {
   const dir = mkdtempSync(join(tmpdir(), "qbaseline-"));
   writeFileSync(join(dir, "a.ts"), "x\ny\n");
   const baseline = join(dir, "quality-baseline");
-  writeBaseline({ metrics: { lines: { "a.ts": 9 } }, exclude: [] }, baseline);
+  writeBaseline({ metrics: { lines: { "a.ts": 9 } } }, baseline);
   const shard = join(baseline, "lines/a.ts.json");
   const stale = readFileSync(shard, "utf8");
   const run = (...flags: string[]) =>
@@ -57,7 +57,7 @@ test("--check fails on a shard that is not in canonical form", () => {
   const dir = mkdtempSync(join(tmpdir(), "qbaseline-"));
   writeFileSync(join(dir, "a.ts"), "x\ny\n");
   const baseline = join(dir, "quality-baseline");
-  writeBaseline({ metrics: { lines: { "a.ts": 2 } }, exclude: [] }, baseline);
+  writeBaseline({ metrics: { lines: { "a.ts": 2 } } }, baseline);
   writeFileSync(join(baseline, "lines/stray.json"), '{"file":"a.ts","max":2}\n');
   const run = Bun.spawnSync(
     [

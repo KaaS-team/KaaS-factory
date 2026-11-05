@@ -1,16 +1,15 @@
 // The quality baseline is a directory of one-line files, so two branches that each add or lower an
 // entry touch different paths and git merges them with no conflict:
 //   quality-baseline/<metric>/<slug>.json   {"file":"src/cli.ts","max":912}
-//   quality-baseline/exclude.json           ["glob", ...]
+// quality-baseline.json stays as a marker holding only `exclude`: the vendored check-quality.py reads
+// it and defers to this ratchet, so that vendored file never has to differ from the kit.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export const BASELINE_DIR = "quality-baseline";
-const EXCLUDE = "exclude.json";
 
 export interface Baseline {
   metrics: Record<string, Record<string, number>>;
-  exclude: string[];
 }
 
 export const shardSlug = (file: string): string => file.replace(/\//g, "__");
@@ -21,7 +20,6 @@ export function render(b: Baseline): Map<string, string> {
   for (const [metric, entries] of Object.entries(b.metrics))
     for (const [file, max] of Object.entries(entries))
       out.set(`${metric}/${shardSlug(file)}.json`, `${JSON.stringify({ file, max })}\n`);
-  if (b.exclude.length) out.set(EXCLUDE, `${JSON.stringify(b.exclude, null, 2)}\n`);
   return out;
 }
 
@@ -33,14 +31,10 @@ function walk(dir: string, prefix = ""): string[] {
 }
 
 export function readBaseline(root: string, dir = join(root, BASELINE_DIR)): Baseline {
-  const b: Baseline = { metrics: {}, exclude: [] };
+  const b: Baseline = { metrics: {} };
   for (const rel of walk(dir)) {
-    const text = readFileSync(join(dir, rel), "utf8");
-    if (rel === EXCLUDE) b.exclude = JSON.parse(text);
-    else {
-      const { file, max } = JSON.parse(text) as { file: string; max: number };
-      (b.metrics[rel.split("/")[0]!] ??= {})[file] = max;
-    }
+    const { file, max } = JSON.parse(readFileSync(join(dir, rel), "utf8")) as { file: string; max: number };
+    (b.metrics[rel.split("/")[0]!] ??= {})[file] = max;
   }
   return b;
 }
