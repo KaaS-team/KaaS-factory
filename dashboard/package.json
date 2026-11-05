@@ -1,0 +1,13 @@
+{
+  "name": "@kaas-team/factory-dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The factory's web dashboard. The core starts it through createDashboardServer and runs without it.",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

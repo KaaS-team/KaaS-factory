@@ -1,0 +1,1 @@
+{"name":"dashboard package: a missing package is not named as missing","file":"src/dashboard-host.ts","find":"throw new DashboardMissing(`the dashboard package ${DASHBOARD_PACKAGE} is not installed`);","replace":"throw err;","test":"tests/dashboard-package.test.ts"}

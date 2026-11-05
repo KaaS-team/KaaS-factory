@@ -9,10 +9,11 @@ import { SseEventSource } from "./adapters/sse/event-source";
 import { runDir } from "./artifacts";
 import { UsageError } from "./cli-output";
 import { DEFAULT_CONFIG, loadConfig } from "./config";
-import { createMcpServer, serveStdio } from "./mcp-server";
 import { factoryHome, livePath } from "./paths";
 import { encodeQr, qrToTerminal } from "./qr";
 import { dialOut, type RunnerCreds, type RunnerJob, type RunnerWork, registerRunner } from "./runner-channel";
+import type { ScmPort } from "./ports/scm";
+import { isMissingPackage } from "./plugins/loader";
 import { makeScm } from "./scm";
 import { controlCommand } from "./ssh-control";
 import { readLive, stopRunningStage } from "./takeover";
@@ -146,8 +147,26 @@ async function cmdPair(argv: readonly string[]): Promise<void> {
   console.log(`Scan with the phone, or open: ${body.link}`);
 }
 
+interface McpPackage {
+  createMcpServer(deps: { github: ScmPort; repo: string; by: string }): unknown;
+  serveStdio(server: unknown): Promise<void>;
+}
+
+export const MCP_PACKAGE = "@kaas-team/factory-mcp-server";
+
+// The server is its own package; the rest of the factory runs without it.
+async function loadMcpServer(): Promise<McpPackage> {
+  try {
+    return await import(MCP_PACKAGE);
+  } catch (err) {
+    if (isMissingPackage(err, MCP_PACKAGE)) throw new UsageError(`mcp: ${MCP_PACKAGE} is not installed`);
+    throw err;
+  }
+}
+
 async function cmdMcp(argv: readonly string[]): Promise<void> {
   const { repo, github } = await repoOf(argv, "mcp");
+  const { createMcpServer, serveStdio } = await loadMcpServer();
   // stdout carries the protocol, so nothing else may print there.
   await serveStdio(createMcpServer({ github, repo, by: flagOf(argv, "as") ?? "the local owner" }));
 }

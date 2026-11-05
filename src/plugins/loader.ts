@@ -62,3 +62,11 @@ export function startPlugins(
 ) {
   return loadPlugins(join(factoryHome(env), PLUGINS_DIRNAME), machine.plugins?.enabled ?? []);
 }
+
+// One answer to "is this package absent?" for every optional package the core loads by name: Node's
+// code, Bun's message, or a workspace link left behind after the package directory was removed.
+export function isMissingPackage(err: unknown, name: string): boolean {
+  if ((err as { code?: string }).code === "ERR_MODULE_NOT_FOUND") return true;
+  const text = String(err);
+  return /cannot find (module|package)/i.test(text) || (/ENOENT/.test(text) && text.includes(`node_modules/${name}`));
+}

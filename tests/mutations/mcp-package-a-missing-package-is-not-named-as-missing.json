@@ -1,0 +1,1 @@
+{"name":"mcp package: a missing package is not named as missing","file":"src/remote-cli.ts","find":"throw new UsageError(`mcp: ${MCP_PACKAGE} is not installed`);","replace":"throw err;","test":"tests/mcp-package.test.ts"}

@@ -8,35 +8,19 @@ import { join } from "node:path";
 import { GitLeases } from "../src/adapters/git-lease/lease";
 import { agentCatalog } from "../src/agents/docs";
 import { configProblems, type FactoryConfig, loadConfig, mergeConfig } from "../src/config";
-import type { Git } from "../src/git";
 import { plain } from "../src/display";
 import type { HarnessReport } from "../src/harness";
 import { agentChecks } from "../src/doctor";
 import type { versionOf, which } from "../src/probes";
-import { loadMachineConfig, type MachineConfig, type MachineLeases } from "../src/machine";
+import { loadMachineConfig } from "../src/machine";
 import { configMirrorDir } from "../src/paths";
 import { cloneDirFor } from "../src/repo";
-import type { Health } from "../src/runtime-kit";
 import { BUILTIN_RUNTIMES, DEFAULT_RUNTIME, type RuntimeSpec, runtimeRefs, runtimeSpecs } from "../src/runtimes";
 import { fleetView, healthCache } from "./fleet";
 
-// What the dashboard needs to know about the repo it serves. Absent when it
-// was started without --repo-dir: the pages then say so instead of guessing.
-export interface DashboardProject {
-  readonly cloneDir: string;
-  readonly config: FactoryConfig;
-  readonly machine: MachineConfig;
-  // Every lease ref on the remote; GitLeases.held in production.
-  readonly leases: () => Promise<ReadonlyArray<{ key: string; holder: string; expiresAt: number }>>;
-  // This machine's slot leases and the fleet's heartbeats (FACTORY_HOME/machine.db).
-  readonly fleet?: Pick<MachineLeases, "holders" | "machines">;
-  // Tests stand in for probeRuntime here; production probes the runtime itself.
-  readonly probe?: (runtime: string) => Promise<Health>;
-  // The git a workflow edit branches with; a real one when absent.
-  readonly git?: Git;
-  // The copy a runner shipped (src/blobs.ts): no clone to branch from or list leases with.
-  readonly readOnly?: true;
-}
+import type { DashboardProject } from "../src/dashboard-host";
+
+export type { DashboardProject };
 
 export const READ_ONLY = "read only for this repo: this plane has no clone of it";
 

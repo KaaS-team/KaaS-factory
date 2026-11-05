@@ -1,0 +1,1 @@
+{"name":"sdk boundary: a package imports a core internal","file":"packages/mcp-server/index.ts","find":"from \"../../src/sdk\";","replace":"from \"../../src/sdk\";\nimport \"../../src/inbox\";","test":"tests/sdk-boundary.test.ts"}

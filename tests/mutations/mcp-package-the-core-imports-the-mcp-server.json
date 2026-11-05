@@ -1,0 +1,1 @@
+{"name":"mcp package: the core imports the mcp server","file":"src/remote-cli.ts","find":"import { SseEventSource }","replace":"import \"../packages/mcp-server/index\";\nimport { SseEventSource }","test":"tests/mcp-package.test.ts"}
