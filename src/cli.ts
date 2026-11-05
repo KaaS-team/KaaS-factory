@@ -818,7 +818,7 @@ async function main(): Promise<void> {
     case "init":
       return (await import("./init-cli")).cmdInit(cli);
     case "watch":
-      return cmdWatch();
+      return has("all") ? (await import("./registry-cli")).cmdWatchRegistry(cli) : cmdWatch();
     case "run":
       return cmdRun();
     case "tick":

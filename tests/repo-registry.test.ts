@@ -149,3 +149,76 @@ describe("one watcher serves every registered repo", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe("factory watch --all", () => {
+  function setup(machine: unknown) {
+    const dir = mkdtempSync(join(tmpdir(), "factory-registry-"));
+    writeFileSync(join(dir, "machine.json"), JSON.stringify(machine));
+    return dir;
+  }
+
+  test("the CLI entry polls both repos of a fake registry and dispatches one issue from each", async () => {
+    const dir = setup({
+      slots: 2,
+      repos: [{ repo: "acme/one" }, { repo: "acme/two" }, { repo: "acme/off", enabled: false }],
+    });
+    const prev = process.env.FACTORY_HOME;
+    process.env.FACTORY_HOME = dir;
+    const leases = new MachineLeases(join(dir, "machine.db"));
+    const spend = new MachineSpend(join(dir, "machine.db"));
+    const executors = new Map<string, TriageExecutor>();
+    const cloned: string[] = [];
+    const cli = {
+      args: ["watch", "--all", "--once"],
+      flag: () => undefined,
+      has: (n: string) => n === "once" || n === "all",
+      resolveCloneDir: async () => "",
+      watchDeps: async (cloneDir: string, config: { repo: string }) => {
+        const executor = new TriageExecutor(config.repo);
+        executors.set(config.repo, executor);
+        return {
+          github: new FakeGitHub([baseIssue(1, ["factory:ready"])]),
+          git: new FakeGit(),
+          state: new FactoryState(":memory:"),
+          executor,
+          gateRunner: new FakeGateRunner(),
+          holdoutRunner: new FakeHoldoutRunner(),
+          cloneDir,
+          workspacesDir: mkdtempSync(join(tmpdir(), "factory-ws-")),
+          machine: { leases, config: { slots: 2 }, spend },
+        };
+      },
+    };
+    const clone = async (repo: string) => {
+      cloned.push(repo);
+      const d = mkdtempSync(join(tmpdir(), "factory-clone-"));
+      mkdirSync(join(d, ".factory"), { recursive: true });
+      writeFileSync(join(d, ".factory", "config.json"), JSON.stringify({ repo }));
+      return d;
+    };
+    const { cmdWatchRegistry } = await import("../src/registry-cli");
+    try {
+      await cmdWatchRegistry(cli as never, { cloneFor: clone, sleep: async () => {} });
+    } finally {
+      if (prev === undefined) delete process.env.FACTORY_HOME;
+      else process.env.FACTORY_HOME = prev;
+    }
+    expect(cloned).toEqual(["acme/one", "acme/two"]);
+    expect(executors.get("acme/one")?.ran).toEqual(["acme/one#1"]);
+    expect(executors.get("acme/two")?.ran).toEqual(["acme/two#1"]);
+    leases.close();
+    spend.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("factory watch --all with no registry refuses instead of watching nothing", () => {
+    const dir = setup({ slots: 2 });
+    const p = Bun.spawnSync(["bun", join(import.meta.dir, "../src/cli.ts"), "watch", "--all", "--once"], {
+      env: { ...process.env, FACTORY_HOME: dir },
+      timeout: 30_000,
+    });
+    expect(p.exitCode).toBe(1);
+    expect(p.stderr.toString()).toContain("lists no enabled repo");
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

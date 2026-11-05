@@ -1,0 +1,1 @@
+{"name": "watch all builds sources for the first repo only", "file": "src/registry-cli.ts", "find": "const polled = await pollRegistry(registry, sourceFor, inFlight);", "replace": "const polled = await pollRegistry(registry.slice(0, 1), sourceFor, inFlight);", "test": "tests/repo-registry.test.ts"}

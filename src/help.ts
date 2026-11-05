@@ -9,8 +9,8 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   },
   {
     name: "watch",
-    usage: "watch (--repo-dir <path> | --repo <owner/name>) [--once]",
-    does: "poll and drive the loop; --once = one pass",
+    usage: "watch (--repo-dir <path> | --repo <owner/name> | --all) [--once]",
+    does: "poll and drive the loop; --once = one pass; --all = every enabled repo in machine.json repos, in one process",
   },
   {
     name: "run",

@@ -15,10 +15,10 @@ no repo: control plane + relay (the image default); with a repo: watch + dashboa
 ### watch
 
 ```
-factory watch (--repo-dir <path> | --repo <owner/name>) [--once]
+factory watch (--repo-dir <path> | --repo <owner/name> | --all) [--once]
 ```
 
-poll and drive the loop; --once = one pass.
+poll and drive the loop; --once = one pass; --all = every enabled repo in machine.json repos, in one process.
 
 ### run
 

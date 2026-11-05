@@ -1,0 +1,1 @@
+{"name": "watch all polls an empty registry without refusing", "file": "src/registry-cli.ts", "find": "if (!served.length)", "replace": "if (false as boolean)", "test": "tests/repo-registry.test.ts"}

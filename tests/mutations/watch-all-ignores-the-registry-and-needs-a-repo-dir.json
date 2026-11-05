@@ -1,0 +1,1 @@
+{"name": "watch all ignores the registry and needs a repo dir", "file": "src/cli.ts", "find": "return has(\"all\") ? (await import(\"./registry-cli\")).cmdWatchRegistry(cli) : cmdWatch();", "replace": "return cmdWatch();", "test": "tests/repo-registry.test.ts"}
