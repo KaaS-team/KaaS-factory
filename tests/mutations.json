@@ -123,7 +123,7 @@
   {"name": "install: --update removes retired agents", "file": "src/install-template.ts", "find": "        rmSync(join(base, rel));\n", "replace": "", "test": "tests/install.test.ts"},
   {"name": "guard: backgrounded subagent", "file": "template/.claude/hooks/guard-paths.sh", "find": "if os.environ.get(\"FACTORY_STAGE\") and tool_input.get(\"run_in_background\"):", "replace": "if False:", "test": "tests/guard-hook.test.ts"},
   {"name": "proof: exit code decides bites", "file": "src/proof.ts", "find": "status: result.code === 0 ? \"passes-without\" : \"bites\"", "replace": "status: result.code === 0 ? \"bites\" : \"passes-without\"", "test": "tests/proof.test.ts"},
-  {"name": "proof: HEAD restored after the revert", "file": "src/proof.ts", "find": "  } finally {\n    await git.restoreHead(worktree);\n  }", "replace": "  } finally {\n  }", "test": "tests/proof.test.ts"},
+  {"name": "proof: HEAD restored after the revert", "file": "src/proof.ts", "find": "    else await git.restoreHead(worktree);", "replace": "    else undefined;", "test": "tests/prove-test.test.ts"},
   {"name": "proof: factory files never reverted", "file": "src/proof.ts", "find": ".filter((c) => !FACTORY_OWNED.test(c.path))", "replace": "", "test": "tests/proof.test.ts"},
   {"name": "proof: runner runs it before verify", "file": "src/engine/steps.ts", "find": "if (deps.proofGit) {", "replace": "if (false) {", "test": "tests/proof.test.ts"},
   {"name": "claude: per-stage --tools", "file": "src/agents/presets/claude.ts", "find": "    \"--tools\",\n    STAGE_TOOLS[opts.stage].join(\",\"),\n", "replace": "", "test": "tests/agents.test.ts"},

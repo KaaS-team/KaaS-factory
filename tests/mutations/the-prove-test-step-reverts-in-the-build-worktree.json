@@ -1,0 +1,1 @@
+{"name":"the prove-test step reverts in the build worktree","file":"src/proof.ts","find":"const at = scratch?.path ?? worktree;","replace":"const at = worktree;","test":"tests/prove-test.test.ts"}

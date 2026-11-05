@@ -1,0 +1,1 @@
+{"name":"a required check with no row passes","file":"src/scored-checks.ts","find":"if (!r) out.push(","replace":"if (!r) void (","test":"tests/scored-checks.test.ts"}

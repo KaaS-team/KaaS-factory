@@ -15,6 +15,7 @@ import { DirLease, type Lease, serialMerge } from "./merge-queue";
 import { syncRebase } from "./rebase-sync";
 import { changeFailureRate, revertBranch, tightenThresholds, watchAfterMerge } from "./post-merge";
 import { type PrFacts, mergeRecord, withMerge } from "./pr-facts";
+import { readChecks, SCORES_FILE } from "./scored-checks";
 import { readVerifyFacts } from "./pr-facts-collect";
 import type { ScmPort } from "./ports/scm";
 import type { FactoryState } from "./state";
@@ -91,6 +92,9 @@ export async function mergeContext(
       baseline: join(worktree, ".factory/visual/baseline"),
       current: join(worktree, runDir(issue), "visual"),
     }),
+    ...(config.merge.requiredChecks && Object.keys(config.merge.requiredChecks).length
+      ? { scored: { required: config.merge.requiredChecks, rows: readChecks(join(worktree, SCORES_FILE)) } }
+      : {}),
     postMergeWatch: Boolean(config.merge.smokeUrl),
   };
   return { mode: t.mode, merge: { ...config.merge, ...t.limits }, facts };

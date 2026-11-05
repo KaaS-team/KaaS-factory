@@ -5,6 +5,9 @@
 // from the output tail this writes to proof.json. Mirrors src/holdout.ts: an injectable
 // runner plus a pure function, so tests never need a real agent.
 
+import { existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type GateSpec, type PackageSpec, testGate } from "./config";
 import type { CommandResult } from "./github";
 import { isGateFile, ranZeroTests } from "./proof-keep";
@@ -70,6 +73,9 @@ export interface ProofGit {
   restoreHead(worktree: string): Promise<void>;
   dirty(worktree: string): Promise<string[]>;
   test(worktree: string, cmd: string): Promise<CommandResult>;
+  // A throwaway detached checkout of HEAD to revert in, so the build's worktree is never touched.
+  // Absent means the revert runs in the worktree itself and is put back.
+  scratch?(worktree: string): Promise<{ readonly path: string; dispose(): Promise<void> }>;
   // Where plan mutations are applied and run; absent means the plan's mutations are not run.
   readonly mutations?: MutationIO;
 }
@@ -103,14 +109,17 @@ export async function runProof(
   const added = impl.filter((c) => c.status === "A").map((c) => c.path);
   const existing = impl.filter((c) => c.status !== "A").map((c) => c.path);
   let result: CommandResult;
+  const scratch = await git.scratch?.(worktree);
+  const at = scratch?.path ?? worktree;
   try {
-    if (existing.length > 0) await git.restoreFromBase(worktree, base, existing);
-    if (added.length > 0) await git.remove(worktree, added);
-    result = await git.test(worktree, testCmd);
+    if (existing.length > 0) await git.restoreFromBase(at, base, existing);
+    if (added.length > 0) await git.remove(at, added);
+    result = await git.test(at, testCmd);
   } finally {
-    await git.restoreHead(worktree);
+    if (scratch) await scratch.dispose();
+    else await git.restoreHead(worktree);
   }
-  const left = await git.dirty(worktree);
+  const left = scratch ? [] : await git.dirty(worktree);
   if (left.length > 0) throw new Error(`proof: the worktree is not clean after restoring HEAD: ${left.join(", ")}`);
   const tail = `${result.stdout}\n${result.stderr}`.trim().slice(-2000);
   return classifyProof(
@@ -153,6 +162,20 @@ export class ShellProofGit implements ProofGit {
         const [status, path] = line.split("\t") as [string, string];
         return { status: status.slice(0, 1), path };
       });
+  }
+  async scratch(worktree: string) {
+    const path = mkdtempSync(join(tmpdir(), "factory-proof-"));
+    await git(["worktree", "add", "-q", "--detach", path, "HEAD"], worktree);
+    // Dependencies are untracked, so the checkout would not resolve them; the revert never writes there.
+    const deps = join(worktree, "node_modules");
+    if (existsSync(deps)) symlinkSync(deps, join(path, "node_modules"));
+    return {
+      path,
+      dispose: async () => {
+        await sh(["git", "worktree", "remove", "--force", path], worktree);
+        rmSync(path, { recursive: true, force: true });
+      },
+    };
   }
   async restoreFromBase(worktree: string, base: string, paths: string[]) {
     const mergeBase = (await git(["merge-base", `origin/${base}`, "HEAD"], worktree)).stdout.trim();

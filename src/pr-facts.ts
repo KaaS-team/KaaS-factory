@@ -6,6 +6,7 @@ import { type Autonomy, mergeAutoAllowed, STEERING } from "./autonomy";
 import type { MergeDecision, MergeRefusal } from "./merge-policy";
 import type { Statement } from "./receipt";
 import type { RiskObject } from "./risk";
+import { type ScoredFacts, scoredRefusals } from "./scored-checks";
 
 export interface PrFacts {
   // 1. fail-to-pass and pass-to-pass in a fresh checkout (src/clean-room.ts)
@@ -38,6 +39,8 @@ export interface PrFacts {
   };
   // Boundary paths changed with no decision record (src/docs-check.ts); absent when the charter has no Boundaries.
   readonly docs?: { readonly missing: readonly string[] };
+  // Keyed scored checks (src/scored-checks.ts); absent when the repo requires none.
+  readonly scored?: ScoredFacts;
   // 10. a post-merge watch is armed (src/post-merge.ts)
   readonly postMergeWatch: boolean;
 }
@@ -77,6 +80,7 @@ export function factRefusals(facts: PrFacts, mode: Autonomy): MergeRefusal[] {
   if (ui.changed && (!ui.preview || !ui.smoke)) out.push(fail(8, "a UI change has no preview or no smoke"));
   if (ui.changed && !ui.qaSpec) out.push(fail(8, "a UI change has no committed Playwright spec"));
   if (ui.changed && ui.unreviewedDiffs) out.push(fail(8, `${ui.unreviewedDiffs} visual diffs nobody reviewed`));
+  if (facts.scored) for (const d of scoredRefusals(facts.scored)) out.push(fail(11, d));
   if (!facts.postMergeWatch) out.push(fail(10, "no post-merge watch is armed"));
   return out;
 }

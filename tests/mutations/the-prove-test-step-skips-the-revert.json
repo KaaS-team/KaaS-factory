@@ -1,0 +1,1 @@
+{"name":"the prove-test step skips the revert","file":"src/proof.ts","find":"if (existing.length > 0) await git.restoreFromBase(at, base, existing);","replace":"","test":"tests/prove-test.test.ts"}
