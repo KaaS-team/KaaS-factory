@@ -1,0 +1,1 @@
+{"name":"the agent presets table is a copy that registry additions never reach","file":"src/agents/presets/index.ts","find":"= agents.table;","replace":"= { ...agents.table };","test":"tests/plugin-registry.test.ts"}

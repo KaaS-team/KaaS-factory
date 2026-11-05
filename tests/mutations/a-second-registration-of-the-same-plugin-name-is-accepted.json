@@ -1,0 +1,1 @@
+{"name":"a second registration of the same plugin name is accepted","file":"src/plugins/registry.ts","find":"if (prior !== undefined)","replace":"if (false as boolean)","test":"tests/plugin-registry.test.ts"}

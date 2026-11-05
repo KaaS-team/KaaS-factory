@@ -1,0 +1,1 @@
+{"name":"a marketplace entry with a plain http source is accepted","file":"src/plugins/marketplace.ts","find":"if (typeof e.source !== \"string\" || !/^https:","replace":"if (false as boolean && !/^https:","test":"tests/plugin-loader.test.ts"}

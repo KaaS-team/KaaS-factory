@@ -14,6 +14,7 @@ import { factoryHome } from "./paths";
 import type { AgentSandbox } from "./agents/agent-sandbox";
 import type { Agent37Spec } from "./adapters/agent37/execution";
 import { type Connection, connectionProblems } from "./mc/connections";
+import { pluginsProblems } from "./plugins/manifest";
 import { type RuntimeSpec, runtimeProblems } from "./runtimes";
 import { GATEWAY_KEY_ENV, isProviderHost, type LlmGateway } from "./agents/gateway";
 
@@ -28,6 +29,8 @@ export interface MachineConfig {
   readonly llmGateway?: { readonly url: string };
   // What this machine has (gpu, macos, docker): an issue labelled `needs:<cap>` waits for one that has it.
   readonly capabilities?: readonly string[];
+  // Plugins to load from FACTORY_HOME/plugins/<name>. Unset means none: the shipped agents and step types only.
+  readonly plugins?: { readonly enabled: readonly string[] };
   // Mission control connections: each names the environment variable holding its key, never the key.
   readonly sessions?: { readonly connections: Readonly<Record<string, Connection>> };
 }
@@ -83,6 +86,10 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     throw new Error(
       `${path}: "capabilities" must be a list of lowercase names, got ${JSON.stringify(raw.capabilities)}`,
     );
+  if (raw.plugins !== undefined) {
+    const problems = pluginsProblems(raw.plugins).map((p) => `${path}: ${p}`);
+    if (problems.length) throw new Error(problems.join("\n"));
+  }
   if (raw.sessions !== undefined) {
     const problems = connectionProblems(raw.sessions).map((p) => `${path}: ${p}`);
     if (problems.length) throw new Error(problems.join("\n"));
@@ -94,6 +101,7 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
     dailyUsd: raw.dailyUsd as number | undefined,
     ...(raw.agentRuntime ? { agentRuntime: raw.agentRuntime as string } : {}),
     ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}),
+    ...(raw.plugins ? { plugins: raw.plugins as { enabled: string[] } } : {}),
     ...(raw.capabilities ? { capabilities: raw.capabilities as string[] } : {}),
   };
 }

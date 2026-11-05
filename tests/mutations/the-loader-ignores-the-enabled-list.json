@@ -1,0 +1,1 @@
+{"name":"the loader ignores the enabled list","file":"src/plugins/loader.ts","find":"for (const name of enabled) {","replace":"for (const name of [] as string[]) {","test":"tests/plugin-loader.test.ts"}

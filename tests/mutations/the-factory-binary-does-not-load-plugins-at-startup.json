@@ -1,0 +1,1 @@
+{"name": "the factory binary does not load plugins at startup", "file": "src/plugins/boot.ts", "find": "await startPlugins(loadMachineConfig());", "replace": "void 0;", "test": "tests/plugin-loader.test.ts"}

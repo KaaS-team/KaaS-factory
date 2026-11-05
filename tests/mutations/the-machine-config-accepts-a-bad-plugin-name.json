@@ -1,0 +1,1 @@
+{"name":"the machine config accepts a bad plugin name","file":"src/plugins/manifest.ts","find":"if (typeof n !== \"string\" || !PLUGIN_NAME.test(n))","replace":"if (false as boolean)","test":"tests/plugin-loader.test.ts"}
