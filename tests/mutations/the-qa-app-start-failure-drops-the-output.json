@@ -1,0 +1,1 @@
+{"name":"the qa app start failure drops the output","file":"src/qa-step.ts","find":"before it answered at ${spec.url}\\n${app.output()}`","replace":"before it answered at ${spec.url}`","test":"tests/qa-step.test.ts"}

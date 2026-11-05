@@ -3,7 +3,15 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pairShots, pushAssets, runGit, shotUrls, shotsSection } from "../src/assets-branch";
+import {
+  extractBaseBaseline,
+  publishShots,
+  pairShots,
+  pushAssets,
+  runGit,
+  shotUrls,
+  shotsSection,
+} from "../src/assets-branch";
 import { prBody } from "../src/engine/pr-body";
 
 // The per-run temp parent can be gone on a rerun, so it is recreated before each mkdtemp.
@@ -64,5 +72,53 @@ describe("assets branch", () => {
     );
     expect(shotsSection(urls)).toContain("factory/assets/5/before/home.png");
     expect(prBody("b", { shots: [] })).not.toContain("Screenshots");
+  });
+});
+
+describe("before images come from the base branch", () => {
+  test("a baseline edited on the change is not the before image", async () => {
+    const root = scratch("factory-base-test-");
+    try {
+      const wt = join(root, "wt");
+      mkdirSync(join(wt, ".factory/visual/baseline"), { recursive: true });
+      await git(wt, "init", "-q", "-b", "main");
+      writeFileSync(join(wt, ".factory/visual/baseline/home.png"), "base-image");
+      await git(wt, "add", ".");
+      await git(wt, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+      await git(wt, "update-ref", "refs/remotes/origin/main", "HEAD");
+      writeFileSync(join(wt, ".factory/visual/baseline/home.png"), "changed-image");
+      const dir = extractBaseBaseline(wt, "origin/main", join(root, "out"));
+      expect(readFileSync(join(dir!, "home.png"), "utf8")).toBe("base-image");
+      expect(extractBaseBaseline(wt, "origin/nope", join(root, "out2")) === undefined).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("publishShots", () => {
+  test("pushes the base branch image as before and the new capture as after", async () => {
+    const root = scratch("factory-publish-test-");
+    try {
+      const remote = join(root, "remote.git");
+      const wt = join(root, "wt");
+      mkdirSync(join(wt, ".factory/visual/baseline"), { recursive: true });
+      await git(root, "init", "-q", "--bare", remote);
+      await git(wt, "init", "-q", "-b", "main");
+      await git(wt, "remote", "add", "origin", remote);
+      writeFileSync(join(wt, ".factory/visual/baseline/home.png"), "base-image");
+      await git(wt, "add", ".");
+      await git(wt, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+      await git(wt, "update-ref", "refs/remotes/origin/main", "HEAD");
+      writeFileSync(join(wt, ".factory/visual/baseline/home.png"), "edited-on-change");
+      mkdirSync(join(wt, ".factory/runs/issue-9/visual"), { recursive: true });
+      writeFileSync(join(wt, ".factory/runs/issue-9/visual/home.png"), "after-image");
+      const urls = await publishShots(runGit, wt, { repo: "o/r", issue: 9, changed: ["app/page.tsx"], base: "main" });
+      expect(urls?.[0]?.before).toContain("/9/before/home.png");
+      expect(await git(remote, "show", "factory/assets:9/before/home.png")).toBe("base-image");
+      expect(await git(remote, "show", "factory/assets:9/after/home.png")).toBe("after-image");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

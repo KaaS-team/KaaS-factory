@@ -7,7 +7,16 @@ import { runDir } from "../src/artifacts";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { engine, FakeShell, removeEngineDirs } from "./engine-harness";
 import { ALL_STEP_TYPES } from "../src/engine/registry";
-import { criterionVerdict, qaEnabled, renderQa, runQaStep, type QaRouteResult } from "../src/qa-step";
+import {
+  AppStartError,
+  criterionVerdict,
+  qaEnabled,
+  renderQa,
+  runQaStep,
+  withRunningApp,
+  type AppPorts,
+  type QaRouteResult,
+} from "../src/qa-step";
 
 // A rerun finds the per-run tmpdir removed; the harness mkdtemps inside it.
 beforeAll(() => mkdirSync(tmpdir(), { recursive: true }));
@@ -154,5 +163,101 @@ describe("uses: qa in a workflow", () => {
   test("FACTORY_QA=1: no qa.json written is a failure, not a pass", async () => {
     const { outcome } = await drive(true, new QaShell({}));
     expect(outcome).toBe("failed");
+  });
+});
+
+describe("withRunningApp", () => {
+  const spec = { command: "bun dev", url: "http://x", cwd: "/w", timeoutMs: 1000, intervalMs: 100 };
+  const harness = (answerAfter: number, exitCode?: number) => {
+    let t = 0;
+    let probes = 0;
+    const log = { stopped: 0, spawned: 0 };
+    let resolveExit: (c: number) => void = () => {};
+    const exited = new Promise<number>((r) => (resolveExit = r));
+    const ports: AppPorts = {
+      spawn: () => (
+        log.spawned++,
+        exitCode !== undefined && resolveExit(exitCode),
+        { exited, output: () => "boom: port in use", stop: async () => void log.stopped++ }
+      ),
+      probe: async () => ++probes > answerAfter,
+      sleep: async (ms) => void (t += ms),
+      now: () => t,
+    };
+    return { ports, log };
+  };
+  test("a start that answers runs the use callback and then stops the app", async () => {
+    const { ports, log } = harness(2);
+    expect(await withRunningApp(spec, ports, async () => "ok")).toBe("ok");
+    expect(log).toEqual({ spawned: 1, stopped: 1 });
+  });
+  test("a start that exits fails with the command's output and stops the app", async () => {
+    const { ports, log } = harness(99, 1);
+    const err = await withRunningApp(spec, ports, async () => "no").catch((e) => e);
+    expect(err).toBeInstanceOf(AppStartError);
+    expect(err.message).toContain("exited 1");
+    expect(err.message).toContain("boom: port in use");
+    expect(log.stopped).toBe(1);
+  });
+  test("an app that never answers fails after the timeout with its output and is stopped", async () => {
+    const { ports, log } = harness(Number.POSITIVE_INFINITY);
+    const err = await withRunningApp(spec, ports, async () => "no").catch((e) => e);
+    expect(err).toBeInstanceOf(AppStartError);
+    expect(err.message).toContain("did not answer");
+    expect(err.message).toContain("boom: port in use");
+    expect(log.stopped).toBe(1);
+  });
+  test("the app is stopped when the use callback throws", async () => {
+    const { ports, log } = harness(0);
+    await expect(
+      withRunningApp(spec, ports, async () => {
+        throw new Error("route failed");
+      }),
+    ).rejects.toThrow("route failed");
+    expect(log.stopped).toBe(1);
+  });
+});
+
+describe("the qa step starts the app", () => {
+  test("FACTORY_QA_APP and FACTORY_QA_URL: the app is started, the run command sees no second start, and it is stopped", async () => {
+    const prev = { ...process.env };
+    process.env.FACTORY_QA = "1";
+    process.env.FACTORY_QA_APP = "bun dev";
+    process.env.FACTORY_QA_URL = "http://app";
+    const log = { spawned: [] as string[], stopped: 0 };
+    const appPorts: AppPorts = {
+      spawn: (c) => (
+        log.spawned.push(c),
+        { exited: new Promise<number>(() => {}), output: () => "", stop: async () => void log.stopped++ }
+      ),
+      probe: async () => true,
+      sleep: async () => {},
+      now: () => 0,
+    };
+    try {
+      const wfText =
+        "name: q\nsteps:\n  qa:\n    uses: qa\n    label: factory:qa\n    run: bash .factory/qa.sh\n    next: done\n  done:\n    uses: report\n    label: factory:reporting\n";
+      const parsed = parseWorkflowText(wfText);
+      if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+      class S extends FakeShell {
+        override async run(cmd: string, cwd?: string) {
+          await super.run(cmd);
+          const f = join(cwd!, runDir(1), "qa.json");
+          mkdirSync(dirname(f), { recursive: true });
+          writeFileSync(f, JSON.stringify({ routes: [{ path: "/", status: 200, ok: true }] }));
+          return { stdout: "", stderr: "", code: 0 };
+        }
+      }
+      const shell = new S(0);
+      const e = engine(parsed.workflow, 0, {}, {}, { setupRunner: shell, appPorts } as never);
+      expect(await e.run()).toBe("shipped");
+      expect(log).toEqual({ spawned: ["bun dev"], stopped: 1 });
+      expect(shell.ran.some((c) => c.startsWith('QA_COMMAND=: QA_URL="http://app" bash .factory/qa.sh'))).toBe(true);
+    } finally {
+      for (const k of ["FACTORY_QA", "FACTORY_QA_APP", "FACTORY_QA_URL"]) {
+        if (prev[k] === undefined) delete process.env[k];
+        else process.env[k] = prev[k];
+      }
+    }
   });
 });

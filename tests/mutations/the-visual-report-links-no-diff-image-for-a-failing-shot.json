@@ -1,0 +1,1 @@
+{"name": "the visual report links no diff image for a failing shot", "file": "src/visual-compare.ts", "find": "writeFileSync(join(out, diff), diffPng(a, b, opts));", "replace": "void diff;", "test": "tests/visual-compare.test.ts"}

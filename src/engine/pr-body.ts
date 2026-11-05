@@ -132,13 +132,13 @@ export function checkedPrBody(body: string, template: string | undefined): strin
 // The QA result and a UI change's pushed screenshots, for the PR body's optional sections.
 export async function prExtras(
   worktree: string,
-  config: Pick<FactoryConfig, "repo">,
+  config: Pick<FactoryConfig, "repo"> & Partial<Pick<FactoryConfig, "base">>,
   issue: number,
   changed: readonly string[],
 ): Promise<Pick<PrParts, "qa" | "shots" | "tryIt">> {
   return {
     qa: readQa(worktree, issue),
     tryIt: readTryIt(worktree, issue),
-    shots: await publishShots(runGit, worktree, { repo: config.repo, issue, changed }),
+    shots: await publishShots(runGit, worktree, { repo: config.repo, issue, changed, base: config.base }),
   };
 }

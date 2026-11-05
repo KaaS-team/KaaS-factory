@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { runDir } from "../src/artifacts";
 import { parseWorkflowText } from "../src/engine/workflows";
-import { compareImages, compareShotDirs, decodePng, type Rgba } from "../src/visual-compare";
+import { compareImages, compareShotDirs, decodePng, writeVisualReport, type Rgba } from "../src/visual-compare";
 import { engine, FakeShell, removeEngineDirs } from "./engine-harness";
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -193,6 +193,42 @@ describe("the qa step attaches the visual report", () => {
     } finally {
       if (prev === undefined) delete process.env.FACTORY_QA;
       else process.env.FACTORY_QA = prev;
+    }
+  });
+});
+
+describe("writeVisualReport", () => {
+  const dirs = () => {
+    mkdirSync(tmpdir(), { recursive: true });
+    const root = mkdtempSync(join(tmpdir(), "visual-report-"));
+    for (const d of ["base", "cur"]) mkdirSync(join(root, d));
+    return root;
+  };
+  test("a sub-pixel change passes and a moved button fails with a diff image", () => {
+    const root = dirs();
+    try {
+      writeFileSync(join(root, "base/ok.png"), png(40, 40));
+      writeFileSync(
+        join(root, "cur/ok.png"),
+        png(40, 40, (x, y) => (x === 0 && y === 0 ? [200, 200, 200] : [255, 255, 255])),
+      );
+      const button =
+        (x0: number) =>
+        (x: number, y: number): [number, number, number] =>
+          x >= x0 && x < x0 + 10 && y < 10 ? [0, 0, 0] : [255, 255, 255];
+      writeFileSync(join(root, "base/btn.png"), png(40, 40, button(0)));
+      writeFileSync(join(root, "cur/btn.png"), png(40, 40, button(20)));
+      const file = writeVisualReport(join(root, "base"), join(root, "cur"), join(root, "out"));
+      const html = readFileSync(file!, "utf8");
+      expect(html).toContain("<td>ok.png</td><td>pass</td>");
+      expect(html).toContain("<td>btn.png</td><td>fail</td>");
+      expect(html).toContain('src="btn.diff.png"');
+      expect(decodePng(readFileSync(join(root, "out/btn.diff.png"))).data.slice(0, 4)).toEqual(
+        new Uint8Array([255, 0, 0, 255]),
+      );
+      expect(existsSync(join(root, "out/ok.diff.png"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

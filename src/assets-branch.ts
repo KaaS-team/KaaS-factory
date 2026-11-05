@@ -1,8 +1,9 @@
 // Before and after screenshots for a UI PR, kept on the orphan branch `factory/assets` so the PR body can
 // link raw URLs. Built with git plumbing and a throwaway index: the worktree's HEAD, index and files never move.
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDir } from "./artifacts";
@@ -111,15 +112,44 @@ export function shotsSection(shots: readonly ShotUrls[]): string {
   return ["## Screenshots", "", "| Before | After |", "| --- | --- |", ...rows].join("\n");
 }
 
+// The before images come from the base branch, not from the worktree: a change that edits the baseline
+// would otherwise show its own new images as "before". Returns the extracted dir, or undefined with no baseline.
+export function extractBaseBaseline(worktree: string, baseRef: string, into: string): string | undefined {
+  const dir = ".factory/visual/baseline";
+  try {
+    const names = execFileSync("git", ["ls-tree", "--name-only", baseRef, `${dir}/`], { cwd: worktree })
+      .toString()
+      .split("\n")
+      .filter((f) => f.endsWith(".png"));
+    if (names.length === 0) return undefined;
+    mkdirSync(into, { recursive: true });
+    for (const n of names) {
+      writeFileSync(
+        join(into, n.slice(dir.length + 1)),
+        execFileSync("git", ["show", `${baseRef}:${n}`], { cwd: worktree, maxBuffer: 64 * 1024 * 1024 }),
+      );
+    }
+    return into;
+  } catch {
+    return undefined;
+  }
+}
+
 // The pr step's one call: for a UI change, pushes the pairs, records the URLs in shots.json for the
 // preview tab, and returns the URLs. A non-UI change, or no shots, does nothing.
 export async function publishShots(
   git: RunGit,
   worktree: string,
-  o: { repo: string; issue: number; changed: readonly string[] },
+  o: { repo: string; issue: number; changed: readonly string[]; base?: string },
 ): Promise<ShotUrls[] | undefined> {
   if (!isUiChange(o.changed)) return undefined;
-  const pairs = pairShots(join(worktree, ".factory/visual/baseline"), join(worktree, runDir(o.issue), "visual"));
+  const baseDir = o.base
+    ? extractBaseBaseline(worktree, `origin/${o.base}`, join(worktree, runDir(o.issue), "visual-base"))
+    : undefined;
+  const pairs = pairShots(
+    baseDir ?? join(worktree, ".factory/visual/baseline"),
+    join(worktree, runDir(o.issue), "visual"),
+  );
   if (pairs.length === 0) return undefined;
   await pushAssets(git, worktree, o.issue, pairs);
   const urls = shotUrls(o.repo, o.issue, pairs);
