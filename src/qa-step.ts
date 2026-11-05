@@ -6,7 +6,9 @@ import { runDir } from "./artifacts";
 import { LABEL } from "./labels";
 import { readQa } from "./qa";
 import { ShellSetupRunner } from "./setup";
+import { runGit, type RunGit } from "./assets-branch";
 import { compareShotDirs, writeVisualReport } from "./visual-compare";
+import { publishVisualReport, reportLinks } from "./visual-publish";
 import { join } from "node:path";
 
 export interface QaCriterion {
@@ -207,14 +209,31 @@ export const qaStep: StepType = {
       join(worktree, ".factory/visual/baseline"),
       join(worktree, runDir(issue.number), "visual"),
     );
-    // Files only: nothing publishes the report to the PR yet.
+    const reportDir = join(worktree, runDir(issue.number), "visual-report");
     writeVisualReport(
       join(worktree, ".factory/visual/baseline"),
       join(worktree, runDir(issue.number), "visual"),
-      join(worktree, runDir(issue.number), "visual-report"),
+      reportDir,
     );
+    // A failing shot gets its diff image and the HTML report pushed and linked. A push that fails
+    // leaves the comment without links; the route verdict is unaffected.
+    let links = "";
+    if (visual && !visual.ok) {
+      try {
+        const git = (deps as { assetsGit?: RunGit }).assetsGit ?? runGit;
+        const pub = await publishVisualReport(git, worktree, {
+          repo: config.repo,
+          issue: issue.number,
+          dir: reportDir,
+        });
+        if (pub) links = reportLinks(pub);
+      } catch {
+        // not published
+      }
+    }
+    const visualSection = visual ? [visual.section, links].filter(Boolean).join("\n\n") : "";
     if (outcome.ok) {
-      const body = visual ? `${outcome.section ?? ""}\n\n${visual.section}` : (outcome.section ?? "");
+      const body = visual ? `${outcome.section ?? ""}\n\n${visualSection}` : (outcome.section ?? "");
       await postComment(deps, config, issue.number, body, { stage: step.id, json: { ok: true } });
       return { kind: "next", facts: { ok: true } };
     }

@@ -1,0 +1,1 @@
+{"name":"the qa comment drops the published visual report links","file":"src/qa-step.ts","find":"if (pub) links = reportLinks(pub);","replace":"if (pub) links = \"\";","test":"tests/visual-compare.test.ts"}

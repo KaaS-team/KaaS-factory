@@ -197,6 +197,72 @@ describe("the qa step attaches the visual report", () => {
   });
 });
 
+describe("the QA comment links the published visual report", () => {
+  const wf = () => {
+    const parsed = parseWorkflowText(
+      "name: qa-flow\nsteps:\n  qa:\n    uses: qa\n    label: factory:qa\n    run: bash .factory/qa.sh\n    next: done\n  done:\n    uses: report\n    label: factory:reporting\n",
+    );
+    if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+    return parsed.workflow;
+  };
+  class MovedShell extends FakeShell {
+    constructor(private readonly moved: boolean) {
+      super(0);
+    }
+    override async run(cmd: string, cwd?: string) {
+      await super.run(cmd);
+      const files: Record<string, Buffer | string> = {
+        [`${runDir(1)}/qa.json`]: JSON.stringify({ routes: [{ path: "/", status: 200, ok: true }] }),
+        ".factory/visual/baseline/home.png": png(10, 10),
+        [`${runDir(1)}/visual/home.png`]: this.moved
+          ? png(10, 10, (x) => (x < 5 ? [0, 0, 0] : [255, 255, 255]))
+          : png(10, 10),
+      };
+      for (const [name, body] of Object.entries(files)) {
+        mkdirSync(dirname(join(cwd!, name)), { recursive: true });
+        writeFileSync(join(cwd!, name), body);
+      }
+      return { stdout: "", stderr: "", code: 0 };
+    }
+  }
+  const drive = async (moved: boolean) => {
+    const calls: string[][] = [];
+    const assetsGit = async (_cwd: string, args: string[]) => {
+      calls.push(args);
+      return args[0] === "hash-object" ? `blob-${args[args.length - 1]!.split("/").pop()}` : "sha";
+    };
+    const prev = process.env.FACTORY_QA;
+    process.env.FACTORY_QA = "1";
+    try {
+      const e = engine(wf(), 0, {}, {}, { setupRunner: new MovedShell(moved), assetsGit } as never);
+      expect(await e.run()).toBe("shipped");
+      return {
+        calls,
+        body: e.github.issues
+          .get(1)!
+          .comments.map((c) => c.body)
+          .join("\n"),
+      };
+    } finally {
+      if (prev === undefined) delete process.env.FACTORY_QA;
+      else process.env.FACTORY_QA = prev;
+    }
+  };
+  test("a moved button fails and the comment links the diff image and report.html", async () => {
+    const { calls, body } = await drive(true);
+    expect(body).toContain("| `home.png` | fail |");
+    expect(body).toContain("/factory/assets/1/report/report.html)");
+    expect(body).toContain("/factory/assets/1/report/home.diff.png)");
+    expect(calls.some((a) => a[0] === "push")).toBe(true);
+  });
+  test("a shot within tolerance publishes and links nothing", async () => {
+    const { calls, body } = await drive(false);
+    expect(body).toContain("| `home.png` | pass |");
+    expect(body).not.toContain("report.html");
+    expect(calls.length).toBe(0);
+  });
+});
+
 describe("writeVisualReport", () => {
   const dirs = () => {
     mkdirSync(tmpdir(), { recursive: true });
