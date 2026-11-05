@@ -19,7 +19,8 @@ import {
 } from "../src/core/event";
 import { EventBus, backoffMs } from "../src/engine/bus";
 import { FactoryState } from "../src/state";
-import { configProblems, DEFAULT_EVENTS_SECRET_ENV } from "../src/config";
+import { configProblems, DEFAULT_CONFIG, DEFAULT_EVENTS_SECRET_ENV } from "../src/config";
+import type { DashboardProject } from "../dashboard/project";
 import { createDashboard } from "../dashboard/server";
 import { FakeGitHub } from "./harness";
 import { createHmac } from "node:crypto";
@@ -264,7 +265,7 @@ describe("POST /events", () => {
   let restore = () => {};
   afterEach(() => restore());
 
-  function dashboardWith(secret: string | undefined) {
+  function dashboardWith(secret: string | undefined, accept?: string[]) {
     expect(DEFAULT_EVENTS_SECRET_ENV).toBe("FACTORY_EVENTS_SECRET");
     const before = process.env[DEFAULT_EVENTS_SECRET_ENV];
     if (secret === undefined) delete process.env[DEFAULT_EVENTS_SECRET_ENV];
@@ -274,7 +275,28 @@ describe("POST /events", () => {
         ? delete process.env[DEFAULT_EVENTS_SECRET_ENV]
         : (process.env[DEFAULT_EVENTS_SECRET_ENV] = before);
     const state = new FactoryState(":memory:");
-    return { state, dashboard: createDashboard(state, new FakeGitHub([]), "acme/widgets", false, "/nonexistent") };
+    const project =
+      accept === undefined
+        ? undefined
+        : ({
+            cloneDir: "/nonexistent",
+            config: { ...DEFAULT_CONFIG, repo: "acme/widgets", events: { sinks: [], accept } },
+            machine: {},
+            leases: async () => [],
+          } as unknown as DashboardProject);
+    return {
+      state,
+      dashboard: createDashboard(
+        state,
+        new FakeGitHub([]),
+        "acme/widgets",
+        false,
+        "/nonexistent",
+        DEFAULT_CONFIG,
+        undefined,
+        project,
+      ),
+    };
   }
 
   const event = (over: Record<string, unknown> = {}) => ({
@@ -337,5 +359,19 @@ describe("POST /events", () => {
     expect((await d.dashboard.handle(post(event({ id: "u", type: "wiki.page.deleted" })), OFF_BOX)).status).toBe(202);
     expect((await d.dashboard.handle(post(event({ specversion: "0.3" })), OFF_BOX)).status).toBe(400);
     expect(d.state.busEvents()).toEqual([]);
+  });
+
+  test("a type listed in events.accept is stored; one that is not listed is ignored; a factory type never is", async () => {
+    const d = dashboardWith(IN_SECRET, ["acme.*", "factory.*"]);
+    expect((await d.dashboard.handle(post(event({ id: "a", type: "acme.job.done" })), OFF_BOX)).status).toBe(201);
+    expect((await d.dashboard.handle(post(event({ id: "o", type: "other.job.done" })), OFF_BOX)).status).toBe(202);
+    expect((await d.dashboard.handle(post(event({ id: "f", type: "factory.pr.merged" })), OFF_BOX)).status).toBe(202);
+    expect(d.state.busEvents().map((r) => r.type)).toEqual(["acme.job.done"]);
+  });
+
+  test("with accept unset the fixed list behaves as before", async () => {
+    const d = dashboardWith(IN_SECRET);
+    expect((await d.dashboard.handle(post(event({ id: "a", type: "acme.job.done" })), OFF_BOX)).status).toBe(202);
+    expect((await d.dashboard.handle(post(event()), OFF_BOX)).status).toBe(201);
   });
 });

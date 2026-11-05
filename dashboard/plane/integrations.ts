@@ -8,7 +8,7 @@ import { LINEAR_AGENT_ENV, LinearAgentClient, linearAgentReceiver } from "../../
 import { LinkStore } from "../../src/integrations/links";
 import { SLACK_ENV, SlackClient, slackReceiver } from "../../src/integrations/slack";
 import { type SteerTracker, surfaceActors } from "../../src/integrations/steer";
-import { eventSignature, isExternalEventType, parseEvent, verifyEvent } from "../../src/core/event";
+import { acceptsEvent, eventSignature, parseEvent, verifyEvent } from "../../src/core/event";
 import { readCapped, WEBHOOK_MAX_BYTES } from "../../src/webhook";
 import pkg from "../../package.json";
 import type { createAccess, Route } from "./access";
@@ -35,6 +35,8 @@ export interface EventsDeps {
   readonly secretFor: (repo: string) => Promise<string>;
   readonly defaultSecret: () => string;
   readonly stateFor: (repo: string) => Pick<FactoryState, "recordBusEvent">;
+  // One served repo's events.accept; unset keeps the fixed list of other apps' types.
+  readonly acceptFor?: (repo: string) => Promise<readonly string[] | undefined>;
 }
 
 export function eventsRoute(deps: EventsDeps): Route {
@@ -71,7 +73,8 @@ export function eventsRoute(deps: EventsDeps): Route {
       const parsed = parseEvent(raw);
       if (!parsed.ok) return Response.json({ error: parsed.problem }, { status: 400 });
       const e = parsed.event;
-      if (!isExternalEventType(e.type)) return Response.json({ ok: true, ignored: true }, { status: 202 });
+      if (!acceptsEvent(e.type, await deps.acceptFor?.(target)))
+        return Response.json({ ok: true, ignored: true }, { status: 202 });
       // Deduped on id: a sender's retry of an event already stored is acknowledged, not re-run.
       const fresh = deps.stateFor(target).recordBusEvent({
         id: e.id,

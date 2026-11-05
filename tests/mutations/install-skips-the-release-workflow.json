@@ -1,0 +1,1 @@
+{"name":"install skips the release workflow","file":"src/install-template.ts","find":"  if (lexists(dest)) return `skip (exists): ${RELEASE_DEST_REL}`;\n  if (dry) return `write: ${RELEASE_DEST_REL}`;","replace":"  if (true) return `skip (exists): ${RELEASE_DEST_REL}`;\n  if (dry) return `write: ${RELEASE_DEST_REL}`;","test":"tests/install.test.ts"}

@@ -22,7 +22,7 @@ export async function openInitPr(
   scm: Pick<CodeHostPort, "createPr">,
 ): Promise<string> {
   git(dir, "switch", "-c", "factory/init");
-  git(dir, "add", "-A", ".factory", ".claude", ".agents", "AGENTS.md");
+  git(dir, "add", "-A", ".factory", ".claude", ".agents", "AGENTS.md", ".github/workflows/release.yml");
   git(dir, "commit", "-m", `factory: init for a ${summary.name} repo`);
   git(dir, "push", "-u", "origin", "factory/init");
   return scm.createPr({

@@ -307,7 +307,7 @@
   {"name": "tracker: branch mode keeps Closes #n", "file": "src/scm.ts", "find": "return text.replace(CLOSING, \"$1$2tracker issue $3\");", "replace": "return text;", "test": "tests/tracker-contract.test.ts"},
   {"name": "events: signature check accepts anything", "file": "src/core/event.ts", "find": "  return diff === 0;", "replace": "  return true;", "test": "tests/events.test.ts"},
   {"name": "events: inbound skips the signature", "file": "dashboard/plane/integrations.ts", "find": "if (!verifyEvent(secret, body, eventSignature(req.headers)))", "replace": "if (false)", "test": "tests/events.test.ts"},
-  {"name": "events: inbound accepts factory types", "file": "dashboard/plane/integrations.ts", "find": "if (!isExternalEventType(e.type)) return Response.json(", "replace": "if (false) return Response.json(", "test": "tests/events.test.ts"},
+  {"name": "events: inbound accepts factory types", "file": "dashboard/plane/integrations.ts", "find": "if (!acceptsEvent(e.type, await deps.acceptFor?.(target)))", "replace": "if (false)", "test": "tests/events.test.ts"},
   {"name": "events: another app's event files a ready issue", "file": "src/engine/triggers.ts", "find": "own ? [LABEL.ready] : []", "replace": "[LABEL.ready]", "test": "tests/triggers.test.ts"},
   {"name": "minions: run past the spend cap", "file": "src/engine/minion.ts", "find": "  if (capped) return", "replace": "  if (false) return", "test": "tests/minion.test.ts"},
   {"name": "minions: run while intake is paused", "file": "src/engine/minion.ts", "find": "if (!deps.state.getToggle(\"auto_start\", true))\n    return", "replace": "if (false)\n    return", "test": "tests/minion.test.ts"},

@@ -1,0 +1,1 @@
+{"name":"doctor ignores a skipped ci baseline call","file":"src/ci-baseline-check.ts","find":"job.if !== undefined","replace":"job.if === 1","test":"tests/ci-baseline-check.test.ts"}

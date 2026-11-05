@@ -1,0 +1,1 @@
+{"name":"a build step with no input source passes","file":"src/engine/planless-build.ts","find":"    if (!hasInput)\n","replace":"    if (false as boolean)\n","test":"tests/planless-build.test.ts"}
