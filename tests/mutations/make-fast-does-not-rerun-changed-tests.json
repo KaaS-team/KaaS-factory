@@ -1,0 +1,7 @@
+{
+  "name": "make fast does not rerun changed tests",
+  "file": "make/fast.mk",
+  "find": "TEST_ARGS=\"--rerun-each 3\"",
+  "replace": "TEST_ARGS=\"\"",
+  "test": "tests/rerun-state.test.ts"
+}

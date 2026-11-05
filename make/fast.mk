@@ -5,6 +5,8 @@ fast:
 	bun x biome ci .
 	bun x tsc --noEmit
 	bun scripts/check-tests-only.ts $(BASE) HEAD
+	@changed=$$(git diff --name-only --diff-filter=AM "$(BASE)...HEAD" -- 'tests/*.test.ts' | tr '\n' ' '); \
+	if [ -n "$$changed" ]; then $(MAKE) test FILES="$$changed" TEST_ARGS="--rerun-each 3"; fi
 	bun scripts/check-mutations.ts --base $(BASE)
 	bun scripts/gen-quality-baseline.ts --check
 	bun scripts/check-mutation-anchors.ts

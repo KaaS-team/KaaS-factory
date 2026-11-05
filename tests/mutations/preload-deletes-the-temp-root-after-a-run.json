@@ -1,0 +1,7 @@
+{
+  "name": "preload deletes the temp root after a run",
+  "file": "tests/preload.ts",
+  "find": "  for (const name of readdirSync(root)) rmSync(join(root, name), { recursive: true, force: true });\n  mkdirSync(home);",
+  "replace": "  rmSync(root, { recursive: true, force: true });",
+  "test": "tests/rerun-state.test.ts"
+}

@@ -54,6 +54,9 @@ function childRun(cmd: string[], env: Record<string, string>): { code: number; l
       },
     );
     const out = `${res.stdout}`.slice(-1500) + `\n--stderr--\n${res.stderr}`.slice(-1500);
+    // The preload's watcher removes the run root a moment after bun exits (#622).
+    const end = Date.now() + 10_000;
+    while (readdirSync(tmp).length > 0 && Date.now() < end) Bun.sleepSync(50);
     return { code: res.exitCode, left: readdirSync(tmp), out };
   } finally {
     rmSync(outer, { recursive: true, force: true });

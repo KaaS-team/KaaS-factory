@@ -1,7 +1,0 @@
-{
-  "name": "git test forgets to recreate the temp root",
-  "file": "tests/git.test.ts",
-  "find": "  mkdirSync(tmpdir(), { recursive: true });\n  const root = mkdtempSync(join(tmpdir(), \"factory-git-\"));",
-  "replace": "  const root = mkdtempSync(join(tmpdir(), \"factory-git-\"));",
-  "test": "tests/rerun-state.test.ts"
-}
