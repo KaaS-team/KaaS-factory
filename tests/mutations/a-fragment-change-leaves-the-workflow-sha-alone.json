@@ -1,0 +1,1 @@
+{"name":"a fragment change leaves the workflow sha alone","file":"src/engine/workflows.ts","find":"build(merged.raw, [text, ...merged.texts].join(\"\\n---\\n\"))","replace":"build(merged.raw, text)","test":"tests/workflow-imports.test.ts"}

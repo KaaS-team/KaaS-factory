@@ -123,7 +123,7 @@ export function extraViews({ h, heading, stateOr, quiet, post }) {
                   "tr",
                   null,
                   h("td", null, e.time),
-                  h("td", null, h("code", null, e.type)),
+                  h("td", null, h("code", null, e.type), e.preview ? " (preview)" : ""),
                   h("td", null, e.subject ?? ""),
                   h("td", null, sent),
                   cell,
