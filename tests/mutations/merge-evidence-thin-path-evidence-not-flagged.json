@@ -1,0 +1,1 @@
+{"name": "merge evidence: thin path evidence not flagged", "file": "src/merge-evidence.ts", "find": "if (n < THIN_EVIDENCE) gaps.push", "replace": "if (false) gaps.push", "test": "tests/metrics-evidence.test.ts"}

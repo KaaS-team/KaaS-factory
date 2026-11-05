@@ -1,0 +1,1 @@
+{"name": "merge evidence: unset smoke url not a gap", "file": "src/merge-evidence.ts", "find": "if (!config.merge.smokeUrl)", "replace": "if (false)", "test": "tests/metrics-evidence.test.ts"}

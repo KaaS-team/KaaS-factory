@@ -1,0 +1,1 @@
+{"name": "merge evidence: missing gates not listed", "file": "src/merge-evidence.ts", "find": "const gaps = missingGates(config);", "replace": "const gaps: string[] = [];", "test": "tests/metrics-evidence.test.ts"}
