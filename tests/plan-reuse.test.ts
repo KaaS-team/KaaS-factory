@@ -19,7 +19,7 @@ const workflow = (() => {
   return r.workflow;
 })();
 
-const BODY = "do the thing";
+const BODY = "do the thing\n\n## Acceptance\n- the thing is done";
 const PRIOR_TEXT = "<!-- factory:plan v1 rev=1 -->\n## Plan (rev 1)\nprior plan text\n### Risk: low";
 const priorJson = (bodyHash?: string, extra: object = {}) => ({
   risk: "low",

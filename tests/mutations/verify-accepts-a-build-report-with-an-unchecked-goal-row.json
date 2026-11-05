@@ -1,0 +1,7 @@
+{
+  "name": "verify accepts a build report with an unchecked goal row",
+  "file": "src/goal.ts",
+  "find": "if (r.checked !== true) out.push",
+  "replace": "if (false) out.push",
+  "test": "tests/goal.test.ts"
+}

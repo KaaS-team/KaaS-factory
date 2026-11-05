@@ -14,7 +14,15 @@ import { FactoryState } from "../src/state";
 import { pollOnce } from "../src/watch";
 import { EventBus } from "../src/engine/bus";
 import { MemoryTracker, SERVER_ROUTES, startTracker } from "./fixtures/tracker-server";
-import { FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import {
+  FakeGateRunner,
+  FakeGit,
+  FakeGitHub,
+  FakeHoldoutRunner,
+  fixtureFor,
+  greenBuild,
+  MultiStageExecutor,
+} from "./harness";
 import { trackerContract } from "./ports/tracker.contract";
 
 const TOKEN = "s3cret-test-token";
@@ -146,7 +154,9 @@ describe("end to end on an http tracker", () => {
     const http = new HttpTracker(spec, env);
     const host = new FakeGitHub([]);
     const github = new ComposedScm(new LabelMappedTracker(http, team), host, "branch", "http");
-    const n = await github.createIssue(repo, "Fix the widget", "It is broken.", [LABEL.ready]);
+    const n = await github.createIssue(repo, "Fix the widget", "It is broken.\n\n## Acceptance\n- it works", [
+      LABEL.ready,
+    ]);
     expect((await server.store.getIssue(repo, n)).labels).toEqual([{ name: "ready-for-ai" }]);
 
     const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
@@ -175,7 +185,7 @@ describe("end to end on an http tracker", () => {
     });
     push("build", {
       "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
-      "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+      "build.json": JSON.stringify(greenBuild),
     });
     push("verify", {
       "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",

@@ -1,0 +1,7 @@
+{
+  "name": "the build pack drops the goal and checkpoints",
+  "file": "src/context.ts",
+  "find": "  if (rows.length > 0) out.push(",
+  "replace": "  if (false) out.push(",
+  "test": "tests/goal.test.ts"
+}

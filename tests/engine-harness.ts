@@ -18,6 +18,7 @@ import {
   FakeHoldoutRunner,
   fixtureFor,
   MultiStageExecutor,
+  greenBuild,
 } from "./harness";
 
 const dirs: string[] = [];
@@ -114,7 +115,7 @@ export function engine(
   for (const out of opts.outputs?.plan ?? []) executor.push("plan", n, fixtureFor("plan", n), out);
   push("build", {
     "status-comment.md": "<!-- factory:status v1 -->\nb",
-    "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+    "build.json": JSON.stringify(greenBuild),
   });
   push("verify", {
     "verdict-comment.md": "<!-- factory:verdict v1 -->\nv",

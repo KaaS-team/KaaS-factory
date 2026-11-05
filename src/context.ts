@@ -9,6 +9,7 @@ import { readStageArtifacts } from "./artifacts";
 import type { StageName } from "./executor";
 import { stripFrontmatter } from "./agents/prompt";
 import { readdirSync } from "node:fs";
+import { goalSection, type Row, rowsFrom } from "./goal";
 import { reviewMdSection } from "./review-md";
 
 export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
@@ -21,7 +22,15 @@ export const LESSONS_PATH = ".factory/memory/lessons.md";
 export const MAX_LESSONS_BYTES = 8 * 1024;
 export const CHARTER_PATH = ".factory/charter.md";
 
-type SectionKey = "conventions" | "charter" | "lessons" | "skillsIndex" | "routeSkills" | "architecture" | "planFiles";
+type SectionKey =
+  | "goal"
+  | "conventions"
+  | "charter"
+  | "lessons"
+  | "skillsIndex"
+  | "routeSkills"
+  | "architecture"
+  | "planFiles";
 
 // v3.0 token diet: every stage used to get every section. pr gets nothing
 // (its inputs are the run's own artifacts), retro only the lessons it must
@@ -30,7 +39,7 @@ type SectionKey = "conventions" | "charter" | "lessons" | "skillsIndex" | "route
 export const STAGE_PACK: Record<StageName, readonly SectionKey[]> = {
   triage: ["conventions", "charter", "lessons"],
   plan: ["conventions", "charter", "lessons", "skillsIndex", "architecture"],
-  build: ["conventions", "charter", "lessons", "routeSkills", "architecture", "planFiles"],
+  build: ["goal", "conventions", "charter", "lessons", "routeSkills", "architecture", "planFiles"],
   verify: ["conventions", "routeSkills"],
   pr: [],
   retro: ["lessons"],
@@ -83,6 +92,11 @@ async function planFiles(cwd: string, issue: number): Promise<readonly string[]>
   return Array.isArray(files) ? files.filter((f): f is string => typeof f === "string") : [];
 }
 
+async function goalRows(cwd: string, issue: number): Promise<Row[]> {
+  const plan = (await readStageArtifacts(cwd, issue, "plan")).json as Partial<PlanArtifact> | undefined;
+  return rowsFrom(plan);
+}
+
 export async function contextFileLoadsAgentsMd(cwd: string, contextFile: string | undefined): Promise<boolean> {
   if (!contextFile) return false;
   if (contextFile === "AGENTS.md") return true;
@@ -114,6 +128,10 @@ export async function skillsIndex(cwd: string, skillsDir = ".claude/skills"): Pr
 async function sections(stage: StageName, issue: number, cwd: string, opts: PackOptions): Promise<Section[]> {
   const out: Section[] = [];
   const want = new Set(STAGE_PACK[stage]);
+
+  // First, so the build prompt opens with what it must prove and what to check before a commit (#636).
+  const rows = want.has("goal") ? await goalRows(cwd, issue) : [];
+  if (rows.length > 0) out.push({ label: "goal and checkpoints", body: goalSection(rows) });
 
   if (want.has("conventions") && !(await contextFileLoadsAgentsMd(cwd, opts.contextFile))) {
     const agentsMd = await readOptional(`${cwd}/AGENTS.md`);

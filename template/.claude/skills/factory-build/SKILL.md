@@ -81,7 +81,7 @@ Write `.factory/runs/issue-<N>/status-comment.md` using the
 {
   "status": "green",
   "gate_line": "FACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0",
-  "rounds": 1
+  "rounds": 1, "goal": [{ "id": "AC-1", "test": "its test", "checked": true }], "checkpoints": [{ "id": 1, "answer": "yes" }]
 }
 ```
 

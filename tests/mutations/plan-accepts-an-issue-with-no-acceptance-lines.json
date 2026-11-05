@@ -1,0 +1,7 @@
+{
+  "name": "plan accepts an issue with no acceptance lines",
+  "file": "src/engine/build-report.ts",
+  "find": "if (acceptanceLines(issue.body ?? \"\").length > 0) return undefined;",
+  "replace": "return undefined;",
+  "test": "tests/goal.test.ts"
+}

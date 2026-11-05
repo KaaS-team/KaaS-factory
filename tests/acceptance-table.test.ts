@@ -32,6 +32,7 @@ import {
   FakeHoldoutRunner,
   fixtureFor,
   MultiStageExecutor,
+  greenBuild,
 } from "./harness";
 
 const fixture = JSON.parse(
@@ -271,7 +272,7 @@ describe("an unproven acceptance verdict rejects verify", () => {
         ...plan,
       }),
     });
-    const built = { "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) };
+    const built = { "build.json": JSON.stringify(greenBuild) };
     for (const _ of verdicts) push("build", built);
     push("verify", {
       "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",

@@ -30,6 +30,7 @@ import {
   FakeHoldoutRunner,
   fixtureFor,
   MultiStageExecutor,
+  greenBuild,
 } from "./harness";
 
 const seen = new Set<string>();
@@ -87,7 +88,7 @@ const plan = (risk: "low" | "medium", extra: object = {}, rev = 1) => ({
 });
 const build = () => ({
   "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
-  "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
+  "build.json": JSON.stringify(greenBuild),
 });
 const verdict = (result: "pass" | "reject" | "uncertain") => ({
   "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
@@ -1308,7 +1309,7 @@ describe("proof: check ships markdown-only work with no test file", () => {
 describe("blocker gate", () => {
   test("24. a ready issue blocked by an open issue demotes, then promotes and ships once its blocker closes", async () => {
     const c = setup([LABEL.ready]);
-    c.github.issues.get(1)!.body = "Blocked by: #2";
+    c.github.issues.get(1)!.body = "Blocked by: #2\n\n## Acceptance\n- the thing is done";
     c.github.issues.set(2, baseIssue(2, []));
 
     let result = await pollOnce(c.deps, c.config);

@@ -60,6 +60,8 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       // per-item shape (state, viewport, theme, path, all required) is
       // enforced by factory-verify reading the manifest, not by this schema.
       screenshots: { type: "array", items: { type: "object" } },
+      goal: { type: "array", items: { type: "object" } },
+      checkpoints: { type: "array", items: { type: "object" } },
     },
     verify: {
       result: { enum: ["pass", "reject", "uncertain"] },

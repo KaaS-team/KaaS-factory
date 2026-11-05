@@ -60,6 +60,9 @@ export interface BuildArtifact {
   readonly status: BuildStatus;
   readonly gate_line: string;
   readonly rounds: number;
+  // Rows the build checked off and the deviation checkpoints it answered; verify refuses a report without them (#636).
+  readonly goal?: readonly { readonly id: string; readonly test: string; readonly checked: boolean }[];
+  readonly checkpoints?: readonly { readonly id: number; readonly answer: string }[];
 }
 
 // A finding is a plain string (older verdicts) or the blueprint review shape:
@@ -153,7 +156,7 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
     "outcome",
     "summary",
   ],
-  build: ["status", "gate_line", "rounds", "screenshots", "outcome", "summary"],
+  build: ["status", "gate_line", "rounds", "screenshots", "goal", "checkpoints", "outcome", "summary"],
   pr: ["outcome", "summary"],
   retro: ["lesson", "skill_name", "skill_edit", "outcome", "summary"],
 };

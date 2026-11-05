@@ -1,0 +1,7 @@
+{
+  "name": "verify does not send back an incomplete build report",
+  "file": "src/engine/steps.ts",
+  "find": "if (incomplete) return rejectToBuild(",
+  "replace": "if (false) return rejectToBuild(",
+  "test": "tests/goal.test.ts"
+}

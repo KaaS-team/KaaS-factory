@@ -438,11 +438,20 @@ export class FakeHoldoutRunner implements HoldoutRunner {
   }
 }
 
+// A build report that is complete for any plan with criteria AC-1 to AC-9 (#636).
+export const greenBuild = {
+  status: "green",
+  gate_line: "ok",
+  rounds: 1,
+  goal: Array.from({ length: 9 }, (_, i) => ({ id: `AC-${i + 1}`, test: "t", checked: true })),
+  checkpoints: [1, 2, 3, 4, 5, 6].map((id) => ({ id, answer: "yes" })),
+};
+
 export function baseIssue(number: number, labels: string[]): GhIssue {
   return {
     number,
     title: `Issue ${number}`,
-    body: "do the thing",
+    body: "do the thing\n\n## Acceptance\n- the thing is done",
     labels: labels.map((name) => ({ name })),
     comments: [],
   };

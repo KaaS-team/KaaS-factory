@@ -17,6 +17,7 @@ the runner posts the verdict and moves the issue's label.
   before verify. Holdout tests are the runner's too: never read their paths.
 - `prior-findings.json` (open findings from every earlier reject) and `operator-answers.md`, when present.
   List each prior finding in `verdict.json` as `"prior": [{ "what": "...", "status": "resolved" }]` (`resolved` or `open`).
+- `build.json`'s `goal` rows and `checkpoints`: the runner rejects a report that leaves one unchecked or unanswered before you start.
 - The worktree at its current state. Write `"rounds": 1`; the runner replaces it.
 
 ## 2. UI route: the visual check

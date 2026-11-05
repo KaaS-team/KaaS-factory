@@ -35,3 +35,12 @@ export async function runStageChecked<T extends { outcome?: "complete" | "blocke
     opts = { ...extra, resume: { ...(sessionId ? { sessionId } : {}), failure } };
   }
 }
+
+// A rebuild is told why it came back, any agent; it forks the build session only if one was kept.
+export function rebuildFrom(sc: StepCtx): { resume?: { sessionId?: string; failure: string } } {
+  const failure = sc.ctx.failure;
+  delete sc.ctx.failure;
+  const id =
+    failure === undefined ? "" : sc.deps.state.lastSession(sc.config.repo, sc.issue.number, "build")?.session_id;
+  return failure !== undefined ? { resume: { ...(id ? { sessionId: id } : {}), failure } } : {};
+}

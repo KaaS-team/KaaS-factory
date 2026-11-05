@@ -1,0 +1,7 @@
+{
+  "name": "verify accepts an unanswered checkpoint",
+  "file": "src/goal.ts",
+  "find": "if (typeof a !== \"string\" || a.trim() === \"\") out.push",
+  "replace": "if (false) out.push",
+  "test": "tests/goal.test.ts"
+}

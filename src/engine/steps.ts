@@ -3,6 +3,7 @@
 // the step's edges and moves the label), "reject" (it follows `reject:`), or "stop" once it has parked
 // or finished the issue itself, from `step.label`.
 
+import { incompleteReport, refuseNoAcceptance } from "./build-report";
 import { readRunJson, settleVerdict, verdictPost } from "./verdict-rules";
 import { prPreflight } from "./pr-preflight";
 import { holdoutEnabled, type FactoryConfig } from "../config";
@@ -56,7 +57,7 @@ import { finishBuild } from "./build-tail";
 import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { parkLowConfidence } from "../triage-confidence";
-import { runStageChecked } from "./stage-retry";
+import { rebuildFrom, runStageChecked } from "./stage-retry";
 import { checkedPlan } from "./plan-critic";
 import { proofInputs, recordVerifyFacts, secondReview, survivingMutations } from "./verify-facts";
 import {
@@ -157,6 +158,8 @@ const plan: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
+    const refused = await refuseNoAcceptance(sc);
+    if (refused) return refused;
     const art = await checkedPlan(deps, config, issue, worktree, stepOpts(step));
     const { result, parsed } = art;
     const { json, problem } = parsed;
@@ -175,15 +178,6 @@ const plan: StepType = {
     return { kind: "next", facts: json };
   },
 };
-
-// A rebuild is told why it came back, any agent; it forks the build session only if one was kept.
-function rebuildFrom(sc: StepCtx): { resume?: { sessionId?: string; failure: string } } {
-  const failure = sc.ctx.failure;
-  delete sc.ctx.failure;
-  const id =
-    failure === undefined ? "" : sc.deps.state.lastSession(sc.config.repo, sc.issue.number, "build")?.session_id;
-  return failure !== undefined ? { resume: { ...(id ? { sessionId: id } : {}), failure } } : {};
-}
 
 const build: StepType = {
   agent: true,
@@ -327,6 +321,8 @@ const verify: StepType = {
     // check its own gates.sh cannot have been tuned to pass. It runs on every entry to verify, not only a
     // stale one, since gate.json cannot already cover paths the build never saw.
     clearRunFiles(worktree, runDir(issueNumber));
+    const incomplete = incompleteReport(worktree, issueNumber);
+    if (incomplete) return rejectToBuild(sc, incomplete.body, incomplete.json, incomplete.why);
     if (holdoutEnabled(config.holdout)) {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
       // A pass leaves no comment, so the run page reads the result from here.
