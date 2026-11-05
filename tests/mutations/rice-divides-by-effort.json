@@ -1,0 +1,1 @@
+{"name": "rice divides by effort", "file": "src/prioritize.ts", "find": "return d > 0 ? (a * b * c) / d : undefined;", "replace": "return d > 0 ? (a * b * c) * d : undefined;", "test": "tests/planning-steps.test.ts"}

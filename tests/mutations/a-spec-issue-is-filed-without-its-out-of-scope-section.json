@@ -1,0 +1,1 @@
+{"name": "a spec issue is filed without its Out of scope section", "file": "src/engine/planning.ts", "find": "\\n\\n## Out of scope\\n\\n${out}\\n`", "replace": "\\n`", "test": "tests/planning-steps.test.ts"}

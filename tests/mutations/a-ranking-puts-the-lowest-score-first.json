@@ -1,0 +1,1 @@
+{"name": "a ranking puts the lowest score first", "file": "src/prioritize.ts", "find": "return b - a;", "replace": "return a - b;", "test": "tests/planning-steps.test.ts"}

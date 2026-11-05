@@ -1,0 +1,1 @@
+{"name": "a decompose child is not linked as a sub-issue", "file": "src/engine/planning.ts", "find": "await tracker.linkSubIssue(repo, epic.number, n!);", "replace": "", "test": "tests/planning-steps.test.ts"}

@@ -165,3 +165,17 @@ steps:
 ```
 
 A new label such as `factory:linting` needs creating once: `factory doctor --fix`.
+
+## Planning steps
+
+Three steps work on the tracker, not the code. None runs an agent.
+
+- `spec` reads a fenced `spec` block of JSON drafts (`title`, `problem`, `acceptance`, optional
+  `outOfScope`) in the goal issue and files one issue per draft with Problem, Acceptance and Out of
+  scope sections.
+- `decompose` files a child issue for each unchecked checklist line with no `#N`, links it as a
+  sub-issue and writes `#N` into the epic. It fails first on a tracker with no `linkSubIssue`.
+- `prioritize` posts the issue's rank among ready issues. `prioritize.method` in `.factory/config.json`
+  is `rice` or `wsjf`, scored from `Reach`, `Impact`, `Confidence`, `Effort` or `Value`, `Urgency`,
+  `Risk`, `Size` lines in the issue body. Pickup takes the highest score first, unscored issues last,
+  and oldest first when no method is set.

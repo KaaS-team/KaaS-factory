@@ -1,0 +1,1 @@
+{"name": "wsjf sums value urgency and risk", "file": "src/prioritize.ts", "find": "return c !== undefined && d > 0 ? (a + b + c) / d : undefined;", "replace": "return c !== undefined && d > 0 ? (a + b) / d : undefined;", "test": "tests/planning-steps.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"an unmapped tracker status is guessed as todo","file":"src/ports/tracker-status.ts","find":"return isSourceState(state) ? { state } : { unmapped: status };","replace":"return isSourceState(state) ? { state } : { state: \"todo\" };","test":"tests/tracker-status.test.ts"}

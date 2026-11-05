@@ -33,7 +33,10 @@ export const TRACKER_ROUTES = {
   labeledBy: "GET /projects/{project}/issues/{n}/label-events",
   roleOf: "GET /projects/{project}/members/{login}",
   authStatus: "GET /me",
-} as const satisfies Record<Exclude<keyof TrackerPort, "listIssuesByLabels" | "editIssueBody">, string>;
+} as const satisfies Record<
+  Exclude<keyof TrackerPort, "listIssuesByLabels" | "editIssueBody" | "linkSubIssue">,
+  string
+>;
 
 export const TRACKER_PREFIX = "/tracker/v1";
 

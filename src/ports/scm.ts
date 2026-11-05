@@ -127,6 +127,8 @@ export interface TrackerPort {
   closeIssue(repo: string, number: number): Promise<void>;
   // Optional: a tracker that cannot edit a body leaves an epic's checklist as filed.
   editIssueBody?(repo: string, number: number, body: string): Promise<void>;
+  // Optional: makes `child` a sub-issue of `parent`; a tracker without the concept leaves decompose unavailable.
+  linkSubIssue?(repo: string, parent: number, child: number): Promise<void>;
   reopenIssue(repo: string, number: number): Promise<void>;
   createIssue(repo: string, title: string, body: string, labels: string[]): Promise<number>;
   listLabels(repo: string): Promise<string[]>;
