@@ -856,6 +856,8 @@ async function main(): Promise<void> {
       return cmdOnboard();
     case "explain":
       return (await import("./explain-cli")).cmdExplain(cli);
+    case "config":
+      return (await import("./config-cli")).cmdConfig(cli);
     case "install":
       return (await import("./init-cli")).cmdInstall(cli);
     case "verify-agent":

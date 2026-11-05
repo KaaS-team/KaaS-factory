@@ -34,6 +34,7 @@ import { createAccess, type Route } from "./plane/access";
 import { planeExtensions } from "./plane/extension";
 import { boardCache } from "./plane/board-cache";
 import { readAccess, runIn } from "./plane/repo-scope";
+import { narrowToTeam } from "./team-filter";
 import { PlaneStore } from "./plane/store";
 import { senderName } from "./plane/commands";
 import { planeRoutes } from "./plane/mode";
@@ -165,7 +166,9 @@ export function createDashboard(
   const inboxRepos = () => servedRepos(process.env, repo);
   const repoOf = access.repoOf;
   // A list with no ?repo= reads every served repo the caller may see; tenancy narrows it.
-  const reposFor = (req: Request) => (repoOf(req) ? [repoOf(req)] : access.visibleRepos(req, inboxRepos()));
+  const inTeam = (req: Request, repos: string[]) =>
+    narrowToTeam(repos, new URL(req.url).searchParams.get("team"), project?.cloneDir);
+  const reposFor = (req: Request) => inTeam(req, repoOf(req) ? [repoOf(req)] : access.visibleRepos(req, inboxRepos()));
   // A hosted member who may not read the default repo is never told its name.
   const homeOf = (req: Request) => (repo ? (access.visibleRepos(req, [repo])[0] ?? "") : "");
   const runsOf = (req: Request) =>

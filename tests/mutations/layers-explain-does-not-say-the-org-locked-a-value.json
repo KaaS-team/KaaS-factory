@@ -1,0 +1,1 @@
+{"name":"layers: explain does not say the org locked a value","file":"src/team/explain.ts","find":"lines.push(\"locked by the org\")","replace":"lines.push(\"\")","test":"tests/team-layers.test.ts"}
