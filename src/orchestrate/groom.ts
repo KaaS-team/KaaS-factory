@@ -11,7 +11,7 @@ import { isPlannedBody, PLANNED_MARKER } from "../engine/import-plan";
 import { minionOutput } from "../engine/minion";
 import { postComment, type WatchDeps } from "../engine/common";
 import { guardPlan } from "../plan-guard";
-import { sliceBacklog, type BacklogItem } from "../plan-slice";
+import { chainReport, sliceBacklog, type BacklogItem } from "../plan-slice";
 import { TRUSTED_ROLES } from "../ports/scm";
 import { cachedRole } from "../trust";
 
@@ -135,7 +135,15 @@ export async function groomIssue(
             .map((x) => `#${x}`)
             .join(", ")}`,
       );
-      return park(deps, config, n, groom.label, `This epic is too large for one pull request. ${lines.join("; ")}`);
+      const report = chainReport(units);
+      const chain = `Longest dependency chain: ${report.longestChain}.${report.warning ? ` Warning: ${report.warning}.` : ""}`;
+      return park(
+        deps,
+        config,
+        n,
+        groom.label,
+        `This epic is too large for one pull request. ${lines.join("; ")}. ${chain}`,
+      );
     }
     children = loaded.map((c) => ({ number: c.number, title: c.title, body: c.body }));
   }

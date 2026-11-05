@@ -1,0 +1,1 @@
+{"name": "chain report never warns above two", "file": "src/plan-slice.ts", "find": "longest <= CHAIN_WARN_ABOVE", "replace": "true", "test": "tests/plan-slice.test.ts"}
