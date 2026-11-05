@@ -1,5 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { HttpTracker } from "../src/adapters/http-tracker";
 import { mergeConfig, configProblems } from "../src/config";
+import { decomposeEpic } from "../src/engine/planning";
 import { parseWorkflowText } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
 import { pollOnce } from "../src/watch";
@@ -29,8 +31,10 @@ function run(uses: string, body: string, config: Record<string, unknown> = {}, l
   const e = engine(flow(uses), 0, {}, {}, {}, { config });
   e.github.issues.get(1)!.body = body;
   const links: [number, number][] = [];
-  if (link)
-    Object.assign(e.github, { linkSubIssue: async (_r: string, p: number, c: number) => void links.push([p, c]) });
+  // FakeGitHub extends the real adapter, so "cannot link" has to be set, not left unset.
+  Object.assign(e.github, {
+    linkSubIssue: link ? async (_r: string, p: number, c: number) => void links.push([p, c]) : undefined,
+  });
   return { e, links };
 }
 
@@ -83,6 +87,16 @@ describe("decompose step (#610)", () => {
     const { e } = run("decompose", epic, {}, false);
     expect(await e.run()).toBe("failed");
     expect(e.github.issues.size).toBe(1);
+  });
+});
+
+describe("sub-issue support per adapter (#610)", () => {
+  test("the HTTP tracker has no sub-issue concept, so decompose refuses by name before filing", async () => {
+    const http = new HttpTracker({ kind: "http", url: "http://127.0.0.1:1", tokenEnv: "T" }, {});
+    expect(http.linkSubIssue).toBeUndefined();
+    await expect(decomposeEpic(http as never, "o/r", { number: 1, body: "- [ ] x" })).rejects.toThrow(
+      "this tracker cannot link sub-issues",
+    );
   });
 });
 

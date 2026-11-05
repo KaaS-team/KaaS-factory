@@ -1,0 +1,1 @@
+{"name":"clickup linkSubIssue parents the epic under the child","file":"src/adapters/trackers/clickup.ts","find":"body: { parent: await this.scoped(parent) },","replace":"body: { parent: await this.scoped(child) },","test":"tests/trackers-clickup.test.ts"}

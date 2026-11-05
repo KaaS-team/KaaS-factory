@@ -28,6 +28,15 @@ trackerContract("ClickUp", () => make());
 describe("ClickUp specifics", () => {
   const repo = "acme/shop";
 
+  test("linkSubIssue makes the child a subtask of the epic", async () => {
+    const t = make();
+    const epic = await t.createIssue(repo, "epic", "", []);
+    const epicId = server.store.tasks.at(-1)!.id;
+    const child = await t.createIssue(repo, "child", "", []);
+    await t.linkSubIssue(repo, epic, child);
+    expect(server.store.tasks.at(-1)!.parent).toBe(epicId);
+  });
+
   test("without labelTrust a tag names no one, so label triggers fail closed, and doctor says so", async () => {
     const t = make("none");
     const n = await t.createIssue(repo, "x", "", ["factory:ready"]);

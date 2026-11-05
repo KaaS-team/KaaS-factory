@@ -4,12 +4,12 @@
 
 import { appendFileSync } from "node:fs";
 import { resolveBlockers } from "./blockers";
-import { orderByBump } from "./ci-failure-priority";
 import { parseCron } from "./core/cron";
 import type { FactoryConfig } from "./config";
 import { type SpendDeps, spendCapHit, type WatchDeps } from "./engine/common";
-import type { GhPr } from "./github";
+import type { GhIssue, GhPr } from "./github";
 import { LABEL } from "./labels";
+import { rankIssues } from "./prioritize";
 import { teamBudgetHit } from "./team/budget";
 import { canServe } from "./machine";
 
@@ -82,6 +82,7 @@ export async function dispatchJobs(
   const capabilities = deps.machine?.config.capabilities;
   const seen = new Set<number>();
   const jobs: DispatchJob[] = [];
+  const listed: GhIssue[] = [];
   for (const [label, issues] of [
     [LABEL.ready, ready] as const,
     ...RESUME_LABELS.map((l, i) => [l, resumed[i]!] as const),
@@ -89,9 +90,15 @@ export async function dispatchJobs(
     for (const issue of issues) {
       if (seen.has(issue.number) || !canServe(capabilities, issue.labels)) continue;
       seen.add(issue.number);
+      listed.push(issue);
       jobs.push({ issue: issue.number, label });
     }
-  const ordered = orderByBump(jobs, bumps);
+  // A CI-failure bump goes first, then the same rank a tick uses (watch.ts), so both pick the same issue.
+  const position = new Map(rankIssues(listed, config.prioritize?.method).map((i, at) => [i.number, at]));
+  const ordered = [...jobs].sort(
+    (a, b) =>
+      (bumps.get(b.issue) ?? 0) - (bumps.get(a.issue) ?? 0) || position.get(a.issue)! - position.get(b.issue)!,
+  );
   return gate.paused ? { jobs: ordered, paused: gate.paused } : { jobs: ordered };
 }
 

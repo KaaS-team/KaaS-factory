@@ -15,6 +15,31 @@ describe("GitHub.editComment", () => {
   });
 });
 
+describe("GitHub.linkSubIssue", () => {
+  test("looks up the child's database id, then POSTs it to the parent's sub_issues", async () => {
+    const calls: string[][] = [];
+    const gh = new GitHub({
+      run: async (args: string[]) => {
+        calls.push(args);
+        return { code: 0, stdout: args.includes("--jq") ? "9001\n" : "", stderr: "" };
+      },
+    });
+    await gh.linkSubIssue("o/r", 7, 12);
+    expect(calls).toEqual([
+      ["api", "repos/o/r/issues/12", "--jq", ".id"],
+      ["api", "-X", "POST", "repos/o/r/issues/7/sub_issues", "-F", "sub_issue_id=9001"],
+    ]);
+  });
+
+  test("a failed link throws, so decompose cannot report a child as linked", async () => {
+    const gh = new GitHub({
+      run: async (args: string[]) =>
+        args.includes("POST") ? { code: 1, stdout: "", stderr: "HTTP 422" } : { code: 0, stdout: "5", stderr: "" },
+    });
+    await expect(gh.linkSubIssue("o/r", 7, 12)).rejects.toThrow("422");
+  });
+});
+
 describe("GitHub.listPrs", () => {
   const prs = [
     {

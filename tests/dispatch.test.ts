@@ -16,6 +16,37 @@ const config = mergeConfig({ repo: "acme/widgets", maxOpenFactoryPrs: 3 });
 const machine = (m: Partial<MachineConfig>, todayUsd = 0) =>
   ({ config: { slots: 1, ...m }, spend: { todayUsd: () => todayUsd } }) as never;
 
+describe("dispatch order follows the prioritize rank (#610)", () => {
+  const rice = (r: number) => `Reach: ${r}\nImpact: 1\nConfidence: 1\nEffort: 1\n`;
+  const issues = () => [
+    { ...baseIssue(2, [LABEL.ready]), body: rice(1) },
+    { ...baseIssue(3, [LABEL.ready]), body: rice(9) },
+    baseIssue(4, [LABEL.ready]),
+    { ...baseIssue(5, [LABEL.failed]), body: rice(5) },
+  ];
+
+  test("with a method set, the highest score goes first and unscored issues go last", async () => {
+    const ranked = mergeConfig({ repo: "acme/widgets", prioritize: { method: "rice" } });
+    const result = await dispatchJobs({ github: new FakeGitHub(issues()), state: new FactoryState(":memory:") }, ranked);
+    expect(result.jobs.map((j) => j.issue)).toEqual([3, 5, 2, 4]);
+  });
+
+  test("with no method, oldest first as before", async () => {
+    const result = await dispatchJobs({ github: new FakeGitHub(issues()), state: new FactoryState(":memory:") }, config);
+    expect(result.jobs.map((j) => j.issue)).toEqual([2, 3, 4, 5]);
+  });
+
+  test("a CI-failure bump still outranks the score", async () => {
+    const ranked = mergeConfig({ repo: "acme/widgets", prioritize: { method: "rice" } });
+    const result = await dispatchJobs(
+      { github: new FakeGitHub(issues()), state: new FactoryState(":memory:") },
+      ranked,
+      new Map([[4, 1]]),
+    );
+    expect(result.jobs.map((j) => j.issue)).toEqual([4, 3, 5, 2]);
+  });
+});
+
 describe("dispatch and routine", () => {
   test("dispatch names the issues one tick would advance, and a routine runs factory tick on its cron", async () => {
     const blocked = { ...baseIssue(3, [LABEL.ready]), body: "Blocked by: #9" };

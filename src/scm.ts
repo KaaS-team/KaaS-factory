@@ -142,6 +142,9 @@ export class ComposedScm implements ScmPort {
   get editIssueBody(): TrackerPort["editIssueBody"] {
     return this.tracker.editIssueBody?.bind(this.tracker);
   }
+  get linkSubIssue(): TrackerPort["linkSubIssue"] {
+    return this.tracker.linkSubIssue?.bind(this.tracker);
+  }
   getIssue(repo: string, number: number) {
     return this.tracker.getIssue(repo, number);
   }

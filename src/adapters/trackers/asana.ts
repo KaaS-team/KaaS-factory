@@ -225,6 +225,9 @@ export class AsanaTracker implements TrackerPort {
   async reopenIssue(_repo: string, n: number): Promise<void> {
     await this.one("PUT", `/tasks/${await this.scoped(n)}`, { completed: false });
   }
+  async linkSubIssue(_repo: string, parent: number, child: number): Promise<void> {
+    await this.one("POST", `/tasks/${await this.scoped(child)}/setParent`, { parent: await this.scoped(parent) });
+  }
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     const t = await this.one<{ gid: string }>("POST", "/tasks", {
       name: title,

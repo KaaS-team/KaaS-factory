@@ -231,6 +231,11 @@ export class ClickUpTracker implements TrackerPort {
       body: { status: await this.status("open") },
     });
   }
+  async linkSubIssue(_repo: string, parent: number, child: number): Promise<void> {
+    await this.client.request("PUT", `/api/v2/task/${await this.scoped(child)}`, {
+      body: { parent: await this.scoped(parent) },
+    });
+  }
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     await this.ensureTags(labels);
     const t = await this.client.request<{ id: string }>("POST", `/api/v2/list/${this.spec.list}/task`, {

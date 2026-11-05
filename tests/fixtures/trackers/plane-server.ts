@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 
 interface Item {
+  parent?: string;
   id: string;
   name: string;
   description_html: string;
@@ -87,6 +88,7 @@ export class PlaneStore {
     if (!sub && method === "GET") return Response.json(view(w));
     if (!sub && method === "PATCH") {
       if (body.state_id) w.state_id = body.state_id;
+      if (typeof body.parent === "string") w.parent = body.parent;
       if (typeof body.description_html === "string") w.description_html = strip(body.description_html);
       if (body.label_ids) {
         const next: string[] = body.label_ids;

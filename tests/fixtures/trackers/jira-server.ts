@@ -2,6 +2,7 @@
 // developer.atlassian.com documents. It drops HTML comments from stored text, as a wiki renderer may.
 
 interface Issue {
+  parent?: string;
   key: string;
   summary: string;
   description: string;
@@ -100,6 +101,7 @@ export class JiraStore {
     if (!sub && method === "GET") return Response.json(this.view(i));
     if (!sub && method === "PUT") {
       if (typeof body.fields?.description === "string") i.description = strip(body.fields.description);
+      if (typeof body.fields?.parent?.key === "string") i.parent = body.fields.parent.key;
       let next = [...i.labels];
       for (const op of body.update?.labels ?? []) {
         if (op.add && !next.includes(op.add)) next.push(op.add);

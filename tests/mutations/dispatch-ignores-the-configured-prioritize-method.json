@@ -1,0 +1,1 @@
+{"name":"dispatch ignores the configured prioritize method","file":"src/dispatch.ts","find":"rankIssues(listed, config.prioritize?.method)","replace":"rankIssues(listed, undefined)","test":"tests/dispatch.test.ts"}

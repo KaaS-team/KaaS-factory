@@ -3,6 +3,7 @@
 // comments and tag changes. It drops HTML comments from stored text, as Asana's editor may.
 
 interface Task {
+  parent?: string;
   gid: string;
   project: string;
   name: string;
@@ -86,7 +87,7 @@ export class AsanaStore {
       s.text = strip(data.text);
       return ok({ gid: s.gid });
     }
-    m = /^tasks\/(\d+)(?:\/(stories|addTag|removeTag))?$/.exec(path);
+    m = /^tasks\/(\d+)(?:\/(stories|addTag|removeTag|setParent))?$/.exec(path);
     const t = m && this.tasks.find((x) => x.gid === m![1]);
     if (!m || !t) return err(404, "task: Not Found");
     const sub = m[2];
@@ -94,6 +95,11 @@ export class AsanaStore {
     if (!sub && method === "PUT") {
       if (typeof data.completed === "boolean") t.completed = data.completed;
       if (typeof data.notes === "string") t.notes = strip(data.notes);
+      return ok(this.view(t));
+    }
+    if (sub === "setParent") {
+      if (!this.tasks.some((x) => x.gid === data.parent)) return err(404, "parent: Not Found");
+      t.parent = data.parent;
       return ok(this.view(t));
     }
     if (sub === "addTag") {

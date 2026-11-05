@@ -205,6 +205,11 @@ export class JiraTracker implements TrackerPort {
   setStateLabel(_repo: string, n: number, current: string[], next: string): Promise<void> {
     return this.labels(n, [next], current);
   }
+  async linkSubIssue(_repo: string, parent: number, child: number): Promise<void> {
+    await this.client.request("PUT", `/rest/api/2/issue/${this.key(child)}`, {
+      body: { fields: { parent: { key: this.key(parent) } } },
+    });
+  }
   closeIssue(_repo: string, n: number): Promise<void> {
     return this.transition(n, "done");
   }

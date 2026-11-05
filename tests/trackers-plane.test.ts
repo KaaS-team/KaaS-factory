@@ -28,6 +28,15 @@ trackerContract("Plane", make);
 describe("Plane specifics", () => {
   const repo = "acme/shop";
 
+  test("linkSubIssue makes the child a sub-issue of the epic", async () => {
+    const t = make();
+    const epic = await t.createIssue(repo, "epic", "", []);
+    const epicId = project().items.at(-1)!.id;
+    const child = await t.createIssue(repo, "child", "", []);
+    await t.linkSubIssue(repo, epic, child);
+    expect(project().items.at(-1)!.parent).toBe(epicId);
+  });
+
   test("labeledBy names the human who added the label in Plane, and roles follow the project tiers", async () => {
     const t = make();
     project().members.push({ member_id: "alice", role: 15 }, { member_id: "gus", role: 5 });

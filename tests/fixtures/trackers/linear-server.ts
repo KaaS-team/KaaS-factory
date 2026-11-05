@@ -12,6 +12,7 @@ interface User {
 }
 interface Issue {
   id: string;
+  parentId?: string;
   team: string;
   number: number;
   title: string;
@@ -139,6 +140,7 @@ export class LinearStore {
         const i = this.find(v.id);
         if (!i) throw new Error("Entity not found: Issue");
         if (v.input.stateId) i.stateId = v.input.stateId;
+        if (typeof v.input.parentId === "string") i.parentId = v.input.parentId;
         if (typeof v.input.description === "string") i.description = strip(v.input.description);
         for (const id of v.input.addedLabelIds ?? []) this.applyLabel(i.id, id, this.viewer);
         i.labelIds = i.labelIds.filter((id) => !(v.input.removedLabelIds ?? []).includes(id));

@@ -278,6 +278,10 @@ export class PlaneTracker implements TrackerPort {
       body: { state_id: await this.stateIn("unstarted", "backlog") },
     });
   }
+  async linkSubIssue(_repo: string, parent: number, child: number): Promise<void> {
+    const [p, c] = [await this.item(parent), await this.item(child)];
+    await this.client.request("PATCH", `${this.base}/work-items/${c.id}/`, { body: { parent: p.id } });
+  }
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     const w = await this.client.request<WorkItem>("POST", `${this.base}/work-items/`, {
       body: {

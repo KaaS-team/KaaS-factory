@@ -1,0 +1,1 @@
+{"name":"jira linkSubIssue parents the epic under the child","file":"src/adapters/trackers/jira.ts","find":"parent: { key: this.key(parent) }","replace":"parent: { key: this.key(child) }","test":"tests/trackers-jira.test.ts"}

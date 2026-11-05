@@ -20,6 +20,15 @@ trackerContract("Linear", make);
 describe("Linear specifics", () => {
   const repo = "acme/shop";
 
+  test("linkSubIssue sets the child's parent to the epic", async () => {
+    const t = make();
+    const epic = await t.createIssue(repo, "epic", "", []);
+    const epicId = server.store.issues.at(-1)!.id;
+    const child = await t.createIssue(repo, "child", "", []);
+    await t.linkSubIssue(repo, epic, child);
+    expect(server.store.issues.at(-1)!.parentId).toBe(epicId);
+  });
+
   test("labeledBy names the human who added the label in Linear, and roles follow the workspace", async () => {
     const t = make();
     server.store.users.set("alice", { id: "alice", admin: false, guest: false, active: true });

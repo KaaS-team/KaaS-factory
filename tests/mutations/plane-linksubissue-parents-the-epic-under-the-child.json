@@ -1,0 +1,1 @@
+{"name":"plane linkSubIssue parents the epic under the child","file":"src/adapters/trackers/plane.ts","find":"{ body: { parent: p.id } }","replace":"{ body: { parent: c.id } }","test":"tests/trackers-plane.test.ts"}

@@ -158,6 +158,14 @@ export class GitHub implements TrackerPort, CodeHostPort {
     await this.exec(["issue", "edit", String(number), "--repo", repo, "--body", body]);
   }
 
+  // The sub-issues endpoint takes the child's database id, not its number, so look that up first.
+  async linkSubIssue(repo: string, parent: number, child: number): Promise<void> {
+    const found = await this.exec(["api", `repos/${repo}/issues/${child}`, "--jq", ".id"]);
+    const id = found.stdout.trim();
+    if (!/^\d+$/.test(id)) throw new Error(`could not read the id of ${repo}#${child}: ${found.stdout}`);
+    await this.exec(["api", "-X", "POST", `repos/${repo}/issues/${parent}/sub_issues`, "-F", `sub_issue_id=${id}`]);
+  }
+
   async reopenIssue(repo: string, number: number): Promise<void> {
     await this.exec(["issue", "reopen", String(number), "--repo", repo]);
   }

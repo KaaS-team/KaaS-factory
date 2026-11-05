@@ -255,6 +255,9 @@ export class LinearTracker implements TrackerPort {
   async reopenIssue(_repo: string, n: number): Promise<void> {
     await this.update(n, { stateId: (await this.team()).open });
   }
+  async linkSubIssue(_repo: string, parent: number, child: number): Promise<void> {
+    await this.update(child, { parentId: (await this.raw(parent)).id });
+  }
   async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
     const d = await this.gql<{ issueCreate: { issue: { number: number } } }>(Q.issueCreate, {
       input: {

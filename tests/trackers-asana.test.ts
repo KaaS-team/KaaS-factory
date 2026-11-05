@@ -26,6 +26,15 @@ trackerContract("Asana", make);
 describe("Asana specifics", () => {
   const repo = "acme/shop";
 
+  test("linkSubIssue makes the child a subtask of the epic", async () => {
+    const t = make();
+    const epic = await t.createIssue(repo, "epic", "", []);
+    const epicId = server.store.tasks.at(-1)!.gid;
+    const child = await t.createIssue(repo, "child", "", []);
+    await t.linkSubIssue(repo, epic, child);
+    expect(server.store.tasks.at(-1)!.parent).toBe(epicId);
+  });
+
   test("labeledBy names the human who tagged the task, and no one once the tag is renamed", async () => {
     const t = make();
     server.store.members.set("1200000000000002", { is_admin: false, is_guest: false, is_active: true });

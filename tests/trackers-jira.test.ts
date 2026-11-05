@@ -21,6 +21,15 @@ trackerContract("Jira", make);
 describe("Jira specifics", () => {
   const repo = "acme/shop";
 
+  test("linkSubIssue makes the child a sub-issue of the epic", async () => {
+    const t = make();
+    const epic = await t.createIssue(repo, "epic", "", []);
+    const epicId = project().issues.at(-1)!.key;
+    const child = await t.createIssue(repo, "child", "", []);
+    await t.linkSubIssue(repo, epic, child);
+    expect(project().issues.at(-1)!.parent).toBe(epicId);
+  });
+
   test("labeledBy names the human who added the label in Jira, and roles follow project permissions", async () => {
     const t = make();
     project().perms.set("acc-alice", ["EDIT_ISSUES", "BROWSE_PROJECTS"]);

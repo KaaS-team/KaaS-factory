@@ -1,0 +1,1 @@
+{"name":"asana linkSubIssue parents the epic under the child","file":"src/adapters/trackers/asana.ts","find":"{ parent: await this.scoped(parent) }","replace":"{ parent: await this.scoped(child) }","test":"tests/trackers-asana.test.ts"}

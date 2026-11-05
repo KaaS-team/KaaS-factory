@@ -1,0 +1,1 @@
+{"name":"linear linkSubIssue parents the epic under the child","file":"src/adapters/trackers/linear.ts","find":"(await this.raw(parent)).id","replace":"(await this.raw(child)).id","test":"tests/trackers-linear.test.ts"}
