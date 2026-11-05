@@ -1,0 +1,10 @@
+{
+  "name": "mapped",
+  "kind": "tracker",
+  "summary": "Any tracker with an MCP server or a CLI, through a mapping file for list, read and update.",
+  "env": [],
+  "enable": "`\"tracker\": {\"kind\": \"mapped\", \"mapping\": \"jira\", \"project\": \"...\"}` with `.factory/trackers/jira.json` (examples in docs/tracker-mappings/)",
+  "module": "src/adapters/trackers/mapped.ts",
+  "contract": "tests/tracker-mapped.test.ts",
+  "default": false
+}

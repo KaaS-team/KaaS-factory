@@ -219,12 +219,12 @@ export type TrackerConfig =
 // Each kind's keys beside kind and tokenEnv, true when required. trackerProblems reads only this.
 const TRACKER_KEYS: Record<Exclude<TrackerConfig["kind"], "github">, Record<string, boolean>> = {
   http: { url: true, project: false },
-  mapped: { mapping: true, project: false },
   linear: { team: true, url: false },
   plane: { workspace: true, project: true, url: false },
   jira: { url: true, project: true, issueType: false },
   clickup: { workspace: true, list: true, url: false, labelTrust: false },
   asana: { workspace: true, project: true, url: false },
+  mapped: { mapping: true, project: false },
 };
 export const TRACKER_KINDS = ["github", ...Object.keys(TRACKER_KEYS)] as TrackerConfig["kind"][];
 

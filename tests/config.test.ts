@@ -180,7 +180,7 @@ describe("config validation at boot", () => {
       configProblems({ repo: "a/b", tracker: { kind: "http", url: "http://127.0.0.1:9000", tokenEnv: "T" } }),
     ).toEqual([]);
     expect(configProblems({ repo: "a/b", tracker: { kind: "trello" } })).toEqual([
-      'tracker.kind: expected one of "github", "http", "linear", "plane", "jira", "clickup", "asana", got "trello"',
+      'tracker.kind: expected one of "github", "http", "linear", "plane", "jira", "clickup", "asana", "mapped", got "trello"',
     ]);
     expect(configProblems({ repo: "a/b", tracker: { kind: "toString" } })).toEqual([
       expect.stringContaining("tracker.kind: expected one of"),
@@ -210,10 +210,12 @@ describe("config validation at boot", () => {
       { kind: "jira", url: "https://acme.atlassian.net", project: "SHOP", tokenEnv: "JIRA_TOKEN", issueType: "Bug" },
       { kind: "clickup", workspace: "9001", list: "901", tokenEnv: "CLICKUP_API_TOKEN", labelTrust: "creator" },
       { kind: "asana", workspace: "1200", project: "1201", tokenEnv: "ASANA_TOKEN" },
+      { kind: "mapped", mapping: "acme", project: "ACME" },
     ];
     for (const tracker of ok) expect(configProblems({ repo: "a/b", tracker })).toEqual([]);
     expect(new Set([...ok.map((t) => t.kind), "github", "http"])).toEqual(new Set(TRACKER_KINDS));
-    for (const tracker of [...ok, { kind: "github" } as const])
+    // "mapped" reads a mapping file from the repo, so tests/tracker-mapped.test.ts builds it.
+    for (const tracker of [...ok.filter((t) => t.kind !== "mapped"), { kind: "github" } as const])
       expect(makeTracker(tracker, {}).constructor.name.toLowerCase()).toContain(
         tracker.kind === "github" ? "github" : tracker.kind,
       );

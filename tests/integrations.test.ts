@@ -4,6 +4,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { KINDS, loadManifests, manifestProblems, renderIntegrationsDoc } from "../src/integrations/catalogue";
+import { trackers } from "../src/plugins/registry";
+import "../src/scm";
 import { LIVE_RUNTIMES } from "./live/runtimes";
 import { LIVE_TRACKERS } from "./live/trackers";
 
@@ -40,7 +42,7 @@ describe("integration manifests", () => {
 
   test("every tracker and runtime kind the runner builds has a manifest", () => {
     const kindOf = (m: (typeof manifests)[number]) => m.configKind ?? m.name;
-    expect(byKind("tracker").map(kindOf).sort()).toEqual(casesIn("src/scm.ts", "makeTracker"));
+    expect(byKind("tracker").map(kindOf).sort()).toEqual(["github", ...trackers.names()].sort());
     expect(byKind("runtime").map(kindOf).sort()).toEqual(
       [...casesIn("src/runtimes.ts", "executionFor"), "pool"].sort(),
     );
