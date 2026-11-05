@@ -39,6 +39,13 @@ export const PACKAGE_KEYS = {
   protectedPaths: "strings",
 } as const;
 
+// `delivery.stack`: "epic" (default) opens one PR for the run; "task" opens one PR per planned task, each
+// based on the one before (src/engine/stack-pr.ts).
+export interface DeliveryConfig {
+  readonly stack: "epic" | "task";
+}
+export const DELIVERY_KEYS = { stack: "string" } as const;
+
 const oneOf = (key: string, v: unknown, allowed: readonly string[]) =>
   v === undefined || allowed.includes(v as string)
     ? []
@@ -48,6 +55,10 @@ const oneOf = (key: string, v: unknown, allowed: readonly string[]) =>
           .join(", ")
           .replace(/, ([^,]*)$/, " or $1")}, got ${JSON.stringify(v)}`,
       ];
+
+export function deliveryProblems(delivery: Record<string, unknown>): string[] {
+  return oneOf("stack", delivery.stack, ["epic", "task"]).map((p) => p.replace(/^merge\./, "delivery."));
+}
 
 export function mergeProblems(merge: Record<string, unknown>): string[] {
   return [

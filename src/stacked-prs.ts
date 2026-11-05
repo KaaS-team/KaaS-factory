@@ -58,7 +58,7 @@ export interface StackParked {
   readonly reason: string;
 }
 
-async function git(cwd: string, ...args: string[]): Promise<{ code: number; out: string }> {
+export async function git(cwd: string, ...args: string[]): Promise<{ code: number; out: string }> {
   const p = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
   return { code, out: code === 0 ? out.trim() : err.trim() };

@@ -1,0 +1,1 @@
+{"name":"stack-pr: pr step ignores the slices","file":"src/engine/stack-pr.ts","find":"if (!slices || !(await slicesCut(worktree, slices))) return undefined;","replace":"if (true) return undefined;","test":"tests/stack-pr.test.ts"}

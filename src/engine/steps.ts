@@ -53,6 +53,7 @@ import {
 } from "./epic";
 import { issueRef, postRunDetails, prBody, prExtras, prTemplate, renderRunDetails, renderWhatChanged } from "./pr-body";
 import { finishBuild } from "./build-tail";
+import { cutBuildSlices, shipStack } from "./stack-pr";
 import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { parkLowConfidence } from "../triage-confidence";
@@ -269,6 +270,7 @@ const build: StepType = {
       files: builtPlan?.files ?? [],
       problem: issue.body,
     });
+    await cutBuildSlices(config, worktree, deps.git.branchName(issueNumber), builtPlan?.tasks ?? []);
 
     // Defense in depth behind the guard hook: a Bash-made edit to a
     // protected path never reaches Edit/Write, so the hook never sees it
@@ -456,6 +458,8 @@ const pr: StepType = {
       holdoutRequired: holdoutEnabled(config.holdout),
       seal: readSeal(deps.state.getSetting(sealKey(config.repo, issueNumber))),
     });
+    const stacked = await shipStack(sc, head, art.comment, receipt);
+    if (stacked) return stacked;
     const existing = await deps.github.findPrByHead(config.repo, head);
     // A revise re-entry finds the PR open; its comment is already there.
     if (!existing) await postRunDetails(deps, config, issueNumber, receipt);

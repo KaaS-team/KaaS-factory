@@ -1,0 +1,1 @@
+{"name":"stack-pr: a conflicting retarget does not park","file":"src/engine/stack-pr.ts","find":"if (out.parked) return { parked: await park(deps, config, issueNumber, label, out.parked.reason) };","replace":"","test":"tests/stack-pr.test.ts"}

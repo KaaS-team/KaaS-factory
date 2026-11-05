@@ -1,0 +1,1 @@
+{"name":"stack-pr: a fix on a lower slice is not carried up","file":"src/engine/stack-pr.ts","find":"const up = await carryUp(worktree, plan, slice.task, pushed);","replace":"const up: Awaited<ReturnType<typeof carryUp>> = { carried: [] };","test":"tests/stack-pr.test.ts"}

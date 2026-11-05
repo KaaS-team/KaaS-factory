@@ -1,0 +1,1 @@
+{"name":"stack-pr: every slice gets the closing body","file":"src/engine/stack-pr.ts","find":"if (slice.task === last) return","replace":"if (true) return","test":"tests/stack-pr.test.ts"}

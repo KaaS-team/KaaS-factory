@@ -1,0 +1,1 @@
+{"name":"stack-pr: a merged lower slice is not rebased","file":"src/engine/stack-pr.ts","find":"    if (stale) {","replace":"    if (false) {","test":"tests/stack-pr.test.ts"}

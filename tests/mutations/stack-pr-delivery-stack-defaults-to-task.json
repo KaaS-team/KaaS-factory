@@ -1,0 +1,1 @@
+{"name":"stack-pr: delivery.stack defaults to task","file":"src/config.ts","find":"delivery: { stack: \"epic\" },","replace":"delivery: { stack: \"task\" },","test":"tests/stack-pr.test.ts"}

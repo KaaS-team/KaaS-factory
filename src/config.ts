@@ -126,6 +126,7 @@ export interface FactoryConfig extends keys.ReviewFields, keys.OrchestrateFields
   readonly egress?: import("./team/egress-policy").EgressPolicy; // set by applyTeam from the team policy
   readonly approval?: import("./team/approval").ApprovalPolicy; // likewise
   readonly merge: MergeConfig;
+  readonly delivery: keys.DeliveryConfig; // delivery.stack "task" opens one PR per planned task; off by default
   readonly review: { readonly maxRounds: number; readonly alwaysHumanPaths?: readonly string[] }; // maxRounds: failed reviews before a person takes over
   readonly holdout: HoldoutConfig;
   readonly acceptance: AcceptanceConfig; // The checker's path in the repo. "" turns the Acceptance table off.
@@ -319,6 +320,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   routes: {},
   spend: {},
   merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
+  delivery: { stack: "epic" },
   review: { maxRounds: 3 },
   holdout: { paths: [], cmd: "" },
   acceptance: { script: "scripts/kaas/check-acceptance.py" },
@@ -346,6 +348,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
     merge: { ...DEFAULT_CONFIG.merge, ...p.merge, ...partial.merge },
+    delivery: { ...DEFAULT_CONFIG.delivery, ...partial.delivery },
     review: { ...DEFAULT_CONFIG.review, ...partial.review },
     holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
     acceptance: { ...DEFAULT_CONFIG.acceptance, ...partial.acceptance },
@@ -384,6 +387,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   routes: "object",
   spend: "object",
   merge: "object",
+  delivery: "object",
   review: "object",
   holdout: "object",
   acceptance: "object",
@@ -472,6 +476,9 @@ export function configProblems(raw: unknown): string[] {
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
     problems.push(...keys.mergeProblems(cfg.merge as Record<string, unknown>));
   }
+  nested("delivery", keys.DELIVERY_KEYS);
+  if (cfg.delivery !== undefined && kindOk(cfg.delivery, "object"))
+    problems.push(...keys.deliveryProblems(cfg.delivery as Record<string, unknown>));
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
   nested("tmux", { enabled: "boolean", session: "string" });
   if (cfg.holdout !== undefined && kindOk(cfg.holdout, "object")) {

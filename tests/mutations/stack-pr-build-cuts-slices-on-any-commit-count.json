@@ -1,0 +1,1 @@
+{"name":"stack-pr: build cuts slices on any commit count","file":"src/engine/stack-pr.ts","find":"if (commits.length !== plan.length) {","replace":"if (false) {","test":"tests/stack-pr.test.ts"}
