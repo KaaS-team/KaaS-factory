@@ -1,0 +1,1 @@
+{"name":"a plugin entry that climbs out of its directory is accepted","file":"src/plugins/manifest.ts","find":"|| entry.split(/[\\\\/]/).includes(\"..\")","replace":"|| false","test":"tests/plugin-loader.test.ts"}

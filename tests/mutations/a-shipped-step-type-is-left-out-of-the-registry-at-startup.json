@@ -1,0 +1,1 @@
+{"name":"a shipped step type is left out of the registry at startup","file":"src/engine/registry.ts","find":"steps.register(name, type);","replace":"void [name, type];","test":"tests/core-names-no-agent.test.ts"}

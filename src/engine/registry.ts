@@ -2,6 +2,7 @@
 // the ones the library workflows need. `tool` calls one MCP tool with no agent and `report` ends
 // a workflow that opens no PR. Only the runner acts here, so agent stages stay read-only.
 
+import { steps } from "../plugins/registry";
 import { LABEL } from "../labels";
 import { callMcpTool } from "../mcp-call";
 import { ShellSetupRunner } from "../setup";
@@ -96,7 +97,7 @@ const check: StepType = {
   },
 };
 
-export const ALL_STEP_TYPES: Readonly<Record<string, StepType>> = {
+const SHIPPED: Record<string, StepType> = {
   ...STEP_TYPES,
   build: cloudAware(STEP_TYPES.build!),
   check,
@@ -106,3 +107,8 @@ export const ALL_STEP_TYPES: Readonly<Record<string, StepType>> = {
   qa: qaStep,
   changelog: changelogStep,
 };
+
+for (const [name, type] of Object.entries(SHIPPED)) steps.register(name, type);
+
+// The live step table. The engine and the workflow parser read step types from here by name.
+export const ALL_STEP_TYPES: Readonly<Record<string, StepType>> = steps.table;

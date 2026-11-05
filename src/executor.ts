@@ -4,7 +4,8 @@
 // src/agents/presets/.
 
 import { truncateFinalMessage } from "./agents/final-message";
-import { parseStreamJsonLine } from "./agents/presets/claude";
+import { DEFAULT_AGENT } from "./agents/default";
+import { PRESETS } from "./agents/presets";
 
 import {
   OPERATOR_TAKEOVER,
@@ -115,7 +116,7 @@ export class ReplayExecutor implements Executor {
     const key = `${opts.stage}:${opts.issue}`;
     const lines = this.fixtures[key];
     if (!lines) throw new Error(`replay: no fixture recorded for ${key}`);
-    const events = lines.flatMap((l) => parseStreamJsonLine(l));
+    const events = lines.flatMap((l) => PRESETS[DEFAULT_AGENT]!.parseLine(l));
     return aggregateStageEvents(events, 0);
   }
 }

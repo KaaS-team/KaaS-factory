@@ -1,3 +1,4 @@
 #!/usr/bin/env bun
-// The `factory` CLI; the code is src/cli.ts so tsc checks it.
+// The `factory` CLI; the code is src/cli.ts so tsc checks it. Plugins load first (src/plugins/boot.ts).
+import "../src/plugins/boot";
 import "../src/cli";

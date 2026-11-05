@@ -1,0 +1,1 @@
+{"name":"the workflow step types table is a copy that registry additions never reach","file":"src/engine/registry.ts","find":"= steps.table;","replace":"= { ...steps.table };","test":"tests/plugin-registry.test.ts"}

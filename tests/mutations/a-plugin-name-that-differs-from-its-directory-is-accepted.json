@@ -1,0 +1,1 @@
+{"name":"a plugin name that differs from its directory is accepted","file":"src/plugins/loader.ts","find":"manifest.name !== expectName","replace":"false","test":"tests/plugin-loader.test.ts"}

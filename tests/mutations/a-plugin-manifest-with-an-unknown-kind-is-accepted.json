@@ -1,0 +1,1 @@
+{"name":"a plugin manifest with an unknown kind is accepted","file":"src/plugins/manifest.ts","find":"if (!PLUGIN_KINDS.includes(m.kind as PluginKind))","replace":"if (false as boolean)","test":"tests/plugin-loader.test.ts"}
