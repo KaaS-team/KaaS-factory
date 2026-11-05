@@ -6,6 +6,7 @@ import { missBody, missRate, missRow, missTitle, selectorMisses, suggestedInputs
 
 let root = "";
 beforeAll(() => {
+  mkdirSync(tmpdir(), { recursive: true });
   root = mkdtempSync(join(tmpdir(), "selector-misses-"));
   for (const [f, t] of [
     ["tests/a.test.ts", 'import { h } from "./helper";\n'],
