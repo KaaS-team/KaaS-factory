@@ -1,0 +1,7 @@
+{
+  "name": "a recent event does not keep a quiet run alive",
+  "file": "src/state.ts",
+  "find": "return row.ts && row.ts > run.updated_at ? row.ts : run.updated_at;",
+  "replace": "return run.updated_at;",
+  "test": "tests/run-liveness.test.ts"
+}

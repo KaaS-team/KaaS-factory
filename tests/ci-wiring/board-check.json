@@ -1,1 +1,1 @@
-{"scripts":["scripts/board-check.ts"],"workflows":[".github/workflows/board-check.yml","ci/board-check.yml"]}
+{"scripts":["scripts/board-check.ts"],"workflows":[".github/workflows/board-check.yml","ci/board-check.yml"],"onMainExempt":"reads the live issue board over the network, and the workflow is report-only, so it cannot block a PR"}

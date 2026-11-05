@@ -1,0 +1,7 @@
+{
+  "name": "a test tier is read from the end of the line",
+  "file": "src/test-tiers.ts",
+  "find": "const tier = TIER.exec(line)?.[1]?.toLowerCase() as Tier | undefined;",
+  "replace": "const tier = undefined as Tier | undefined;",
+  "test": "tests/test-tiers.test.ts"
+}

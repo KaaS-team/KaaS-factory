@@ -7,7 +7,7 @@
 // actually calls runRetro with the right outcome and that it runs to done.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mergeConfig } from "../src/config";
@@ -31,6 +31,7 @@ afterAll(() => {
 });
 
 function setup(initial: string[], overrides: Parameters<typeof mergeConfig>[0] = { repo: "acme/widgets" }, n = 1) {
+  mkdirSync(tmpdir(), { recursive: true });
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-retro-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-retro-clone-"));
   dirs.push(workspacesDir, cloneDir);
@@ -61,7 +62,8 @@ const triage = (o: object = {}) => ({
   }),
 });
 const plan = (risk: "low" | "medium" = "low") => ({
-  "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",
+  "plan-comment.md":
+    "<!-- factory:plan v1 rev=1 -->\nplan\n### Tests to write first\n- `tests/a.test.ts` (permanent)\n- `tests/tmp.test.ts` (scaffold)\n### Risk: low\n",
   "plan.json": JSON.stringify({ risk, revision: 1, files: ["src/a.ts"], autoApproveEligible: risk === "low" }),
 });
 const build = () => ({
@@ -116,6 +118,13 @@ describe("a retro row is queued and run after each of the four final-outcome tri
     expect(c.state.listRetros(c.config.repo)).toEqual([
       expect.objectContaining({ issue: c.n, outcome: "merged", status: "done" }),
     ]);
+    const tiers = join(c.deps.workspacesDir, "test-tiers", `issue-${c.n}.json`);
+    expect(existsSync(tiers)).toBe(true);
+    expect(JSON.parse(readFileSync(tiers, "utf8"))).toEqual({
+      permanent: 1,
+      scaffold: 1,
+      prune: ["tests/tmp.test.ts"],
+    });
     c.state.close();
   });
 

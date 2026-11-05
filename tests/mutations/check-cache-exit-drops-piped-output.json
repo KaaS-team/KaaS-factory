@@ -1,0 +1,1 @@
+{"name": "check-cache: exit drops piped output", "file": "scripts/check-cache.ts", "find": "process.exitCode = await runCached({ ...parsed, root: process.cwd(), env: process.env });", "replace": "process.exit(await runCached({ ...parsed, root: process.cwd(), env: process.env }));", "test": "tests/check-cache.test.ts"}

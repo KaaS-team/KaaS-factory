@@ -1,0 +1,1 @@
+{"name":"ci reads the pr body again","file":"ci/ci.yml","find":"      # The two checks that read the PR body live in pr-body.yml, so editing the body reruns only them.\n","replace":"      - run: echo \"$PR_BODY\"\n        env:\n          PR_BODY: ${{ github.event.pull_request.body }}\n","test":"tests/ci-body-edit.test.ts"}

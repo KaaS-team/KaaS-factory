@@ -33,6 +33,7 @@ export const RUN_STATUS_ENUM = [
   "failed",
   "needs-human",
   "cancelled",
+  "interrupted",
 ];
 
 function object(properties: Record<string, JsonSchema>, required = Object.keys(properties)): JsonSchema {

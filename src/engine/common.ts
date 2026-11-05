@@ -2,12 +2,14 @@
 // label helpers, running one agent stage, retro, and the spend caps. Moved
 // verbatim from watch.ts when the pipeline became a workflow (v3.1).
 
+import { recordMergedTestTiers } from "../test-tiers";
 import type { BlobStore } from "../ports/blob";
 import { shipStage } from "./blobs";
 import type { FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
 import { settle } from "../run-transitions";
+import { recordRunFailure, refusalsOf } from "./failure";
 import { costFor } from "../pricing";
 import {
   OPERATOR_TAKEOVER,
@@ -279,6 +281,7 @@ export function finish(
   reason?: string,
 ): void {
   settle(deps.state, deps.view, config.repo, issueNumber, status, reason);
+  if (status === "failed" || status === "needs-human") recordRunFailure(deps, config, issueNumber, reason);
 }
 
 // Skills never call `gh` (only the runner talks to GitHub), so the current
@@ -393,6 +396,7 @@ export async function runStage(
     killed_reason: result.killedReason ?? null,
     session_id: result.sessionId ?? null,
     config_hash: configHash(config),
+    refused_calls: refusalsOf(result).length,
   });
   await recordSpend(deps, config, {
     issue: issueNumber,
@@ -441,15 +445,12 @@ export async function stageFiles(
   return { transcriptFile, liveFile: deps.runFiles.live(issueNumber) };
 }
 
-// Plan v2.10.0 item 3: a read-only stage after a final outcome (merged,
-// rejected, or given up on after verify rejections). Never goes through
-// runStage: that wrapper's upsertRun would put an already-terminal run back
-// to "running", and retro's cost never rolls into runs.cost_usd (spendSummary
-// sums stage_runs, not runs, so the spend caps still see it via recordStageRun).
-// `existingId` is set only when a row was queued earlier (the dashboard's
-// operator-merge route, which has no Executor to run this itself) and is now
-// being drained by runQueuedRetros; the three watch.ts triggers queue and run
-// in the same call.
+// Plan v2.10.0 item 3: a read-only stage after a final outcome (merged, rejected, or given up on
+// after verify rejections). Never goes through runStage: its upsertRun would put a terminal run back
+// to "running", and retro's cost never rolls into runs.cost_usd (spendSummary sums stage_runs, so the
+// spend caps still see it via recordStageRun). `existingId` is set only when a row was queued earlier
+// (the dashboard's operator-merge route, which has no Executor) and is now drained by runQueuedRetros;
+// the three watch.ts triggers queue and run in the same call.
 export async function runRetro(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -464,6 +465,7 @@ export async function runRetro(
     await rehydrate(worktree, issue);
     await writeIssueSnapshot(worktree, issue);
     await clearStageArtifacts(worktree, issueNumber, "retro");
+    if (outcome === "merged") recordMergedTestTiers(deps.workspacesDir, worktree, issueNumber);
     const startedAt = new Date();
     const result = await deps.executor.runStage({
       stage: "retro",

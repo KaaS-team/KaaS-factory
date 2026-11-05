@@ -1,0 +1,7 @@
+{
+  "name": "the run result counts held mutations",
+  "file": "scripts/mutation-list.ts",
+  "find": "const held = ran.length - failed.length;",
+  "replace": "const held = ran.length;",
+  "test": "tests/mutation-list.test.ts"
+}

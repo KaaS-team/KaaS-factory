@@ -1,0 +1,7 @@
+{
+  "name": "Needs you counts run status instead of the inbox",
+  "file": "dashboard/public/lib/core.js",
+  "find": "state.inbox.some((i) => i.issue === run.issue && repoOf(i) === repoOf(run))",
+  "replace": "[\"needs-info\",\"awaiting-approval\",\"needs-human\",\"failed\"].includes(run.status)",
+  "test": "tests/dashboard-ui.test.ts"
+}

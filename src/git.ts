@@ -6,7 +6,7 @@
 // fast-forward and both exits 0, which is the bug this replaces (audit
 // finding #3).
 
-import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claimCommitMessage } from "./commit-message";
@@ -101,6 +101,21 @@ export function issueOfPr(pr: Pick<GhPr, "headRefName" | "closingIssuesReference
   return closes.length === 1 ? closes[0]!.number : undefined;
 }
 
+// git lists a worktree by its resolved path, so a workspace under a symlink (macOS /var is
+// /private/var) never matched a plain string compare and was wiped, uncommitted work included.
+function registered(porcelain: string, dir: string): boolean {
+  const real = (p: string) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return undefined;
+    }
+  };
+  const want = real(dir);
+  if (want === undefined) return false;
+  return porcelain.split("\n").some((line) => line.startsWith("worktree ") && real(line.slice(9)) === want);
+}
+
 export class Git {
   constructor(private readonly runner: CommandRunner = new GitCommandRunner()) {}
 
@@ -142,9 +157,25 @@ export class Git {
   async ensureWorktree(cloneDir: string, worktreeDir: string, issue: number): Promise<void> {
     const branch = this.branchName(issue);
     await this.runner.run(["fetch", "origin", branch], { cwd: cloneDir });
+    // A workspace deleted from disk stays registered until pruned, and would be skipped as present (#73).
+    await this.runner.run(["worktree", "prune"], { cwd: cloneDir });
     const list = await this.runner.run(["worktree", "list", "--porcelain"], { cwd: cloneDir });
-    if (list.stdout.includes(`worktree ${worktreeDir}\n`)) return;
-    await this.runner.run(["worktree", "add", worktreeDir, branch], { cwd: cloneDir });
+    if (registered(list.stdout, worktreeDir)) {
+      if (!(await this.diverged(worktreeDir, `origin/${branch}`))) return;
+      await this.removeWorktree(cloneDir, worktreeDir);
+    }
+    // A directory an earlier run left, or a local branch it moved, holds an old tree: start from origin's.
+    rmSync(worktreeDir, { recursive: true, force: true });
+    await this.runner.run(["worktree", "add", "-B", branch, worktreeDir, `origin/${branch}`], { cwd: cloneDir });
+  }
+
+  // A branch deleted and claimed again leaves an earlier run's workspace on a history origin no longer
+  // has; one only behind or ahead of origin is the same run resuming, and keeps its tree.
+  private async diverged(worktreeDir: string, remote: string): Promise<boolean> {
+    const run = (args: string[]) => this.runner.run(args, { cwd: worktreeDir });
+    if ((await run(["rev-parse", "--verify", "--quiet", remote])).code !== 0) return false;
+    if ((await run(["merge-base", "--is-ancestor", "HEAD", remote])).code === 0) return false;
+    return (await run(["merge-base", "--is-ancestor", remote, "HEAD"])).code !== 0;
   }
 
   /** @deprecated use ensureWorktree */

@@ -20,7 +20,7 @@ The goal is to {{one_line_goal}}.
 
 ### Tests to write first
 {{#each tests}}
-- `{{test_name}}`
+- `{{test_name}}` ({{scaffold_or_permanent}})
 {{/each}}
 
 ### Repo skills to apply

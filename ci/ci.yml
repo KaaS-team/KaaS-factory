@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
   schedule:
     - cron: "41 4 * * *"
 
@@ -36,17 +36,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: bun scripts/dco.ts "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
 
-      - name: The PR body follows the template (CONTRIBUTING.md)
-        if: github.event_name == 'pull_request'
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: bun scripts/check-pr-body.ts
-
-      - name: A weakening test change states its reason (CONTRIBUTING.md)
-        if: github.event_name == 'pull_request'
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: bun scripts/check-tests-only.ts "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
+      # The two checks that read the PR body live in pr-body.yml, so editing the body reruns only them.
 
       - name: Install uv (for skills-ref validate)
         uses: astral-sh/setup-uv@v3
@@ -160,6 +150,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
       - name: Decide whether the image needs a build
         id: inputs
         run: |

@@ -1,0 +1,7 @@
+{
+  "name": "a workspace deleted from disk is skipped as present",
+  "file": "src/git.ts",
+  "find": "    await this.runner.run([\"worktree\", \"prune\"], { cwd: cloneDir });\n",
+  "replace": "",
+  "test": "tests/git.test.ts"
+}

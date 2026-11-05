@@ -2,7 +2,16 @@
 // prior-finding rule; the verify step posts what it settles.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { validateVerdict, runDir, type VerdictArtifact } from "../src/artifacts";
@@ -125,6 +134,83 @@ describe("settleVerdict ledger", () => {
     expect(out.result).toBe("uncertain");
     const runnerWhats = out.findings.flatMap((f) => (typeof f === "string" || f.where !== "runner" ? [] : [f.what]));
     expect(runnerWhats.some((w) => w.startsWith("Open findings from earlier rejects (1)"))).toBe(true);
+  });
+});
+
+describe("settleVerdict hardening (#576)", () => {
+  const dirs: string[] = [];
+  afterAll(() => {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
+  const mustA = { severity: "must" as const, confidence: 5, what: "A" };
+  const marker = (verdict: object) => ({
+    authorAssociation: "OWNER",
+    body: `<!-- factory:data ${JSON.stringify({ stage: "verify", json: verdict })} -->`,
+  });
+  function setup(comments: object[] = []) {
+    mkdirSync(tmpdir(), { recursive: true });
+    const worktree = mkdtempSync(join(tmpdir(), "settle-hard-"));
+    dirs.push(worktree);
+    const run = join(worktree, runDir(1));
+    mkdirSync(run, { recursive: true });
+    const sc = {
+      worktree,
+      config: { base: "main" },
+      deps: { git: { changedFiles: async () => [] } },
+      issue: { number: 1, comments },
+      ctx: {},
+    } as unknown as StepCtx;
+    return { sc, run, worktree };
+  }
+  const pass = (): VerdictArtifact => ({ result: "pass", rounds: 2, findings: [] });
+
+  for (const name of ["findings-ledger.json", "prior-findings.json"]) {
+    test(`a symlinked ${name} is refused and never written through`, async () => {
+      const { sc, run, worktree } = setup();
+      const outside = join(worktree, "outside.txt");
+      writeFileSync(outside, "keep");
+      symlinkSync(outside, join(run, name));
+      const out = await settleVerdict(sc, { ...pass(), result: "reject", findings: [mustA] });
+      expect(readFileSync(outside, "utf8")).toBe("keep");
+      expect(lstatSync(join(run, name)).isSymbolicLink()).toBe(false);
+      const passed = await settleVerdict(
+        (() => {
+          const again = setup();
+          symlinkSync(outside, join(again.run, name));
+          return again.sc;
+        })(),
+        pass(),
+      );
+      expect(passed.result).toBe("uncertain");
+      expect(JSON.stringify(passed.findings)).toContain(`${name} is not a regular file`);
+      expect(out.result).toBe("reject");
+    });
+  }
+
+  test("a ledger edited to resolve or drop a posted open finding does not let a verdict pass", async () => {
+    const posted = marker({ result: "reject", rounds: 1, findings: [mustA] });
+    for (const edited of [[], [{ id: "x", what: "A", status: "resolved", firstRound: 1, lastRound: 1, reopened: 0 }]]) {
+      const { sc, run } = setup([posted]);
+      writeFileSync(join(run, "findings-ledger.json"), JSON.stringify(edited));
+      const out = await settleVerdict(sc, pass());
+      expect(out.result).toBe("uncertain");
+      expect(JSON.stringify(out.findings)).toContain("Open findings from earlier rejects (1)");
+    }
+  });
+
+  test("a finding in prior-findings.json but missing from the ledger counts as open", async () => {
+    const { sc, run } = setup();
+    writeFileSync(join(run, "prior-findings.json"), JSON.stringify(["B"]));
+    writeFileSync(join(run, "findings-ledger.json"), "[]");
+    expect((await settleVerdict(sc, pass())).result).toBe("uncertain");
+  });
+
+  test("a ledger row of the wrong shape is refused", async () => {
+    const { sc, run } = setup();
+    writeFileSync(join(run, "findings-ledger.json"), JSON.stringify([{ what: "A", status: "resolved" }]));
+    const out = await settleVerdict(sc, pass());
+    expect(out.result).toBe("uncertain");
+    expect(JSON.stringify(out.findings)).toContain("does not have the expected shape");
   });
 });
 

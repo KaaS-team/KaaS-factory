@@ -1,0 +1,7 @@
+{
+  "name": "a symlinked findings file is read and written through",
+  "file": "src/engine/verdict-rules.ts",
+  "find": "if (!st.isFile()) return { ok: false, why: \"is not a regular file\" };",
+  "replace": "",
+  "test": "tests/verdict-rules.test.ts"
+}

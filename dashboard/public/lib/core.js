@@ -24,6 +24,8 @@ export const state = {
   // The relay's last inbox, shown read-only while the dashboard is out of reach.
   relay: null,
   offline: false,
+  // When the last view loaded, so a person can see how fresh the board is.
+  refreshedAt: null,
 };
 
 export const shell = {
@@ -113,6 +115,8 @@ export function glyph(kind, label) {
 }
 
 export const repoOf = (row) => row.repo ?? state.repo;
+// Needs you means the open issue is in the inbox, so the Line, Runs and `factory inbox` agree.
+export const needsYou = (run) => state.inbox.some((i) => i.issue === run.issue && repoOf(i) === repoOf(run));
 // A page about one repo (board, toggles) acts on the picked project; the server refuses a guess.
 export const focusRepo = () => state.repoFilter || state.repo || state.repos[0] || "";
 export const repoQuery = () => (focusRepo() ? `?repo=${encodeURIComponent(focusRepo())}` : "");

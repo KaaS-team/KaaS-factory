@@ -1,0 +1,7 @@
+{
+  "name": "the watcher poll never settles dead runs",
+  "file": "src/watch.ts",
+  "find": "    processed.push(...(await settleDeadRuns(deps, config, inFlight, (deps.now?.() ?? new Date()).getTime())));",
+  "replace": "    void settleDeadRuns;",
+  "test": "tests/run-liveness.test.ts"
+}

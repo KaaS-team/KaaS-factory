@@ -1,0 +1,7 @@
+{
+  "name": "git: worktree match ignores symlinks",
+  "file": "src/git.ts",
+  "find": "real(line.slice(9)) === want",
+  "replace": "line.slice(9) === dir",
+  "test": "tests/git.test.ts"
+}

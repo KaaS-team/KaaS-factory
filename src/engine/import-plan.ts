@@ -218,7 +218,10 @@ export function planFromIssue(p: PlannedIssue, issue: { body: string }, revision
     ...p.files.map((f) => `- \`${f.path}\`${f.isNew ? " (new)" : ""}`),
     "",
     "### Tests to write first",
-    ...p.tests.map((t) => (t.includes("`") ? `- ${t}` : `- \`${t}\``)),
+    ...p.tests.map(
+      (t) =>
+        `${t.includes("`") ? `- ${t}` : `- \`${t}\``}${/\((scaffold|permanent)\)\s*$/i.test(t) ? "" : " (permanent)"}`,
+    ),
     "",
     "### Repo skills to apply",
     "none",

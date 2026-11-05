@@ -41,7 +41,8 @@ export type RunStatus =
   | "shipped"
   | "failed"
   | "needs-human"
-  | "cancelled";
+  | "cancelled"
+  | "interrupted";
 
 export interface Run {
   id: number;
@@ -102,10 +103,18 @@ export interface StageRun {
   // Verify only: pass, reject or uncertain, set once verdict.json is read (setVerifyVerdict).
   verdict: string | null;
   config_hash: string | null;
+  // Tool calls the allow list or a hook refused in this attempt (#173).
+  refused_calls: number;
 }
 
 // Defaulted on insert: 0 cached and cache-write tokens, a complete count, session_id NULL.
-type DefaultedStageRunKey = "tokens_cached" | "tokens_cache_write" | "usage_complete" | "session_id" | "config_hash";
+type DefaultedStageRunKey =
+  | "tokens_cached"
+  | "tokens_cache_write"
+  | "usage_complete"
+  | "session_id"
+  | "config_hash"
+  | "refused_calls";
 export type StageRunInput = Omit<StageRun, "id" | "verdict" | DefaultedStageRunKey> &
   Partial<Pick<StageRun, DefaultedStageRunKey>>;
 
@@ -264,6 +273,7 @@ export class FactoryState {
       ["stage_runs", "session_id", "TEXT"],
       ["stage_runs", "verdict", "TEXT"],
       ["stage_runs", "config_hash", "TEXT"],
+      ["stage_runs", "refused_calls", "INTEGER NOT NULL DEFAULT 0"],
       ["runs", "config_hash", "TEXT"],
     ] as const) {
       const have = (this.db.query(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
@@ -306,7 +316,8 @@ export class FactoryState {
         tokens_cached INTEGER NOT NULL DEFAULT 0,
         usage_complete INTEGER NOT NULL DEFAULT 1,
         session_id TEXT,
-        verdict TEXT, tokens_cache_write INTEGER NOT NULL DEFAULT 0, config_hash TEXT
+        verdict TEXT, tokens_cache_write INTEGER NOT NULL DEFAULT 0, config_hash TEXT,
+        refused_calls INTEGER NOT NULL DEFAULT 0
       );
       INSERT INTO stage_runs_new (${names}) SELECT ${names} FROM stage_runs;
       UPDATE stage_runs_new SET cost_usd = NULL WHERE usage_complete = 0;
@@ -389,6 +400,14 @@ export class FactoryState {
     }
   }
 
+  // The newest of the run's own update and its latest event: what "recent" means for a live run.
+  lastActivity(run: Pick<Run, "id" | "updated_at">): string {
+    const row = this.db.query("SELECT MAX(ts) AS ts FROM events WHERE run_id = $id").get({ $id: run.id }) as {
+      ts: string | null;
+    };
+    return row.ts && row.ts > run.updated_at ? row.ts : run.updated_at;
+  }
+
   // How many runs hold an in-memory event budget; tests watch it for leaks.
   get openBudgets(): number {
     return this.budgets.size;
@@ -446,8 +465,8 @@ export class FactoryState {
   recordStageRun(input: StageRunInput): void {
     this.db
       .query(
-        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, tokens_cache_write, cost_usd, usage_complete, exit_code, killed_reason, session_id, config_hash)
-         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $tokens_cache_write, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id, $config_hash)`,
+        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, tokens_cache_write, cost_usd, usage_complete, exit_code, killed_reason, session_id, config_hash, refused_calls)
+         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $tokens_cache_write, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id, $config_hash, $refused_calls)`,
       )
       .run({
         $repo: input.repo,
@@ -469,6 +488,7 @@ export class FactoryState {
         $killed_reason: input.killed_reason,
         $session_id: input.session_id ?? null,
         $config_hash: input.config_hash ?? null,
+        $refused_calls: input.refused_calls ?? 0,
       });
   }
 

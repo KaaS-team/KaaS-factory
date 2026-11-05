@@ -1,0 +1,1 @@
+{"name":"a wired ci check has no proof it passes","file":"tests/ci-wiring-green.test.ts","find":"  if (!entry.onMain) return [`${name}: no onMain command proves the check passes on the current tree`];","replace":"  if (!entry.onMain) return [];","test":"tests/ci-wiring-green.test.ts"}

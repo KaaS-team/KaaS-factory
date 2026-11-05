@@ -98,6 +98,8 @@ const { workflowsView } = await import(`${lib}/view-workflows.js`);
 const { boardColumns } = await import(`${lib}/view-board.js`);
 const { createSendQueue } = await import(`${lib}/actions.js`);
 const { taskComposer } = await import(`${lib}/view-line.js`);
+const { runsView } = await import(`${lib}/view-runs.js`);
+const { renderNav } = await import(`${lib}/rail.js`);
 Object.assign(shell, { render() {}, go() {}, async loadInbox() {}, async loadView() {}, startFollowing() {} });
 
 const css = readFileSync(join(import.meta.dir, "..", "dashboard", "public", "styles.css"), "utf8");
@@ -141,6 +143,44 @@ beforeEach(() => {
   state.data = {};
   state.error = {};
   as("viewer");
+});
+
+describe("the board shows only what is true now", () => {
+  const run = (issue: number, status: string) => ({
+    id: issue,
+    issue,
+    repo: "acme/shop",
+    title: `task ${issue}`,
+    stage: "verify",
+    status,
+    updated_at: new Date().toISOString(),
+  });
+  test("Needs you counts the inbox, interrupted runs only appear under History", () => {
+    state.repo = "acme/shop";
+    state.inbox = [planItem];
+    state.filter = "all";
+    state.data.runs = {
+      runs: [run(1, "running"), run(7, "awaiting-approval"), run(8, "needs-human"), run(9, "interrupted")],
+    };
+    const tabs = (runsView() as El).byClass("tab").map((t) => t.textContent);
+    expect(tabs).toEqual(["All 4", "Active 1", "Needs you 1", "History 2"]);
+  });
+  test("the rail says when the board last refreshed", () => {
+    const nav = new El("nav");
+    const doc = (globalThis as unknown as { document: unknown }).document as unknown as {
+      getElementById: (id: string) => El | null;
+    };
+    const original = doc.getElementById;
+    doc.getElementById = (id) => (id === "nav" ? nav : new El("div"));
+    state.refreshedAt = new Date(2026, 0, 1, 9, 5, 7);
+    state.data.line = { rows: [] };
+    try {
+      renderNav();
+    } finally {
+      doc.getElementById = original;
+    }
+    expect(nav.all((e) => e.textContent.startsWith("Updated ")).length).toBeGreaterThan(0);
+  });
 });
 
 describe("cockpit for QA and PMs", () => {

@@ -21,6 +21,14 @@ function tmp(): string {
 }
 
 describe("failure ledger transitions", () => {
+  test("recordFix names the check that proves the fix, and the row survives a write and read", () => {
+    const dir = tmp();
+    const rows = recordFix(recordFailure([], F, 3), F, "https://example.test/pull/9", "tests/x.test.ts");
+    writeLedger(dir, rows);
+    expect(readLedger(dir)[0]).toMatchObject({ fix: "https://example.test/pull/9", check: "tests/x.test.ts" });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("a new failure opens with no fix, and a repeat keeps one row", () => {
     const rows = recordFailure(recordFailure([], F, 3), F, 5);
     expect(rows).toEqual([{ failure: F, fix: "", status: "open", failedRun: 5 }]);

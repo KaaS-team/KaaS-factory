@@ -8,6 +8,7 @@ export class SqliteStore implements StorePort {
     private readonly table = "kv_store",
   ) {
     if (!/^\w+$/.test(table)) throw new Error(`bad table name ${table}`);
+    // nosemgrep: js-shell-exec-interpolated -- SQL, not a shell; the regex above limits table to word characters
     db.exec(`CREATE TABLE IF NOT EXISTS ${table} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
   }
 

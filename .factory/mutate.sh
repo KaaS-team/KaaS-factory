@@ -24,7 +24,8 @@
 # - The tests run with only PATH, HOME (the copy) and TMPDIR (outside the copy, so a test's temp
 #   sandbox is never inside the repo it tests) in their environment: no token or other variable of
 #   the stage reaches the repo's code.
-# The tests run on the unmutated copy first and must pass, then on the mutated copy. Last line:
+# The tests run on the unmutated copy first; with a fileCmd a named test that is red or unrunnable there is
+# skipped and listed (SKIPPED: lines), and only the green ones judge the mutation. If none is green it is an error. Last line:
 #   MUTATION: file=<file> status=bites|survives|error failed=<n> reason=<why, on error>
 # It fails closed: a runner that cannot start (exit 126 or 127) or is killed, a timeout, a
 # no-op replacement, a non-zero exit with no failed test (a crash or compile error),
@@ -153,7 +154,8 @@ gate = next((g for g in gates if g.get("role") == "test"), None) or next((g for 
 gate_cmd = (gate or {}).get("fileCmd") or (gate or {}).get("cmd") or ""
 if not gate_cmd or re.search(r"[;&|<>$`()\\\n]", gate_cmd) or re.match(r"\s*[A-Za-z_][A-Za-z0-9_]*=", gate_cmd):
     error("no-test-runner", f"the test gate fileCmd or cmd must be one plain command to run as argv, got {gate_cmd!r}")
-argv = shlex.split(gate_cmd) + tests
+base_argv = shlex.split(gate_cmd)
+argv = base_argv + tests
 
 root = tempfile.mkdtemp(prefix="factory-mutate.")
 copy = os.path.join(root, "tree")
@@ -189,27 +191,43 @@ try:
     os.makedirs(tmp, exist_ok=True)
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": copy, "TMPDIR": tmp}
 
-    def run():
+    def run(files):
         try:
-            r = subprocess.run(argv, cwd=copy, env=env, capture_output=True, text=True, errors="replace", timeout=TIMEOUT)
+            r = subprocess.run(base_argv + files, cwd=copy, env=env, capture_output=True, text=True, errors="replace", timeout=TIMEOUT)
         except OSError as e:
             error("no-test-runner", f"could not run {argv[0]}: {e}")
         except subprocess.TimeoutExpired:
             error("timeout", f"the tests ran past {TIMEOUT}s")
-        out = r.stdout + r.stderr
-        if r.returncode < 0 or r.returncode in (126, 127):
-            say("\n".join(out.splitlines()[-30:]))
-            error("runner-failed", f"the test runner did not run the tests (exit {r.returncode})")
-        return r.returncode, out
+        return r.returncode, r.stdout + r.stderr
 
-    code, out = run()
-    if code != 0:
-        say("\n".join(out.splitlines()[-30:]))
-        error("baseline-red", "the tests fail on the unmutated copy, so a failure after the mutation would prove nothing")
+    # With a fileCmd each named test is judged alone, so one red or unrunnable file is skipped and listed
+    # instead of losing the proof. Without one the runner takes the whole suite as a single unit.
+    units = [[t] for t in tests] if (gate or {}).get("fileCmd") else [tests]
+    green, skipped, last = [], [], ""
+    for unit in units:
+        code, out = run(unit)
+        last = out
+        if code in (126, 127) or code < 0:
+            skipped.append((unit, f"unrunnable (exit {code})"))
+        elif code != 0:
+            skipped.append((unit, "red at baseline"))
+        else:
+            green.extend(unit)
+    for unit, why in skipped:
+        say(f"SKIPPED: {' '.join(unit)} {why}")
+    if not green:
+        say("\n".join(last.splitlines()[-30:]))
+        if all("unrunnable" in why for _, why in skipped):
+            error("runner-failed", "the test runner did not run the tests")
+        error("baseline-red", "every named test is red or unrunnable on the unmutated copy, so a failure after the mutation would prove nothing")
     mutated = text.replace(search, replace, 1)
     with open(target, "w", encoding="utf-8", newline="") as f:
         f.write(mutated)
-    code, out = run()
+    argv = base_argv + green
+    code, out = run(green)
+    if code in (126, 127) or code < 0:
+        say("\n".join(out.splitlines()[-30:]))
+        error("runner-failed", f"the test runner did not run the tests (exit {code})")
 finally:
     git("worktree", "remove", "--force", copy)
     shutil.rmtree(root, ignore_errors=True)

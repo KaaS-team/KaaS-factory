@@ -99,8 +99,8 @@ const STAGE_COLS = {
   killed_reason: "str?",
   session_id: "str?",
   verdict: "str?",
-  // tokens_cache_write is not mirrored yet (#115 NG-4); a mirrored row reads back 0. config_hash reads back NULL.
-} as const satisfies Record<keyof Omit<StageRun, "id" | "tokens_cache_write" | "config_hash">, Col>;
+  // tokens_cache_write is not mirrored yet (#115 NG-4); a mirrored row reads back 0. config_hash reads back NULL, refused_calls 0.
+} as const satisfies Record<keyof Omit<StageRun, "id" | "tokens_cache_write" | "config_hash" | "refused_calls">, Col>;
 // Records keyed by the union types, so tsc fails here when a stage or a status is added.
 const STAGES: Record<Stage, true> = { triage: true, plan: true, build: true, verify: true, pr: true };
 const STATUSES: Record<RunStatus, true> = {
@@ -113,6 +113,7 @@ const STATUSES: Record<RunStatus, true> = {
   failed: true,
   "needs-human": true,
   cancelled: true,
+  interrupted: true,
 };
 
 const MAX_STAGE_ROWS = 1000;

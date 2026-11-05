@@ -1,1 +1,1 @@
-{"scripts":["scripts/check-changed-mutants.ts","scripts/selector-misses.ts"],"workflows":[".github/workflows/mutations.yml","ci/mutations.yml"]}
+{"scripts":["scripts/check-changed-mutants.ts","scripts/selector-misses.ts"],"workflows":[".github/workflows/mutations.yml","ci/mutations.yml"],"onMainExempt":"needs a pull request diff, and the mutations job runs off the push verdict"}

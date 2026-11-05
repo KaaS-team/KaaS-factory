@@ -1,0 +1,7 @@
+{
+  "name": "a new workspace checks out the stale local branch",
+  "file": "src/git.ts",
+  "find": "[\"worktree\", \"add\", \"-B\", branch, worktreeDir, `origin/${branch}`]",
+  "replace": "[\"worktree\", \"add\", worktreeDir, branch]",
+  "test": "tests/git.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "prior findings missing from the ledger are not counted open",
+  "file": "src/engine/verdict-rules.ts",
+  "find": "for (const r of seedLedger(prior)) byWhat.set(",
+  "replace": "for (const r of [] as LedgerRow[]) byWhat.set(",
+  "test": "tests/verdict-rules.test.ts"
+}

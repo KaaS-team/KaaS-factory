@@ -1,34 +1,10 @@
 // The one place that shells out to `gh`. Injectable so tests never touch the network.
 
-export interface CommandResult {
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly code: number;
-}
-
-export interface CommandRunner {
-  run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult>;
-}
-
-export class GhCommandRunner implements CommandRunner {
-  async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
-    const proc = Bun.spawn(["gh", ...args], {
-      cwd: opts?.cwd,
-      env: opts?.env ? { ...process.env, ...opts.env } : undefined,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    return { stdout, stderr, code };
-  }
-}
-
+export { type CommandResult, type CommandRunner, GhCommandRunner } from "./gh-runner";
+import { type CommandResult, type CommandRunner, GhCommandRunner } from "./gh-runner";
+import { createPrCall, mergeCall } from "./github-pr";
 import { RestIssues } from "./github-rest";
-import { type MergeSettings, mergeArgs } from "./merge-method";
+import { isHostRun, type MergeSettings, mergeArgs } from "./merge-method";
 import { RateLimitError } from "./ports/scm";
 import type {
   GhIssue,
@@ -78,10 +54,16 @@ class GhError extends Error {
   }
 }
 
+// A stalled `gh` call must not hold a PR step forever.
+export const REST_TIMEOUT_MS = 30_000;
+
 export class GitHub implements TrackerPort, CodeHostPort {
   private readonly rest: RestIssues;
 
-  constructor(private readonly runner: CommandRunner = new GhCommandRunner()) {
+  constructor(
+    private readonly runner: CommandRunner = new GhCommandRunner(),
+    private readonly restTimeoutMs: number = REST_TIMEOUT_MS,
+  ) {
     this.rest = new RestIssues(
       runner,
       async (args, result) => (await this.rateLimitOf(result)) ?? new GhError(args, result),
@@ -92,6 +74,22 @@ export class GitHub implements TrackerPort, CodeHostPort {
     const result = await this.runner.run(args);
     if (result.code !== 0) throw new GhError(args, result);
     return result;
+  }
+
+  // A REST write with a request timeout. A timed-out call is tried once more; if that times out too the
+  // step fails with the call named. Any other failure is thrown at once, so a refusal is never repeated.
+  private async restCall(name: string, args: string[]): Promise<CommandResult> {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const result = await this.runner.run(args, { timeoutMs: this.restTimeoutMs });
+      if (result.timedOut) continue;
+      if (result.code !== 0) throw await this.restFail(args, result);
+      return result;
+    }
+    throw new Error(`${name} timed out after ${this.restTimeoutMs}ms on 2 attempts`);
+  }
+
+  private async restFail(args: string[], result: CommandResult): Promise<Error> {
+    return (await this.rateLimitOf(result)) ?? new GhError(args, result);
   }
 
   async listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]> {
@@ -198,23 +196,10 @@ export class GitHub implements TrackerPort, CodeHostPort {
   }
 
   async createPr(opts: CreatePrOptions): Promise<string> {
-    const args = [
-      "pr",
-      "create",
-      "--repo",
-      opts.repo,
-      "--base",
-      opts.base,
-      "--head",
-      opts.head,
-      "--title",
-      opts.title,
-      "--body",
-      opts.body,
-    ];
-    if (opts.draft) args.push("--draft");
-    const result = await this.exec(args);
-    return result.stdout.trim().split("\n").pop() ?? "";
+    const [name, args] = createPrCall(opts);
+    const url = (JSON.parse((await this.restCall(name, args)).stdout || "{}") as { html_url?: string }).html_url;
+    if (!url) throw new Error(`${name} returned no html_url`);
+    return url;
   }
 
   // A fork can name its branch factory/issue-N or write "Closes #N", so only PRs from this
@@ -429,7 +414,9 @@ export class GitHub implements TrackerPort, CodeHostPort {
   // --match-head-commit refuses the merge if the PR's head moved since headSha was read.
   // Never --admin: a branch-protection block is respected.
   async mergePr(repo: string, number: number, headSha: string, settings?: MergeSettings): Promise<void> {
-    await this.exec(mergeArgs(repo, number, headSha, settings));
+    // The host owns an auto-merge, and REST has no call for it, so that one stays on `gh pr merge`.
+    if (isHostRun(settings)) await this.exec(mergeArgs(repo, number, headSha, settings));
+    else await this.restCall(...mergeCall(repo, number, headSha, settings));
   }
 
   async prFiles(repo: string, prNumber: number): Promise<PrFile[]> {

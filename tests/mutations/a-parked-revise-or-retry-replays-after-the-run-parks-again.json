@@ -1,0 +1,7 @@
+{
+  "name": "a parked revise or retry replays after the run parks again",
+  "file": "src/watch.ts",
+  "find": "  if (handled(issue, latest)) return undefined;\n  if (command.type === \"cancel\")",
+  "replace": "  if (command.type === \"cancel\")",
+  "test": "tests/chat-commands.test.ts"
+}

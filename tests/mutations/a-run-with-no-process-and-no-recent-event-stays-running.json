@@ -1,0 +1,7 @@
+{
+  "name": "a run with no process and no recent event stays running",
+  "file": "src/run-liveness.ts",
+  "find": "now - Date.parse(deps.state.lastActivity(run)) > STALE_RUN_MS",
+  "replace": "false",
+  "test": "tests/run-liveness.test.ts"
+}

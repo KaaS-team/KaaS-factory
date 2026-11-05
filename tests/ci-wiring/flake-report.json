@@ -1,1 +1,1 @@
-{"script":"scripts/flake-report.ts","workflows":[".github/workflows/flakes.yml","ci/flakes.yml"]}
+{"script":"scripts/flake-report.ts","workflows":[".github/workflows/flakes.yml","ci/flakes.yml"],"onMainExempt":"reads the nightly junit report, and never blocks a push"}
