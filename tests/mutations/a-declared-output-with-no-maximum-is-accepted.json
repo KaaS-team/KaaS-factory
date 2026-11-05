@@ -1,0 +1,7 @@
+{
+  "name": "a declared output with no maximum is accepted",
+  "file": "src/core/workflow-outputs.ts",
+  "find": "if (!whole(d.max, 1000)) problems.push(",
+  "replace": "if (false) problems.push(",
+  "test": "tests/workflow-outputs.test.ts"
+}

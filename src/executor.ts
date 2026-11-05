@@ -102,6 +102,33 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
   return exitCode !== 0 && stderrTail ? { ...result, stderrTail } : result;
 }
 
+// The stop reason once a stage's refused calls reach `limit`, naming each refused command; undefined below it.
+// A refusal is matched to its tool_use by id; an unmatched one is named by its tool.
+export function refusalStop(events: readonly StageEvent[], limit: number): string | undefined {
+  const refused = events.filter((e) => e.kind === "refusal");
+  if (refused.length < limit) return undefined;
+  const calls = new Map(events.filter((e) => e.kind === "tool_use" && e.toolUseId).map((e) => [e.toolUseId, e]));
+  const named = refused.map((r) => {
+    const call = calls.get(r.toolUseId);
+    const what = [call?.toolName ?? "tool", call?.toolTarget].filter(Boolean).join(" ").replace(/\s+/g, " ");
+    return `\`${what.length > 120 ? `${what.slice(0, 119)}…` : what}\` (${r.refusedBy ?? "refused"})`;
+  });
+  return `stage stopped after ${refused.length} refused tool calls (limit ${limit}): ${named.join("; ")}`;
+}
+
+// Why the running stage should be killed after `e`, or undefined: a startup error, too many tool calls, or too many refused ones.
+export function stageStop(
+  events: readonly StageEvent[],
+  e: StageEvent,
+  toolCalls: number,
+  opts: Pick<StageRunOptions, "maxToolCalls" | "maxRefusals">,
+): string | undefined {
+  if (e.kind === "startup_error") return `agent startup failed: ${e.text}`;
+  if (e.kind === "tool_use" && opts.maxToolCalls && toolCalls > opts.maxToolCalls)
+    return `stage exceeded maxToolCalls=${opts.maxToolCalls}`;
+  return e.kind === "refusal" && opts.maxRefusals ? refusalStop(events, opts.maxRefusals) : undefined;
+}
+
 // Fixture-driven, deterministic, no network. Keyed by "<stage>:<issue>" -> an
 // array of raw stream-json lines, exactly what a recorded `claude` run wrote.
 export class ReplayExecutor implements Executor {

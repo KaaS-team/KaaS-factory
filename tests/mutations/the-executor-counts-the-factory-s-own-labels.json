@@ -1,0 +1,7 @@
+{
+  "name": "the executor counts the factory's own labels",
+  "file": "src/safe-outputs.ts",
+  "find": "if (!l.startsWith(\"factory:\")) admit(",
+  "replace": "if (true) admit(",
+  "test": "tests/workflow-outputs.test.ts"
+}

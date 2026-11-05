@@ -26,6 +26,7 @@ export interface StageEvent {
   readonly denials?: string[];
   // On "result" events: the same calls with their tool_use ids; on "refusal" events: the id and what refused it.
   readonly denied?: ReadonlyArray<{ readonly tool: string; readonly target: string; readonly id?: string }>;
+  // On "tool_use" events (when the CLI reports it) and "refusal" events: the call's id.
   readonly toolUseId?: string;
   readonly refusedBy?: string;
   // The agent's own closing message (Claude `result.result`, Codex `agent_message`).
@@ -43,6 +44,8 @@ export interface StageRunOptions {
   readonly maxBudgetUsd: number;
   readonly timeoutMinutes?: number;
   readonly maxToolCalls?: number;
+  // Stop the stage once this many of its tool calls were refused; unset never stops it on refusals.
+  readonly maxRefusals?: number;
   readonly agentCommands?: AgentCommands;
   // The agent name from config; recorded in stage_runs. Unset means "claude".
   readonly agent?: string;

@@ -1,0 +1,1 @@
+{"name":"the refill reserves a slot without holding its spend","file":"src/orchestrate/refill.ts","find":"ledger.reserve(issue.number, pick.provider, orch.cost.perRunUsd);","replace":"ledger.reserve(issue.number, pick.provider);","test":"tests/cloud-runtimes.test.ts"}

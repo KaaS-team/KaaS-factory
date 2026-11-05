@@ -1,0 +1,7 @@
+{
+  "name": "the screen lets a link to an unlisted host through",
+  "file": "src/write-screen.ts",
+  "find": "if (host && !allowed(host, hosts))",
+  "replace": "if (false)",
+  "test": "tests/write-screen.test.ts"
+}

@@ -12,6 +12,7 @@ const launchInput = {
   model: "claude-sonnet",
   key: "o/r#7#1",
   title: "issue 7",
+  issueRef: "o/r#7",
 };
 
 type Recorded = { method: string; url: string; headers: Record<string, string>; body: Record<string, unknown> };

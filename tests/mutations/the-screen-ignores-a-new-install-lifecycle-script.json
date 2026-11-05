@@ -1,0 +1,7 @@
+{
+  "name": "the screen ignores a new install lifecycle script",
+  "file": "src/write-screen.ts",
+  "find": "if (LIFECYCLE.test(text))",
+  "replace": "if (false)",
+  "test": "tests/write-screen.test.ts"
+}

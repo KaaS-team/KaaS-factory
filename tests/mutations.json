@@ -128,7 +128,7 @@
   {"name": "proof: runner runs it before verify", "file": "src/engine/steps.ts", "find": "if (deps.proofGit) {", "replace": "if (false) {", "test": "tests/proof.test.ts"},
   {"name": "claude: per-stage --tools", "file": "src/agents/presets/claude.ts", "find": "    \"--tools\",\n    STAGE_TOOLS[opts.stage].join(\",\"),\n", "replace": "", "test": "tests/agents.test.ts"},
   {"name": "claude: Agent only where a skill dispatches one", "file": "src/stage-permissions.ts", "find": "  triage: BASE_TOOLS,", "replace": "  triage: [...BASE_TOOLS, \"Agent\"],", "test": "tests/agents.test.ts"},
-  {"name": "startup: kill on startup_error", "file": "src/agents/executor.ts", "find": "if (e.kind === \"startup_error\" && !killedReason) {", "replace": "if (false) {", "test": "tests/claude-stage-run.test.ts"},
+  {"name": "startup: kill on startup_error", "file": "src/executor.ts", "find": "if (e.kind === \"startup_error\") return", "replace": "if (false) return", "test": "tests/claude-stage-run.test.ts"},
   {"name": "startup: failed MCP server", "file": "src/agents/presets/claude.ts", "find": "s.status === \"failed\"", "replace": "false", "test": "tests/claude-stage-run.test.ts"},
   {"name": "claude: stage env applied", "file": "src/agents/executor.ts", "find": "      ...agent.preset?.env,\n", "replace": "", "test": "tests/claude-stage-run.test.ts"},
   {"name": "manifest: doctor compares hashes", "file": "src/doctor.ts", "find": "sha256(text) !== sha", "replace": "false", "test": "tests/install.test.ts"},

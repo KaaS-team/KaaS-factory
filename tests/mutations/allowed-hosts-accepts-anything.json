@@ -1,0 +1,7 @@
+{
+  "name": "allowed_hosts accepts anything",
+  "file": "src/core/workflow-outputs.ts",
+  "find": "if (!ok) problems.push(\"allowed_hosts:",
+  "replace": "if (false) problems.push(\"allowed_hosts:",
+  "test": "tests/write-screen.test.ts"
+}

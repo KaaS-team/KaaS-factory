@@ -1,0 +1,7 @@
+{
+  "name": "a schedule runs after its stop date",
+  "file": "src/engine/triggers.ts",
+  "find": "workflow.triggers.until !== undefined &&",
+  "replace": "false &&",
+  "test": "tests/workflow-outputs.test.ts"
+}

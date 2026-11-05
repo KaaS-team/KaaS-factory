@@ -1,0 +1,7 @@
+{
+  "name": "the executor never stops a stage on refused calls",
+  "file": "src/executor.ts",
+  "find": "return e.kind === \"refusal\" && opts.maxRefusals ?",
+  "replace": "return false && e.kind === \"refusal\" && opts.maxRefusals ?",
+  "test": "tests/refusal-stop.test.ts"
+}

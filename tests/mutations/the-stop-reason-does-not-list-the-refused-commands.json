@@ -1,0 +1,7 @@
+{
+  "name": "the stop reason does not list the refused commands",
+  "file": "src/executor.ts",
+  "find": "return `stage stopped after ${refused.length} refused tool calls (limit ${limit}): ${named.join(\"; \")}`;",
+  "replace": "return `stage stopped after ${refused.length} refused tool calls (limit ${limit})`;",
+  "test": "tests/refusal-stop.test.ts"
+}

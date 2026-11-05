@@ -37,13 +37,14 @@ export function resolveOrchestrate(input: {
   const spec: OrchestrateSpec = {};
   const origin: Record<string, string> = {};
   const problems: string[] = [];
-  for (const l of leaves("enabled", value)) origin[l] = "builtin";
+  origin.enabled = "builtin";
   for (const [n, p] of Object.entries(value.providers))
     for (const l of leaves(`providers.${n}`, p)) origin[l] = "builtin";
   for (const l of leaves("roles", value.roles)) origin[l] = "builtin";
   for (const l of leaves("priority", value.priority)) origin[l] = "builtin";
   for (const l of leaves("groom", value.groom)) origin[l] = "builtin";
   for (const l of leaves("cost", value.cost)) origin[l] = "builtin";
+  origin.promptMaxBytes = "builtin";
 
   const tname = input.teamName ?? "team";
   const levels: Lv[] = [
@@ -154,6 +155,9 @@ export function resolveOrchestrate(input: {
     });
     pickLow("cost.intakeStopUsd", value.cost.intakeStopUsd, o.cost?.intakeStopUsd, lv, (v) => {
       value.cost.intakeStopUsd = v;
+    });
+    pickLow("promptMaxBytes", value.promptMaxBytes, o.promptMaxBytes, lv, (v) => {
+      value.promptMaxBytes = v;
     });
     const block = lv.tag !== "org" && locked.includes("orchestrate.roles");
     if (o.roles?.build !== undefined) {

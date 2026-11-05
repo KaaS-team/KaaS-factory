@@ -1,0 +1,7 @@
+{
+  "name": "the runner steps are not screened",
+  "file": "src/engine/output-gate.ts",
+  "find": "github: screenScm(github, hosts, diff)",
+  "replace": "github",
+  "test": "tests/write-screen.test.ts"
+}

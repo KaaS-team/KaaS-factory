@@ -1,0 +1,7 @@
+{
+  "name": "the refusal limit default is not five",
+  "file": "src/core/workflow.ts",
+  "find": "export const DEFAULT_MAX_REFUSALS = 5;",
+  "replace": "export const DEFAULT_MAX_REFUSALS = 50;",
+  "test": "tests/refusal-stop.test.ts"
+}

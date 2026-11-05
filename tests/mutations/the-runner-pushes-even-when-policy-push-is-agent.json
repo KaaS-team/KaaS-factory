@@ -1,0 +1,1 @@
+{"name":"the runner pushes even when policy.push is agent","file":"src/engine/build-tail.ts","find":"pushPolicy(config) === \"agent\" ?","replace":"false ?","test":"tests/push-policy.test.ts"}

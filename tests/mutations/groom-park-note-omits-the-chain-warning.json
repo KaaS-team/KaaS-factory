@@ -1,0 +1,1 @@
+{"name": "groom park note omits the chain warning", "file": "src/orchestrate/groom.ts", "find": "report.warning ? `", "replace": "false ? `", "test": "tests/orchestrate-groom.test.ts"}

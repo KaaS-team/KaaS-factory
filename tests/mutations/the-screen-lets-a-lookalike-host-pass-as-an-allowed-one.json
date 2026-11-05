@@ -1,0 +1,7 @@
+{
+  "name": "the screen lets a lookalike host pass as an allowed one",
+  "file": "src/write-screen.ts",
+  "find": "host === h || host.endsWith(`.${h.toLowerCase()}`)",
+  "replace": "host.includes(h)",
+  "test": "tests/write-screen.test.ts"
+}

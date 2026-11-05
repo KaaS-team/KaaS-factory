@@ -1,0 +1,1 @@
+{"name":"cloud status leaves out the runtime","file":"src/cloud/status-cli.ts","find":"r.provider || \"(released)\"","replace":"\"(released)\"","test":"tests/cloud-runtimes.test.ts"}

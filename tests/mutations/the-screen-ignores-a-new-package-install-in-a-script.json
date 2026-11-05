@@ -1,0 +1,7 @@
+{
+  "name": "the screen ignores a new package install in a script",
+  "file": "src/write-screen.ts",
+  "find": "if (INSTALL.test(text))",
+  "replace": "if (false)",
+  "test": "tests/write-screen.test.ts"
+}

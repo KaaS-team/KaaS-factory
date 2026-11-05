@@ -1,0 +1,1 @@
+{"name":"the template drops the push deny when policy.push is runner","file":"src/install-template.ts","find":"(opts.push ?? targetPushPolicy(base)) === \"agent\"","replace":"true","test":"tests/push-policy.test.ts"}

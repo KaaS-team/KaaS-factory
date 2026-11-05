@@ -1,0 +1,7 @@
+{
+  "name": "the screen ignores a script that downloads and runs code",
+  "file": "src/write-screen.ts",
+  "find": "if (PIPE_TO_SHELL.test(text))",
+  "replace": "if (false)",
+  "test": "tests/write-screen.test.ts"
+}

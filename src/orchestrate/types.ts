@@ -21,6 +21,7 @@ export interface OrchestrateSpec {
     model?: string;
   };
   cost?: { perRunUsd?: number; perDayUsd?: number; intakeStopUsd?: number };
+  promptMaxBytes?: number;
 }
 export interface Provider {
   max: number;
@@ -38,6 +39,8 @@ export interface Orchestrate {
   priority: PriorityRule[];
   groom: { enabled: boolean; target: number; label: string; perTick: number; epicMinutes: number; model: string };
   cost: { perRunUsd: number; perDayUsd: number; intakeStopUsd: number };
+  // The one limit on a launch prompt; a longer one is refused before launch.
+  promptMaxBytes: number;
 }
 export const PRIORITY_RULES = ["label", "rank", "risk", "size", "epic", "number"] as const;
 export type PriorityRule = (typeof PRIORITY_RULES)[number];
@@ -61,19 +64,23 @@ const defClaude: Provider = {
   cancel: [],
 };
 
+const defLocal: Provider = { ...defClaude, model: "auto" };
+
 // model ids are not verified here; confirm with GET /v1/models (cursor) or the claude CLI model list; opusplan uses Opus only in plan mode, fall back to opus if a read-only stage rejects it
 export const DEFAULT_ORCHESTRATE: Orchestrate = {
   enabled: false,
-  providers: { "cursor-cloud": { ...defCursor }, "claude-cloud": { ...defClaude } },
+  providers: { "cursor-cloud": { ...defCursor }, "claude-cloud": { ...defClaude }, "cursor-local": { ...defLocal } },
   roles: { build: ["cursor-cloud", "local"], groom: "" },
   priority: [...PRIORITY_RULES],
   groom: { enabled: false, target: 4, label: "needs-plan", perTick: 1, epicMinutes: 120, model: "opusplan" },
   cost: { perRunUsd: 5, perDayUsd: 50, intakeStopUsd: 40 },
+  promptMaxBytes: 4000,
 };
 
 export function defaultProvider(name: string, cur?: Provider): Provider {
   if (cur) return structuredClone(cur);
   if (name === "cursor-cloud") return { ...defCursor };
   if (name === "claude-cloud") return { ...defClaude };
+  if (name === "cursor-local") return { ...defLocal };
   return { max: 0, model: "auto", timeoutMinutes: 90, keyEnv: "", launch: [], status: [], cancel: [] };
 }

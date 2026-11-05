@@ -1,0 +1,1 @@
+{"name":"cursor-local pushes even when the agent pushes","file":"src/cloud/cursor-local.ts","find":"if (i.agentPushes)","replace":"if (false)","test":"tests/cloud-runtimes.test.ts"}

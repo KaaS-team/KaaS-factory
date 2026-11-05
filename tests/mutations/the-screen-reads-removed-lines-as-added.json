@@ -1,0 +1,7 @@
+{
+  "name": "the screen reads removed lines as added",
+  "file": "src/write-screen.ts",
+  "find": "line.startsWith(\"+\") && !line.startsWith(\"+++\")",
+  "replace": "line.startsWith(\"-\") && !line.startsWith(\"---\")",
+  "test": "tests/write-screen.test.ts"
+}

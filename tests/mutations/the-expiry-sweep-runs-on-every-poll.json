@@ -1,0 +1,7 @@
+{
+  "name": "the expiry sweep runs on every poll",
+  "file": "src/engine/triggers.ts",
+  "find": "< 60 * MINUTE) return;",
+  "replace": "< 0) return;",
+  "test": "tests/workflow-outputs.test.ts"
+}

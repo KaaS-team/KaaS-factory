@@ -42,7 +42,7 @@ describe("the bundled feature-to-pr", () => {
       ["verify", LABEL.verifying],
       ["pr", LABEL.inReview],
     ]);
-    expect(wf.limits).toEqual({ questions: 2, rejects: 2 });
+    expect(wf.limits).toEqual({ questions: 2, rejects: 2, refusals: 5 });
     expect(wf.steps.verify!.reject).toBe("build");
     expect(wf.steps.pr!.revise).toBe("build");
   });

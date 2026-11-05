@@ -98,6 +98,8 @@ comment does not. Every park edge of one step takes the same `after:`.
 ```
 
 `limits.questions` caps needs-info rounds and `limits.rejects` caps rejections (both default 2).
+`limits.refusals` (default 5, at least 1) stops a stage once that many of its tool calls were refused. The run
+fails with the refused commands listed in the reason.
 
 ## `on:` schedules and events
 
@@ -124,6 +126,40 @@ on:
 Each event files one issue per event id with the event data in its body; a redelivered event files
 nothing new. A factory event's issue is `factory:ready`. Another app's event files it unlabelled, for
 a maintainer to read and label (see [events.md](events.md)).
+
+`on.until: 2026-12-31` is the last day, in UTC, a workflow's cron triggers file an issue. After it they file nothing.
+
+## `outputs:` declared writes
+
+A workflow with no `outputs:` is not limited. One that has it may write only what it declares, each with a
+per-run `max` (required):
+
+```yaml
+outputs:
+  issue: { max: 2, title_prefix: "[bot] ", expires: 14 }   # expires: days
+  pull_request: { max: 1, title_prefix: "[bot] ", on_protected_path: issue }
+  comment: { max: 3 }
+  label: { max: 2 }
+```
+
+Its steps then get a tracker that refuses an undeclared write or one past the maximum. The step fails, and the
+refusal is on the run as a `write_refused` event and in the failure reason. Counted are issues, pull requests,
+labels that are not `factory:` labels, and comments on any issue other than the run's own. A `title_prefix` is put
+in front of the title of each issue or pull request. An issue with `expires` carries an expiry line; once past it
+with no comment by a person, the watcher's hourly sweep closes it with one comment saying why. Only issues expire.
+With `on_protected_path: issue` (it needs `outputs.issue`), a change that touches a protected path is filed as an
+issue with the diff instead of parking the run.
+
+## The write screen
+
+Every issue, comment and pull request a step writes is screened first, whatever the workflow. The screen holds a
+write when it finds a secret, a line that tells an agent what to do (to ignore its instructions, to keep something
+from the maintainer), a link to a host outside the allowlist (`github.com` and `githubusercontent.com`, plus any
+`allowed_hosts: [docs.example.com]` the workflow lists), or, in the diff a pull request carries, a script that
+downloads and runs code, or a new network call, package install or install lifecycle script in a shell script,
+Makefile, Dockerfile, CI workflow or `package.json`. The `pr` step's diff is screened before the step starts. A hold
+does not make that write, parks the run as `factory:needs-human`, records a `write_held` event, and names each finding by check and place
+without quoting what tripped it. The secret scan on every post is unchanged.
 
 ## `mcp:` servers per step
 

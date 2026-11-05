@@ -62,6 +62,12 @@ class CloudGit extends FakeGit {
   beforeSha = "aaa000";
   pullCalls = 0;
   pushCalls = 0;
+  // False until a test says the branch already holds the issue's commits.
+  prebuilt = false;
+
+  override async hasCommits(): Promise<boolean> {
+    return this.prebuilt;
+  }
 
   override async remoteHeadSha(): Promise<string | undefined> {
     return this.remoteSha;
@@ -321,6 +327,87 @@ describe("cloud build step", () => {
       .join("\n");
     expect(bodies.includes("without pushing commits")).toBe(true);
     state.close();
+  });
+
+  const run7 = async (
+    fake: FakeCloud,
+    git: CloudGit,
+    orchestrate: Record<string, unknown> = { enabled: true },
+    reserve: (state: FactoryState, repo: string) => Promise<void> | void = (state, repo) =>
+      reserveCloud(state, repo, 7),
+  ) => {
+    const state = new FactoryState(":memory:");
+    state.setToggle("orchestrate", true);
+    const repo = "acme/widgets";
+    const config = mergeConfig({ repo, base: "main", orchestrate });
+    await reserve(state, repo);
+    state.upsertRun({ repo, issue: 7, title: "t", stage: "build", status: "running", config_hash: "x" });
+    const github = new FakeGitHub([baseIssue(7, [LABEL.ready])]);
+    const issue = { ...baseIssue(7, [LABEL.ready]), body: "SECRET-SPEC-BODY ".repeat(2000) };
+    const sc = stepCtx(
+      { state, git, gateRunner: new FakeGateRunner(), github } as unknown as StepCtx["deps"],
+      config,
+      issue,
+      worktreeDir(),
+    );
+    const result = await cloudAware(STEP_TYPES.build!, testIo(fake)).run(sc);
+    const comments = github.issues
+      .get(7)!
+      .comments.map((c) => c.body)
+      .join("\n");
+    state.close();
+    return { result, comments };
+  };
+
+  test("the launch carries the issue reference, not the issue body", async () => {
+    const fake = new FakeCloud();
+    let seen: import("../src/cloud/port").LaunchInput | undefined;
+    const launch = fake.launch.bind(fake);
+    fake.launch = async (i) => ((seen = i), launch(i));
+    await run7(fake, new CloudGit());
+    expect(seen!.issueRef).toBe("acme/widgets#7");
+    expect(seen!.prompt).toContain("/repos/acme/widgets/issues/7");
+    expect(seen!.prompt).not.toContain("SECRET-SPEC-BODY");
+  });
+
+  test("a prompt over the limit is refused before launch, naming size and limit", async () => {
+    const fake = new FakeCloud();
+    const { comments } = await run7(fake, new CloudGit(), { enabled: true, promptMaxBytes: 50 });
+    expect(fake.launchCalls).toBe(0);
+    expect(comments).toMatch(/bytes, over the limit of 50/);
+  });
+
+  test("a branch that already holds the commits skips the launch", async () => {
+    const fake = new FakeCloud();
+    const git = new CloudGit();
+    git.prebuilt = true;
+    await run7(fake, git);
+    expect(fake.launchCalls).toBe(0);
+    expect(git.pullCalls).toBe(1);
+  });
+
+  test("a runtime label reserves a slot at poll time and the build launches through it", async () => {
+    const fake = new FakeCloud();
+    const { reserveForPoll } = await import("../src/orchestrate/refill");
+    let reserved: { issue: number; provider: string }[] | undefined;
+    await run7(
+      fake,
+      new CloudGit(),
+      { enabled: true, providers: { "cursor-cloud": { max: 1 } } },
+      async (state, repo) => {
+        const config = mergeConfig({ repo, orchestrate: { enabled: true, providers: { "cursor-cloud": { max: 1 } } } });
+        const ready = [{ number: 7, body: "", labels: [{ name: "runtime:cursor-cloud" }] }];
+        reserved = (await reserveForPoll({ state }, config, ready))?.reserved;
+      },
+    );
+    expect(reserved).toEqual([{ issue: 7, provider: "cursor-cloud" }]);
+    expect(fake.launchCalls).toBe(1);
+  });
+
+  test("a branch without commits launches", async () => {
+    const fake = new FakeCloud();
+    await run7(fake, new CloudGit());
+    expect(fake.launchCalls).toBe(1);
   });
 
   test("neutral comment", async () => {

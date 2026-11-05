@@ -23,8 +23,6 @@ import { defaultRepo } from "../src/paths";
 import { liveItems, proofView } from "./run-page";
 import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
-import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
-import { codeownersFromBase, rulesFor } from "../src/profile-rules";
 import { analytics } from "./analytics";
 import { HEALTH_ROUTE, healthRoute } from "./health";
 import { agentsProbe, type DashboardProject, projectResolver } from "./project";
@@ -35,6 +33,7 @@ import { planeExtensions } from "./plane/extension";
 import { boardCache } from "./plane/board-cache";
 import { readAccess, runIn } from "./plane/repo-scope";
 import { PlaneStore } from "./plane/store";
+import { operatorMerge } from "./operator-merge";
 import { senderName } from "./plane/commands";
 import { planeRoutes } from "./plane/mode";
 import { createRemote, REMOTE_PUBLIC_ROUTES } from "./plane/remote";
@@ -384,24 +383,16 @@ export function createDashboard(
           github.mergeReadiness(r, pr.number),
           ciStatusNow(github, r, pr.number),
         ]);
-        let owners: Parameters<typeof decideOperatorMerge>[2];
-        if (rulesFor((await projectFor(r))?.config.profile).codeownerApproval) {
-          const files = await github.prFiles?.(r, pr.number).catch(() => undefined);
-          let rules: Awaited<ReturnType<typeof codeownersFromBase>>;
-          try {
-            rules = await codeownersFromBase(github, r, readiness.baseRefName);
-          } catch {
-            return json({ error: "CODEOWNERS could not be read, so the merge is held" }, { status: 502 });
-          }
-          owners = {
-            rules,
-            files,
-            approvedBy: readiness.approvedBy ?? [],
-          };
-        }
-        const decision = decideOperatorMerge(readiness, ci, owners);
-        const merged = await attemptMerge(github, r, pr.number, decision);
-        await github.commentIssue(r, issueNumber, renderOperatorAuditComment(decision));
+        const project = await projectFor(r);
+        const out = await operatorMerge(github, r, pr.number, issueNumber, {
+          readiness,
+          ci,
+          approver: access.actorOf(req)?.login ?? "",
+          profile: project?.config.profile,
+          cloneDir: project?.readOnly ? undefined : project?.cloneDir,
+        });
+        if (out.error) return json({ error: out.error }, { status: out.status });
+        const { merged, decision } = out;
         // The dashboard has no Executor to run retro itself (plan v2.10.0 item
         // 3); queueRetro just records the row, and watch.ts's poll loop
         // (runQueuedRetros) drains it on its next tick.
@@ -409,7 +400,7 @@ export function createDashboard(
           invalidateIssuesCache(r);
           stateFor(r, true)!.queueRetro(r, issueNumber, "merged");
         }
-        return json({ ok: merged, decision });
+        return json({ ok: merged, decision }, { status: out.status });
       },
     },
     {

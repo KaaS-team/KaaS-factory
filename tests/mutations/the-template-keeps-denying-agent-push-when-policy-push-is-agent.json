@@ -1,0 +1,1 @@
+{"name":"the template keeps denying agent push when policy.push is agent","file":"src/install-template.ts","find":"json.permissions.deny.filter((d: string) => d !== PLAIN_PUSH_DENY)","replace":"json.permissions.deny","test":"tests/push-policy.test.ts"}

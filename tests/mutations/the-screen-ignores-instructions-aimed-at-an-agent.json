@@ -1,0 +1,7 @@
+{
+  "name": "the screen ignores instructions aimed at an agent",
+  "file": "src/write-screen.ts",
+  "find": "if (re.test(text)) findings.push(",
+  "replace": "if (false) findings.push(",
+  "test": "tests/write-screen.test.ts"
+}

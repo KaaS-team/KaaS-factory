@@ -1,0 +1,7 @@
+{
+  "name": "a hold does not name its findings on the thread",
+  "file": "src/engine/output-gate.ts",
+  "find": "so nothing more of it was applied.\\n\\n${what}`",
+  "replace": "so nothing more of it was applied.`",
+  "test": "tests/write-screen.test.ts"
+}

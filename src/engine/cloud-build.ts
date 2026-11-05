@@ -1,5 +1,7 @@
 // Cloud build path: hand the planned body to a provider, pull its commits, grade locally.
 
+import type { RunCommand } from "../cloud/spawn";
+import { pushPolicy } from "../config-merge";
 import { cloudLedger, cloudProvider, CloudError, TERMINAL, type CloudProvider, type CloudStatus } from "../cloud";
 import { defaultCloudIo } from "../cloud-io";
 import { runGates } from "../gates";
@@ -34,15 +36,18 @@ export interface CloudIo {
   sleep: (ms: number) => Promise<void>;
   now: () => number;
   pollMs: number;
+  run?: RunCommand;
   provider?: (name: string, orch: Orchestrate) => CloudProvider | undefined;
   /** When set, overrides orchestrateActive for tests. */
   orchestrate?: boolean;
 }
 
-export function cloudPrompt(issueBody: string, branch: string, protectedPaths: readonly string[]): string {
+// The agent reads the issue body itself over REST, so a long spec is never copied into the launch.
+export function cloudPrompt(repo: string, issue: number, branch: string, protectedPaths: readonly string[]): string {
   const paths =
     protectedPaths.length > 0 ? protectedPaths.map((p) => `- ${p}`).join("\n") : "- (none beyond .factory/)";
-  return `${issueBody}
+  return `Read issue #${issue} of ${repo} and build what it asks.
+Fetch it with GET https://api.github.com/repos/${repo}/issues/${issue} (the body field is the spec).
 
 Work only on branch \`${branch}\`.
 Commit and push there.
@@ -84,8 +89,9 @@ export function cloudAware(local: StepType, io: CloudIo = defaultCloudIo()): Ste
         let runId: string;
         let summary: string | undefined;
         let status: CloudStatus;
+        let built = false;
         try {
-          ({ before, runId, summary, status } = await startCloudRun(sc, ledger, provider, model));
+          ({ before, runId, summary, status, built } = await startCloudRun(sc, ledger, provider, model, orch));
         } catch (err) {
           if (err instanceof CloudError && err.kind === "auth") {
             await postComment(deps, config, n, AUTH_COMMENT);
@@ -98,6 +104,11 @@ export function cloudAware(local: StepType, io: CloudIo = defaultCloudIo()): Ste
         let lastCost: number | undefined;
         let killedReason: string | null = null;
         const startedMs = io.now();
+
+        if (built) {
+          ledger.release(n);
+          return await gradeAndFinish(sc, summary);
+        }
 
         while (!TERMINAL.has(status)) {
           if (io.now() >= deadline) {
@@ -176,19 +187,7 @@ export function cloudAware(local: StepType, io: CloudIo = defaultCloudIo()): Ste
           );
         }
 
-        const gate = await runGates(deps.gateRunner, worktree);
-        if (gate.status !== "GREEN") {
-          deps.state.updateRun(config.repo, n, { gate_line: gate.raw });
-          const cause = stageCause(config, n, "build", CLOUD_OK, { gate });
-          return stop(await failStage(deps, config, issue, step.label, "build", cause));
-        }
-
-        return finishBuild(sc, gate, {
-          status: "done",
-          gate_line: gate.raw,
-          rounds: 1,
-          summary,
-        });
+        return await gradeAndFinish(sc, summary);
       } finally {
         ledger.release(n);
       }
@@ -196,19 +195,46 @@ export function cloudAware(local: StepType, io: CloudIo = defaultCloudIo()): Ste
   };
 }
 
+async function gradeAndFinish(sc: StepCtx, summary: string | undefined): Promise<StepResult> {
+  const { deps, config, issue, worktree, step } = sc;
+  const gate = await runGates(deps.gateRunner, worktree);
+  if (gate.status !== "GREEN") {
+    deps.state.updateRun(config.repo, issue.number, { gate_line: gate.raw });
+    const cause = stageCause(config, issue.number, "build", CLOUD_OK, { gate });
+    return stop(await failStage(deps, config, issue, step.label, "build", cause));
+  }
+  return finishBuild(sc, gate, { status: "done", gate_line: gate.raw, rounds: 1, summary });
+}
+
 async function startCloudRun(
   sc: StepCtx,
   ledger: ReturnType<typeof cloudLedger>,
   provider: CloudProvider,
   model: string,
-): Promise<{ before: string; runId: string; summary?: string; status: CloudStatus }> {
+  orch: Orchestrate,
+): Promise<{ before: string; runId: string; summary?: string; status: CloudStatus; built: boolean }> {
   const { deps, config, issue, worktree } = sc;
   const n = issue.number;
   const res = ledger.reservation(n)!;
   const branch = deps.git.branchName(n);
-  const prompt = cloudPrompt(issue.body ?? "", branch, config.protectedPaths);
+  const prompt = cloudPrompt(config.repo, n, branch, config.protectedPaths);
+  const size = Buffer.byteLength(prompt);
+  if (size > orch.promptMaxBytes)
+    throw new CloudError(
+      "provider",
+      `the launch prompt is ${size} bytes, over the limit of ${orch.promptMaxBytes} (orchestrate.promptMaxBytes)`,
+    );
   const sess = ledger.session(n);
-  const before = sess?.baseSha ?? (await deps.git.remoteHeadSha(worktree, n)) ?? "";
+  const remote = await deps.git.remoteHeadSha(worktree, n);
+  const before = sess?.baseSha ?? remote ?? "";
+  // A branch that already holds the issue's commits goes straight to the PR step; launching again would redo it.
+  if (
+    !sess &&
+    remote &&
+    (await deps.git.pullBranch(worktree, n)).code === 0 &&
+    (await deps.git.hasCommits(worktree, config.base))
+  )
+    return { before, runId: "", status: "finished", built: true };
   const key = `${config.repo}#${n}#${res.attempt}`;
   const launched = await provider.launch({
     repoUrl: `https://github.com/${config.repo}`,
@@ -217,7 +243,10 @@ async function startCloudRun(
     model,
     key,
     title: issue.title,
+    issueRef: `${config.repo}#${n}`,
+    cwd: worktree,
+    agentPushes: pushPolicy(config) === "agent",
   });
   ledger.started(n, provider.name, launched.id, before);
-  return { before, runId: launched.id, summary: launched.summary, status: launched.status };
+  return { before, runId: launched.id, summary: launched.summary, status: launched.status, built: false };
 }

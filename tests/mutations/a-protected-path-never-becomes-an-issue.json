@@ -1,0 +1,7 @@
+{
+  "name": "a protected path never becomes an issue",
+  "file": "src/engine/output-gate.ts",
+  "find": "if (!workflow.outputs?.pull_request?.onProtectedPath) return undefined;",
+  "replace": "return undefined;",
+  "test": "tests/workflow-outputs.test.ts"
+}

@@ -2,6 +2,9 @@
 // talks to the tracker or GitHub, with tokens the agent never sees. A repo's agentCommands are
 // held to an allowlist of shapes, since a denylist of commands is bypassed by any wrapper.
 
+import type { OutputKind, Outputs } from "./core/workflow-outputs";
+import type { CreatePrOptions, ScmPort } from "./ports/scm";
+
 // Executables that run another command or arbitrary code, so the rule says nothing about what runs.
 const WRAPPERS = new Set([
   ...["env", "bash", "sh", "zsh", "dash", "ksh", "fish", "eval", "exec", "sudo", "doas", "nohup", "timeout"],
@@ -55,4 +58,109 @@ export function isOutward(rule: string): boolean {
   if (cmd === undefined) return false;
   const [argv0 = "", sub] = cmd.toLowerCase().split(/\s+/);
   return OUTWARD.has(argv0) || (argv0 === "git" && OUTWARD_GIT.has(sub ?? ""));
+}
+
+// ---- Declared outputs (#637): what a workflow's run may write, how much, and for how long. ----
+
+// The write the workflow did not declare, or one past its maximum.
+export class WriteRefused extends Error {}
+
+export type Tally = Map<OutputKind, number>;
+const MARK = "<!-- factory:expires ";
+
+// The title with the declared prefix, and the count taken: or the reason it is refused. With no
+// `outputs:` the workflow declared nothing, so nothing is gated (every shipped workflow today).
+export function admit(
+  outputs: Outputs | undefined,
+  tally: Tally,
+  kind: OutputKind,
+  title?: string,
+): string | undefined {
+  if (!outputs) return title;
+  const decl = outputs[kind];
+  if (!decl) throw new WriteRefused(`the workflow declares no ${kind} output`);
+  const used = tally.get(kind) ?? 0;
+  if (used >= decl.max) throw new WriteRefused(`${kind}: past the maximum of ${decl.max} per run`);
+  tally.set(kind, used + 1);
+  const prefix = decl.titlePrefix;
+  return title !== undefined && prefix && !title.startsWith(prefix) ? `${prefix}${title}` : title;
+}
+
+export const expiryLine = (days: number, now: Date): string =>
+  `${MARK}${new Date(now.getTime() + days * 86_400_000).toISOString()} -->`;
+
+// The ScmPort a run's steps get when the workflow declares outputs: an issue, a PR, a label of
+// its own or a comment on another item is counted, prefixed and refused here. The run's own
+// thread (factory labels, status comments) is the runner's, not an output.
+export function gateScm<T extends ScmPort>(
+  github: T,
+  outputs: Outputs,
+  tally: Tally,
+  runIssue: number,
+  now: () => Date,
+): T {
+  const days = outputs.issue?.expiresDays;
+  return Object.create(github, {
+    createIssue: {
+      value: async (repo: string, title: string, body: string, labels: string[]) =>
+        github.createIssue(
+          repo,
+          admit(outputs, tally, "issue", title)!,
+          days ? `${body}\n\n${expiryLine(days, now())}` : body,
+          labels,
+        ),
+    },
+    createPr: {
+      value: async (opts: CreatePrOptions) =>
+        github.createPr({ ...opts, title: admit(outputs, tally, "pull_request", opts.title)! }),
+    },
+    addLabels: {
+      value: async (repo: string, n: number, labels: string[]) => {
+        for (const l of labels) if (!l.startsWith("factory:")) admit(outputs, tally, "label");
+        return github.addLabels(repo, n, labels);
+      },
+    },
+    commentIssue: {
+      value: async (repo: string, n: number, body: string) => {
+        if (n !== runIssue) admit(outputs, tally, "comment");
+        return github.commentIssue(repo, n, body);
+      },
+    },
+  }) as T;
+}
+
+const DIFF_CAP = 50_000;
+
+// The issue a protected-path PR becomes: the paths named and the diff attached.
+export function protectedFallbackBody(prTitle: string, hits: readonly string[], diff: string): string {
+  const shown = diff.length > DIFF_CAP ? `${diff.slice(0, DIFF_CAP)}\n... (diff truncated)` : diff;
+  const fence = "`".repeat(Math.max(3, ...(shown.match(/`+/g) ?? []).map((r) => r.length + 1)));
+  return [
+    `A pull request ("${prTitle}") was not opened because it touches protected paths:`,
+    ...hits.map((h) => `- \`${h}\``),
+    "",
+    `A maintainer applies the change by hand.\n\n${fence}diff\n${shown}\n${fence}`,
+  ].join("\n");
+}
+
+// Closes each open issue that carries a past expiry and has had no human comment, with one comment saying why.
+export async function closeExpired(
+  github: Pick<ScmPort, "listOpenIssues" | "commentIssue" | "closeIssue">,
+  repo: string,
+  now: Date,
+): Promise<number[]> {
+  const closed: number[] = [];
+  for (const issue of await github.listOpenIssues(repo)) {
+    const at = Date.parse(new RegExp(`${MARK}(\\S+) -->`).exec(issue.body ?? "")?.[1] ?? "");
+    if (Number.isNaN(at) || at > now.getTime()) continue;
+    if (issue.comments.some((c) => !c.body.includes("<!-- factory:"))) continue;
+    await github.commentIssue(
+      repo,
+      issue.number,
+      `Closing: this item expired on ${new Date(at).toISOString().slice(0, 10)} and nobody had commented on it.\n\n<!-- factory:expired -->`,
+    );
+    await github.closeIssue(repo, issue.number);
+    closed.push(issue.number);
+  }
+  return closed;
 }
