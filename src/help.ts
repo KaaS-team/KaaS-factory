@@ -78,6 +78,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "list what waits for a human; with <N> <action>, post the same /factory comment a human would",
   },
   {
+    name: "send",
+    usage: "send <N> <words> (--repo <owner/name> | --repo-dir <path>) [--json]",
+    does: "say something to the run working on #N: it reaches the agent before its next step, or the next stage",
+  },
+  {
     name: "scan",
     usage: "scan --repo-dir <path> [--lighthouse <report.json>]",
     does: "file issues from `osv-scanner` (any lockfile), else `bun audit` on a Bun project; with --lighthouse, one per page below its bar",

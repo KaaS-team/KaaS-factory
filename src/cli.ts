@@ -897,6 +897,7 @@ async function main(): Promise<void> {
     case "mcp":
     case "runner":
     case "pair":
+    case "send":
       return remoteCommand(args);
     default:
       console.log(helpText());
@@ -907,7 +908,6 @@ async function main(): Promise<void> {
 try {
   await main();
 } catch (err) {
-  if (has("json")) console.error(failureJson(err));
-  else console.error(`factory: ${plain(err instanceof Error ? err.message : String(err))}`);
+  console.error(has("json") ? failureJson(err) : `factory: ${plain(err instanceof Error ? err.message : String(err))}`);
   process.exit(EXIT.error);
 }

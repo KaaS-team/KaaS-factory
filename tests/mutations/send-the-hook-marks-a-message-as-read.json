@@ -1,0 +1,7 @@
+{
+  "name": "send: the hook marks a message as read",
+  "file": "template/.claude/hooks/operator-messages.sh",
+  "find": "    open(seen, \"w\").write(str(len(data)))\n",
+  "replace": "    pass\n",
+  "test": "tests/ask-steer.test.ts"
+}

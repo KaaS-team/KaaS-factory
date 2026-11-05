@@ -95,3 +95,19 @@ export const cleanName = (name: string) =>
     .replace(/[<>\s]+/g, " ")
     .trim()
     .slice(0, 80) || "someone";
+
+// Where a message to a running issue goes: the thread (the record) and the run (the agent).
+export interface RunLine {
+  readonly tracker: Pick<TrackerPort, "commentIssue">;
+  readonly deliver: (issue: number, text: string, by: string) => Promise<unknown> | unknown;
+}
+
+export const MESSAGE_MAX = 4000;
+
+// The one call under the cockpit composer, the CLI's `send` and any other surface that talks to a run.
+export async function sendToRun(line: RunLine, repo: string, issue: number, text: string, by: string) {
+  const words = text.trim();
+  if (!words || words.length > MESSAGE_MAX) throw new InboxError(`a message is 1 to ${MESSAGE_MAX} characters`);
+  await line.tracker.commentIssue(repo, issue, signedBy(`Message to the run: ${words}`, by));
+  return line.deliver(issue, words, by);
+}

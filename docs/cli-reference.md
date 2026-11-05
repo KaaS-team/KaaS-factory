@@ -124,6 +124,14 @@ factory inbox [<N> <action> [--text <words>]] (--repo <owner/name> | --repo-dir 
 
 list what waits for a human; with <N> <action>, post the same /factory comment a human would.
 
+### send
+
+```
+factory send <N> <words> (--repo <owner/name> | --repo-dir <path>) [--json]
+```
+
+say something to the run working on #N: it reaches the agent before its next step, or the next stage.
+
 ### scan
 
 ```

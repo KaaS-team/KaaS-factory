@@ -7,7 +7,7 @@ import { age, api, h, heading, isOperator, money, quiet, runKey, shell, state, s
 import { rightPane } from "./pane.js";
 import { feedCard, stageName } from "./run-page.js";
 import { WAITING } from "./stations.js";
-import { actOn } from "./view-inbox.js";
+import { actOn, sendMessage } from "./view-inbox.js";
 import { stationsFor } from "./view-line.js";
 
 export const live = {
@@ -128,13 +128,14 @@ function planCard(item) {
 }
 
 const queue = createSendQueue({
-  send: (m) => actOn(m.item, m.action, m.text),
+  send: (m) => (m.action === "message" ? sendMessage(m.at, m.text) : actOn(m.item, m.action, m.text)),
   onChange: () => shell.render(),
 });
 export const sendQueue = queue;
 
-function composer(item) {
-  const action = item?.actions.includes("answer") ? "answer" : item?.actions.includes("revise") ? "revise" : null;
+function composer(item, at) {
+  const waiting = item?.actions.includes("answer") ? "answer" : item?.actions.includes("revise") ? "revise" : null;
+  const action = waiting ?? (at ? "message" : null);
   const box = h("textarea", {
     class: "field-control",
     id: "composer",
@@ -144,9 +145,11 @@ function composer(item) {
     placeholder:
       action === "answer"
         ? "Your answer"
-        : action
-          ? "What should change in the plan?"
-          : "You can reply here when the run asks you something.",
+        : action === "message"
+          ? "Tell the agent something; it reads this before its next step."
+          : action
+            ? "What should change in the plan?"
+            : "You can reply here when the run asks you something.",
   });
   return h(
     "form",
@@ -155,7 +158,7 @@ function composer(item) {
       onsubmit: (e) => {
         e.preventDefault();
         if (!action || !box.value.trim()) return box.focus();
-        queue.enqueue({ item, action, text: box.value.trim() });
+        queue.enqueue({ item, at, action, text: box.value.trim() });
         box.value = "";
       },
     },
@@ -163,7 +166,11 @@ function composer(item) {
       h(
         "div",
         { class: "queued", role: "status" },
-        h("span", null, `${action === "answer" ? "Sending your answer" : "Sending your changes"} in a few seconds`),
+        h(
+          "span",
+          null,
+          `${action === "answer" ? "Sending your answer" : action === "message" ? "Sending your message" : "Sending your changes"} in a few seconds`,
+        ),
         h("button", { class: "btn", type: "button", onclick: () => queue.undo(m) }, "Undo"),
       ),
     ),
@@ -174,7 +181,7 @@ function composer(item) {
       h(
         "button",
         { class: "btn btn-primary", type: "submit", disabled: !action },
-        action === "revise" ? "Request changes" : "Send answer",
+        action === "revise" ? "Request changes" : action === "message" ? "Send message" : "Send answer",
       ),
     ),
   );
@@ -240,7 +247,7 @@ export function runView() {
           timeline(live.items),
           item?.kind === "approve-plan" && item.actions.includes("approve") ? planCard(item) : null,
         ),
-        composer(item),
+        composer(item, at),
       ),
       rightPane({
         tab: live.tab,

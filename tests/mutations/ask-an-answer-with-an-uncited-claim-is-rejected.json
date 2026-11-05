@@ -1,0 +1,7 @@
+{
+  "name": "ask: an answer with an uncited claim is rejected",
+  "file": "src/engine/ask.ts",
+  "find": "|| !answer || loose.length > 0)",
+  "replace": "|| !answer)",
+  "test": "tests/ask-steer.test.ts"
+}

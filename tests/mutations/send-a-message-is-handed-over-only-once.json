@@ -1,0 +1,7 @@
+{
+  "name": "send: a message is handed over only once",
+  "file": "src/run-messages.ts",
+  "find": "  writeFileSync(join(dir, MESSAGES_READ), String(all.length));\n",
+  "replace": "\n",
+  "test": "tests/ask-steer.test.ts"
+}

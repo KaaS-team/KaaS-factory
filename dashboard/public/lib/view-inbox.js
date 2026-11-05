@@ -73,6 +73,17 @@ export async function actOn(item, action, text) {
   shell.render();
 }
 
+// A message to a run that is not waiting on anyone: the same sendToRun call the CLI's `send` makes.
+export async function sendMessage(at, text) {
+  try {
+    await post(`/api/issues/${at.issue}/message`, { text, repo: at.repo });
+    state.toast = `Sent to the run on #${at.issue}`;
+  } catch (e) {
+    state.toast = e.message;
+  }
+  shell.render();
+}
+
 async function mergeApprove(item) {
   try {
     const r = await post(`/api/issues/${item.issue}/merge`, { repo: item.repo });

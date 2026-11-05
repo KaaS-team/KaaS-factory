@@ -1,0 +1,7 @@
+{
+  "name": "ask: intake routes an ask label away from the claim",
+  "file": "src/watch.ts",
+  "find": "if (labelsOf(issue).includes(LABEL.ask))",
+  "replace": "if (false)",
+  "test": "tests/ask-steer.test.ts"
+}

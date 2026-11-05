@@ -3,13 +3,14 @@
 // The runner routes skip the session gate (PUBLIC_ROUTES) because each one checks the secret itself.
 import type { ScmPort } from "../../src/github";
 import { signedBy } from "../../src/chatops";
+import { InboxError } from "../../src/inbox";
+import { sendToRun } from "../../src/integrations/steer";
 import type { Actor, Route } from "./access";
 import { senderName } from "./commands";
 import { HEARTBEAT_MS, type RunnerHub, type Signal } from "./runners";
 
 export const RUNNER_ROUTES = ["POST /runner/register", "GET /runner/stream", "POST /runner/events"] as const;
 const POLL_MS = 250;
-const MESSAGE_MAX = 4000;
 
 export interface RunnerDeps {
   hub: RunnerHub;
@@ -174,10 +175,24 @@ export function runnerRoutes(deps: RunnerDeps): Route[] {
       role: "operator",
       repo: "body",
       handler: async (req, _url, m) => {
-        const text = String((await body(req)).text ?? "").trim();
-        if (!text || text.length > MESSAGE_MAX)
-          return json({ error: `a message is 1 to ${MESSAGE_MAX} characters` }, 400);
-        return json({ ok: true, id: hub.message(jobOf(req, m), text, deps.actorOf(req)?.login ?? "") });
+        const job = jobOf(req, m);
+        const line = {
+          tracker: deps.github,
+          deliver: (_n: number, text: string, by: string) => hub.message(job, text, by),
+        };
+        try {
+          const id = await sendToRun(
+            line,
+            job.repo,
+            job.issue,
+            String((await body(req)).text ?? ""),
+            senderName(deps.actorOf(req)),
+          );
+          return json({ ok: true, id });
+        } catch (err) {
+          if (err instanceof InboxError) return json({ error: err.message }, 400);
+          throw err;
+        }
       },
     },
     {

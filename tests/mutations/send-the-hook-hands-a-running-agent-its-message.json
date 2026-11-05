@@ -1,0 +1,7 @@
+{
+  "name": "send: the hook hands a running agent its message",
+  "file": "template/.claude/hooks/operator-messages.sh",
+  "find": "print(json.dumps(",
+  "replace": "(lambda x: None)(json.dumps(",
+  "test": "tests/ask-steer.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "send: the next stage prompt carries the messages",
+  "file": "src/agents/prompt.ts",
+  "find": "...(said ? [messagesSection(said), \"\"] : []),",
+  "replace": "...[],",
+  "test": "tests/ask-steer.test.ts"
+}

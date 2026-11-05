@@ -1,0 +1,7 @@
+{
+  "name": "ask: the answered question closes the issue",
+  "file": "src/engine/ask.ts",
+  "find": "  await deps.github.closeIssue(config.repo, n);\n",
+  "replace": "\n",
+  "test": "tests/ask-steer.test.ts"
+}

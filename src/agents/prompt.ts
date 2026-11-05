@@ -8,6 +8,7 @@ import { COMMENT_FILENAMES, JSON_FILENAMES, runDir } from "../artifacts";
 import { stageSchema } from "../schemas";
 import type { StageRunOptions } from "../executor";
 import { resolveSkill } from "../harness-defaults";
+import { messagesSection, takeMessages } from "../run-messages";
 
 export function stripFrontmatter(text: string): string {
   return text.startsWith("---\n") ? text.slice(text.indexOf("\n---", 3) + 4).replace(/^\n+/, "") : text;
@@ -59,12 +60,14 @@ export async function renderPrompt(
       `stage skill .claude/skills/factory-${opts.stage}/SKILL.md not found in ${opts.cwd}; run \`factory install --update\``,
     );
   });
+  const said = takeMessages(opts.cwd, opts.issue);
   return [
     `Stage: ${opts.stage}. Issue number: ${opts.issue}. Wherever the instructions say <N>, use ${opts.issue}.`,
     "",
     stripFrontmatter(skill).trim(),
     "",
     ...(contextPack ? [contextPack, ""] : []),
+    ...(said ? [messagesSection(said), ""] : []),
     ...(opts.resume ? [`## The last attempt was sent back\n\nThe tail of why:\n\n${opts.resume.failure}`, ""] : []),
     artifactContract(opts, readOnly, types),
     "",

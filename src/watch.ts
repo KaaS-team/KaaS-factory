@@ -180,10 +180,10 @@ async function readyIsTrusted(issue: GhIssue, deps: WatchDeps, config: FactoryCo
 export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome> {
   if (!(await readyIsTrusted(issue, deps, config))) return "untrusted";
   if (deps.shadow) return processShadowIssue(issue, deps, config, workflowOf(deps, issue));
+  if (labelsOf(issue).includes(LABEL.ask)) return (await import("./engine/ask")).answerAsk(issue, deps, config);
   const claimed = await deps.git.claim(deps.cloneDir, issue.number, config.base);
   if (!claimed) {
-    // Another runner claimed it first, or `factory:ready` was re-applied to an issue whose branch
-    // already exists from a parked run. Silently dropping it would strand the issue, so say so.
+    // Another runner claimed it, or ready was re-applied over a parked run's branch: say so, never strand it.
     await postComment(
       deps,
       config,

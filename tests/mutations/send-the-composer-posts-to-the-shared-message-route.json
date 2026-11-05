@@ -1,0 +1,7 @@
+{
+  "name": "send: the composer posts to the shared message route",
+  "file": "dashboard/public/lib/view-inbox.js",
+  "find": "`/api/issues/${at.issue}/message`",
+  "replace": "`/api/issues/${at.issue}/messages`",
+  "test": "tests/ask-steer.test.ts"
+}

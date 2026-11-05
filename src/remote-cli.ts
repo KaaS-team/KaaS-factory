@@ -1,16 +1,16 @@
 // `factory mcp`, `factory runner` and `factory pair`: the commands that let the factory be driven
 // from somewhere other than this terminal. Kept out of cli.ts, which sits at its size limit.
 import { spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { EnvSecrets } from "./adapters/env/secrets";
 import { SseEventSource } from "./adapters/sse/event-source";
-import { runDir } from "./artifacts";
 import { UsageError } from "./cli-output";
 import { DEFAULT_CONFIG, loadConfig } from "./config";
 import { createMcpServer, serveStdio } from "./mcp-server";
 import { factoryHome, livePath } from "./paths";
+import { appendMessage, worktreeOf } from "./run-messages";
 import { encodeQr, qrToTerminal } from "./qr";
 import { dialOut, type RunnerCreds, type RunnerJob, type RunnerWork, registerRunner } from "./runner-channel";
 import { makeScm } from "./scm";
@@ -25,7 +25,7 @@ function flagOf(argv: readonly string[], name: string): string | undefined {
   return i >= 0 ? argv[i + 1] : undefined;
 }
 
-async function repoOf(argv: readonly string[], cmd: string) {
+export async function repoOf(argv: readonly string[], cmd: string) {
   const repoDir = flagOf(argv, "repo-dir");
   const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
   const repo = flagOf(argv, "repo") ?? process.env.FACTORY_REPO ?? config?.repo;
@@ -70,9 +70,8 @@ export function runnerWork(dirs: ReadonlyMap<string, string>): RunnerWork {
         });
       }),
     deliver: async (job, text) => {
-      const dir = join(dirOf(job), runDir(job.issue));
-      mkdirSync(dir, { recursive: true });
-      appendFileSync(join(dir, "messages.md"), `- ${new Date().toISOString()}: ${text.replace(/\n/g, " ")}\n`);
+      dirOf(job);
+      appendMessage(worktreeOf(job.repo, job.issue), job.issue, text);
     },
     stop: async (job, kind) => {
       const live = readLive(livePath(job.repo, job.issue));
@@ -155,5 +154,6 @@ async function cmdMcp(argv: readonly string[]): Promise<void> {
 export function remoteCommand(argv: readonly string[]): Promise<void> {
   if (argv[0] === "mcp") return cmdMcp(argv);
   if (argv[0] === "runner") return cmdRunner(argv);
+  if (argv[0] === "send") return import("./send-cli").then((m) => m.cmdSend(argv));
   return cmdPair(argv);
 }
