@@ -5,6 +5,7 @@ import {
   h,
   heading,
   inRepo,
+  needsYou,
   isOperator,
   money,
   quiet,
@@ -17,13 +18,13 @@ import {
   table,
   tone,
 } from "./core.js";
-import { ACTIVE, WAITING } from "./stations.js";
+import { ACTIVE } from "./stations.js";
 
 const FILTERS = [
   ["all", "All", () => true],
   ["active", "Active", (r) => ACTIVE.has(r.status)],
-  ["needs", "Needs you", (r) => WAITING.has(r.status)],
-  ["done", "Finished", (r) => ["shipped", "cancelled", "rejected"].includes(r.status)],
+  ["needs", "Needs you", needsYou],
+  ["history", "History", (r) => !ACTIVE.has(r.status) && !needsYou(r)],
 ];
 
 export function runsView() {

@@ -1,0 +1,7 @@
+{
+  "name": "the watcher lets a poll timeout escape its catch",
+  "file": "src/watch.ts",
+  "find": "        nextTickAt = undefined;\n        console.error(\"factory watch: poll failed\", err);",
+  "replace": "        throw err;",
+  "test": "tests/watch-timeout.test.ts"
+}

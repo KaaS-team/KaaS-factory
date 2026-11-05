@@ -127,7 +127,8 @@
                               "shipped",
                               "failed",
                               "needs-human",
-                              "cancelled"
+                              "cancelled",
+                              "interrupted"
                             ]
                           },
                           "started_at": {
@@ -299,7 +300,8 @@
                             "shipped",
                             "failed",
                             "needs-human",
-                            "cancelled"
+                            "cancelled",
+                            "interrupted"
                           ]
                         },
                         "started_at": {

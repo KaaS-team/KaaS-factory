@@ -57,23 +57,11 @@ import { emitEvent } from "./engine/bus";
 import { settleEpic } from "./engine/epic";
 import { shipRunState } from "./engine/blobs";
 import { RateLimitError, TRUSTED_ROLES } from "./ports/scm";
+import { settleDeadRuns } from "./run-liveness";
 import { cachedRole, isWriter, writersOnly } from "./trust";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
-
-export interface PollResult {
-  readonly paused: boolean;
-  readonly reason?: string;
-  readonly processed: number[];
-  // Epoch ms before which the tracker must not be called again (it rate limited this tick).
-  readonly nextTickAt?: number;
-}
-
-export const MAX_BACKOFF_MS = 900_000;
-
-// How long to wait before the next tick, and whether a tick may call the tracker now.
-export const tickDelay = (intervalMs: number, nextTickAt: number | undefined, now: number): number =>
-  Math.max(intervalMs, (nextTickAt ?? 0) - now);
-export const tickDue = (nextTickAt: number | undefined, now: number): boolean => (nextTickAt ?? 0) <= now;
+export { MAX_BACKOFF_MS, type PollResult, tickDelay, tickDue } from "./watch-tick";
+import { MAX_BACKOFF_MS, type PollResult, release, releasedSince, releaseSeq, tickDelay, tickDue } from "./watch-tick";
 
 // The labels pollOnce watches: one request when the tracker can, else one per label.
 async function listWatched(deps: WatchDeps, config: FactoryConfig): Promise<Map<string, GhIssue[]>> {
@@ -627,21 +615,8 @@ async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue):
   }
 }
 
-// `inFlight` spans overlapping polls (plan v2.7.0 item 6), so a busy issue never reaches a second
-// runPool. A poll that listed issues before one was released holds a stale copy and must skip it:
-// `releasedAt` records when, in `releaseSeq` order. Absent, every poll is self-contained.
-const releasedAt = new WeakMap<Set<number>, Map<number, number>>();
-let releaseSeq = 0;
-
-function release(inFlight: Set<number> | undefined, issue: number): void {
-  if (!inFlight?.delete(issue)) return;
-  const seqs = releasedAt.get(inFlight) ?? new Map<number, number>();
-  releasedAt.set(inFlight, seqs);
-  seqs.set(issue, ++releaseSeq);
-}
-
 export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?: Set<number>): Promise<PollResult> {
-  const listedAt = releaseSeq;
+  const listedAt = releaseSeq();
   const openPrs = await deps.github.listPrs(config.repo, { state: "open" });
   // STOP_IF, the auto_start switch and the spend caps pause new pickups only (src/dispatch.ts);
   // approvals, answers, retries and revises keep flowing so a human can clear the backlog.
@@ -688,8 +663,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     .filter((issue) => {
       if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
       if (!canServe(deps.machine?.config.capabilities, issue.labels)) return false;
-      const released = inFlight ? releasedAt.get(inFlight)?.get(issue.number) : undefined;
-      if (released !== undefined && released > listedAt) return false;
+      if (releasedSince(inFlight, issue.number, listedAt)) return false;
       seen.add(issue.number);
       return true;
     })
@@ -720,7 +694,9 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     const processed = candidates
       .filter((_, i) => outcomes[i] && outcomes[i] !== "waiting")
       .map((issue) => issue.number);
-    processed.push(...(await reconcileClosed(deps, config, new Set(buckets.flat().map((i) => i.number)), inFlight)));
+    const listed = new Set(buckets.flat().map((i) => i.number));
+    processed.push(...(await reconcileClosed(deps, config, listed, inFlight)));
+    processed.push(...(await settleDeadRuns(deps, config, inFlight, (deps.now?.() ?? new Date()).getTime())));
     if (gate.paused) return { paused: true, reason: gate.paused, processed };
     return { paused: false, processed };
   } finally {
@@ -731,8 +707,13 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
 // Re-drives any issue a crashed or restarted process left sitting in a
 // running label — otherwise it just sits there forever, since none of those
 // labels are ones pollOnce's resume functions look for (audit finding #21).
-// Call once, before the first poll.
-export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): Promise<number[]> {
+// Call once, before the first poll, and again by startWatch when a quota backoff ends. An issue in
+// `inFlight` is being worked by this process right now, so it is left alone.
+export async function recoverInFlight(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  inFlight?: Set<number>,
+): Promise<number[]> {
   // Every label a step holds while it runs; a terminal step's (in-review) is a waiting state.
   const running = new Set(
     allWorkflows(deps).flatMap((w) =>
@@ -742,9 +723,10 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
     ),
   );
   const lists = await Promise.all([...running].map((l) => deps.github.listIssuesByLabel(config.repo, l)));
-  const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()].filter((i) =>
-    canServe(deps.machine?.config.capabilities, i.labels),
+  const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()].filter(
+    (i) => !inFlight?.has(i.number) && canServe(deps.machine?.config.capabilities, i.labels),
   );
+  for (const i of issues) inFlight?.add(i.number);
   await runPool(issues, dispatchConcurrency(deps, config), async (listed) => {
     const issue = await trustedThread(deps, config, listed);
     const derived = deriveIssueState(issue, workflowOf(deps, issue));
@@ -755,6 +737,8 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
       rejectRound: derived.rejectRounds,
       questionRound: derived.questionRounds,
     });
+  }).finally(() => {
+    for (const i of issues) inFlight?.delete(i.number);
   });
   return issues.map((i) => i.number);
 }
@@ -789,6 +773,8 @@ export function startWatch(
 
   const intervalMs = config.pollIntervalSeconds * 1000;
   let nextTickAt: number | undefined;
+  // A quota backoff can outlast a crash's stale label; re-drive once the backoff has ended.
+  let backedOff = false;
   const now = () => (deps.now?.() ?? new Date()).getTime();
   const arm = (ms: number) => {
     if (timer) clearTimeout(timer);
@@ -808,6 +794,13 @@ export function startWatch(
     pollOnce(deps, config, inFlight)
       .then((result) => {
         nextTickAt = result.nextTickAt;
+        if (nextTickAt !== undefined) backedOff = true;
+        else if (backedOff) {
+          backedOff = false;
+          recoverInFlight(deps, config, inFlight).catch((err) =>
+            console.error("factory watch: re-driving stale issues failed", err),
+          );
+        }
         if (nextTickAt !== undefined && !stopped) arm(tickDelay(intervalMs, nextTickAt, now()));
         onTick?.(result);
       })

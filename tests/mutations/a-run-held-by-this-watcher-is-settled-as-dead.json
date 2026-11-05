@@ -1,0 +1,7 @@
+{
+  "name": "a run held by this watcher is settled as dead",
+  "file": "src/run-liveness.ts",
+  "find": "!LIVE_STATUSES.has(run.status) || inFlight?.has(run.issue)",
+  "replace": "!LIVE_STATUSES.has(run.status)",
+  "test": "tests/run-liveness.test.ts"
+}

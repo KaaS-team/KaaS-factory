@@ -1,0 +1,7 @@
+{
+  "name": "a run whose issue closed is never settled",
+  "file": "src/run-liveness.ts",
+  "find": "if (issue.state === \"CLOSED\") {",
+  "replace": "if (false) {",
+  "test": "tests/run-liveness.test.ts"
+}

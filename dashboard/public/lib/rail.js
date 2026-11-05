@@ -80,13 +80,18 @@ export function taskRow(row) {
 function taskLists() {
   const rows = (state.data.line?.rows ?? []).filter((r) => !state.repoFilter || repoOf(r) === state.repoFilter);
   const running = rows.filter((r) => ACTIVE.has(r.run.status)).slice(0, 6);
-  const done = rows.filter((r) => ["shipped", "cancelled", "rejected", "failed"].includes(r.run.status)).slice(0, 5);
+  const done = rows
+    .filter((r) => ["shipped", "cancelled", "rejected", "failed", "interrupted"].includes(r.run.status))
+    .slice(0, 5);
   loadRisks([...running, ...done]);
   const list = (title, items) =>
     items.length
       ? [h("div", { class: "nav-heading" }, title), h("div", { class: "rail-list" }, items.map(taskRow))]
       : [];
-  return [...list("Running", running), ...list("Done", done)];
+  const stamp = state.refreshedAt
+    ? [h("div", { class: "nav-heading muted", id: "refreshed" }, `Updated ${state.refreshedAt.toLocaleTimeString()}`)]
+    : [];
+  return [...stamp, ...list("Running", running), ...list("Done", done)];
 }
 
 export function renderNav() {

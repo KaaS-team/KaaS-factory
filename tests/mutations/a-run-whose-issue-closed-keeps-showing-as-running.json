@@ -1,0 +1,7 @@
+{
+  "name": "a run whose issue closed keeps showing as running",
+  "file": "src/run-liveness.ts",
+  "find": "const shipped = issue.stateReason === \"COMPLETED\";",
+  "replace": "const shipped = true;",
+  "test": "tests/run-liveness.test.ts"
+}

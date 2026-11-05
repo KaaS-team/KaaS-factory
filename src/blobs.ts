@@ -113,6 +113,7 @@ const STATUSES: Record<RunStatus, true> = {
   failed: true,
   "needs-human": true,
   cancelled: true,
+  interrupted: true,
 };
 
 const MAX_STAGE_ROWS = 1000;

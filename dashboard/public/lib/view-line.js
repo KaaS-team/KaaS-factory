@@ -11,6 +11,7 @@ import {
   inRepo,
   isOperator,
   money,
+  needsYou,
   plural,
   post,
   quiet,
@@ -65,7 +66,7 @@ export function stationsFor(row) {
 
 function lineRow(row) {
   const { run } = row;
-  const needs = WAITING.has(run.status);
+  const needs = needsYou(run);
   const repo = repoOf(row);
   const meta = needs
     ? "Needs you"

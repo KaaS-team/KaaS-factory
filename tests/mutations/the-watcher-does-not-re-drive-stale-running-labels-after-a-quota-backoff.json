@@ -1,0 +1,7 @@
+{
+  "name": "the watcher does not re-drive stale running labels after a quota backoff",
+  "file": "src/watch.ts",
+  "find": "recoverInFlight(deps, config, inFlight).catch((err) =>",
+  "replace": "Promise.resolve([]).catch((err) =>",
+  "test": "tests/watch-recover.test.ts"
+}
