@@ -1,0 +1,7 @@
+{
+  "name": "a failed run writes no failure ledger row",
+  "file": "src/engine/common.ts",
+  "find": "if (status === \"failed\" || status === \"needs-human\") recordRunFailure(deps, config, issueNumber, reason);",
+  "replace": "",
+  "test": "tests/scenarios.test.ts"
+}

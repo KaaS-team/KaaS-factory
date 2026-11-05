@@ -1,0 +1,7 @@
+{
+  "name": "build and verify may not run git grep",
+  "file": "src/stage-permissions.ts",
+  "find": "  \"Bash(git grep *)\",\n",
+  "replace": "",
+  "test": "tests/stage-permissions.test.ts"
+}

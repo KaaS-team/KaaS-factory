@@ -8,6 +8,7 @@ import type { FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
 import { settle } from "../run-transitions";
+import { recordRunFailure, refusalsOf } from "./failure";
 import { costFor } from "../pricing";
 import {
   OPERATOR_TAKEOVER,
@@ -279,6 +280,7 @@ export function finish(
   reason?: string,
 ): void {
   settle(deps.state, deps.view, config.repo, issueNumber, status, reason);
+  if (status === "failed" || status === "needs-human") recordRunFailure(deps, config, issueNumber, reason);
 }
 
 // Skills never call `gh` (only the runner talks to GitHub), so the current
@@ -393,6 +395,7 @@ export async function runStage(
     killed_reason: result.killedReason ?? null,
     session_id: result.sessionId ?? null,
     config_hash: configHash(config),
+    refused_calls: refusalsOf(result).length,
   });
   await recordSpend(deps, config, {
     issue: issueNumber,

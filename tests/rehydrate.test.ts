@@ -5,13 +5,24 @@
 // posted, then check rehydrate recovers exactly what a stage would have
 // left on disk.
 
-import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { beforeEach, describe, expect, test } from "bun:test";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDir } from "../src/artifacts";
 import type { GhComment, GhIssue } from "../src/github";
 import { rehydrate } from "../src/rehydrate";
+
+beforeEach(() => mkdirSync(tmpdir(), { recursive: true }));
 
 function comment(body: string, id: number): GhComment {
   return { id, author: "factory-bot", authorAssociation: "NONE", body, createdAt: "2026-01-01T00:00:00Z" };
@@ -168,6 +179,17 @@ describe("rehydrate: prior findings and operator answers", () => {
   });
   test("an existing prior-findings.json is left alone", async () => {
     expect((await run([verdict(reject, 1)], '["kept"]'))("prior-findings.json")).toBe('["kept"]');
+  });
+  test("a dangling prior-findings.json symlink is replaced, never written through (#576)", async () => {
+    mkdirSync(tmpdir(), { recursive: true });
+    const worktree = mkdtempSync(join(tmpdir(), "factory-rehydrate-"));
+    const outside = join(worktree, "outside.json");
+    mkdirSync(join(worktree, runDir(5)), { recursive: true });
+    symlinkSync(outside, join(worktree, runDir(5), "prior-findings.json"));
+    await rehydrate(worktree, { number: 5, title: "t", body: "", labels: [], comments: [verdict(reject, 1)] });
+    expect(existsSync(outside)).toBe(false);
+    expect(lstatSync(join(worktree, runDir(5), "prior-findings.json")).isFile()).toBe(true);
+    rmSync(worktree, { recursive: true, force: true });
   });
   test("trusted plain comments become operator-answers.md; commands, runner and untrusted ones do not", async () => {
     const read = await run([
