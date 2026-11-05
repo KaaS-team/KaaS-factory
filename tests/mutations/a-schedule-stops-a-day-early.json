@@ -1,0 +1,7 @@
+{
+  "name": "a schedule stops a day early",
+  "file": "src/engine/triggers.ts",
+  "find": "Date.parse(workflow.triggers.until) + 24 * 60 * MINUTE",
+  "replace": "Date.parse(workflow.triggers.until)",
+  "test": "tests/workflow-outputs.test.ts"
+}

@@ -45,7 +45,7 @@ import type { SpendEntry, SpendPolicy, SpendStore, SpendTotal } from "../ports/s
 import type { ExecutionPort } from "../ports/execution";
 import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
-import type { Workflow } from "../core/workflow";
+import { DEFAULT_MAX_REFUSALS, type Workflow } from "../core/workflow";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
 import type { FactoryState, RetroTrigger, Stage } from "../state";
 import { LABEL, issueType } from "../labels";
@@ -327,9 +327,8 @@ export async function runStage(
   extra: Omit<Partial<StageRunOptions>, "mcp"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
-  // Read from the clone of the base branch, never the worktree: an earlier step's agent can write
-  // the worktree, and a server entry is a command this step would launch. A missing name throws
-  // before anything is recorded or spent.
+  // Read from the base branch's clone, never the worktree: an earlier agent can write the worktree, and
+  // a server entry is a command this step would launch. A missing name throws before anything is spent.
   const { mcp: mcpNames, ...rest } = extra;
   const mcp = mcpNames?.length ? mcpServersFor(deps.cloneDir, mcpNames) : undefined;
   // Clearing after rehydrate means this stage never starts with a stale copy of its own last attempt
@@ -357,6 +356,7 @@ export async function runStage(
     maxBudgetUsd: config.maxBudgetUsd[stage],
     timeoutMinutes: config.stageTimeoutMinutes,
     maxToolCalls: config.maxToolCalls,
+    maxRefusals: deps.workflow?.limits.refusals ?? DEFAULT_MAX_REFUSALS,
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
     ...scopeOf(issue, stage),

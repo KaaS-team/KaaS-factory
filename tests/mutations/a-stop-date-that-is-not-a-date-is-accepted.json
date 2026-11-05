@@ -1,0 +1,7 @@
+{
+  "name": "a stop date that is not a date is accepted",
+  "file": "src/core/workflow-outputs.ts",
+  "find": "if (!ok) problems.push(\"on.until",
+  "replace": "if (false) problems.push(\"on.until",
+  "test": "tests/workflow-outputs.test.ts"
+}

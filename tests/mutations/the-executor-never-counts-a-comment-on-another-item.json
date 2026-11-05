@@ -1,0 +1,7 @@
+{
+  "name": "the executor never counts a comment on another item",
+  "file": "src/safe-outputs.ts",
+  "find": "if (n !== runIssue) admit(outputs, tally, \"comment\");",
+  "replace": "if (false) admit(outputs, tally, \"comment\");",
+  "test": "tests/workflow-outputs.test.ts"
+}

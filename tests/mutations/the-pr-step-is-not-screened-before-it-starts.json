@@ -1,0 +1,7 @@
+{
+  "name": "the pr step is not screened before it starts",
+  "file": "src/engine/output-gate.ts",
+  "find": "if (step.uses === \"pr\") {",
+  "replace": "if (false) {",
+  "test": "tests/write-screen.test.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "a hold does not stop the write",
+  "file": "src/write-screen.ts",
+  "find": "if (screen.verdict === \"hold\") throw new ScreenHeld(screen.findings);",
+  "replace": "",
+  "test": "tests/write-screen.test.ts"
+}

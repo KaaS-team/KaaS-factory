@@ -1,0 +1,7 @@
+{
+  "name": "an item past its expiry is kept open",
+  "file": "src/safe-outputs.ts",
+  "find": "if (Number.isNaN(at) || at > now.getTime()) continue;",
+  "replace": "if (Number.isNaN(at) || true) continue;",
+  "test": "tests/workflow-outputs.test.ts"
+}

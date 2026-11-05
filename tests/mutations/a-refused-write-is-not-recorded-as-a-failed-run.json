@@ -1,0 +1,7 @@
+{
+  "name": "a refused write is not recorded as a failed run",
+  "file": "src/engine/output-gate.ts",
+  "find": "if (!(e instanceof WriteRefused)) throw e;",
+  "replace": "throw e;",
+  "test": "tests/workflow-outputs.test.ts"
+}

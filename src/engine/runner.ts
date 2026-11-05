@@ -24,6 +24,7 @@ import {
   type WatchDeps,
 } from "./common";
 import { RuntimeMissing } from "./steps";
+import { runGated } from "./output-gate";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./registry";
 import { bindingFields } from "./approval-binding";
 import { emitEvent } from "./bus";
@@ -204,7 +205,7 @@ async function walk(
       }
       at.step = step.id;
       emitEvent(deps.bus, "factory.step.started", { ...base(), step: step.id, uses: step.uses }, subject);
-      const result = await STEP_TYPES[step.uses]!.run({ deps, config, issue, worktree, ctx, step, workflow });
+      const result = await runGated(STEP_TYPES[step.uses]!, { deps, config, issue, worktree, ctx, step, workflow });
       if (result.kind === "stop" && result.outcome === "failed")
         emitEvent(deps.bus, "factory.step.failed", { ...base(), step: step.id, outcome: result.outcome }, subject);
       else

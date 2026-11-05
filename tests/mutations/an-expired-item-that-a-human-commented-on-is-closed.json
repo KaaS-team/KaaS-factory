@@ -1,0 +1,7 @@
+{
+  "name": "an expired item that a human commented on is closed",
+  "file": "src/safe-outputs.ts",
+  "find": "if (issue.comments.some((c) => !c.body.includes(\"<!-- factory:\"))) continue;",
+  "replace": "",
+  "test": "tests/workflow-outputs.test.ts"
+}

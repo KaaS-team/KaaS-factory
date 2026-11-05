@@ -1,0 +1,7 @@
+{
+  "name": "the screen does not read a pull request's diff",
+  "file": "src/write-screen.ts",
+  "find": "comments: [opts.body], diff: await diff() }",
+  "replace": "comments: [opts.body] }",
+  "test": "tests/write-screen.test.ts"
+}

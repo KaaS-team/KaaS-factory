@@ -12,6 +12,7 @@ import type { RouteConfig } from "../config";
 import { buildContextPack } from "../context";
 import {
   aggregateStageEvents,
+  stageStop,
   OPERATOR_TAKEOVER,
   type Executor,
   type StageEvent,
@@ -413,14 +414,10 @@ export class CommandExecutor implements Executor {
           if (line !== undefined) append(opts.transcriptFile, `${line}\n`);
         }
         // Running on without the MCP servers or plugins it was configured with gives a wrong result, not a slower one.
-        if (e.kind === "startup_error" && !killedReason) {
-          killedReason = `agent startup failed: ${e.text}`;
-          killGroup();
-        }
-        if (e.kind !== "tool_use") continue;
-        toolCalls += 1;
-        if (opts.maxToolCalls && toolCalls > opts.maxToolCalls && !killedReason) {
-          killedReason = `stage exceeded maxToolCalls=${opts.maxToolCalls}`;
+        if (e.kind === "tool_use") toolCalls += 1;
+        const stop = stageStop(events, e, toolCalls, opts);
+        if (stop && !killedReason) {
+          killedReason = stop;
           killGroup();
         }
       }

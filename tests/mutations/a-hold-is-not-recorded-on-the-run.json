@@ -1,0 +1,7 @@
+{
+  "name": "a hold is not recorded on the run",
+  "file": "src/engine/output-gate.ts",
+  "find": "deps.state.appendEvent(run.id, step.uses as Stage, \"write_held\", what);",
+  "replace": "",
+  "test": "tests/write-screen.test.ts"
+}

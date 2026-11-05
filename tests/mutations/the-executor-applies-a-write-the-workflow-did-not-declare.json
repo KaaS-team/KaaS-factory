@@ -1,0 +1,7 @@
+{
+  "name": "the executor applies a write the workflow did not declare",
+  "file": "src/safe-outputs.ts",
+  "find": "if (!decl) throw new WriteRefused(",
+  "replace": "if (false) throw new WriteRefused(",
+  "test": "tests/workflow-outputs.test.ts"
+}

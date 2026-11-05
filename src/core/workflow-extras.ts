@@ -2,6 +2,7 @@
 // mapping, checked here, then put back on what parseWorkflow returns, so the core parser stays the
 // one walker of steps and edges. Pure: no I/O.
 
+import { parseHosts, parseOutputs, parseUntil } from "./workflow-outputs";
 import { parseWorkflow, type Step, type StepKind, type WorkflowResult } from "./workflow";
 
 const STEP_EXTRAS = ["agent", "timeout", "retries", "tool", "with", "env", "optional"] as const;
@@ -17,7 +18,10 @@ export function parseWorkflowFull(
 ): WorkflowResult {
   if (!isObj(raw)) return parseWorkflow(raw, kinds, exprRoots);
   const problems: string[] = [];
-  const { emit, ...top } = raw;
+  const { emit, outputs: outputsRaw, allowed_hosts: hostsRaw, ...top } = raw;
+  const allowedHosts = parseHosts(hostsRaw, problems);
+  const outputs = parseOutputs(outputsRaw, problems);
+  let until: string | undefined;
   if (emit !== undefined && (typeof emit !== "string" || !NAME.test(emit)))
     problems.push("emit: a name other workflows' on.emitted can match");
   let emitted: string[] | undefined;
@@ -29,6 +33,11 @@ export function parseWorkflowFull(
     else emitted = [...new Set(list as string[])];
     top.on = Object.keys(on).length ? on : undefined;
     if (top.on === undefined) delete top.on;
+  }
+  if (isObj(top.on) && top.on.until !== undefined) {
+    const { until: u, ...on } = top.on;
+    until = parseUntil(u, problems);
+    top.on = on;
   }
   const extras: Record<string, Extras> = {};
   if (isObj(top.steps)) {
@@ -55,7 +64,9 @@ export function parseWorkflowFull(
     workflow: {
       ...w,
       steps,
-      triggers: { ...w.triggers, ...(emitted ? { emitted } : {}) },
+      triggers: { ...w.triggers, ...(emitted ? { emitted } : {}), ...(until ? { until } : {}) },
+      ...(outputs ? { outputs } : {}),
+      ...(allowedHosts ? { allowedHosts } : {}),
       ...(typeof emit === "string" ? { emit } : {}),
     },
   };
