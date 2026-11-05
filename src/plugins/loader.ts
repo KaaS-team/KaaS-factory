@@ -33,7 +33,11 @@ export async function loadPlugin(dir: string, expectName?: string): Promise<Plug
   const source = `plugin ${manifest.name} (${file})`;
   if (manifest.kind === "agent") agents.register(manifest.name, mod.default as never, source);
   else if (manifest.kind === "step") steps.register(manifest.name, mod.default as never, source);
-  else {
+  else if (manifest.kind === "extension") {
+    if (typeof mod.default !== "function")
+      throw new Error(`${file}: entry: an extension plugin default-exports a function`);
+    (mod.default as (env: NodeJS.ProcessEnv) => void)(process.env);
+  } else {
     if (typeof mod.default !== "function")
       throw new Error(`${file}: entry: a tracker plugin default-exports a function`);
     trackers.register(manifest.name, mod.default as never, source);

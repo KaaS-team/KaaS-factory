@@ -1,0 +1,1 @@
+{"name":"the core cannot start without ee present","file":"src/plugins/boot.ts","find":"import { startPlugins } from \"./loader\";","replace":"import { startPlugins } from \"./loader\";\nimport \"../../ee/register\";","test":"tests/enterprise-package.test.ts"}

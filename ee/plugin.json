@@ -1,0 +1,1 @@
+{"name":"enterprise","kind":"extension","entry":"plugin.ts","version":"0.0.0","description":"SSO, SAML, SCIM, custom roles, audit export, org mode and fleet spend policy."}

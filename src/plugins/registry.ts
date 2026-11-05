@@ -6,8 +6,10 @@ import type { AgentPreset } from "../agents/types";
 import type { StepType } from "../engine/steps";
 import type { TrackerPort } from "../ports/scm";
 
-export type PluginKind = "agent" | "step" | "tracker";
-export const PLUGIN_KINDS: readonly PluginKind[] = ["agent", "step", "tracker"];
+// An extension default-exports a function that registers its own features (the plane extensions, a
+// spend policy) through the ports the core defines. The core keeps no table of them.
+export type PluginKind = "agent" | "step" | "tracker" | "extension";
+export const PLUGIN_KINDS: readonly PluginKind[] = ["agent", "step", "tracker", "extension"];
 
 export class Registry<T> {
   // The live table. Callers that index by name (`PRESETS[name]`) read this object, so a later

@@ -28,7 +28,10 @@ const plugin = (name: string, manifest: object, code: string) => {
 describe("manifest", () => {
   test.each([
     [{ kind: "step", entry: "i.ts" }, "plugin.json: name: expected"],
-    [{ name: "x", kind: "widget", entry: "i.ts" }, "plugin.json: kind: expected one of agent, step, tracker"],
+    [
+      { name: "x", kind: "widget", entry: "i.ts" },
+      "plugin.json: kind: expected one of agent, step, tracker, extension",
+    ],
     [{ name: "x", kind: "step" }, "plugin.json: entry: expected a non-empty path"],
     [{ name: "x", kind: "step", entry: "../i.ts" }, "plugin.json: entry: expected a path inside"],
     [{ name: "x", kind: "step", entry: "i.ts", extra: 1 }, "plugin.json: extra: unknown key"],

@@ -1,0 +1,1 @@
+{"name":"the core imports the enterprise package by name","file":"tests/licensing.test.ts","find":"|@kaas-team\\/factory-enterprise(?:\\/|[\"']))/;","replace":"|zzz))/;","test":"tests/licensing.test.ts"}

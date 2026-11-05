@@ -80,10 +80,14 @@ test("the brand is not licensed, and forks are told to replace it", () => {
 
 // The core must build without ee/, so an import into it from anywhere else is the boundary broken.
 // This file is skipped: its own examples below are the only allowed mention.
-const CROSSES = /(?:from|import|require)\s*\(?\s*["'](?:\.{1,2}\/)+(?:[\w.-]+\/)*ee(?:\/|["'])/;
+// The package's name counts as a crossing too: the core reaches it only through the plugin loader.
+const CROSSES =
+  /(?:from|import|require)\s*\(?\s*["'](?:(?:\.{1,2}\/)+(?:[\w.-]+\/)*ee(?:\/|["'])|@kaas-team\/factory-enterprise(?:\/|["']))/;
 test("nothing outside ee/ imports from ee/", () => {
   expect(CROSSES.test('import { sso } from "../ee/sso";')).toBe(true);
   expect(CROSSES.test('const x = await import("../../ee/scim.ts");')).toBe(true);
+  expect(CROSSES.test('import register from "@kaas-team/factory-enterprise";')).toBe(true);
+  expect(CROSSES.test('await import("@kaas-team/factory-enterprise/plugin");')).toBe(true);
   const crossing = files
     .filter((f) => /\.(ts|js|mjs)$/.test(f) && !f.startsWith("ee/") && f !== "tests/licensing.test.ts")
     .filter((f) => CROSSES.test(read(f)));

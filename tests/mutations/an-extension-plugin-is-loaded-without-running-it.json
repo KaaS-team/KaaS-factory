@@ -1,0 +1,1 @@
+{"name":"an extension plugin is loaded without running it","file":"src/plugins/loader.ts","find":"(mod.default as (env: NodeJS.ProcessEnv) => void)(process.env);","replace":"void mod.default;","test":"ee/tests/plugin.test.ts"}

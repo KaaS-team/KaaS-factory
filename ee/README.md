@@ -8,6 +8,9 @@ The core never imports from here. Each feature implements an interface the core 
 core builds, tests and runs with this directory deleted. `tests/licensing.test.ts` fails on an
 import that crosses the boundary.
 
+This directory is a package (`package.json`, `plugin.json`) and an `extension` plugin: link or copy it to
+`<factory home>/plugins/enterprise` and put `enterprise` in the machine config's `plugins.enabled`, and the
+plugin loader registers the features at startup. The Docker image preloads it instead:
 `bun --preload ./ee/register.ts bin/factory ...` turns the features on. SSO, roles and audit export
 register always and stay inert until configured. Org mode needs `FACTORY_ORG_MODE_REPO` (the
 plane's own repo), and the fleet spend policy needs `FACTORY_SPEND_POLICY` (a JSON file path).

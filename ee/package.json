@@ -1,0 +1,9 @@
+{
+  "name": "@kaas-team/factory-enterprise",
+  "version": "0.0.0",
+  "private": true,
+  "license": "LicenseRef-KaaS-EE",
+  "type": "module",
+  "description": "Organisation features of KaaS Factory, loaded as the enterprise plugin.",
+  "main": "plugin.ts"
+}
