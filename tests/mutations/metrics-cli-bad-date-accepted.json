@@ -1,0 +1,1 @@
+{"name": "metrics cli bad date accepted", "file": "src/metrics-cli.ts", "find": "Number.isNaN(Date.parse(s))", "replace": "false", "test": "tests/metrics-cli.test.ts"}

@@ -1,0 +1,1 @@
+{"name": "outcomes teams grouped by workflow", "file": "src/outcomes.ts", "find": "by(items, (o) => o.team)", "replace": "by(items, (o) => o.workflow)", "test": "tests/outcomes.test.ts"}

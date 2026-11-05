@@ -292,6 +292,14 @@ factory hotspots [--commits <n>] [--top <n>] [--json]
 
 list the files that the most recent merged PRs (first-parent commits ending in (#N), default 200) changed more than once, most often first; a file listed there is where parallel PRs collide, so shard it.
 
+### metrics
+
+```
+factory metrics [--repo-dir <path> | --repo <owner/name>] [--since <date>] [--until <date>] [--json]
+```
+
+outcomes read from the repo (PRs merged or closed unmerged, issues kept or dismissed, factory comments acted on or ignored) and cost per accepted outcome per workflow and per team; workflows named <base>__<variant> are also compared per base.
+
 ### backup
 
 ```

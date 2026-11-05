@@ -1,0 +1,1 @@
+{"name": "outcomes read issue with a PR counted twice", "file": "src/outcomes-read.ts", "find": "else if (!pr && issue.state", "replace": "else if (issue.state", "test": "tests/outcomes-read.test.ts"}

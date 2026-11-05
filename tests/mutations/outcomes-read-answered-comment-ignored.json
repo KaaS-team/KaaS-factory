@@ -1,0 +1,1 @@
+{"name": "outcomes read answered comment ignored", "file": "src/outcomes-read.ts", "find": ".some(isHumanComment)", "replace": ".some(() => false)", "test": "tests/outcomes-read.test.ts"}

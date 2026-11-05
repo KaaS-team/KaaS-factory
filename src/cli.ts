@@ -887,9 +887,9 @@ async function main(): Promise<void> {
     case "routine":
       return cmdRoutine(cli);
     case "receipt":
-      return (await import("./receipt-cli")).cmdReceipt(cli);
     case "hotspots":
-      return (await import("./hotspots-cli")).cmdHotspots(cli);
+    case "metrics":
+      return (await import("./report-commands")).runReportCommand(command!, cli, stateDbPath);
     case "backup":
       return (await import("./backup-cli")).cmdBackup(cli);
     case "mcp":

@@ -179,6 +179,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "list the files that the most recent merged PRs (first-parent commits ending in (#N), default 200) changed more than once, most often first; a file listed there is where parallel PRs collide, so shard it",
   },
   {
+    name: "metrics",
+    usage: "metrics [--repo-dir <path> | --repo <owner/name>] [--since <date>] [--until <date>] [--json]",
+    does: "outcomes read from the repo (PRs merged or closed unmerged, issues kept or dismissed, factory comments acted on or ignored) and cost per accepted outcome per workflow and per team; workflows named <base>__<variant> are also compared per base",
+  },
+  {
     name: "backup",
     usage: "backup (now | list | restore (--id <id> | --date <YYYY-MM-DD>) [--to <dir>] [--force]) [--json]",
     does: "now: snapshot every state DB to the bucket with a sha256 manifest, then prune past FACTORY_BACKUP_KEEP_DAYS; list: the backups there; restore: check every sha256, then write the files (stop the stack first)",

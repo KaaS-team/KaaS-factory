@@ -1,0 +1,1 @@
+{"name": "outcomes read cost put on every outcome", "file": "src/outcomes-read.ts", "find": "mine[0]!.cost_usd = cost;", "replace": "for (const m of mine) m.cost_usd = cost;", "test": "tests/outcomes-read.test.ts"}
