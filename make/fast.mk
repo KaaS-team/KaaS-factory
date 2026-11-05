@@ -9,6 +9,7 @@ fast:
 	if [ -n "$$changed" ]; then $(MAKE) test FILES="$$changed" TEST_ARGS="--rerun-each 3"; fi
 	bun scripts/check-mutations.ts --base $(BASE)
 	bun scripts/gen-quality-baseline.ts --check
+	bun scripts/check-generated-docs.ts $(BASE)
 	bun scripts/check-mutation-anchors.ts
 	@echo "make fast: ok"
 

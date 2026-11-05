@@ -1,0 +1,7 @@
+{
+  "name": "make fast skips the generated doc check",
+  "file": "make/fast.mk",
+  "find": "\tbun scripts/check-generated-docs.ts $(BASE)\n",
+  "replace": "",
+  "test": "tests/generated-docs.test.ts"
+}

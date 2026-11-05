@@ -1,0 +1,7 @@
+{
+  "name": "the fast path drops the cli-reference entry",
+  "file": "scripts/check-generated-docs.ts",
+  "find": "    file: \"docs/cli-reference.md\",\n    generator: \"scripts/gen-cli-reference.ts\",",
+  "replace": "    file: \"docs/cli-reference.md\",\n    generator: \"scripts/gen-agents-doc.ts\",",
+  "test": "tests/generated-docs.test.ts"
+}
