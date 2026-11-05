@@ -72,3 +72,30 @@ test("a chain above two units warns", () => {
 test("a dependency cycle is refused", () => {
   expect(() => sliceBacklog([item("a", ["b"], [], 1), item("b", ["a"], [], 1)])).toThrow("dependency cycle");
 });
+
+const partialFixture = [
+  item("a", [], ["src/a.ts", "src/a-api.ts"], 20),
+  { ...item("b", [], ["src/b.ts"], 20), partialDeps: [{ dep: "a", files: ["src/a-api.ts"] }] },
+];
+
+test("a task needing only an interface of another has chain depth 1, not 2", () => {
+  const units = sliceBacklog(fixture(partialFixture), 30);
+  expect(units.map((u) => u.id)).toEqual(["a", "b"]);
+  expect("after" in units[1]!).toBe(false);
+  expect(chainReport(units).longestChain).toBe(1);
+});
+
+test("a partial dependency lets the unit start once the interface lands", () => {
+  const units = sliceBacklog(fixture(partialFixture), 30);
+  expect(units[1]!.startsWhen).toEqual([{ unit: "a", files: ["src/a-api.ts"] }]);
+  expect("startsWhen" in units[0]!).toBe(false);
+});
+
+test("a full dependency still chains", () => {
+  const items = [item("a", [], ["a"], 20), item("b", ["a"], ["b"], 20)];
+  const units = sliceBacklog(fixture(items), 30);
+  expect(units.map((u) => u.id)).toEqual(["a", "a#2"]);
+  expect(units[1]!.after).toBe("a");
+  expect("startsWhen" in units[1]!).toBe(false);
+  expect(chainReport(units).longestChain).toBe(2);
+});

@@ -6,6 +6,13 @@ export interface BacklogItem {
   readonly deps: readonly string[];
   readonly files: readonly string[];
   readonly minutes: number;
+  /** Needs only these files of another task (its interface): no chain, the unit may start once they land. */
+  readonly partialDeps?: readonly PartialDep[];
+}
+
+export interface PartialDep {
+  readonly dep: string;
+  readonly files: readonly string[];
 }
 
 export interface SliceUnit {
@@ -15,6 +22,8 @@ export interface SliceUnit {
   readonly minutes: number;
   /** The unit that must merge first: the previous part of the same epic. */
   readonly after?: string;
+  /** Interface files of other units this unit waits for; it does not wait for those units to merge. */
+  readonly startsWhen?: readonly { unit: string; files: readonly string[] }[];
 }
 
 export interface SliceReport {
@@ -85,7 +94,17 @@ export function sliceBacklog(items: readonly BacklogItem[], capMinutes = DEFAULT
       });
     });
   }
-  return units;
+  const unitOf = new Map(units.flatMap((u) => u.tasks.map((t) => [t, u.id] as const)));
+  return units.map((u) => {
+    const waits = items
+      .filter((i) => u.tasks.includes(i.id))
+      .flatMap((i) => i.partialDeps ?? [])
+      .flatMap((p) => {
+        const unit = unitOf.get(p.dep);
+        return unit && unit !== u.id ? [{ unit, files: p.files }] : [];
+      });
+    return waits.length > 0 ? { ...u, startsWhen: waits } : u;
+  });
 }
 
 export function chainReport(units: readonly SliceUnit[]): SliceReport {
