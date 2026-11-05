@@ -61,7 +61,7 @@ export const isOperatorIssue = (issue: Pick<GhIssue, "body">): boolean =>
   parseMeta(issue.body ?? "").runner === "operator";
 
 function stripMarkers(body: string): string {
-  return body.replace(/<!--[\s\S]*?-->/g, "").trim();
+  return body.replace(/[<]!--[\s\S]*?-->/g, "").trim();
 }
 
 // The runner's latest comment is what the human is being asked about.
