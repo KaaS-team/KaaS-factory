@@ -161,6 +161,8 @@ describe("groomIssue", () => {
     if (note?.kind !== "commentIssue") throw new Error("expected comment");
     expect(note.body).toContain("Unit 1:");
     expect(note.body).toContain("#2");
+    expect(note.body).toContain("Longest dependency chain: 3.");
+    expect(note.body).toContain("Warning: longest dependency chain is 3, above 2");
     expect(orch.groom.epicMinutes).toBe(120);
   });
 

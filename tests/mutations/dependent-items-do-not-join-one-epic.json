@@ -1,0 +1,1 @@
+{"name": "dependent items do not join one epic", "file": "src/plan-slice.ts", "find": "parent.set(root(item.id), root(dep))", "replace": "void dep", "test": "tests/plan-slice.test.ts"}
