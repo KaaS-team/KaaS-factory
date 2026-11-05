@@ -55,6 +55,7 @@ function build() {
 const get = async (d: ReturnType<typeof build>, path: string) =>
   (await (await d.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1")).json()) as {
     runs: unknown[];
+    rows: unknown[];
     items: { repo: string }[];
     spend7dUsd: number;
   };
@@ -67,6 +68,8 @@ test("runs, spend and the inbox follow the team filter", async () => {
     expect((await get(d, "/api/runs")).runs).toHaveLength(1);
     expect((await get(d, "/api/runs?team=web")).runs).toHaveLength(1);
     expect((await get(d, "/api/runs?team=ops")).runs).toHaveLength(0);
+    expect((await get(d, "/api/line?team=web")).rows).toHaveLength(1);
+    expect((await get(d, "/api/line?team=ops")).rows).toHaveLength(0);
     expect((await get(d, "/api/analytics?team=web")).spend7dUsd).toBeCloseTo(2, 5);
     expect((await get(d, "/api/analytics?team=ops")).spend7dUsd).toBe(0);
     const all = await get(d, "/api/inbox");

@@ -1,1 +1,1 @@
-{"name": "dashboard: spend ignores the issue's team", "file": "dashboard/server.ts", "find": "analytics(await scopedRuns(req), await scopedStages(req),", "replace": "analytics(runsOf(req), stagesOf(req),", "test": "tests/dashboard-team-issue.test.ts"}
+{"name": "dashboard: spend ignores the issue's team", "file": "dashboard/server.ts", "find": "analytics(await kept(req, runsOf(req)), await kept(req, stagesOf(req)),", "replace": "analytics(runsOf(req), stagesOf(req),", "test": "tests/dashboard-team-issue.test.ts"}

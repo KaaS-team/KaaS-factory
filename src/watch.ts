@@ -10,7 +10,6 @@
 // comment thread alone, so a restarted watcher, a fresh CI job, or a runner
 // on a different machine can all resume any issue.
 
-import { configForIssue } from "./engine/team-config";
 import { mergeContext, settleMerge, tierInput } from "./merge-autonomy";
 import { resolveBlockers } from "./blockers";
 import { intakeGate } from "./dispatch";
@@ -45,7 +44,7 @@ import {
   withDataMarker,
 } from "./engine/common";
 import { byRank } from "./prioritize";
-import { parkEdgeOf, runWorkflow } from "./engine/runner";
+import { parkEdgeOf, runUnderTeam } from "./engine/runner";
 import { ALL_STEP_TYPES as STEP_TYPES } from "./engine/registry";
 import { processShadowIssue } from "./shadow";
 import { defaultWorkflow } from "./engine/workflows";
@@ -148,16 +147,8 @@ function runFromStage(
   // With leases on, only the lease holder walks the steps: a second worker
   // (another machine, a CI job) gets "waiting", and a dead worker's issue is
   // reclaimed by whoever resumes it after the TTL.
-  return leased(deps, issue.number, async () =>
-    runWorkflow(
-      deps,
-      await configForIssue(deps.cloneDir, config, issue),
-      workflowOf(deps, issue),
-      issue,
-      stepId,
-      worktree,
-      ctx,
-    ),
+  return leased(deps, issue.number, () =>
+    runUnderTeam(deps, config, workflowOf(deps, issue), issue, stepId, worktree, ctx),
   );
 }
 

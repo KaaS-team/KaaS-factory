@@ -1,1 +1,1 @@
-{"name":"engine: the run ignores the issue's team","file":"src/watch.ts","find":"await configForIssue(deps.cloneDir, config, issue),","replace":"config,","test":"tests/engine-team-config.test.ts"}
+{"name": "engine: the run ignores the issue's team", "file": "src/engine/runner.ts", "find": "await configForIssue(deps.cloneDir, config, issue)", "replace": "config", "test": "tests/engine-team-config.test.ts"}

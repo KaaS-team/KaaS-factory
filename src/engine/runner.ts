@@ -36,11 +36,33 @@ import { guardPlan } from "../plan-guard";
 import { unmetDeps } from "../plan-deps";
 import { isPlannedBody } from "./import-plan";
 import { runOriginOf } from "./run-origin";
+import { configForIssue } from "./team-config";
 
 // Outcomes that leave the issue waiting on a person; each emits factory.issue.parked.
 const PARKED: ReadonlySet<Outcome> = new Set(["needs-info", "needs-human", "awaiting-approval", "failed"]);
 // Outcomes where this worker did not run the issue to a stop, so no run ended.
 const NOT_A_RUN: ReadonlySet<Outcome> = new Set(["waiting", "lost-claim", "untrusted"]);
+
+// runWorkflow under the team the issue routes to (src/engine/team-config.ts).
+export async function runUnderTeam(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  workflow: Workflow,
+  issue: GhIssue,
+  startStep: string,
+  worktree: string,
+  ctx?: RunCtx,
+): Promise<Outcome> {
+  return runWorkflow(
+    deps,
+    await configForIssue(deps.cloneDir, config, issue),
+    workflow,
+    issue,
+    startStep,
+    worktree,
+    ctx,
+  );
+}
 
 export async function runWorkflow(
   deps: WatchDeps,

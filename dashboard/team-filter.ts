@@ -1,6 +1,7 @@
 // `?team=<name>` on the dashboard lists: the repos a team's file names. A team that does not exist
 // matches no repo, so a typo shows nothing instead of everything.
 import { join } from "node:path";
+import type { GhIssue } from "../src/github";
 import { loadTeam, loadTeams } from "../src/team/load";
 import { routeTeam } from "../src/team/route";
 
@@ -40,4 +41,16 @@ export function issueInTeam(
   if (listing.length === 1) return true;
   if (!labels) return false;
   return routeTeam(listing, repo, { labels, paths: [] })?.team === team;
+}
+
+// Keeps the rows of the issues `team` owns. Labels come from each repo's open issues, read once per call.
+export function teamFilter(cloneDir: string | undefined, openIssues: (repo: string) => Promise<readonly GhIssue[]>) {
+  return async (team: string | null, repos: readonly string[]) => {
+    if (team === null) return <T>(rows: T[]) => rows;
+    const labels = new Map<string, Map<number, string[]>>();
+    for (const r of repos)
+      labels.set(r, new Map((await openIssues(r)).map((i) => [i.number, i.labels.map((l) => l.name)])));
+    return <T extends { repo: string; issue: number }>(rows: T[]) =>
+      rows.filter((row) => issueInTeam(cloneDir, team, row.repo, labels.get(row.repo)?.get(row.issue)));
+  };
 }
