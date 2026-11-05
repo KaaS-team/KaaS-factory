@@ -1,5 +1,5 @@
 // Where a gate or a `check` step's command runs. "local" (this machine) and
-// "lwpr" (the lwpr build box, as `lwpr` is configured here) always exist;
+// "lwpr" (the lwpr build box, from the lwpr plugin) exist unless that plugin is disabled;
 // FACTORY_HOME/machine.json `runtimes` names any others, because hosts and
 // images belong to the machine, not the repo. The repo's `runtime.gates` and
 // `runtime.check`, and a check step's own `runtime:`, pick one by name.
@@ -11,7 +11,6 @@ import { CodespacesExecution, type CodespacesSpec } from "./adapters/codespaces/
 import { DockerExecution, type DockerSpec } from "./adapters/docker/execution";
 import { HttpSandboxExecution, type HttpSandboxSpec } from "./adapters/http-sandbox/execution";
 import { LocalExecution } from "./adapters/local/execution";
-import { LwprExecution, type LwprSpec } from "./adapters/lwpr/execution";
 import { MicrosandboxExecution, type MicrosandboxSpec, SECRET } from "./adapters/microsandbox/execution";
 import { PoolExecution, type PoolSpec, SqliteUsageStore } from "./adapters/pool/execution";
 import { SshExecution, type SshSpec } from "./adapters/ssh/execution";
@@ -19,6 +18,17 @@ import { CMD, WrapExecution, type WrapSpec } from "./adapters/wrap/execution";
 import { existsSync } from "node:fs";
 import { factoryHome } from "./paths";
 import type { ExecutionPort } from "./ports/execution";
+import { type RuntimePlugin, runtimes } from "./plugins/registry";
+import "./runtimes-shipped";
+
+// The fields of a runtime that ships as a plugin (contrib/runtimes/lwpr.ts); its behaviour lives there.
+export interface LwprSpec {
+  readonly kind: "lwpr";
+  readonly app?: string;
+  readonly timeoutMin?: number;
+  // Run the repo's own lwpr `setup` first (default true).
+  readonly setup?: boolean;
+}
 
 export type RuntimeSpec =
   | { readonly kind: "local" }
@@ -32,10 +42,19 @@ export type RuntimeSpec =
   | CodespacesSpec
   | PoolSpec;
 
-export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = {
-  local: { kind: "local" },
-  lwpr: { kind: "lwpr" },
-};
+// `local`, plus each runtime plugin that names itself a built-in. Read at call time, so a plugin
+// registered later is included.
+export function builtinRuntimes(): Readonly<Record<string, RuntimeSpec>> {
+  return {
+    local: { kind: "local" },
+    ...Object.fromEntries(
+      runtimes
+        .names()
+        .filter((n) => runtimes.get(n)?.builtin)
+        .map((n) => [n, { kind: n } as unknown as RuntimeSpec]),
+    ),
+  };
+}
 
 // `default` is the one place the factory picks a sandbox for you: a microsandbox VM where `msb` and a
 // hypervisor are present, otherwise this machine, which `factory doctor` warns about.
@@ -65,10 +84,9 @@ export function defaultRuntime(probe: HostProbe = hostProbe): { spec: RuntimeSpe
 }
 
 const NAME = /^[\w-]{1,64}$/;
-type Field = "string" | "posInt" | "boolean" | "strings" | "members";
-const SHAPES: Readonly<
-  Record<RuntimeSpec["kind"], { required: readonly string[]; fields: Readonly<Record<string, Field>> }>
-> = {
+type Field = RuntimePlugin["shape"]["fields"][string] | "members";
+type Shape = { readonly required: readonly string[]; readonly fields: Readonly<Record<string, Field>> };
+const SHAPES: Readonly<Record<Exclude<RuntimeSpec["kind"], "lwpr">, Shape>> = {
   local: { required: [], fields: {} },
   docker: {
     required: ["image"],
@@ -83,7 +101,6 @@ const SHAPES: Readonly<
     },
   },
   ssh: { required: ["host", "dir"], fields: { host: "string", dir: "string", exclude: "strings", image: "string" } },
-  lwpr: { required: [], fields: { app: "string", timeoutMin: "posInt", setup: "boolean" } },
   wrap: { required: ["argv"], fields: { argv: "strings", allow: "strings" } },
   http: { required: ["url"], fields: { url: "string", tokenEnv: "string", exclude: "strings" } },
   agent37: {
@@ -109,7 +126,10 @@ const SHAPES: Readonly<
   pool: { required: ["members"], fields: { members: "members", reserveMin: "posInt", fallback: "string" } },
 };
 
-export const RUNTIME_KINDS = Object.keys(SHAPES) as RuntimeSpec["kind"][];
+const shapeOf = (kind: unknown): Shape | undefined =>
+  Object.hasOwn(SHAPES, kind as string) ? SHAPES[kind as keyof typeof SHAPES] : runtimes.get(kind as string)?.shape;
+
+export const runtimeKinds = (): string[] => [...Object.keys(SHAPES), ...runtimes.names()];
 
 // Kinds a pool can cut off at the minutes it holds: one fetch each, aborted by its signal.
 const POOLABLE = new Set<unknown>(["http", "agent37"]);
@@ -165,7 +185,7 @@ function secretProblems(at: string, secrets: unknown[], allow: unknown): string[
 
 // A pool's fallback is "none", a built-in, or a runtime in the same file that is not itself a pool.
 function fallbackProblems(at: string, fallback: unknown, all: Record<string, unknown>): string[] {
-  if (typeof fallback !== "string" || fallback === "none" || Object.hasOwn(BUILTIN_RUNTIMES, fallback)) return [];
+  if (typeof fallback !== "string" || fallback === "none" || Object.hasOwn(builtinRuntimes(), fallback)) return [];
   const kind = (all[fallback] as { kind?: unknown } | undefined)?.kind;
   if (kind === undefined) return [`${at}.fallback: no runtime "${fallback}" (or "none")`];
   return kind === "pool" ? [`${at}.fallback: "${fallback}" is a pool`] : [];
@@ -196,12 +216,12 @@ export function runtimeProblems(raw: unknown, where = "runtimes"): string[] {
   for (const [name, spec] of Object.entries(raw as Record<string, unknown>)) {
     const at = `${where}.${name}`;
     if (!NAME.test(name)) problems.push(`${at}: a name is letters, digits, _ and -`);
-    if (Object.hasOwn(BUILTIN_RUNTIMES, name) || name === DEFAULT_RUNTIME)
+    if (Object.hasOwn(builtinRuntimes(), name) || name === DEFAULT_RUNTIME)
       problems.push(`${at}: "${name}" is built in`);
     const s = (spec ?? {}) as Record<string, unknown>;
-    const shape = SHAPES[s.kind as RuntimeSpec["kind"]];
+    const shape = shapeOf(s.kind);
     if (!shape) {
-      problems.push(`${at}.kind: one of ${Object.keys(SHAPES).join(", ")}`);
+      problems.push(`${at}.kind: one of ${runtimeKinds().join(", ")}`);
       continue;
     }
     for (const k of shape.required) if (s[k] === undefined) problems.push(`${at}.${k}: required for ${s.kind}`);
@@ -225,8 +245,6 @@ export function executionFor(spec: Exclude<RuntimeSpec, PoolSpec>): ExecutionPor
       return new DockerExecution(spec);
     case "ssh":
       return new SshExecution(spec);
-    case "lwpr":
-      return new LwprExecution(spec);
     case "wrap":
       return new WrapExecution(spec);
     case "http":
@@ -237,6 +255,11 @@ export function executionFor(spec: Exclude<RuntimeSpec, PoolSpec>): ExecutionPor
       return new MicrosandboxExecution(spec);
     case "codespaces":
       return new CodespacesExecution(spec);
+    default: {
+      const plugin = runtimes.get((spec as { kind: string }).kind);
+      if (!plugin) throw new Error(`no runtime kind "${(spec as { kind: string }).kind}" (is its plugin disabled?)`);
+      return plugin.create(spec as never);
+    }
   }
 }
 
@@ -245,7 +268,7 @@ export function runtimeSpecs(
   machine: Readonly<Record<string, RuntimeSpec>> = {},
   probe: HostProbe = hostProbe,
 ): Readonly<Record<string, RuntimeSpec>> {
-  return { [DEFAULT_RUNTIME]: defaultRuntime(probe).spec, ...BUILTIN_RUNTIMES, ...machine };
+  return { [DEFAULT_RUNTIME]: defaultRuntime(probe).spec, ...builtinRuntimes(), ...machine };
 }
 
 // One ExecutionPort per runtimeSpecs entry; a pool after the runtimes it names, falling back to local.

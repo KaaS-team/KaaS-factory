@@ -30,7 +30,7 @@ describe("contrib agents", () => {
     for (const name of Object.keys(PRESETS)) expect(from[name]).toBe(`contrib/agents/${name}`);
     // Only the registry reaches into contrib: the rest of the core never names a vendor preset.
     const reach = filesUnder(join(root, "src")).filter(
-      (f) => f !== index && imports(f).some((p) => p.includes("contrib/")),
+      (f) => f !== index && !f.endsWith("/src/runtimes-shipped.ts") && imports(f).some((p) => p.includes("contrib/")),
     );
     expect(reach.map((f) => relative(root, f))).toEqual([]);
     expect(readFileSync(join(root, "Dockerfile"), "utf8")).toMatch(/^COPY contrib \.\/contrib$/m);

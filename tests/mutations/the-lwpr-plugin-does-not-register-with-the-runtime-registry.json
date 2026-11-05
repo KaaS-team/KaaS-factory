@@ -1,0 +1,1 @@
+{"name":"the lwpr plugin does not register with the runtime registry","file":"contrib/runtimes/lwpr.ts","find":"runtimes.register(\"lwpr\", {","replace":"void ({","test":"tests/runtime-plugins.test.ts"}

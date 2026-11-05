@@ -1,0 +1,1 @@
+{"name":"core imports the lwpr plugin directly","file":"src/sandbox.ts","find":"import { runtimes } from \"./plugins/registry\";","replace":"import { runtimes } from \"./plugins/registry\";\nimport \"../contrib/runtimes/lwpr\";","test":"tests/runtime-plugins.test.ts"}

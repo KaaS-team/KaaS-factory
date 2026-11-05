@@ -17,7 +17,7 @@ import { loadMachineConfig, type MachineConfig, type MachineLeases } from "../sr
 import { configMirrorDir } from "../src/paths";
 import { cloneDirFor } from "../src/repo";
 import type { Health } from "../src/runtime-kit";
-import { BUILTIN_RUNTIMES, DEFAULT_RUNTIME, type RuntimeSpec, runtimeRefs, runtimeSpecs } from "../src/runtimes";
+import { builtinRuntimes, DEFAULT_RUNTIME, type RuntimeSpec, runtimeRefs, runtimeSpecs } from "../src/runtimes";
 import { fleetView, healthCache } from "./fleet";
 
 // What the dashboard needs to know about the repo it serves. Absent when it
@@ -144,7 +144,7 @@ export function settingsView(
     runtimes: Object.entries(specs).map(([name, spec]) => ({
       name: plain(name),
       kind: spec.kind,
-      builtin: name === DEFAULT_RUNTIME || Object.hasOwn(BUILTIN_RUNTIMES, name),
+      builtin: name === DEFAULT_RUNTIME || Object.hasOwn(builtinRuntimes(), name),
       target: plain(target(spec)),
       usedBy: refs.filter((r) => r.name === name).map((r) => plain(r.where)),
     })),
