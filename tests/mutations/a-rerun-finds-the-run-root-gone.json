@@ -1,0 +1,1 @@
+{"name":"a rerun finds the run root gone","file":"tests/preload.ts","find":"beforeAll(() => mkdirSync(process.env.FACTORY_HOME!, { recursive: true }));","replace":"","test":"tests/temp-leak.test.ts"}

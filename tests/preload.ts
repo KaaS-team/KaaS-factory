@@ -1,6 +1,6 @@
 // A test that falls back to the real ~/.factory would read whatever repos ran on this machine.
 // Every temp dir a test or the code under it makes lands in one root, removed when the run ends (#270).
-import { afterAll } from "bun:test";
+import { afterAll, beforeAll } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,4 +11,6 @@ process.env.TMPDIR = root;
 process.env.FACTORY_HOME = join(root, "home");
 mkdirSync(process.env.FACTORY_HOME);
 delete process.env.FACTORY_REPOS;
+// --rerun-each runs the file again after afterAll removed the root, so each run makes it again.
+beforeAll(() => mkdirSync(process.env.FACTORY_HOME!, { recursive: true }));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
