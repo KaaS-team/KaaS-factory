@@ -1,0 +1,1 @@
+{"name":"machine.json repos are not validated at load","file":"src/machine.ts","find":"const problems = registryProblems(raw.repos, path);","replace":"const problems: string[] = [];","test":"tests/repo-registry.test.ts"}

@@ -1,0 +1,1 @@
+{"name":"an org import reads the team file","file":"src/engine/workflow-imports.ts","find":"kind === \"org\" ? \".factory/team/org.yml\"","replace":"kind === \"org\" ? `.factory/team/teams/${a}.yml`","test":"tests/workflow-imports.test.ts"}

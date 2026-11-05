@@ -1,0 +1,1 @@
+{"name":"a failing repo poll stops the registry watcher","file":"src/registry-watch.ts","find":"out[entry.repo] = { error: err instanceof Error ? err.message : String(err) };","replace":"throw err;","test":"tests/repo-registry.test.ts"}

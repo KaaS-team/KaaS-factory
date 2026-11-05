@@ -1,0 +1,1 @@
+{"name":"a fragment overrides the workflow that imports it","file":"src/engine/workflow-imports.ts","find":"return merge(base, rest);","replace":"return merge(rest, base);","test":"tests/workflow-imports.test.ts"}

@@ -23,6 +23,7 @@ const USAGE =
 const EVAL_WINDOW = 100_000;
 
 export async function cmdHarness(c: CliContext): Promise<void> {
+  if (c.args[0] === "workflow") return (await import("./workflow-cli")).cmdWorkflow(c);
   const sub = c.args[1];
   const dir = resolve(c.flag("repo-dir") ?? ".");
   if (sub === "scaffold") return scaffold(c, dir);

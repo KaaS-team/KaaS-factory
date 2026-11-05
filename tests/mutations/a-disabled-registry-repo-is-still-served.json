@@ -1,0 +1,1 @@
+{"name":"a disabled registry repo is still served","file":"src/repo-registry.ts","find":"e.enabled !== false","replace":"true","test":"tests/repo-registry.test.ts"}

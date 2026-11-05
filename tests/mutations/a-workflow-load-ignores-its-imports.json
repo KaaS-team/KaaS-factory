@@ -1,0 +1,1 @@
+{"name":"a workflow load ignores its imports","file":"src/engine/workflows.ts","find":"return parseWorkflowWithImports(text, cloneDir, read);","replace":"return parseWorkflowText(text);","test":"tests/workflow-imports.test.ts"}

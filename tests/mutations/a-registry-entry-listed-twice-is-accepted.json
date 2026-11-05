@@ -1,0 +1,1 @@
+{"name":"a registry entry listed twice is accepted","file":"src/repo-registry.ts","find":"else if (seen.has(entry.repo))","replace":"else if (false)","test":"tests/repo-registry.test.ts"}

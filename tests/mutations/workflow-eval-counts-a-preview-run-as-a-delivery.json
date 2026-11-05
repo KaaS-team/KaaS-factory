@@ -1,0 +1,1 @@
+{"name":"workflow eval counts a preview run as a delivery","file":"src/harness.ts","find":" || d.preview === true) continue;","replace":") continue;","test":"tests/workflow-preview.test.ts"}

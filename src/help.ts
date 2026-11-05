@@ -128,6 +128,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types; scaffold: write a starting .factory/workflows/<name>.md; eval: runs, shipped rate, failed steps and cost per workflow from the event log",
   },
   {
+    name: "workflow",
+    usage: "workflow (show <name> | run <name> --issue <N> --preview) [--json]",
+    does: "show: the workflow as the runner loads it, with its imports resolved; run --preview: run its stages against an issue and list each tracker or code host write it would have made, with target and body, without making any; a preview is marked in the events log and never counts as a delivery",
+  },
+  {
     name: "teach",
     usage: 'teach "<how we ship>" (--repo-dir <path> | --repo <owner/name>) [--json]',
     does: "one agent reads the repo, its CI and the brain MCP server, and opens a PR with the workflows, minions and skills it proposes, each checked first",
