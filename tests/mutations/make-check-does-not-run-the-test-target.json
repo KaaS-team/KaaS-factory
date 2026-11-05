@@ -1,0 +1,1 @@
+{"name":"make check does not run the test target","file":"Makefile","find":"check: lint typecheck test skills-check","replace":"check: lint typecheck skills-check","test":"tests/check-reaches-tests.test.ts"}

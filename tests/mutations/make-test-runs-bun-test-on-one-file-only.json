@@ -1,0 +1,1 @@
+{"name":"make test runs bun test on one file only","file":"Makefile","find":"-- bun test -t","replace":"-- bun test tests/schedule.test.ts -t","test":"tests/check-reaches-tests.test.ts"}

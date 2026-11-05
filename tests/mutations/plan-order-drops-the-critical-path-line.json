@@ -1,0 +1,1 @@
+{"name":"plan-order drops the critical path line","file":"src/plan-order.ts","find":"`Critical path: ${plan.criticalPath.map((n) => `#${n}`).join(\" -> \") || \"none\"}`","replace":"\"Critical path: none\"","test":"tests/plan-order.test.ts"}
