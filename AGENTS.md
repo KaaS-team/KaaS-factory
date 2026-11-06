@@ -3,6 +3,8 @@
 A GitHub-native loop for coding agents: triage, plan, build, verify, PR. `src/` is the runner,
 `bin/factory` the CLI (its code is `src/cli.ts`), `dashboard/` the web view. `src/install-template.ts` copies `template/` into a target repo;
 `template-ci/` holds the inert CI workflow. Reasoning goes in `docs/decisions/`.
+How a stage gets its skills and what it may do: [default-skills-harness](docs/decisions/default-skills-harness.md),
+[stage-harness-design](docs/decisions/stage-harness-design.md).
 
 ## Commands
 
