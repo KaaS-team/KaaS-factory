@@ -4,7 +4,9 @@
 // wiped) still has every earlier stage's artifact available. This is what
 // makes an issue resumable from any machine (plan section "Core refactor").
 
+import { rm } from "node:fs/promises";
 import { runDir, COMMENT_FILENAMES, JSON_FILENAMES, type ArtifactStage } from "./artifacts";
+import { isHumanComment, parseChatOps } from "./chatops";
 import { parseDataMarkers } from "./derive";
 import type { GhComment, GhIssue } from "./github";
 
@@ -47,4 +49,29 @@ export async function rehydrate(worktree: string, issue: GhIssue): Promise<void>
     const comment = findComment(issue.comments, needle);
     if (comment) await Bun.write(`${dir}/${COMMENT_FILENAMES[stage]}`, stripDataMarker(comment.body));
   }
+
+  // The last reject's findings, so a later verify can tell whether each one was answered.
+  const lastReject = [...markers].reverse().find((m) => m.stage === "verify" && verdictResult(m.json) === "reject");
+  const findings = (lastReject?.json as { findings?: unknown } | undefined)?.findings;
+  const hasFindings = Array.isArray(findings) && findings.length > 0;
+  await writeOrClear(`${dir}/prior-findings.json`, hasFindings ? JSON.stringify(findings, null, 2) : undefined);
+
+  // Human answers are the only input a build or verify can get from the operator mid-run.
+  const answers: string[] = [];
+  for (const c of issue.comments) {
+    if (!isHumanComment(c)) continue;
+    const cmd = parseChatOps(c.body);
+    if (cmd.type === "answer" && cmd.text) answers.push(cmd.text);
+  }
+  await writeOrClear(`${dir}/operator-answers.md`, answers.length ? `${answers.join("\n\n")}\n` : undefined);
+}
+
+function verdictResult(json: unknown): unknown {
+  return (json as { result?: unknown } | null)?.result;
+}
+
+// A file from an earlier rehydrate must not outlive the thread that wrote it.
+async function writeOrClear(path: string, body: string | undefined): Promise<void> {
+  if (body === undefined) await rm(path, { force: true });
+  else await Bun.write(path, body);
 }

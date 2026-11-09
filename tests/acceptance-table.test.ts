@@ -294,7 +294,11 @@ describe("an unproven acceptance verdict rejects verify", () => {
   });
 
   test("the PR body opens with What changed, built from the plan and the diff", async () => {
-    const plan = { goal: "Monthly plan shows its price.", criteria: [{ id: "AC-1", text: "Shows 49." }] };
+    const plan = {
+      goal: "Monthly plan shows its price.",
+      criteria: [{ id: "AC-1", text: "Shows 49." }],
+      files: ["src/a.ts", "tests/a.test.ts"],
+    };
     const { body } = await ship([fixture], plan, ["src/a.ts", "tests/a.test.ts"]);
     expect(body.startsWith("## What changed\n\nMonthly plan shows its price.\n")).toBe(true);
     expect(body).toContain("- Files: `src/a.ts`, `tests/a.test.ts`");

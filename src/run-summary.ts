@@ -17,6 +17,7 @@ export interface RunSummaryCtx {
 
 const PROOF_LINE: Record<ProofStatus, string> = {
   bites: "the new test fails without the change",
+  "compile-only": "proof failed only because the reverted tree does not compile",
   "passes-without": "the new test also passes without the change",
   "no-tests": "the diff adds no test",
   skipped: "skipped: the plan's proof is check, so the named checks were re-run instead",

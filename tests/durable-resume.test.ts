@@ -71,13 +71,13 @@ describe("durable resume", () => {
     });
   });
 
-  test("a rerun with no approval keeps triage and asks again with a fresh plan and token", async () => {
+  test("a rerun with no approval keeps triage and the plan, and asks again with a fresh token", async () => {
     const e = setup(2);
     await e.run();
     await e.github.setStateLabel(e.config.repo, 1, [LABEL.awaitingApproval], LABEL.ready);
     const first = tokenOf(e);
     expect(await e.run()).toBe("awaiting-approval");
-    expect(ran(e)).toEqual(["triage", "plan", "plan"]);
+    expect(ran(e)).toEqual(["triage", "plan"]);
     const tokens = e.deps.state.busEvents(100).filter((r) => r.type === "factory.approval.requested");
     expect(tokens.map((r) => (JSON.parse(r.data) as { token: string }).token)).not.toEqual([first, first]);
   });

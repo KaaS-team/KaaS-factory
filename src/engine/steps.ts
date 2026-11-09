@@ -4,7 +4,6 @@
 // and moves the label), "reject" (the engine follows `reject:`), or "stop"
 // once it has parked or finished the issue itself, from `step.label`.
 
-import { readFileSync } from "node:fs";
 import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
@@ -31,6 +30,9 @@ import {
 import { isChecked } from "../recheck";
 import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
 import { runProof, type ProofResult } from "../proof";
+import { postReusedPlan, withBodyHash } from "./plan-reuse";
+import { verdictComment } from "./verdict-rules";
+import { judgeRound, readRunJson } from "./verify-judge";
 import { touchesProtectedPath } from "../boundary";
 import { clearRunFiles, readSeal, sealKey, sealRunFiles } from "../receipt";
 import { ShellSetupRunner } from "../setup";
@@ -148,6 +150,8 @@ const plan: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
+    const reused = await postReusedPlan(deps, config, issue, worktree);
+    if (reused) return { kind: "next", facts: reused };
     const art = await checkedPlan(deps, config, issue, worktree, stepOpts(step));
     const { result, parsed } = art;
     const { json, problem } = parsed;
@@ -162,8 +166,9 @@ const plan: StepType = {
     const planStop = stepStop(json);
     if (planStop) return stop(await stopStep(deps, config, issueNumber, step.label, planStop));
     if (json.status === "needs-info") return askOrHandOver(sc, art.question);
-    if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "plan", json });
-    return { kind: "next", facts: json };
+    const stamped = withBodyHash(json, issue.body);
+    if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "plan", json: stamped });
+    return { kind: "next", facts: stamped };
   },
 };
 
@@ -400,6 +405,11 @@ const verify: StepType = {
       json = rechecked.verdict;
       recheckNote = rechecked.note;
     }
+    const judged = await judgeRound(deps, config, issue, worktree, json);
+    json = judged.verdict;
+    recheckNote += judged.note;
+    const comment =
+      art.comment && verdictComment(art.comment + recheckNote, json, ctx.rejectRound + 1, workflow.limits.rejects);
     if (json) deps.state.setVerifyVerdict(config.repo, issueNumber, json.result);
     if (checked && !checked.ok) {
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
@@ -410,8 +420,7 @@ const verify: StepType = {
     if (verifyStop) return stop(await stopStep(deps, config, issueNumber, step.label, verifyStop));
     if (result.exitCode !== 0 || !json || json.result === "uncertain") {
       // The human needs the verdict to act on, and the post is the marker that retires the retry that led here.
-      if (art.comment)
-        await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+      if (comment) await postComment(deps, config, issueNumber, comment, { stage: "verify", json });
       await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
       const fallback = json ? "verify uncertain" : "verify produced no valid verdict.json";
       const cause = stageCause(config, issueNumber, "verify", result, { fallback });
@@ -424,8 +433,7 @@ const verify: StepType = {
       );
       return stop("needs-human");
     }
-    if (art.comment)
-      await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+    if (comment) await postComment(deps, config, issueNumber, comment, { stage: "verify", json });
     if (json.result === "reject") {
       ctx.rejectRound += 1;
       ctx.failure = failureTail(art.comment ?? JSON.stringify(json.findings, null, 2));
@@ -441,14 +449,6 @@ const verify: StepType = {
     return { kind: "next", facts: json };
   },
 };
-
-function readRunJson<T>(worktree: string, issueNumber: number, name: string): T | undefined {
-  try {
-    return JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/${name}`, "utf8")) as T;
-  } catch {
-    return undefined; // the stage that writes it did not run
-  }
-}
 
 async function unshippedBranch(
   deps: WatchDeps,

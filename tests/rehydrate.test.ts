@@ -124,4 +124,53 @@ describe("rehydrate", () => {
     expect(await Bun.file(`${dir}/triage-comment.md`).exists()).toBe(false);
     rmSync(worktree, { recursive: true, force: true });
   });
+
+  test("writes the last reject's findings and the operator's answers for the next verify", async () => {
+    const worktree = mkdtempSync(join(tmpdir(), "factory-rehydrate-"));
+    const findings = [{ severity: "must", confidence: 4, what: "AC-2 is not covered" }];
+    const issue: GhIssue = {
+      number: 6,
+      title: "t",
+      body: "b",
+      labels: [{ name: "factory:building" }],
+      comments: [
+        comment(
+          `<!-- factory:verdict v1 -->\nreject\n\n${dataMarker("verify", { result: "reject", rounds: 1, findings })}`,
+          1,
+        ),
+        { ...comment("Use the existing helper, not a new one.", 2), authorAssociation: "MEMBER" },
+        { ...comment("/factory retry", 3), authorAssociation: "MEMBER" },
+      ],
+    };
+    await rehydrate(worktree, issue);
+    const dir = `${worktree}/${runDir(6)}`;
+    expect(await Bun.file(`${dir}/prior-findings.json`).json()).toEqual(findings);
+    expect(await Bun.file(`${dir}/operator-answers.md`).text()).toBe("Use the existing helper, not a new one.\n");
+    rmSync(worktree, { recursive: true, force: true });
+  });
+
+  test("a later rehydrate with nothing to say removes the files an earlier one wrote", async () => {
+    const worktree = mkdtempSync(join(tmpdir(), "factory-rehydrate-"));
+    const dir = `${worktree}/${runDir(7)}`;
+    const withReject: GhIssue = {
+      number: 7,
+      title: "t",
+      body: "b",
+      labels: [],
+      comments: [
+        comment(
+          `<!-- factory:verdict v1 -->\nreject\n\n${dataMarker("verify", { result: "reject", rounds: 1, findings: ["x"] })}`,
+          1,
+        ),
+        { ...comment("a reply", 2), authorAssociation: "MEMBER" },
+      ],
+    };
+    await rehydrate(worktree, withReject);
+    expect(await Bun.file(`${dir}/prior-findings.json`).exists()).toBe(true);
+    expect(await Bun.file(`${dir}/operator-answers.md`).exists()).toBe(true);
+    await rehydrate(worktree, { ...withReject, comments: [] });
+    expect(await Bun.file(`${dir}/prior-findings.json`).exists()).toBe(false);
+    expect(await Bun.file(`${dir}/operator-answers.md`).exists()).toBe(false);
+    rmSync(worktree, { recursive: true, force: true });
+  });
 });

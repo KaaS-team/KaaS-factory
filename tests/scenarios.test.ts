@@ -868,7 +868,15 @@ describe("failure paths", () => {
     d.push("build", build());
     d.push("verify", rejected([finding("real bug")]));
     d.push("build", build());
-    d.push("verify", verdict("pass"));
+    d.push("verify", {
+      "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
+      "verdict.json": JSON.stringify({
+        result: "pass",
+        rounds: 2,
+        findings: [],
+        prior: [{ what: "real bug", status: "resolved" }],
+      }),
+    });
     d.push("pr", pr());
     expect(await d.step()).toBe("shipped");
     expect(d.github.seenLabels.has(LABEL.building)).toBe(true);

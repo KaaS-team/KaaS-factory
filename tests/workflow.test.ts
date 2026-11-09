@@ -298,7 +298,11 @@ const BUILD = {
 };
 const VERDICT = (result: "pass" | "reject") => ({
   "verdict-comment.md": "<!-- factory:verdict v1 -->\nv",
-  "verdict.json": JSON.stringify({ result, rounds: 1, findings: result === "reject" ? ["misses the bug"] : [] }),
+  "verdict.json": JSON.stringify(
+    result === "reject"
+      ? { result, rounds: 1, findings: ["misses the bug"] }
+      : { result, rounds: 1, findings: [], prior: [{ what: "misses the bug", status: "resolved" }] },
+  ),
 });
 const PLAN = {
   "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan",

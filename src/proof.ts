@@ -11,7 +11,8 @@ import { touchedPackages } from "./risk";
 
 // "unavailable": the repo has no test gate, so nothing could prove the change. It is shown
 // in the PR's run summary rather than passing silently.
-export type ProofStatus = "bites" | "passes-without" | "no-tests" | "skipped" | "unavailable";
+// "compile-only": the test failed only because the reverted tree does not compile (verdict-rules.ts).
+export type ProofStatus = "bites" | "compile-only" | "passes-without" | "no-tests" | "skipped" | "unavailable";
 
 export interface ProofResult {
   readonly status: ProofStatus;
@@ -39,6 +40,13 @@ export const TEST_PATH = [
   /_test\.(py|go)$/,
   /_spec\.rb$/,
 ];
+
+// A red test that fails on a compile error proves nothing about the behaviour it names.
+const COMPILE_ERROR = /Cannot find module|Could not resolve|error TS\d+|SyntaxError|ModuleNotFoundError|ImportError/;
+
+export function classifyProof(status: ProofStatus, tail: string): ProofStatus {
+  return status === "bites" && COMPILE_ERROR.test(tail) ? "compile-only" : status;
+}
 
 export function isTestPath(path: string): boolean {
   return TEST_PATH.some((re) => re.test(path));
@@ -94,7 +102,7 @@ export async function runProof(
   if (left.length > 0) throw new Error(`proof: the worktree is not clean after restoring HEAD: ${left.join(", ")}`);
   const tail = `${result.stdout}\n${result.stderr}`.trim().slice(-2000);
   return {
-    status: result.code === 0 ? "passes-without" : "bites",
+    status: classifyProof(result.code === 0 ? "passes-without" : "bites", tail),
     reverted: [...existing, ...added],
     tests,
     cmd,
