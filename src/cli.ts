@@ -187,6 +187,9 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
   };
 }
 
+// A stopped watcher must not leave a live process behind, so a fatal stop exits.
+const exitOnFatal = (): void => process.exit(EXIT.error);
+
 async function cmdWatch(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
@@ -203,10 +206,16 @@ async function cmdWatch(): Promise<void> {
     if (result.paused) process.exit(EXIT.paused);
     return;
   }
-  startWatch(deps, config, (r) => {
-    if (r.paused) console.log(`factory watch: paused — ${r.reason}`);
-    else if (r.processed.length) console.log(`factory watch: processed #${r.processed.join(", #")}`);
-  });
+  startWatch(
+    deps,
+    config,
+    (r) => {
+      if (r.paused) console.log(`factory watch: paused — ${r.reason}`);
+      else if (r.processed.length) console.log(`factory watch: processed #${r.processed.join(", #")}`);
+    },
+    undefined,
+    exitOnFatal,
+  );
   console.log("factory watch: running. Ctrl+C to stop.");
   await new Promise(() => {}); // keep the process alive
 }
@@ -562,10 +571,16 @@ async function cmdUp(): Promise<void> {
   const deps = await buildWatchDeps(cloneDir, config);
   const recovered = await recoverInFlight(deps, config);
   if (recovered.length) console.log(`factory up: recovered #${recovered.join(", #")}`);
-  startWatch(deps, config, (r) => {
-    if (r.paused) console.log(`factory up: paused — ${r.reason}`);
-    else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
-  });
+  startWatch(
+    deps,
+    config,
+    (r) => {
+      if (r.paused) console.log(`factory up: paused — ${r.reason}`);
+      else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
+    },
+    undefined,
+    exitOnFatal,
+  );
   serveDashboard(
     deps.state,
     deps.github,

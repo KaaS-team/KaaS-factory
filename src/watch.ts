@@ -68,6 +68,11 @@ export interface PollResult {
 
 export const MAX_BACKOFF_MS = 900_000;
 
+// A bad credential or repo never heals on retry, so it stops the watcher; a timeout or 5xx waits for the next tick.
+const FATAL_STDERR = [/HTTP 401/, /gh auth login/, /authentication/i, /Could not resolve to a Repository/];
+export const isFatalError = (err: unknown): boolean =>
+  FATAL_STDERR.some((re) => re.test(err instanceof Error ? err.message : String(err)));
+
 // How long to wait before the next tick, and whether a tick may call the tracker now.
 export const tickDelay = (intervalMs: number, nextTickAt: number | undefined, now: number): number =>
   Math.max(intervalMs, (nextTickAt ?? 0) - now);
@@ -758,6 +763,7 @@ export function startWatch(
   config: FactoryConfig,
   onTick?: (r: PollResult) => void,
   webhookCheckMs = WEBHOOK_CHECK_MS,
+  onFatal?: (err: unknown) => void,
 ): () => void {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -766,7 +772,9 @@ export function startWatch(
   // Another app's event only wakes the poll, which then applies every normal check (readyIsTrusted,
   // intake, caps). Nothing reads an issue or an actor out of event data.
   const unsubscribe = deps.bus?.subscribe("*", (e) =>
-    handleEvent(deps, config, e).then((filed) => void ((filed > 0 || isExternalEventType(e.type)) && tick())),
+    handleEvent(deps, config, e)
+      .then((filed) => void ((filed > 0 || isExternalEventType(e.type)) && tick()))
+      .catch((err) => console.error(`factory watch: handling ${e.type} failed`, err)),
   );
 
   const intervalMs = config.pollIntervalSeconds * 1000;
@@ -795,6 +803,12 @@ export function startWatch(
       })
       .catch((err) => {
         nextTickAt = undefined;
+        if (isFatalError(err)) {
+          console.error("factory watch: stopped, a retry cannot fix this", err);
+          stop();
+          onFatal?.(err);
+          return;
+        }
         console.error("factory watch: poll failed", err);
       });
     arm(intervalMs);
@@ -804,7 +818,7 @@ export function startWatch(
     // POST /events rows the dashboard stored, then sinks whose retry is due.
     if (deps.bus) {
       deps.bus.drainInbound();
-      void deps.bus.deliver();
+      deps.bus.deliver().catch((err) => console.error("factory watch: bus delivery failed", err));
     }
     const latest = deps.state.latestDelivery();
     if (latest === seenDelivery) return;
@@ -812,13 +826,15 @@ export function startWatch(
     tick();
   }, webhookCheckMs);
 
-  tick();
-  return () => {
+  function stop(): void {
     stopped = true;
     if (timer) clearTimeout(timer);
     clearInterval(webhooks);
     unsubscribe?.();
-  };
+  }
+
+  tick();
+  return stop;
 }
 
 function startMinion(deps: WatchDeps, config: FactoryConfig, minion: Minion, event?: CloudEvent): void {
