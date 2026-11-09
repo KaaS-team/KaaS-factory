@@ -21,7 +21,8 @@ export type InboxKind =
   | "failed"
   | "budget"
   | "learning-pr"
-  | "stale-pr";
+  | "stale-pr"
+  | "needs-you";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
 
 // Actions that carry the human's own words.
@@ -48,9 +49,16 @@ export const WAITING: Readonly<Record<string, { kind: InboxKind; actions: readon
   [LABEL.inReview]: { kind: "review-pr", actions: ["revise", "cancel"] },
   [LABEL.needsHuman]: { kind: "parked", actions: ["retry", "cancel"] },
   [LABEL.failed]: { kind: "failed", actions: ["retry", "cancel"] },
+  // Operator work: the human closes the issue on GitHub; the factory has no action for it.
+  [LABEL.operator]: { kind: "needs-you", actions: [] },
 };
 
-export const WAITING_LABELS: readonly string[] = [LABEL.awaitingApproval, LABEL.inReview, ...PARKED_LABELS];
+export const WAITING_LABELS: readonly string[] = [
+  LABEL.awaitingApproval,
+  LABEL.inReview,
+  LABEL.operator,
+  ...PARKED_LABELS,
+];
 
 const ASK_LIMIT = 1200;
 

@@ -87,6 +87,19 @@ describe("dispatch and routine", () => {
     expect(repoCapped.jobs.map((j) => j.issue)).toEqual([5]);
   });
 
+  test("a declared dependency chain reorders the jobs; undeclared ones keep their number", async () => {
+    const declared = (number: number, labels: string[], body: string) => ({ ...baseIssue(number, labels), body });
+    const github = new FakeGitHub([
+      declared(4, [LABEL.ready], "Runner: factory\n\n## Why\nx"),
+      baseIssue(2, [LABEL.ready]),
+      declared(8, [LABEL.ready], "Runner: factory\n\n## Why\nx"),
+      declared(9, [LABEL.blocked], "Deps: #8\n\n## Why\nx"),
+    ]);
+    const state = new FactoryState(":memory:");
+    const result = await dispatchJobs({ github, state }, config);
+    expect(result.jobs.map((j) => j.issue)).toEqual([2, 8, 4]);
+  });
+
   test("dispatch lists the same labels pollOnce does", () => {
     const watch = readFileSync(join(import.meta.dir, "../src/watch.ts"), "utf8");
     const listed = watch.slice(watch.indexOf("async function listWatched"), watch.indexOf("function workflowOf"));

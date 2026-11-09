@@ -99,3 +99,69 @@ describe("resolveBlockers", () => {
     expect(github.issues.get(1)!.comments).toEqual([]);
   });
 });
+
+describe("Deps joins Blocked by", () => {
+  test("a Deps line counts as a blocker, next to a Blocked by line", () => {
+    expect(blockerNumbers("Blocked by: #2\nDeps: #2 #3")).toEqual([2, 3]);
+    expect(blockerNumbers("Deps: none")).toEqual([]);
+  });
+
+  test("an open Deps dep demotes a ready issue to blocked", async () => {
+    const blocker = baseIssue(2, []);
+    const issue = { ...baseIssue(1, [LABEL.ready]), body: "Deps: #2\n\n## Why\nx" };
+    const github = new FakeGitHub([issue, blocker]);
+    const { clear } = await resolveBlockers(github, "acme/widgets", [issue], []);
+    expect(clear).toEqual([]);
+    expect(github.issues.get(1)!.labels.map((l) => l.name)).toEqual([LABEL.blocked]);
+  });
+
+  test("a closed-completed Deps dep promotes a blocked issue back to ready", async () => {
+    const blocker = { ...baseIssue(2, []), state: "CLOSED" as const, stateReason: "COMPLETED" };
+    const issue = { ...baseIssue(1, [LABEL.blocked]), body: "Deps: #2" };
+    const github = new FakeGitHub([issue, blocker]);
+    const { clear } = await resolveBlockers(github, "acme/widgets", [], [issue]);
+    expect(clear.map((i) => i.number)).toEqual([1]);
+  });
+
+  test("two issues waiting on the same dep fetch it once per poll", async () => {
+    class CountingGitHub extends FakeGitHub {
+      fetches = new Map<number, number>();
+      override async getIssue(repo: string, number: number) {
+        this.fetches.set(number, (this.fetches.get(number) ?? 0) + 1);
+        return super.getIssue(repo, number);
+      }
+    }
+    const blocker = baseIssue(2, []);
+    const a = { ...baseIssue(1, [LABEL.ready]), body: "Deps: #2" };
+    const b = { ...baseIssue(3, [LABEL.ready]), body: "Blocked by: #2" };
+    const github = new CountingGitHub([a, b, blocker]);
+    await resolveBlockers(github, "acme/widgets", [a, b], []);
+    expect(github.fetches.get(2)).toBe(1);
+  });
+});
+
+describe("Runner: operator work is never released", () => {
+  const operatorIssue = (number: number, labels: string[], body = "Runner: operator\n\n## Why\nrename") => ({
+    ...baseIssue(number, labels),
+    body,
+  });
+
+  test("a ready operator issue moves to factory:operator with one comment and is not clear", async () => {
+    const issue = operatorIssue(1, [LABEL.ready]);
+    const github = new FakeGitHub([issue]);
+    const { clear } = await resolveBlockers(github, "acme/widgets", [issue], []);
+    expect(clear).toEqual([]);
+    expect(github.issues.get(1)!.labels.map((l) => l.name)).toEqual([LABEL.operator]);
+    expect(github.issues.get(1)!.comments).toHaveLength(1);
+    expect(github.issues.get(1)!.comments[0]!.body).toContain("Operator work (Runner: operator)");
+  });
+
+  test("a blocked operator issue whose dep closes goes to operator, not ready", async () => {
+    const blocker = { ...baseIssue(2, []), state: "CLOSED" as const, stateReason: "COMPLETED" };
+    const issue = operatorIssue(1, [LABEL.blocked], "Runner: operator\nDeps: #2\n\n## Why\nx");
+    const github = new FakeGitHub([issue, blocker]);
+    const { clear } = await resolveBlockers(github, "acme/widgets", [], [issue]);
+    expect(clear).toEqual([]);
+    expect(github.issues.get(1)!.labels.map((l) => l.name)).toEqual([LABEL.operator]);
+  });
+});

@@ -11,7 +11,7 @@
 // on a different machine can all resume any issue.
 
 import { mergeContext, settleMerge, tierInput } from "./merge-autonomy";
-import { resolveBlockers } from "./blockers";
+import { resolveBlockers, scheduleOrder } from "./blockers";
 import { intakeGate } from "./dispatch";
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
@@ -664,20 +664,16 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const buckets = [ready, needsInfo, awaitingApproval, overlapped, failed, needsHuman, inReview];
 
   const seen = new Set<number>();
-  const candidates = buckets
-    .flat()
-    .filter((issue) => {
-      if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
-      if (!canServe(deps.machine?.config.capabilities, issue.labels)) return false;
-      const released = inFlight ? releasedAt.get(inFlight)?.get(issue.number) : undefined;
-      if (released !== undefined && released > listedAt) return false;
-      seen.add(issue.number);
-      return true;
-    })
-    // Oldest ticket first: tickets are filed in dependency order, and gh's
-    // own list order is otherwise unspecified (audit: newest-first in
-    // practice), which raced dependents ahead of what they were blocked on.
-    .sort((a, b) => a.number - b.number);
+  // Oldest first; declared Deps/Epic/Milestone/Runner issues take critical-path order (src/blockers.ts).
+  const pending = buckets.flat().filter((issue) => {
+    if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
+    if (!canServe(deps.machine?.config.capabilities, issue.labels)) return false;
+    const released = inFlight ? releasedAt.get(inFlight)?.get(issue.number) : undefined;
+    if (released !== undefined && released > listedAt) return false;
+    seen.add(issue.number);
+    return true;
+  });
+  const candidates = scheduleOrder(pending, blockedRaw, Math.min(dispatchConcurrency(deps, config), gate.room));
 
   // candidates was filtered against inFlight above; mark them before any
   // await so an overlapping poll's own candidates filter (same check) never

@@ -148,6 +148,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "the issues one tick would advance, written to $GITHUB_OUTPUT as a matrix for one `factory run` job each",
   },
   {
+    name: "plan-order",
+    usage: "plan-order (--repo-dir <path> | --repo <owner/name>) [--json]",
+    does: "the order the factory would start declared issues in, the critical path, and why; exits 1 on a dependency cycle or a missing dep",
+  },
+  {
     name: "routine",
     usage: "routine (--repo <owner/name> | --repo-dir <path>) [--cron <expr>] [--json]",
     does: "print a Claude Code cloud routine (name, cron, prompt) that runs `factory tick` on a schedule",

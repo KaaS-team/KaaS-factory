@@ -46,12 +46,15 @@ describe("inbox structure", () => {
       LABEL.verifying,
       LABEL.overlap,
     ]);
+    // Operator work is the human's to do on GitHub, so it is listed with no action.
+    const noAction = new Set<string>([LABEL.operator]);
     for (const l of LABELS.filter((x) => x.category === "state" || x.category === "parked")) {
       const items = buildInbox([issue(1, l.name)]);
       if (inFlight.has(l.name)) expect(items, l.name).toHaveLength(0);
       else {
         expect(items, l.name).toHaveLength(1);
-        expect(items[0]!.actions.length, l.name).toBeGreaterThan(0);
+        if (noAction.has(l.name)) expect(items[0]!.actions, l.name).toEqual([]);
+        else expect(items[0]!.actions.length, l.name).toBeGreaterThan(0);
       }
     }
     expect(STATE_LABELS.filter((s) => !inFlight.has(s) && !WAITING[s])).toEqual([]);
@@ -105,6 +108,12 @@ describe("buildInbox", () => {
   test("an in-review PR with no merge-policy comment keeps the generic review-pr kind", () => {
     const items = buildInbox([issue(3, LABEL.inReview, "<!-- factory:plan v1 -->\nready for review")]);
     expect(items[0]!.kind).toBe("review-pr");
+  });
+
+  test("operator work shows as needs-you with no actions", () => {
+    const [item] = buildInbox([issue(9, LABEL.operator)]);
+    expect(item!.kind).toBe("needs-you");
+    expect(item!.actions).toEqual([]);
   });
 });
 

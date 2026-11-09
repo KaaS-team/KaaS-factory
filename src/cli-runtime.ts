@@ -1,13 +1,16 @@
-// The CLI's runtime and run-anywhere commands: `factory pool`, `factory runtime`, `factory dispatch`
-// and `factory routine`. src/cli.ts dispatches here so it stays a thin switch.
+// The CLI's runtime and run-anywhere commands: `factory pool`, `factory runtime`, `factory dispatch`,
+// `factory routine` and `factory plan-order`. src/cli.ts dispatches here so it stays a thin switch.
 
+import { schedNode } from "./blockers";
 import { SqliteUsageStore } from "./adapters/pool/execution";
 import { successJson, UsageError, EXIT } from "./cli-output";
 import { loadConfig, type FactoryConfig } from "./config";
 import type { WatchDeps } from "./engine/common";
 import { monthKey, poolReport } from "./core/sandbox-pool";
+import { parseMeta, type Schedule, schedule } from "./core/schedule";
 import { plain } from "./display";
 import { cloudRoutine, dispatchJobs, writeActionsOutput } from "./dispatch";
+import type { GhIssue, ScmPort } from "./github";
 import { loadMachineConfig } from "./machine";
 import { formatKit, probeRuntime, verifyRuntime } from "./runtime-kit";
 import { defaultRuntime, poolDbPath, runtimeSpecs, runtimesFrom } from "./runtimes";
@@ -91,6 +94,68 @@ export async function cmdDispatch(cli: CliContext): Promise<void> {
   if (result.paused) console.log(`factory dispatch: intake paused, ${result.paused}`);
   for (const j of result.jobs) console.log(`#${j.issue} ${j.label}`);
   if (!result.jobs.length) console.log("factory dispatch: nothing to run");
+}
+
+// The `dispatch`, `routine` and `plan-order` commands: one case in src/cli.ts, routed here by name.
+export function cmdScheduling(name: string, cli: CliContext): Promise<void> {
+  if (name === "dispatch") return cmdDispatch(cli);
+  if (name === "routine") return cmdRoutine(cli);
+  return cmdPlanOrder(cli);
+}
+
+// `factory plan-order`: the order declared issues would start in, the critical path, and why. Exits 1 on a
+// dependency cycle or a declared dep that is neither open nor closed as completed, so CI can gate a backlog.
+export async function cmdPlanOrder(cli: CliContext): Promise<void> {
+  const cloneDir = await cli.resolveCloneDir();
+  const config = await loadConfig(cloneDir);
+  const { github } = await cli.watchDeps(cloneDir, config);
+  const open = await github.listOpenIssues(config.repo);
+  const result = await planOrder(github, config.repo, open, config.concurrency);
+  const failed = result.cycles.length > 0 || result.missing.length > 0;
+  if (cli.has("json")) console.log(successJson(result, !failed));
+  else console.log(formatPlanOrder(result, new Map(open.map((i) => [i.number, plain(i.title)] as const))));
+  if (failed) process.exit(EXIT.error);
+}
+
+// The scheduler's plan over the open issues. Every open issue is a node, as the watcher's dependency gate
+// sees them, but only declared issues are listed; a dep that is closed as not planned counts as missing.
+async function planOrder(github: ScmPort, repo: string, open: readonly GhIssue[], slots: number): Promise<Schedule> {
+  const openNumbers = new Set(open.map((i) => i.number));
+  const declared = open.filter((i) => parseMeta(i.body).declared);
+  const completed = new Map<number, Promise<boolean>>();
+  const isCompleted = (n: number): Promise<boolean> => {
+    let known = completed.get(n);
+    if (!known) {
+      known = github.getIssue(repo, n).then(
+        (i) => i.state === "CLOSED" && i.stateReason !== "NOT_PLANNED",
+        () => false,
+      );
+      completed.set(n, known);
+    }
+    return known;
+  };
+  const missing: Schedule["missing"] = [];
+  for (const issue of declared)
+    for (const dep of schedNode(issue).deps)
+      if (!openNumbers.has(dep) && !(await isCompleted(dep))) missing.push({ issue: issue.number, dep });
+  const plan = schedule({ nodes: open.map(schedNode), open: openNumbers, slots });
+  const listed = new Set(declared.map((i) => i.number));
+  return { ...plan, order: plan.order.filter((n) => listed.has(n)), missing };
+}
+
+// The plain-text plan: one line per issue in start order with its reason, then the critical path, then any
+// cycle or missing dep.
+export function formatPlanOrder(plan: Schedule, titles: ReadonlyMap<number, string>): string {
+  if (plan.order.length === 0 && plan.cycles.length === 0) return "factory plan-order: no declared issues are open";
+  const lines = plan.order.map((n, i) => `${i + 1}. ${plan.why[n]}  ${titles.get(n) ?? ""}`.trimEnd());
+  if (plan.criticalPath.length) lines.push(`critical path: ${plan.criticalPath.map((n) => `#${n}`).join(" -> ")}`);
+  if (plan.cycles.length) lines.push("cycles:", ...plan.cycles.map((c) => `  ${c.map((n) => `#${n}`).join(" -> ")}`));
+  if (plan.missing.length)
+    lines.push(
+      "missing:",
+      ...plan.missing.map((m) => `  #${m.issue} depends on #${m.dep}, which is neither open nor closed as completed`),
+    );
+  return lines.join("\n");
 }
 
 // `factory routine`: the Claude Code cloud routine (name, cron, prompt) that runs `factory tick`.

@@ -3,11 +3,11 @@
 // a Claude Code cloud routine that runs `factory tick` on a schedule.
 
 import { appendFileSync } from "node:fs";
-import { resolveBlockers } from "./blockers";
+import { resolveBlockers, scheduleOrder } from "./blockers";
 import { parseCron } from "./core/cron";
 import type { FactoryConfig } from "./config";
 import { type SpendDeps, spendCapHit, type WatchDeps } from "./engine/common";
-import type { GhPr } from "./github";
+import type { GhIssue, GhPr } from "./github";
 import { LABEL } from "./labels";
 import { canServe } from "./machine";
 
@@ -34,6 +34,8 @@ export interface Dispatch {
 
 export interface IntakeGate {
   readonly open: boolean;
+  // Open factory PRs still allowed under maxOpenFactoryPrs; the most new pickups this poll may start.
+  readonly room: number;
   readonly paused?: string;
 }
 
@@ -44,15 +46,17 @@ export async function intakeGate(
   openPrs: readonly GhPr[],
 ): Promise<IntakeGate> {
   const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/")).length;
+  const room = Math.max(0, config.maxOpenFactoryPrs - factoryPrs);
   if (factoryPrs >= config.maxOpenFactoryPrs)
     return {
       open: false,
+      room,
       paused: `STOP_IF: ${factoryPrs} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`,
     };
   // An issue already in flight keeps going: checkSpendCap parks it on its own next stage (plan v2.7.0 item 7).
   if ((await spendCapHit(deps, config)) !== undefined)
-    return { open: false, paused: "budget: today's spend cap is hit, new pickups are paused" };
-  return { open: deps.state.getToggle("auto_start", true) };
+    return { open: false, room, paused: "budget: today's spend cap is hit, new pickups are paused" };
+  return { open: deps.state.getToggle("auto_start", true), room };
 }
 
 export async function dispatchJobs(
@@ -63,30 +67,28 @@ export async function dispatchJobs(
   const repo = config.repo;
   const gate = await intakeGate(deps, config, await github.listPrs(repo, { state: "open" }));
   // Same intake as a tick: a blocked ready issue is demoted, not dispatched.
+  const blocked = gate.open ? await github.listIssuesByLabel(repo, LABEL.blocked) : [];
   const ready = gate.open
-    ? (
-        await resolveBlockers(
-          github,
-          repo,
-          await github.listIssuesByLabel(repo, LABEL.ready),
-          await github.listIssuesByLabel(repo, LABEL.blocked),
-        )
-      ).clear
+    ? (await resolveBlockers(github, repo, await github.listIssuesByLabel(repo, LABEL.ready), blocked)).clear
     : [];
   const resumed = await Promise.all(RESUME_LABELS.map((l) => github.listIssuesByLabel(repo, l)));
   const capabilities = deps.machine?.config.capabilities;
-  const seen = new Set<number>();
-  const jobs: DispatchJob[] = [];
-  for (const [label, issues] of [
+  const labelOf = new Map<number, string>();
+  const issues: GhIssue[] = [];
+  for (const [label, list] of [
     [LABEL.ready, ready] as const,
     ...RESUME_LABELS.map((l, i) => [l, resumed[i]!] as const),
   ])
-    for (const issue of issues) {
-      if (seen.has(issue.number) || !canServe(capabilities, issue.labels)) continue;
-      seen.add(issue.number);
-      jobs.push({ issue: issue.number, label });
+    for (const issue of list) {
+      if (labelOf.has(issue.number) || !canServe(capabilities, issue.labels)) continue;
+      labelOf.set(issue.number, label);
+      issues.push(issue);
     }
-  jobs.sort((a, b) => a.issue - b.issue);
+  // The order a tick starts them in: declared ready issues by critical path, the rest by number.
+  const jobs: DispatchJob[] = scheduleOrder(issues, blocked, gate.room).map((i) => ({
+    issue: i.number,
+    label: labelOf.get(i.number)!,
+  }));
   return gate.paused ? { jobs, paused: gate.paused } : { jobs };
 }
 
