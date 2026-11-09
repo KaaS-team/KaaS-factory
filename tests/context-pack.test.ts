@@ -228,6 +228,35 @@ describe("v3.0: each stage gets only what it uses", () => {
   });
 });
 
+describe("A4: the context pack reads the agent's skillsDir", () => {
+  test("the index and routed skills come from skillsDir, and the default is still .claude/skills", async () => {
+    const cwd = worktree();
+    mkdirSync(`${cwd}/.agents/skills/codex-only`, { recursive: true });
+    writeFileSync(
+      `${cwd}/.agents/skills/codex-only/SKILL.md`,
+      "---\nname: codex-only\ndescription: Codex skill.\n---\nCodex body.",
+    );
+    mkdirSync(`${cwd}/.claude/skills/claude-only`, { recursive: true });
+    writeFileSync(
+      `${cwd}/.claude/skills/claude-only/SKILL.md`,
+      "---\nname: claude-only\ndescription: Claude skill.\n---\nClaude body.",
+    );
+
+    const index = await buildContextPack("plan", 1, cwd, { skillsDir: ".agents/skills" });
+    expect(index).toContain("- codex-only: Codex skill.");
+    expect(index).not.toContain("claude-only");
+
+    const routed = await buildContextPack("build", 1, cwd, { skills: ["codex-only"], skillsDir: ".agents/skills" });
+    expect(routed).toContain("Codex body.");
+
+    const defaults = await buildContextPack("plan", 1, cwd);
+    expect(defaults).toContain("- claude-only: Claude skill.");
+    expect(defaults).not.toContain("codex-only");
+
+    rmSync(cwd, { recursive: true, force: true });
+  });
+});
+
 describe("the context pack reaches both agent paths", () => {
   test("a non-Claude agent gets it inlined into the rendered prompt", async () => {
     const cwd = worktree();

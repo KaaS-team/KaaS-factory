@@ -228,7 +228,11 @@ export class CommandExecutor implements Executor {
     const contextPack =
       opts.prompt !== undefined
         ? ""
-        : await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
+        : await buildContextPack(opts.stage, opts.issue, opts.cwd, {
+            skills,
+            contextFile: agent.preset?.contextFile,
+            skillsDir: agent.preset?.skillsDir,
+          });
     const reply = agent.config.outputSchema && (spec || readOnly) ? join(scratch, "reply.schema.json") : undefined;
     if (reply) writeFileSync(reply, JSON.stringify(replySchema(opts.stage, types)));
     if (agent.preset?.ownsPrompt) {

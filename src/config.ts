@@ -165,6 +165,8 @@ export interface EventsConfig {
 }
 
 export const DEFAULT_EVENTS_SECRET_ENV = "FACTORY_EVENTS_SECRET";
+// Claude reads .claude/skills; Codex and Gemini (acp) read .agents/skills.
+export const SKILL_DIRS = [".claude/skills", ".agents/skills"] as const;
 
 // The one resolver for the inbound secret's variable name.
 export function eventsInboundSecretEnv(config: Pick<FactoryConfig, "events"> | undefined): string {
@@ -719,12 +721,16 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   }
   // configProblems is pure and cannot see the worktree, so a route naming a
   // skill that was never installed would otherwise only surface as a silent
-  // no-op in buildContextPack, mid-run (plan v2.7.0 item 3).
+  // no-op in buildContextPack, mid-run (plan v2.7.0 item 3). A Codex or Gemini
+  // repo keeps its skills under .agents/skills, so either directory counts.
   const missing: string[] = [];
   for (const [type, route] of Object.entries(config.routes)) {
     for (const name of route.skills ?? []) {
-      if (!existsSync(`${targetRepoDir}/.claude/skills/${name}/SKILL.md`))
-        missing.push(`routes.${type}.skills: "${name}" (.claude/skills/${name}/SKILL.md not found)`);
+      const found = SKILL_DIRS.some((dir) => existsSync(`${targetRepoDir}/${dir}/${name}/SKILL.md`));
+      if (!found)
+        missing.push(
+          `routes.${type}.skills: "${name}" (${SKILL_DIRS.map((dir) => `${dir}/${name}/SKILL.md`).join(" or ")} not found)`,
+        );
     }
   }
   if (missing.length > 0)
