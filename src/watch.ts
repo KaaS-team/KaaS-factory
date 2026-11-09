@@ -52,7 +52,7 @@ import { refuseRepeat } from "./engine/failure";
 import { dueCronMinions, minionsFor, runMinion } from "./engine/minion";
 import { isExternalEventType, type CloudEvent } from "./core/event";
 import type { Minion } from "./core/minion";
-import { emitEvent } from "./engine/bus";
+import { emitEvent, type EventBus } from "./engine/bus";
 import { shipRunState } from "./engine/blobs";
 import { RateLimitError, TRUSTED_ROLES } from "./ports/scm";
 import { cachedRole, isWriter, writersOnly } from "./trust";
@@ -752,6 +752,12 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
 // from this process or the dashboard's own) polls straight away instead of
 // waiting out the interval.
 export const WEBHOOK_CHECK_MS = 2000;
+
+// `factory up` could not start (a taken port, a failed recovery): leave the reason as an event for `events tail`.
+export function reportStartupFailure(bus: EventBus | undefined, err: unknown): void {
+  const reason = err instanceof Error ? err.message : String(err);
+  emitEvent(bus, "factory.watcher.failed", { reason });
+}
 
 export function startWatch(
   deps: WatchDeps,

@@ -173,7 +173,10 @@ export const OPTIONS: [string, string][] = [
   ],
   ["--tmux", "watch and up: show each issue's live transcript in a tmux window (config tmux.enabled does the same)"],
   ["-h, --help", "print this help; after a command, that command's usage"],
-  ["--port <n>", "dashboard port (default FACTORY_DASHBOARD_PORT or 4100)"],
+  [
+    "--port <n>",
+    "dashboard port (default FACTORY_DASHBOARD_PORT or 4100; a taken default falls back to the next free port)",
+  ],
 ];
 
 export const ENV: [string, string][] = [

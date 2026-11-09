@@ -13,7 +13,7 @@ import { tokenEnvNames } from "./agents/env";
 import { CommandExecutor } from "./agents/executor";
 import { DEFAULT_CONFIG, loadConfig, repoFromRemoteUrl, type FactoryConfig } from "./config";
 import { EXIT, UsageError, failureJson, successJson } from "./cli-output";
-import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "./watch";
+import { advanceIssue, pollOnce, recoverInFlight, reportStartupFailure, startWatch, type WatchDeps } from "./watch";
 import { ShellGateRunner } from "./gates";
 import { ShellHoldoutRunner } from "./holdout";
 import { ShellSetupRunner } from "./setup";
@@ -45,6 +45,7 @@ import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeov
 import { LABEL } from "./labels";
 import { ensureRepoClone } from "./repo";
 import { daemonPlatform, installDaemon, uninstallDaemon } from "./daemon";
+import { listenDashboard } from "./port";
 import { helpText } from "./help";
 import { decodeStatement, type Envelope, generateReceiptKey, keyId, RECEIPT_KEY_ENV, verifyEnvelope } from "./receipt";
 import { FixtureRecorder } from "./agents/record";
@@ -511,17 +512,20 @@ function serveDashboard(
   fleet?: Pick<FactoryConfig, "agents" | "stages">,
   project?: DashboardProject,
 ): number {
-  const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
+  const requested = flag("port") ?? process.env.FACTORY_DASHBOARD_PORT;
+  const port = Number(requested ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
   const app = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet, undefined, project, plane());
-  const server = Bun.serve({
-    port,
+  // A taken default moves to the next free port; a requested one that is taken throws.
+  const server = listenDashboard({
     hostname,
-    fetch: (req: Request): Promise<Response> => app.handle(req, server.requestIP(req)?.address),
+    port,
+    explicit: requested !== undefined,
+    fetch: (req, srv) => app.handle(req, srv.requestIP(req)?.address),
   });
-  console.log(`factory dashboard: http://${hostname}:${port} (repo=${repo || "unset"})`);
+  console.log(`factory dashboard: http://${hostname}:${server.port} (repo=${repo || "unset"})`);
   app.remote.start();
-  return port;
+  return server.port;
 }
 
 // The repo the Workflows and Settings pages describe.
@@ -560,20 +564,27 @@ async function cmdUp(): Promise<void> {
   await requireTmux(config);
   if (has("tmux")) return upInTmux(cloneDir, config);
   const deps = await buildWatchDeps(cloneDir, config);
-  const recovered = await recoverInFlight(deps, config);
-  if (recovered.length) console.log(`factory up: recovered #${recovered.join(", #")}`);
-  startWatch(deps, config, (r) => {
-    if (r.paused) console.log(`factory up: paused — ${r.reason}`);
-    else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
-  });
-  serveDashboard(
-    deps.state,
-    deps.github,
-    config.repo,
-    config.riskPolicy.autoApproveLowRisk,
-    config,
-    dashboardProject(cloneDir, config),
-  );
+  try {
+    const recovered = await recoverInFlight(deps, config);
+    if (recovered.length) console.log(`factory up: recovered #${recovered.join(", #")}`);
+    startWatch(deps, config, (r) => {
+      if (r.paused) console.log(`factory up: paused — ${r.reason}`);
+      else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
+    });
+    serveDashboard(
+      deps.state,
+      deps.github,
+      config.repo,
+      config.riskPolicy.autoApproveLowRisk,
+      config,
+      dashboardProject(cloneDir, config),
+    );
+  } catch (err) {
+    // Leaves the reason in the event log for `factory events tail`; the exit is the signal for a supervisor.
+    reportStartupFailure(deps.bus, err);
+    console.error(`factory up: did not start — ${err instanceof Error ? err.message : err}`);
+    process.exit(EXIT.error);
+  }
   console.log(`factory up: polling ${config.repo} every ${config.pollIntervalSeconds}s. Ctrl+C to stop.`);
   await new Promise(() => {}); // keep the process alive
 }

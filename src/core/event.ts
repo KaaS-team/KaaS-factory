@@ -18,6 +18,7 @@ export const FACTORY_EVENTS = [
   "factory.approval.requested",
   "factory.approval.resolved",
   "factory.workflow.emitted",
+  "factory.watcher.failed",
 ] as const;
 
 // Types other KaaS apps emit that POST /events accepts. Anything else is ignored.

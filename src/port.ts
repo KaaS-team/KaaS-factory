@@ -56,6 +56,44 @@ export function worktreePort(worktree: string, pick: () => number = freePort): n
   return port;
 }
 
+// Bun.serve reports a taken port as EADDRINUSE or "... in use"; anything else is a real failure.
+function isAddrInUse(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return (err as { code?: string }).code === "EADDRINUSE" || /in use/i.test(err.message);
+}
+
+// How many ports above the default the dashboard tries before giving up.
+export const DASHBOARD_PORT_TRIES = 20;
+
+// Bun types a server's port as optional; a TCP server always has one.
+type DashboardServer = ReturnType<typeof Bun.serve> & { port: number };
+
+// The default port, or the next free one above it. An explicit port is never swapped: one try, then throw.
+export function listenDashboard(opts: {
+  hostname: string;
+  port: number;
+  explicit: boolean;
+  fetch: (req: Request, server: DashboardServer) => Promise<Response>;
+}): DashboardServer {
+  const tries = opts.explicit ? 1 : DASHBOARD_PORT_TRIES;
+  for (let i = 0; i < tries; i++) {
+    let server!: DashboardServer;
+    try {
+      server = Bun.serve({
+        hostname: opts.hostname,
+        port: opts.port + i,
+        fetch: (req) => opts.fetch(req, server),
+      }) as DashboardServer;
+      return server;
+    } catch (err) {
+      if (!isAddrInUse(err)) throw err;
+    }
+  }
+  if (opts.explicit)
+    throw new Error(`port ${opts.port} is in use (set by --port or FACTORY_DASHBOARD_PORT); pick another`);
+  throw new Error(`ports ${opts.port}-${opts.port + tries - 1} are all in use`);
+}
+
 export function portEnv(worktree: string | undefined): { FACTORY_PORT?: string } {
   const port = worktree ? worktreePort(worktree) : undefined;
   return port ? { FACTORY_PORT: String(port) } : {};
