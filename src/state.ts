@@ -12,7 +12,7 @@ export type Stage = "triage" | "plan" | "build" | "verify" | "pr";
 
 // The final pipeline outcome that triggers a retro (plan v2.10.0 item 3),
 // distinct from a stage artifact's own outcome field (complete/blocked/failed).
-export type RetroTrigger = "merged" | "rejected" | "gave-up";
+export type RetroTrigger = "merged" | "rejected" | "gave-up" | "plan-critic";
 export type RetroStatus = "queued" | "done" | "failed";
 
 // One row per final outcome, queued by checkMergePolicy, cancelRun, the verify-reject cap and the
@@ -565,6 +565,16 @@ export class FactoryState {
         "SELECT * FROM retros WHERE repo = $repo AND status = 'done' AND learned_at IS NULL AND (lesson IS NOT NULL OR skill_name IS NOT NULL) ORDER BY id ASC",
       )
       .all({ $repo: repo }) as RetroRow[];
+  }
+
+  // A lesson that needs no retro run (the plan critic's rubric reasons): a done row `factory learn` picks up.
+  addPendingLesson(repo: string, issue: number, lesson: string): void {
+    const now = new Date().toISOString();
+    this.db
+      .query(
+        "INSERT INTO retros (repo, issue, outcome, status, lesson, created_at, completed_at) VALUES ($repo, $issue, 'plan-critic', 'done', $lesson, $now, $now)",
+      )
+      .run({ $repo: repo, $issue: issue, $lesson: lesson, $now: now });
   }
 
   // Stamps the rows a learning PR just batched so a later run never re-batches them.

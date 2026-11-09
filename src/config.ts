@@ -117,6 +117,10 @@ export interface FactoryConfig {
   // Named agents, each a preset or a command; `stages` says which one runs a stage.
   readonly agents: Readonly<Record<string, AgentConfig>>;
   readonly stages: StageAgents;
+  // The agent (a key of `agents`) that runs the plan critic's rubric pass; unset means "sonnet".
+  // Set but not in `agents`: the rubric is skipped and the plan is not auto-approved. Unset with no
+  // "sonnet" agent: the rubric is skipped quietly.
+  readonly planCriticAgent?: string;
   // Per-type overrides, keyed by the type label. See RouteConfig.
   readonly routes: Readonly<Record<string, RouteConfig>>;
   // Checked before every stage (plan v2.7.0 item 7): an issue's lifetime spend, the repo's since 00:00
@@ -370,6 +374,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   agentCommands: "object",
   agents: "object",
   stages: "object",
+  planCriticAgent: "string",
   routes: "object",
   spend: "object",
   merge: "object",

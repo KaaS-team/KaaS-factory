@@ -109,6 +109,30 @@ export function stageSchema(stage: ArtifactStage, types: readonly string[] = TYP
   };
 }
 
+// The plan critic's rubric reply (engine/plan-critic.ts). Not a stage artifact, so it stays out of stageSchema.
+export interface PlanCritique {
+  readonly verdict: "pass" | "revise";
+  readonly reasons: string[];
+}
+
+export const planCritiqueSchema: Record<string, unknown> = {
+  $schema: "http://json-schema.org/draft-07/schema#",
+  type: "object",
+  properties: { verdict: { enum: ["pass", "revise"] }, reasons: strings },
+  required: ["verdict", "reasons"],
+  additionalProperties: false,
+};
+
+export function planCritiqueProblem(v: unknown): string | undefined {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return "expected an object";
+  const o = v as Record<string, unknown>;
+  const extra = Object.keys(o).find((k) => k !== "verdict" && k !== "reasons");
+  if (extra) return `"${extra}" is not allowed`;
+  if (o.verdict !== "pass" && o.verdict !== "revise") return '"verdict" must be "pass" or "revise"';
+  if (!fits(strings, o.reasons)) return '"reasons" must be a list of strings';
+  return undefined;
+}
+
 // The read-only reply envelope around a stage's schema.
 export function replySchema(stage: ArtifactStage, types: readonly string[] = TYPE_LABELS): Record<string, unknown> {
   return {

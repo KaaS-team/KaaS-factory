@@ -13,7 +13,7 @@ import { proofAllowRules, planMustFix } from "./plan-critic";
 import type { StepCtx, StepResult, StepType } from "./steps";
 
 // The body is issue text, so a path that leaves the worktree must never reach the filesystem.
-const outside = (worktree: string, p: string): boolean => {
+export const outside = (worktree: string, p: string): boolean => {
   const rel = relative(resolve(worktree), resolve(worktree, p));
   return isAbsolute(p) || rel.startsWith("..") || isAbsolute(rel);
 };

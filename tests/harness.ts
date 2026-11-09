@@ -281,6 +281,8 @@ export class FakeGit extends Git {
 
   override async ensureWorktree(_cloneDir: string, worktreeDir: string, issue: number): Promise<void> {
     mkdirSync(join(worktreeDir, runDir(issue)), { recursive: true });
+    // The plan critic wants each planned file to exist or sit in a directory that does; a checkout has src/.
+    mkdirSync(join(worktreeDir, "src"), { recursive: true });
     for (const [name, content] of Object.entries(this.seed)) {
       mkdirSync(dirname(join(worktreeDir, name)), { recursive: true });
       writeFileSync(join(worktreeDir, name), content);

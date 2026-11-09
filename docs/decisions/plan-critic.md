@@ -28,6 +28,23 @@ Two halves, the cheapest that covers each checklist item.
 Left out: checking publish dates against a registry (needs network in the runner), and the shell
 shapes `guard-paths.sh` refuses beyond a leading `cd` or `VAR=` (one definition, the hook).
 
+## Critic v2 (#112): two passes, one revise round
+
+`deterministicCritique` runs first and calls no model: the plan's schema, the checks above, each file
+inside the repo and present (or in a directory that is), every `AC-n` in both the comment and
+`plan.json`, each criterion's task in `plan.tasks`, and `estimateCost` within `maxBudgetUsd.build`.
+Only a clean result reaches the rubric: one call to `config.planCriticAgent` (default `sonnet`) that
+replies `{verdict, reasons[]}` (`planCritiqueSchema`). No such agent, or an unusable reply, skips the
+rubric and the plan waits for a human.
+
+The plan stage runs at most twice. A deterministic failure or a rubric `revise` uses the round; what is
+open after it posts under "Plan check: still open" and is never auto-approved. A rubric `revise`
+also stores its reasons as a pending lesson for `factory learn`.
+
+`PLAN_COST` (0.5 base, 0.4 per file, 0.2 per criterion, USD) is a guess: the issue gave no formula and
+no past run calibrates it. The default build budget ($5) is crossed at about 12 files. Retune it from
+`stage_runs` once there is data. The rubric call is not recorded in `stage_runs` or the spend ledger.
+
 ## Measure
 
 Rounds per issue from `stage_runs`, before and after. needs-human and question rounds are not in
