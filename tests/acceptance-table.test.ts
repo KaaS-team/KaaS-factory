@@ -12,6 +12,7 @@ import {
   acceptanceProven,
   hiddenPaths,
   renderAcceptanceTable,
+  renderPlanAcceptance,
   runAcceptance,
   type AcceptanceVerdict,
 } from "../src/acceptance";
@@ -276,6 +277,19 @@ describe("an unproven acceptance verdict rejects verify", () => {
     // A plan that names no spec shows none of the kit's rows.
     expect(body).not.toContain("| 07-pricing |");
     expect(body.lastIndexOf("## ")).toBe(body.indexOf("## Factory run"));
+  });
+
+  test("a verdict id not in the plan gets no row", () => {
+    const out = renderPlanAcceptance(
+      { criteria: [{ id: "AC-1", text: "Shows 49." }] },
+      [
+        { id: "AC-1", status: "pass" },
+        { id: "AC-9", status: "pass" },
+      ],
+      undefined,
+    );
+    expect(out).toContain("| AC-1: Shows 49. | pass |");
+    expect(out).not.toContain("AC-9");
   });
 
   test("What changed names the test that fails without the change, or says none was shown", () => {

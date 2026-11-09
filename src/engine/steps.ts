@@ -49,6 +49,7 @@ import { prBody, renderWhatChanged } from "./pr-body";
 import { failStage, failureLine, stageCause } from "./failure";
 import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
+import { planMutations, runMutations } from "./plan-mutations";
 import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
 import {
   failureTail,
@@ -364,6 +365,25 @@ const verify: StepType = {
         return stop("needs-human");
       }
       return { kind: "reject" };
+    }
+    // Like an unproven criterion, a declared mutation that its test does not catch is the build's to fix.
+    const mutations = planMutations(readRunJson<PlanArtifact>(worktree, issueNumber, "plan.json"));
+    if (mutations.length) {
+      const results = await runMutations(deps.setupRunner ?? new ShellSetupRunner(), worktree, mutations);
+      const survivors = results.filter((r) => r.status === "survives").map((r) => r.name);
+      if (survivors.length) {
+        const text = `Mutations survived their tests: ${survivors.map((n) => `\`${n}\``).join(", ")}.`;
+        ctx.rejectRound += 1;
+        ctx.failure = failureTail(text);
+        await postComment(deps, config, issueNumber, text, { stage: "verify", json: { survivors } });
+        if (ctx.rejectRound > maxRejects) {
+          await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
+          await runRetro(deps, config, issue, "gave-up");
+          finish(deps, config, issueNumber, "needs-human", `mutations survived ${ctx.rejectRound} times`);
+          return stop("needs-human");
+        }
+        return { kind: "reject" };
+      }
     }
     const result = await runStage(deps, config, issue, "verify", worktree, stepOpts(step));
     const art = await readStageArtifacts(worktree, issueNumber, "verify");

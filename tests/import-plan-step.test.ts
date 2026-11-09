@@ -78,11 +78,13 @@ describe("the four deterministic checks", () => {
   });
 });
 
-// A repo with nothing checked out: every file is (new), so the harness worktree needs none.
+// A repo with nothing checked out: every file is (new), so the harness worktree needs none, and
+// a mutation of one would have nothing to apply to when verify runs it.
 const ALL_NEW = async () =>
   (await fixture())
     .replace("- `src/engine/failure.ts`", "- `src/engine/failure.ts` (new)")
-    .replace("- `src/derive.ts`", "- `src/derive.ts` (new)");
+    .replace("- `src/derive.ts`", "- `src/derive.ts` (new)")
+    .replace(/```json\n\{"name":"resume[^`]*```/, "none: the files are new");
 
 describe("planned-to-pr", () => {
   const run = async (body: string) => {
