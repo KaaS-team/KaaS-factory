@@ -71,6 +71,8 @@ describe("claude preset", () => {
       "cd",
       "VAR=value",
       "git restore --source=",
+      "agentCommands",
+      ".factory/gates.sh",
     ])
       expect(STAGE_GUIDANCE).toContain(shape);
     expect(STAGE_DISALLOWED_TOOLS).toContain("ScheduleWakeup");
