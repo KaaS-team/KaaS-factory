@@ -26,7 +26,7 @@ import { runPool } from "./pool";
 import { holdForOverlap, overlapsOf, plannedFiles } from "./overlap";
 import type { GhComment, GhIssue } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
-import { canServe, effectiveSlots, machineBeat } from "./machine";
+import { canServe, effectiveSlots, leaseForRepo, machineBeat } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
   ensureWorktreeReady,
@@ -598,7 +598,7 @@ function dispatchConcurrency(deps: WatchDeps, config: FactoryConfig): number {
 // slot count, which each pool's own cap alone would not. No lease just means "waiting" until next poll.
 async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome> {
   if (!deps.machine) return advanceIssue(deps, config, issue);
-  const leaseId = deps.machine.leases.acquire(`${config.repo}#${issue.number}`, dispatchConcurrency(deps, config));
+  const leaseId = leaseForRepo(deps.machine, config.repo, issue.number, config.concurrency);
   if (leaseId === undefined) return "waiting";
   try {
     return await advanceIssue(deps, config, issue);

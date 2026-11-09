@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { agentVm, effectiveSlots, loadMachineConfig, MachineLeases, suggestSlots } from "../src/machine";
+import { agentVm, effectiveSlots, leaseForRepo, loadMachineConfig, MachineLeases, suggestSlots } from "../src/machine";
 
 function tmpDb(): string {
   const dir = mkdtempSync(join(tmpdir(), "factory-machine-"));
@@ -33,6 +33,32 @@ describe("MachineLeases", () => {
     expect(a).not.toBeUndefined();
     expect(b).toBeUndefined();
     expect(leases.held()).toBe(1);
+    leases.close();
+  });
+
+  test("a repo at its own cap waits while a sibling repo still gets a lease", () => {
+    const leases = new MachineLeases(tmpDb());
+    const m = { leases, config: { slots: 4 } };
+    expect(leaseForRepo(m, "acme/a", 1, 1)).not.toBeUndefined();
+    expect(leaseForRepo(m, "acme/a", 2, 1)).toBeUndefined();
+    expect(leaseForRepo(m, "acme/b", 1, 1)).not.toBeUndefined();
+    leases.close();
+  });
+
+  test("the machine's slots still bound every repo together", () => {
+    const leases = new MachineLeases(tmpDb());
+    const m = { leases, config: { slots: 2 } };
+    expect(leaseForRepo(m, "acme/a", 1, 5)).not.toBeUndefined();
+    expect(leaseForRepo(m, "acme/b", 1, 5)).not.toBeUndefined();
+    expect(leaseForRepo(m, "acme/c", 1, 5)).toBeUndefined();
+    leases.close();
+  });
+
+  test("an underscore in a repo name does not match a sibling repo", () => {
+    const leases = new MachineLeases(tmpDb());
+    const m = { leases, config: { slots: 4 } };
+    expect(leaseForRepo(m, "acme/a_b", 1, 1)).not.toBeUndefined();
+    expect(leaseForRepo(m, "acme/axb", 1, 1)).not.toBeUndefined();
     leases.close();
   });
 

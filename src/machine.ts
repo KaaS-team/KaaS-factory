@@ -212,13 +212,25 @@ export class MachineLeases {
   // Count-then-insert inside one BEGIN IMMEDIATE transaction, so two
   // processes racing for the last slot never both succeed (the same shape as
   // git.ts's compare-and-swap push). Returns the lease id to release later,
-  // or undefined when every slot is already held.
-  acquire(holder: string, slots: number, pid: number = process.pid): number | undefined {
+  // or undefined when every slot is already held. With `repo`, that repo's own live leases are
+  // also capped at `repoCap`, so one busy repo cannot take the whole machine.
+  acquire(
+    holder: string,
+    slots: number,
+    pid: number = process.pid,
+    own?: { repo: string; repoCap: number },
+  ): number | undefined {
     return this.db
       .transaction(() => {
         this.reclaimDead();
         const n = (this.db.query("SELECT COUNT(*) AS n FROM leases").get() as { n: number }).n;
         if (n >= slots) return undefined;
+        if (own) {
+          const mine = this.db
+            .query("SELECT COUNT(*) AS n FROM leases WHERE holder LIKE $prefix ESCAPE '\\'")
+            .get({ $prefix: `${own.repo.replace(/[\\%_]/g, "\\$&")}#%` }) as { n: number };
+          if (mine.n >= own.repoCap) return undefined;
+        }
         const row = this.db
           .query("INSERT INTO leases (holder, pid, acquired_at) VALUES ($holder, $pid, $now) RETURNING id")
           .get({ $holder: holder, $pid: pid, $now: new Date().toISOString() }) as { id: number };
@@ -255,6 +267,16 @@ export class MachineLeases {
   close(): void {
     this.db.close();
   }
+}
+
+// A lease under the machine's slots and the repo's own cap: a repo at its cap waits while a sibling repo still runs.
+export function leaseForRepo(
+  m: { leases: MachineLeases; config: MachineConfig },
+  repo: string,
+  issue: number,
+  repoCap: number,
+): number | undefined {
+  return m.leases.acquire(`${repo}#${issue}`, m.config.slots, process.pid, { repo, repoCap });
 }
 
 // The smaller of the machine's own cap and this repo's own config.concurrency

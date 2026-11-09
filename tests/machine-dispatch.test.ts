@@ -123,6 +123,31 @@ describe("pollOnce respects a machine-wide lease across two independent WatchDep
   });
 });
 
+describe("a repo's own cap is not the machine's cap", () => {
+  test("two repos at concurrency 1 overlap on a 2-slot machine", async () => {
+    const dbDir = mkdtempSync(join(tmpdir(), "factory-machine-"));
+    const dbPath = join(dbDir, "machine.db");
+    const leasesA = new MachineLeases(dbPath);
+    const leasesB = new MachineLeases(dbPath);
+    const spendA = new MachineSpend(dbPath);
+    const spendB = new MachineSpend(dbPath);
+    const shared = { active: 0, max: 0 };
+    const a = makeDeps("acme/repo-a", [1], new SlowTriageExecutor(40, shared), leasesA, 2, spendA);
+    const b = makeDeps("acme/repo-b", [1], new SlowTriageExecutor(40, shared), leasesB, 2, spendB);
+
+    await Promise.all([pollOnce(a.deps, a.config), pollOnce(b.deps, b.config)]);
+
+    expect(shared.max).toBe(2);
+
+    leasesA.close();
+    leasesB.close();
+    spendA.close();
+    spendB.close();
+    for (const dir of [a.workspacesDir, a.cloneDir, b.workspacesDir, b.cloneDir, dbDir])
+      rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe("capability routing", () => {
   test("an issue labelled needs:<cap> goes only to a machine that has it", async () => {
     const dbDir = mkdtempSync(join(tmpdir(), "factory-machine-"));
