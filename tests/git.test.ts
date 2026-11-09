@@ -322,6 +322,31 @@ describe("buildCommitMessage", () => {
     expect(closes).toBe("Closes #7");
   });
 
+  test("closing keywords in issue text are defused, so only the final Closes line closes anything", () => {
+    const body = "## Problem\nFixes #12. Closes: acme/x#30. Resolved https://github.com/a/b/issues/3.";
+    const msg = buildCommitMessage({ goal: "Fixes #12 in the export", issue: { number: 7, title: "T", body } });
+    expect(msg).toContain("Fixes issue #12. Closes: issue acme/x#30. Resolved issue https://github.com/a/b/issues/3.");
+    expect(msg.split("\n")[0]).toBe("chore: fixes issue #12 in the export (#7)");
+    const closing = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+(?:[\w.-]+\/[\w.-]+)?#\d/gi;
+    expect(msg.match(closing)).toEqual(["Closes #7"]);
+  });
+
+  test("a heading-only paragraph is skipped and a leading heading line is stripped", () => {
+    const why = (body: string) => buildCommitMessage({ issue: { number: 1, title: "T", body } }).split("\n\n")[1];
+    expect(why("## Problem\n\n## Wanted\n\nReal text here.")).toBe("Real text here.");
+    expect(why("## Problem\n\nIt breaks.")).toBe("It breaks.");
+    expect(why("# Title\nIt breaks on save.")).toBe("It breaks on save.");
+    expect(why("## Only a heading")).toBe("T");
+  });
+
+  test("an acronym keeps its case, the cap counts characters, and an empty summary still gives a title", () => {
+    const issue = { number: 7, title: "", body: "" };
+    const title = (goal: string) => buildCommitMessage({ goal, issue }).split("\n")[0]!;
+    expect(title("API gets a retry")).toBe("chore: API gets a retry (#7)");
+    expect([...title("😀".repeat(80))].length).toBeLessThanOrEqual(72);
+    expect(title("")).toBe("chore: factory build (#7)");
+  });
+
   test("body falls back to the first paragraph, then the title", () => {
     expect(buildCommitMessage({ issue: { number: 1, title: "T", body: "Plain text here." } })).toContain(
       "\n\nPlain text here.\n\nCloses #1",

@@ -868,5 +868,6 @@
   {"name": "operator merge: CODEOWNERS read at the PR head, not the base", "file": "src/profile-rules.ts", "find": "const text = await read(repo, at, baseRef);", "replace": "const text = await read(repo, at, \"HEAD\");", "test": "tests/profile-rules.test.ts"},
   {"name": "build commit: old message literal", "file": "src/engine/steps.ts", "find": "buildCommitMessage({\n        type: readRunJson<TriageArtifact>(worktree, issueNumber, \"triage.json\")?.type,\n        goal: readRunJson<PlanArtifact>(worktree, issueNumber, \"plan.json\")?.goal,\n        issue,\n      }),", "replace": "`factory: build #${issueNumber}`,", "test": "tests/acceptance-table.test.ts"},
   {"name": "claim commit: runner id back in the title", "file": "src/git.ts", "find": "`chore(factory): claim #${issue} for a build\\n\\n", "replace": "`chore(factory): claim #${issue} by ${runnerId}\\n\\n", "test": "tests/git.test.ts"},
+  {"name": "build commit: closing keywords in issue text kept", "file": "src/git.ts", "find": "(?=(?:[\\w.-]+\\/[\\w.-]+)?#\\d|https?:\\/\\/)/gi,", "replace": "(?=never)/gi,", "test": "tests/git.test.ts"},
   {"name": "build commit: Closes line dropped", "file": "src/git.ts", "find": "\\n\\nCloses #${issue.number}`;", "replace": "`;", "test": "tests/git.test.ts"}
 ]
