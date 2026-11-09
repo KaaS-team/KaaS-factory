@@ -723,8 +723,13 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   const missing: string[] = [];
   for (const [type, route] of Object.entries(config.routes)) {
     for (const name of route.skills ?? []) {
-      if (!existsSync(`${targetRepoDir}/.claude/skills/${name}/SKILL.md`))
-        missing.push(`routes.${type}.skills: "${name}" (.claude/skills/${name}/SKILL.md not found)`);
+      const found = [".claude/skills", ".agents/skills"].some((dir) =>
+        existsSync(`${targetRepoDir}/${dir}/${name}/SKILL.md`),
+      );
+      if (!found)
+        missing.push(
+          `routes.${type}.skills: "${name}" (${name}/SKILL.md not found under .claude/skills or .agents/skills)`,
+        );
     }
   }
   if (missing.length > 0)

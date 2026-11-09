@@ -125,8 +125,16 @@ describe("loadConfig checks every routed skill exists on disk", () => {
   test("a route naming a skill with no SKILL.md on disk is refused at boot, not left to no-op mid-run", async () => {
     const target = repoWith({ repo: "a/b", routes: { docs: { skills: ["writing"] } } });
     await expect(loadConfig(target)).rejects.toThrow(
-      /routes\.docs\.skills: "writing" \(\.claude\/skills\/writing\/SKILL\.md not found\)/,
+      /routes\.docs\.skills: "writing" \(writing\/SKILL\.md not found under \.claude\/skills or \.agents\/skills\)/,
     );
+  });
+
+  test("a route skill that exists only under .agents/skills passes the check", async () => {
+    const target = repoWith({ repo: "a/b", routes: { docs: { skills: ["writing"] } } });
+    mkdirSync(join(target, ".agents/skills/writing"), { recursive: true });
+    writeFileSync(join(target, ".agents/skills/writing/SKILL.md"), "---\nname: writing\n---\nWrite plainly.");
+    const config = await loadConfig(target);
+    expect(config.routes.docs?.skills).toEqual(["writing"]);
   });
 
   test("a route naming a skill that is on disk loads cleanly", async () => {

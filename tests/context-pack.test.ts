@@ -259,3 +259,38 @@ describe("the context pack reaches both agent paths", () => {
     expect(claudeArgs(opts, "")).toEqual(claudeArgs(opts));
   });
 });
+
+describe("buildContextPack skillsDir", () => {
+  function codexRepo(): string {
+    const cwd = worktree();
+    mkdirSync(`${cwd}/.agents/skills/writing`, { recursive: true });
+    writeFileSync(
+      `${cwd}/.agents/skills/writing/SKILL.md`,
+      "---\nname: writing\ndescription: Plain prose.\n---\nWrite plainly.\n",
+    );
+    mkdirSync(`${cwd}/.claude/skills/legacy`, { recursive: true });
+    writeFileSync(
+      `${cwd}/.claude/skills/legacy/SKILL.md`,
+      "---\nname: legacy\ndescription: Old one.\n---\nOld body.\n",
+    );
+    return cwd;
+  }
+
+  test("the index and a routed skill come from the agent's skills directory", async () => {
+    const cwd = codexRepo();
+    const plan = await buildContextPack("plan", 1, cwd, { skillsDir: ".agents/skills" });
+    expect(plan).toContain("- writing: Plain prose.");
+    expect(plan).not.toContain("legacy");
+    const build = await buildContextPack("build", 1, cwd, { skills: ["writing"], skillsDir: ".agents/skills" });
+    expect(build).toContain("Write plainly.");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("the default still reads .claude/skills", async () => {
+    const cwd = codexRepo();
+    const plan = await buildContextPack("plan", 1, cwd);
+    expect(plan).toContain("- legacy: Old one.");
+    expect(plan).not.toContain("- writing:");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+});
