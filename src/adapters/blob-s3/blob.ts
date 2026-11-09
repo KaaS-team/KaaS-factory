@@ -20,6 +20,10 @@ export class S3BlobStore implements BlobStore {
     return new Uint8Array(await file.arrayBuffer());
   }
 
+  async delete(key: string): Promise<void> {
+    await this.client.delete(this.checked(key));
+  }
+
   async list(prefix: string): Promise<readonly BlobEntry[]> {
     const out: BlobEntry[] = [];
     let continuationToken: string | undefined;

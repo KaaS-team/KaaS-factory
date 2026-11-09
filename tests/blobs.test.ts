@@ -236,6 +236,7 @@ describe("the plane mirrors only what it serves", () => {
     const store: BlobStore = {
       put: async () => {},
       get: async (k) => (objects.has(k) ? bytes(objects.get(k)!) : undefined),
+      delete: async () => {},
       list: async (): Promise<BlobEntry[]> => [...objects].map(([key, v]) => ({ key, size: v.length })),
     };
     const plane = { FACTORY_HOME: tmp("blobs-allow-"), FACTORY_REPO: "acme/widgets" };
@@ -359,6 +360,7 @@ describe("the plane writes a runner's run rows into that repo's own DB", () => {
     const store: BlobStore = {
       put: (k, b) => disk.put(k, b),
       get: (k) => disk.get(k),
+      delete: (k) => disk.delete(k),
       list: async (p) => (await disk.list(p)).map((o) => ({ ...o, size: 1 })),
     };
     const plane = { FACTORY_HOME: tmp("blobs-rows-big-plane-"), FACTORY_REPO: "acme/widgets", FACTORY_REPOS: "acme/b" };
@@ -436,6 +438,7 @@ describe("a repo's config reaches the plane", () => {
     const store: BlobStore = {
       put: async () => {},
       get: async (k) => (objects.has(k) ? bytes("x".repeat(objects.get(k)!)) : undefined),
+      delete: async () => {},
       list: async (): Promise<BlobEntry[]> => [...objects].map(([key, size]) => ({ key, size })),
     };
     const plane = { FACTORY_HOME: tmp("blobs-cfg-plane-"), FACTORY_REPO: "acme/widgets" };

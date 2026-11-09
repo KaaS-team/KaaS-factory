@@ -59,7 +59,7 @@ import { GitHubSpend } from "./adapters/github-store/spend";
 import { spendPolicy } from "./ports/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 import { probeRuntime } from "./runtime-kit";
-import { cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
+import { cmdBackup, cmdDispatch, cmdPool, cmdRoutine, cmdRuntime } from "./cli-runtime";
 import { detectStack, diskFiles } from "./stack";
 import { warnWhenStale } from "./config-health";
 import { describeStack, initConfig, isFilledIn, writeCharter } from "./init";
@@ -1061,6 +1061,8 @@ async function main(): Promise<void> {
       return cmdEvents();
     case "pool":
       return cmdPool(cli);
+    case "backup":
+      return cmdBackup(cli);
     case "runtime":
       return cmdRuntime(cli);
     case "dispatch":

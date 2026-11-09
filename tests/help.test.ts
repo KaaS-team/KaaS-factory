@@ -16,6 +16,11 @@ describe("factory help", () => {
     expect(handled.length).toBeGreaterThan(5);
   });
 
+  test("the backup command has a help entry", () => {
+    expect(COMMANDS.map((c) => c.name)).toContain("backup");
+    expect(helpText()).toContain("backup (now | list)");
+  });
+
   test("every flag the CLI reads is documented", () => {
     const remote = readFileSync(join(import.meta.dir, "..", "src", "remote-cli.ts"), "utf8");
     const used = new Set([

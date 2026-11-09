@@ -12,6 +12,8 @@ export interface BlobStore {
   get(key: string): Promise<Uint8Array | undefined>;
   // Every key under the prefix with its size, so a mirror copies only what changed.
   list(prefix: string): Promise<readonly BlobEntry[]>;
+  // A key with nothing under it is not an error: a prune may run twice.
+  delete(key: string): Promise<void>;
 }
 
 // Keys are `owner/name/issue-N/...`: plain segments only, so no key can climb out of a directory.

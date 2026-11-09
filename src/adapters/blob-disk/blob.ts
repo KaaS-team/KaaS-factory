@@ -1,5 +1,5 @@
 // The local-disk blob store: one file per key under a root directory.
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
 import { type BlobEntry, type BlobStore, validBlobKey } from "../../ports/blob";
 
@@ -20,6 +20,10 @@ export class DiskBlobStore implements BlobStore {
   async get(key: string): Promise<Uint8Array | undefined> {
     const file = Bun.file(this.path(key));
     return (await file.exists()) ? new Uint8Array(await file.arrayBuffer()) : undefined;
+  }
+
+  async delete(key: string): Promise<void> {
+    await rm(this.path(key), { force: true });
   }
 
   async list(prefix: string): Promise<readonly BlobEntry[]> {

@@ -1,7 +1,11 @@
 // The CLI's runtime and run-anywhere commands: `factory pool`, `factory runtime`, `factory dispatch`
 // and `factory routine`. src/cli.ts dispatches here so it stays a thin switch.
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { SqliteUsageStore } from "./adapters/pool/execution";
+import { backupOnce, type BackupSource, listBackups } from "./backup";
+import { blobStoreFromEnv } from "./blobs";
 import { successJson, UsageError, EXIT } from "./cli-output";
 import { loadConfig, type FactoryConfig } from "./config";
 import type { WatchDeps } from "./engine/common";
@@ -9,6 +13,7 @@ import { monthKey, poolReport } from "./core/sandbox-pool";
 import { plain } from "./display";
 import { cloudRoutine, dispatchJobs, writeActionsOutput } from "./dispatch";
 import { loadMachineConfig } from "./machine";
+import { defaultStatePath, discoverRepos, factoryHome } from "./paths";
 import { formatKit, probeRuntime, verifyRuntime } from "./runtime-kit";
 import { defaultRuntime, poolDbPath, runtimeSpecs, runtimesFrom } from "./runtimes";
 import { capabilitiesOf } from "./sandbox";
@@ -42,6 +47,41 @@ export async function cmdPool(cli: CliContext): Promise<void> {
         `  ${m.runtime}  used ${m.used} of ${m.allowance} min, ${m.left} left${m.lastFailure ? `  last failure: ${plain(m.lastFailure)}` : ""}`,
       );
   }
+}
+
+const BACKUP_USAGE = "usage: factory backup (now | list) [--json]";
+
+// Every database the plane keeps: the machine's, and each repo's own factory.db.
+function backupSources(): BackupSource[] {
+  const machine = join(factoryHome(), "machine.db");
+  return [
+    ...(existsSync(machine) ? [{ name: "machine.db", path: machine }] : []),
+    ...discoverRepos().map((repo) => ({
+      name: `${repo.replace("/", ".")}.factory.db`,
+      path: defaultStatePath(process.env, repo),
+    })),
+  ];
+}
+
+// `factory backup now`: snapshot those databases to the blob store. `factory backup list`: the snapshots there.
+export async function cmdBackup(cli: CliContext): Promise<void> {
+  const sub = cli.args[1];
+  if (sub !== "now" && sub !== "list") throw new UsageError(BACKUP_USAGE);
+  const store = blobStoreFromEnv();
+  if (!store) throw new Error("backup: no blob store; set FACTORY_BLOB_DIR or FACTORY_BLOB_BUCKET");
+  if (sub === "list") {
+    const stamps = await listBackups(store);
+    if (cli.has("json")) return void console.log(successJson({ backups: stamps }));
+    if (!stamps.length) console.log("factory backup: no snapshots yet");
+    for (const s of stamps) console.log(s);
+    return;
+  }
+  const sources = backupSources();
+  if (!sources.length) throw new Error("backup: no database to back up yet");
+  const manifest = await backupOnce(store, sources, new Date());
+  if (cli.has("json")) return void console.log(successJson(manifest));
+  const files = manifest.files.map((f) => `${f.name} (${f.size} bytes)`).join(", ");
+  console.log(`factory backup: ${manifest.stamp}: ${files}`);
 }
 
 const RUNTIME_USAGE = "usage: factory runtime (list [--probe] | verify <name>) [--json]";

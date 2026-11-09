@@ -138,6 +138,11 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
     does: "each pool runtime in machine.json: every member's free minutes used and left this month, and its last failure",
   },
   {
+    name: "backup",
+    usage: "backup (now | list) [--json]",
+    does: "now: snapshot machine.db and each repo's factory.db to FACTORY_BLOB_DIR or FACTORY_BLOB_BUCKET; list: the snapshots there, oldest first",
+  },
+  {
     name: "runtime",
     usage: "runtime (list [--probe] | verify <name>) [--json]",
     does: "list runtimes with their sandbox flags (--probe: does each answer); verify runs the shared conformance kit on one",
