@@ -14,6 +14,7 @@ import { type PrFacts, mergeRecord, withMerge } from "./pr-facts";
 import { readVerifyFacts } from "./pr-facts-collect";
 import type { ScmPort } from "./ports/scm";
 import type { FactoryState } from "./state";
+import { git, resolveConflicts, worktreeLines } from "./rebase-sync";
 import { buildStatement, receiptKey, renderReceipt, signStatement } from "./receipt";
 import { isChecked } from "./recheck";
 import { BLOCKING_CONFIDENCE, type Risk } from "./artifacts";
@@ -87,20 +88,15 @@ export async function mergeContext(
   return { mode: t.mode, merge: { ...config.merge, ...t.limits }, facts };
 }
 
-async function git(cwd: string, ...args: string[]): Promise<string> {
-  const p = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
-  const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
-  if (code !== 0) throw new Error(`git ${args[0]}: ${(await new Response(p.stderr).text()).trim()}`);
-  return out.trim();
-}
-
 // Rebases the PR branch on the latest base and pushes it when that moved the head.
 export async function rebaseOnBase(worktree: string, base: string, branch: string): Promise<string> {
   await git(worktree, "fetch", "--quiet", "origin", base);
   const before = await git(worktree, "rev-parse", "HEAD");
-  await git(worktree, "rebase", `origin/${base}`).catch(async (err) => {
-    await git(worktree, "rebase", "--abort").catch(() => undefined);
-    throw err;
+  await git(worktree, "rebase", `origin/${base}`).catch(async () => {
+    await resolveConflicts(worktree, worktreeLines(worktree)).catch(async (err) => {
+      await git(worktree, "rebase", "--abort").catch(() => undefined);
+      throw err;
+    });
   });
   const after = await git(worktree, "rev-parse", "HEAD");
   if (after !== before) await git(worktree, "push", "--force-with-lease", "origin", `HEAD:${branch}`);
