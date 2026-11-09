@@ -86,6 +86,34 @@ describe("MachineLeases", () => {
   });
 });
 
+describe("MachineLeases per-repo cap", () => {
+  test("a repo at its own cap is refused while a sibling repo still gets a slot", () => {
+    const leases = new MachineLeases(tmpDb());
+    const scope = { repo: "acme/a", repoCap: 1 };
+    expect(leases.acquire("acme/a#1", 2, process.pid, scope)).not.toBeUndefined();
+    expect(leases.acquire("acme/a#2", 2, process.pid, scope)).toBeUndefined();
+    expect(leases.acquire("acme/b#1", 2, process.pid, { repo: "acme/b", repoCap: 1 })).not.toBeUndefined();
+    expect(leases.held()).toBe(2);
+    leases.close();
+  });
+
+  test("the machine-wide slot count still bounds all repos together", () => {
+    const leases = new MachineLeases(tmpDb());
+    expect(leases.acquire("acme/a#1", 2, process.pid, { repo: "acme/a", repoCap: 5 })).not.toBeUndefined();
+    expect(leases.acquire("acme/b#1", 2, process.pid, { repo: "acme/b", repoCap: 5 })).not.toBeUndefined();
+    expect(leases.acquire("acme/c#1", 2, process.pid, { repo: "acme/c", repoCap: 5 })).toBeUndefined();
+    expect(leases.held()).toBe(2);
+    leases.close();
+  });
+
+  test("a `_` in a repo name does not match a sibling repo", () => {
+    const leases = new MachineLeases(tmpDb());
+    expect(leases.acquire("acme/aXb#1", 3, process.pid, { repo: "acme/aXb", repoCap: 1 })).not.toBeUndefined();
+    expect(leases.acquire("acme/a_b#1", 3, process.pid, { repo: "acme/a_b", repoCap: 1 })).not.toBeUndefined();
+    leases.close();
+  });
+});
+
 describe("effectiveSlots", () => {
   test("is the smaller of the repo's own concurrency and the machine's slots", () => {
     expect(effectiveSlots(5, { slots: 2 })).toBe(2);

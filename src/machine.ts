@@ -212,13 +212,26 @@ export class MachineLeases {
   // Count-then-insert inside one BEGIN IMMEDIATE transaction, so two
   // processes racing for the last slot never both succeed (the same shape as
   // git.ts's compare-and-swap push). Returns the lease id to release later,
-  // or undefined when every slot is already held.
-  acquire(holder: string, slots: number, pid: number = process.pid): number | undefined {
+  // or undefined when every slot is already held. `scope` also caps one repo's
+  // own leases, so a busy repo cannot take every machine slot.
+  acquire(
+    holder: string,
+    slots: number,
+    pid: number = process.pid,
+    scope?: { repo: string; repoCap: number },
+  ): number | undefined {
     return this.db
       .transaction(() => {
         this.reclaimDead();
         const n = (this.db.query("SELECT COUNT(*) AS n FROM leases").get() as { n: number }).n;
         if (n >= slots) return undefined;
+        if (scope) {
+          const prefix = `${scope.repo.replace(/[\\%_]/g, "\\$&")}#%`;
+          const mine = this.db
+            .query("SELECT COUNT(*) AS n FROM leases WHERE holder LIKE $prefix ESCAPE '\\'")
+            .get({ $prefix: prefix }) as { n: number };
+          if (mine.n >= scope.repoCap) return undefined;
+        }
         const row = this.db
           .query("INSERT INTO leases (holder, pid, acquired_at) VALUES ($holder, $pid, $now) RETURNING id")
           .get({ $holder: holder, $pid: pid, $now: new Date().toISOString() }) as { id: number };

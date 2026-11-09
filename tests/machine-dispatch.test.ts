@@ -70,11 +70,12 @@ function makeDeps(
   leases: MachineLeases,
   slots: number,
   spend: MachineSpend,
+  concurrency: number = issues.length,
 ) {
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   const github = new FakeGitHub(issues.map((n) => baseIssue(n, ["factory:ready"])));
-  const config = mergeConfig({ repo, concurrency: issues.length });
+  const config = mergeConfig({ repo, concurrency });
   const deps = {
     github,
     git: new FakeGit(),
@@ -114,6 +115,30 @@ describe("pollOnce respects a machine-wide lease across two independent WatchDep
     expect(shared.max).toBeGreaterThan(0); // the run actually overlapped, not just ran serially
     expect(leasesA.held()).toBe(0); // every lease is released once its stage finishes
 
+    leasesA.close();
+    leasesB.close();
+    spendA.close();
+    spendB.close();
+    for (const dir of [a.workspacesDir, a.cloneDir, b.workspacesDir, b.cloneDir, dbDir])
+      rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("two repos at concurrency 1 run in parallel on a 2-slot machine, never three at once", async () => {
+    const dbDir = mkdtempSync(join(tmpdir(), "factory-machine-"));
+    const dbPath = join(dbDir, "machine.db");
+    const leasesA = new MachineLeases(dbPath);
+    const leasesB = new MachineLeases(dbPath);
+    const spendA = new MachineSpend(dbPath);
+    const spendB = new MachineSpend(dbPath);
+    const slots = 2;
+
+    const shared = { active: 0, max: 0 };
+    const a = makeDeps("acme/repo-a", [1, 2], new SlowTriageExecutor(20, shared), leasesA, slots, spendA, 1);
+    const b = makeDeps("acme/repo-b", [1, 2], new SlowTriageExecutor(20, shared), leasesB, slots, spendB, 1);
+
+    await Promise.all([pollOnce(a.deps, a.config), pollOnce(b.deps, b.config)]);
+
+    expect(shared.max).toBe(slots); // both repos ran a stage at once, neither was starved by the other
     leasesA.close();
     leasesB.close();
     spendA.close();

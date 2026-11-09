@@ -598,7 +598,13 @@ function dispatchConcurrency(deps: WatchDeps, config: FactoryConfig): number {
 // slot count, which each pool's own cap alone would not. No lease just means "waiting" until next poll.
 async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome> {
   if (!deps.machine) return advanceIssue(deps, config, issue);
-  const leaseId = deps.machine.leases.acquire(`${config.repo}#${issue.number}`, dispatchConcurrency(deps, config));
+  // The repo's concurrency caps that repo's leases only; the machine's slots bound all repos together.
+  const leaseId = deps.machine.leases.acquire(
+    `${config.repo}#${issue.number}`,
+    deps.machine.config.slots,
+    process.pid,
+    { repo: config.repo, repoCap: config.concurrency },
+  );
   if (leaseId === undefined) return "waiting";
   try {
     return await advanceIssue(deps, config, issue);
