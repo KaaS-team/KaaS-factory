@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mergeConfig } from "../src/config";
 import { deriveIssueState } from "../src/derive";
+import type { GhIssue } from "../src/github";
 import { LABEL } from "../src/labels";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
@@ -140,6 +141,31 @@ test("an unknown step name is ignored", async () => {
   const before = c.planRuns();
   for (const s of ["build", "verify", "pr"] as const) c.push(s);
   c.github.say(1, "/factory retry nonsense");
+  expect(await c.step()).toBe("shipped");
+  expect(c.planRuns()).toBe(before);
+  c.state.close();
+});
+
+// The reported bug: a failure marker is the last marker of its stage, with no build marker after the plan's.
+const without = (issue: GhIssue, stage: string) => ({
+  ...issue,
+  comments: issue.comments.filter((x) => !x.body.includes(`factory:data {"stage":"${stage}"`)),
+});
+
+test("a failure marker naming build resumes at build when no build marker follows the plan", async () => {
+  const c = await failedBuild();
+  const thread = without(c.github.issues.get(1)!, "build");
+  expect(thread.comments.some((x) => x.body.includes('factory:data {"stage":"plan"'))).toBe(true);
+  expect(deriveIssueState(thread).resumeStage).toBe("build");
+  c.state.close();
+});
+
+test("retry with no build marker in the thread runs no plan stage", async () => {
+  const c = await failedBuild();
+  c.github.issues.set(1, without(c.github.issues.get(1)!, "build"));
+  const before = c.planRuns();
+  for (const s of ["build", "verify", "pr"] as const) c.push(s);
+  c.github.say(1, "/factory retry");
   expect(await c.step()).toBe("shipped");
   expect(c.planRuns()).toBe(before);
   c.state.close();

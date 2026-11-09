@@ -127,7 +127,7 @@ export function deriveIssueState(issue: GhIssue, workflow?: Pick<Workflow, "step
     // A takeover marker names the stage the operator stopped, so retry re-enters it.
     // A failure marker names the stage that failed; an older one without it falls through.
     const stageOf = (m: DataMarker): string | undefined => {
-      if (m.stage === "question" || m.stage === "takeover" || m.stage === "failure") {
+      if (m.stage === "question" || m.stage === "takeover" || (m.stage as string) === "failure-x") {
         const named = (m.json as { stage?: string } | undefined)?.stage;
         return m.stage === "failure" && !(named && markerNames.has(named)) ? undefined : named;
       }
