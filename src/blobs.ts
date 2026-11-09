@@ -89,6 +89,8 @@ const STAGE_COLS = {
   finished_at: "str",
   duration_ms: "int",
   tool_calls: "int",
+  // Optional: a runner from before #173 does not send it, and its rows count as 0 refused.
+  refused_calls: "int?",
   tokens_in: "int",
   tokens_out: "int",
   tokens_cached: "int",
@@ -159,20 +161,21 @@ const UPSERT_RUN = `INSERT INTO runs (issue, repo, title, stage, status, started
         excluded.tool_calls, excluded.tokens_in, excluded.tokens_out, excluded.cost_usd, excluded.gate_line,
         excluded.pr_url, excluded.reason)`;
 const UPDATE_STAGE = `UPDATE stage_runs SET agent = $agent, model = $model, finished_at = $finished_at,
-    duration_ms = $duration_ms, tool_calls = $tool_calls, tokens_in = $tokens_in, tokens_out = $tokens_out,
+    duration_ms = $duration_ms, tool_calls = $tool_calls, refused_calls = COALESCE($refused_calls, 0),
+    tokens_in = $tokens_in, tokens_out = $tokens_out,
     tokens_cached = $tokens_cached, cost_usd = $cost_usd, usage_complete = $usage_complete, exit_code =
     $exit_code, killed_reason = $killed_reason, session_id = $session_id, verdict = $verdict
   WHERE repo = $repo AND issue = $issue AND stage = $stage AND started_at = $started_at
-    AND (agent, model, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached,
+    AND (agent, model, finished_at, duration_ms, tool_calls, refused_calls, tokens_in, tokens_out, tokens_cached,
         cost_usd, usage_complete, exit_code, killed_reason, session_id, verdict)
-    IS NOT ($agent, $model, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out,
-        $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id, $verdict)`;
+    IS NOT ($agent, $model, $finished_at, $duration_ms, $tool_calls, COALESCE($refused_calls, 0), $tokens_in,
+        $tokens_out, $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id, $verdict)`;
 const INSERT_STAGE = `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at,
-    duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, cost_usd, usage_complete, exit_code,
-    killed_reason, session_id, verdict)
+    duration_ms, tool_calls, refused_calls, tokens_in, tokens_out, tokens_cached, cost_usd, usage_complete,
+    exit_code, killed_reason, session_id, verdict)
   SELECT $repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls,
-      $tokens_in, $tokens_out, $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason,
-      $session_id, $verdict
+      COALESCE($refused_calls, 0), $tokens_in, $tokens_out, $tokens_cached, $cost_usd, $usage_complete,
+      $exit_code, $killed_reason, $session_id, $verdict
   WHERE NOT EXISTS (SELECT 1 FROM stage_runs WHERE repo = $repo AND issue = $issue AND stage = $stage
       AND started_at = $started_at)`;
 

@@ -142,6 +142,7 @@ describe("renderRunSummary", () => {
     finished_at: "",
     duration_ms: 65_000,
     tool_calls: 4,
+    refused_calls: 0,
     tokens_in: 0,
     tokens_out: 0,
     tokens_cached: 0,
@@ -159,9 +160,9 @@ describe("renderRunSummary", () => {
       [run({ stage: "triage" }), run({ stage: "verify" }), run({ stage: "retro" as StageRun["stage"] })],
       { rejectRounds: 0, retries: 0 },
     );
-    expect(out).toContain("| triage | claude (opus) | 1m 5s | 4 | $0.50 | ok |");
+    expect(out).toContain("| triage | claude (opus) | 1m 5s | 4 | 0 | $0.50 | ok |");
     expect(out).not.toContain("| retro |");
-    expect(out).toContain("2 stage runs, 2m 10s, $1.00.");
+    expect(out).toContain("2 stage runs, 2m 10s, $1.00, 0 refused tool calls.");
     expect(out).toContain("- triage, verify passed on the first attempt");
     expect(out).toContain("- verify approved on the first round");
     expect(out).toMatch(/\*\*Needed help\*\*\n\n- nothing$/);
@@ -172,7 +173,7 @@ describe("renderRunSummary", () => {
       rejectRounds: 0,
       retries: 0,
     });
-    expect(out).toContain("| verify | claude (opus) | 1m 5s | 4 | $0.50 | uncertain |");
+    expect(out).toContain("| verify | claude (opus) | 1m 5s | 4 | 0 | $0.50 | uncertain |");
     expect(out).toContain("- triage passed on the first attempt");
     expect(out).not.toContain("verify approved");
     expect(out).toContain("- verify: uncertain");

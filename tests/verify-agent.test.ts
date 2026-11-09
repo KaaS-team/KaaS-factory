@@ -20,6 +20,7 @@ const run = (over: Partial<StageRun>): StageRun => ({
   finished_at: "",
   duration_ms: 1500,
   tool_calls: 2,
+  refused_calls: 0,
   tokens_in: 10,
   tokens_out: 5,
   tokens_cached: 0,

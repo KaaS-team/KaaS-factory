@@ -744,6 +744,8 @@ describe("failure paths", () => {
     c.push("triage", {}, { exitCode: 0, permissionDenials: ["Write .factory/runs/issue-1/triage.json"] });
     expect(await c.step()).toBe("failed");
     expect(c.state.getRun("acme/widgets", 1)!.reason).toContain("Write .factory/runs/issue-1/triage.json");
+    // #173: the attempt's stage row keeps the refused count the summary shows.
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 })[0]!.refused_calls).toBe(1);
     done(c);
   });
 

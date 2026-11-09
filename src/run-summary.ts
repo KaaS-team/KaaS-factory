@@ -46,20 +46,21 @@ export function renderRunSummary(runs: readonly StageRun[], ctx: RunSummaryCtx):
   const lines = [
     "## Factory run",
     "",
-    "| Stage | Agent | Duration | Tool calls | Cost | Outcome |",
-    "|---|---|---|---|---|---|",
+    "| Stage | Agent | Duration | Tool calls | Refused | Cost | Outcome |",
+    "|---|---|---|---|---|---|---|",
     ...rows.map(
       (r) =>
-        `| ${r.stage} | ${cell(r.model ? `${r.agent} (${r.model})` : r.agent)} | ${seconds(r.duration_ms)} | ${r.tool_calls} | ${r.cost_usd === null ? "not reported" : `$${r.cost_usd.toFixed(2)}`} | ${cell(outcome(r))} |`,
+        `| ${r.stage} | ${cell(r.model ? `${r.agent} (${r.model})` : r.agent)} | ${seconds(r.duration_ms)} | ${r.tool_calls} | ${r.refused_calls} | ${r.cost_usd === null ? "not reported" : `$${r.cost_usd.toFixed(2)}`} | ${cell(outcome(r))} |`,
     ),
   ];
   const known = rows.filter((r) => r.cost_usd !== null).reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
   const unknown = rows.filter((r) => r.cost_usd === null).length;
   const total = rows.reduce((sum, r) => sum + r.duration_ms, 0);
+  const refused = rows.reduce((sum, r) => sum + r.refused_calls, 0);
   if (ctx.proof) lines.push("", `Proof: ${PROOF_LINE[ctx.proof]}.`);
   lines.push(
     "",
-    `${rows.length} stage runs, ${seconds(total)}, $${known.toFixed(2)}${unknown ? ` plus ${unknown} not reported` : ""}.`,
+    `${rows.length} stage runs, ${seconds(total)}, $${known.toFixed(2)}${unknown ? ` plus ${unknown} not reported` : ""}, ${refused} refused tool calls.`,
   );
 
   const stages = [...new Set(rows.map((r) => r.stage))];

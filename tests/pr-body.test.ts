@@ -28,6 +28,7 @@ const run = (stage: string, model: string): StageRun =>
     model,
     duration_ms: 5000,
     tool_calls: 4,
+    refused_calls: 0,
     cost_usd: 1.23,
     exit_code: 0,
     killed_reason: null,

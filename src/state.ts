@@ -84,6 +84,8 @@ export interface StageRun {
   finished_at: string;
   duration_ms: number;
   tool_calls: number;
+  // Tool calls the stage's permissions or a hook refused (permissionDenials), summed per attempt.
+  refused_calls: number;
   tokens_in: number;
   tokens_out: number;
   tokens_cached: number;
@@ -99,9 +101,12 @@ export interface StageRun {
   verdict: string | null;
 }
 
-// The two v2.5.1 columns default to 0 cached tokens and a complete count; session_id to NULL.
-export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete" | "session_id" | "verdict"> &
-  Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id">>;
+// The two v2.5.1 columns default to 0 cached tokens and a complete count; session_id to NULL; refused_calls to 0.
+export type StageRunInput = Omit<
+  StageRun,
+  "id" | "tokens_cached" | "usage_complete" | "session_id" | "verdict" | "refused_calls"
+> &
+  Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id" | "refused_calls">>;
 
 // Absolute under FACTORY_HOME (paths.ts): a cwd-relative path broke off the target repo (audit finding #1).
 export const DEFAULT_DB_PATH = defaultStatePath();
@@ -259,6 +264,7 @@ export class FactoryState {
       ["usage_complete", "INTEGER NOT NULL DEFAULT 1"],
       ["session_id", "TEXT"],
       ["verdict", "TEXT"],
+      ["refused_calls", "INTEGER NOT NULL DEFAULT 0"],
     ] as const) {
       if (have.has(col)) continue;
       try {
@@ -297,7 +303,8 @@ export class FactoryState {
         tokens_cached INTEGER NOT NULL DEFAULT 0,
         usage_complete INTEGER NOT NULL DEFAULT 1,
         session_id TEXT,
-        verdict TEXT
+        verdict TEXT,
+        refused_calls INTEGER NOT NULL DEFAULT 0
       );
       INSERT INTO stage_runs_new (${names}) SELECT ${names} FROM stage_runs;
       UPDATE stage_runs_new SET cost_usd = NULL WHERE usage_complete = 0;
@@ -428,8 +435,8 @@ export class FactoryState {
   recordStageRun(input: StageRunInput): void {
     this.db
       .query(
-        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, cost_usd, usage_complete, exit_code, killed_reason, session_id)
-         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id)`,
+        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, refused_calls, tokens_in, tokens_out, tokens_cached, cost_usd, usage_complete, exit_code, killed_reason, session_id)
+         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $refused_calls, $tokens_in, $tokens_out, $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id)`,
       )
       .run({
         $repo: input.repo,
@@ -441,6 +448,7 @@ export class FactoryState {
         $finished_at: input.finished_at,
         $duration_ms: input.duration_ms,
         $tool_calls: input.tool_calls,
+        $refused_calls: input.refused_calls ?? 0,
         $tokens_in: input.tokens_in,
         $tokens_out: input.tokens_out,
         $tokens_cached: input.tokens_cached ?? 0,

@@ -887,5 +887,9 @@
   {"name": "mutation select: a PR runs only the touched mutations", "file": "scripts/mutation-select.ts", "find": "touched.has(m.file) ||", "replace": "true ||", "test": "tests/mutation-select.test.ts"},
   {"name": "mutation select: the runner or list change runs everything", "file": "scripts/mutation-select.ts", "find": "changed.some((f) => RUNS_ALL.has(f))", "replace": "false", "test": "tests/mutation-select.test.ts"},
   {"name": "mutations workflow: the PR job is scoped to its base", "file": ".github/workflows/mutations.yml", "find": "--base origin/{0}", "replace": "--all origin/{0}", "test": "tests/mutation-select.test.ts"},
-  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"}
+  {"name": "resume: a failure marker names no stage", "file": "src/derive.ts", "find": "if (m.stage === \"failure\") {", "replace": "if (false) {", "test": "tests/retry-resume.test.ts"},
+  {"name": "inspection: git grep is not allowed to build or verify", "file": "src/stage-permissions.ts", "find": "  \"Bash(git grep *)\",\n", "replace": "", "test": "tests/stage-permissions.test.ts"},
+  {"name": "inspection: find is allowed, so find -exec gets through", "file": "src/stage-permissions.ts", "find": "  \"Bash(git worktree list)\",\n", "replace": "  \"Bash(git worktree list)\",\n  \"Bash(find *)\",\n", "test": "tests/stage-permissions.test.ts"},
+  {"name": "refused calls: a stage row records none", "file": "src/engine/common.ts", "find": "refused_calls: result.permissionDenials.length,", "replace": "refused_calls: 0,", "test": "tests/scenarios.test.ts"},
+  {"name": "run summary: the Refused column is dropped", "file": "src/run-summary.ts", "find": "| ${r.refused_calls} | ${r.cost_usd", "replace": "| 0 | ${r.cost_usd", "test": "tests/run-summary.test.ts"}
 ]

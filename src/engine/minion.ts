@@ -223,6 +223,7 @@ async function runOnce(
     finished_at: finishedAt.toISOString(),
     duration_ms: finishedAt.getTime() - startedAt.getTime(),
     tool_calls: result.toolCalls,
+    refused_calls: result.permissionDenials.length,
     tokens_in: result.tokensIn,
     tokens_out: result.tokensOut,
     tokens_cached: cached,

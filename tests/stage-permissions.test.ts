@@ -130,3 +130,57 @@ describe("STAGE_GUIDANCE", () => {
     expect(STAGE_GUIDANCE).toContain(".factory/gates.sh");
   });
 });
+
+// #173: the read-only inspection commands a build or verify may run, and the write forms of them that stay refused.
+const INSPECTION = [
+  "git diff --stat",
+  "git show HEAD",
+  "git log --oneline -3",
+  "git status --short",
+  "git grep -n TODO src",
+  "grep -rn foo src",
+  "ls src",
+  "wc -l src/x.ts",
+  "cat package.json",
+  "head -5 README.md",
+  "tail -5 README.md",
+];
+
+describe("read-only inspection commands are allowed for build and verify", () => {
+  for (const stage of ["build", "verify"] as StageName[]) {
+    test(stage, () => {
+      const allow: string[] = JSON.parse(stageSettings(stage, 1)).permissions.allow;
+      for (const cmd of INSPECTION) expect([cmd, uncoveredPart(cmd, allow)]).toEqual([cmd, undefined]);
+    });
+  }
+});
+
+describe("write forms of inspection commands are refused", () => {
+  const HOOK = join(import.meta.dir, "..", "template", ".claude", "hooks", "guard-paths.sh");
+  const hookBlocks = (stage: StageName, command: string): boolean => {
+    const dir = mkdtempSync(join(tmpdir(), "stage-hook-"));
+    const proc = Bun.spawnSync([HOOK], {
+      stdin: Buffer.from(JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: dir })),
+      cwd: dir,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: dir, FACTORY_STAGE: stage },
+    });
+    return proc.exitCode === 2;
+  };
+
+  test("build: sed -i, git checkout and find -exec are not on the allow list", () => {
+    const allow: string[] = JSON.parse(stageSettings("build", 1)).permissions.allow;
+    for (const cmd of ["sed -i s/a/b/ src/x.ts", "git checkout -- src/x.ts", "find . -name x -exec rm {} ;"])
+      expect([cmd, uncoveredPart(cmd, allow) !== undefined]).toEqual([cmd, true]);
+  });
+
+  test("verify: sed -i and find -exec are not on the allow list (git checkout stays for test-that-bites)", () => {
+    const allow: string[] = JSON.parse(stageSettings("verify", 1)).permissions.allow;
+    for (const cmd of ["sed -i s/a/b/ src/x.ts", "find . -name x -exec rm {} ;"])
+      expect([cmd, uncoveredPart(cmd, allow) !== undefined]).toEqual([cmd, true]);
+  });
+
+  test("a redirect to a file is refused by the guard hook for build and verify", () => {
+    for (const stage of ["build", "verify"] as StageName[])
+      expect([stage, hookBlocks(stage, "echo x > out.txt")]).toEqual([stage, true]);
+  });
+});
