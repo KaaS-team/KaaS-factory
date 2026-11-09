@@ -4,7 +4,7 @@
 // and moves the label), "reject" (the engine follows `reject:`), or "stop"
 // once it has parked or finished the issue itself, from `step.label`.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { holdoutEnabled, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
@@ -57,11 +57,13 @@ import { mcpStep } from "./mcp-step";
 import { checkedPlan } from "./plan-critic";
 import { proofInputs, recordVerifyFacts, secondReview } from "./verify-facts";
 import {
+  bodyHashOf,
   failureTail,
   finish,
   labelsOf,
   planOf,
   moveLabel,
+  reusablePlan,
   postComment,
   recheckFindings,
   runRetro,
@@ -157,6 +159,9 @@ const plan: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
+    // A revise leaves revise.md in the worktree, and that is the one reason to plan an unchanged body again (#255).
+    const reused = existsSync(`${worktree}/${runDir(issueNumber)}/revise.md`) ? undefined : reusablePlan(issue);
+    if (reused) return { kind: "next", facts: reused };
     const art = await checkedPlan(deps, config, issue, worktree, stepOpts(step));
     const { result, parsed } = art;
     const { json, problem } = parsed;
@@ -171,8 +176,10 @@ const plan: StepType = {
     const planStop = stepStop(json);
     if (planStop) return stop(await stopStep(deps, config, issueNumber, step.label, planStop));
     if (json.status === "needs-info") return askOrHandOver(sc, art.question);
-    if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "plan", json });
-    return { kind: "next", facts: json };
+    // The marker carries the body hash, so a later plan stage can tell whether this plan still fits.
+    const stored = { ...json, bodyHash: bodyHashOf(issue) };
+    if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "plan", json: stored });
+    return { kind: "next", facts: stored };
   },
 };
 

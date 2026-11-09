@@ -22,9 +22,11 @@ import {
   validateStepJson,
   readStageArtifacts,
   runDir,
+  type PlanArtifact,
   type RetroArtifact,
   type VerdictArtifact,
 } from "../artifacts";
+import { sha256 } from "./import-plan";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isTrusted } from "../chatops";
 import { mcpServersFor } from "../mcp";
@@ -312,6 +314,18 @@ export function scopeOf(issue: GhIssue, stage: string): { scope?: IssueScope } {
 
 export function planOf(issue: GhIssue): unknown {
   return latestDataFor(parseDataMarkers(issue.comments.filter(isTrusted)), "plan");
+}
+
+// The hash a plan is keyed to: the one import-plan records for a planned issue, so both paths agree.
+export function bodyHashOf(issue: Pick<GhIssue, "body">): string {
+  return sha256(issue.body);
+}
+
+// The stored plan, when the issue body is unchanged since it was planned (#255): a retry or resume
+// then skips the planner and its critic. Undefined when there is no stored plan or the body changed.
+export function reusablePlan(issue: GhIssue): (PlanArtifact & { bodyHash?: string }) | undefined {
+  const plan = planOf(issue) as (PlanArtifact & { bodyHash?: string }) | undefined;
+  return plan && plan.bodyHash === bodyHashOf(issue) ? plan : undefined;
 }
 
 export async function runStage(

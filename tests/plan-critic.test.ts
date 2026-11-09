@@ -15,6 +15,7 @@ import {
   planMustFix,
   proofAllowRules,
 } from "../src/engine/plan-critic";
+import { bodyHashOf, withDataMarker } from "../src/engine/common";
 import { LABEL } from "../src/labels";
 import { engine, removeEngineDirs } from "./engine-harness";
 
@@ -276,4 +277,61 @@ test("factory-plan dispatches factory-plan-critic once, a read-only Sonnet agent
   expect(agent).toMatch(/^model: sonnet$/m);
   for (const item of ["traces to the issue", "release-age cooldown", "Changes a repo gate needs"])
     expect(agent).toContain(item);
+});
+
+// #255: a plan stage on an unchanged body reuses the stored plan; an edited body, or a pending revise, plans again.
+describe("the plan step reuses its stored plan when the body is unchanged", () => {
+  const workflow = (() => {
+    const text = readFileSync(join(import.meta.dir, "..", "template", ".factory", "workflows", "feature-to-pr.yml"));
+    const r = parseWorkflowText(text.toString());
+    if (!r.ok) throw new Error(r.problems.join("; "));
+    return r.workflow;
+  })();
+  const GOOD_JSON = { risk: "low", revision: 1, files: ["src/exists.ts"], autoApproveEligible: false };
+  const GOOD = {
+    "plan-comment.md": plan(["- **AC-1:** x: checked by `npm test`"]),
+    "plan.json": JSON.stringify(GOOD_JSON),
+  };
+  const config = { agentCommands: AGENT_COMMANDS };
+
+  // The thread as the first run left it: the factory's own plan, keyed to the hash of the body it was planned from.
+  const storedThread = (body: string) => [
+    {
+      id: 99,
+      author: "factory",
+      authorAssociation: "OWNER",
+      body: withDataMarker(plan(["- **AC-1:** x: checked by `npm test`"]), "plan", {
+        ...GOOD_JSON,
+        bodyHash: bodyHashOf({ body }),
+      }),
+      createdAt: "2026-10-28T00:00:00.000Z",
+    },
+  ];
+
+  test("an unchanged body reuses the stored plan: the planner runs zero times", async () => {
+    const e = engine(workflow, 0, {}, {}, {}, { config });
+    const issue = e.github.issues.get(1)!;
+    issue.comments.push(...storedThread(issue.body));
+    await e.run();
+    expect(e.executor.pinned.filter(([s]) => s === "plan")).toHaveLength(0);
+  });
+
+  test("an edited body plans again", async () => {
+    const e = engine(workflow, 0, {}, {}, {}, { config, outputs: { plan: [GOOD] } });
+    const issue = e.github.issues.get(1)!;
+    issue.comments.push(...storedThread("the body before the edit"));
+    await e.run();
+    expect(e.executor.pinned.filter(([s]) => s === "plan")).toHaveLength(1);
+  });
+
+  test("a pending revise plans again even when the body is unchanged", async () => {
+    const e = engine(workflow, 0, {}, {}, {}, { config, outputs: { plan: [GOOD] } });
+    const issue = e.github.issues.get(1)!;
+    issue.comments.push(...storedThread(issue.body));
+    const dir = join(e.deps.workspacesDir, "issue-1", ".factory", "runs", "issue-1");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "revise.md"), "use a different approach");
+    await e.run();
+    expect(e.executor.pinned.filter(([s]) => s === "plan")).toHaveLength(1);
+  });
 });
