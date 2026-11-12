@@ -14,7 +14,7 @@ var _ api.Historian = (*Core)(nil)
 func seqOf(evs []api.Event) []int {
 	out := make([]int, len(evs))
 	for i, e := range evs {
-		out[i] = int(e.Data["n"].(int))
+		out[i] = e.Data["n"].(int)
 	}
 	return out
 }

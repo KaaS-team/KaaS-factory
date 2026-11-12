@@ -322,8 +322,10 @@ func TestTimelineLoadsHistoryThenFollowsLiveOnce(t *testing.T) {
 		t.Fatalf("history out of order:\n%s", v)
 	}
 	live := api.Event{V: 1, Time: t0, Kind: "stalled", Ticket: "101", Data: map[string]any{"message": "nudge"}}
-	m = emit(t, m, f, live)
-	m = emit(t, m, f, past) // already in history: the snapshot raced the stream
+	// Apply events directly: emit's pending wait command may swallow a second pushed event.
+	nm, _ := m.Update(eventMsg(live))
+	nm, _ = nm.Update(eventMsg(past)) // already in history: the snapshot raced the stream
+	m = nm.(*Model)
 	v = view(m)
 	if n := strings.Count(v, "stalled"); n != 1 {
 		t.Fatalf("live event shown %d times:\n%s", n, v)
