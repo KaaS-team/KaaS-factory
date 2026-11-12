@@ -15,6 +15,8 @@ import (
 	"github.com/KaaS-team/factory/internal/api"
 )
 
+const fixturesDir = "../../evals/fixtures"
+
 // solver is a fake agent runner that solves the tickets in its set. No model call.
 type solver struct{ solves map[api.TicketID]bool }
 
@@ -48,15 +50,11 @@ func TestEvalRunWritesJSONAndMarkdownThatAgree(t *testing.T) {
 	if err := os.WriteFile(lock, []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// testdata has two fixtures, three tickets; ticket id 1 appears in both, so the fake solves 2 of 3.
-	m, err := LoadMatrix("testdata")
-	if err != nil || len(m.Fixtures) != 2 {
-		t.Fatalf("fixtures: %v %d", err, len(m.Fixtures))
-	}
-	solves := map[api.TicketID]bool{m.Fixtures[0].Tickets[0].ID: true}
+	// The fixtures have five tickets; four have id 1, so the fake solves 4 of 5.
+	solves := map[api.TicketID]bool{"1": true}
 	_, run := newTestCommand(t, dir, solves)
 	out := filepath.Join(dir, "evals")
-	if err := run("--workflow", "default", "--agent", "claude", "--packs", lock, "--fixtures", "testdata", "--out", out); err != nil {
+	if err := run("--workflow", "default", "--agent", "claude", "--packs", lock, "--fixtures", fixturesDir, "--out", out); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(filepath.Join(out, "2026-11-12-default-claude.json"))
@@ -75,7 +73,7 @@ func TestEvalRunWritesJSONAndMarkdownThatAgree(t *testing.T) {
 		t.Fatalf("identity fields: %+v", sc)
 	}
 	a := sc.Aggregate
-	if a.Total != 3 || a.Merged != 2 || a.PassRate != 2.0/3 || a.MainGreenRate != 1 || a.TokensPerMergedPR != 180 {
+	if a.Total != 5 || a.Merged != 4 || a.PassRate != 0.8 || a.MainGreenRate != 1 || a.TokensPerMergedPR != 150 {
 		t.Fatalf("aggregate %+v", a)
 	}
 	want := []string{
@@ -108,7 +106,7 @@ func TestEvalRunRejectsBadNames(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			dir := t.TempDir()
 			_, run := newTestCommand(t, dir, nil)
-			args := []string{"--workflow", c.workflow, "--fixtures", "testdata", "--out", dir}
+			args := []string{"--workflow", c.workflow, "--fixtures", fixturesDir, "--out", dir}
 			if c.agent != "" {
 				args = append(args, "--agent", c.agent)
 			}
@@ -135,10 +133,10 @@ func TestEvalDiffTableAndExit(t *testing.T) {
 		worse bool
 		cells []string
 	}{
-		{"better", card(0.75, 800, 8*time.Second), false, []string{"| pass rate | 0.50 | 0.75 | +0.25 |", "| tokens per merged PR | 1000 | 800 | -200 (-20.0%) |", "| median wall time | 10s | 8s | -2s |"}},
-		{"equal", old, false, []string{"| pass rate | 0.50 | 0.50 | +0.00 |", "| tokens per merged PR | 1000 | 1000 | +0 (+0.0%) |"}},
-		{"worse pass rate", card(0.25, 1000, 10*time.Second), true, []string{"| pass rate | 0.50 | 0.25 | -0.25 |", "worse: pass rate fell"}},
-		{"worse tokens", card(0.5, 1500, 10*time.Second), true, []string{"| tokens per merged PR | 1000 | 1500 | +500 (+50.0%) |", "worse: tokens per merged PR rose"}},
+		{"better", card(0.75, 800, 8*time.Second), false, []string{"| pass rate | 0.50 | 0.75 | +0.25 |", "| tokens per merged PR | 1000 | 800 | -200 (-20.0%) | better |", "| median wall time | 10s | 8s | -2s |"}},
+		{"equal", old, false, []string{"| pass rate | 0.50 | 0.50 | +0.00 | same |", "| tokens per merged PR | 1000 | 1000 | +0 (+0.0%) |"}},
+		{"worse pass rate", card(0.25, 1000, 10*time.Second), true, []string{"| pass rate | 0.50 | 0.25 | -0.25 | worse |", "worse: pass rate fell"}},
+		{"worse tokens", card(0.5, 1500, 10*time.Second), true, []string{"| tokens per merged PR | 1000 | 1500 | +500 (+50.0%) | worse |", "worse: tokens per merged PR rose"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

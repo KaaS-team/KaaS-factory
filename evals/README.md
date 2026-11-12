@@ -11,3 +11,6 @@ Pack upgrades compare two of them:
 
 It prints each metric with its delta and exits 1 when the new one is worse on pass rate or on
 tokens per merged PR (more than 10 percent up). Sample files here are fake-agent output.
+
+`factory eval` copies each seed under `fixtures/<name>/seed` into a scratch repo, runs the agent
+through the local dispatcher, then adds `hidden/<ticket>` and runs the fixture's `hidden` command.

@@ -3,6 +3,8 @@ package eval
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -149,17 +151,30 @@ func TestScorecardRoundTripAndCustomerView(t *testing.T) {
 }
 
 func TestLoadSeedFixtures(t *testing.T) {
-	m, err := LoadMatrix("testdata")
+	m, err := LoadMatrix(fixturesDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Fixtures) != 2 {
-		t.Fatalf("want 2 seed fixtures, got %d", len(m.Fixtures))
-	}
+	var names []string
+	tickets := 0
 	for _, f := range m.Fixtures {
-		if f.Name == "" || len(f.Tickets) == 0 || f.Hidden == "" {
+		if f.Name == "" || len(f.Tickets) == 0 || f.Hidden == "" || f.Gate == "" {
 			t.Fatalf("incomplete fixture %+v", f)
 		}
+		names = append(names, f.Name)
+		tickets += len(f.Tickets)
+		for _, tk := range f.Tickets {
+			if tk.Repo != f.Name {
+				t.Fatalf("%s ticket %s repo %q, want the fixture name", f.Name, tk.ID, tk.Repo)
+			}
+			if _, err := os.Stat(filepath.Join(fixturesDir, f.Name, "hidden", string(tk.ID))); err != nil {
+				t.Fatalf("%s ticket %s has no hidden tests: %v", f.Name, tk.ID, err)
+			}
+		}
+	}
+	// go, bun, uv and one multi-ticket repo.
+	if got := strings.Join(names, ","); got != "bun-add,go-stack,splitbill,uv-add" || tickets != 5 {
+		t.Fatalf("fixtures %s with %d tickets", got, tickets)
 	}
 }
 
@@ -172,5 +187,32 @@ func TestMedianAndHumanTouches(t *testing.T) {
 	}
 	if got := median(nil); got != 0 {
 		t.Fatal(got)
+	}
+}
+
+// Acceptance 2: Diff says better, same or worse for each metric, in both directions.
+func TestDiffVerdictPerMetric(t *testing.T) {
+	mk := func(pass, green float64, tokens int64, wall time.Duration, touches float64) Scorecard {
+		return Scorecard{Schema: SchemaV1, Aggregate: Aggregate{PassRate: pass, MainGreenRate: green, TokensPerMergedPR: tokens, MedianWallTime: wall, HumanTouchesPerPR: touches}}
+	}
+	base := mk(0.5, 1, 1000, 10*time.Second, 1)
+	cases := []struct {
+		name string
+		next Scorecard
+		want []string
+	}{
+		{"all better", mk(0.75, 1, 900, 8*time.Second, 0), []string{"| pass rate | 0.50 | 0.75 | +0.25 | better |", "| main green rate | 1.00 | 1.00 | +0.00 | same |", "| tokens per merged PR | 1000 | 900 | -100 (-10.0%) | better |", "| median wall time | 10s | 8s | -2s | better |", "| human touches per PR | 1.00 | 0.00 | -1.00 | better |"}},
+		{"all worse", mk(0.25, 0.5, 1100, 12*time.Second, 2), []string{"| pass rate | 0.50 | 0.25 | -0.25 | worse |", "| main green rate | 1.00 | 0.50 | -0.50 | worse |", "| tokens per merged PR | 1000 | 1100 | +100 (+10.0%) | worse |", "| median wall time | 10s | 12s | +2s | worse |", "| human touches per PR | 1.00 | 2.00 | +1.00 | worse |"}},
+		{"same", base, []string{"| pass rate | 0.50 | 0.50 | +0.00 | same |", "| tokens per merged PR | 1000 | 1000 | +0 (+0.0%) | same |", "| median wall time | 10s | 10s | +0s | same |"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := Diff(base, c.next)
+			for _, w := range c.want {
+				if !strings.Contains(got, w) {
+					t.Fatalf("diff lacks %q:\n%s", w, got)
+				}
+			}
+		})
 	}
 }
