@@ -1,0 +1,544 @@
+{
+ "_note": "generated from src/agents/presets/claude.ts at ts-final by running claudeArgs and claudeModelArgs",
+ "guidance": "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+ "disallowed": [
+  "ScheduleWakeup",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
+  "Monitor",
+  "RemoteTrigger",
+  "PushNotification",
+  "SendMessage",
+  "ListAgents",
+  "Workflow",
+  "EnterWorktree",
+  "ExitWorktree"
+ ],
+ "tools": {
+  "triage": [
+   "Bash",
+   "Read",
+   "Write",
+   "Skill"
+  ],
+  "plan": [
+   "Bash",
+   "Read",
+   "Write",
+   "Skill",
+   "Agent"
+  ],
+  "build": [
+   "Bash",
+   "Read",
+   "Write",
+   "Skill",
+   "Edit"
+  ],
+  "verify": [
+   "Bash",
+   "Read",
+   "Write",
+   "Skill",
+   "Edit",
+   "Agent"
+  ],
+  "pr": [
+   "Bash",
+   "Read",
+   "Write",
+   "Skill"
+  ],
+  "retro": [
+   "Bash",
+   "Read",
+   "Write",
+   "Skill"
+  ]
+ },
+ "cases": [
+  {
+   "name": "build pinned (agents.test.ts)",
+   "input": {
+    "stage": "build",
+    "issue": 12,
+    "maxBudgetUsd": 5
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-build 12",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Edit",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-12/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\",\"Edit(**)\",\"Bash(git add *)\",\"Bash(git commit *)\",\"Bash(git rm *)\",\"Bash(.factory/gates.sh*)\",\"Bash(bash .factory/gates.sh*)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "5"
+   ]
+  },
+  {
+   "name": "rebuild forks the last session",
+   "input": {
+    "stage": "build",
+    "issue": 12,
+    "maxBudgetUsd": 5,
+    "resume": {
+     "sessionId": "s-1",
+     "failure": "gate red: test"
+    }
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-build 12\n\nThe last attempt was sent back. The tail of why:\n\ngate red: test",
+    "--resume",
+    "s-1",
+    "--fork-session",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Edit",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-12/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\",\"Edit(**)\",\"Bash(git add *)\",\"Bash(git commit *)\",\"Bash(git rm *)\",\"Bash(.factory/gates.sh*)\",\"Bash(bash .factory/gates.sh*)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "5"
+   ]
+  },
+  {
+   "name": "configured model opus on plan",
+   "input": {
+    "stage": "plan",
+    "issue": 1,
+    "maxBudgetUsd": 2,
+    "model": "opus"
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-plan 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Agent",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2",
+    "--model",
+    "opus"
+   ]
+  },
+  {
+   "name": "stage default triage",
+   "input": {
+    "stage": "triage",
+    "issue": 1,
+    "maxBudgetUsd": 2
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-triage 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2",
+    "--model",
+    "sonnet",
+    "--effort",
+    "low"
+   ]
+  },
+  {
+   "name": "stage default plan",
+   "input": {
+    "stage": "plan",
+    "issue": 1,
+    "maxBudgetUsd": 2
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-plan 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Agent",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2"
+   ]
+  },
+  {
+   "name": "stage default build",
+   "input": {
+    "stage": "build",
+    "issue": 1,
+    "maxBudgetUsd": 2
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-build 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Edit",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\",\"Edit(**)\",\"Bash(git add *)\",\"Bash(git commit *)\",\"Bash(git rm *)\",\"Bash(.factory/gates.sh*)\",\"Bash(bash .factory/gates.sh*)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2"
+   ]
+  },
+  {
+   "name": "stage default verify",
+   "input": {
+    "stage": "verify",
+    "issue": 1,
+    "maxBudgetUsd": 2
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-verify 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Edit,Agent",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\",\"Bash(git stash *)\",\"Bash(git checkout *)\",\"Bash(git restore *)\",\"Bash(.factory/mutate.sh *)\",\"Bash(bash .factory/mutate.sh *)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2"
+   ]
+  },
+  {
+   "name": "stage default pr",
+   "input": {
+    "stage": "pr",
+    "issue": 1,
+    "maxBudgetUsd": 2
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-pr 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2",
+    "--model",
+    "sonnet",
+    "--effort",
+    "low"
+   ]
+  },
+  {
+   "name": "stage default retro",
+   "input": {
+    "stage": "retro",
+    "issue": 1,
+    "maxBudgetUsd": 2
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-retro 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2",
+    "--model",
+    "sonnet",
+    "--effort",
+    "low"
+   ]
+  },
+  {
+   "name": "triage with configured opus",
+   "input": {
+    "stage": "triage",
+    "issue": 1,
+    "maxBudgetUsd": 2,
+    "model": "opus"
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-triage 1",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-1/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "2",
+    "--model",
+    "opus",
+    "--effort",
+    "low"
+   ]
+  },
+  {
+   "name": "context pack mcp and schema",
+   "input": {
+    "stage": "verify",
+    "issue": 7,
+    "maxBudgetUsd": 3.5,
+    "contextPack": "PACK",
+    "mcpConfig": "/tmp/mcp.json",
+    "mcp": [
+     "gh",
+     "docs"
+    ],
+    "jsonSchema": "{\"type\":\"object\"}"
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-verify 7",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--mcp-config",
+    "/tmp/mcp.json",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Edit,Agent",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-7/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\",\"Bash(git stash *)\",\"Bash(git checkout *)\",\"Bash(git restore *)\",\"Bash(.factory/mutate.sh *)\",\"Bash(bash .factory/mutate.sh *)\",\"mcp__gh\",\"mcp__docs\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.\n\nPACK",
+    "--max-budget-usd",
+    "3.5",
+    "--json-schema",
+    "{\"type\":\"object\"}"
+   ]
+  },
+  {
+   "name": "repo commands",
+   "input": {
+    "stage": "build",
+    "issue": 9,
+    "maxBudgetUsd": 4,
+    "commands": {
+     "read": [
+      "make lint *"
+     ],
+     "build": [
+      "make test *",
+      "bun test *"
+     ],
+     "verify": [
+      "make verify"
+     ]
+    }
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-build 9",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Edit",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-9/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\",\"Bash(make lint *)\",\"Edit(**)\",\"Bash(git add *)\",\"Bash(git commit *)\",\"Bash(git rm *)\",\"Bash(.factory/gates.sh*)\",\"Bash(bash .factory/gates.sh*)\",\"Bash(make test *)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "4"
+   ]
+  },
+  {
+   "name": "resume without session id",
+   "input": {
+    "stage": "build",
+    "issue": 3,
+    "maxBudgetUsd": 1,
+    "resume": {
+     "failure": "boom"
+    }
+   },
+   "argv": [
+    "claude",
+    "-p",
+    "/factory-build 3\n\nThe last attempt was sent back. The tail of why:\n\nboom",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "dontAsk",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "project,local",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor,RemoteTrigger,PushNotification,SendMessage,ListAgents,Workflow,EnterWorktree,ExitWorktree",
+    "--tools",
+    "Bash,Read,Write,Skill,Edit",
+    "--settings",
+    "{\"permissions\":{\"allow\":[\"Edit(.factory/runs/issue-3/**)\",\"Bash(git status *)\",\"Bash(git diff *)\",\"Bash(git log *)\",\"Bash(git show *)\",\"Bash(git rev-parse *)\",\"Bash(git worktree list)\",\"Bash(cat *)\",\"Bash(ls *)\",\"Bash(grep *)\",\"Bash(find *)\",\"Bash(mkdir -p *)\",\"Bash(echo *)\",\"Bash(head *)\",\"Bash(tail *)\",\"Bash(wc *)\",\"Bash(diff *)\",\"Bash(pwd)\",\"Edit(**)\",\"Bash(git add *)\",\"Bash(git commit *)\",\"Bash(git rm *)\",\"Bash(.factory/gates.sh*)\",\"Bash(bash .factory/gates.sh*)\"]}}",
+    "--append-system-prompt",
+    "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>. Tests: make test FILES=\"<files>\", make check or .factory/gates.sh; rewrite a refused one.",
+    "--max-budget-usd",
+    "1"
+   ]
+  }
+ ]
+}
