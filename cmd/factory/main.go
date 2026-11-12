@@ -55,7 +55,7 @@ func newRoot() *cobra.Command {
 	addCommands(root)
 	addEE(root)
 	mountClients(root)
-	root.AddCommand(docsCmd(newRoot))
+	root.AddCommand(docsCmd(newRoot), designCmd())
 	return root
 }
 
