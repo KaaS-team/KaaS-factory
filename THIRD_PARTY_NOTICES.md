@@ -92,6 +92,7 @@ Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepl
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
 
 
+
 ## browser-use/browser-use@dfb6a73
 
 Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Gregor Zunic)
@@ -105,6 +106,7 @@ Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Greg
 Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). Only the stuck detector was ported; `openhands-sdk/` outside `ee/` directories.
 
 - `internal/dispatch/local/stuck/stuck.go` from `openhands-sdk/openhands/sdk/conversation/stuck_detector.py` [tested by `internal/dispatch/local/stuck/stuck_test.go`]
+
 ## block/goose@910d084
 
 Source: https://github.com/block/goose (Apache-2.0, Copyright Block, Inc.)
