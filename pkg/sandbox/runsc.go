@@ -94,7 +94,7 @@ func stageRunsc(path string, pin RunscPin) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 	dir, err := os.MkdirTemp("", "kaas-runsc-")
 	if err != nil {
 		return "", "", err
