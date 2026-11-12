@@ -154,7 +154,7 @@ func TestDecide(t *testing.T) { // Symphony 8.1 tick order, 17.4
 			s := st(Entry{Ticket: tkt("a", "src/"), Phase: api.PhaseRetryQueue, Attempt: 1, RetryAt: t0.Add(time.Hour)})
 			s.Ready = []api.Ticket{tkt("b", "src/x.go"), tkt("c", "docs")}
 			return s
-		}, nil, nil, []Action{{Kind: Dispatch, ID: "c", Ticket: tkt("c", "docs"), Attempt: 1}}},
+		}, nil, nil, []Action{{Kind: Skip, ID: "b", Reason: "files overlap a"}, {Kind: Dispatch, ID: "c", Ticket: tkt("c", "docs"), Attempt: 1}}},
 		{"reconcile comes before dispatch", func() State {
 			s := st(running("a", 1, t0))
 			s.Terminal = map[api.TicketID]bool{"a": true}

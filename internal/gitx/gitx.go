@@ -21,9 +21,6 @@ var (
 	ErrCASLost = errors.New("gitx: ref changed, compare-and-swap lost")
 )
 
-// EmptyTree is the object id of the empty tree; lease commits point at it.
-const EmptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-
 // Git runs git commands in one repository directory.
 type Git struct{ Dir string }
 
@@ -140,21 +137,6 @@ func (g Git) FFPush(ctx context.Context, remote, src, branch string) error {
 
 var treeID = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
 
-// NewLeaseCommit writes an empty-tree commit whose message is the lease record
-// and returns its id. A non-empty parent makes it a child of the lease it replaces.
-func (g Git) NewLeaseCommit(ctx context.Context, parent, message string) (string, error) {
-	args := []string{"-c", "user.name=factory", "-c", "user.email=factory@localhost", "-c", "commit.gpgsign=false", "commit-tree", EmptyTree}
-	if parent != "" {
-		args = append(args, "-p", parent)
-	}
-	args = append(args, "-m", message)
-	out, err := g.must(ctx, args...)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(out), nil
-}
-
 // UpdateRef sets ref to newSha only if it currently holds oldSha
 // (`git update-ref ref new old`). An empty oldSha means the ref must not exist.
 // A mismatch returns ErrCASLost.
@@ -171,23 +153,6 @@ func (g Git) UpdateRef(ctx context.Context, ref, newSha, oldSha string) error {
 		return nil
 	}
 	return fmt.Errorf("%w: %s", ErrCASLost, strings.TrimSpace(r.stderr))
-}
-
-// PushLease points ref on remote at newSha only if the remote's ref still holds
-// oldSha (`git push --force-with-lease=ref:old`). An empty oldSha means the ref
-// must be absent. A stale value returns ErrCASLost.
-func (g Git) PushLease(ctx context.Context, remote, ref, newSha, oldSha string) error {
-	r, err := g.run(ctx, "push", "--no-verify", "-q", "--force-with-lease="+ref+":"+oldSha, remote, newSha+":"+ref)
-	if err != nil {
-		return err
-	}
-	if r.code == 0 {
-		return nil
-	}
-	if strings.Contains(r.stderr, "stale info") || strings.Contains(r.stderr, "[rejected]") || strings.Contains(r.stderr, "cannot lock ref") || strings.Contains(r.stderr, "failed to update ref") {
-		return fmt.Errorf("%w: %s", ErrCASLost, strings.TrimSpace(r.stderr))
-	}
-	return fmt.Errorf("gitx: git push: exit %d: %s", r.code, strings.TrimSpace(r.stderr))
 }
 
 // RemoteRef returns the id ref points to on remote, or "" when it does not exist.

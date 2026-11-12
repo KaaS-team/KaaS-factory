@@ -15,6 +15,11 @@ type Locks struct {
 	Files []string
 	// Unmerged are tickets known to be open that no other list shows.
 	Unmerged map[api.TicketID]bool
+	// Branches names the branch of each ticket that has one, running or ready.
+	Branches map[api.TicketID]string
+	// Merge returns the paths that conflict when two branches merge, nil when clean.
+	// With Merge nil, an overlap always blocks.
+	Merge func(a, b string) ([]string, error)
 }
 
 // Rank returns a copy of ready ordered by priority (lower first), then oldest
@@ -64,52 +69,101 @@ func Overlap(a, b []string) bool {
 	return false
 }
 
-// Refill returns the tickets from ranked to start now, in rank order. It
-// returns at most min(free, firesLeft) tickets, none whose Files overlap a
-// running ticket, a held lock or an earlier pick, and none with an unmerged
-// blocker. A skipped ticket is not dropped; the caller offers it next tick.
-func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, firesLeft int) []api.Ticket {
+// Skip says why Refill passed over a ticket this tick.
+type Skip struct {
+	ID     api.TicketID
+	Reason string // one line, e.g. "blocked by dep" or "files overlap T1; merge-tree conflicts: a.go"
+}
+
+// holder is one held write set: a running ticket, an earlier pick or a bare lock.
+type holder struct {
+	id    api.TicketID
+	files []string
+	// branch is empty when the holder has none, which is always so for a bare lock.
+	branch string
+}
+
+// Refill returns the tickets from ranked to start now, in rank order, and one
+// Skip per ticket it passed over. It returns at most min(free, firesLeft)
+// tickets, none with an unmerged blocker, none already running, and none whose
+// Files overlap a running ticket, a held lock or an earlier pick, unless both
+// tickets have a branch in locks.Branches and locks.Merge reports no conflict
+// between them (a Merge error counts as a conflict). A skipped ticket is not
+// dropped; the caller offers it next tick.
+func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, firesLeft int) ([]api.Ticket, []Skip) {
 	limit := min(free, firesLeft)
 	out := []api.Ticket{}
 	if limit <= 0 {
-		return out
+		return out, nil
 	}
-	held := append([]string(nil), locks.Files...)
+	held := []holder{{files: locks.Files}}
 	open := map[api.TicketID]bool{}
 	for id, v := range locks.Unmerged {
 		if v {
 			open[id] = true
 		}
 	}
+	isRunning := map[api.TicketID]bool{}
 	for _, r := range running {
-		held = append(held, r.Files...)
+		held = append(held, holder{r.ID, r.Files, locks.Branches[r.ID]})
 		open[r.ID] = true
+		isRunning[r.ID] = true
 	}
 	for _, t := range ranked {
 		open[t.ID] = true
 	}
-	isRunning := map[api.TicketID]bool{}
-	for _, r := range running {
-		isRunning[r.ID] = true
-	}
+	var skips []Skip
 	for _, t := range ranked {
 		if len(out) >= limit {
 			break
 		}
-		if isRunning[t.ID] || blocked(t, open) || Overlap(t.Files, held) {
+		if isRunning[t.ID] {
+			continue
+		}
+		if b := blocker(t, open); b != "" {
+			skips = append(skips, Skip{t.ID, "blocked by " + string(b)})
+			continue
+		}
+		if why := overlap(t, locks, held); why != "" {
+			skips = append(skips, Skip{t.ID, why})
 			continue
 		}
 		out = append(out, t)
-		held = append(held, t.Files...)
+		held = append(held, holder{t.ID, t.Files, locks.Branches[t.ID]})
 	}
-	return out
+	return out, skips
 }
 
-func blocked(t api.Ticket, open map[api.TicketID]bool) bool {
-	for _, b := range t.BlockedBy {
-		if open[b] {
-			return true
+// overlap returns why t must wait for a holder, or "" when it may start.
+func overlap(t api.Ticket, locks Locks, held []holder) string {
+	for _, h := range held {
+		if !Overlap(t.Files, h.files) {
+			continue
+		}
+		who := "a held lock"
+		if h.id != "" {
+			who = string(h.id)
+		}
+		tb := locks.Branches[t.ID]
+		if tb == "" || h.branch == "" || locks.Merge == nil {
+			return "files overlap " + who
+		}
+		paths, err := locks.Merge(tb, h.branch)
+		switch {
+		case err != nil:
+			return "files overlap " + who + "; merge-tree failed: " + err.Error()
+		case len(paths) > 0:
+			return "files overlap " + who + "; merge-tree conflicts: " + strings.Join(paths, ", ")
 		}
 	}
-	return false
+	return ""
+}
+
+func blocker(t api.Ticket, open map[api.TicketID]bool) api.TicketID {
+	for _, b := range t.BlockedBy {
+		if open[b] {
+			return b
+		}
+	}
+	return ""
 }

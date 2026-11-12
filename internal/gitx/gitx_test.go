@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/KaaS-team/factory/internal/gitx"
@@ -148,12 +147,9 @@ func TestUpdateRefCAS(t *testing.T) {
 	g := gitx.New(dir)
 	ctx := context.Background()
 	ref := "refs/factory/lease/x"
-	c1, err := g.NewLeaseCommit(ctx, "", "holder=a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	c2, _ := g.NewLeaseCommit(ctx, c1, "holder=b")
-	c3, _ := g.NewLeaseCommit(ctx, c1, "holder=c")
+	c1 := run(t, dir, "commit-tree", "-m", "a", "main^{tree}")
+	c2 := run(t, dir, "commit-tree", "-m", "b", "-p", c1, "main^{tree}")
+	c3 := run(t, dir, "commit-tree", "-m", "c", "-p", c1, "main^{tree}")
 
 	if err := g.UpdateRef(ctx, ref, c1, ""); err != nil {
 		t.Fatalf("create: %v", err)
@@ -169,87 +165,6 @@ func TestUpdateRefCAS(t *testing.T) {
 	}
 	if got := run(t, dir, "rev-parse", ref); got != c2 {
 		t.Fatalf("ref = %s, want %s", got, c2)
-	}
-}
-
-func TestLeaseCommitIsEmptyTreeChild(t *testing.T) {
-	dir := newRepo(t)
-	g := gitx.New(dir)
-	c1, _ := g.NewLeaseCommit(context.Background(), "", "rec")
-	c2, _ := g.NewLeaseCommit(context.Background(), c1, "rec2")
-	if got := run(t, dir, "rev-parse", c2+"^{tree}"); got != "4b825dc642cb6eb9a060e54bf8d69288fbee4904" {
-		t.Fatalf("tree = %s, want the empty tree", got)
-	}
-	if got := run(t, dir, "rev-parse", c2+"^"); got != c1 {
-		t.Fatalf("parent = %s, want %s", got, c1)
-	}
-	if got := run(t, dir, "log", "-1", "--format=%B", c2); got != "rec2" {
-		t.Fatalf("message = %q", got)
-	}
-}
-
-// Two takers read the same lease value and race to replace it; the remote lets exactly one in.
-func TestPushLeaseCASOneWinner(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		initial bool // a lease already exists (old = its sha) or the ref is absent (old = "")
-	}{{"swap existing", true}, {"create absent", false}} {
-		t.Run(tc.name, func(t *testing.T) {
-			remote, a := bare(t)
-			ctx := context.Background()
-			b := filepath.Join(t.TempDir(), "b")
-			run(t, t.TempDir(), "clone", "-q", remote, b)
-
-			ref := "refs/factory/lease/merge-queue"
-			ga, gb := gitx.New(a), gitx.New(b)
-			old := ""
-			if tc.initial {
-				c0, _ := ga.NewLeaseCommit(ctx, "", "holder=seed")
-				if err := ga.PushLease(ctx, "origin", ref, c0, ""); err != nil {
-					t.Fatalf("seed: %v", err)
-				}
-				run(t, b, "fetch", "-q", "origin", ref+":"+ref)
-				old = c0
-			}
-			ca, _ := ga.NewLeaseCommit(ctx, old, "holder=a")
-			cb, _ := gb.NewLeaseCommit(ctx, old, "holder=b")
-
-			errs := make([]error, 2)
-			var wg sync.WaitGroup
-			wg.Add(2)
-			go func() { defer wg.Done(); errs[0] = ga.PushLease(ctx, "origin", ref, ca, old) }()
-			go func() { defer wg.Done(); errs[1] = gb.PushLease(ctx, "origin", ref, cb, old) }()
-			wg.Wait()
-
-			wins := 0
-			for i, err := range errs {
-				switch {
-				case err == nil:
-					wins++
-				case !errors.Is(err, gitx.ErrCASLost):
-					t.Fatalf("taker %d: %v, want nil or ErrCASLost", i, err)
-				}
-			}
-			if wins != 1 {
-				t.Fatalf("winners = %d (errs %v), want exactly 1", wins, errs)
-			}
-			got, err := ga.RemoteRef(ctx, "origin", ref)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != ca && got != cb {
-				t.Fatalf("remote lease = %s, want one of the takers", got)
-			}
-
-			// Deterministic half: a taker holding the old value after the winner landed always loses.
-			loser, _ := gb.NewLeaseCommit(ctx, old, "holder=late")
-			if err := gb.PushLease(ctx, "origin", ref, loser, old); !errors.Is(err, gitx.ErrCASLost) {
-				t.Fatalf("stale taker = %v, want ErrCASLost", err)
-			}
-			if after, _ := ga.RemoteRef(ctx, "origin", ref); after != got {
-				t.Fatalf("remote lease moved to %s, want %s", after, got)
-			}
-		})
 	}
 }
 
