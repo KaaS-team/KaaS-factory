@@ -14,6 +14,8 @@ import (
 	"github.com/KaaS-team/factory/internal/api/porttest"
 	"github.com/KaaS-team/factory/internal/config"
 	"github.com/KaaS-team/factory/internal/core"
+	"github.com/KaaS-team/factory/internal/logs"
+	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/meter"
 )
 
@@ -104,7 +106,7 @@ func TestDispatcherErrors(t *testing.T) {
 	}
 }
 
-// TestNoopQueueRefuses: the merge queue is not wired yet and says so from Run.
+// TestNoopQueueRefuses: off the GitHub tracker the merge queue is not configured and says so from Run.
 func TestNoopQueueRefuses(t *testing.T) {
 	var q core.MergeQueue = notConfiguredQueue{}
 	if _, err := q.Run(context.Background()); err == nil || !strings.Contains(err.Error(), "not configured") {
@@ -200,5 +202,51 @@ func TestControlCommandsGetControl(t *testing.T) {
 		if err != nil && (strings.Contains(err.Error(), "no control") || strings.Contains(err.Error(), "no Control")) {
 			t.Errorf("%v: %v", args, err)
 		}
+	}
+}
+
+// TestGitHubDepsAreReal: on the GitHub tracker the loop gets the real merge queue, shadow mode wraps
+// the dispatcher, and every dispatcher records its sessions. Other trackers keep the stand-in queue.
+func TestGitHubDepsAreReal(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "t")
+	t.Setenv("LINEAR_API_KEY", "t")
+	t.Chdir(t.TempDir())
+	d, err := buildDeps(config.Config{Tracker: "github", Repo: "acme/shop", Dispatcher: "local", Slots: 1, Shadow: true, Base: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := d.Queue.(*mergeq.CoreQueue); !ok {
+		t.Errorf("github queue is %T, want *mergeq.CoreQueue", d.Queue)
+	}
+	if _, ok := d.Dispatcher.(recorded); !ok || d.Dispatcher.Name() != "shadow:local" {
+		t.Errorf("dispatcher %T named %q, want recorded shadow:local", d.Dispatcher, d.Dispatcher.Name())
+	}
+	d, err = buildDeps(config.Config{Tracker: "linear", Repo: "ENG", Dispatcher: "local", Slots: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := d.Queue.(notConfiguredQueue); !ok || d.Dispatcher.Name() != "local" {
+		t.Errorf("linear: queue %T, dispatcher %q", d.Queue, d.Dispatcher.Name())
+	}
+}
+
+// TestLogsReadsTheRecordedSession: a dispatch through recorded is what `factory logs` finds.
+func TestLogsReadsTheRecordedSession(t *testing.T) {
+	ctx := context.Background()
+	t.Chdir(t.TempDir())
+	if _, err := logBackends().Source(ctx, "7"); !errors.Is(err, logs.ErrNoSession) {
+		t.Fatalf("no store: got %v, want ErrNoSession", err)
+	}
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (recorded{porttest.NewDispatcher(1), st}).Dispatch(ctx, api.Brief{Ticket: "7", Attempt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	_ = st.Close()
+	_, err = logBackends().Source(ctx, "7")
+	if err == nil || !strings.Contains(err.Error(), `dispatcher "fake"`) {
+		t.Fatalf("got %v, want the recorded fake session to reach the factory lookup", err)
 	}
 }

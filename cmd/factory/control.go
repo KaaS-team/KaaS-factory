@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,14 +18,18 @@ import (
 	"github.com/KaaS-team/factory/internal/dispatch/fire"
 	"github.com/KaaS-team/factory/internal/dispatch/local"
 	"github.com/KaaS-team/factory/internal/dispatch/routines"
+	"github.com/KaaS-team/factory/internal/dispatch/shadow"
 	"github.com/KaaS-team/factory/internal/mergeq"
+	"github.com/KaaS-team/factory/internal/mergeq/wire"
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/observe"
+	"github.com/KaaS-team/factory/internal/observe/ghsource"
 	"github.com/KaaS-team/factory/internal/reconcile"
 	"github.com/KaaS-team/factory/internal/store"
 	"github.com/KaaS-team/factory/internal/tracker/github"
 	"github.com/KaaS-team/factory/internal/tracker/jira"
 	"github.com/KaaS-team/factory/internal/tracker/linear"
+	gogithub "github.com/google/go-github/v79/github"
 )
 
 // newControl builds the api.Control every command talks to. Tests replace it with a fake.
@@ -59,16 +64,11 @@ const (
 // trackers is one row per tracker adapter. The key is the value of the `tracker` config key.
 var trackers = map[string]func(config.Config) (api.Tracker, error){
 	"github": func(c config.Config) (api.Tracker, error) {
-		owner, repo, ok := strings.Cut(c.Repo, "/")
-		if !ok || owner == "" || repo == "" {
-			return nil, fmt.Errorf("tracker github: key repo must be owner/name, got %q", c.Repo)
+		g, err := newGitHubConn(c)
+		if err != nil {
+			return nil, err
 		}
-		tok := os.Getenv(envGitHubToken)
-		if tok == "" {
-			return nil, fmt.Errorf("tracker github: env var %s is not set", envGitHubToken)
-		}
-		return github.New(github.Config{Owner: owner, Repo: repo, BaseURL: os.Getenv(envGitHubURL),
-			HTTPClient: &http.Client{Timeout: 30 * time.Second, Transport: bearer{tok, http.DefaultTransport}}})
+		return g.tracker()
 	},
 	"linear": func(c config.Config) (api.Tracker, error) {
 		return linear.New(linear.Config{Team: c.Repo, TokenEnv: envLinearToken, BaseURL: os.Getenv(envLinearURL), ReadyLabel: readyLabel})
@@ -105,6 +105,81 @@ var dispatchers = map[string]func(context.Context, config.Config) (api.Dispatche
 		root := filepath.Join(repo, ".factory", "worktrees")
 		return local.New(ctx, local.Config{Worktrees: local.GitWorktrees{Repo: repo, Root: root}, MaxConcurrent: c.Slots})
 	},
+}
+
+// gitHubConn is what the GitHub tracker, observer source and merge queue share: one repo, one token.
+type gitHubConn struct {
+	owner, repo, baseURL string
+	http                 *http.Client
+}
+
+func newGitHubConn(c config.Config) (gitHubConn, error) {
+	owner, repo, ok := strings.Cut(c.Repo, "/")
+	if !ok || owner == "" || repo == "" {
+		return gitHubConn{}, fmt.Errorf("tracker github: key repo must be owner/name, got %q", c.Repo)
+	}
+	tok := os.Getenv(envGitHubToken)
+	if tok == "" {
+		return gitHubConn{}, fmt.Errorf("tracker github: env var %s is not set", envGitHubToken)
+	}
+	return gitHubConn{owner: owner, repo: repo, baseURL: os.Getenv(envGitHubURL),
+		http: &http.Client{Timeout: 30 * time.Second, Transport: bearer{tok, http.DefaultTransport}}}, nil
+}
+
+func (g gitHubConn) tracker() (*github.Tracker, error) {
+	return github.New(github.Config{Owner: g.owner, Repo: g.repo, BaseURL: g.baseURL, HTTPClient: g.http})
+}
+
+func (g gitHubConn) client() (*gogithub.Client, error) {
+	c := gogithub.NewClient(g.http)
+	if g.baseURL != "" {
+		u, err := url.Parse(strings.TrimSuffix(g.baseURL, "/") + "/")
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return nil, fmt.Errorf("github: bad %s %q", envGitHubURL, g.baseURL)
+		}
+		c.BaseURL = u
+	}
+	return c, nil
+}
+
+// gitHubParts builds the GitHub observer source and merge queue for the repository in the working
+// directory. Other trackers keep the not-configured stand-ins.
+func gitHubParts(c config.Config, tr *github.Tracker) (api.Observer, core.MergeQueue, error) {
+	g, err := newGitHubConn(c)
+	if err != nil {
+		return nil, nil, err
+	}
+	client, err := g.client()
+	if err != nil {
+		return nil, nil, err
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return nil, nil, err
+	}
+	q, err := wire.New(tr, dir, mergeq.Config{}, client, g.owner, g.repo)
+	if err != nil {
+		return nil, nil, err
+	}
+	return observe.New(ghsource.New(client, g.owner, g.repo, c.Base)), q, nil
+}
+
+// recorded stores every session it dispatches, so `factory logs` can find a ticket's latest one.
+type recorded struct {
+	api.Dispatcher
+	st *store.Store
+}
+
+func (r recorded) Dispatch(ctx context.Context, b api.Brief) (api.Session, error) {
+	s, err := r.Dispatcher.Dispatch(ctx, b)
+	if err != nil {
+		return s, err
+	}
+	// Dispatch is idempotent per attempt, so a failed write is safe to retry on the next tick.
+	if err := r.st.PutSession(ctx, s); err != nil {
+		return s, fmt.Errorf("record session %s: %w", s.Key, err)
+	}
+	return s, nil
 }
 
 func routinesURL() string {
@@ -166,19 +241,31 @@ func buildDeps(c config.Config) (core.Deps, error) {
 	if err != nil {
 		return core.Deps{}, err
 	}
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-		return core.Deps{}, err
-	}
-	st, err := store.Open(dbPath)
+	disp = shadow.Wrap(disp, c, shadow.NewFileWriter(shadow.DefaultPath))
+	st, err := openStore()
 	if err != nil {
 		return core.Deps{}, err
 	}
+	var obs api.Observer = observe.New(notConfiguredSource{})
+	var queue core.MergeQueue = notConfiguredQueue{}
+	if gt, ok := trk.(*github.Tracker); ok {
+		if obs, queue, err = gitHubParts(c, gt); err != nil {
+			return core.Deps{}, err
+		}
+	}
 	b := func(usd float64) api.Budget { return api.Budget{USD: usd} }
 	return core.Deps{
-		Tracker: trk, Dispatcher: disp, Observer: observe.New(notConfiguredSource{}), Store: st,
+		Tracker: trk, Dispatcher: recorded{disp, st}, Observer: obs, Store: st,
 		Meter: meter.New(meter.Budgets{Node: b(c.Budgets.Node), Ticket: b(c.Budgets.Ticket), TeamDay: b(c.Budgets.TeamDay)}, time.Now),
-		Queue: notConfiguredQueue{}, Clock: core.RealClock{},
+		Queue: queue, Clock: core.RealClock{},
 	}, nil
+}
+
+func openStore() (*store.Store, error) {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		return nil, err
+	}
+	return store.Open(dbPath)
 }
 
 func coreConfig(c config.Config) core.Config {
@@ -189,7 +276,7 @@ func coreConfig(c config.Config) core.Config {
 	}
 }
 
-// notConfiguredQueue stands in for the merge queue until mergeq.CoreQueue exists.
+// notConfiguredQueue stands in for the merge queue on trackers other than GitHub.
 type notConfiguredQueue struct{}
 
 func (notConfiguredQueue) Enqueue(context.Context, api.TicketID, int) error { return nil }
@@ -198,7 +285,7 @@ func (notConfiguredQueue) Run(context.Context) (mergeq.Report, error) {
 	return mergeq.Report{}, errors.New("merge queue is not configured in this build")
 }
 
-// notConfiguredSource stands in for the git and GitHub reader the observer needs.
+// notConfiguredSource stands in for the observer source on trackers other than GitHub.
 type notConfiguredSource struct{}
 
 var errNoSource = errors.New("observer source is not configured in this build")
