@@ -1,0 +1,7 @@
+{{template "head"}}
+<h1>Board</h1>
+<p>{{len .Board.Slots}} slots, {{.Board.FiresLeft}} fires left.</p>
+<table><tr><th>Ticket</th><th>Title</th><th>Phase</th><th>Last push</th>{{if .Operator}}<th>Tokens in/out</th><th>Spend</th><th>Token cap</th>{{end}}</tr>
+{{range .Board.Slots}}<tr><td><a href="/ticket/{{.Ticket.ID}}">{{.Ticket.ID}}</a></td><td>{{.Ticket.Title}}</td><td><span class="phase">{{.Phase}}</span></td><td>{{if not .LastPush.IsZero}}{{.LastPush.Format "2006-01-02 15:04:05"}}{{end}}</td>{{if $.Operator}}<td>{{.Usage.InputTokens}} / {{.Usage.OutputTokens}}</td><td>{{printf "%.2f" .Usage.CostUSD}}</td><td>{{.Budget.Tokens}}</td>{{end}}</tr>
+{{end}}</table>
+{{template "live"}}{{template "foot"}}

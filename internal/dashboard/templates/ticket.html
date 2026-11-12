@@ -1,0 +1,13 @@
+{{template "head"}}
+<h1>{{.Slot.Ticket.ID}} {{.Slot.Ticket.Title}}</h1>
+<p>Phase: <span class="phase">{{.Slot.Phase}}</span>{{if .Slot.Session}}, session {{.Slot.Session.ID}} on {{.Slot.Session.Dispatcher}}, attempt {{.Slot.Session.Attempt}}{{end}}</p>
+{{if not .Slot.LastPush.IsZero}}<p>Last push {{.Slot.LastPush.Format "2006-01-02 15:04:05"}}</p>{{end}}
+{{if .Operator}}<p>Tokens {{.Slot.Usage.InputTokens}} in, {{.Slot.Usage.OutputTokens}} out. Spend {{printf "%.2f" .Slot.Usage.CostUSD}}. Token cap {{.Slot.Budget.Tokens}}.</p>{{end}}
+<h2>Timeline</h2>
+<ul id="timeline"></ul>
+<script>
+(function(){if(!window.EventSource)return;var id={{.Slot.Ticket.ID}};var ul=document.getElementById("timeline");
+var s=new EventSource("/events");s.onmessage=function(m){var e=JSON.parse(m.data);if(e.ticket!==id)return;
+var li=document.createElement("li");li.textContent=e.time+" "+e.kind;ul.appendChild(li)}})();
+</script>
+{{template "foot"}}

@@ -1,0 +1,18 @@
+{{define "head"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Factory</title>
+<style>
+body{font:15px/1.5 system-ui,sans-serif;margin:0;color:#1a1a1a;background:#fafafa}
+header{display:flex;gap:1rem;padding:.75rem 1rem;background:#1a1a1a}
+header a{color:#fff;text-decoration:none}
+main{padding:1rem;max-width:64rem;margin:auto}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:.4rem .6rem;border-bottom:1px solid #ddd}
+.phase{padding:.1rem .5rem;border-radius:.6rem;background:#e6e6e6}
+</style></head><body>
+<header><a href="/">Board</a><a href="/queue">Queue</a></header><main>{{end}}
+{{define "foot"}}</main></body></html>{{end}}
+{{define "live"}}<script>
+(function(){if(!window.EventSource)return;var t;var s=new EventSource("/events");
+s.onmessage=function(){clearTimeout(t);t=setTimeout(function(){location.reload()},500)}})();
+</script>{{end}}
