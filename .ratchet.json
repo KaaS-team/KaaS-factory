@@ -1,5 +1,5 @@
 {
-  "go_lines": 26858,
-  "deadcode": 154,
-  "reason": "raised by the reviewed merge of go/k10-infra-classify (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 26971,
+  "deadcode": 163,
+  "reason": "raised by the reviewed merge of go/k10-judge-cache (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
