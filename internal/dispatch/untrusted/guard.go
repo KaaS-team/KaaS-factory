@@ -5,6 +5,7 @@ package untrusted
 
 import (
 	"bytes"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -96,18 +97,54 @@ func walk(root string, fn func(path string)) {
 	})
 }
 
-// Snapshot records the sensitive paths under dir and every git config file git reads there.
-func Snapshot(dir string) (*Guard, error) {
+// Snapshot records the state of the sensitive paths in the base branch's tree (base is a ref git
+// resolves in dir, such as origin/main) and of every git config file git reads in dir. The
+// checkout's own copies are the pull request's, so they are never the state to restore to: a path
+// the base lacks is recorded as absent and Restore removes it.
+func Snapshot(wt, base string) (*Guard, error) {
 	g := &Guard{entries: map[string]entry{}}
-	for _, p := range sensitivePaths {
-		g.roots = append(g.roots, filepath.Join(dir, p))
-	}
-	for _, p := range gitConfigs(dir) {
+	for _, p := range gitConfigs(wt) {
 		g.entries[p] = snap(p)
 	}
-	for _, r := range g.roots {
-		g.entries[r] = snap(r)
-		walk(r, func(p string) { g.entries[p] = snap(p) })
+	args := append([]string{"-C", wt, "ls-tree", "-r", "-z", base, "--"}, sensitivePaths...)
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("untrusted: read %s: %w", base, err)
+	}
+	for _, p := range sensitivePaths {
+		root := filepath.Join(wt, p)
+		g.roots = append(g.roots, root)
+		g.entries[root] = entry{kind: absent}
+	}
+	for _, rec := range strings.Split(string(out), "\x00") {
+		meta, name, ok := strings.Cut(rec, "\t")
+		f := strings.Fields(meta)
+		if !ok || len(f) != 3 {
+			continue
+		}
+		path := filepath.Join(wt, filepath.FromSlash(name))
+		e := entry{kind: opaque} // a submodule is left alone
+		switch f[0] {
+		case "100644", "100755":
+			b, err := exec.Command("git", "-C", wt, "cat-file", "blob", f[2]).Output()
+			if err != nil {
+				return nil, fmt.Errorf("untrusted: read %s:%s: %w", base, name, err)
+			}
+			e = entry{kind: file, content: b, mode: 0o644}
+			if f[0] == "100755" {
+				e.mode = 0o755
+			}
+		case "120000":
+			b, err := exec.Command("git", "-C", wt, "cat-file", "blob", f[2]).Output()
+			if err != nil {
+				return nil, fmt.Errorf("untrusted: read %s:%s: %w", base, name, err)
+			}
+			e = entry{kind: link, target: string(b)}
+		}
+		for d := filepath.Dir(path); d != wt && len(d) > len(wt); d = filepath.Dir(d) {
+			g.entries[d] = entry{kind: dir, mode: 0o755}
+		}
+		g.entries[path] = e
 	}
 	return g, nil
 }

@@ -249,8 +249,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			if argv, err = untrusted.Restrict(argv, deny); err != nil {
 				return api.Session{}, err
 			}
-			if guard, err = untrusted.Snapshot(dir); err != nil {
+			if guard, err = untrusted.Snapshot(dir, "origin/"+b.Base); err != nil {
 				return api.Session{}, err
+			}
+			if _, err = guard.Restore(); err != nil { // the run starts on the base's settings, not the PR's
+				return api.Session{}, fmt.Errorf("local: put the base settings in place: %w", err)
 			}
 		}
 	}
