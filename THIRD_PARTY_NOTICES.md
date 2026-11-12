@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## e2b-dev/E2B@3e72be3
+
+Source: https://github.com/e2b-dev/E2B (Apache-2.0). Licence text: https://www.apache.org/licenses/LICENSE-2.0. The Go port keeps the rationale and the character rule, not the code.
+
+- `pkg/sandbox/egress/names.go` from `packages/js-sdk/src/sandbox/iam.ts` (`validateIamTokenName`) [upstream has no test for it; `pkg/sandbox/egress/secrets_test.go` has one row per clause of its doc comment]
