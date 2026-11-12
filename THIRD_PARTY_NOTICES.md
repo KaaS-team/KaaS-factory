@@ -90,3 +90,12 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## coder/agentapi@7c468d5
+
+Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technologies, Inc.)
+
+- `internal/dispatch/local/input/ringbuffer.go` from `lib/screentracker/ringbuffer.go` [no upstream test; `internal/dispatch/local/input/gate_test.go`]
+
+The bracketed-paste framing, the SIGINT-then-kill close and the stability gate are written after
+`lib/httpapi/claude.go`, `lib/termexec/termexec.go` and `lib/screentracker` and copy none of their code.
