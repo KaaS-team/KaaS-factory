@@ -19,6 +19,7 @@ import (
 	"github.com/KaaS-team/factory/internal/initwiz"
 	"github.com/KaaS-team/factory/internal/logs"
 	"github.com/KaaS-team/factory/internal/mcp"
+	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/packs"
 	"github.com/KaaS-team/factory/internal/plancmd"
 	"github.com/KaaS-team/factory/internal/report"
@@ -67,7 +68,11 @@ func mountClients(root *cobra.Command) {
 		if err != nil {
 			return nil, err
 		}
-		return report.StoreSource{Store: st}, nil
+		src := report.StoreSource{Store: st}
+		if tr, err := planTracker(); err == nil {
+			src.Ledger = meter.Ledger{Thread: tr}
+		}
+		return src, nil
 	})))
 	root.AddCommand(initwiz.NewCommand(), plancmd.NewCommand(
 		plancmd.WithSpecFunc(plancmd.LocalSpec("claude", ".")),
