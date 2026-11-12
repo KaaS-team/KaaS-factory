@@ -6,6 +6,7 @@ require (
 	charm.land/huh/v2 v2.0.3
 	github.com/a2aproject/a2a-go/v2 v2.8.0
 	github.com/beevik/etree v1.8.1
+	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/chromedp/cdproto v0.159.0
 	github.com/chromedp/chromedp v0.23.0
 	github.com/crewjam/saml v0.6.3

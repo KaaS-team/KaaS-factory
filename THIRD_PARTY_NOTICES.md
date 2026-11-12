@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## continuedev/continue@5522c6f
+
+Source: https://github.com/continuedev/continue (Apache-2.0, Copyright 2023 Continue Dev, Inc.). Logic was ported to Go and rewritten, not pasted; the prompt scope rules are reworded.
+
+- `internal/packs/checkmd/pack.go` from `core/llm/rules/getSystemMessageWithRules.ts` (glob, regex and colocation applicability) [tested by `internal/packs/checkmd/pack_test.go`]
