@@ -30,7 +30,7 @@ func (m *memSink) OnSpanEnd(s trace.Span) { m.spans = append(m.spans, s) }
 // Acceptance: gate spans carry a triggered flag.
 func TestRunGateSpansCarryTriggered(t *testing.T) {
 	m := &memSink{}
-	if _, err := Run(context.Background(), matrix4(), gateDeps{}, WithSink(m)); err != nil {
+	if _, err := RunArm(context.Background(), matrix4(), gateDeps{}, Arm{Sink: m}); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]bool{"f/1 base-green": false, "f/2 base-green": true, "f/3 hidden": true, "f/1 hidden": false}

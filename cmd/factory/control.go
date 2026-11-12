@@ -119,7 +119,7 @@ var dispatchers = map[string]func(context.Context, config.Config) (api.Dispatche
 		}
 		root := filepath.Join(repo, ".factory", "worktrees")
 		cfg := local.Config{Worktrees: local.GitWorktrees{Repo: repo, Root: root}, MaxConcurrent: c.Slots,
-			Sandbox: c.Sandbox && canJail(sandbox.Probe()), Writable: []string{filepath.Join(repo, ".git")}}
+			Sandbox: c.Sandbox && canJail(sandbox.Probe()), GitDir: filepath.Join(repo, ".git")}
 		if c.Tracker == "github" { // a pull request's author is only known on GitHub
 			g, err := newGitHubConn(c)
 			if err != nil {

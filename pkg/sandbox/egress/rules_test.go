@@ -39,6 +39,11 @@ func TestNetworkAllowed(t *testing.T) {
 		{"allow cidr beats deny all", Network{AllowOut: []string{"1.2.3.0/24"}, DenyOut: []string{"0.0.0.0/0"}}, "h.example", ips("1.2.3.4"), true},
 		{"one denied ip denies the host", Network{DenyOut: []string{"10.0.0.0/8"}}, "h.example", ips("1.1.1.1", "10.0.0.1"), false},
 		{"ip literal host is checked as an ip", Network{DenyOut: []string{"10.0.0.0/8"}}, "10.9.9.9", nil, false},
+		{"allow cidr never opens a private ip", Network{AllowOut: []string{"10.0.0.0/8"}}, "h.example", ips("10.1.2.3"), false},
+		{"allow ip never opens metadata", Network{AllowOut: []string{"169.254.169.254"}}, "169.254.169.254", nil, false},
+		{"allow domain never opens loopback", Network{AllowOut: []string{"ok.com"}}, "ok.com", ips("127.0.0.1"), false},
+		{"one private answer refuses the host", Network{AllowOut: []string{"ok.com"}}, "ok.com", ips("1.2.3.4", "192.168.0.1"), false},
+		{"no rules still refuse loopback", Network{}, "localhost", ips("::1"), false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -70,6 +75,24 @@ func TestNetworkValidate(t *testing.T) {
 				t.Fatalf("Validate() = %v, wantErr %v", err, c.wantErr)
 			}
 		})
+	}
+}
+
+func TestNonPublic(t *testing.T) {
+	for _, a := range []string{"127.0.0.1", "127.9.9.9", "10.0.0.1", "172.16.0.1", "192.168.1.1", "169.254.169.254",
+		"169.254.0.1", "100.64.0.1", "0.0.0.0", "0.1.2.3", "255.255.255.255", "224.0.0.1", "::", "::1", "fe80::1",
+		"fd00::1", "fc00::1", "ff02::1", "::ffff:10.0.0.1", "::ffff:169.254.169.254", "64:ff9b::7f00:1"} {
+		if !NonPublic(net.ParseIP(a)) {
+			t.Errorf("%s counted as public", a)
+		}
+	}
+	for _, a := range []string{"1.1.1.1", "140.82.112.5", "203.0.113.9", "100.128.0.1", "2606:4700::1111", "64:ff9b::808:808"} {
+		if NonPublic(net.ParseIP(a)) {
+			t.Errorf("%s counted as non-public", a)
+		}
+	}
+	if !NonPublic(nil) {
+		t.Error("nil ip counted as public")
 	}
 }
 

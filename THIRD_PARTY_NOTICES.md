@@ -364,3 +364,29 @@ Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangC
 Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangChain, Inc.). Design and constants only, ported from Python to Go.
 
 - `internal/graph/interrupt/interrupt.go` from `libs/langgraph/langgraph/types.py` (Interrupt, interrupt) [tested by `internal/graph/interrupt/interrupt_test.go`]
+
+## SWE-agent/mini-swe-agent@04d809c
+
+Source: https://github.com/SWE-agent/mini-swe-agent (MIT, Copyright (c) 2025 Kilian A. Lieret and Carlos E. Jimenez). The licence text is the MIT text above.
+
+- `internal/eval/bare.go` from `src/minisweagent/agents/default.py` and the submission sentinel of `environments/local.py` [tested by `internal/eval/bare_test.go`]
+
+## sst/opencode@a1aa513f78c7e9c57ea6c1237de09b702e18f934
+
+Source: https://github.com/sst/opencode (MIT, Copyright (c) 2025 opencode)
+
+- `internal/dispatch/local/auth.go` from `packages/server/src/auth.ts` [tests in `internal/dispatch/local/auth_test.go`]
+
+## sst/opencode@a1aa513
+
+Source: https://github.com/sst/opencode (MIT, Copyright (c) 2025 opencode). Ported to Go by hand.
+
+- `internal/dispatch/local/rules.go` from `packages/core/src/permission.ts` (evaluate, Unattended) and `packages/core/src/util/wildcard.ts` [tested by `internal/dispatch/local/rules_test.go`]
+
+## UKGovernmentBEIS/inspect_ai@26f6d05
+
+Source: https://github.com/UKGovernmentBEIS/inspect_ai (MIT, Copyright (c) 2024 UK AI Security Institute). The MIT permission notice is the same text as in "License text (both projects)" above.
+
+- `internal/eval/cascade.go` from `src/inspect_ai/scorer/_cascade.py` [tested by `internal/eval/cascade_test.go`, cases from `tests/scorer/test_cascade.py`]
+- `internal/eval/wilson.go` from `src/inspect_ai/scorer/_metrics/std.py` (`ci_wilson`, without clustering) [tested by `internal/eval/wilson_test.go`, values from `tests/scorer/test_metric.py`]
+- `internal/eval/epochs.go` from `src/inspect_ai/scorer/_reducer/reducer.py` (mean, max, pass_at, at_least) [tested by `internal/eval/epochs_test.go`]

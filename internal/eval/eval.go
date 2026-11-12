@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,6 +40,12 @@ type Fixture struct {
 	Gate    string          `json:"gate,omitempty"` // command that says main is green after a ticket
 	Tickets []FixtureTicket `json:"tickets"`
 	Hidden  string          `json:"hidden"`
+	// Scorers are commands run cheapest first through HiddenTest; the first to pass decides.
+	// Empty means just Hidden.
+	Scorers []string `json:"scorers,omitempty"`
+	Epochs  int      `json:"epochs,omitempty"`  // runs per ticket, 0 means 1
+	Reducer string   `json:"reducer,omitempty"` // mean (default), max, pass_at_k or at_least_k
+	K       int      `json:"k,omitempty"`       // for pass_at_k and at_least_k
 }
 
 // Matrix is the set of fixtures one eval run covers.
@@ -49,10 +56,13 @@ type Matrix struct {
 // Outcome is what a dispatcher run reports for one ticket: absolute usage
 // updates as they arrived (Symphony §13.5), attempts, wall time and human touches.
 type Outcome struct {
-	Attempts     int
-	Updates      []api.Usage
-	Wall         time.Duration
-	HumanTouches int
+	Attempts     int           `json:"attempts"`
+	Updates      []api.Usage   `json:"updates,omitempty"`
+	Wall         time.Duration `json:"wall"`
+	HumanTouches int           `json:"human_touches"`
+	Malformed    int           `json:"malformed,omitempty"`   // replies or edits that could not be parsed
+	Output       string        `json:"output,omitempty"`      // what the agent produced, kept so --replay can re-score it
+	ExitStatus   string        `json:"exit_status,omitempty"` // control arm exit_status
 }
 
 // Deps are the injected collaborators; tests pass fakes, never a model.
@@ -78,6 +88,21 @@ type TicketResult struct {
 	WallTime     time.Duration `json:"wall_time"`
 	Attempts     int           `json:"attempts"`
 	HumanTouches int           `json:"human_touches"`
+	Arm          string        `json:"arm,omitempty"`
+	Agent        string        `json:"agent,omitempty"`
+	Format       string        `json:"format,omitempty"`
+	PassedOn     int           `json:"passed_on,omitempty"` // first try that merged, 0 when none did
+	Malformed    int           `json:"malformed_count,omitempty"`
+	ExitStatus   string        `json:"exit_status,omitempty"`
+	// Epochs holds each run's score; Reduced is the Fixture's reducer applied to them.
+	Epochs  []EpochResult `json:"epochs"`
+	Reduced float64       `json:"reduced_score"`
+}
+
+// EpochResult is one run of a ticket: its score and the scorer stage that decided it.
+type EpochResult struct {
+	Score     float64 `json:"score"`
+	DecidedBy string  `json:"decided_by,omitempty"`
 }
 
 // Aggregate is the summary the pack upgrade loop compares.
@@ -99,7 +124,9 @@ type Scorecard struct {
 	Workflow  string         `json:"workflow,omitempty"`
 	Agent     string         `json:"agent,omitempty"` // preset name, never a model name
 	Packs     string         `json:"packs,omitempty"` // sha256 of the lock file the run used
+	Tries     int            `json:"tries,omitempty"`
 	Tickets   []TicketResult `json:"tickets"`
+	Cells     []Cell         `json:"cells,omitempty"`
 	Aggregate Aggregate      `json:"aggregate"`
 }
 
@@ -121,53 +148,72 @@ func maxCost(updates []api.Usage) float64 {
 	return c
 }
 
-// RunOption configures Run.
-type RunOption func(*runOptions)
-
-type runOptions struct{ sink trace.Sink }
-
-// WithSink records one trace per ticket: an agent span, a generation span with token counts and a
-// gate span for the base gate and one for the hidden test, each flagged triggered when it failed.
-func WithSink(s trace.Sink) RunOption { return func(o *runOptions) { o.sink = s } }
-
-// Run executes every ticket of every fixture and returns the scorecard.
-func Run(ctx context.Context, m Matrix, d Deps, opts ...RunOption) (Scorecard, error) {
-	var ro runOptions
-	for _, f := range opts {
-		f(&ro)
+// runTicket runs one ticket for the fixture's epochs. Each epoch is scored by a cascade of the
+// fixture's scorers; the reducer folds the epoch scores. The ticket passes at PassThreshold,
+// and base is green only when it was after every epoch. Usage and wall time add up over epochs.
+func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps, sink trace.Sink) (TicketResult, []Outcome, error) {
+	if f.Epochs < 0 {
+		return TicketResult{}, nil, fmt.Errorf("fixture %s: epochs %d is negative", f.Name, f.Epochs)
 	}
-	sc := Scorecard{Schema: SchemaV1}
-	for _, f := range m.Fixtures {
-		for _, ft := range f.Tickets {
-			if err := ctx.Err(); err != nil {
-				return sc, err
-			}
-			t := ft.Ticket
-			o, err := d.Dispatch(ctx, t)
-			if err != nil {
-				return sc, fmt.Errorf("dispatch %s/%s: %w", f.Name, t.ID, err)
-			}
-			green, err := d.Gate(ctx, t)
-			if err != nil {
-				return sc, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
-			}
-			pass, err := d.HiddenTest(ctx, t, f.Hidden)
-			if err != nil {
-				return sc, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
-			}
-			in, out := AbsoluteTotals(o.Updates)
-			if ro.sink != nil {
-				recordTicket(ro.sink, f.Name, t.ID, o, in, out, green, pass)
-			}
-			sc.Tickets = append(sc.Tickets, TicketResult{
-				Fixture: f.Name, Ticket: t.ID, HiddenPass: pass, BaseGreen: green, Merged: pass && green,
-				InputTokens: in, OutputTokens: out, CostUSD: maxCost(o.Updates),
-				WallTime: o.Wall, Attempts: o.Attempts, HumanTouches: o.HumanTouches,
-			})
+	epochs := max(f.Epochs, 1)
+	red, err := ParseReducer(f.Reducer, f.K, epochs)
+	if err != nil {
+		return TicketResult{}, nil, fmt.Errorf("fixture %s: %w", f.Name, err)
+	}
+	cmds := f.Scorers
+	if len(cmds) == 0 {
+		cmds = []string{f.Hidden}
+	}
+	r := TicketResult{Fixture: f.Name, Ticket: t.ID, BaseGreen: true}
+	var scores []float64
+	var outs []Outcome
+	for range epochs {
+		o, err := d.Dispatch(ctx, t)
+		if err != nil {
+			return r, outs, fmt.Errorf("dispatch %s/%s: %w", f.Name, t.ID, err)
 		}
+		green, err := d.Gate(ctx, t)
+		if err != nil {
+			return r, outs, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
+		}
+		stages := make([]Stage, len(cmds))
+		for i, c := range cmds {
+			stages[i] = Stage{Name: c, Score: func(ctx context.Context) (float64, bool, error) {
+				ok, err := d.HiddenTest(ctx, t, c)
+				if err != nil {
+					return 0, false, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
+				}
+				if ok {
+					return 1, true, nil
+				}
+				return 0, true, nil
+			}}
+		}
+		dec, err := Cascade(ctx, 1, stages)
+		if err != nil {
+			return r, outs, err
+		}
+		outs = append(outs, o)
+		in, out := AbsoluteTotals(o.Updates)
+		if sink != nil {
+			recordTicket(sink, f.Name, t.ID, o, in, out, green, dec.Value >= PassThreshold)
+		}
+		r.InputTokens += in
+		r.OutputTokens += out
+		r.CostUSD += maxCost(o.Updates)
+		r.WallTime += o.Wall
+		r.Attempts += o.Attempts
+		r.HumanTouches += o.HumanTouches
+		r.BaseGreen = r.BaseGreen && green
+		r.Epochs = append(r.Epochs, EpochResult{Score: dec.Value, DecidedBy: dec.DecidedBy})
+		scores = append(scores, dec.Value)
 	}
-	sc.Aggregate = aggregate(sc.Tickets)
-	return sc, nil
+	if r.Reduced = red.Reduce(scores); math.IsNaN(r.Reduced) {
+		r.Reduced = 0
+	}
+	r.HiddenPass = r.Reduced >= PassThreshold
+	r.Merged = r.HiddenPass && r.BaseGreen
+	return r, outs, nil
 }
 
 func aggregate(rs []TicketResult) Aggregate {
@@ -281,13 +327,23 @@ func Markdown(sc Scorecard, customer bool) string {
 	if !customer && (sc.Workflow != "" || sc.Agent != "") {
 		fmt.Fprintf(&b, "Workflow: %s\n\nAgent: %s\n\n", sc.Workflow, sc.Agent)
 	}
-	fmt.Fprintf(&b, "- Pass rate: %.2f (%d of %d)\n", a.PassRate, a.Merged, a.Total)
+	fmt.Fprintf(&b, "- Pass rate: %.2f (%d of %d)", a.PassRate, a.Merged, a.Total)
+	if lo, hi, err := Wilson(float64(a.Merged), a.Total, 0.95); err == nil && a.Total > 0 {
+		fmt.Fprintf(&b, ", 95%% Wilson interval %.2f to %.2f", lo, hi)
+	}
+	b.WriteString("\n")
 	fmt.Fprintf(&b, "- Main green rate: %.2f\n", a.MainGreenRate)
 	if !customer {
 		fmt.Fprintf(&b, "- Tokens per merged PR: %d\n", a.TokensPerMergedPR)
 	}
 	fmt.Fprintf(&b, "- Median wall time: %s\n", a.MedianWallTime)
 	fmt.Fprintf(&b, "- Human touches per PR: %.2f\n\n", a.HumanTouchesPerPR)
+	b.WriteString(cellTable(sc.Cells, customer))
+	for _, r := range sc.Tickets {
+		if len(r.Epochs) > 1 {
+			fmt.Fprintf(&b, "- %s/%s: reduced score %.2f over %d epochs\n", r.Fixture, r.Ticket, r.Reduced, len(r.Epochs))
+		}
+	}
 	if customer {
 		b.WriteString("| Fixture | Ticket | Passed | Base green | Attempts |\n|---|---|---|---|---|\n")
 		for _, r := range sc.Tickets {
@@ -323,6 +379,36 @@ func LoadMatrix(dir string) (Matrix, error) {
 		m.Fixtures = append(m.Fixtures, f)
 	}
 	return m, nil
+}
+
+// cellTable renders one row per cell, so control and preset sit side by side per fixture.
+func cellTable(cs []Cell, customer bool) string {
+	if len(cs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("| Cell | Tickets | Pass rate by try | Malformed |")
+	if !customer {
+		b.WriteString(" Cost |")
+	}
+	b.WriteString("\n|---|---|---|---|")
+	if !customer {
+		b.WriteString("---|")
+	}
+	b.WriteString("\n")
+	for _, c := range cs {
+		var rs []string
+		for _, r := range c.PassRates {
+			rs = append(rs, fmt.Sprintf("%.2f", r))
+		}
+		fmt.Fprintf(&b, "| %s | %d | %s | %d |", c.Key(), c.Tickets, strings.Join(rs, " / "), c.Malformed)
+		if !customer {
+			fmt.Fprintf(&b, " %.4f |", c.CostUSD)
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	return b.String()
 }
 
 // recordTicket emits the trace of one ticket. Times are not set: the trace is a record of

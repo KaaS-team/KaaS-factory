@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -79,9 +78,10 @@ type Config struct {
 	MaxConcurrent int
 	Now           func() time.Time
 	// Sandbox runs each agent under pkg/sandbox: reads anywhere, writes only in its worktree,
-	// Writable and the agent's own state under the home directory.
-	Sandbox  bool
-	Writable []string
+	// the temp dir, the shared git objects, refs and logs plus its own worktree metadata
+	// under GitDir (never hooks or config), and a per-session Claude config dir.
+	Sandbox bool
+	GitDir  string
 	// CloseTimeout is how long Cancel waits after SIGINT before it kills; default 5 seconds.
 	CloseTimeout time.Duration
 	// Clock times the steer gate and the close wait; default the real clock.
@@ -259,13 +259,30 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	}
 
 	runCtx, cancel := context.WithCancel(d.ctx)
-	cmd, err := d.command(runCtx, argv, dir, childEnv(d.cfg.Environ, preset.Env))
+	env := childEnv(d.cfg.Environ, preset.Env)
+	var cfgDir string
+	if d.cfg.Sandbox {
+		if cfgDir, err = sessionConfigDir(); err != nil {
+			cancel()
+			return api.Session{}, err
+		}
+		env = append(env, "CLAUDE_CONFIG_DIR="+cfgDir)
+	}
+	// The dir holds a copy of the operator's login: it goes when the session ends, and on every
+	// way out of Dispatch before the session's goroutine owns it.
+	started := false
+	defer func() {
+		if !started && cfgDir != "" {
+			_ = os.RemoveAll(cfgDir)
+		}
+	}()
+	cmd, err := d.command(runCtx, argv, dir, b.Branch, env, cfgDir)
 	if err != nil {
 		cancel()
 		return api.Session{}, err
 	}
-	ownGroup(cmd)
-	cmd.Cancel = func() error { return killGroup(cmd) }
+	sandbox.OwnGroup(cmd)
+	cmd.Cancel = func() error { return sandbox.KillGroup(cmd) }
 	cmd.WaitDelay = 2 * time.Second
 	out, err := cmd.StdoutPipe()
 	if err != nil {
@@ -289,6 +306,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	}
 	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now(), q: q}
 	d.runs[key] = p
+	started = true
 	var capGuard *autosubmit.Guard
 	if d.cfg.Autosubmit != nil {
 		capGuard = d.cfg.Autosubmit.Guard()
@@ -305,15 +323,15 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 				restoreErr = rerr
 			}
 		}
-		for sc.Scan() {
+		// After an abort the loop stops reading instead of draining to EOF: a child forked while
+		// the group kill landed can escape it and hold the pipe open. Wait returns once the
+		// killed leader exits, and the sandbox.KillGroup below reaps whatever is left.
+		for stuckErr == nil && sc.Scan() {
 			p.usage.feed(sc.Bytes())
 			// The agent CLI re-reads its settings while it runs, so put them back at most once a second.
 			if guard != nil && d.cfg.Clock.Since(lastRestore) >= time.Second {
 				lastRestore = d.cfg.Clock.Now()
 				restore()
-			}
-			if stuckErr != nil {
-				continue // drain until the kill lands
 			}
 			switch v := loop.Feed(sc.Bytes()); v.Kind {
 			case stuck.Nudge:
@@ -330,12 +348,15 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			}
 		}
 		p.err = exitErr(cmd.Wait(), cmd.ProcessState, stuckErr)
-		_ = killGroup(cmd) // anything the agent left behind
+		_ = sandbox.KillGroup(cmd) // anything the agent left behind
 		if guard != nil {
 			restore()
 			if restoreErr != nil && p.err == nil {
 				p.err = fmt.Errorf("local: restore after untrusted session: %w", restoreErr)
 			}
+		}
+		if cfgDir != "" {
+			_ = os.RemoveAll(cfgDir)
 		}
 		p.end = d.cfg.Now()
 		if capGuard != nil && d.ctx.Err() == nil && !p.canceled.Load() && (breach != "" || p.err != nil) {
@@ -365,17 +386,13 @@ func exitErr(waitErr error, ps *os.ProcessState, stuckErr error) error {
 
 // command builds the agent process. With Sandbox set it is the jail helper, which applies the
 // restrictions and then execs argv with env as its whole environment.
-func (d *Dispatcher) command(ctx context.Context, argv []string, dir string, env []string) (*exec.Cmd, error) {
+func (d *Dispatcher) command(ctx context.Context, argv []string, dir, branch string, env []string, cfgDir string) (*exec.Cmd, error) {
 	if !d.cfg.Sandbox {
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		cmd.Dir, cmd.Env = dir, env
 		return cmd, nil
 	}
-	rw := append([]string{os.TempDir()}, d.cfg.Writable...)
-	if home, err := os.UserHomeDir(); err == nil {
-		rw = append(rw, filepath.Join(home, ".claude"), filepath.Join(home, ".claude.json"))
-	}
-	return sandbox.Command(ctx, sandbox.Spec{Workdir: dir, ReadOnly: []string{"/"}, ReadWrite: rw, AllowNet: true, Env: env}, argv[0], argv[1:]...)
+	return sandbox.Command(ctx, sandbox.Spec{Workdir: dir, ReadOnly: []string{"/"}, ReadWrite: writablePaths(d.cfg.GitDir, dir, branch, cfgDir), AllowNet: true, Env: env}, argv[0], argv[1:]...)
 }
 
 // Wait blocks until the session's process has exited. It returns the exit

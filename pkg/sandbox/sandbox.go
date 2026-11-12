@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 )
 
 // helperEnv names the variable that carries the jail request to the helper.
@@ -32,12 +33,15 @@ type Spec struct {
 	AllowNet bool
 	// AllowHosts is recorded in the report only; no host filtering is enforced.
 	AllowHosts []string
-	// MaxMemBytes is RLIMIT_AS; zero means no limit.
-	MaxMemBytes uint64
-	// MaxCPUSeconds is RLIMIT_CPU; zero means no limit.
-	MaxCPUSeconds uint64
-	// MaxProcs is RLIMIT_NPROC; zero means no limit.
-	MaxProcs uint64
+	// Backend selects the isolation: "" or "jail" for the helper below, "runsc" for gVisor
+	// when a pinned runsc is installed; otherwise the jail runs.
+	Backend string
+	// Baseline is the session's rlimit layer; every process in the jail inherits it.
+	Baseline Limits
+	// Exec overrides Baseline by name for this one command; zero lifts a baseline limit.
+	Exec Limits
+	// Policy bounds the session lifetime; Command stops the child at MaxDuration.
+	Policy Policy
 	// Env is the only environment the child receives, as KEY=value entries.
 	Env []string
 }
@@ -65,6 +69,13 @@ type request struct {
 // Command returns a command that runs name with args under the jail described by spec.
 // The command re-executes the current binary, whose main must call MaybeEnter first.
 func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec.Cmd, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+	return commandFor(ctx, spec, DefaultRunscPin, name, args...)
+}
+
+func jailCommand(ctx context.Context, spec Spec, name string, args ...string) (*exec.Cmd, error) {
 	path, err := exec.LookPath(name)
 	if err != nil {
 		return nil, fmt.Errorf("sandbox: %w", err)
@@ -79,6 +90,9 @@ func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec
 	}
 	cmd := exec.CommandContext(ctx, self)
 	cmd.Dir = spec.Workdir
+	OwnGroup(cmd)
+	cmd.Cancel = func() error { return KillGroup(cmd) }
+	cmd.WaitDelay = 2 * time.Second
 	cmd.Env = []string{helperEnv + "=" + string(payload)}
 	return cmd, nil
 }
