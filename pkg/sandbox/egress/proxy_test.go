@@ -197,6 +197,33 @@ func TestProxyAllowOutWinsOverDeny(t *testing.T) {
 	}
 }
 
+// SSRF: an allow entry never opens a non-public address. The name is allowed by
+// domain, by wildcard or by CIDR, and resolves into loopback, a private range or
+// the cloud metadata service; the proxy refuses before dialing.
+func TestProxyAllowOutNeverReachesNonPublicAddresses(t *testing.T) {
+	allows := map[string]Network{
+		"domain":   {AllowOut: []string{"internal.example", "api.github.com"}},
+		"wildcard": {AllowOut: []string{"*.example", "*.github.com"}},
+		"cidr":     {AllowOut: []string{"0.0.0.0/0", "::/0"}},
+	}
+	targets := []string{"https://internal.example/", "https://api.github.com/", "http://internal.example/"}
+	for name, n := range allows {
+		for _, ip := range []string{"169.254.169.254", "127.0.0.1", "10.0.0.5", "192.168.1.1", "100.64.0.1", "::1", "fd00::1", "::ffff:127.0.0.1", "64:ff9b::a9fe:a9fe"} {
+			for _, target := range targets {
+				t.Run(name+"/"+ip+"/"+target, func(t *testing.T) {
+					r := newRig(t, n, ip)
+					if code, _, err := r.get(t, target, ""); err == nil && code != 403 {
+						t.Fatalf("want refusal, got %d", code)
+					}
+					if d := r.dials.Load(); d != 0 {
+						t.Fatalf("dialed %d times", d)
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestCALeafCoversTheHost(t *testing.T) {
 	ca, err := NewCA()
 	if err != nil {
