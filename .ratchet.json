@@ -1,5 +1,5 @@
 {
-  "go_lines": 35284,
-  "deadcode": 303,
-  "reason": "raised by the reviewed merges of go/k8-sanitize, m3-graph-resume and the m1-f2 landing of go/k8-spend-cap, go/k8-untrusted-pr, go/k6-plan-files, go/k8-agent-token and go/k8-lockfile (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 36885,
+  "deadcode": 326,
+  "reason": "raised by the reviewed m1-fix2 merges of go/k4-sandbox-harden-fix, go/k5-eval-arms-fix, go/fix-egress-ssrf, go/k5-local-auth, go/k5-preset-rules, go/k5-sandbox-runsc, go/k5-sandbox-lifecycle, go/k5-sandbox-limits, go/k6-approval, go/k10-eval-scorer and, earlier, of go/k8-sanitize, m3-graph-resume and the m1-f2 landing of go/k8-spend-cap, go/k8-untrusted-pr, go/k6-plan-files, go/k8-agent-token and go/k8-lockfile (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
