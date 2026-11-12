@@ -27,7 +27,7 @@ func MakePlan(spec Spec, caps Capabilities) Plan {
 		p.DenyNet = !spec.AllowNet
 	}
 	if caps.Rlimits {
-		p.Rlimits = limitSet(spec)
+		p.Rlimits = mergeLimits(spec.Baseline, spec.Exec)
 	}
 	return p
 }

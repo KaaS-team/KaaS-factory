@@ -1,8 +1,6 @@
 package sandbox
 
 import (
-	"fmt"
-	"slices"
 	"sync"
 	"time"
 )
@@ -66,41 +64,4 @@ func (a *Activity) Snapshot() (time.Time, int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.last, a.fg
-}
-
-// limitNames is the whitelist of rlimit names a Spec may set.
-var limitNames = []string{"as", "core", "cpu", "data", "fsize", "nofile", "nproc", "stack"}
-
-// ValidateLimits fails on a rlimit name outside the whitelist, so a typo stops the session at start.
-func ValidateLimits(s Spec) error {
-	for _, m := range []map[string]uint64{s.Limits, s.ExecLimits} {
-		for name := range m {
-			if !slices.Contains(limitNames, name) {
-				return fmt.Errorf("sandbox: unknown rlimit %q (allowed: %v)", name, limitNames)
-			}
-		}
-	}
-	return nil
-}
-
-// limitSet merges the legacy fields, the baseline and the per-exec override, last one wins.
-func limitSet(s Spec) []Rlimit {
-	m := map[string]uint64{}
-	for name, v := range map[string]uint64{"as": s.MaxMemBytes, "cpu": s.MaxCPUSeconds, "nproc": s.MaxProcs} {
-		if v > 0 {
-			m[name] = v
-		}
-	}
-	for _, layer := range []map[string]uint64{s.Limits, s.ExecLimits} {
-		for name, v := range layer {
-			m[name] = v
-		}
-	}
-	var out []Rlimit
-	for _, name := range limitNames {
-		if v, ok := m[name]; ok {
-			out = append(out, Rlimit{name, v})
-		}
-	}
-	return out
 }

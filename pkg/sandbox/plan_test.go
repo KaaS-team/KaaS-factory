@@ -17,15 +17,15 @@ func TestMakePlan(t *testing.T) {
 		wantLimits []Rlimit
 		wantLines  []string
 	}{
-		{"full host, all limits", Spec{Workdir: "/w", MaxMemBytes: 1, MaxCPUSeconds: 2, MaxProcs: 3}, full, true, true,
+		{"full host, all limits", Spec{Workdir: "/w", Baseline: Limits{"as": 1, "cpu": 2, "nproc": 3}}, full, true, true,
 			[]Rlimit{{"as", 1}, {"cpu", 2}, {"nproc", 3}},
 			[]string{"landlock: enforced (abi 5)", "rlimits: applied", "network: denied"}},
 		{"net allowed", Spec{Workdir: "/w", AllowNet: true, AllowHosts: []string{"a.example"}}, full, true, false, nil,
 			[]string{"landlock: enforced (abi 5)", "rlimits: applied", "network: allowed", "allow-hosts: recorded only (a.example)"}},
-		{"no landlock still applies rlimits", Spec{MaxMemBytes: 9}, Capabilities{Rlimits: true}, false, false,
+		{"no landlock still applies rlimits", Spec{Baseline: Limits{"as": 9}}, Capabilities{Rlimits: true}, false, false,
 			[]Rlimit{{"as", 9}},
 			[]string{"landlock: unavailable", "rlimits: applied", "network: denied"}},
-		{"nothing available", Spec{MaxMemBytes: 9}, Capabilities{}, false, false, nil,
+		{"nothing available", Spec{Baseline: Limits{"as": 9}}, Capabilities{}, false, false, nil,
 			[]string{"landlock: unavailable", "rlimits: unavailable", "network: denied"}},
 	}
 	for _, tt := range tests {

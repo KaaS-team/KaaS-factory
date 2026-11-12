@@ -261,8 +261,8 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		cancel()
 		return api.Session{}, err
 	}
-	ownGroup(cmd)
-	cmd.Cancel = func() error { return killGroup(cmd) }
+	sandbox.OwnGroup(cmd)
+	cmd.Cancel = func() error { return sandbox.KillGroup(cmd) }
 	cmd.WaitDelay = 2 * time.Second
 	out, err := cmd.StdoutPipe()
 	if err != nil {
@@ -300,7 +300,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		}
 		// After an abort the loop stops reading instead of draining to EOF: a child forked while
 		// the group kill landed can escape it and hold the pipe open. Wait returns once the
-		// killed leader exits, and the killGroup below reaps whatever is left.
+		// killed leader exits, and the sandbox.KillGroup below reaps whatever is left.
 		for stuckErr == nil && sc.Scan() {
 			p.usage.feed(sc.Bytes())
 			// The agent CLI re-reads its settings while it runs, so put them back at most once a second.
@@ -320,7 +320,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		if stuckErr != nil {
 			p.err = stuckErr
 		}
-		_ = killGroup(cmd) // anything the agent left behind
+		_ = sandbox.KillGroup(cmd) // anything the agent left behind
 		if guard != nil {
 			restore()
 			if restoreErr != nil && p.err == nil {

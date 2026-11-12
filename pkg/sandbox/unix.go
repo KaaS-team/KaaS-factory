@@ -9,25 +9,8 @@ import (
 
 func applyRlimits(limits []Rlimit) error {
 	for _, l := range limits {
-		var res int
-		switch l.Name {
-		case "as":
-			res = syscall.RLIMIT_AS
-		case "cpu":
-			res = syscall.RLIMIT_CPU
-		case "nproc":
-			res = rlimitNproc
-		case "core":
-			res = syscall.RLIMIT_CORE
-		case "data":
-			res = syscall.RLIMIT_DATA
-		case "fsize":
-			res = syscall.RLIMIT_FSIZE
-		case "nofile":
-			res = syscall.RLIMIT_NOFILE
-		case "stack":
-			res = syscall.RLIMIT_STACK
-		default:
+		res, ok := resource(l.Name)
+		if !ok {
 			return fmt.Errorf("sandbox: unknown rlimit %q", l.Name)
 		}
 		v := l.Value
@@ -36,4 +19,12 @@ func applyRlimits(limits []Rlimit) error {
 		}
 	}
 	return nil
+}
+
+// resource maps a whitelisted rlimit name to this OS's resource number.
+func resource(name string) (int, bool) {
+	r, ok := map[string]int{"as": syscall.RLIMIT_AS, "core": syscall.RLIMIT_CORE, "cpu": syscall.RLIMIT_CPU,
+		"data": syscall.RLIMIT_DATA, "fsize": syscall.RLIMIT_FSIZE, "nofile": syscall.RLIMIT_NOFILE,
+		"nproc": rlimitNproc, "stack": syscall.RLIMIT_STACK}[name]
+	return r, ok
 }
