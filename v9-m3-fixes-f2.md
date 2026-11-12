@@ -18,7 +18,7 @@ You fix four defects a merge reviewer found on `next` of KaaS-team/KaaS-factory 
 
 `git fetch -q origin && git checkout -q -B next origin/next`, then fix each defect test-first, one commit each. `go test -race -count=3` on touched packages, `go run ./tools/ratchet`, then `./gate.sh` once. Push with `git push origin HEAD:next`. On a rejection: `git fetch -q origin && git merge origin/next` (no rebase), `go build ./... && go vet ./...` plus the touched packages' tests, push again, up to 6 tries. Run `./gate.sh` once more after the last push and quote it.
 
-Commit trailers: end every commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+Commit trailer: end every commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. This trailer is required and is the one allowed exception to the no-model-name rule, which covers commit subjects, bodies and files.
 
 ## Quality bar (a reviewer reads your report against this)
 

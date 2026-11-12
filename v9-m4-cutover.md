@@ -32,7 +32,7 @@ You do the cutover of KaaS-team/KaaS-factory branch `next` to Go only: delete th
 - Never `SKIP_GATE`, never force-push, never `--no-verify`. Do not edit `.github/`.
 - No `ANTHROPIC_*` or other provider key anywhere. No model name, token count or cost in a commit or file. No session URL or `Claude-Session:` trailer.
 - Do not open PRs, comment on issues, delete branches or tags, or touch `main`.
-- Commit trailer: end every commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Commit trailer: end every commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. This trailer is required and is the one allowed exception to the no-model-name rule.
 
 ## When you finish
 
