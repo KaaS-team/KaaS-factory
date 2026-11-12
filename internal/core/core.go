@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/graph"
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/observe"
@@ -371,7 +372,7 @@ func (c *Core) openPR(ctx context.Context, o api.Observation) api.Observation {
 	return o
 }
 
-// chatops applies the retry and cancel commands trusted humans wrote in the threads of tracked and
+// chatops applies the retry, cancel, approve and revise commands trusted humans wrote in the threads of tracked and
 // parked tickets. A command is acknowledged before it runs, so a failure cannot run it twice.
 func (c *Core) chatops(ctx context.Context) {
 	cm, ok := c.d.Tracker.(observe.Commander)
@@ -404,6 +405,10 @@ func (c *Core) chatops(ctx context.Context) {
 				err = c.retry(ctx, id)
 			case observe.VerbCancel:
 				err = c.cancel(ctx, id)
+			case observe.VerbApprove:
+				err = c.resume(ctx, id, graph.Pass, "")
+			case observe.VerbRevise:
+				err = c.resume(ctx, id, graph.Revise, cmd.Text)
 			}
 			c.report(err)
 		}

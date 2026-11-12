@@ -33,6 +33,9 @@ func (l loopDispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session,
 	if err != nil {
 		return s, err
 	}
+	if st := l.c.stages[b.Ticket]; st != nil {
+		st.input = "" // the feedback is delivered
+	}
 	l.c.sessions[b.Ticket] = s
 	l.c.attempts[b.Ticket] = max(l.c.attempts[b.Ticket], b.Attempt)
 	delete(l.c.warned, b.Ticket)
