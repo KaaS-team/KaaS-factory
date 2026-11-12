@@ -124,7 +124,7 @@ func TestScorecardRoundTripAndCustomerView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc.Model = "model-x"
+	sc.Agent = "agent-x"
 	raw, err := json.Marshal(sc)
 	if err != nil {
 		t.Fatal(err)
@@ -138,12 +138,12 @@ func TestScorecardRoundTripAndCustomerView(t *testing.T) {
 		t.Fatal("round trip differs")
 	}
 	cust := strings.ToLower(Markdown(sc, true))
-	for _, bad := range []string{"model-x", "model", "cost", "usd", "$", "token"} {
+	for _, bad := range []string{"agent-x", "model", "cost", "usd", "$", "token"} {
 		if strings.Contains(cust, bad) {
 			t.Fatalf("customer view contains %q:\n%s", bad, cust)
 		}
 	}
-	if op := Markdown(sc, false); !strings.Contains(op, "model-x") || !strings.Contains(op, "Tokens per merged PR") {
+	if op := Markdown(sc, false); !strings.Contains(op, "agent-x") || !strings.Contains(op, "Tokens per merged PR") {
 		t.Fatalf("operator view lacks detail:\n%s", op)
 	}
 }
