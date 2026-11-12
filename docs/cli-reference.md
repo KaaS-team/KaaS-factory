@@ -8,6 +8,16 @@ Generated from the command tree. Do not edit by hand.
 
 Plan work into tickets and run them on parallel coding-agent sessions
 
+## factory a2a
+
+`factory a2a [flags]`
+
+Serve the factory as an A2A agent
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--addr` | string | `127.0.0.1:8787` | listen address |
+
 ## factory add
 
 `factory add <repo>#<path>[@ref] [flags]`
@@ -24,6 +34,17 @@ Pin a file from a GitHub repository (MIT or Apache-2.0 only) in factory.lock
 `factory board`
 
 Open the terminal board
+
+## factory browsercheck
+
+`factory browsercheck [flags]`
+
+Run browser steps in headless Chrome and print one FACTORY_GATES line
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--out` | string | `.factory/browser-out` | directory for screenshots |
+| `--steps` | string | `.factory/browser-steps.yaml` | YAML file of browser steps |
 
 ## factory cancel
 
@@ -155,6 +176,22 @@ Print each lock entry
 | `--json` | bool | `false` | print JSON |
 | `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
 
+## factory packs upgrade
+
+`factory packs upgrade [flags]`
+
+Bump pinned packs to their newest upstream when the eval says it is not worse
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--baseline` | string | `` | scorecard JSON of the pinned version |
+| `--cache` | string | `` | directory for cached bare repositories (default: factory-packs under the system temp dir) |
+| `--candidate` | string | `` | scorecard JSON of the new version |
+| `--dir` | string | `.` | directory holding factory.lock |
+| `--dry-run` | bool | `false` | report what would change and write nothing |
+| `--remote` | string | `https://github.com` | base URL packs are cloned from |
+| `--tolerance` | float64 | `0.05` | largest allowed rise in tokens per merged PR, as a fraction |
+
 ## factory packs verify
 
 `factory packs verify [flags]`
@@ -214,6 +251,17 @@ Run the factory; --headless streams one JSON event per line
 | `--headless` | bool | `false` | print one api.Event JSON object per line and nothing else on stdout |
 | `--slots` | int | `0` | number of parallel slots (overrides config) |
 
+## factory serve
+
+`factory serve [flags]`
+
+Run the factory loop as a service with /healthz, /readyz and /events
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--addr` | string | `127.0.0.1:8787` | address for /healthz, /readyz and /events |
+| `--drain` | duration | `30s` | how long to wait for the tick in flight on SIGTERM |
+
 ## factory shadow
 
 `factory shadow [flags]`
@@ -244,17 +292,11 @@ Send a message to a ticket's running session
 
 `factory upgrade [flags]`
 
-Bump pinned packs to their newest upstream when the eval says it is not worse
+Replace this binary with the latest factory release
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--baseline` | string | `` | scorecard JSON of the pinned version |
-| `--cache` | string | `` | directory for cached bare repositories (default: factory-packs under the system temp dir) |
-| `--candidate` | string | `` | scorecard JSON of the new version |
-| `--dir` | string | `.` | directory holding factory.lock |
-| `--dry-run` | bool | `false` | report what would change and write nothing |
-| `--remote` | string | `https://github.com` | base URL packs are cloned from |
-| `--tolerance` | float64 | `0.05` | largest allowed rise in tokens per merged PR, as a fraction |
+| `--check` | bool | `false` | report whether a newer release exists and change nothing |
 
 ## factory version
 

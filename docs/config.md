@@ -36,5 +36,9 @@ Keys under `models.` are open: any tier name takes a string.
 | `auto_merge_max_risk` | risk | `"low"` | lower layers may pick a risk at or below the org's |
 | `requester_cannot_approve` | bool | `true` | when the org sets true, lower layers cannot set false |
 | `shadow` | bool | `false` | when the org sets true the value is true; lower layers cannot turn it off |
+| `sandbox` | bool | `true` | any layer may set it |
 | `trust.min_role` | role | `"write"` | the org value is a floor; lower layers may only pick a role at or above it |
 | `trust.allow` | list | `[]` | any layer may set it |
+| `github_app.id` | int | `0` | any layer may set it |
+| `github_app.installation_id` | int | `0` | any layer may set it |
+| `github_app.key_file` | string | `""` | any layer may set it |

@@ -41,6 +41,9 @@ func NewCommand(open DepsFunc) *cobra.Command {
 				return err
 			}
 			deps.Token = token
+			if deps.URL == "" {
+				deps.URL = "http://" + addr
+			}
 			srv := &http.Server{Addr: addr, Handler: NewHandler(deps), ReadHeaderTimeout: 10 * time.Second}
 			go func() {
 				<-ctx.Done()

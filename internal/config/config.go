@@ -23,6 +23,14 @@ type Trust struct {
 	Allow   []string `key:"allow"`
 }
 
+// GitHubApp names a GitHub App installation the factory acts as. ID zero means no app: a token
+// from the environment is used. KeyFile is a path to the PEM private key, never the key.
+type GitHubApp struct {
+	ID             int    `key:"id"`
+	InstallationID int    `key:"installation_id"`
+	KeyFile        string `key:"key_file"`
+}
+
 // Config is the resolved runner configuration. The key tags are the paths used in
 // .factory/factory.yaml, in FACTORY_* variable names and in flag names.
 type Config struct {
@@ -52,7 +60,9 @@ type Config struct {
 	AutoMergeMaxRisk       string            `key:"auto_merge_max_risk"`
 	RequesterCannotApprove bool              `key:"requester_cannot_approve"`
 	Shadow                 bool              `key:"shadow"`
+	Sandbox                bool              `key:"sandbox"`
 	Trust                  Trust             `key:"trust"`
+	GitHubApp              GitHubApp         `key:"github_app"`
 }
 
 // field finds the struct field a key path names. For "models.<tier>" it returns the map and the tier.

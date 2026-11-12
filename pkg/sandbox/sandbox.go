@@ -108,9 +108,6 @@ type Report struct {
 	Lines []string
 }
 
-// String joins the report lines with newlines.
-func (r Report) String() string { return strings.Join(r.Lines, "\n") }
-
 // Has reports whether the report contains the exact line.
 func (r Report) Has(line string) bool { return slices.Contains(r.Lines, line) }
 

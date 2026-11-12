@@ -47,6 +47,10 @@ var layerRows = []layerRow{
 	{key: "auto_merge_max_risk", hi: "high", lo: "medium"},
 	{key: "requester_cannot_approve", hi: "false", lo: "true"},
 	{key: "shadow", hi: "true", lo: "false", clamped: true},
+	{key: "sandbox", hi: "false", lo: "true"},
+	{key: "github_app.id", hi: "7", lo: "3"},
+	{key: "github_app.installation_id", hi: "70", lo: "30"},
+	{key: "github_app.key_file", hi: "/k/hi.pem", lo: "/k/lo.pem"},
 	{key: "trust.min_role", hi: "maintain", lo: "triage", clamped: true},
 	{key: "trust.allow", hi: "[alice, bob]", lo: "[alice]", wantHi: "[alice bob]", wantLo: "[alice]"},
 }

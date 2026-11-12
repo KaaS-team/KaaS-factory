@@ -12,7 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/KaaS-team/factory/internal/a2a"
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/browsercheck"
 	"github.com/KaaS-team/factory/internal/dashboard"
 	"github.com/KaaS-team/factory/internal/dispatch/shadow"
 	"github.com/KaaS-team/factory/internal/eval"
@@ -24,10 +26,12 @@ import (
 	"github.com/KaaS-team/factory/internal/packs"
 	"github.com/KaaS-team/factory/internal/plancmd"
 	"github.com/KaaS-team/factory/internal/report"
+	"github.com/KaaS-team/factory/internal/selfupdate"
 	"github.com/KaaS-team/factory/internal/store"
 	"github.com/KaaS-team/factory/internal/tracker/github"
 	"github.com/KaaS-team/factory/internal/tui"
 	"github.com/KaaS-team/factory/internal/upgrade"
+	"github.com/KaaS-team/factory/pkg/sandbox"
 )
 
 // version is set at release time with -ldflags "-X main.version=...".
@@ -59,7 +63,7 @@ func mountClients(root *cobra.Command) {
 	attach(board, tui.WithControl)
 	dash := dashboard.NewCommand()
 	attach(dash, dashboard.WithControl)
-	root.AddCommand(board, dash, firstrun.NewCommand(), upgrade.NewCommand())
+	root.AddCommand(board, dash, firstrun.NewCommand(), upgrade.NewSelfCommand(version, selfupdate.GitHubSource{}, ""))
 	root.AddCommand(mcp.NewCommand(mcp.WithControl(func() (api.Control, mcp.Handlers, error) {
 		c, err := control(nil)
 		return c, mcp.Handlers{}, err
@@ -85,8 +89,15 @@ func mountClients(root *cobra.Command) {
 			return github.Epic(tr)(ctx, n)
 		}),
 		plancmd.WithFiler(lazyFiler{}),
-	), eval.NewCommand(), shadow.NewCommand(), packs.NewAddCommand(), packs.NewPacksCommand())
-	root.AddCommand(logs.NewCommand(logBackends()))
+	), eval.NewCommand(), shadow.NewCommand(), packs.NewAddCommand(), packsCommand())
+	root.AddCommand(logs.NewCommand(logBackends()), newServe(), a2a.NewCommand(a2aDeps), browsercheck.NewCommand())
+}
+
+// packsCommand is `factory packs`, with `packs upgrade` bumping pinned packs.
+func packsCommand() *cobra.Command {
+	c := packs.NewPacksCommand()
+	c.AddCommand(upgrade.NewCommand())
+	return c
 }
 
 // logBackends reads the session the run loop recorded for a ticket and its cloud run log.
@@ -163,6 +174,10 @@ func attach(cmd *cobra.Command, with func(context.Context, api.Control) context.
 }
 
 func main() {
+	if err := sandbox.MaybeEnter(); err != nil {
+		fmt.Fprintln(os.Stderr, "factory:", err)
+		os.Exit(1)
+	}
 	if err := newRoot().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "factory:", err)
 		os.Exit(1)
