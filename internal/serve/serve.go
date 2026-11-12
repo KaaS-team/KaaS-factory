@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -32,6 +33,9 @@ func (realClock) Now() time.Time { return time.Now() }
 type Options struct {
 	Interval time.Duration // the loop's tick interval; /healthz allows 3 of them since the last tick
 	Clock    Clock         // defaults to the wall clock
+	Jobs     *Jobs         // optional scheduled jobs; Serve drives them and needs Exec
+	JobsPath string        // when Jobs is nil, Serve opens the job database at this path
+	Exec     Executor      // runs one job run
 }
 
 // Server hosts a Core and serves /healthz, /readyz and /events.
@@ -43,6 +47,9 @@ type Server struct {
 	lastTick time.Time
 	ticked   bool
 	ready    atomic.Bool
+	jobs     *Jobs
+	jobsPath string
+	exec     Executor
 	onListen func(addr string) // test hook: called with the bound address
 }
 
@@ -54,7 +61,7 @@ func New(core Core, o Options) *Server {
 	if o.Clock == nil {
 		o.Clock = realClock{}
 	}
-	return &Server{core: core, interval: o.Interval, clock: o.Clock}
+	return &Server{core: core, interval: o.Interval, clock: o.Clock, jobs: o.Jobs, jobsPath: o.JobsPath, exec: o.Exec}
 }
 
 func (s *Server) markTick() {
@@ -69,6 +76,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/healthz", s.healthz)
 	mux.HandleFunc("/readyz", s.readyz)
 	mux.HandleFunc("/events", s.events)
+	mux.HandleFunc("POST /jobs/{id}/{action}", s.jobAction)
+	mux.HandleFunc("PUT /jobs/{id}/cron", s.jobCron)
+	mux.HandleFunc("PUT /jobs/{id}", s.jobAdd)
+	mux.HandleFunc("GET /jobs/{id}/runs", s.jobRuns)
 	return mux
 }
 
@@ -143,10 +154,35 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 	if s.onListen != nil {
 		s.onListen(ln.Addr().String())
 	}
+	if (s.jobs != nil || s.jobsPath != "") && s.exec == nil {
+		_ = ln.Close()
+		return errors.New("serve: jobs need an Exec")
+	}
+	if s.jobs == nil && s.jobsPath != "" {
+		j, err := OpenJobs(s.jobsPath, s.clock, func(f string, a ...any) { log.Printf(f, a...) })
+		if err != nil {
+			_ = ln.Close()
+			return err
+		}
+		defer func() { _ = j.Close() }()
+		s.jobs = j
+	}
 	ev, err := s.core.Events(ctx)
 	if err != nil {
 		_ = ln.Close()
 		return err
+	}
+	if s.jobs != nil {
+		jctx, stopJobs := context.WithCancel(ctx)
+		jobsDone := make(chan struct{})
+		go func() { defer close(jobsDone); s.jobs.Run(jctx, s.exec, s.interval) }()
+		defer func() {
+			stopJobs()
+			select {
+			case <-jobsDone:
+			case <-time.After(drain):
+			}
+		}()
 	}
 	go func() {
 		for e := range ev {

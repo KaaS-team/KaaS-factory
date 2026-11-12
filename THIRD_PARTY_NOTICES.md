@@ -121,3 +121,28 @@ Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026
 Source: https://github.com/SWE-agent/mini-swe-agent (MIT, Copyright (c) 2025 Kilian A. Lieret and Carlos E. Jimenez). The licence text is the MIT text above.
 
 - `internal/eval/bare.go` from `src/minisweagent/agents/default.py` and the submission sentinel of `environments/local.py` [tested by `internal/eval/bare_test.go`]
+
+## e2b-dev/E2B@3e72be3
+
+Source: https://github.com/e2b-dev/E2B (Apache-2.0). Licence text: https://www.apache.org/licenses/LICENSE-2.0. The Go port keeps the rationale and the character rule, not the code.
+
+- `pkg/sandbox/egress/names.go` from `packages/js-sdk/src/sandbox/iam.ts` (`validateIamTokenName`) [upstream has no test for it; `pkg/sandbox/egress/secrets_test.go` has one row per clause of its doc comment]
+
+## OpenHands/software-agent-sdk@10be259
+
+Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). The MIT permission notice above applies, with this copyright line in place of the one it carries.
+
+- `pkg/sandbox/egress/mask.go` from `openhands-sdk/openhands/sdk/conversation/secret_registry.py` (`StreamOutputMask`, `mask_secrets_in_output`) [tests ported in spirit from `tests/sdk/agent/test_stream_context.py`; fixtures in `pkg/sandbox/egress/mask_test.go`]
+## Aider-AI/aider@5dc9490
+
+Source: https://github.com/Aider-AI/aider (Apache-2.0, Copyright (c) Paul Gauthier). The ranking and budget search of `aider/repomap.py` are ported to Go; the tree-sitter `.scm` query files are not copied (they need CGO).
+
+- `internal/packs/repomap/tags.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+- `internal/packs/repomap/rank.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+- `internal/packs/repomap/budget.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+## ast-grep/ast-grep@c7e005c
+
+Source: https://github.com/ast-grep/ast-grep (MIT, Copyright (c) 2022 Herrington Darkholme). Only field lists and output formats were read; no Rust was ported. The release binary is pinned by checksum, not vendored.
+
+- `internal/packs/astgrep/astgrep.go` from `crates/cli/src/print/json_print.rs` [tested by `internal/packs/astgrep/astgrep_test.go`]
+- `internal/packs/astgrep/pack.go` from `crates/config/src/rule_config.rs` and `crates/cli/src/verify/reporter.rs` [tested by `internal/packs/astgrep/pack_test.go`]

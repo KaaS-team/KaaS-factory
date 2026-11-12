@@ -1,0 +1,7 @@
+id: no-todo
+language: TypeScript
+severity: hint
+message: A TODO is left in the code.
+rule:
+  kind: comment
+  regex: TODO
