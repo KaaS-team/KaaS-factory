@@ -211,12 +211,23 @@ func TestGitHubDepsAreReal(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "t")
 	t.Setenv("LINEAR_API_KEY", "t")
 	t.Chdir(t.TempDir())
+	live, err := buildDeps(config.Config{Tracker: "github", Repo: "acme/shop", Dispatcher: "local", Slots: 1, Base: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := live.Queue.(*mergeq.CoreQueue); !ok {
+		t.Errorf("github queue is %T, want *mergeq.CoreQueue", live.Queue)
+	}
 	d, err := buildDeps(config.Config{Tracker: "github", Repo: "acme/shop", Dispatcher: "local", Slots: 1, Shadow: true, Base: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := d.Queue.(*mergeq.CoreQueue); !ok {
-		t.Errorf("github queue is %T, want *mergeq.CoreQueue", d.Queue)
+	// Shadow mode must never merge: the real queue is wrapped and Run refuses.
+	if _, ok := d.Queue.(shadowQueue); !ok {
+		t.Errorf("shadow queue is %T, want shadowQueue", d.Queue)
+	}
+	if _, err := d.Queue.Run(context.Background()); err == nil || !strings.Contains(err.Error(), "shadow") {
+		t.Errorf("shadow queue Run = %v, want a shadow-mode refusal", err)
 	}
 	if _, ok := d.Dispatcher.(recorded); !ok || d.Dispatcher.Name() != "shadow:local" {
 		t.Errorf("dispatcher %T named %q, want recorded shadow:local", d.Dispatcher, d.Dispatcher.Name())

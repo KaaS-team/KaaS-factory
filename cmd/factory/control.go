@@ -253,6 +253,10 @@ func buildDeps(c config.Config) (core.Deps, error) {
 			return core.Deps{}, err
 		}
 	}
+	if c.Shadow {
+		// Shadow mode writes nothing to the repo: the queue lists entries but never merges.
+		queue = shadowQueue{queue}
+	}
 	b := func(usd float64) api.Budget { return api.Budget{USD: usd} }
 	return core.Deps{
 		Tracker: trk, Dispatcher: recorded{disp, st}, Observer: obs, Store: st,
@@ -283,6 +287,14 @@ func (notConfiguredQueue) Enqueue(context.Context, api.TicketID, int) error { re
 func (notConfiguredQueue) Queued(context.Context) ([]mergeq.Entry, error)   { return nil, nil }
 func (notConfiguredQueue) Run(context.Context) (mergeq.Report, error) {
 	return mergeq.Report{}, errors.New("merge queue is not configured in this build")
+}
+
+// shadowQueue reads the wrapped queue but refuses Run, so shadow mode never merges or pushes.
+type shadowQueue struct{ core.MergeQueue }
+
+func (shadowQueue) Enqueue(context.Context, api.TicketID, int) error { return nil }
+func (shadowQueue) Run(context.Context) (mergeq.Report, error) {
+	return mergeq.Report{}, errors.New("merge queue does not run in shadow mode")
 }
 
 // notConfiguredSource stands in for the observer source on trackers other than GitHub.
