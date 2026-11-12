@@ -1,7 +1,7 @@
 BRANCH: go/conformance
 HEAD: 42d8aedd29b881e7bd96ef728f474896d5f922bc
 ## Summary
-New package `internal/conformance`: 18 `Test17_` tests (plus 3 `Test17Mapping` structure tests) against reconcile, pick and the porttest fakes. `checklist.go` maps all 86 section 17 rows and 18 section 18.1 lines to a test or a reason. The package runs in about 1 second (fake clock). `just` is not installed here, so I ran its recipe bodies by hand (gofmt, vet, golangci-lint v2.13.2 on go1.26.7, `go test -race ./...`, static build).
+New package `internal/conformance`: 15 `Test17_` tests (plus 3 `Test17Mapping` structure tests) against reconcile, pick and the porttest fakes. `checklist.go` maps all 86 section 17 rows and 18 section 18.1 lines to a test or a reason. The package runs in about 1 second (fake clock). `just` is not installed here, so I ran its recipe bodies by hand (gofmt, vet, golangci-lint v2.13.2 on go1.26.7, `go test -race ./...`, static build).
 ## Acceptance
 - Every section 17 row is a test or not applicable with a reason -> `Rows17()` in checklist.go, checked by Test17MappingEveryItemHasATestOrAReason -> done (11 rows have tests, the rest are not applicable; see Notes in the table for partial coverage)
 - Mapping test fails when an item has no test -> Test17MappingEveryItemHasATestOrAReason, Test17MappingEveryTestIsMapped, Test17MappingCountsMatchSpec -> done. Shown failing once: pointing "Workspace manager" at Test17_9_Missing gave `18.1 "Workspace manager": maps to Test17_9_Missing, which does not exist`.
