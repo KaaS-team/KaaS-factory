@@ -12,13 +12,13 @@ import (
 var stepTypes = map[string]NodeKind{
 	"triage": KindAgent, "plan": KindAgent, "build": KindAgent, "verify": KindAgent, "pr": KindAgent,
 	"import-plan": KindAgent, "report": KindAgent, "agent": KindAgent,
-	"check": KindCheck, "human": KindHuman, "fanout": KindFanout,
+	"check": KindCheck, "transform": KindTransform, "human": KindHuman, "fanout": KindFanout,
 }
 
 var stepKeys = map[string]bool{
 	"uses": true, "label": true, "next": true, "reject": true, "revise": true, "run": true, "runtime": true,
 	"mcp": true, "needs": true, "approval": true, "gates": true, "after": true, "fresh_session": true,
-	"verify": true, "prompt": true, "tier": true, "budget": true, "skills": true,
+	"verify": true, "prompt": true, "tier": true, "budget": true, "skills": true, "rules": true,
 }
 
 // agentsDeprecated is the warning for the old top-level agents map, which is accepted for one more release.
@@ -41,6 +41,7 @@ type step struct {
 	FreshSession *bool     `yaml:"fresh_session"`
 	Verify       *bool     `yaml:"verify"`
 	Prompt       string    `yaml:"prompt"`
+	Rules        string    `yaml:"rules"`
 }
 
 // Load reads a workflow file: .yml or .yaml is the steps format, .md is stages or a Symphony WORKFLOW.md.
@@ -240,7 +241,7 @@ func (g *Graph) addStep(s namedStep, md bool, check func(string, int) error) err
 	if !ok {
 		return fmt.Errorf("step %s: unknown step type %q", s.id, s.Uses)
 	}
-	n := Node{ID: s.id, Kind: kind, Uses: s.Uses, Label: s.Label, Run: s.Run, Runtime: s.Runtime, Gates: s.Gates, MCP: s.MCP, Prompt: s.Prompt,
+	n := Node{ID: s.id, Kind: kind, Uses: s.Uses, Label: s.Label, Run: s.Run, Runtime: s.Runtime, Gates: s.Gates, MCP: s.MCP, Prompt: s.Prompt, Rules: s.Rules,
 		Tier: s.tier, Budget: s.budget, Skills: s.skills}
 	if kind != KindAgent {
 		for _, k := range []string{"tier", "budget", "skills"} {
@@ -257,6 +258,9 @@ func (g *Graph) addStep(s namedStep, md bool, check func(string, int) error) err
 	}
 	if kind != KindCheck && (s.Run != "" || s.Runtime != "") {
 		return fmt.Errorf("step %s: run and runtime belong on a check step", s.id)
+	}
+	if (kind == KindTransform) != (s.Rules != "") {
+		return fmt.Errorf("step %s: rules belongs on a transform step, which needs it", s.id)
 	}
 	if s.Verify != nil {
 		n.Verify = *s.Verify

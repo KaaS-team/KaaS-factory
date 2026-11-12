@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## ast-grep/ast-grep@c7e005c
+
+Source: https://github.com/ast-grep/ast-grep (MIT, Copyright (c) 2022 Herrington Darkholme). Only `schemas/rule.json` was used.
+
+- `internal/graph/rule.schema.json` from `schemas/rule.json`, unchanged, embedded by `internal/graph/transform.go` [tested by `internal/graph/transform_test.go`]
