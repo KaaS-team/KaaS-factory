@@ -15,7 +15,6 @@ import (
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/config"
 	"github.com/KaaS-team/factory/internal/core"
-	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/dispatch/local"
 	"github.com/KaaS-team/factory/internal/dispatch/shadow"
 	"github.com/KaaS-team/factory/internal/gitx"
@@ -118,19 +117,6 @@ func (c Config) client() (*gogithub.Client, error) {
 	}
 	gc.BaseURL = u
 	return gc, nil
-}
-
-// nameFixer gives the local dispatcher the brief file name it checks for. The reconcile loop names
-// a brief "<ticket>-a<n>.md" and the local dispatcher wants "v9-<ticket>-a<n>.md".
-type nameFixer struct{ api.Dispatcher }
-
-func (n nameFixer) Dispatch(ctx context.Context, b api.Brief) (api.Session, error) {
-	name, err := brief.Name(b.Ticket, b.Attempt)
-	if err != nil {
-		return api.Session{}, err
-	}
-	b.Name = name
-	return n.Dispatcher.Dispatch(ctx, b)
 }
 
 // shadowQueue lists the queue but never runs it, so a shadow run merges nothing.
@@ -246,7 +232,7 @@ func drive(ctx context.Context, cfg Config, gc *gogithub.Client, res Result, rec
 	if err != nil {
 		return err
 	}
-	var disp api.Dispatcher = nameFixer{ld}
+	var disp api.Dispatcher = ld
 	disp = shadow.Wrap(disp, config.Config{Shadow: cfg.Shadow}, rec)
 
 	st, err := store.Open(filepath.Join(cfg.Dir, "factory.db"))

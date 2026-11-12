@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/reconcile"
 )
 
@@ -56,8 +57,12 @@ func (c *Core) start(ctx context.Context, t api.Ticket, attempt int) (api.Sessio
 	if err := c.d.Tracker.SetPhase(ctx, t.ID, api.PhaseClaimed); err != nil {
 		return api.Session{}, err
 	}
+	name, err := brief.Name(t.ID, attempt)
+	if err != nil {
+		return api.Session{}, err
+	}
 	s, err := c.d.Dispatcher.Dispatch(ctx, api.Brief{
-		Ticket: t.ID, Attempt: attempt, Name: fmt.Sprintf("%s-a%d.md", t.ID, attempt),
+		Ticket: t.ID, Attempt: attempt, Name: name,
 		Text: t.Title + "\n\n" + t.Body, Repo: t.Repo, Base: c.cfg.Reconcile.Base,
 		Branch: fmt.Sprintf("factory/%s-a%d", t.ID, attempt), Workflow: t.Workflow, Budget: c.cfg.Budget,
 	})

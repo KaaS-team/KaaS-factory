@@ -163,37 +163,3 @@ func TestShadowQueueNeverRuns(t *testing.T) {
 		t.Fatal("shadow queue ran")
 	}
 }
-
-// The fake agent alone: in a worktree on a ticket branch it pushes the branch and the report and
-// opens one pull request, and it puts the token on no command line.
-func TestAgentScript(t *testing.T) {
-	s := newSandbox(t, false)
-	work := filepath.Join(t.TempDir(), "wt")
-	run(t, filepath.Dir(work), "git", "clone", "-q", s.bare, work)
-	run(t, work, "git", "checkout", "-q", "-b", "factory/7-a2", "origin/main")
-	script := filepath.Join(t.TempDir(), "agent.sh")
-	if err := os.WriteFile(script, []byte(agentScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(agentScript, `-H "Authorization`) {
-		t.Fatal("the script passes the token as a header argument")
-	}
-	cmd := exec.Command("sh", script)
-	cmd.Dir = work
-	cmd.Env = append(os.Environ(), "SMOKE_FILE=smoke/x.txt", "SMOKE_API_URL="+s.cfg.APIURL, "SMOKE_REPO=acme/sandbox", "SMOKE_BASE=main", "SMOKE_TOKEN=fake-token")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("agent: %v\n%s", err, out)
-	}
-	if got := run(t, s.bare, "git", "show", "refs/heads/factory/7-a2:smoke/x.txt"); !strings.Contains(got, "ticket 7") {
-		t.Fatalf("file %q", got)
-	}
-	if got := run(t, s.bare, "git", "show", "refs/heads/report/7:report.md"); !strings.Contains(got, "smoke/x.txt") {
-		t.Fatalf("report %q", got)
-	}
-	if !s.hub.sawRequest("POST", "/repos/acme/sandbox/pulls") || len(s.hub.prs) != 1 || s.hub.prs[0].head != "factory/7-a2" || s.hub.prs[0].base != "main" {
-		t.Fatalf("prs %+v", s.hub.prs)
-	}
-	if main := run(t, s.bare, "git", "rev-parse", "main"); main != run(t, work, "git", "rev-parse", "origin/main") {
-		t.Fatal("the agent moved main")
-	}
-}

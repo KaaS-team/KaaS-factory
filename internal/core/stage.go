@@ -70,7 +70,6 @@ func (c *Core) stageBrief(b api.Brief) (api.Brief, error) {
 	}
 	st.tier = c.tierFor(st, n)
 	b.Attempt += st.base
-	b.Name = fmt.Sprintf("%s-a%d.md", b.Ticket, b.Attempt)
 	b.Branch = fmt.Sprintf("factory/%s-a%d", b.Ticket, b.Attempt)
 	b.Workflow, b.Node, b.Model = st.g.Name, n.ID, st.tier
 	if n.Budget > 0 {
