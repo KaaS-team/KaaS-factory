@@ -398,6 +398,12 @@ Run the factory loop as a service with /healthz, /readyz and /events
 | `--addr` | string | `127.0.0.1:8787` | address for /healthz, /readyz and /events |
 | `--drain` | duration | `30s` | how long to wait for the tick in flight on SIGTERM |
 
+## factory serve token
+
+`factory serve token`
+
+Print a session token for the serve listener, signed from KAAS_SERVE_PASSWORD
+
 ## factory shadow
 
 `factory shadow [flags]`
