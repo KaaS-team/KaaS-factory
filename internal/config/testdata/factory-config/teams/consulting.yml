@@ -1,0 +1,13 @@
+name: consulting
+mission: Run the audit engine and keep the playbooks.
+repos: [KaaS-team/auditor, KaaS-team/playbooks]
+source:
+  kind: github
+  ready: "label:factory:ready"
+roles:
+  build:
+    harness: claude-cloud
+    model: sonnet
+policy:
+  auto_merge:
+    allowed: false

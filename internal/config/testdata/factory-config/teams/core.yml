@@ -1,0 +1,14 @@
+name: core
+mission: Build and harden the factory engine.
+repos: [KaaS-team/KaaS-factory, KaaS-team/factory-plugins, KaaS-team/factory-enterprise]
+source:
+  kind: github
+  ready: "label:factory:ready"
+roles:
+  build:
+    harness: claude-cloud
+    model: sonnet
+policy:
+  protected_paths: ["src/core/**"]
+  auto_merge:
+    max_risk: low

@@ -1,0 +1,13 @@
+name: standards
+mission: Keep the blueprint and its evals honest.
+repos: [KaaS-team/blueprint]
+source:
+  kind: github
+  ready: "label:factory:ready"
+roles:
+  build:
+    harness: claude-cloud
+    model: sonnet
+policy:
+  auto_merge:
+    max_risk: low
