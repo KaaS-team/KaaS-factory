@@ -11,6 +11,7 @@ import (
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/pick"
 	"github.com/KaaS-team/factory/internal/reconcile/eventlog"
+	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 )
 
 // Deps are the ports and hooks Tick uses. Now and OnError may be nil.
@@ -305,7 +306,7 @@ func dispatch(ctx context.Context, d Deps, s *State, a Action, now time.Time, cf
 	if err == nil {
 		sess, err = d.Dispatcher.Dispatch(ctx, api.Brief{
 			Ticket: t.ID, Attempt: a.Attempt, Name: name,
-			Text: t.Title + "\n\n" + t.Body, Repo: t.Repo, Base: cfg.Base,
+			Text: sanitize.Prompt(t.Title + "\n\n" + t.Body), Repo: t.Repo, Base: cfg.Base,
 			Branch: fmt.Sprintf("factory/%s-a%d", t.ID, a.Attempt), Workflow: t.Workflow,
 		})
 	}

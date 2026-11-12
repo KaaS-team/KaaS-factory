@@ -7,6 +7,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/tutor"
 )
 
@@ -33,7 +34,9 @@ type stageRun struct {
 	input   string // revise feedback for the next brief of this node
 }
 
-func (c *Core) stageOf(id api.TicketID, workflow string) (*stageRun, error) {
+// stageOf is the ticket's place in its graph: the one in memory, else the one its thread holds (a restart
+// lost the map), else the graph's first node.
+func (c *Core) stageOf(ctx context.Context, id api.TicketID, workflow string) (*stageRun, error) {
 	if st, ok := c.stages[id]; ok {
 		return st, nil
 	}
@@ -42,8 +45,33 @@ func (c *Core) stageOf(id api.TicketID, workflow string) (*stageRun, error) {
 		return nil, err
 	}
 	st := &stageRun{g: g, node: g.Start}
+	if p, ok := c.savedPosition(ctx, id); ok {
+		if _, known := g.Node(p.Node); known {
+			st.node, st.base, st.fails, st.pr, st.input = p.Node, p.Base, p.Fails, p.PR, p.Input
+		} else {
+			c.hub.emit(KindWarning, id, map[string]any{"reason": fmt.Sprintf("workflow %s has no node %q; starting at %s", g.Name, p.Node, g.Start)})
+		}
+	}
 	c.stages[id] = st
 	return st, nil
+}
+
+// savedPosition reads the position the ticket's thread holds; false when the tracker keeps none.
+func (c *Core) savedPosition(ctx context.Context, id api.TicketID) (observe.Position, bool) {
+	k, ok := c.d.Tracker.(observe.Positioner)
+	if !ok {
+		return observe.Position{}, false
+	}
+	p, found, err := k.LoadPosition(ctx, id)
+	c.report(err)
+	return p, found && err == nil
+}
+
+// savePosition writes the ticket's position to its thread, so a restart resumes at this node.
+func (c *Core) savePosition(ctx context.Context, id api.TicketID, st *stageRun) {
+	if k, ok := c.d.Tracker.(observe.Positioner); ok {
+		c.report(k.SavePosition(ctx, id, observe.Position{Node: st.node, Base: st.base, Fails: st.fails, PR: st.pr, Input: st.input}))
+	}
 }
 
 // tierFor is the node's pinned tier, else the tutor's pick; a verify node takes the review tier when the policy has one.
@@ -60,8 +88,8 @@ func (c *Core) tierFor(st *stageRun, n graph.Node) string {
 
 // stageBrief fits a brief the reconcile loop built to the ticket's current node: the node, its tier and
 // token budget, and an attempt number and branch no earlier node used.
-func (c *Core) stageBrief(b api.Brief) (api.Brief, error) {
-	st, err := c.stageOf(b.Ticket, b.Workflow)
+func (c *Core) stageBrief(ctx context.Context, b api.Brief) (api.Brief, error) {
+	st, err := c.stageOf(ctx, b.Ticket, b.Workflow)
 	if err != nil {
 		return b, err
 	}
@@ -133,6 +161,7 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 		c.escalate(ctx, id, "plan approval")
 		c.stages[id] = st // escalate forgets the stage; approve and revise need it
 	}
+	c.savePosition(ctx, id, st)
 	return true, nil
 }
 
@@ -155,6 +184,7 @@ func (c *Core) resume(ctx context.Context, id api.TicketID, outcome graph.Outcom
 	}
 	st.node, st.input = next, text
 	delete(c.parked, id)
+	c.savePosition(ctx, id, st)
 	return nil
 }
 

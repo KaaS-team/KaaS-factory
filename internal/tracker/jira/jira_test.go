@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/tracker/jira"
 	"github.com/KaaS-team/factory/internal/tracker/vendorkit"
 )
@@ -147,7 +148,7 @@ func TestCommentCarriesMarkers(t *testing.T) {
 	f := newFakeJira(t)
 	i := f.add(1, "Ready")
 	body := "plan ready\n<!-- factory:plan -->\n"
-	if err := newTracker(t, f, nil).Comment(context.Background(), "SHOP-1", body); err != nil {
+	if err := newTracker(t, f, nil).Comment(marker.Allow(context.Background()), "SHOP-1", body); err != nil {
 		t.Fatal(err)
 	}
 	want := vendorkit.EncodeBody(body, vendorkit.HMACSeal("me@example.com:test-token"), "comment")
@@ -358,5 +359,24 @@ func TestSpendCommentRoundTrip(t *testing.T) {
 	}
 	if err := tr.PutSpendComment(ctx, "SHOP-9", v1); err == nil {
 		t.Fatal("unknown issue should fail")
+	}
+}
+
+// Text posted without marker.Allow goes through the publication sanitizer: markers, mentions and
+// foreign URLs do not reach the tracker.
+func TestCommentSanitizesUntrustedText(t *testing.T) {
+	f := newFakeJira(t)
+	i := f.add(1, "Ready")
+	if err := newTracker(t, f, nil).Comment(context.Background(), "SHOP-1", "hi @octocat <!-- factory:plan --> https://evil.example.com/x"); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, p := range i.Comments[0]["body"].(map[string]any)["content"].([]any) {
+		if c, ok := p.(map[string]any)["content"].([]any); ok {
+			got = append(got, c[0].(map[string]any)["text"].(string))
+		}
+	}
+	if len(got) != 1 || got[0] != "hi `@octocat`  (evil.example.com/redacted)" {
+		t.Fatalf("stored %q", got)
 	}
 }

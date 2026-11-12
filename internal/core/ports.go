@@ -23,7 +23,7 @@ func (l loopDispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session,
 	}
 	if l.c.d.Stages != nil {
 		var err error
-		if b, err = l.c.stageBrief(b); err != nil {
+		if b, err = l.c.stageBrief(ctx, b); err != nil {
 			return api.Session{}, err
 		}
 	}
@@ -37,7 +37,10 @@ func (l loopDispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session,
 		return s, err
 	}
 	if st := l.c.stages[b.Ticket]; st != nil {
-		st.input = "" // the feedback is delivered
+		if st.input != "" {
+			st.input = "" // the feedback is delivered
+			l.c.savePosition(ctx, b.Ticket, st)
+		}
 	}
 	l.c.sessions[b.Ticket] = s
 	l.c.attempts[b.Ticket] = max(l.c.attempts[b.Ticket], b.Attempt)

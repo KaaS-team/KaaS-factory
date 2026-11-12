@@ -10,6 +10,7 @@ import (
 	"github.com/KaaS-team/factory/internal/meter"
 	spendcap "github.com/KaaS-team/factory/internal/meter/cap"
 	"github.com/KaaS-team/factory/internal/reconcile"
+	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 )
 
 // Board returns the whole orchestrator state: claimed tickets, ready ones and the merge queue.
@@ -80,7 +81,7 @@ func (c *Core) start(ctx context.Context, t api.Ticket, attempt int) (api.Sessio
 	}
 	s, err := c.d.Dispatcher.Dispatch(ctx, api.Brief{
 		Ticket: t.ID, Attempt: attempt, Name: name,
-		Text: t.Title + "\n\n" + t.Body, Repo: t.Repo, Base: c.cfg.Reconcile.Base,
+		Text: sanitize.Prompt(t.Title + "\n\n" + t.Body), Repo: t.Repo, Base: c.cfg.Reconcile.Base,
 		Branch: fmt.Sprintf("factory/%s-a%d", t.ID, attempt), Workflow: t.Workflow, Budget: c.cfg.Budget,
 	})
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 )
 
 // The verbs the loop acts on. Other `/factory` verbs belong to the plan stage.
@@ -47,4 +48,15 @@ type Recorder interface {
 // their threads for commands.
 type Parker interface {
 	Parked(ctx context.Context) ([]api.Ticket, error)
+}
+
+// Position is a ticket's place in its workflow graph.
+type Position = marker.Position
+
+// Positioner is the optional Tracker write and read that keep a ticket's workflow position in its
+// thread, so a restart resumes at the node the ticket had reached. Load reports false when the
+// thread holds none.
+type Positioner interface {
+	SavePosition(ctx context.Context, id api.TicketID, p Position) error
+	LoadPosition(ctx context.Context, id api.TicketID) (Position, bool, error)
 }

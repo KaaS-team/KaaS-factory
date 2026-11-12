@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -175,7 +176,7 @@ func (t *Tracker) Get(ctx context.Context, id api.TicketID) (api.Ticket, error) 
 	return t.ticket(is), nil
 }
 
-// Comment posts body on the issue thread with every `<!--` neutralised, unless ctx came from
+// Comment posts body on the issue thread through sanitize.Publication (which drops every `<!--`), unless ctx came from
 // marker.Allow: the caller then built body itself and its markers go out as written.
 func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) error {
 	n, err := number(id)
@@ -183,7 +184,7 @@ func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) err
 		return err
 	}
 	if !marker.Allowed(ctx) {
-		body = marker.Neutralise(body)
+		body = sanitize.Publication(body, sanitize.DefaultOptions())
 	}
 	if _, _, err := t.client.Issues.CreateComment(ctx, t.owner, t.repo, n, &gogithub.IssueComment{Body: &body}); err != nil {
 		return fmt.Errorf("github tracker: comment on %d: %w", n, err)

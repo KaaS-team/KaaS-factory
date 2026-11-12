@@ -223,6 +223,13 @@ Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technol
 
 - `internal/serve/hostguard/hostguard.go` from `lib/httpapi/server.go` (parseAllowedHosts, parseAllowedOrigins, hostAuthorizationMiddleware; huma and chi dropped) [tested by `internal/serve/hostguard/hostguard_test.go`]
 
+## github/gh-aw@741ff0c
+
+Source: https://github.com/github/gh-aw (MIT, Copyright GitHub, Inc.)
+
+- `internal/tracker/sanitize/publish.go` from `actions/setup/js/sanitize_content_core.cjs` [tested by `internal/tracker/sanitize/publish_test.go`]
+- `internal/tracker/sanitize/url.go` from `actions/setup/js/sanitize_content_core.cjs` [tested by `internal/tracker/sanitize/publish_test.go`]
+
 ## anthropics/claude-code-action@8a29bc6
 
 Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) 2025 Anthropic, PBC)
@@ -291,3 +298,11 @@ Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) Ant
 Source: https://github.com/dagger/dagger (Apache-2.0, Copyright Dagger, Inc. contributors).
 
 - `internal/packs/lock.go` from `util/lockfile/lockfile.go`: sorted, versioned JSON-lines lockfile with a commit-me header and merge-conflict detection. Namespaces, header text and entry shape changed; the v1 JSON `factory.lock` is still read. [tested by `internal/packs/lockfile_test.go`]
+
+## dagger/dagger@835b0ef
+
+Source: https://github.com/dagger/dagger (Apache-2.0, Copyright 2022 Dagger, Inc.). The licence text is `LICENSES/Apache-2.0.txt`. Dagger's NOTICE file reads: "This product includes software developed at Dagger, Inc. (https://www.dagger.io)."
+
+- `pkg/sandbox/cachevol/store.go` from `engine/cachevolumedir/store.go`, with the Dagger naming removed, a tenant field added to the identity, and the test hooks dropped [tested by `pkg/sandbox/cachevol/store_test.go`]
+
+- `internal/tracker/sanitize/prompt.go` from `src/github/utils/sanitizer.ts` [tested by `internal/tracker/sanitize/prompt_test.go`]
