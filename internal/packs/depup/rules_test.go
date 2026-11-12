@@ -37,6 +37,10 @@ func TestEvaluate(t *testing.T) {
 				{Update: scoped, Enabled: true, Automerge: true, Group: "types"},
 				{Update: lodash, Enabled: true},
 			}},
+		{"later group replaces earlier", []Rule{
+			{Match: Match{Packages: []string{"*"}}, GroupName: "all"},
+			{Match: Match{Packages: []string{"lodash"}}, GroupName: "js"},
+		}, []Update{lodash}, nil, []Decision{{Update: lodash, Enabled: true, Group: "js"}}},
 		{"non matching type", []Rule{{Match: Match{Types: []Type{Patch}}, Enabled: bp(false)}}, []Update{lodash}, nil,
 			[]Decision{{Update: lodash, Enabled: true}}},
 		{"collision with in flight", nil, []Update{lodash}, map[string]bool{"package.json:lodash:4.0.0": true},

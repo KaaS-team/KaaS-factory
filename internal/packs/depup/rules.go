@@ -4,6 +4,7 @@ package depup
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 )
@@ -31,6 +32,7 @@ const (
 type Update struct {
 	Package, File, Current, New string
 	Type                        Type
+	ReleasedAt                  time.Time
 }
 
 // Key is the collision key file:dep:current.

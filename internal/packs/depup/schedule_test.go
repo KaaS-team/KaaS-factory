@@ -72,7 +72,7 @@ func TestDecideOutcomes(t *testing.T) {
 	night, _ := ParseSchedule("* 0-5 * * *", "UTC")
 	day, _ := ParseSchedule("* 9-17 * * *", "UTC")
 	lim := Limits{Hourly: 2, Concurrent: 3}
-	other := api.Ticket{ID: "x", CreatedAt: now}
+	mk := func(id string) api.Ticket { return api.Ticket{ID: api.TicketID(id), CreatedAt: now} }
 	tests := []struct {
 		name   string
 		sched  Schedule
@@ -84,7 +84,7 @@ func TestDecideOutcomes(t *testing.T) {
 		{"hourly limit", night, []api.Ticket{dep("1", time.Minute, now), dep("2", 59*time.Minute, now)}, HourlyLimit},
 		{"old tickets do not count hourly", night, []api.Ticket{dep("1", 2*time.Hour, now), dep("2", 3*time.Hour, now)}, Run},
 		{"concurrent limit", night, []api.Ticket{dep("1", 2*time.Hour, now), dep("2", 3*time.Hour, now), dep("3", 4*time.Hour, now)}, ConcurrentLimit},
-		{"other tickets ignored", night, []api.Ticket{other, other, other}, Run},
+		{"other tickets ignored", night, []api.Ticket{mk("x"), mk("y"), mk("z"), mk("w")}, Run},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
