@@ -10,7 +10,7 @@ import (
 // NewCommand returns `browsercheck`, the command the browser check pack runs. It prints one
 // FACTORY_GATES line and exits non-zero when a step fails or Chrome is missing.
 func NewCommand() *cobra.Command {
-	var stepsFile, outDir string
+	var stepsFile, outDir, profile string
 	cmd := &cobra.Command{
 		Use:   "browsercheck",
 		Short: "Run browser steps in headless Chrome and print one FACTORY_GATES line",
@@ -24,7 +24,7 @@ func NewCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("browser: %s: %w", stepsFile, err)
 			}
-			res := Run(cmd.Context(), Options{Steps: steps, OutDir: outDir})
+			res := Run(cmd.Context(), Options{Steps: steps, OutDir: outDir, Profile: profile})
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), res.Line())
 			if res.Failed > 0 {
 				return fmt.Errorf("%s", res.Message)
@@ -34,5 +34,6 @@ func NewCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&stepsFile, "steps", ".factory/browser-steps.yaml", "YAML file of browser steps")
 	cmd.Flags().StringVar(&outDir, "out", ".factory/browser-out", "directory for screenshots")
+	cmd.Flags().StringVar(&profile, "profile", "", "Chrome user-data-dir whose Default profile is copied, without caches, for the run")
 	return cmd
 }

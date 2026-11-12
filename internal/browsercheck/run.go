@@ -33,6 +33,10 @@ type Options struct {
 	Steps  []Step
 	OutDir string                       // screenshots are written here
 	Look   func(string) (string, error) // finds a binary on PATH; os.LookPath when nil
+	// Profile is a Chrome user-data-dir whose Local State and Default profile are copied, without
+	// caches, into a temp dir for the run. Empty runs with a fresh profile.
+	Profile  string
+	TempRoot string // where the run's temp dir goes; os.TempDir() when empty
 }
 
 // Result is the outcome of one run.
@@ -53,6 +57,11 @@ func (r Result) Line() string {
 // Run executes the steps in headless Chrome and stops at the first failing step.
 // It fails, never passes, when Chrome is missing.
 func Run(ctx context.Context, o Options) Result {
+	root := o.TempRoot
+	if root == "" {
+		root = os.TempDir()
+	}
+	SweepStale(root, time.Now())
 	look := o.Look
 	if look == nil {
 		look = func(n string) (string, error) { return exec.LookPath(n) }
@@ -64,8 +73,18 @@ func Run(ctx context.Context, o Options) Result {
 	if err := os.MkdirAll(o.OutDir, 0o755); err != nil {
 		return Result{Failed: 1, Message: "browser: " + err.Error()}
 	}
+	dir, release, err := workDir(root)
+	if err != nil {
+		return Result{Failed: 1, Message: "browser: " + err.Error()}
+	}
+	defer release()
+	if o.Profile != "" {
+		if err := CopyProfile(o.Profile, "Default", dir); err != nil {
+			return Result{Failed: 1, Message: "browser: profile: " + err.Error()}
+		}
+	}
 	bctx, cancelCtx := chromedp.NewContext(ctx, chromedp.WithAllocatorOptions(append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.ExecPath(bin), chromedp.NoSandbox)...))
+		chromedp.ExecPath(bin), chromedp.NoSandbox, chromedp.UserDataDir(dir))...))
 	defer cancelCtx()
 
 	var mu sync.Mutex

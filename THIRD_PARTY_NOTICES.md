@@ -96,3 +96,4 @@ Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepl
 Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Gregor Zunic)
 
 - `internal/browsercheck/settle.go` from `browser_use/ax.py` (`settle`, `PROBE_JS` reduced to ready and idle)
+- `internal/browsercheck/profile.go` from `browser_use/browser/local.py` (`SKIP_COPY`, `copy_profile`, `_try_lock`, `sweep_stale_dirs`)

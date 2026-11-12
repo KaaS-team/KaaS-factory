@@ -44,6 +44,7 @@ Run browser steps in headless Chrome and print one FACTORY_GATES line
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--out` | string | `.factory/browser-out` | directory for screenshots |
+| `--profile` | string | `` | Chrome user-data-dir whose Default profile is copied, without caches, for the run |
 | `--steps` | string | `.factory/browser-steps.yaml` | YAML file of browser steps |
 
 ## factory cancel
