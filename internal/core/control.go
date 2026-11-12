@@ -204,3 +204,52 @@ func (c *Core) retry(ctx context.Context, id api.TicketID) error {
 	c.hub.emit(KindRetried, id, map[string]any{"attempt": attempt, "manual": true})
 	return nil
 }
+
+// ticketFiler is the optional Tracker write that files a ticket; the GitHub tracker has it.
+type ticketFiler interface {
+	Create(ctx context.Context, t api.Ticket) (api.TicketID, error)
+}
+
+// CreateTicket files a ticket through the tracker. A tracker that cannot file tickets refuses.
+func (c *Core) CreateTicket(ctx context.Context, title, body string) (api.TicketID, error) {
+	f, ok := c.d.Tracker.(ticketFiler)
+	if !ok {
+		return "", fmt.Errorf("tracker %s cannot create tickets", c.d.Tracker.Name())
+	}
+	id, err := f.Create(ctx, api.Ticket{Repo: c.cfg.Team, Title: title, Body: body})
+	if err != nil {
+		return "", err
+	}
+	c.hub.emit(KindCreated, id, map[string]any{"title": title})
+	return id, nil
+}
+
+// HandOff writes the hand-off into the ticket's thread, the one record every tracker has.
+func (c *Core) HandOff(ctx context.Context, id api.TicketID, to, note string) error {
+	body := "Handed off to " + to + "."
+	if note != "" {
+		body += "\n\n" + note
+	}
+	if err := c.d.Tracker.Comment(ctx, id, body); err != nil {
+		return err
+	}
+	c.hub.emit(KindHandedOff, id, map[string]any{"to": to})
+	return nil
+}
+
+// QueueFollowup writes the message into the ticket's thread, where the next attempt's brief reads it.
+func (c *Core) QueueFollowup(ctx context.Context, id api.TicketID, message string) error {
+	if err := c.d.Tracker.Comment(ctx, id, "Follow-up: "+message); err != nil {
+		return err
+	}
+	c.hub.emit(KindFollowup, id, map[string]any{"message": message})
+	return nil
+}
+
+// Repos lists the repository this factory works on.
+func (c *Core) Repos(context.Context) ([]string, error) {
+	if c.cfg.Team == "" {
+		return []string{}, nil
+	}
+	return []string{c.cfg.Team}, nil
+}

@@ -39,6 +39,12 @@ func (f *fakeControl) Retry(_ context.Context, id api.TicketID) error {
 	f.calls = append(f.calls, "retry "+string(id))
 	return nil
 }
+func (f *fakeControl) CreateTicket(context.Context, string, string) (api.TicketID, error) {
+	return "", nil
+}
+func (f *fakeControl) HandOff(context.Context, api.TicketID, string, string) error { return nil }
+func (f *fakeControl) QueueFollowup(context.Context, api.TicketID, string) error   { return nil }
+func (f *fakeControl) Repos(context.Context) ([]string, error)                     { return nil, nil }
 func (f *fakeControl) Events(context.Context) (<-chan api.Event, error) {
 	ch := make(chan api.Event, len(f.events))
 	for _, e := range f.events {

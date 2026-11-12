@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -566,5 +567,54 @@ func TestRestartReplaysStepLog(t *testing.T) {
 	}
 	if b, _ := c.Board(context.Background()); len(b.Slots) != 1 || b.Slots[0].Phase != api.PhaseRunning {
 		t.Fatalf("board %+v", b.Slots)
+	}
+}
+
+// filerTracker adds the optional ticket-filing write to the fake tracker.
+type filerTracker struct {
+	listTracker
+	filed []api.Ticket
+}
+
+func (f *filerTracker) Create(_ context.Context, t api.Ticket) (api.TicketID, error) {
+	f.filed = append(f.filed, t)
+	return "42", nil
+}
+
+func TestControlTicketWrites(t *testing.T) {
+	r := newRig(t, 1, meter.Budgets{}, tkt("a", 0))
+	ft := &filerTracker{listTracker: r.tr}
+	r.c.d.Tracker = ft
+	r.c.cfg.Team = "o/r"
+	get := collect(t, r.c)
+	ctx := context.Background()
+
+	id, err := r.c.CreateTicket(ctx, "new work", "details")
+	if err != nil || id != "42" || len(ft.filed) != 1 || ft.filed[0].Title != "new work" || ft.filed[0].Body != "details" || ft.filed[0].Repo != "o/r" {
+		t.Fatalf("create: id=%q err=%v filed=%+v", id, err, ft.filed)
+	}
+	if err := r.c.HandOff(ctx, "a", "bob", "context"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.c.QueueFollowup(ctx, "a", "also this"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := r.tr.Comments["a"], []string{"Handed off to bob.\n\ncontext", "Follow-up: also this"}; !eq(got, want) {
+		t.Fatalf("comments = %q, want %q", got, want)
+	}
+	if got, want := kinds(get()), []string{"created:42", "handed_off:a", "followup:a"}; !eq(got, want) {
+		t.Fatalf("events = %v, want %v", got, want)
+	}
+	repos, err := r.c.Repos(ctx)
+	if err != nil || len(repos) != 1 || repos[0] != "o/r" {
+		t.Fatalf("repos = %v err=%v", repos, err)
+	}
+}
+
+// A tracker with no Create write refuses, naming itself, and files nothing.
+func TestCreateTicketNeedsAFilingTracker(t *testing.T) {
+	r := newRig(t, 1, meter.Budgets{})
+	if _, err := r.c.CreateTicket(context.Background(), "x", ""); err == nil || !strings.Contains(err.Error(), "cannot create tickets") {
+		t.Fatalf("err = %v", err)
 	}
 }

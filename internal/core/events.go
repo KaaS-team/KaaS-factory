@@ -10,6 +10,12 @@ const (
 	KindDispatched = "dispatched"
 	// KindSteered is an operator Control.Steer reaching the session. Data: message.
 	KindSteered = "steered"
+	// KindCreated is an operator Control.CreateTicket filing a ticket. Data: title.
+	KindCreated = "created"
+	// KindHandedOff is an operator Control.HandOff. Data: to.
+	KindHandedOff = "handed_off"
+	// KindFollowup is an operator Control.QueueFollowup. Data: message.
+	KindFollowup = "followup"
 	// KindCanceled is an operator Control.Cancel. Data: attempt.
 	KindCanceled = "canceled"
 	// KindRetried is a new attempt, by an operator Control.Retry or by the loop
