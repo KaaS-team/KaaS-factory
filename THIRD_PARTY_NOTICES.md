@@ -115,3 +115,14 @@ Source: https://github.com/block/goose (Apache-2.0, Copyright Block, Inc.)
 Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors)
 
 - `internal/packs/triggers.go` from `openhands-sdk/openhands/sdk/skills/skill.py` (path glob, keyword match, trigger selection) [tested by `internal/packs/triggers_test.go`]
+## e2b-dev/E2B@3e72be3
+
+Source: https://github.com/e2b-dev/E2B (Apache-2.0). Licence text: https://www.apache.org/licenses/LICENSE-2.0. The Go port keeps the rationale and the character rule, not the code.
+
+- `pkg/sandbox/egress/names.go` from `packages/js-sdk/src/sandbox/iam.ts` (`validateIamTokenName`) [upstream has no test for it; `pkg/sandbox/egress/secrets_test.go` has one row per clause of its doc comment]
+
+## OpenHands/software-agent-sdk@10be259
+
+Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). The MIT permission notice above applies, with this copyright line in place of the one it carries.
+
+- `pkg/sandbox/egress/mask.go` from `openhands-sdk/openhands/sdk/conversation/secret_registry.py` (`StreamOutputMask`, `mask_secrets_in_output`) [tests ported in spirit from `tests/sdk/agent/test_stream_context.py`; fixtures in `pkg/sandbox/egress/mask_test.go`]
