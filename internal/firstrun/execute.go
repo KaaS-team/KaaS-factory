@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/eval/infra"
 )
 
 // notMeasured is written wherever an actual value is unknown. Zero would read as a real measurement.
@@ -24,8 +25,11 @@ type Exec struct {
 	PRs        PROpener
 	// Observer, when set, supplies the gate result; without it gates read "not measured".
 	Observer api.Observer
-	Repo     string
-	Base     string
+	// Log, when set, returns the session log. It is read only to word the pull request body: an
+	// environment failure is reported apart from a test failure and the run still counts.
+	Log  func(ctx context.Context, s api.Session) (string, error)
+	Repo string
+	Base string
 	// Branch overrides the default factory/<ticket>-a1 branch name.
 	Branch string
 	// Model and Agent go on the brief only, never into the pull request.
@@ -93,10 +97,6 @@ func Execute(ctx context.Context, r Report, e Exec) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("firstrun: dispatch %s: %w", ticket, err)
 	}
-	pr, err := e.PRs.OpenDraft(ctx, branch, e.Base, "Fix "+f.Finding.Title, prBody(*f))
-	if err != nil {
-		return Result{}, fmt.Errorf("firstrun: open draft pull request: %w", err)
-	}
 	sc := Scorecard{Finding: f.Finding.ID, EstimateTokens: f.Tokens, EstimateMinutes: f.Minutes}
 	if u, err := e.Dispatcher.Usage(ctx, s); err == nil {
 		if n := u.InputTokens + u.OutputTokens + u.CacheReadTokens + u.CacheWriteTokens; n > 0 {
@@ -111,6 +111,23 @@ func Execute(ctx context.Context, r Report, e Exec) (Result, error) {
 			sc.GatesGreen = o.ChecksGreen
 		}
 	}
+	var verdict string
+	if e.Log != nil {
+		if text, err := e.Log(ctx, s); err == nil {
+			c, ok := infra.Classify(text)
+			verdict = infra.Summary(c, ok)
+			if ok && c.Tier == infra.TierEnvironment {
+				sc.GatesGreen = nil
+			}
+		}
+	}
+	if sc.GatesGreen != nil && !*sc.GatesGreen {
+		verdict = joinLines("Tests failed: the gate was red.", verdict)
+	}
+	pr, err := e.PRs.OpenDraft(ctx, branch, e.Base, "Fix "+f.Finding.Title, prBody(*f, verdict))
+	if err != nil {
+		return Result{}, fmt.Errorf("firstrun: open draft pull request: %w", err)
+	}
 	return Result{Session: s, PR: pr, Scorecard: sc}, nil
 }
 
@@ -120,8 +137,18 @@ func briefText(f Row) string {
 }
 
 // prBody names the finding and the pack. It carries no estimate, count or model.
-func prBody(f Row) string {
+func prBody(f Row, verdict string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Fixes the auditor finding `%s` (%s) with the %s pack.\n\nOpened by `factory first-run` as a draft for review.\n", f.Finding.ID, loc(f.Finding), f.Pack)
+	if verdict != "" {
+		b.WriteString("\n" + verdict + "\n")
+	}
 	return b.String()
+}
+
+func joinLines(a, b string) string {
+	if b == "" {
+		return a
+	}
+	return a + "\n" + b
 }

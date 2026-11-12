@@ -158,3 +158,9 @@ this commit. The files below are ported to Go and changed from the originals.
 Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trigger.dev)
 
 - `internal/pick/fair.go` from `packages/redis-worker/src/fair-queue/schedulers/drr.ts` (algorithm only, in process, no Redis or Lua) [tested by `internal/pick/fair_test.go`]
+
+## SWE-bench/SWE-bench@02e7a74
+
+Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
+
+- `internal/eval/infra/infra.go` from `swebench/harness/infra_failure.py` [no upstream test]
