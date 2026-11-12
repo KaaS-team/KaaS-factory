@@ -1,5 +1,5 @@
 {
-  "go_lines": 32275,
-  "deadcode": 267,
-  "reason": "raised by the reviewed merge of go/k8-safe-outputs (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 33200,
+  "deadcode": 297,
+  "reason": "raised by the reviewed merge of go/k7-cachevol (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
