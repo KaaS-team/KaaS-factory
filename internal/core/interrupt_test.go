@@ -3,9 +3,11 @@ package core
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 
+	"github.com/KaaS-team/factory/internal/graph"
 	"github.com/KaaS-team/factory/internal/graph/interrupt"
 	gh "github.com/KaaS-team/factory/internal/tracker/github"
 	_ "modernc.org/sqlite"
@@ -53,5 +55,36 @@ func TestNewTakesInterruptsFromStore(t *testing.T) {
 	r, _, _ := parkedRig(t)
 	if r.c.d.Interrupts == nil {
 		t.Fatal("Deps.Interrupts was not filled from the store")
+	}
+}
+
+// An answer with no stored interrupt is refused: the schema check cannot run, so nothing advances.
+func TestAnswerWithNoPendingInterruptIsRefused(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "i.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	book, err := interrupt.Open(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, _, _ := parkedRigWith(t, book)
+	ctx := context.Background()
+	if _, err := db.Exec(`DELETE FROM interrupts`); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.c.resume(ctx, "5", graph.Pass, ""); !errors.Is(err, interrupt.ErrNothingPending) {
+		t.Fatalf("resume error = %v, want ErrNothingPending", err)
+	}
+	if !r.c.parked["5"] {
+		t.Fatal("the ticket left the parked state although the answer was refused")
+	}
+	r.c.Tick(ctx)
+	if _, ok := r.disp.Sessions["5-a2"]; ok {
+		t.Fatalf("the refused answer advanced the ticket: %v", r.disp.Sessions)
+	}
+	if err := r.c.answer(ctx, "5", "x", graph.Pass, ""); !errors.Is(err, interrupt.ErrNothingPending) {
+		t.Fatalf("answer error = %v, want ErrNothingPending", err)
 	}
 }

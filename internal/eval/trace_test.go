@@ -30,7 +30,7 @@ func (m *memSink) OnSpanEnd(s trace.Span) { m.spans = append(m.spans, s) }
 // Acceptance: gate spans carry a triggered flag.
 func TestRunGateSpansCarryTriggered(t *testing.T) {
 	m := &memSink{}
-	if _, err := Run(context.Background(), matrix4(), gateDeps{}, WithSink(m)); err != nil {
+	if _, err := RunArm(context.Background(), matrix4(), gateDeps{}, Arm{Sink: m}); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]bool{"f/1 base-green": false, "f/2 base-green": true, "f/3 hidden": true, "f/1 hidden": false}
@@ -86,5 +86,16 @@ func TestReplayRejectsBadFile(t *testing.T) {
 	var b bytes.Buffer
 	if err := Replay(&b, nil); err != nil || b.Len() != 0 {
 		t.Fatalf("empty replay: %v %q", err, b.String())
+	}
+}
+
+// Replay is exported, so a hand-built gate line with no Triggered flag must be an error, not a panic.
+func TestReplayRejectsGateSpanWithoutTriggered(t *testing.T) {
+	line := trace.Line{Event: trace.EventSpanEnd, Span: &trace.Span{TraceID: "t", Type: trace.SpanGate, Name: "g"}}
+	if err := Replay(&bytes.Buffer{}, []trace.Line{line}); err == nil {
+		t.Fatal("want an error for a nil Triggered")
+	}
+	if err := Replay(&bytes.Buffer{}, []trace.Line{{Event: trace.EventSpanEnd}}); err == nil {
+		t.Fatal("want an error for a missing span")
 	}
 }

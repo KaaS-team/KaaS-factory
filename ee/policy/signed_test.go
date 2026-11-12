@@ -19,7 +19,8 @@ func TestLoadSigned(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(nil)
 	otherPub, _, _ := ed25519.GenerateKey(nil)
 	sign := func(b string) string { return base64.StdEncoding.EncodeToString(ed25519.Sign(priv, []byte(b))) }
-	bad := "rules:\n  - id: a\n    effect: maybe\n    actions: [merge]\n  - id: b\n    effect: allow\n  - id: a\n    effect: deny\n    actions: [fly]\n"
+	fut := "expires_at: 2999-01-01T00:00:00Z\n"
+	bad := fut + "rules:\n  - id: a\n    effect: maybe\n    actions: [merge]\n  - id: b\n    effect: allow\n  - id: a\n    effect: deny\n    actions: [fly]\n"
 	cases := []struct {
 		name  string
 		body  string
@@ -27,13 +28,14 @@ func TestLoadSigned(t *testing.T) {
 		key   ed25519.PublicKey
 		wants []string // every substring the error must hold; nil for success
 	}{
-		{"valid", rules, ptr(sign(rules)), pub, nil},
-		{"missing signature", rules, nil, pub, []string{"signature file"}},
-		{"wrong key", rules, ptr(sign(rules)), otherPub, []string{"does not verify"}},
-		{"edited after signing", rules + "\n", ptr(sign(rules)), pub, []string{"does not verify"}},
+		{"valid", fut + rules, ptr(sign(fut + rules)), pub, nil},
+		{"no expires_at", rules, ptr(sign(rules)), pub, []string{"needs expires_at"}},
+		{"missing signature", fut + rules, nil, pub, []string{"signature file"}},
+		{"wrong key", fut + rules, ptr(sign(fut + rules)), otherPub, []string{"does not verify"}},
+		{"edited after signing", fut + rules + "\n", ptr(sign(fut + rules)), pub, []string{"does not verify"}},
 		{"expired", "expires_at: 2020-01-01T00:00:00Z\n" + rules, ptr(sign("expires_at: 2020-01-01T00:00:00Z\n" + rules)), pub, []string{"expired"}},
 		{"not yet expired", "expires_at: 2999-01-01T00:00:00Z\n" + rules, ptr(sign("expires_at: 2999-01-01T00:00:00Z\n" + rules)), pub, nil},
-		{"no key", rules, ptr(sign(rules)), nil, []string{"no public key"}},
+		{"no key", fut + rules, ptr(sign(fut + rules)), nil, []string{"no public key"}},
 		{"all bad rules listed", bad, ptr(sign(bad)), pub, []string{`"a": effect`, `"b": actions is required`, `duplicate rule id "a"`, `unknown action "fly"`}},
 	}
 	for _, c := range cases {

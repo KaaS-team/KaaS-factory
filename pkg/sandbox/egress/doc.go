@@ -9,7 +9,9 @@
 //
 //   - a placeholder for a secret that is unknown or not listed for the host;
 //   - a placeholder in a URL, or in a request sent over cleartext http;
-//   - a destination the Network rules deny, by name or by any resolved address.
+//   - a destination the Network rules deny, by name or by any resolved address;
+//   - a destination that is or resolves to a non-public address (loopback,
+//     private, link-local including 169.254.169.254), even one AllowOut names.
 //
 // A host with no secret rule is tunnelled untouched, so a placeholder sent
 // there stays literal text. Request bodies are not rewritten.

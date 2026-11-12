@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMain(m *testing.M) {
@@ -82,9 +83,9 @@ func TestRlimitAS(t *testing.T) {
 	if out, code := run(t, spec, "python3", "-c", alloc); code != 0 {
 		t.Fatalf("control without a limit failed (%d): %s", code, out)
 	}
-	spec.MaxMemBytes = 150 << 20
+	spec.Baseline = Limits{"as": 150 << 20}
 	if out, code := run(t, spec, "python3", "-c", alloc); code == 0 {
-		t.Fatalf("allocation past MaxMemBytes succeeded: %s", out)
+		t.Fatalf("allocation past the as limit succeeded: %s", out)
 	}
 }
 
@@ -93,7 +94,7 @@ func TestBestEffortWithoutLandlock(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not installed")
 	}
-	spec := Spec{Workdir: t.TempDir(), MaxMemBytes: 150 << 20, AllowNet: true}
+	spec := Spec{Workdir: t.TempDir(), Baseline: Limits{"as": 150 << 20}, AllowNet: true}
 	py, _ := exec.LookPath("python3")
 	self, _ := os.Executable()
 	caps := Capabilities{Rlimits: true}
@@ -105,5 +106,13 @@ func TestBestEffortWithoutLandlock(t *testing.T) {
 	}
 	if !NewReport(spec, caps).Has("landlock: unavailable") {
 		t.Fatal("report does not record landlock: unavailable")
+	}
+}
+
+func TestMaxDurationKillsChild(t *testing.T) {
+	spec := Spec{Workdir: t.TempDir(), ReadOnly: []string{"/"}, AllowNet: true, Policy: Policy{MaxDuration: 300 * time.Millisecond}}
+	start := time.Now()
+	if _, code := run(t, spec, "sleep", "30"); code == 0 || time.Since(start) > 10*time.Second {
+		t.Fatalf("child not stopped at MaxDuration (exit %d after %v)", code, time.Since(start))
 	}
 }

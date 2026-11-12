@@ -75,7 +75,7 @@ func TestLocalRunnerFakeAgentPassRate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			sc, err := Run(ctx, goMatrix(t), deps)
+			sc, err := RunArm(ctx, goMatrix(t), deps, Arm{Arm: "preset", Agent: "claude"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -105,7 +105,7 @@ func TestLocalRunnerHidesTestsFromAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Run(ctx, goMatrix(t), deps); err != nil {
+	if _, err := RunArm(ctx, goMatrix(t), deps, Arm{Arm: "preset", Agent: "claude"}); err != nil {
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(probe + ".ls")

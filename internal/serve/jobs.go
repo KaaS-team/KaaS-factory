@@ -86,6 +86,8 @@ type Jobs struct {
 	leaseTTL    time.Duration
 	runTimeout  time.Duration
 	maxAttempts int
+	jitter      time.Duration // see SetJitter
+	instance    string
 	mu          sync.Mutex
 	cancels     map[int64]context.CancelFunc
 }
@@ -302,7 +304,7 @@ func (j *Jobs) Tick(ctx context.Context) error {
 		}
 		var due time.Time
 		next := job.sched.Next(job.cursor)
-		for i := 0; i < maxCatchUp && !next.IsZero() && !next.After(now); i++ {
+		for i := 0; i < maxCatchUp && !next.IsZero() && j.due(next, now); i++ {
 			due, next = next, job.sched.Next(next)
 		}
 		if due.IsZero() {

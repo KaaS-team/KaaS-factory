@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/KaaS-team/factory/internal/gitx"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,7 +89,8 @@ func (r Runner) one(ctx context.Context, p Pack, files []string, diff string) (r
 		res.Output = strings.TrimSpace(out + "\n" + err.Error())
 		return res
 	}
-	patch, err := r.git(ctx, dir, nil, "add", "-A")
+	err = r.stageAll(ctx, dir)
+	var patch string
 	if err == nil {
 		patch, err = r.git(ctx, dir, nil, "diff", "--cached", "--binary")
 	}
@@ -102,6 +104,10 @@ func (r Runner) one(ctx context.Context, p Pack, files []string, diff string) (r
 		res.Status = Fail
 	}
 	return res
+}
+
+func (r Runner) stageAll(ctx context.Context, dir string) error {
+	return gitx.StageAll(ctx, func(ctx context.Context, args ...string) (string, error) { return r.git(ctx, dir, nil, args...) })
 }
 
 func (r Runner) git(ctx context.Context, dir string, stdin []byte, args ...string) (string, error) {
@@ -163,7 +169,7 @@ func (r Runner) worktree(ctx context.Context) (string, error) {
 			return dir, err
 		}
 	}
-	if _, err := r.git(ctx, dir, nil, "add", "-A"); err != nil {
+	if err := r.stageAll(ctx, dir); err != nil {
 		return dir, err
 	}
 	_, err = r.git(ctx, dir, nil, "commit", "-m", "factory: working tree state", "--allow-empty", "--no-verify")

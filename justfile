@@ -16,10 +16,7 @@ fast: fmt vet
     go test ./...
 
 fmt:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    bad=$(gofmt -l $(git ls-files -co --exclude-standard '*.go'))
-    if [ -n "$bad" ]; then echo "gofmt needed:"; echo "$bad"; exit 1; fi
+    ./gate.sh fmt
 
 vet:
     go vet ./...

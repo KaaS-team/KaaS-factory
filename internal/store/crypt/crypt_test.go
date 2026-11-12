@@ -58,20 +58,27 @@ func TestEncryptedStoresCiphertextWithTag(t *testing.T) {
 	}
 }
 
-func TestPlainAndEncryptedRowsBothLoad(t *testing.T) {
+// With a key set, a row without the cipher tag is refused: anyone with write access to the database
+// could otherwise plant an unauthenticated row. Without a key the raw store still reads it.
+func TestKeyedStoreRefusesUntaggedRows(t *testing.T) {
 	ctx := context.Background()
 	inner := crypt.NewMemory()
-	_ = inner.Put(ctx, crypt.Row{Thread: "t", ID: "old", Type: "json", Data: []byte("plain")})
+	_ = inner.Put(ctx, crypt.Row{Thread: "t", ID: "planted", Type: "json", Data: []byte("secret-plain")})
 	e := enc(t, inner)
 	_ = e.Put(ctx, crypt.Row{Thread: "t", ID: "new", Type: "json", Data: []byte("sealed")})
-	for id, want := range map[string]string{"old": "plain", "new": "sealed"} {
-		r, ok, err := e.Get(ctx, "t", id)
-		if err != nil || !ok || string(r.Data) != want || r.Type != "json" {
-			t.Fatalf("%s: %+v ok=%v err=%v", id, r, ok, err)
-		}
+	_, ok, err := e.Get(ctx, "t", "planted")
+	if err == nil || ok {
+		t.Fatalf("planted untagged row: ok=%v err=%v, want an error", ok, err)
 	}
-	if r, _, _ := e.Latest(ctx, "t"); string(r.Data) != "sealed" {
-		t.Fatalf("latest = %+v", r)
+	if strings.Contains(err.Error(), "secret-plain") {
+		t.Fatalf("error leaks the row's data: %v", err)
+	}
+	r, ok, err := e.Get(ctx, "t", "new")
+	if err != nil || !ok || string(r.Data) != "sealed" || r.Type != "json" {
+		t.Fatalf("tagged row: %+v ok=%v err=%v", r, ok, err)
+	}
+	if r, ok, err := inner.Get(ctx, "t", "planted"); err != nil || !ok || string(r.Data) != "secret-plain" {
+		t.Fatalf("keyless read of an untagged row: %+v ok=%v err=%v", r, ok, err)
 	}
 }
 

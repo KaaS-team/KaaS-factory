@@ -163,3 +163,50 @@ func TestWriteCredentialRefused(t *testing.T) {
 		}
 	}
 }
+
+// A symlinked import may not reach a file outside the workflow directory; one inside is fine.
+func TestImportSymlinkEscapeRefused(t *testing.T) {
+	outer, d := t.TempDir(), t.TempDir()
+	secret := put(t, outer, "secret.md", "OUTSIDE\n")
+	put(t, d, "real.md", "INSIDE\n")
+	if err := os.Symlink(secret, filepath.Join(d, "escape.md")); err != nil {
+		t.Skip(err)
+	}
+	if err := os.Symlink("real.md", filepath.Join(d, "ok.md")); err != nil {
+		t.Skip(err)
+	}
+	if err := os.Symlink(outer, filepath.Join(d, "dir")); err != nil {
+		t.Skip(err)
+	}
+	for _, imp := range []string{"escape.md", "dir/secret.md"} {
+		_, err := LoadMarkdown(put(t, d, "w.md", "---\nimports: ["+imp+"]\n---\nM\n"))
+		if err == nil || !strings.Contains(err.Error(), "import") {
+			t.Errorf("%s: got %v, want a refusal", imp, err)
+		}
+	}
+	g, err := LoadMarkdown(put(t, d, "w.md", "---\nimports: [ok.md]\n---\nM\n"))
+	if err != nil || !strings.Contains(g.Prompt, "INSIDE") {
+		t.Errorf("inside symlink: %v %v", g, err)
+	}
+}
+
+// Every name the list claims to refuse, and the near misses it must not.
+func TestWriteCredentialNames(t *testing.T) {
+	bad := []string{"github:write", "tracker:write", "GITHUB_TOKEN", "gh_token", "API_SECRET", "AWS_SECRET_ACCESS_KEY",
+		"DEPLOY_KEY", "OPENAI_API_KEY", "APIKEY", "DB_PASSWORD", "db_passwd", "DB_PWD", "GH_PAT", "PAT", "github-pat",
+		"MY_PASS", "PRIVATE_KEY", "PRIVATEKEY", "SERVICE_CREDENTIALS", "BASIC_AUTH"}
+	good := []string{"github:read", "tracker:read", "PATH", "PATTERN", "PASSIVE", "AUTHOR", "KEYBOARD", "REPO", "none"}
+	for _, n := range bad {
+		if !writeCredential(n) {
+			t.Errorf("%q accepted", n)
+		}
+		if err := checkNoWriteCredential("w", []string{n}); err == nil {
+			t.Errorf("%q not refused", n)
+		}
+	}
+	for _, n := range good {
+		if writeCredential(n) {
+			t.Errorf("%q refused", n)
+		}
+	}
+}

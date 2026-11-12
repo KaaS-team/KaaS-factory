@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/api/porttest"
@@ -138,5 +139,33 @@ func TestOtherHolderIgnored(t *testing.T) {
 	tr.Spend["a"] = meter.EncodeSpend(meter.Spend{Holder: "beta", CostUSD: 50, Runs: 1})
 	if err := g.Allow(context.Background(), "a"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Spend recorded per day counts toward the cap: today's rows and undated rows, not other days' or holders'.
+func TestAllowCountsPerDaySpend(t *testing.T) {
+	now := func() time.Time { return time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC) }
+	row := func(holder, day string, usd float64) string {
+		return meter.EncodeSpend(meter.Spend{Holder: holder, Day: day, CostUSD: usd, Runs: 1})
+	}
+	for _, c := range []struct {
+		name string
+		body string
+		over bool
+	}{
+		{"only today's day rows at the cap", row("alpha", "2026-11-12", 3) + "\n" + row("alpha", "2026-11-12", 2), true},
+		{"day row plus undated row reach the cap", row("alpha", "2026-11-12", 3) + "\n" + row("alpha", "", 2), true},
+		{"another day does not count", row("alpha", "2026-11-11", 9), false},
+		{"another holder does not count", row("beta", "2026-11-12", 9), false},
+		{"under the cap", row("alpha", "2026-11-12", 4.99), false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			tr := porttest.NewTracker()
+			tr.Spend["a"] = c.body
+			g := cap.Gate{Thread: tr, Holder: "alpha", USD: 5, Now: now}
+			if got := errors.Is(g.Allow(context.Background(), "a"), cap.ErrOverCap); got != c.over {
+				t.Fatalf("over = %v, want %v", got, c.over)
+			}
+		})
 	}
 }

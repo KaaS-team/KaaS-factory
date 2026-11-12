@@ -79,3 +79,51 @@ func TestLintPicksPinned(t *testing.T) {
 		})
 	}
 }
+
+// TestFmtPicksPinned runs gate.sh fmt with a PATH gofmt that flags every file and a pinned-toolchain gofmt
+// that flags none. The fmt step must use the pinned one, the gofmt golangci-lint formats with.
+func TestFmtPicksPinned(t *testing.T) {
+	pin := match(t, read(t, "justfile"), `(?m)^lint_go := "(.*)"$`)
+	bin, root := t.TempDir(), t.TempDir()
+	script := func(path, body string) {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	script(filepath.Join(bin, "gofmt"), `echo path-gofmt.go`)
+	script(filepath.Join(bin, "go"), `echo "`+root+`/$GOTOOLCHAIN"`)
+	script(filepath.Join(root, pin, "bin", "gofmt"), `exit 0`)
+	cmd := exec.Command("sh", "gate.sh", "fmt")
+	cmd.Dir = filepath.Join("..", "..")
+	cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("gate.sh fmt used the PATH gofmt, not the %s one: %v: %s", pin, err, out)
+	}
+}
+
+// CI runs on linux only; the gate vets darwin too so a linux-only test helper used from a portable file fails here.
+func TestVetCoversBothOSes(t *testing.T) {
+	bin := t.TempDir()
+	log := filepath.Join(bin, "log")
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho \"$GOOS $*\" >> "+log+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "gate.sh", "vet")
+	cmd.Dir = filepath.Join("..", "..")
+	cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("gate.sh vet: %v: %s", err, out)
+	}
+	got, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, goos := range []string{"linux", "darwin"} {
+		if !strings.Contains(string(got), goos+" vet ./...") {
+			t.Fatalf("gate.sh vet did not vet GOOS=%s; ran:\n%s", goos, got)
+		}
+	}
+}

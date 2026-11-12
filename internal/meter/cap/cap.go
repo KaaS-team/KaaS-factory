@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/marker"
@@ -22,6 +23,7 @@ type Gate struct {
 	Thread api.Thread
 	Holder string // ledger rows from other holders do not count
 	USD    float64
+	Now    func() time.Time // names today for the window; default time.Now
 }
 
 // Record is the cap marker on the ledger comment: the cap and the spend it was judged against.
@@ -60,12 +62,11 @@ func (g Gate) Allow(ctx context.Context, id api.TicketID) error {
 	if err != nil {
 		return err
 	}
-	var spent float64
-	for _, s := range spends {
-		if s.Holder == g.Holder && s.Day == "" {
-			spent += s.CostUSD
-		}
+	now := g.Now
+	if now == nil {
+		now = time.Now
 	}
+	spent := meter.InWindow(spends, g.Holder, now().UTC().Format("2006-01-02"))
 	rec := Record{CapUSD: g.USD, SpentUSD: spent}
 	if old, ok := Read(body); !ok || old != rec {
 		if err := g.Thread.PutSpendComment(ctx, id, withRecord(body, rec)); err != nil {
