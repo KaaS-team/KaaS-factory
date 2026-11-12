@@ -1,18 +1,17 @@
 package tui
 
 import (
-	"context"
 	"flag"
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/api/porttest"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -20,50 +19,6 @@ var update = flag.Bool("update", false, "rewrite golden files")
 var ansiRE = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 func strip(s string) string { return ansiRE.ReplaceAllString(s, "") }
-
-// fakeControl records calls and serves a fixed board and a test-driven event channel.
-type fakeControl struct {
-	mu     sync.Mutex
-	board  api.Board
-	events chan api.Event
-	calls  []string
-}
-
-func newFake(b api.Board) *fakeControl {
-	return &fakeControl{board: b, events: make(chan api.Event, 8)}
-}
-
-func (f *fakeControl) rec(s string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls = append(f.calls, s)
-	return nil
-}
-
-func (f *fakeControl) got() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]string(nil), f.calls...)
-}
-
-func (f *fakeControl) Board(context.Context) (api.Board, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.board, nil
-}
-func (f *fakeControl) Dispatch(_ context.Context, id api.TicketID) error {
-	return f.rec("dispatch " + string(id))
-}
-func (f *fakeControl) Steer(_ context.Context, id api.TicketID, m string) error {
-	return f.rec("steer " + string(id) + ": " + m)
-}
-func (f *fakeControl) Cancel(_ context.Context, id api.TicketID) error {
-	return f.rec("cancel " + string(id))
-}
-func (f *fakeControl) Retry(_ context.Context, id api.TicketID) error {
-	return f.rec("retry " + string(id))
-}
-func (f *fakeControl) Events(context.Context) (<-chan api.Event, error) { return f.events, nil }
 
 var t0 = time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
 
@@ -90,9 +45,9 @@ func fixedBoard() api.Board {
 	}
 }
 
-func newModel(t *testing.T, b api.Board) (*Model, *fakeControl) {
+func newModel(t *testing.T, b api.Board) (*Model, *porttest.Control) {
 	t.Helper()
-	f := newFake(b)
+	f := porttest.NewControl(b)
 	m := New(f).(*Model)
 	m.now = func() time.Time { return t0 }
 	var cmd tea.Cmd
@@ -107,9 +62,9 @@ func newModel(t *testing.T, b api.Board) (*Model, *fakeControl) {
 }
 
 // emit sends one event through the fake stream and applies it, as the pending wait command would.
-func emit(t *testing.T, m *Model, f *fakeControl, e api.Event) *Model {
+func emit(t *testing.T, m *Model, f *porttest.Control, e api.Event) *Model {
 	t.Helper()
-	f.events <- e
+	f.Push(e)
 	return settle(t, m, m.waitEvent())
 }
 
@@ -230,7 +185,7 @@ func TestKeysCallControl(t *testing.T) {
 				m, cmd = press(t, m, k)
 				m = settle(t, m, cmd)
 			}
-			got := f.got()
+			got := f.Calls()
 			if strings.Join(got, "|") != strings.Join(tc.calls, "|") {
 				t.Fatalf("calls = %v, want %v", got, tc.calls)
 			}
@@ -347,5 +302,65 @@ func TestNoRawCountsInView(t *testing.T) {
 		if strings.Contains(v, bad) {
 			t.Fatalf("view leaks %q", bad)
 		}
+	}
+}
+
+// Ticket history: the timeline loads past events first, then follows live ones once each.
+func TestTimelineLoadsHistoryThenFollowsLiveOnce(t *testing.T) {
+	m, f := newModel(t, fixedBoard())
+	past := api.Event{V: 1, Time: t0.Add(-time.Minute), Kind: "dispatched", Ticket: "101", Data: map[string]any{"attempt": 1}}
+	f.Seed("101", past, api.Event{V: 1, Time: t0.Add(-30 * time.Second), Kind: "pushed", Ticket: "101", Data: map[string]any{"branch": "b1"}})
+	m, cmd := press(t, m, "enter")
+	m = settle(t, m, cmd)
+	v := view(m)
+	for _, want := range []string{"dispatched", "attempt=1", "branch=b1"} {
+		if !strings.Contains(v, want) {
+			t.Fatalf("timeline lacks %q:\n%s", want, v)
+		}
+	}
+	if strings.Index(v, "dispatched") > strings.Index(v, "pushed") {
+		t.Fatalf("history out of order:\n%s", v)
+	}
+	live := api.Event{V: 1, Time: t0, Kind: "stalled", Ticket: "101", Data: map[string]any{"message": "nudge"}}
+	m = emit(t, m, f, live)
+	m = emit(t, m, f, past) // already in history: the snapshot raced the stream
+	v = view(m)
+	if n := strings.Count(v, "stalled"); n != 1 {
+		t.Fatalf("live event shown %d times:\n%s", n, v)
+	}
+	if n := strings.Count(v, "dispatched"); n != 1 {
+		t.Fatalf("history event duplicated by the stream:\n%s", v)
+	}
+	if got := f.HistoryCalls(); len(got) != 1 || got[0] != "101" {
+		t.Fatalf("History calls = %v", got)
+	}
+}
+
+func TestTimelineHistoryKeepsLiveEventsSeenBeforeItLoaded(t *testing.T) {
+	m, f := newModel(t, fixedBoard())
+	m = emit(t, m, f, api.Event{V: 1, Time: t0, Kind: "stalled", Ticket: "101"})
+	f.Seed("101", api.Event{V: 1, Time: t0.Add(-time.Minute), Kind: "dispatched", Ticket: "101"})
+	m, cmd := press(t, m, "enter")
+	m = settle(t, m, cmd)
+	v := view(m)
+	if !strings.Contains(v, "dispatched") || strings.Count(v, "stalled") != 1 {
+		t.Fatalf("history and live not merged:\n%s", v)
+	}
+	if strings.Index(v, "dispatched") > strings.Index(v, "stalled") {
+		t.Fatalf("history not before live:\n%s", v)
+	}
+}
+
+func TestTimelineWithoutHistorianStillWorks(t *testing.T) {
+	f := porttest.NewControl(fixedBoard())
+	m := New(f.ControlOnly()).(*Model)
+	m.now = func() time.Time { return t0 }
+	nm, _ := m.Update(boardMsg(fixedBoard()))
+	m, cmd := press(t, nm.(*Model), "enter")
+	if cmd != nil {
+		t.Fatalf("a Control without Historian queued a command")
+	}
+	if !strings.Contains(view(m), "no events yet") {
+		t.Fatalf("timeline:\n%s", view(m))
 	}
 }
