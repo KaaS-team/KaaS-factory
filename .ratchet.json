@@ -1,5 +1,5 @@
 {
-  "go_lines": 32275,
-  "deadcode": 267,
-  "reason": "raised by the reviewed merge of go/k8-safe-outputs (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 33308,
+  "deadcode": 271,
+  "reason": "raised by the reviewed merge of go/k8-spend-cap, go/k8-untrusted-pr, go/k6-plan-files, go/k8-agent-token and go/k8-lockfile (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
