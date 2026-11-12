@@ -302,3 +302,9 @@ Source: https://github.com/openrewrite/rewrite (Apache-2.0). The design is porte
 Source: https://github.com/openai/openai-agents-python (MIT, Copyright (c) 2025 OpenAI). Design only, no text copied.
 
 - `internal/trace/trace.go` from `src/agents/tracing/span_data.py` and `src/agents/tracing/processor_interface.py` [tested by `internal/trace/trace_test.go`]
+
+## langchain-ai/langgraph@a054ed0
+
+Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangChain, Inc.). Only the checkpoint-sqlite table layout was used, ported to Go.
+
+- `internal/graph/checkpoint/checkpoint.go` from `libs/checkpoint-sqlite/langgraph/checkpoint/sqlite/__init__.py` [tested by `internal/graph/checkpoint/checkpoint_test.go`]

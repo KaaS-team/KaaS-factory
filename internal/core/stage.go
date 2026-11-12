@@ -17,6 +17,9 @@ type Stages struct {
 	Graph func(name string) (*graph.Graph, error)
 	// Policy picks the tier of a node that does not pin one. A zero Policy leaves the tier empty.
 	Policy tutor.Policy
+	// Checkpoints, when set, saves each ticket's place in its graph after every step, so a restart
+	// resumes there and re-runs only the node that had not finished. Nil keeps it in memory.
+	Checkpoints Checkpointer
 }
 
 // stageRun is where one ticket stands in its graph. Node runs take their own attempt numbers, so each
@@ -30,18 +33,24 @@ type stageRun struct {
 	fails   int
 	pr      int
 	history []tutor.Attempt
-	input   string // revise feedback for the next brief of this node
+	input   string    // revise feedback for the next brief of this node
+	wf      string    // the workflow name the ticket asked for, to reload the graph after a restart
+	fin     *finished // the saved result of node, when it finished before a restart
+	saved   bool      // a checkpoint of this run exists
 }
 
-func (c *Core) stageOf(id api.TicketID, workflow string) (*stageRun, error) {
+func (c *Core) stageOf(ctx context.Context, id api.TicketID, workflow string) (*stageRun, error) {
 	if st, ok := c.stages[id]; ok {
 		return st, nil
+	}
+	if st, err := c.restore(ctx, id); st != nil || err != nil {
+		return st, err
 	}
 	g, err := c.d.Stages.Graph(workflow)
 	if err != nil {
 		return nil, err
 	}
-	st := &stageRun{g: g, node: g.Start}
+	st := &stageRun{g: g, node: g.Start, wf: workflow}
 	c.stages[id] = st
 	return st, nil
 }
@@ -60,8 +69,8 @@ func (c *Core) tierFor(st *stageRun, n graph.Node) string {
 
 // stageBrief fits a brief the reconcile loop built to the ticket's current node: the node, its tier and
 // token budget, and an attempt number and branch no earlier node used.
-func (c *Core) stageBrief(b api.Brief) (api.Brief, error) {
-	st, err := c.stageOf(b.Ticket, b.Workflow)
+func (c *Core) stageBrief(ctx context.Context, b api.Brief) (api.Brief, error) {
+	st, err := c.stageOf(ctx, b.Ticket, b.Workflow)
 	if err != nil {
 		return b, err
 	}
@@ -93,9 +102,9 @@ func (c *Core) stageBrief(b api.Brief) (api.Brief, error) {
 // advance runs when a node's session has finished its work: it picks the next node from the graph.
 // It reports true when the ticket moves on to another node, so the ticket is not done yet.
 func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
-	st, ok := c.stages[id]
-	if !ok {
-		return false, nil
+	st, err := c.restore(ctx, id)
+	if err != nil || st == nil {
+		return false, err
 	}
 	e := c.state.Entries[id]
 	o := c.lastObs[id]
@@ -106,6 +115,12 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	outcome := graph.Pass
 	if n.Verify && o.ChecksGreen != nil && !*o.ChecksGreen {
 		outcome = graph.Fail
+	}
+	attempts := e.Attempt
+	if st.fin != nil { // this node finished before a restart: its recorded result stands
+		outcome, attempts = st.fin.Outcome, st.fin.Attempts
+	} else {
+		c.saveWrite(ctx, id, st, finished{outcome, attempts})
 	}
 	st.record(n)
 	next, err := st.g.Next(st.node, outcome)
@@ -118,6 +133,7 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	}
 	if outcome == graph.Fail {
 		if st.fails++; st.fails >= c.cfg.Reconcile.MaxAttempts {
+			c.save(ctx, id, st, st.node)
 			c.escalate(ctx, id, fmt.Sprintf("%s failed %d times", st.node, st.fails))
 			return true, nil
 		}
@@ -125,9 +141,11 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	if next == graph.End {
 		c.lastObs[id] = withPR(o, st.pr)
 		delete(c.stages, id)
+		c.save(ctx, id, st, graph.End)
 		return false, nil
 	}
-	st.node, st.base = next, st.base+e.Attempt
+	st.node, st.base = next, st.base+attempts
+	c.save(ctx, id, st, next)
 	c.hub.emit(KindStage, id, map[string]any{"node": next, "after": n.ID, "outcome": string(outcome)})
 	if h, _ := st.g.Node(next); h.Kind == graph.KindHuman {
 		c.escalate(ctx, id, "plan approval")
@@ -139,8 +157,11 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 // resume answers a ticket waiting at a human node: approve takes the pass edge, revise the revise edge
 // with text as the next brief's input. The ticket goes back to ready, so the loop dispatches the node.
 func (c *Core) resume(ctx context.Context, id api.TicketID, outcome graph.Outcome, text string) error {
-	st, ok := c.stages[id]
-	if !ok || !c.parked[id] {
+	st, err := c.restore(ctx, id)
+	if err != nil {
+		return err
+	}
+	if st == nil || !c.parked[id] {
 		return fmt.Errorf("ticket %s is not waiting on plan approval", id)
 	}
 	if h, _ := st.g.Node(st.node); h.Kind != graph.KindHuman {
@@ -154,6 +175,7 @@ func (c *Core) resume(ctx context.Context, id api.TicketID, outcome graph.Outcom
 		return err
 	}
 	st.node, st.input = next, text
+	c.save(ctx, id, st, next)
 	delete(c.parked, id)
 	return nil
 }
