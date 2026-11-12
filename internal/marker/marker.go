@@ -38,9 +38,6 @@ func JSString(s string) string {
 	return strings.ReplaceAll(out, "\\u2029", "\u2029")
 }
 
-// Neutralise turns every `<!--` in s into visible text, so posted model or user text cannot carry a marker.
-func Neutralise(s string) string { return strings.ReplaceAll(s, "<!--", "&lt;!--") }
-
 type allowKey struct{}
 
 // Allow marks ctx as carrying a body the runner built itself, whose markers a tracker must post as written.
@@ -99,4 +96,39 @@ func Latest(markers []Data, stage string) (json.RawMessage, bool) {
 		}
 	}
 	return nil, false
+}
+
+// StagePosition is the data marker stage that carries a ticket's place in its workflow graph.
+const StagePosition = "position"
+
+// PositionV is the version EncodePosition writes; a reader skips any other.
+const PositionV = 1
+
+// Position is where a ticket stands in its workflow graph: what a restart needs to resume it.
+type Position struct {
+	V     int    `json:"v"`
+	Node  string `json:"node"`
+	Base  int    `json:"base"`
+	Fails int    `json:"fails"`
+	PR    int    `json:"pr"`
+	Input string `json:"input,omitempty"`
+}
+
+// EncodePosition appends the position marker to body.
+func EncodePosition(body string, p Position) string {
+	p.V = PositionV
+	raw, _ := json.Marshal(p) // a struct of strings and ints always encodes
+	return EncodeData(body, StagePosition, raw)
+}
+
+// LatestPosition returns the last position marker in the bodies that is of a known version.
+func LatestPosition(bodies ...string) (Position, bool) {
+	ms := ParseData(bodies...)
+	for i := len(ms) - 1; i >= 0; i-- {
+		var p Position
+		if ms[i].Stage == StagePosition && json.Unmarshal(ms[i].JSON, &p) == nil && p.V == PositionV && p.Node != "" {
+			return p, true
+		}
+	}
+	return Position{}, false
 }

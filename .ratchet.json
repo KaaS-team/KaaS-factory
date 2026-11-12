@@ -1,5 +1,5 @@
 {
-  "go_lines": 35243,
-  "deadcode": 334,
-  "reason": "raised by the reviewed merge of go/k10-retry, k10-scan-edit, k10-traces, k11-graph-checkpoint, k11-graph-interrupt, k11-store-crypt, k9-scim and k7-trajectory (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 36820,
+  "deadcode": 336,
+  "reason": "raised by the reviewed merges of go/k10-retry, k10-scan-edit, k10-traces, k11-graph-checkpoint, k11-graph-interrupt, k11-store-crypt, k9-scim, k7-trajectory, k8-sanitize and m3-graph-resume (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }

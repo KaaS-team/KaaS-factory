@@ -3,6 +3,9 @@
 package linear
 
 import (
+	"github.com/KaaS-team/factory/internal/marker"
+	"github.com/KaaS-team/factory/internal/tracker/sanitize"
+
 	"context"
 	"encoding/json"
 	"errors"
@@ -253,7 +256,8 @@ func (t *Tracker) Get(ctx context.Context, id api.TicketID) (api.Ticket, error) 
 	return t.ticket(i), nil
 }
 
-// Comment adds a comment. Markers survive Linear's comment stripping through a sealed footer.
+// Comment adds a comment through sanitize.Publication, unless ctx came from marker.Allow: the caller
+// then built body itself and its markers survive Linear's comment stripping through a sealed footer.
 func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) error {
 	tok, err := t.token()
 	if err != nil {
@@ -262,6 +266,9 @@ func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) err
 	i, err := t.raw(ctx, id)
 	if err != nil {
 		return err
+	}
+	if !marker.Allowed(ctx) {
+		body = sanitize.Publication(body, sanitize.DefaultOptions())
 	}
 	in := map[string]any{"issueId": i.ID, "body": vendorkit.EncodeBody(body, vendorkit.HMACSeal(tok), "comment")}
 	var d json.RawMessage
@@ -363,7 +370,7 @@ func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body str
 		return err
 	}
 	if c == "" {
-		return t.Comment(ctx, id, body)
+		return t.Comment(marker.Allow(ctx), id, body)
 	}
 	tok, _ := t.token()
 	var d json.RawMessage

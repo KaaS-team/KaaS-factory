@@ -222,11 +222,19 @@ Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technol
 
 - `internal/serve/hostguard/hostguard.go` from `lib/httpapi/server.go` (parseAllowedHosts, parseAllowedOrigins, hostAuthorizationMiddleware; huma and chi dropped) [tested by `internal/serve/hostguard/hostguard_test.go`]
 
+## github/gh-aw@741ff0c
+
+Source: https://github.com/github/gh-aw (MIT, Copyright GitHub, Inc.)
+
+- `internal/tracker/sanitize/publish.go` from `actions/setup/js/sanitize_content_core.cjs` [tested by `internal/tracker/sanitize/publish_test.go`]
+- `internal/tracker/sanitize/url.go` from `actions/setup/js/sanitize_content_core.cjs` [tested by `internal/tracker/sanitize/publish_test.go`]
+
 ## anthropics/claude-code-action@8a29bc6
 
 Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) 2025 Anthropic, PBC)
 
 - `internal/tracker/github/trigger.go` from `src/github/validation/trigger.ts`, `src/github/validation/actor.ts` and `src/github/utils/actor-filter.ts` [ported to Go; tested by `internal/tracker/github/trigger_test.go`]
+- `internal/tracker/sanitize/prompt.go` from `src/github/utils/sanitizer.ts` [tested by `internal/tracker/sanitize/prompt_test.go`]
 
 ```
 MIT License
