@@ -30,6 +30,7 @@ type Tracker struct {
 
 	mu    sync.Mutex
 	filed map[string]api.TicketID // titles Create filed; the search index lags a fresh issue
+	login string                  // the token's own login, read once by self
 }
 
 var (

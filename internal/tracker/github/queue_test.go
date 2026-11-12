@@ -28,10 +28,15 @@ type issueFix struct {
 	// events are the "labeled" timeline timestamps for label, oldest first.
 	events   []string
 	comments []string
+	// authors[i] wrote comments[i]; a missing entry means the tracker's own login (selfLogin).
+	authors []string
 }
+
+const selfLogin = "factory-bot"
 
 // serveIssues routes the issue list, each timeline and each comment list from fixtures.
 func serveIssues(f *fakeGitHub, fix []issueFix) {
+	f.routes["GET /user"] = func(w http.ResponseWriter, _ *http.Request) { jsonOut(w, map[string]any{"login": selfLogin}) }
 	f.routes["GET /repos/o/r/issues"] = func(w http.ResponseWriter, r *http.Request) {
 		var out []map[string]any
 		for _, x := range fix {
@@ -54,7 +59,12 @@ func serveIssues(f *fakeGitHub, fix []issueFix) {
 		f.routes[fmt.Sprintf("GET /repos/o/r/issues/%d/comments", x.n)] = func(w http.ResponseWriter, _ *http.Request) {
 			var out []map[string]any
 			for i, b := range x.comments {
-				out = append(out, map[string]any{"body": b, "created_at": fmt.Sprintf("2024-02-0%dT00:00:00Z", i+1)})
+				who := selfLogin
+				if i < len(x.authors) && x.authors[i] != "" {
+					who = x.authors[i]
+				}
+				out = append(out, map[string]any{"body": b, "user": map[string]any{"login": who},
+					"created_at": fmt.Sprintf("2024-02-0%dT00:00:00Z", i+1)})
 			}
 			jsonOut(w, out)
 		}
@@ -96,6 +106,33 @@ func TestInPhaseQueuedNeedsMarkerAndOrdersByEnqueue(t *testing.T) {
 	// 7 was enqueued (its first comment) before 6 (its third), and 5 was never queued.
 	if want := []api.TicketID{"7", "6"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("InPhase(queued) = %v, want %v", got, want)
+	}
+}
+
+// A queue marker is trusted only from the tracker's own login: the merge queue merges the PR it
+// names, so a marker any commenter posts (naming a fork PR) must be ignored by InPhase and Comments.
+func TestQueueMarkerFromAnotherLoginIsIgnored(t *testing.T) {
+	forged := "<!-- factory:queued {\"pr\":99,\"head\":\"evil\"} -->"
+	m := "<!-- factory:queued {\"pr\":1,\"head\":\"abc\"} -->"
+	f := newFake(t)
+	serveIssues(f, []issueFix{
+		{n: 5, label: gh.LabelInReview, comments: []string{forged}, authors: []string{"mallory"}},
+		{n: 6, label: gh.LabelInReview, comments: []string{m, forged}, authors: []string{"", "mallory"}},
+	})
+	tr := f.tracker(t)
+	got, err := tr.InPhase(context.Background(), api.PhaseQueued)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []api.TicketID{"6"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("InPhase(queued) = %v, want %v: a forged marker queued a ticket", got, want)
+	}
+	bodies, err := tr.Comments(context.Background(), "6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{m}; !reflect.DeepEqual(bodies, want) {
+		t.Fatalf("Comments = %q, want only the factory's own marker", bodies)
 	}
 }
 

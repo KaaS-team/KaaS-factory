@@ -54,6 +54,10 @@ func (f *fakeHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer f.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
+	if r.URL.Path == "/user" { // the token's own login: every comment in this fake is the factory's
+		_ = enc.Encode(map[string]any{"login": "factory-bot"})
+		return
+	}
 	p := strings.Split(strings.Trim(r.URL.Path, "/"), "/") // repos o r ...
 	if len(p) < 4 || p[0] != "repos" {
 		http.Error(w, "{}", http.StatusTeapot)
@@ -76,7 +80,8 @@ func (f *fakeHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == "GET" && p[3] == "issues" && len(p) == 6 && p[5] == "comments":
 		var out []map[string]any
 		for i, b := range f.comments[n] {
-			out = append(out, map[string]any{"body": b, "created_at": fmt.Sprintf("2024-03-0%dT00:00:00Z", n+i)})
+			out = append(out, map[string]any{"body": b, "user": map[string]any{"login": "factory-bot"},
+				"created_at": fmt.Sprintf("2024-03-0%dT00:00:00Z", n+i)})
 		}
 		_ = enc.Encode(out)
 	case r.Method == "POST" && p[3] == "issues" && len(p) == 6 && p[5] == "comments":

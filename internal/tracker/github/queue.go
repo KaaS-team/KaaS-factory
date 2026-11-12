@@ -34,7 +34,9 @@ func (t *Tracker) comments(ctx context.Context, n int) ([]*gogithub.IssueComment
 	}
 }
 
-// Comments returns the bodies of the issue's comments, oldest first.
+// Comments returns the bodies of the issue's comments, oldest first. A comment carrying a queue
+// marker is kept only when the tracker's own login wrote it: the merge queue merges the PR a marker
+// names, so a marker anyone else posts (naming a fork PR, say) must never reach it.
 func (t *Tracker) Comments(ctx context.Context, id api.TicketID) ([]string, error) {
 	n, err := number(id)
 	if err != nil {
@@ -46,9 +48,44 @@ func (t *Tracker) Comments(ctx context.Context, id api.TicketID) ([]string, erro
 	}
 	out := make([]string, 0, len(cs))
 	for _, c := range cs {
-		out = append(out, c.GetBody())
+		if ok, err := t.markerTrusted(ctx, c); err != nil {
+			return nil, err
+		} else if ok {
+			out = append(out, c.GetBody())
+		}
 	}
 	return out, nil
+}
+
+// markerTrusted reports whether c may be read: true for a comment with no queue marker, and for a
+// marker comment only when the tracker's own login wrote it.
+func (t *Tracker) markerTrusted(ctx context.Context, c *gogithub.IssueComment) (bool, error) {
+	if !strings.Contains(c.GetBody(), queuedMarkerPrefix) {
+		return true, nil
+	}
+	self, err := t.self(ctx)
+	if err != nil {
+		return false, err
+	}
+	return c.GetUser().GetLogin() == self, nil
+}
+
+// self returns the login the tracker's token acts as, fetched once.
+func (t *Tracker) self(ctx context.Context) (string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.login != "" {
+		return t.login, nil
+	}
+	u, _, err := t.client.Users.Get(ctx, "")
+	if err != nil {
+		return "", fmt.Errorf("github tracker: read own login: %w", err)
+	}
+	if u.GetLogin() == "" {
+		return "", fmt.Errorf("github tracker: token has no login")
+	}
+	t.login = u.GetLogin()
+	return t.login, nil
 }
 
 // labeledAt returns when label was last added to issue n, from its timeline.
@@ -72,7 +109,8 @@ func (t *Tracker) labeledAt(ctx context.Context, n int, label string) (time.Time
 	}
 }
 
-// enqueuedAt returns when the first queue marker was commented on issue n, and false when there is none.
+// enqueuedAt returns when the first queue marker the tracker's own login wrote was commented on issue
+// n, and false when there is none.
 // The in-review label is shared by done and queued tickets, so the marker is what says a ticket is queued.
 func (t *Tracker) enqueuedAt(ctx context.Context, n int) (time.Time, bool, error) {
 	cs, err := t.comments(ctx, n)
@@ -80,7 +118,12 @@ func (t *Tracker) enqueuedAt(ctx context.Context, n int) (time.Time, bool, error
 		return time.Time{}, false, err
 	}
 	for _, c := range cs {
-		if strings.Contains(c.GetBody(), queuedMarkerPrefix) {
+		if !strings.Contains(c.GetBody(), queuedMarkerPrefix) {
+			continue
+		}
+		if ok, err := t.markerTrusted(ctx, c); err != nil {
+			return time.Time{}, false, err
+		} else if ok {
 			return c.GetCreatedAt().Time, true, nil
 		}
 	}
