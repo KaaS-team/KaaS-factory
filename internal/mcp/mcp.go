@@ -133,6 +133,15 @@ func nonNil[T any](t []T) []T {
 	return t
 }
 
+// safe hides the cause of err from the client: it names the tool and nothing else,
+// so paths, hosts and stack text from the core never reach a tool result.
+func safe(name string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s failed; the operator can see why in the factory log", name)
+}
+
 func unavailable(name string) error {
 	return fmt.Errorf("%s: not available in this build", name)
 }
@@ -144,7 +153,7 @@ func textTool[In any](name string, h func(context.Context, In) (string, error)) 
 			return nil, TextOutput{}, unavailable(name)
 		}
 		s, err := h(ctx, in)
-		return nil, TextOutput{Text: s}, err
+		return nil, TextOutput{Text: s}, safe(name, err)
 	}
 }
 
@@ -158,7 +167,7 @@ func noArg(h func(context.Context) (string, error)) func(context.Context, Empty)
 func act(name string, f func(context.Context, TicketInput) error) sdk.ToolHandlerFor[TicketInput, OK] {
 	return func(ctx context.Context, _ *sdk.CallToolRequest, in TicketInput) (*sdk.CallToolResult, OK, error) {
 		if err := f(ctx, in); err != nil {
-			return nil, OK{}, fmt.Errorf("%s: %w", name, err)
+			return nil, OK{}, safe(name, err)
 		}
 		return nil, OK{Ticket: in.Ticket, Done: name}, nil
 	}
@@ -180,11 +189,11 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 			b, err := ctl.Board(ctx)
 			out := StatusOutput{BoardView: boardView(b)}
 			if err != nil || in.Ticket == "" {
-				return nil, out, err
+				return nil, out, safe("status", err)
 			}
 			v, ok, err := ticketView(ctx, ctl, b, in.Ticket)
 			if err != nil {
-				return nil, out, err
+				return nil, out, safe("status", err)
 			}
 			if !ok {
 				return nil, out, fmt.Errorf("status: ticket %s is not on the board", in.Ticket)
@@ -200,12 +209,12 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 				out.Tickets = append(out.Tickets, sl.Ticket)
 			}
 			out.Tickets = append(out.Tickets, b.Ready...)
-			return nil, out, err
+			return nil, out, safe("list_tickets", err)
 		})
 	sdk.AddTool(s, &sdk.Tool{Name: "queue", Description: "Show the merge queue"},
 		func(ctx context.Context, _ *sdk.CallToolRequest, _ Empty) (*sdk.CallToolResult, QueueOutput, error) {
 			b, err := ctl.Board(ctx)
-			return nil, QueueOutput{MergeQueue: nonNil(b.MergeQueue)}, err
+			return nil, QueueOutput{MergeQueue: nonNil(b.MergeQueue)}, safe("queue", err)
 		})
 
 	sdk.AddTool(s, &sdk.Tool{Name: "dispatch", Description: "Dispatch a ready ticket"},
@@ -217,7 +226,7 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 	sdk.AddTool(s, &sdk.Tool{Name: "steer", Description: "Send a message to a running ticket's session"},
 		func(ctx context.Context, _ *sdk.CallToolRequest, in SteerInput) (*sdk.CallToolResult, OK, error) {
 			if err := ctl.Steer(ctx, api.TicketID(in.Ticket), in.Message); err != nil {
-				return nil, OK{}, fmt.Errorf("steer: %w", err)
+				return nil, OK{}, safe("steer", err)
 			}
 			return nil, OK{Ticket: in.Ticket, Done: "steer"}, nil
 		})
@@ -226,7 +235,7 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 		func(ctx context.Context, req *sdk.ReadResourceRequest) (*sdk.ReadResourceResult, error) {
 			b, err := ctl.Board(ctx)
 			if err != nil {
-				return nil, err
+				return nil, safe("board", err)
 			}
 			return jsonResource(req.Params.URI, boardView(b))
 		})
@@ -252,11 +261,11 @@ func ticketResource(ctx context.Context, ctl api.Control, uri string) (*sdk.Read
 	}
 	b, err := ctl.Board(ctx)
 	if err != nil {
-		return nil, err
+		return nil, safe("ticket", err)
 	}
 	v, found, err := ticketView(ctx, ctl, b, id)
 	if err != nil {
-		return nil, err
+		return nil, safe("ticket", err)
 	}
 	if !found {
 		return nil, sdk.ResourceNotFoundError(uri)

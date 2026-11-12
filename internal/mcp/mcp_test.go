@@ -3,6 +3,7 @@ package mcp_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -327,5 +328,120 @@ func TestStatusForOneTicketIncludesHistory(t *testing.T) {
 	raw, _ = json.Marshal(r.StructuredContent)
 	if !strings.Contains(string(raw), "history is unavailable") {
 		t.Errorf("no unavailable note: %s", raw)
+	}
+}
+
+// spy wraps a Control to record every method the server calls (Symphony §11 reads, §8 writes)
+// and to fail them with an operator-detail error on demand.
+type spy struct {
+	api.Control
+	failWith error
+	calls    []string
+}
+
+func (s *spy) Board(ctx context.Context) (api.Board, error) {
+	s.calls = append(s.calls, "board")
+	if s.failWith != nil {
+		return api.Board{}, s.failWith
+	}
+	return s.Control.Board(ctx)
+}
+func (s *spy) Dispatch(ctx context.Context, id api.TicketID) error {
+	s.calls = append(s.calls, "dispatch")
+	if s.failWith != nil {
+		return s.failWith
+	}
+	return s.Control.Dispatch(ctx, id)
+}
+func (s *spy) Steer(ctx context.Context, id api.TicketID, m string) error {
+	s.calls = append(s.calls, "steer")
+	if s.failWith != nil {
+		return s.failWith
+	}
+	return s.Control.Steer(ctx, id, m)
+}
+func (s *spy) Cancel(ctx context.Context, id api.TicketID) error {
+	s.calls = append(s.calls, "cancel")
+	if s.failWith != nil {
+		return s.failWith
+	}
+	return s.Control.Cancel(ctx, id)
+}
+func (s *spy) Retry(ctx context.Context, id api.TicketID) error {
+	s.calls = append(s.calls, "retry")
+	if s.failWith != nil {
+		return s.failWith
+	}
+	return s.Control.Retry(ctx, id)
+}
+
+func TestEachToolCallsMatchingControlMethod(t *testing.T) {
+	want := map[string]string{"list_tickets": "board", "status": "board", "queue": "board",
+		"dispatch": "dispatch", "steer": "steer", "cancel": "cancel", "retry": "retry"}
+	for tool, method := range want {
+		sp := &spy{Control: newFake()}
+		cs := connect(t, sp, factorymcp.Handlers{})
+		r, err := cs.CallTool(t.Context(), &sdk.CallToolParams{Name: tool, Arguments: callArgs[tool]})
+		if err != nil || r.IsError {
+			t.Fatalf("%s: err=%v r=%+v", tool, err, r)
+		}
+		if len(sp.calls) != 1 || sp.calls[0] != method {
+			t.Errorf("%s: control calls = %v, want [%s]", tool, sp.calls, method)
+		}
+	}
+}
+
+func TestListsBothResources(t *testing.T) {
+	cs := connect(t, newFake(), factorymcp.Handlers{})
+	var uris []string
+	for r, err := range cs.Resources(t.Context(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		uris = append(uris, r.URI)
+	}
+	var tmpl []string
+	for r, err := range cs.ResourceTemplates(t.Context(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		tmpl = append(tmpl, r.URITemplate)
+	}
+	if strings.Join(uris, ",") != "factory://board" || strings.Join(tmpl, ",") != "factory://ticket/{id}" {
+		t.Errorf("resources %v templates %v", uris, tmpl)
+	}
+}
+
+var operatorDetail = regexp.MustCompile(`(?i)/home/|\.go:\d|goroutine|panic|10\.0\.0\.5|sk-secret|stack`)
+
+func TestErrorsAreToolErrorsWithoutOperatorDetail(t *testing.T) {
+	boom := errors.New("dial tcp 10.0.0.5:5432 (/home/op/x.go:42) token sk-secret goroutine 1 panic stack")
+	failing := func(context.Context) (string, error) { return "", boom }
+	h := factorymcp.Handlers{
+		Plan:          func(context.Context, factorymcp.PlanInput) (string, error) { return "", boom },
+		ApprovePlan:   func(context.Context, factorymcp.ApprovePlanInput) (string, error) { return "", boom },
+		ExplainConfig: failing, FirstRun: failing, Report: failing,
+	}
+	cs := connect(t, &spy{Control: newFake(), failWith: boom}, h)
+	for _, n := range toolNames {
+		r, err := cs.CallTool(t.Context(), &sdk.CallToolParams{Name: n, Arguments: callArgs[n]})
+		if err != nil {
+			t.Fatalf("%s: protocol error %v", n, err)
+		}
+		if !r.IsError {
+			t.Errorf("%s: want tool error", n)
+		}
+		if m := operatorDetail.FindString(text(t, r)); m != "" {
+			t.Errorf("%s leaks %q: %s", n, m, text(t, r))
+		}
+		if !strings.Contains(text(t, r), n) {
+			t.Errorf("%s: error does not name the tool: %s", n, text(t, r))
+		}
+	}
+	for _, uri := range []string{"factory://board", "factory://ticket/7"} {
+		_, err := cs.ReadResource(t.Context(), &sdk.ReadResourceParams{URI: uri})
+		if err == nil || operatorDetail.MatchString(err.Error()) {
+			t.Errorf("%s: err = %v", uri, err)
+		}
 	}
 }
