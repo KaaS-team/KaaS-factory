@@ -42,9 +42,15 @@ func unsigned(commits []Commit) []Commit {
 
 // commitsBetween lists the non-merge commits in base..head.
 func commitsBetween(dir, base, head string) ([]Commit, error) {
-	out, err := gitOut(dir, "log", "--no-merges", "--format=%H%x1f%ae%x1f%B%x1e", base+".."+head)
+	return commitsIn(dir, base+".."+head)
+}
+
+// commitsIn lists the non-merge commits git log selects with revs.
+func commitsIn(dir string, revs ...string) ([]Commit, error) {
+	args := append([]string{"log", "--no-merges", "--format=%H%x1f%ae%x1f%B%x1e"}, revs...)
+	out, err := gitOut(dir, args...)
 	if err != nil {
-		return nil, fmt.Errorf("git log %s..%s: %w", base, head, err)
+		return nil, fmt.Errorf("git log %s: %w", strings.Join(revs, " "), err)
 	}
 	var commits []Commit
 	for _, rec := range strings.Split(string(out), "\x1e") {
@@ -63,8 +69,18 @@ func commitsBetween(dir, base, head string) ([]Commit, error) {
 
 func runDCO(dir string, args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		sayln(stderr, "usage: prcheck dco <base> [head]")
+		sayln(stderr, "usage: prcheck dco <base> [head] | dco --unpushed")
 		return 2
+	}
+	if args[0] == "--unpushed" {
+		// The pre-push hook: only commits no origin ref has yet, so history already on the remote,
+		// checked when it landed, never blocks a later push.
+		commits, err := commitsIn(dir, "HEAD", "--not", "--remotes=origin")
+		if err != nil {
+			sayln(stderr, err)
+			return 2
+		}
+		return report(unsigned(commits), "every unpushed commit is signed off", stdout, stderr)
 	}
 	base, head := args[0], "HEAD"
 	if len(args) > 1 {
@@ -75,13 +91,17 @@ func runDCO(dir string, args []string, stdout, stderr io.Writer) int {
 		sayln(stderr, err)
 		return 2
 	}
-	bad := unsigned(commits)
+	return report(unsigned(commits), fmt.Sprintf("every commit in %s..%s is signed off", base, head), stdout, stderr)
+}
+
+// report names every unsigned commit and returns 1, or prints ok and returns 0.
+func report(bad []Commit, ok string, stdout, stderr io.Writer) int {
 	for _, c := range bad {
 		sayf(stderr, "%s has no Signed-off-by for %s (git commit -s)\n", c.SHA[:min(7, len(c.SHA))], c.Email)
 	}
 	if len(bad) > 0 {
 		return 1
 	}
-	sayf(stdout, "dco: every commit in %s..%s is signed off\n", base, head)
+	sayf(stdout, "dco: %s\n", ok)
 	return 0
 }
