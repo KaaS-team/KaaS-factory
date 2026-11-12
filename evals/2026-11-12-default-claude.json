@@ -1,0 +1,52 @@
+{
+  "schema": "factory.scorecard/v1",
+  "workflow": "default",
+  "agent": "claude",
+  "tickets": [
+    {
+      "fixture": "go-stack",
+      "ticket": "1",
+      "hidden_pass": true,
+      "base_green": true,
+      "merged": true,
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "wall_time": 4000000000,
+      "attempts": 1,
+      "human_touches": 0
+    },
+    {
+      "fixture": "splitbill",
+      "ticket": "1",
+      "hidden_pass": true,
+      "base_green": true,
+      "merged": true,
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "wall_time": 4000000000,
+      "attempts": 1,
+      "human_touches": 0
+    },
+    {
+      "fixture": "splitbill",
+      "ticket": "2",
+      "hidden_pass": false,
+      "base_green": true,
+      "merged": false,
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "wall_time": 4000000000,
+      "attempts": 1,
+      "human_touches": 0
+    }
+  ],
+  "aggregate": {
+    "pass_rate": 0.6666666666666666,
+    "main_green_rate": 1,
+    "tokens_per_merged_pr": 180,
+    "median_wall_time": 4000000000,
+    "human_touches_per_pr": 0,
+    "merged": 2,
+    "total": 3
+  }
+}

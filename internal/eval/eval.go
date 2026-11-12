@@ -76,6 +76,7 @@ type TicketResult struct {
 // Aggregate is the summary the pack upgrade loop compares.
 type Aggregate struct {
 	PassRate          float64       `json:"pass_rate"`
+	MainGreenRate     float64       `json:"main_green_rate"`
 	TokensPerMergedPR int64         `json:"tokens_per_merged_pr"`
 	MedianWallTime    time.Duration `json:"median_wall_time"`
 	HumanTouchesPerPR float64       `json:"human_touches_per_pr"`
@@ -85,8 +86,12 @@ type Aggregate struct {
 
 // Scorecard is the versioned eval result (schema factory.scorecard/v1).
 type Scorecard struct {
-	Schema    string         `json:"schema"`
+	Schema string `json:"schema"`
+	// Model is kept only so internal/upgrade still compiles. `factory eval` never sets it.
 	Model     string         `json:"model,omitempty"`
+	Workflow  string         `json:"workflow,omitempty"`
+	Agent     string         `json:"agent,omitempty"` // preset name, never a model name
+	Packs     string         `json:"packs,omitempty"` // sha256 of the lock file the run used
 	Tickets   []TicketResult `json:"tickets"`
 	Aggregate Aggregate      `json:"aggregate"`
 }
@@ -145,11 +150,14 @@ func Run(ctx context.Context, m Matrix, d Deps) (Scorecard, error) {
 func aggregate(rs []TicketResult) Aggregate {
 	a := Aggregate{Total: len(rs)}
 	var tokens int64
-	var touches int
+	var touches, green int
 	var walls []time.Duration
 	for _, r := range rs {
 		tokens += r.InputTokens + r.OutputTokens
 		walls = append(walls, r.WallTime)
+		if r.BaseGreen {
+			green++
+		}
 		if r.Merged {
 			a.Merged++
 			touches += r.HumanTouches
@@ -157,6 +165,7 @@ func aggregate(rs []TicketResult) Aggregate {
 	}
 	if a.Total > 0 {
 		a.PassRate = float64(a.Merged) / float64(a.Total)
+		a.MainGreenRate = float64(green) / float64(a.Total)
 	}
 	if a.Merged > 0 {
 		a.TokensPerMergedPR = tokens / int64(a.Merged)
@@ -200,16 +209,16 @@ func Compare(prev, next Scorecard, margin float64) Verdict {
 	return Verdict{}
 }
 
-// Markdown renders the scorecard. The customer view leaves out the model,
-// token counts and cost.
+// Markdown renders the scorecard. The customer view leaves out token counts and cost.
 func Markdown(sc Scorecard, customer bool) string {
 	var b strings.Builder
 	a := sc.Aggregate
 	b.WriteString("# Eval scorecard\n\n")
-	if !customer && sc.Model != "" {
-		fmt.Fprintf(&b, "Model: %s\n\n", sc.Model)
+	if !customer && (sc.Workflow != "" || sc.Agent != "") {
+		fmt.Fprintf(&b, "Workflow: %s\n\nAgent: %s\n\n", sc.Workflow, sc.Agent)
 	}
 	fmt.Fprintf(&b, "- Pass rate: %.2f (%d of %d)\n", a.PassRate, a.Merged, a.Total)
+	fmt.Fprintf(&b, "- Main green rate: %.2f\n", a.MainGreenRate)
 	if !customer {
 		fmt.Fprintf(&b, "- Tokens per merged PR: %d\n", a.TokensPerMergedPR)
 	}
