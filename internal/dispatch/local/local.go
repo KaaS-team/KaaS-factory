@@ -206,8 +206,8 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		cancel()
 		return api.Session{}, err
 	}
-	ownGroup(cmd)
-	cmd.Cancel = func() error { return killGroup(cmd) }
+	sandbox.OwnGroup(cmd)
+	cmd.Cancel = func() error { return sandbox.KillGroup(cmd) }
 	cmd.WaitDelay = 2 * time.Second
 	out, err := cmd.StdoutPipe()
 	if err != nil {
@@ -227,7 +227,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			p.usage.feed(sc.Bytes())
 		}
 		p.err = cmd.Wait()
-		_ = killGroup(cmd) // anything the agent left behind
+		_ = sandbox.KillGroup(cmd) // anything the agent left behind
 		p.end = d.cfg.Now()
 		cancel()
 		close(p.done)
