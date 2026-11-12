@@ -125,7 +125,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 	cmd.Flags().StringVar(&packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
 	cmd.Flags().StringVar(&fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
 	cmd.Flags().StringVar(&outDir, "out", "evals", "directory the scorecard is written to")
-	cmd.AddCommand(newDiffCommand())
+	cmd.AddCommand(newDiffCommand(), newCheckCommand())
 	return cmd
 }
 
@@ -178,4 +178,36 @@ func newDiffCommand() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newCheckCommand() *cobra.Command {
+	var fixtures string
+	var fix bool
+	cmd := &cobra.Command{
+		Use:           "check",
+		Short:         "Lint the fixtures; exit 1 when one is malformed",
+		Long:          "Checks every fixture for its required file and keys, its seed, and a hidden directory per ticket.\n--fix writes back only what the tree determines: the name and the seed key.",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ps, err := CheckFixtures(fixtures, fix)
+			if err != nil {
+				return err
+			}
+			if len(ps) == 0 {
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), "ok")
+				return err
+			}
+			for _, p := range ps {
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), p); err != nil {
+					return err
+				}
+			}
+			return ErrFixtureProblems
+		},
+	}
+	cmd.Flags().StringVar(&fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
+	cmd.Flags().BoolVar(&fix, "fix", false, "write back the data the tree determines")
+	return cmd
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/eval/grade"
 )
 
 // SchemaV1 is the version string written into every scorecard.
@@ -24,6 +25,8 @@ const DefaultMargin = 0.10
 // FixtureTicket is one ticket in a fixture.
 type FixtureTicket struct {
 	api.Ticket
+	// Grade, when set, makes the hidden command run under grade.Script and be graded from its log.
+	Grade *grade.Spec `json:"grade,omitempty"`
 }
 
 // Fixture is a repo seed, its tickets and the hidden acceptance command.

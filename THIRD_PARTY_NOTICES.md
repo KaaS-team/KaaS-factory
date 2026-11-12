@@ -159,6 +159,7 @@ Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trig
 
 - `internal/pick/fair.go` from `packages/redis-worker/src/fair-queue/schedulers/drr.ts` (algorithm only, in process, no Redis or Lua) [tested by `internal/pick/fair_test.go`]
 
+
 ## SWE-bench/SWE-bench@02e7a74
 
 Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
@@ -202,3 +203,7 @@ Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technol
 
 The bracketed-paste framing, the SIGINT-then-kill close and the stability gate are written after
 `lib/httpapi/claude.go`, `lib/termexec/termexec.go` and `lib/screentracker` and copy none of their code.
+
+- `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
+- `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
+- `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)

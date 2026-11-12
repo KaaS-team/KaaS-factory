@@ -111,6 +111,17 @@ Run the fixtures matrix and write a scorecard
 | `--packs` | string | `` | packs lock file the run used, e.g. factory.lock |
 | `--workflow` | string | `` | workflow name (required) |
 
+## factory eval check
+
+`factory eval check [flags]`
+
+Lint the fixtures; exit 1 when one is malformed
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--fix` | bool | `false` | write back the data the tree determines |
+| `--fixtures` | string | `evals/fixtures` | directory of fixtures |
+
 ## factory eval diff
 
 `factory eval diff <old.json> <new.json>`
