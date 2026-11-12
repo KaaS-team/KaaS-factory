@@ -4,12 +4,14 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/api/porttest"
+	"github.com/KaaS-team/factory/internal/dispatch/brief"
 )
 
 // activeTracker lists every ticket that is not finished, as a real tracker's
@@ -144,6 +146,11 @@ func TestTickStallRetryNeedsHuman(t *testing.T) {
 	if tr.Phases["a"] != api.PhaseNeedsHuman || len(tr.Comments["a"]) == 0 {
 		t.Fatalf("phase %v comments %v", tr.Phases["a"], tr.Comments["a"])
 	}
+	for _, c := range tr.Comments["a"] { // the session URL stays operator-only
+		if strings.Contains(c, "fake_") || strings.Contains(c, "http") {
+			t.Fatalf("tracker comment leaks the session: %q", c)
+		}
+	}
 }
 
 func TestTickCancelsTerminal(t *testing.T) {
@@ -228,3 +235,30 @@ func TestTickCancelledBeforeStartMakesNoCall(t *testing.T) {
 }
 
 func (g *guard) Name() string { return "guard" }
+
+// briefSpy records the briefs Tick dispatches.
+type briefSpy struct {
+	*porttest.Dispatcher
+	briefs []api.Brief
+}
+
+func (s *briefSpy) Dispatch(ctx context.Context, b api.Brief) (api.Session, error) {
+	s.briefs = append(s.briefs, b)
+	return s.Dispatcher.Dispatch(ctx, b)
+}
+
+// Every dispatcher refuses a brief whose Name is not brief.Name(ticket, attempt), so Tick must use it.
+func TestDispatchBriefNameIsBriefName(t *testing.T) {
+	c := &clock{t0}
+	spy := &briefSpy{Dispatcher: porttest.NewDispatcher(1)}
+	deps := newDeps(activeTracker{porttest.NewTracker(tkt("a"))}, porttest.NewObserver(), spy, c)
+	var state *State
+	Tick(context.Background(), deps, &state, cfg())
+	if len(spy.briefs) != 1 {
+		t.Fatalf("want one dispatch, got %d", len(spy.briefs))
+	}
+	want, err := brief.Name("a", 1)
+	if err != nil || spy.briefs[0].Name != want || want != "v9-a-a1.md" {
+		t.Fatalf("brief name %q, want %q (err %v)", spy.briefs[0].Name, want, err)
+	}
+}
