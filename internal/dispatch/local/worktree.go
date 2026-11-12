@@ -36,7 +36,7 @@ func (g GitWorktrees) Add(ctx context.Context, b api.Brief) (string, error) {
 	if err := os.MkdirAll(g.Root, 0o755); err != nil {
 		return "", err
 	}
-	cmd := exec.CommandContext(ctx, "git", "-C", g.Repo, "worktree", "add", "-B", b.Branch, dir, "origin/"+b.Base)
+	cmd := exec.CommandContext(ctx, "git", "-c", "core.hooksPath=/dev/null", "-C", g.Repo, "worktree", "add", "-B", b.Branch, dir, "origin/"+b.Base)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("local: git worktree add: %w: %s", err, firstLine(out))
 	}
