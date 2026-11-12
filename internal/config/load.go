@@ -105,6 +105,9 @@ func Load(s Sources) (*Loaded, error) {
 		}
 		l.layers[LayerFlags] = vals
 	}
+	if err := l.checkCeilings(); err != nil {
+		return nil, err
+	}
 	l.resolve()
 	return l, nil
 }

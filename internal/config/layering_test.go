@@ -44,7 +44,7 @@ var layerRows = []layerRow{
 	{key: "risk_max", hi: "medium", lo: "low"},
 	{key: "auto_merge", hi: "true", lo: "false"},
 	{key: "auto_merge_max_risk", hi: "high", lo: "medium"},
-	{key: "requester_cannot_approve", hi: "true", lo: "false"},
+	{key: "requester_cannot_approve", hi: "false", lo: "true"},
 }
 
 func yamlFor(key, val string) []byte {
