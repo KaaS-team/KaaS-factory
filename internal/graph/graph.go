@@ -60,6 +60,8 @@ type Node struct {
 	Budget int
 	// Skills names the skills the node's agent loads.
 	Skills []string
+	// Credentials names the credentials the node asks for. An agent node never holds a write one.
+	Credentials []string
 }
 
 // Edge leads from one node to another when From ends with outcome On. If is an optional condition
@@ -85,6 +87,10 @@ type Graph struct {
 	ModelTier   string
 	Budget      float64
 	SafeOutputs []WriteKind
+	// Credentials is the top-level credentials list of a markdown workflow; it applies to its agent.
+	Credentials []string
+	// Hash is the sha256 (hex) of the workflow's sorted-key canonical JSON, for pinning in a scorecard or ledger.
+	Hash string
 	// Warnings lists deprecated forms the file used, such as the top-level agents map. Load does not print them.
 	Warnings []string
 	nodes    []Node

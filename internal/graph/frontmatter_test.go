@@ -39,6 +39,7 @@ func TestLoadMarkdownEqualsYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	a.Hash, b.Hash = "", "" // the file text differs (nodes or steps), so the hashes do
 	if !reflect.DeepEqual(a, b) {
 		t.Errorf("graphs differ:\n--- md\n%s--- yaml\n%s", describe(a), describe(b))
 	}
