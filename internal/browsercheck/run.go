@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
@@ -84,12 +85,16 @@ func Run(ctx context.Context, o Options) Result {
 		return Result{Failed: 1, Message: "browser: " + err.Error()}
 	}
 
+	env, err := newPageEnv(bctx)
+	if err != nil {
+		return Result{Failed: 1, Message: "browser: " + err.Error()}
+	}
 	res := Result{}
 	for i, s := range o.Steps {
 		mu.Lock()
 		errs := consoleErrs
 		mu.Unlock()
-		if err := runStep(bctx, s, o.OutDir, errs); err != nil {
+		if err := runStep(bctx, env, s, o.OutDir, errs); err != nil {
 			res.Failed = 1
 			res.Message = fmt.Sprintf("browser: step %d %s: %v", i+1, s.Kind, err)
 			return res
@@ -99,14 +104,32 @@ func Run(ctx context.Context, o Options) Result {
 	return res
 }
 
-func runStep(ctx context.Context, s Step, outDir string, consoleErrs int) error {
+// settleAll is what every action waits for before the next step runs.
+var settleAll = Conditions{Ready: true, Quiet: true, Network: true}
+
+const (
+	actionCap   = time.Second
+	quietWindow = 80 * time.Millisecond
+)
+
+func runStep(ctx context.Context, env *pageEnv, s Step, outDir string, consoleErrs int) error {
+	began := env.now()
 	switch s.Kind {
 	case "goto":
-		return chromedp.Do(ctx, chromedp.Navigate(s.URL), chromedp.WaitReady("body"))
+		if err := chromedp.Do(ctx, chromedp.Navigate(s.URL)); err != nil {
+			return err
+		}
+		Settle(env, settleAll, actionCap, quietWindow, began)
 	case "click":
-		return chromedp.Do(ctx, chromedp.Click(chromedp.CSS(s.Selector)))
+		if err := chromedp.Do(ctx, chromedp.Click(chromedp.CSS(s.Selector))); err != nil {
+			return err
+		}
+		Settle(env, settleAll, actionCap, quietWindow, began)
 	case "fill":
-		return chromedp.Do(ctx, chromedp.SetValue(chromedp.CSS(s.Selector), s.Value))
+		if err := chromedp.Do(ctx, chromedp.SetValue(chromedp.CSS(s.Selector), s.Value)); err != nil {
+			return err
+		}
+		Settle(env, settleAll, actionCap, quietWindow, began)
 	case "expect_text":
 		body, err := chromedp.Run(ctx, chromedp.Text(chromedp.CSS("body")))
 		if err != nil {

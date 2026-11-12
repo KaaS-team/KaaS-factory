@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## browser-use/browser-use@dfb6a73
+
+Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Gregor Zunic)
+
+- `internal/browsercheck/settle.go` from `browser_use/ax.py` (`settle`, `PROBE_JS` reduced to ready and idle)
