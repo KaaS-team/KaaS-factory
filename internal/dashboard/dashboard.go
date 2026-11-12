@@ -60,9 +60,24 @@ func Handler(ctl api.Control, opts Options) http.Handler {
 }
 
 type view struct {
-	Operator bool
-	Board    api.Board
-	Slot     api.Slot
+	Operator   bool
+	Board      api.Board
+	Slot       api.Slot
+	History    []historyItem
+	HasHistory bool // the Control keeps history; false shows a note instead of a list
+}
+
+// historyItem is one past event on the ticket page. Key matches the key the page script
+// builds from a live event, so the script can skip an event the page already lists.
+type historyItem struct {
+	Key  string
+	Time string
+	Kind string
+}
+
+func newHistoryItem(e api.Event) historyItem {
+	t := e.Time.Format(time.RFC3339Nano)
+	return historyItem{Key: t + " " + e.Kind, Time: t, Kind: e.Kind}
 }
 
 func (s *server) render(w http.ResponseWriter, name string, v view) {
@@ -96,7 +111,22 @@ func (s *server) ticket(w http.ResponseWriter, r *http.Request) {
 	id := api.TicketID(r.PathValue("id"))
 	for _, sl := range b.Slots {
 		if sl.Ticket.ID == id {
-			s.render(w, "ticket.html", view{Board: b, Slot: sl})
+			v := view{Board: b, Slot: sl}
+			if h, ok := s.ctl.(api.Historian); ok {
+				evs, err := h.History(r.Context(), id)
+				if err != nil {
+					http.Error(w, "history unavailable", http.StatusBadGateway)
+					return
+				}
+				v.HasHistory = true
+				for _, e := range evs {
+					if !s.opts.Operator && hidden(e.Kind) {
+						continue
+					}
+					v.History = append(v.History, newHistoryItem(e))
+				}
+			}
+			s.render(w, "ticket.html", v)
 			return
 		}
 	}

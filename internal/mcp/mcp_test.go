@@ -269,7 +269,7 @@ func TestTicketResourceHistory(t *testing.T) {
 			f := newFake()
 			cs := connect(t, tc.ctl(f), factorymcp.Handlers{})
 			tk := readTicket(t, cs, "7")
-			var kinds []string = []string{}
+			kinds := []string{}
 			for _, e := range tk.Events {
 				kinds = append(kinds, e.Kind)
 			}
