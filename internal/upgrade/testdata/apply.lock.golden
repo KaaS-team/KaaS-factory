@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "kind": "skill",
+      "ref": "o/r@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#skills/b/SKILL.md",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sha256": "6ca7ea2feefc88ecb5ed6356ed963f47dc9137f82526fdd25d618ea626d0803f",
+      "licence": "MIT"
+    },
+    {
+      "kind": "skill",
+      "ref": "o/r@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb#skills/a/SKILL.md",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sha256": "11507a0e2f5e69d5dfa40a62a1bd7b6ee57e6bcd85c67c9b8431b36fff21c437",
+      "licence": "MIT"
+    }
+  ]
+}
