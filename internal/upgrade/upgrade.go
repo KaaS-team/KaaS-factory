@@ -82,18 +82,14 @@ type Verdict struct {
 	Reason string
 }
 
-// Decide bumps when the pass rate did not fall and tokens per merged PR did not rise by more than
-// tolerance (a fraction; zero or less means DefaultTolerance).
+// Decide bumps unless eval.Compare finds the new scorecard worse than the old (tolerance is the
+// allowed rise in tokens per merged PR as a fraction; zero or less means DefaultTolerance).
 func Decide(old, next eval.Scorecard, tolerance float64) Verdict {
 	if tolerance <= 0 {
 		tolerance = DefaultTolerance
 	}
-	o, n := old.Aggregate, next.Aggregate
-	if n.PassRate < o.PassRate {
-		return Verdict{Reason: fmt.Sprintf("pass rate fell from %.2f to %.2f", o.PassRate, n.PassRate)}
-	}
-	if o.TokensPerMergedPR > 0 && float64(n.TokensPerMergedPR-o.TokensPerMergedPR) > float64(o.TokensPerMergedPR)*tolerance {
-		return Verdict{Reason: fmt.Sprintf("tokens per merged PR rose from %d to %d, more than %.0f%%", o.TokensPerMergedPR, n.TokensPerMergedPR, tolerance*100)}
+	if v := eval.Compare(old, next, tolerance); v.Worse {
+		return Verdict{Reason: v.Reason}
 	}
 	return Verdict{Bump: true, Reason: fmt.Sprintf("pass rate not lower and tokens per merged PR within %.0f%%", tolerance*100)}
 }
