@@ -329,6 +329,17 @@ Show tokens per merged PR, rework, human touches and cycle time (operator only)
 
 Queue a new attempt for a ticket
 
+## factory review
+
+`factory review [flags]`
+
+Run the check packs in .factory/checks against the uncommitted changes, edits returned as patches
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--base` | string | `` | ref the prompt's diff starts from (empty: only the uncommitted changes) |
+| `--timeout` | duration | `10m0s` | limit per check |
+
 ## factory run
 
 `factory run [flags]`
