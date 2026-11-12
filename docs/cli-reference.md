@@ -122,6 +122,12 @@ Lint the fixtures; exit 1 when one is malformed
 | `--fix` | bool | `false` | write back the data the tree determines |
 | `--fixtures` | string | `evals/fixtures` | directory of fixtures |
 
+## factory eval compare
+
+`factory eval compare <old> <new>`
+
+Compare two sets of trajectory files offline
+
 ## factory eval diff
 
 `factory eval diff <old.json> <new.json>`
@@ -133,6 +139,12 @@ Compare two scorecards; exit 1 when the new one is worse
 `factory eval replay <run.trace.jsonl>`
 
 Print the spans a run recorded, gate spans with their triggered flag
+
+## factory eval stats
+
+`factory eval stats <trajectories>`
+
+Summarise trajectory files offline
 
 ## factory first-run
 
