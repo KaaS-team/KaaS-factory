@@ -270,3 +270,63 @@ func viaJSON(v map[string]any) map[string]any {
 	_ = json.Unmarshal(b, &out)
 	return out
 }
+
+var _ api.Lister = (*jira.Tracker)(nil)
+
+// Symphony §14: Active is the restart read, tickets claimed and not finished, in one search.
+func TestActive(t *testing.T) {
+	cases := []struct {
+		name string
+		mut  func(*jira.Config)
+		want []string
+	}{
+		{"claimed status only", nil, []string{"SHOP-2"}},
+		{"another active phase adds its status", func(c *jira.Config) {
+			c.Phases[api.PhaseStalled] = "To Do"
+		}, []string{"SHOP-2", "SHOP-5"}},
+		{"a status shared with a finished phase is not active", func(c *jira.Config) {
+			c.Phases[api.PhaseQueued] = "In Review"
+		}, []string{"SHOP-2"}},
+		{"no active phase mapped", func(c *jira.Config) {
+			c.Phases = map[api.Phase]string{api.PhaseReady: "Ready", api.PhaseDone: "In Review"}
+		}, []string{}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFakeJira(t)
+			f.add(1, "Ready")
+			f.add(2, "In Progress")
+			f.add(3, "In Review")
+			f.add(4, "Done")
+			f.add(5, "To Do")
+			got, err := newTracker(t, f, c.mut).Active(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(ids(got), c.want) {
+				t.Fatalf("got %v, want %v", ids(got), c.want)
+			}
+			if len(c.want) == 0 && len(f.Requests) != 0 {
+				t.Fatalf("no active status should make no request, got %v", f.calls())
+			}
+		})
+	}
+}
+
+func TestActiveSendsJQL(t *testing.T) {
+	f := newFakeJira(t)
+	if _, err := newTracker(t, f, func(c *jira.Config) {
+		c.Phases[api.PhaseRunning] = `Work "x"`
+	}).Active(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	r := f.Requests[0]
+	want := `project = "SHOP" AND statusCategory != Done AND status in ("In Progress", "Work \"x\"") ORDER BY created ASC`
+	if len(f.Requests) != 1 || r.Method != "POST" || r.Path != "/rest/api/3/search/jql" || r.Body["jql"] != want {
+		t.Fatalf("requests = %+v", f.Requests)
+	}
+	wantBody := map[string]any{"jql": want, "fields": []any{"summary", "description", "labels", "status", "created"}, "maxResults": float64(100)}
+	if !reflect.DeepEqual(r.Body, wantBody) {
+		t.Fatalf("body = %v, want %v", r.Body, wantBody)
+	}
+}
