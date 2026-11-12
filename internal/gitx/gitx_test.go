@@ -262,6 +262,15 @@ func TestPushLeaseCASOneWinner(t *testing.T) {
 			if got != ca && got != cb {
 				t.Fatalf("remote lease = %s, want one of the takers", got)
 			}
+
+			// Deterministic half: a taker holding the old value after the winner landed always loses.
+			loser, _ := gb.NewLeaseCommit(ctx, old, "holder=late")
+			if err := gb.PushLease(ctx, "origin", ref, loser, old); !errors.Is(err, gitx.ErrCASLost) {
+				t.Fatalf("stale taker = %v, want ErrCASLost", err)
+			}
+			if after, _ := ga.RemoteRef(ctx, "origin", ref); after != got {
+				t.Fatalf("remote lease moved to %s, want %s", after, got)
+			}
 		})
 	}
 }
