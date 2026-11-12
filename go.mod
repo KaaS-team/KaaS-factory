@@ -13,6 +13,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/landlock-lsm/go-landlock v0.11.2
 	github.com/modelcontextprotocol/go-sdk v1.8.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/oauth2 v0.36.0
