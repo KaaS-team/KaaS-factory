@@ -1,6 +1,10 @@
 package github
 
-import "context"
+import (
+	"context"
+
+	"github.com/KaaS-team/factory/internal/marker"
+)
 
 // PlanApproval returns the id of the comment that approves the latest plan in the thread, or 0.
 // Approval is a trusted `/factory approve` comment posted after that plan and not yet handled, and
@@ -9,7 +13,7 @@ import "context"
 func PlanApproval(ctx context.Context, tr *Trust, cs []Comment) int64 {
 	plan := -1
 	for i, c := range cs {
-		if _, ok := Latest(ParseData(c.Body), stagePlan); ok && tr.Trusted(ctx, c.Author) {
+		if _, ok := marker.Latest(marker.ParseData(c.Body), stagePlan); ok && tr.Trusted(ctx, c.Author) {
 			plan = i
 		}
 	}

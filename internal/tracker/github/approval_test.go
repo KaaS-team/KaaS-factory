@@ -30,6 +30,7 @@ func TestPlanApproval(t *testing.T) {
 		{"cancel after approve voids it", []gh.Comment{plan, {ID: 12, Author: "dev", Body: "/factory approve"}, {ID: 14, Author: "dev", Body: "/factory cancel"}}, 0},
 		{"revised plan needs a new approve", []gh.Comment{plan, {ID: 12, Author: "dev", Body: "/factory approve"}, {ID: 14, Author: "dev", Body: "/factory revise x"}, {ID: 15, Author: "bot", Body: planBody}}, 0},
 		{"new approve on the revised plan", []gh.Comment{plan, {ID: 14, Author: "dev", Body: "/factory revise x"}, {ID: 15, Author: "bot", Body: planBody}, {ID: 16, Author: "dev", Body: "/factory approve"}}, 16},
+		{"a plan marker from a reader is not a plan", []gh.Comment{{ID: 10, Author: "reader", Body: planBody}, {ID: 12, Author: "dev", Body: "/factory approve"}}, 0},
 		{"plain text is not approval", []gh.Comment{plan, {ID: 12, Author: "dev", Body: "approved, go ahead"}}, 0},
 	}
 	for _, tc := range cases {
