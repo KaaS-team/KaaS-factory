@@ -14,6 +14,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/graph/interrupt"
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/observe"
@@ -60,7 +61,10 @@ type Deps struct {
 	Meter      *meter.Meter
 	Queue      MergeQueue
 	Stages     *Stages // nil runs each ticket as one session
-	Clock      Clock   // RealClock when nil
+	// Interrupts records each plan-approval wait as a durable interrupt and checks the answer against
+	// its schema before the ticket resumes. New fills it from a Store that has an Interrupts method.
+	Interrupts *interrupt.Book
+	Clock      Clock // RealClock when nil
 	OnError    func(error)
 	Log        *eventlog.Store // step log replayed on restart; nil keeps none
 }
@@ -70,6 +74,7 @@ type Config struct {
 	Reconcile   reconcile.Config
 	Team        string     // meter key team
 	Budget      api.Budget // per-ticket cap shown on the board
+	SessionCap  float64    // USD a ticket may spend before a new dispatch is refused; 0 is no cap
 	EventBuffer int        // events a subscriber may fall behind by before it is dropped (64)
 }
 
@@ -109,6 +114,14 @@ func New(d Deps, cfg Config) (*Core, error) {
 		return nil, errors.New("core: Deps.Meter is required")
 	case d.Queue == nil:
 		return nil, errors.New("core: Deps.Queue is required")
+	}
+	if ib, ok := d.Store.(interface {
+		Interrupts() (*interrupt.Book, error)
+	}); ok && d.Interrupts == nil {
+		var err error
+		if d.Interrupts, err = ib.Interrupts(); err != nil {
+			return nil, err
+		}
 	}
 	if d.Clock == nil {
 		d.Clock = RealClock{}
@@ -181,6 +194,22 @@ func (c *Core) Tick(ctx context.Context) {
 	c.hub.emit(KindTick, "", map[string]any{"slots": running, "ready": max(ready, 0), "queued": len(queued)})
 }
 
+// restoreStage puts a ticket back at the workflow node its thread says it reached. A parked ticket
+// with no saved position is left alone: it was not parked by a workflow node.
+func (c *Core) restoreStage(ctx context.Context, t api.Ticket) *stageRun {
+	if c.d.Stages == nil {
+		return nil
+	}
+	if c.parked[t.ID] {
+		if _, ok := c.savedPosition(ctx, t.ID); !ok {
+			return nil
+		}
+	}
+	st, err := c.stageOf(ctx, t.ID, t.Workflow)
+	c.report(err)
+	return st
+}
+
 // recover builds the running set once: from the tracker's Active list when it
 // has one, otherwise from Ready (Symphony 14.3). A ticket with a work branch
 // for some attempt is running that attempt.
@@ -204,23 +233,29 @@ func (c *Core) recover(ctx context.Context) {
 		c.report(err)
 		for _, t := range parked {
 			c.parked[t.ID] = true
+			c.tickets[t.ID] = t
+			c.restoreStage(ctx, t)
 		}
 	}
 	s := &reconcile.State{Entries: map[api.TicketID]reconcile.Entry{}}
 	for _, t := range tickets {
+		base := 0 // attempts the finished nodes used; the observer counts attempts across nodes
+		if st := c.restoreStage(ctx, t); st != nil {
+			base = st.base
+		}
 		for n := c.cfg.Reconcile.MaxAttempts; n >= 1; n-- {
-			o, err := c.d.Observer.Observe(ctx, t.ID, n)
+			o, err := c.d.Observer.Observe(ctx, t.ID, base+n)
 			if err != nil {
 				c.report(err)
 				break
 			}
-			if o.Attempt == n && o.Branch != "" {
+			if o.Attempt == base+n && o.Branch != "" {
 				started := o.LastPush
 				if started.IsZero() {
 					started = c.d.Clock.Now()
 				}
 				s.Entries[t.ID] = reconcile.Entry{Ticket: t, Phase: api.PhaseRunning, Attempt: n, StartedAt: started}
-				c.attempts[t.ID] = n
+				c.attempts[t.ID] = base + n
 				c.lastPush[t.ID] = o.LastPush
 				break
 			}

@@ -119,3 +119,20 @@ func TestAllowedOnlyByAllow(t *testing.T) {
 		t.Fatal("Allowed must be false on a plain context and true after Allow")
 	}
 }
+
+func TestPositionRoundTripsAndSkipsOtherVersions(t *testing.T) {
+	p := marker.Position{Node: "build", Base: 2, Fails: 1, PR: 7, Input: `say "hi" <!-- x -->`}
+	body := marker.EncodePosition("Factory position: build.", p)
+	got, ok := marker.LatestPosition("noise", body)
+	p.V = marker.PositionV
+	if !ok || got != p {
+		t.Fatalf("LatestPosition = %+v, %v, want %+v", got, ok, p)
+	}
+	later := marker.EncodeData("x", marker.StagePosition, json.RawMessage(`{"v":99,"node":"future"}`))
+	if got, ok := marker.LatestPosition(body, later); !ok || got.Node != "build" {
+		t.Fatalf("a newer version was read: %+v, %v", got, ok)
+	}
+	if _, ok := marker.LatestPosition(marker.EncodeData("x", marker.StagePosition, json.RawMessage(`{"v":1}`))); ok {
+		t.Fatal("a position without a node was accepted")
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/api/porttest"
 	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/graph/interrupt"
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/reconcile"
@@ -71,6 +72,11 @@ const planWorkflow = `steps:
 // parkedRig runs ticket 5 through the plan node of a plan, approval, build workflow until it waits.
 func parkedRig(t *testing.T) (*rig, *threadTracker, map[string]api.Brief) {
 	t.Helper()
+	return parkedRigWith(t, nil)
+}
+
+func parkedRigWith(t *testing.T, book *interrupt.Book) (*rig, *threadTracker, map[string]api.Brief) {
+	t.Helper()
 	g, err := graph.ParseYAML("w", []byte(planWorkflow))
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +94,7 @@ func parkedRig(t *testing.T) (*rig, *threadTracker, map[string]api.Brief) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	r.c, err = New(Deps{Tracker: tt, Dispatcher: briefDisp{r.disp, briefs}, Observer: r.obs, Store: st, Meter: r.m, Queue: r.mq, Clock: r.clk,
+	r.c, err = New(Deps{Tracker: tt, Dispatcher: briefDisp{r.disp, briefs}, Observer: r.obs, Store: st, Meter: r.m, Queue: r.mq, Clock: r.clk, Interrupts: book,
 		Stages:  &Stages{Graph: func(string) (*graph.Graph, error) { return g, nil }},
 		OnError: func(err error) { t.Errorf("loop error: %v", err) }},
 		Config{Reconcile: reconcile.Config{Tick: 30 * time.Second}})

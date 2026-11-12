@@ -68,6 +68,7 @@ type Report struct {
 	Landed   []string
 	Ejected  []Ejection
 	Dropped  []string
+	Returned []string // PRs the precheck sent back to their agent
 	GateRuns int
 }
 
@@ -90,6 +91,7 @@ type Runner struct {
 	Store Store
 	Cfg   Config
 	Sleep func(ctx context.Context, d time.Duration) error // waits between push retries; real time when nil
+	Pre   *Precheck                                        // optional; nil skips the stale-diff and syntax precheck
 }
 
 // Run plans and applies actions until the queue has nothing left to do or ctx ends. The base only
@@ -115,6 +117,9 @@ func (r *Runner) Run(ctx context.Context) (Report, error) {
 				return rep, fmt.Errorf("pr %s: %w", e.ID, err)
 			}
 		}
+		if queue, err = r.precheck(ctx, queue, st, &rep); err != nil {
+			return rep, err
+		}
 		actions := Plan(queue, st)
 		if len(actions) == 0 {
 			return rep, nil
@@ -125,6 +130,46 @@ func (r *Runner) Run(ctx context.Context) (Report, error) {
 			}
 		}
 	}
+}
+
+// precheck sends PRs that no longer apply to the base back to their agent and returns the rest. Only
+// PRs that are still open at their queued head are checked; Plan handles the others.
+func (r *Runner) precheck(ctx context.Context, queue []Entry, st State, rep *Report) ([]Entry, error) {
+	if r.Pre == nil || len(queue) == 0 {
+		return queue, nil
+	}
+	var live, rest []Entry
+	for _, e := range queue {
+		if p := st.PRs[e.ID]; p.Open && !p.Merged && p.Head == e.Head {
+			live = append(live, e)
+		} else {
+			rest = append(rest, e)
+		}
+	}
+	ok, bad, err := r.Pre.Filter(ctx, st.Base, live)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range bad {
+		if err := r.Pre.Return(ctx, f); err != nil {
+			return nil, fmt.Errorf("return %s: %w", f.ID, err)
+		}
+		rep.Returned = append(rep.Returned, f.ID)
+	}
+	keep := map[string]bool{}
+	for _, e := range ok {
+		keep[e.ID] = true
+	}
+	for _, e := range rest {
+		keep[e.ID] = true
+	}
+	var out []Entry
+	for _, e := range queue {
+		if keep[e.ID] {
+			out = append(out, e)
+		}
+	}
+	return out, nil
 }
 
 func (r *Runner) apply(ctx context.Context, a Action, st State, results map[string]Result, rep *Report, pushRetries *int) (map[string]Result, error) {

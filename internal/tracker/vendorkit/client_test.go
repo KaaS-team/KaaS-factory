@@ -19,7 +19,6 @@ func newClient(sleeps *[]time.Duration) *vendorkit.Client {
 		MaxRetries: 2,
 		Base:       100 * time.Millisecond,
 		Sleep:      func(_ context.Context, d time.Duration) error { *sleeps = append(*sleeps, d); return nil },
-		Jitter:     func(d time.Duration) time.Duration { return d / 2 },
 	}
 }
 
@@ -70,14 +69,16 @@ func TestDoRetryRules(t *testing.T) {
 	}
 }
 
+// Symphony §8.4: waits grow exponentially; the shared policy jitters each into [0.8x, x).
 func TestDoBackoffGrowsWithJitter(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(503) }))
 	defer srv.Close()
 	var sleeps []time.Duration
 	_, _ = newClient(&sleeps).Do(context.Background(), "GET", srv.URL, nil, nil)
-	want := []time.Duration{150 * time.Millisecond, 300 * time.Millisecond}
-	if len(sleeps) != 2 || sleeps[0] != want[0] || sleeps[1] != want[1] {
-		t.Fatalf("sleeps = %v, want %v", sleeps, want)
+	if len(sleeps) != 2 ||
+		sleeps[0] < 80*time.Millisecond || sleeps[0] >= 100*time.Millisecond ||
+		sleeps[1] < 160*time.Millisecond || sleeps[1] >= 200*time.Millisecond {
+		t.Fatalf("sleeps = %v, want [80ms,100ms) then [160ms,200ms)", sleeps)
 	}
 }
 

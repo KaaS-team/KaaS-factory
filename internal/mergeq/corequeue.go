@@ -33,6 +33,9 @@ type Deps struct {
 	Gate    Gate
 	Heads   Heads
 	Cfg     Config
+	Applier Applier // optional; when set, a PR that no longer applies to the base goes back to its agent
+	Syntax  Syntax  // optional; needs Paths too
+	Paths   func(ctx context.Context, id, head string) ([]string, error)
 }
 
 // CoreQueue is the merge queue the core loop feeds: a Runner over tracker-held queue state.
@@ -131,7 +134,20 @@ func (q *CoreQueue) Run(ctx context.Context) (Report, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	r := &Runner{Git: q.d.Git, Gate: q.d.Gate, Store: coreStore{q}, Cfg: q.d.Cfg}
+	if q.d.Applier != nil {
+		r.Pre = &Precheck{Applier: q.d.Applier, Syntax: q.d.Syntax, Paths: q.d.Paths, Return: q.returnToAgent}
+	}
 	return r.Run(ctx)
+}
+
+// returnToAgent comments the failing path on the ticket and puts it back in the running phase, so the
+// agent fixes it and the PR is queued again; the ticket leaves the merge queue.
+func (q *CoreQueue) returnToAgent(ctx context.Context, f Failure) error {
+	tid := api.TicketID(f.ID)
+	if err := q.d.Tracker.Comment(ctx, tid, "Returned to the agent: the PR "+f.Reason+". Failing path: `"+f.Path+"`."); err != nil {
+		return err
+	}
+	return q.d.Tracker.SetPhase(ctx, tid, api.PhaseRunning)
 }
 
 // coreStore is the Runner's Store over the tracker.

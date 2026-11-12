@@ -5,144 +5,164 @@
 package scim
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
+
+	lib "github.com/elimity-com/scim"
+	scimerr "github.com/elimity-com/scim/errors"
+	filter "github.com/scim2/filter-parser/v2"
 )
 
-type member struct {
-	Value string `json:"value"`
-}
+type groupHandler struct{ store Store }
 
-func groupView(g Group) map[string]any {
-	ms := make([]map[string]any, 0, len(g.Members))
+func groupResource(g Group) lib.Resource {
+	ms := make([]any, 0, len(g.Members))
 	for _, id := range g.Members {
-		ms = append(ms, map[string]any{"value": id, "$ref": usersPath + "/" + id})
+		ms = append(ms, map[string]any{"value": id, "$ref": basePath + "/Users/" + id})
 	}
-	return map[string]any{
-		"schemas":     []string{schemaGroup},
-		"id":          g.ID,
-		"displayName": g.DisplayName,
-		"members":     ms,
-		"meta":        map[string]any{"resourceType": "Group", "location": groupsPath + "/" + g.ID},
-	}
+	return lib.Resource{ID: g.ID, Attributes: lib.ResourceAttributes{"displayName": g.DisplayName, "members": ms}}
 }
 
-func (h *handler) listGroups(w http.ResponseWriter, r *http.Request) {
-	name, _, ok := filterValue(r, "displayName")
-	if !ok {
-		fail(w, 400, "invalidFilter", `only the filter displayName eq "<value>" is supported`)
-		return
-	}
-	groups, err := h.store.ListGroups(name)
-	if err != nil {
-		storeFail(w, err, "group")
-		return
-	}
-	out := make([]any, 0, len(groups))
-	for _, g := range groups {
-		out = append(out, groupView(g))
-	}
-	write(w, 200, listResponse(out))
-}
-
-func (h *handler) getGroup(w http.ResponseWriter, _ *http.Request, id string) {
+// own returns the group when it belongs to the request's tenant; another tenant's id is not found.
+func (h groupHandler) own(r *http.Request, id string) (Group, error) {
 	g, err := h.store.GetGroup(id)
-	if err != nil {
-		storeFail(w, err, "group")
-		return
+	if err == nil && g.Tenant != tenantFrom(r) {
+		err = ErrNotFound
 	}
-	write(w, 200, groupView(g))
+	return g, storeErr(err, id)
 }
 
-// known reports whether every id names a stored user.
-func (h *handler) known(ids []string) bool {
+// known reports whether every id names a user of the tenant.
+func (h groupHandler) known(r *http.Request, ids []string) bool {
 	for _, id := range ids {
-		if _, err := h.store.GetUser(id); err != nil {
+		if u, err := h.store.GetUser(id); err != nil || u.Tenant != tenantFrom(r) {
 			return false
 		}
 	}
 	return true
 }
 
-func ids(ms []member) []string {
+// memberIDs reads the value of each member in a SCIM members array.
+func memberIDs(v any) []string {
 	out := []string{}
-	for _, m := range ms {
-		out = append(out, m.Value)
+	list, _ := v.([]any)
+	for _, m := range list {
+		if obj, ok := m.(map[string]any); ok {
+			if s, ok := obj["value"].(string); ok {
+				out = append(out, s)
+			}
+		}
 	}
 	return out
 }
 
-func (h *handler) createGroup(w http.ResponseWriter, r *http.Request) {
-	var b struct {
-		DisplayName string   `json:"displayName"`
-		Members     []member `json:"members"`
-	}
-	if !decodeBody(r, &b) || strings.TrimSpace(b.DisplayName) == "" {
-		fail(w, 400, "invalidValue", "displayName is required")
-		return
-	}
-	g := Group{ID: newID(), DisplayName: strings.TrimSpace(b.DisplayName), Members: ids(b.Members)}
-	if !h.known(g.Members) {
-		fail(w, 400, "invalidValue", "a member is not a known user")
-		return
+func (h groupHandler) Create(r *http.Request, a lib.ResourceAttributes) (lib.Resource, error) {
+	name, _ := a["displayName"].(string)
+	g := Group{ID: newID(), Tenant: tenantFrom(r), DisplayName: strings.TrimSpace(name), Members: memberIDs(a["members"])}
+	if g.DisplayName == "" || !h.known(r, g.Members) {
+		return lib.Resource{}, scimerr.ScimErrorBadRequest("displayName is required and members must be known users")
 	}
 	if err := h.store.CreateGroup(g); err != nil {
-		storeFail(w, err, "group")
-		return
+		return lib.Resource{}, storeErr(err, "")
 	}
-	write(w, 201, groupView(g))
+	return groupResource(g), nil
 }
 
-// patchGroup supports add, remove and replace of members, the operations Okta and Entra send.
-func (h *handler) patchGroup(w http.ResponseWriter, r *http.Request, id string) {
-	g, err := h.store.GetGroup(id)
+func (h groupHandler) Get(r *http.Request, id string) (lib.Resource, error) {
+	g, err := h.own(r, id)
+	return groupResource(g), err
+}
+
+func (h groupHandler) GetAll(r *http.Request, p lib.ListRequestParams) (lib.Page, error) {
+	groups, err := h.store.ListGroups(tenantFrom(r))
 	if err != nil {
-		storeFail(w, err, "group")
-		return
+		return lib.Page{}, storeErr(err, "")
 	}
-	b, ok := readPatch(w, r)
-	if !ok {
-		return
+	all := make([]lib.Resource, 0, len(groups))
+	for _, g := range groups {
+		all = append(all, groupResource(g))
 	}
-	for _, op := range b.Operations {
-		var vals []member
-		_ = json.Unmarshal(op.Value, &vals)
-		got := ids(vals)
-		if !strings.EqualFold(op.Path, "members") || (!h.known(got)) {
-			fail(w, 400, "invalidValue", "only members can be patched, with known users")
-			return
-		}
-		switch strings.ToLower(op.Op) {
-		case "add":
-			for _, m := range got {
-				g.Members = append(without(g.Members, m), m)
+	return page(all, withIdentity, p), nil
+}
+
+func (h groupHandler) Replace(r *http.Request, id string, a lib.ResourceAttributes) (lib.Resource, error) {
+	g, err := h.own(r, id)
+	if err != nil {
+		return lib.Resource{}, err
+	}
+	name, _ := a["displayName"].(string)
+	g.DisplayName, g.Members = strings.TrimSpace(name), memberIDs(a["members"])
+	if g.DisplayName == "" || !h.known(r, g.Members) {
+		return lib.Resource{}, scimerr.ScimErrorBadRequest("displayName is required and members must be known users")
+	}
+	if err := h.store.UpdateGroup(g); err != nil {
+		return lib.Resource{}, storeErr(err, id)
+	}
+	return groupResource(g), nil
+}
+
+func (h groupHandler) Delete(r *http.Request, id string) error {
+	if _, err := h.own(r, id); err != nil {
+		return err
+	}
+	return storeErr(h.store.DeleteGroup(id), id)
+}
+
+// Patch supports add, remove and replace of members, and replace of displayName, the operations
+// Okta and Entra send. A remove may name one member as members[value eq "id"].
+func (h groupHandler) Patch(r *http.Request, id string, ops []lib.PatchOperation) (lib.Resource, error) {
+	g, err := h.own(r, id)
+	if err != nil {
+		return lib.Resource{}, err
+	}
+	for _, op := range ops {
+		switch target := patchTarget(op); {
+		case target == "displayName" && strings.EqualFold(op.Op, lib.PatchOperationReplace):
+			name, _ := op.Value.(string)
+			if g.DisplayName = strings.TrimSpace(name); g.DisplayName == "" {
+				return lib.Resource{}, scimerr.ScimErrorBadRequest("displayName is required")
 			}
-		case "remove":
-			if len(got) == 0 {
-				g.Members = []string{}
+		case target == "members":
+			got := memberIDs(op.Value)
+			if sel := selected(op); sel != "" {
+				got = []string{sel}
 			}
-			for _, m := range got {
-				g.Members = without(g.Members, m)
+			if !h.known(r, got) {
+				return lib.Resource{}, scimerr.ScimErrorBadRequest("members must be known users")
 			}
-		case "replace":
-			g.Members = got
+			switch strings.ToLower(op.Op) {
+			case lib.PatchOperationAdd:
+				for _, m := range got {
+					g.Members = append(without(g.Members, m), m)
+				}
+			case lib.PatchOperationRemove:
+				if len(got) == 0 {
+					g.Members = []string{}
+				}
+				for _, m := range got {
+					g.Members = without(g.Members, m)
+				}
+			default:
+				g.Members = got
+			}
 		default:
-			fail(w, 400, "invalidValue", "op "+op.Op+" is not supported")
-			return
+			return lib.Resource{}, scimerr.ScimErrorBadRequest("only members and displayName can be patched")
 		}
 	}
 	if err := h.store.UpdateGroup(g); err != nil {
-		storeFail(w, err, "group")
-		return
+		return lib.Resource{}, storeErr(err, id)
 	}
-	write(w, 200, groupView(g))
+	return groupResource(g), nil
 }
 
-func (h *handler) deleteGroup(w http.ResponseWriter, _ *http.Request, id string) {
-	if err := h.store.DeleteGroup(id); err != nil {
-		storeFail(w, err, "group")
-		return
+// selected returns the id in a members[value eq "id"] path, or "".
+func selected(op lib.PatchOperation) string {
+	if op.Path == nil {
+		return ""
 	}
-	w.WriteHeader(204)
+	if e, ok := op.Path.ValueExpression.(*filter.AttributeExpression); ok && e.AttributePath.AttributeName == "value" {
+		s, _ := e.CompareValue.(string)
+		return s
+	}
+	return ""
 }

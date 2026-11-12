@@ -1,5 +1,5 @@
 {
-  "go_lines": 34154,
-  "deadcode": 299,
-  "reason": "raised by the m3 fixes (push-attempt cap, replay redaction, wildcard public-suffix gate, nudge reset; two more functions not yet reachable from cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 37409,
+  "deadcode": 342,
+  "reason": "raised by the reviewed merges of go/k10-retry, k10-scan-edit, k10-traces, k11-graph-checkpoint, k11-graph-interrupt, k11-store-crypt, k9-scim, k7-trajectory, the m1-f2 landing and the m3 fixes (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
