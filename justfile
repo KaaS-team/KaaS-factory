@@ -32,6 +32,7 @@ lint:
 
 test:
     go test -race ./...
+    go vet -tags ee ./... && go test -race -tags ee ./...
 
 build:
     CGO_ENABLED=0 go build -o dist/factory ./cmd/factory
