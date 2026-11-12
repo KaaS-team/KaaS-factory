@@ -13,7 +13,7 @@ Bite-check: using all comments instead of those after the plan failed "approve i
 none
 ## Gate evidence
 just is not installed; ran the recipe bodies by hand: gofmt -l . (empty), go vet ./... (clean), golangci-lint v2.13.2 (GOTOOLCHAIN=go1.26.7): "0 issues.", go test -race ./...: all ok (last lines: ok .../pkg/agentrun, ok .../pkg/sandbox), CGO_ENABLED=0 go build ./cmd/factory: built. I did not run just fast or just check, so no pre-push hook ran either.
-Measures: non-test Go lines (repo-wide) before 20360, after 20393 (+33; the 1319 I first counted was only the package directory). Deadcode lines: before 69 (with my files present, measured before commit); the after count equals it plus the new function unless wired.
+Measures: non-test Go lines (repo-wide) before 20357, after 20393 (+36; the 1319 I first counted was only the package directory). Deadcode lines: 69 measured with my files present (the brief gives no baseline); PlanApproval is one of them until wired.
 ## Learnings
 - git ls-files in a subdirectory only counts that directory; run measures from the repo root.
 - Tickets that touch a decision rule should name the observe verb and tracker method together, since the area boundary splits them.
