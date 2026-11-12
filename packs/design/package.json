@@ -1,0 +1,13 @@
+{
+  "name": "factory-design-pack",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic design edits on JSX and TSX, ported from the onlook parser at 423e2e9",
+  "license": "Apache-2.0",
+  "scripts": { "test": "node --test test/*.test.js" },
+  "dependencies": {
+    "@babel/standalone": "7.27.0",
+    "tailwind-merge": "3.3.1"
+  }
+}

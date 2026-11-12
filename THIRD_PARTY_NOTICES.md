@@ -90,3 +90,20 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## onlook-dev/onlook@423e2e9
+
+Source: https://github.com/onlook-dev/onlook (Apache-2.0; the LICENSE is kept at `packs/design/LICENSE`, upstream ships no NOTICE, ours is `packs/design/NOTICE`)
+
+- `packs/design/src/packages.js` from `packages/parser/src/packages.ts` [no upstream test]
+- `packs/design/src/helpers.js` from `packages/parser/src/helpers.ts` and `packages/parser/src/code-edit/helpers.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/parse.js` from `packages/parser/src/parse.ts` [tested by `packs/design/test/parser.test.js`]
+- `packs/design/src/ids.js` from `packages/parser/src/ids.ts` [tested by `packs/design/test/parser.test.js`]
+- `packs/design/src/style.js` from `packages/parser/src/code-edit/style.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/text.js` from `packages/parser/src/code-edit/text.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/move.js` from `packages/parser/src/code-edit/move.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/remove.js` from `packages/parser/src/code-edit/remove.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/insert.js` from `packages/parser/src/code-edit/insert.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/transform.js` from `packages/parser/src/code-edit/transform.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/dynamic.js` from `packages/parser/src/template-node/map.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/test/data/` from `packages/parser/test/data/{ids,parse}` [tested by `packs/design/test/parser.test.js`]
