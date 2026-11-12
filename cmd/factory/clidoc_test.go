@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/KaaS-team/factory/internal/docgen"
@@ -23,6 +24,18 @@ func TestCLIReferenceFresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(want) != got {
-		t.Fatalf("%s is stale; run UPDATE_GOLDEN=1 go test ./cmd/factory", path)
+		w, g := strings.Split(string(want), "\n"), strings.Split(got, "\n")
+		for i := 0; i < len(w) || i < len(g); i++ {
+			var wl, gl string
+			if i < len(w) {
+				wl = w[i]
+			}
+			if i < len(g) {
+				gl = g[i]
+			}
+			if wl != gl {
+				t.Fatalf("%s is stale at line %d; run UPDATE_GOLDEN=1 go test ./cmd/factory\n file: %q\n tree: %q", path, i+1, wl, gl)
+			}
+		}
 	}
 }
