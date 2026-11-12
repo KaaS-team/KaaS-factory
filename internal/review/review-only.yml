@@ -1,0 +1,9 @@
+# Review only: run every check pack once against the working tree, each in a disposable worktree
+# seeded from HEAD plus uncommitted changes. A check passes when its agent edits nothing; otherwise
+# its patch is the finding. Nothing is committed or pushed.
+name: review-only
+steps:
+  review:
+    uses: check
+    run: factory review
+    label: factory:reviewing
