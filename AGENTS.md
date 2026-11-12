@@ -15,6 +15,7 @@ v2.13.2, `CGO_ENABLED=0`.
 
 - `just check`: the gate (gofmt, vet, golangci-lint, `go test -race`, static build). CI runs it
   (`.github/workflows/go.yml`) and so does the pre-push hook (`.agents/repo.json`).
+- `./gate.sh`: the same steps as `just check` for hosts without `just`; `tools/gate` fails when they or the lint pin (justfile vs `go.yml`) drift.
 - `just fast`: gofmt, vet, `go test` without race or lint. Run it before every push.
 
 ## Boundaries

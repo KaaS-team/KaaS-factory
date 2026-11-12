@@ -12,6 +12,7 @@ require (
 	github.com/crewjam/saml v0.6.3
 	github.com/go-enry/go-enry/v2 v2.9.6
 	github.com/google/go-github/v79 v79.0.0
+	github.com/google/jsonschema-go v0.4.3
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/landlock-lsm/go-landlock v0.11.2
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -41,7 +42,6 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
-	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
