@@ -1,0 +1,62 @@
+{
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "description": "Turns a request into a merged pull request.",
+  "name": "factory",
+  "version": "1",
+  "skills": [
+    {
+      "description": "Turn a request into a merged PR. Input is text; the output artifact is the PR URL.",
+      "id": "implement",
+      "inputModes": [
+        "text/plain"
+      ],
+      "name": "implement",
+      "outputModes": [
+        "text/plain"
+      ],
+      "tags": [
+        "code"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "bearer": {
+      "type": "http",
+      "scheme": "Bearer",
+      "http": {
+        "scheme": "Bearer"
+      }
+    }
+  },
+  "capabilities": {
+    "pushNotifications": false,
+    "streaming": false
+  },
+  "supportedInterfaces": [
+    {
+      "url": "http://factory.test/",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "0.3"
+    }
+  ],
+  "securityRequirements": [
+    {
+      "schemes": {
+        "bearer": {}
+      }
+    }
+  ],
+  "url": "http://factory.test/",
+  "protocolVersion": "0.3",
+  "preferredTransport": "JSONRPC",
+  "security": [
+    {
+      "bearer": []
+    }
+  ]
+}
