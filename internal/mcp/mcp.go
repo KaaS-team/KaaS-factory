@@ -49,6 +49,45 @@ type SteerInput struct {
 	Message string `json:"message" jsonschema:"message for the session"`
 }
 
+// CreateTaskInput is the input of create_task.
+type CreateTaskInput struct {
+	Title string `json:"title" jsonschema:"Short task title"`
+	Body  string `json:"body,omitempty" jsonschema:"Longer description"`
+}
+
+// HandOffInput is the input of hand_off_task.
+type HandOffInput struct {
+	ID   string `json:"id" jsonschema:"Task id"`
+	To   string `json:"to" jsonschema:"New assignee"`
+	Note string `json:"note,omitempty" jsonschema:"Context for the new assignee"`
+}
+
+// FollowupInput is the input of queue_followup.
+type FollowupInput struct {
+	ID      string `json:"id" jsonschema:"Task id"`
+	Message string `json:"message" jsonschema:"Message text"`
+}
+
+// IDInput is the input of list_events.
+type IDInput struct {
+	ID string `json:"id" jsonschema:"Task id"`
+}
+
+// CreatedOutput is the answer of create_task.
+type CreatedOutput struct {
+	ID string `json:"id"`
+}
+
+// EventsOutput lists a task's events without their free-form data.
+type EventsOutput struct {
+	Events []EventView `json:"events"`
+}
+
+// ReposOutput lists the repositories the factory works on.
+type ReposOutput struct {
+	Repos []string `json:"repos"`
+}
+
 // TextOutput is a plain text answer.
 type TextOutput struct {
 	Text string `json:"text"`
@@ -173,7 +212,83 @@ func act(name string, f func(context.Context, TicketInput) error) sdk.ToolHandle
 	}
 }
 
-// NewServer returns an MCP server exposing the twelve factory tools and the
+// Annotations of the factory-mcp tools, carried over unchanged. The hints are explicit because the
+// protocol's defaults for destructive and open-world are true.
+var (
+	no, yes     = false, true
+	readHint    = &sdk.ToolAnnotations{ReadOnlyHint: true, DestructiveHint: &no, IdempotentHint: true, OpenWorldHint: &no}
+	writeHint   = &sdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &no}
+	handOffHint = &sdk.ToolAnnotations{DestructiveHint: &yes, IdempotentHint: true, OpenWorldHint: &no}
+)
+
+func required(tool string, fields ...[2]string) error {
+	for _, f := range fields {
+		if strings.TrimSpace(f[1]) == "" {
+			return fmt.Errorf("%s: %s must not be empty", tool, f[0])
+		}
+	}
+	return nil
+}
+
+// addTaskTools registers the tools ported from factory-mcp that act on tasks and runs.
+func addTaskTools(s *sdk.Server, ctl api.Control) {
+	sdk.AddTool(s, &sdk.Tool{Name: "create_task", Annotations: writeHint,
+		Description: "Create a new task. Each call creates another task, so repeating it makes duplicates. Never removes or changes existing tasks."},
+		func(ctx context.Context, _ *sdk.CallToolRequest, in CreateTaskInput) (*sdk.CallToolResult, CreatedOutput, error) {
+			if err := required("create_task", [2]string{"title", in.Title}); err != nil {
+				return nil, CreatedOutput{}, err
+			}
+			id, err := ctl.CreateTicket(ctx, in.Title, in.Body)
+			return nil, CreatedOutput{ID: string(id)}, safe("create_task", err)
+		})
+	sdk.AddTool(s, &sdk.Tool{Name: "hand_off_task", Annotations: handOffHint,
+		Description: "Hand a task to another assignee. This replaces the current assignee, so the previous owner loses it. Repeating the same hand-off leaves the same end state."},
+		func(ctx context.Context, _ *sdk.CallToolRequest, in HandOffInput) (*sdk.CallToolResult, OK, error) {
+			if err := required("hand_off_task", [2]string{"id", in.ID}, [2]string{"to", in.To}); err != nil {
+				return nil, OK{}, err
+			}
+			if err := ctl.HandOff(ctx, api.TicketID(in.ID), in.To, in.Note); err != nil {
+				return nil, OK{}, safe("hand_off_task", err)
+			}
+			return nil, OK{Ticket: in.ID, Done: "hand_off_task"}, nil
+		})
+	sdk.AddTool(s, &sdk.Tool{Name: "queue_followup", Annotations: writeHint,
+		Description: "Queue a follow-up message for a run. Each call queues another message. Does not remove or edit earlier ones."},
+		func(ctx context.Context, _ *sdk.CallToolRequest, in FollowupInput) (*sdk.CallToolResult, OK, error) {
+			if err := required("queue_followup", [2]string{"id", in.ID}, [2]string{"message", in.Message}); err != nil {
+				return nil, OK{}, err
+			}
+			if err := ctl.QueueFollowup(ctx, api.TicketID(in.ID), in.Message); err != nil {
+				return nil, OK{}, safe("queue_followup", err)
+			}
+			return nil, OK{Ticket: in.ID, Done: "queue_followup"}, nil
+		})
+	sdk.AddTool(s, &sdk.Tool{Name: "list_events", Annotations: readHint,
+		Description: "List the events of one run, as the factory returns them. Read-only."},
+		func(ctx context.Context, _ *sdk.CallToolRequest, in IDInput) (*sdk.CallToolResult, EventsOutput, error) {
+			out := EventsOutput{Events: []EventView{}}
+			if err := required("list_events", [2]string{"id", in.ID}); err != nil {
+				return nil, out, err
+			}
+			h, ok := ctl.(api.Historian)
+			if !ok {
+				return nil, out, errors.New("list_events: history is unavailable: this control plane does not keep past events")
+			}
+			evs, err := h.History(ctx, api.TicketID(in.ID))
+			for _, e := range evs {
+				out.Events = append(out.Events, EventView{Time: e.Time, Kind: e.Kind, Ticket: e.Ticket})
+			}
+			return nil, out, safe("list_events", err)
+		})
+	sdk.AddTool(s, &sdk.Tool{Name: "list_repos", Annotations: readHint,
+		Description: "List the repositories the factory knows about. Read-only."},
+		func(ctx context.Context, _ *sdk.CallToolRequest, _ Empty) (*sdk.CallToolResult, ReposOutput, error) {
+			repos, err := ctl.Repos(ctx)
+			return nil, ReposOutput{Repos: nonNil(repos)}, safe("list_repos", err)
+		})
+}
+
+// NewServer returns an MCP server exposing the seventeen factory tools and the
 // factory://board and factory://ticket/{id} resources.
 func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 	s := sdk.NewServer(&sdk.Implementation{Name: "factory", Version: "v9"}, nil)
@@ -230,6 +345,8 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 			}
 			return nil, OK{Ticket: in.Ticket, Done: "steer"}, nil
 		})
+
+	addTaskTools(s, ctl)
 
 	s.AddResource(&sdk.Resource{URI: "factory://board", Name: "board", MIMEType: "application/json", Description: "The factory board"},
 		func(ctx context.Context, req *sdk.ReadResourceRequest) (*sdk.ReadResourceResult, error) {
