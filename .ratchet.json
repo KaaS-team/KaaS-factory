@@ -1,5 +1,5 @@
 {
-  "go_lines": 22390,
+  "go_lines": 22894,
   "deadcode": 68,
-  "reason": "raised to 22390 by the reviewed merge of go/k5-loop-guard; lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "reason": "raised to 22894 by the reviewed merge of go/k5-packs-manifest; lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
