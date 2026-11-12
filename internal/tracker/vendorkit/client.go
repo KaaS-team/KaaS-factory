@@ -3,6 +3,7 @@ package vendorkit
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -92,7 +93,8 @@ func (c *Client) Do(ctx context.Context, method, rawURL string, header http.Head
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if se, ok := err.(*StatusError); ok && se.Status != http.StatusTooManyRequests && se.Status < 500 {
+		var se *StatusError
+		if errors.As(err, &se) && se.Status != http.StatusTooManyRequests && se.Status < 500 {
 			return nil, err
 		}
 		if attempt == retries {
@@ -142,7 +144,8 @@ func (c *Client) once(ctx context.Context, h *http.Client, timeout time.Duration
 
 // stripURL drops the URL (and so any query) that net/http puts in its errors.
 func stripURL(err error) error {
-	if ue, ok := err.(*url.Error); ok {
+	var ue *url.Error
+	if errors.As(err, &ue) {
 		return ue.Err
 	}
 	return err

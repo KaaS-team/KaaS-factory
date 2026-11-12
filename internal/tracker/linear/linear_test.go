@@ -182,7 +182,7 @@ func TestSetPhase(t *testing.T) {
 			if i.State != c.wantState {
 				t.Fatalf("state = %s, want %s", i.State, c.wantState)
 			}
-			if c.wantOps != nil && !reflect.DeepEqual(append([]string{}, f.ops()...), c.wantOps) && !(len(c.wantOps) == 0 && len(f.ops()) == 0) {
+			if c.wantOps != nil && len(c.wantOps)+len(f.ops()) > 0 && !reflect.DeepEqual(f.ops(), c.wantOps) {
 				t.Fatalf("ops = %v, want %v", f.ops(), c.wantOps)
 			}
 		})
