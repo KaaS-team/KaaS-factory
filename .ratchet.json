@@ -1,5 +1,5 @@
 {
-  "go_lines": 34072,
-  "deadcode": 297,
-  "reason": "raised by the reviewed merge of go/k8-sanitize (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 34251,
+  "deadcode": 299,
+  "reason": "raised by the reviewed merges of go/k8-sanitize and m3-graph-resume (session packages not yet wired into cmd/factory; workflow position kept in the ticket thread); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }

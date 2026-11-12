@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/observe"
 )
 
 // Dispatcher records every call and returns deterministic sessions.
@@ -76,12 +77,13 @@ type Tracker struct {
 	Tickets  map[api.TicketID]api.Ticket
 	Phases   map[api.TicketID]api.Phase
 	Comments map[api.TicketID][]string
-	Spend    map[api.TicketID]string // the one spend comment per ticket, rewritten in place
+	Spend    map[api.TicketID]string           // the one spend comment per ticket, rewritten in place
+	Position map[api.TicketID]observe.Position // the one workflow position per ticket, rewritten in place
 }
 
 // NewTracker returns a tracker holding the given ready tickets.
 func NewTracker(ts ...api.Ticket) *Tracker {
-	t := &Tracker{Tickets: map[api.TicketID]api.Ticket{}, Phases: map[api.TicketID]api.Phase{}, Comments: map[api.TicketID][]string{}, Spend: map[api.TicketID]string{}}
+	t := &Tracker{Tickets: map[api.TicketID]api.Ticket{}, Phases: map[api.TicketID]api.Phase{}, Comments: map[api.TicketID][]string{}, Spend: map[api.TicketID]string{}, Position: map[api.TicketID]observe.Position{}}
 	for _, x := range ts {
 		t.Tickets[x.ID] = x
 		t.Phases[x.ID] = api.PhaseReady
@@ -150,6 +152,22 @@ func (t *Tracker) PutSpendComment(_ context.Context, id api.TicketID, body strin
 	return nil
 }
 
+// SavePosition replaces the ticket's workflow position.
+func (t *Tracker) SavePosition(_ context.Context, id api.TicketID, p observe.Position) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Position[id] = p
+	return nil
+}
+
+// LoadPosition returns the ticket's workflow position, false before the first save.
+func (t *Tracker) LoadPosition(_ context.Context, id api.TicketID) (observe.Position, bool, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	p, ok := t.Position[id]
+	return p, ok, nil
+}
+
 func (t *Tracker) SetPhase(_ context.Context, id api.TicketID, p api.Phase) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -206,5 +224,6 @@ var (
 	_ api.Observer       = (*Observer)(nil)
 	_ api.Lister         = (*Tracker)(nil)
 	_ api.Thread         = (*Tracker)(nil)
+	_ observe.Positioner = (*Tracker)(nil)
 	_ api.LatestObserver = (*Observer)(nil)
 )
