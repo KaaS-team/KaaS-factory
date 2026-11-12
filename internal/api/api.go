@@ -200,6 +200,14 @@ type Control interface {
 	Cancel(ctx context.Context, id TicketID) error
 	Retry(ctx context.Context, id TicketID) error
 	Events(ctx context.Context) (<-chan Event, error)
+	// CreateTicket files a new ticket through the tracker and returns its id.
+	CreateTicket(ctx context.Context, title, body string) (TicketID, error)
+	// HandOff records in the ticket's thread that it passes to another assignee, with an optional note.
+	HandOff(ctx context.Context, id TicketID, to, note string) error
+	// QueueFollowup adds a follow-up message to the ticket's thread for its next attempt to read.
+	QueueFollowup(ctx context.Context, id TicketID, message string) error
+	// Repos lists the repositories this factory works on.
+	Repos(ctx context.Context) ([]string, error)
 }
 
 // Historian is the optional Control read for a ticket's past events, oldest first.

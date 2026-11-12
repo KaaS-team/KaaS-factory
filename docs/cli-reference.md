@@ -196,9 +196,13 @@ Print what a ticket's session is doing
 
 ## factory mcp
 
-`factory mcp`
+`factory mcp [flags]`
 
-Serve the factory to Claude Code over stdio (MCP)
+Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--http` | string | `` | serve streamable HTTP at /mcp on this address (default host 127.0.0.1); the bearer token is read from FACTORY_MCP_TOKEN |
 
 ## factory packs
 
