@@ -110,16 +110,26 @@ func TestDecide(t *testing.T) {
 	}
 }
 
-func TestJudgeRefusesLicenceChange(t *testing.T) {
-	c := Candidate{Old: entry("o/r", "p.md", shaA, "x"), New: entry("o/r", "p.md", shaB, "y")}
-	c.New.Licence = "AGPL-3.0"
-	v := Judge(c, sc(0.8, 1000), sc(0.9, 900), 0.05)
-	if v.Bump || !strings.Contains(v.Reason, "licence") || !strings.Contains(v.Reason, "AGPL-3.0") {
-		t.Fatalf("got %+v", v)
-	}
-	c.New.Licence = "MIT"
-	if v := Judge(c, sc(0.8, 1000), sc(0.9, 900), 0.05); !v.Bump {
-		t.Fatalf("got %+v", v)
+func TestJudgeLicence(t *testing.T) {
+	for _, tc := range []struct {
+		licence string
+		bump    bool
+	}{
+		{"MIT", true},
+		{"Apache-2.0", true},
+		{"AGPL-3.0", false},
+		{"CC-BY-SA-4.0", false},
+		{"NOASSERTION", false},
+		{"", false},
+	} {
+		t.Run(tc.licence, func(t *testing.T) {
+			c := Candidate{Old: entry("o/r", "p.md", shaA, "x"), New: entry("o/r", "p.md", shaB, "y")}
+			c.New.Licence = tc.licence
+			v := Judge(c, sc(0.8, 1000), sc(0.9, 900), 0.05)
+			if v.Bump != tc.bump || (!tc.bump && !strings.Contains(v.Reason, "licence")) {
+				t.Fatalf("got %+v", v)
+			}
+		})
 	}
 }
 
