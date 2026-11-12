@@ -90,3 +90,11 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## Aider-AI/aider@5dc9490
+
+Source: https://github.com/Aider-AI/aider (Apache-2.0, Copyright (c) Paul Gauthier). The ranking and budget search of `aider/repomap.py` are ported to Go; the tree-sitter `.scm` query files are not copied (they need CGO).
+
+- `internal/packs/repomap/tags.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+- `internal/packs/repomap/rank.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+- `internal/packs/repomap/budget.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]

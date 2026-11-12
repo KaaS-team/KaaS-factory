@@ -24,6 +24,7 @@ import (
 	"github.com/KaaS-team/factory/internal/mcp"
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/packs"
+	"github.com/KaaS-team/factory/internal/packs/repomap"
 	"github.com/KaaS-team/factory/internal/plancmd"
 	"github.com/KaaS-team/factory/internal/report"
 	"github.com/KaaS-team/factory/internal/selfupdate"
@@ -89,7 +90,7 @@ func mountClients(root *cobra.Command) {
 			return github.Epic(tr)(ctx, n)
 		}),
 		plancmd.WithFiler(lazyFiler{}),
-	), eval.NewCommand(), shadow.NewCommand(), packs.NewAddCommand(), packsCommand())
+	), eval.NewCommand(), shadow.NewCommand(), packs.NewAddCommand(), packsCommand(), repomap.NewCommand())
 	root.AddCommand(logs.NewCommand(logBackends()), newServe(), a2a.NewCommand(a2aDeps), browsercheck.NewCommand())
 }
 
