@@ -397,3 +397,25 @@ func Test17_4_TickOrder(t *testing.T) {
 		t.Errorf("want claim d < Dispatch d < Dispatch e, got %d, %d, %d: %v", claimD, dispD, dispE, log)
 	}
 }
+
+// Section 7.1 claim states: a claimed, running or stalled entry holds a slot; a retry-queued one does not.
+func Test17_4_ClaimStatesHoldSlots(t *testing.T) {
+	for _, tc := range []struct {
+		phase api.Phase
+		want  []string
+	}{
+		{api.PhaseClaimed, nil}, {api.PhaseRunning, nil}, {api.PhaseStalled, nil}, {api.PhaseRetryQueue, []string{"b"}},
+	} {
+		t.Run(string(tc.phase), func(t *testing.T) {
+			s := reconcile.State{
+				Entries:   map[api.TicketID]reconcile.Entry{"a": {Ticket: tk("a", 1, t0), Phase: tc.phase, Attempt: 1, RetryAt: t0.Add(time.Hour)}},
+				Ready:     []api.Ticket{tk("b", 1, t0)},
+				FiresLeft: 100,
+			}
+			got := dispatchIDs(reconcile.Decide(s, nil, t0, reconcile.Config{MaxConcurrent: 1}))
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("with one slot and a %s entry, dispatched %v, want %v", tc.phase, got, tc.want)
+			}
+		})
+	}
+}

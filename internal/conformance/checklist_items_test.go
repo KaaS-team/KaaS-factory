@@ -147,7 +147,7 @@ func Items18() []Item {
 		na("18.1", "Typed config layer with defaults and $ resolution", outsideScheduler),
 		na("18.1", "Dynamic WORKFLOW.md watch and reload", outsideScheduler),
 		withAlso(tc("18.1", "Polling orchestrator with single-authority mutable state", "Test17_4_NoDuplicateDispatch", "Section 8.1 tick order, 14.3 restart and dispatch idempotence are the extra tests."),
-			"Test17_4_TickOrder", "Test17_4_RestartRebuildsRunningSet", "Test17_4_DispatchIdempotentPerAttempt", "Test17_4_InitialLocksHoldFiles"),
+			"Test17_4_TickOrder", "Test17_4_ClaimStatesHoldSlots", "Test17_4_RestartRebuildsRunningSet", "Test17_4_DispatchIdempotentPerAttempt", "Test17_4_InitialLocksHoldFiles"),
 		na("18.1", "Tracker adapter with state-list and ID-refresh reads", outsideScheduler),
 		na("18.1", "Workspace manager", outsideScheduler),
 		na("18.1", "Workspace lifecycle hooks", outsideScheduler),

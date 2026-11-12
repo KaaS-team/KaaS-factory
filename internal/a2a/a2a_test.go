@@ -116,9 +116,9 @@ func TestStateForPhase(t *testing.T) {
 		api.PhaseRunning: "working", api.PhaseStalled: "working", api.PhaseRetryQueue: "working",
 		api.PhaseDone: "working", api.PhaseQueued: "working",
 		api.PhaseMerged: "completed", api.PhaseNeedsHuman: "input-required",
-		api.PhaseCanceled: "canceled", PhaseFailed: "failed",
+		api.PhaseCanceled: "canceled",
 	}
-	for _, p := range append(all, PhaseFailed) {
+	for _, p := range all {
 		got, ok := stateForPhase(p)
 		if !ok || strings.ToLower(strings.TrimPrefix(string(got), "TASK_STATE_")) != strings.ReplaceAll(want[p], "-", "_") {
 			t.Errorf("phase %q -> %q ok=%v, want %q", p, got, ok, want[p])
@@ -127,8 +127,8 @@ func TestStateForPhase(t *testing.T) {
 	if _, ok := stateForPhase("bogus"); ok {
 		t.Error("unknown phase must not map")
 	}
-	if len(all) != len(phaseState)-1 {
-		t.Errorf("table has %d rows, api has %d phases plus failed", len(phaseState), len(all))
+	if len(all) != len(phaseState) {
+		t.Errorf("table has %d rows, api has %d phases", len(phaseState), len(all))
 	}
 }
 
@@ -194,6 +194,23 @@ func TestGetUnknownTask(t *testing.T) {
 	_, out := rpc(t, NewHandler(deps), testToken, "tasks/get", map[string]any{"id": "nope"})
 	if out["error"] == nil {
 		t.Fatalf("want an error for an unknown task, got %v", out)
+	}
+}
+
+// A phase the table does not map is an error, and methods the server does not serve fail.
+func TestUnmappedPhaseAndUnservedMethodsFail(t *testing.T) {
+	deps, tr, _ := newDeps()
+	h := NewHandler(deps)
+	_, out := rpc(t, h, testToken, "message/send", sendParams("x"))
+	id := out["result"].(map[string]any)["id"].(string)
+	tr.Phases[api.TicketID(id)] = "failed"
+	if _, out := rpc(t, h, testToken, "tasks/get", map[string]any{"id": id}); out["error"] == nil {
+		t.Errorf("phase failed is not in the table, want an error, got %v", out)
+	}
+	for _, m := range []string{"tasks/cancel", "tasks/pushNotificationConfig/list"} {
+		if _, out := rpc(t, h, testToken, m, map[string]any{"id": id}); out["error"] == nil {
+			t.Errorf("%s: want an error, got %v", m, out)
+		}
 	}
 }
 

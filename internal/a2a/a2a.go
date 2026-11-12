@@ -23,10 +23,6 @@ import (
 // LabelReady is the label a filed ticket carries so the factory picks it up.
 const LabelReady = "factory:ready"
 
-// PhaseFailed is a phase a PhaseReader may report for a ticket that gave up.
-// api.Phase has no failed value, so this one lives here.
-const PhaseFailed api.Phase = "failed"
-
 // Filer files one ticket and returns its id. api.Tracker has no way to create one
 // (the GitHub tracker's Create satisfies this).
 type Filer interface {
@@ -60,7 +56,6 @@ var phaseState = map[api.Phase]sdk.TaskState{
 	api.PhaseMerged:     sdk.TaskStateCompleted,
 	api.PhaseNeedsHuman: sdk.TaskStateInputRequired,
 	api.PhaseCanceled:   sdk.TaskStateCanceled,
-	PhaseFailed:         sdk.TaskStateFailed,
 }
 
 func stateForPhase(p api.Phase) (sdk.TaskState, bool) {
@@ -94,7 +89,8 @@ func agentCard(url string) *sdk.AgentCard {
 	}
 }
 
-// server implements a2asrv.RequestHandler over the tracker; every method it does not serve is unsupported.
+// server implements a2asrv.RequestHandler over the tracker. It serves message/send and tasks/get;
+// the other methods return the SDK's unsupported-operation or push-notification-not-supported error.
 type server struct {
 	deps Deps
 }
