@@ -52,9 +52,10 @@ func Combine(ctx context.Context, rules []CombinerRule) Combined {
 		if !hit {
 			continue
 		}
-		if r.Effect == Forbid {
+		switch r.Effect {
+		case Forbid:
 			forbids = append(forbids, r.ID)
-		} else if r.Effect == Permit {
+		case Permit:
 			permits = append(permits, r.ID)
 		}
 	}
