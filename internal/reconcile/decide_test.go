@@ -124,7 +124,22 @@ func TestDecide(t *testing.T) { // Symphony 8.1 tick order, 17.4
 		{"retry due but no slot", func() State {
 			return st(running("x", 1, t0), running("y", 1, t0),
 				Entry{Ticket: tkt("a"), Phase: api.PhaseRetryQueue, Attempt: 1, RetryAt: t0})
+		}, []api.Observation{obsPush("x", 1, t0), obsPush("y", 1, t0)}, nil,
+			[]Action{{Kind: Requeue, ID: "a", Attempt: 1, Reason: SlotsExhausted}}},
+		{"retry no slot, reason already recorded", func() State {
+			return st(running("x", 1, t0), running("y", 1, t0),
+				Entry{Ticket: tkt("a"), Phase: api.PhaseRetryQueue, Attempt: 1, RetryAt: t0, Error: SlotsExhausted})
 		}, []api.Observation{obsPush("x", 1, t0), obsPush("y", 1, t0)}, nil, nil},
+		{"ready failed: due retry not dispatched", func() State {
+			s := st(Entry{Ticket: tkt("a"), Phase: api.PhaseRetryQueue, Attempt: 1, RetryAt: t0})
+			s.noDispatch = true
+			return s
+		}, nil, nil, nil},
+		{"observation failed: no stall decision", func() State {
+			s := st(running("a", 1, t0.Add(-time.Hour)))
+			s.Unobserved = map[api.TicketID]bool{"a": true}
+			return s
+		}, nil, nil, nil},
 		{"retry takes the slot before new work", func() State {
 			s := st(running("x", 1, t0), Entry{Ticket: tkt("a"), Phase: api.PhaseRetryQueue, Attempt: 1, RetryAt: t0})
 			s.Ready = []api.Ticket{tkt("b")}

@@ -7,16 +7,18 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/pick"
 )
 
 // Deps are the ports and hooks Run uses. Now and OnError may be nil.
 type Deps struct {
-	Dispatcher api.Dispatcher
-	Tracker    api.Tracker
-	Observer   api.Observer
-	Cancels    <-chan api.TicketID // operator cancel requests, read without blocking each tick
-	Now        func() time.Time
-	OnError    func(error)
+	Dispatcher   api.Dispatcher
+	Tracker      api.Tracker
+	Observer     api.Observer
+	Cancels      <-chan api.TicketID // operator cancel requests, read without blocking each tick
+	Now          func() time.Time
+	OnError      func(error)
+	InitialLocks pick.Locks // Locks for the state Tick builds on a fresh start
 }
 
 func (d Deps) now() time.Time {
@@ -79,30 +81,39 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 		return
 	}
 	ready, err := d.Tracker.Ready(ctx)
+	now := d.now()
 	if err != nil {
 		d.report(err)
-		return
-	}
-	now := d.now()
-	if *sp == nil {
+		if *sp == nil {
+			return // nothing to reconcile and no candidates
+		}
+	} else if *sp == nil {
 		*sp = recoverState(ctx, d, ready, cfg, now)
+		(*sp).Locks = d.InitialLocks
 	}
 	s := *sp
 	if ctx.Err() != nil {
 		return
 	}
-	listed := map[api.TicketID]api.Ticket{}
-	for _, t := range ready {
-		listed[t.ID] = t
-	}
-	s.Ready = ready
-	s.Terminal = map[api.TicketID]bool{}
-	for id, e := range s.Entries {
-		if t, ok := listed[id]; ok {
-			e.Ticket = t
-			s.Entries[id] = e
-		} else {
-			s.Terminal[id] = true
+	// Symphony 8.1: running work is reconciled first. When Ready fails, stall and terminal
+	// checks run from the stored state and only new dispatch is skipped.
+	s.noDispatch = err != nil
+	if err == nil {
+		// The Ready list must include claimed and running tickets (core merges in Lister.Active);
+		// a ticket missing from it is marked terminal and its session cancelled.
+		listed := map[api.TicketID]api.Ticket{}
+		for _, t := range ready {
+			listed[t.ID] = t
+		}
+		s.Ready = ready
+		s.Terminal = map[api.TicketID]bool{}
+		for id, e := range s.Entries {
+			if t, ok := listed[id]; ok {
+				e.Ticket = t
+				s.Entries[id] = e
+			} else {
+				s.Terminal[id] = true
+			}
 		}
 	}
 	caps := d.Dispatcher.Caps()
@@ -115,6 +126,7 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 		s.FiresLeft = max(0, caps.FiresPerHour-len(s.fired))
 	}
 	var obs []api.Observation
+	s.Unobserved = map[api.TicketID]bool{}
 	for id, e := range s.Entries {
 		if !holdsSlot(e.Phase) || s.Terminal[id] {
 			continue
@@ -125,8 +137,11 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 		o, err := d.Observer.Observe(ctx, id, e.Attempt)
 		if err != nil {
 			d.report(err)
+			s.Unobserved[id] = true // keep LastObs; no stall decision this tick (Symphony 8.5)
 			continue
 		}
+		e.LastObs = o
+		s.Entries[id] = e
 		obs = append(obs, o)
 	}
 	for _, a := range Decide(*s, obs, now, cfg) {
@@ -212,7 +227,10 @@ func apply(ctx context.Context, d Deps, s *State, a Action, now time.Time, cfg C
 			d.report(err)
 			return
 		}
-		e.Phase, e.RetryAt, e.Session, e.SteeredAt = api.PhaseRetryQueue, a.At, nil, time.Time{}
+		e.Phase, e.RetryAt, e.Session, e.SteeredAt, e.Error = api.PhaseRetryQueue, a.At, nil, time.Time{}, a.Reason
+		s.Entries[a.ID] = e
+	case Requeue:
+		e.Error = a.Reason
 		s.Entries[a.ID] = e
 	case Cancel:
 		cancelEntry(ctx, d, s, e, a)
@@ -291,7 +309,7 @@ func dispatch(ctx context.Context, d Deps, s *State, a Action, now time.Time, cf
 			return
 		}
 		if d.Tracker.SetPhase(ctx, a.ID, api.PhaseRetryQueue) == nil {
-			s.Entries[a.ID] = Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(Backoff(a.Attempt))}
+			s.Entries[a.ID] = Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.backoff(a.Attempt)), Error: err.Error()}
 		}
 		return
 	}
