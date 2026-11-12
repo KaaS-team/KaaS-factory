@@ -53,6 +53,18 @@ func TestParseLockUnsupportedVersion(t *testing.T) {
 	}
 }
 
+// A file with no version line is not a lock: comments alone must not read as an empty one.
+func TestParseLockWithoutVersionLineIsAnError(t *testing.T) {
+	for name, in := range map[string]string{
+		"comments only": "# factory.lock\n# always commit it\n",
+		"blank":         "\n  \n",
+	} {
+		if _, err := ParseLock([]byte(in)); err == nil || !strings.Contains(err.Error(), "missing version header") {
+			t.Errorf("%s: want missing version header error, got %v", name, err)
+		}
+	}
+}
+
 func TestParseLockReadsLegacyJSONAndUpgradesOnWrite(t *testing.T) {
 	legacy := `{"version":1,"entries":[{"kind":"skill","ref":"o/r@` + sha1 + `#x.md","sha":"` + sha1 +
 		`","sha256":"` + strings.Repeat("b", 64) + `","licence":"MIT","eval_score":0.5}]}` + "\n"

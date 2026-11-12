@@ -228,6 +228,9 @@ func parseV2(b []byte) (*Lock, error) {
 		}
 		l.Entries = append(l.Entries, e)
 	}
+	if !seenVersion {
+		return nil, errors.New("factory.lock: missing version header")
+	}
 	return l, nil
 }
 
