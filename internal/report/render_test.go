@@ -56,7 +56,6 @@ func TestGoldenByTeam(t *testing.T) {
 	golden(t, "by_team.golden.json", js.Bytes())
 }
 
-
 // TestJSONAndMarkdownAgree computes both outputs and compares every number.
 func TestJSONAndMarkdownAgree(t *testing.T) {
 	r := built(t)
