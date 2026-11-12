@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/KaaS-team/factory/internal/api"
 	gogithub "github.com/google/go-github/v79/github"
@@ -26,6 +27,9 @@ type Config struct {
 type Tracker struct {
 	client      *gogithub.Client
 	owner, repo string
+
+	mu    sync.Mutex
+	filed map[string]api.TicketID // titles Create filed; the search index lags a fresh issue
 }
 
 var (
