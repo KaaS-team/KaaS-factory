@@ -1,5 +1,5 @@
 // Package firstrun is the first-hour demo: it runs the auditor, maps each finding to a catalogue
-// pack, sizes the fixes and writes a scorecard. It dispatches nothing.
+// pack, sizes the fixes and writes a scorecard. Run dispatches nothing; Execute dispatches the first fix.
 package firstrun
 
 import (
@@ -102,9 +102,9 @@ type Report struct {
 	Rows       []Row
 	NotCovered []Finding
 	ScoreAfter int
-	// First is the row Run would fix first; nil when nothing is covered.
+	// First is the row to fix first; nil when nothing is covered.
 	First *Row
-	// Command is the command that approves First; empty when First is nil.
+	// Command is the command that approves First; empty when First is nil or on a dry run.
 	Command string
 	DryRun  bool
 }
@@ -143,11 +143,9 @@ func Run(ctx context.Context, o Options) (Report, error) {
 	}
 	r := Build(a, *cat)
 	r.DryRun = o.DryRun
-	if !o.DryRun {
-		r.First = Pick(r.Rows)
-		if r.First != nil {
-			r.Command = "factory approve first-run " + r.First.Finding.ID
-		}
+	r.First = Pick(r.Rows)
+	if r.First != nil && !o.DryRun {
+		r.Command = "factory approve first-run " + r.First.Finding.ID
 	}
 	return r, nil
 }
@@ -286,7 +284,9 @@ func (r Report) Markdown() (string, error) {
 		}
 		b.WriteString("\n")
 	}
-	if r.First != nil {
+	if r.First != nil && r.DryRun {
+		fmt.Fprintf(&b, "\n## First fix\n\nWould dispatch one build for %s with pack %s. Nothing was dispatched.\n", r.First.Finding.ID, r.First.Pack)
+	} else if r.First != nil {
 		fmt.Fprintf(&b, "\n## First fix\n\n%s with pack %s. Approve it with:\n\n    %s\n", r.First.Finding.ID, r.First.Pack, r.Command)
 	}
 	return b.String(), nil

@@ -137,8 +137,8 @@ func TestDryRunDispatchesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(d.Sessions) != 0 || r.First != nil || r.Command != "" {
-		t.Fatalf("dry run acted: sessions=%d first=%v", len(d.Sessions), r.First)
+	if len(d.Sessions) != 0 || r.First == nil || r.Command != "" {
+		t.Fatalf("dry run acted or named no first fix: sessions=%d first=%v", len(d.Sessions), r.First)
 	}
 }
 
@@ -188,7 +188,7 @@ func TestCommandPrintsReport(t *testing.T) {
 	if err := c.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "## Top 3 risks") || strings.Contains(out.String(), "## First fix") {
+	if !strings.Contains(out.String(), "## Top 3 risks") || !strings.Contains(out.String(), "Would dispatch one build") || strings.Contains(out.String(), "factory approve") {
 		t.Fatalf("out:\n%s", out.String())
 	}
 }
