@@ -254,3 +254,64 @@ func TestAuthAndConfig(t *testing.T) {
 		t.Fatalf("unset token err = %v", err)
 	}
 }
+
+var _ api.Lister = (*linear.Tracker)(nil)
+
+// Symphony §14: Active is the restart read, tickets claimed and not finished, in one Issues query.
+func TestActive(t *testing.T) {
+	cases := []struct {
+		name string
+		mut  func(*linear.Config)
+		want []string
+	}{
+		{"claimed status only", nil, []string{"ENG-2"}},
+		{"another active phase adds its status", func(c *linear.Config) {
+			c.Phases[api.PhaseStalled] = "Backlog"
+		}, []string{"ENG-2", "ENG-5"}},
+		{"a status shared with a finished phase is not active", func(c *linear.Config) {
+			c.Phases[api.PhaseQueued] = "In Review"
+		}, []string{"ENG-2"}},
+		{"no active phase mapped", func(c *linear.Config) {
+			c.Phases = map[api.Phase]string{api.PhaseReady: "Ready", api.PhaseDone: "In Review"}
+		}, []string{}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFakeLinear(t)
+			f.add(1, "s-ready")
+			f.add(2, "s-progress")
+			f.add(3, "s-review")
+			f.add(4, "s-done")
+			f.add(5, "s-backlog")
+			got, err := newTracker(t, f, c.mut).Active(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(ids(got), c.want) {
+				t.Fatalf("got %v, want %v", ids(got), c.want)
+			}
+			if len(c.want) == 0 && len(f.Requests) != 0 {
+				t.Fatalf("no active status should make no request, got %v", f.ops())
+			}
+		})
+	}
+}
+
+func TestActiveRequestMatchesGolden(t *testing.T) {
+	f := newFakeLinear(t)
+	f.add(2, "s-progress")
+	if _, err := newTracker(t, f, nil).Active(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile("testdata/go-IssuesActive-0.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var golden map[string]any
+	if err := json.Unmarshal(raw, &golden); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Requests) != 1 || f.Requests[0].Op != "Issues" || !reflect.DeepEqual(f.Requests[0].Body, golden) {
+		t.Fatalf("request differs from golden:\n got %v\nwant %v", f.Requests, golden)
+	}
+}

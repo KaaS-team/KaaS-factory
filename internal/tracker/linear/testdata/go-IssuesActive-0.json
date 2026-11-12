@@ -1,0 +1,20 @@
+{
+ "query": "query Issues($filter: IssueFilter, $after: String) { issues(filter: $filter, first: 100, after: $after) {\n    nodes { id number title description state { type } creator { id } createdAt labels { nodes { id name updatedAt } }\n  comments(first: 250) { nodes { id body createdAt user { id } } } } pageInfo { hasNextPage endCursor } } }",
+ "variables": {
+  "filter": {
+   "team": {
+    "key": {
+     "eq": "ENG"
+    }
+   },
+   "state": {
+    "name": {
+     "in": [
+      "In Progress"
+     ]
+    }
+   }
+  },
+  "after": null
+ }
+}
