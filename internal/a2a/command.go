@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/serve/hostguard"
@@ -18,6 +19,10 @@ const TokenEnv = "FACTORY_A2A_TOKEN"
 
 // ErrNoToken is returned when the server is asked to start without a bearer token.
 var ErrNoToken = errors.New("a2a: " + TokenEnv + " is not set; refusing to start")
+
+// DefaultAuditLog is where the audit rows go when --audit-log is not given: the factory's data
+// directory in the repo, never the bare working directory.
+const DefaultAuditLog = ".factory/a2a-audit.jsonl"
 
 // DepsFunc builds the server's dependencies once the token check has passed.
 type DepsFunc func(ctx context.Context) (Deps, error)
@@ -50,6 +55,9 @@ func NewCommand(open DepsFunc) *cobra.Command {
 					return err
 				}
 			}
+			if err := os.MkdirAll(filepath.Dir(auditPath), 0o700); err != nil {
+				return err
+			}
 			f, err := os.OpenFile(auditPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 			if err != nil {
 				return err
@@ -75,7 +83,7 @@ func NewCommand(open DepsFunc) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&keyPath, "signing-key", "", "ECDSA P-256 PEM key that signs the agent card (a new key per start when empty)")
-	cmd.Flags().StringVar(&auditPath, "audit-log", "a2a-audit.jsonl", "file that gets one JSON line per call")
+	cmd.Flags().StringVar(&auditPath, "audit-log", DefaultAuditLog, "file that gets one JSON line per call")
 	cmd.Flags().StringVar(&addr, "addr", "127.0.0.1:8787", "listen address")
 	return cmd
 }

@@ -16,6 +16,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 )
 
 // Role is who sent a message.
@@ -262,6 +264,30 @@ func (r *Recorder) Send(ctx context.Context, history []Message) (Message, error)
 	return reply, nil
 }
 
+// redactMessages returns a copy of ms with credentials in text and tool arguments replaced by
+// sanitize.RedactSecrets, so a fixture never stores one. Media data is left as recorded.
+func redactMessages(ms []Message) []Message {
+	out := make([]Message, len(ms))
+	for i, m := range ms {
+		out[i] = m
+		out[i].Content = redactBlocks(m.Content)
+	}
+	return out
+}
+
+func redactBlocks(bs []Block) []Block {
+	if bs == nil {
+		return nil
+	}
+	out := make([]Block, len(bs))
+	for i, b := range bs {
+		b.Text, b.Arguments = sanitize.RedactSecrets(b.Text), sanitize.RedactSecrets(b.Arguments)
+		b.Content = redactBlocks(b.Content)
+		out[i] = b
+	}
+	return out
+}
+
 // RerecordFromEnv reports whether FACTORY_EVAL_RERECORD asks for a live run.
 func RerecordFromEnv(getenv func(string) string) bool {
 	v := getenv("FACTORY_EVAL_RERECORD")
@@ -288,7 +314,7 @@ func Open(path string, rerecord bool, live Sender) (Sender, func() error, error)
 	}
 	rec := &Recorder{live: live}
 	save := func() error {
-		data, err := json.MarshalIndent(rec.conv, "", " ")
+		data, err := json.MarshalIndent(redactMessages(rec.conv), "", " ")
 		if err != nil {
 			return err
 		}

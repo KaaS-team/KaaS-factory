@@ -1,7 +1,9 @@
 // Ported from OpenHands/software-agent-sdk@10be259 openhands-sdk/openhands/sdk/conversation/stuck_detector.py
 
 // Package stuck watches the stream-json events of a `claude -p` run and reports when the agent is
-// looping: one nudge on the first hit, an abort on the next.
+// looping: a nudge verdict on the first hit of a stall, an abort on the next hit before the agent
+// makes progress. A different action after a nudge is progress and re-arms the nudge. The package
+// only returns verdicts; whether a nudge reaches the agent is the caller's business.
 package stuck
 
 import (
@@ -89,6 +91,8 @@ type Guard struct {
 	names       map[string]string // tool_use_id to tool name
 	resumedAt   int               // only events after this seq count, set when a nudge is issued
 	nudged      bool
+	nudgeAct    event // the last action when the nudge was issued; a different action is progress
+	hasNudgeAct bool
 	nudgedError string // tool_use_id of the error already nudged for
 }
 
@@ -105,6 +109,9 @@ func (g *Guard) Feed(line []byte) Verdict {
 	for _, e := range evs {
 		g.seq++
 		e.seq = g.seq
+		if g.nudged && e.kind == kAction && (!g.hasNudgeAct || !e.eq(g.nudgeAct)) {
+			g.nudged = false // progress: the next stall gets its own nudge
+		}
 		g.hist = append(g.hist, e)
 	}
 	if len(g.hist) > historyCap {
@@ -229,6 +236,7 @@ func (g *Guard) verdict() Verdict {
 	}
 	if streak == g.th.ActionError && acts2[0].toolID != g.nudgedError {
 		g.nudgedError, g.nudged = acts2[0].toolID, true
+		g.nudgeAct, g.hasNudgeAct = acts2[0], true
 		return Verdict{Kind: Nudge, Pattern: ActionError, Message: fmt.Sprintf("You've called `%s` with the same arguments %d times in a row and gotten the same error each time. Repeating the exact same call again will not work. Review the error message and either correct the arguments or try a different approach.", acts2[0].name, streak)}
 	}
 	if p := g.pattern(evs, acts, obs); p != "" {
@@ -236,6 +244,10 @@ func (g *Guard) verdict() Verdict {
 			return Verdict{Kind: Abort, Pattern: p, Message: "stuck in a " + string(p) + " loop after a nudge"}
 		}
 		g.nudged, g.resumedAt = true, g.seq
+		g.nudgeAct, g.hasNudgeAct = event{}, false
+		if len(acts) > 0 {
+			g.nudgeAct, g.hasNudgeAct = acts[0], true
+		}
 		return Verdict{Kind: Nudge, Pattern: p, Message: "You appear to be stuck in a " + string(p) + " loop. Stop repeating yourself and try a different approach."}
 	}
 	return Verdict{}

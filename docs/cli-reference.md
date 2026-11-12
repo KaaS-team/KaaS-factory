@@ -17,7 +17,7 @@ Serve the factory as an A2A agent
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--addr` | string | `127.0.0.1:8787` | listen address |
-| `--audit-log` | string | `a2a-audit.jsonl` | file that gets one JSON line per call |
+| `--audit-log` | string | `.factory/a2a-audit.jsonl` | file that gets one JSON line per call |
 | `--signing-key` | string | `` | ECDSA P-256 PEM key that signs the agent card (a new key per start when empty) |
 
 ## factory add

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -129,5 +130,33 @@ func TestRunCancelIsNotATimeout(t *testing.T) {
 	r := &Runner{Git: w, Gate: slowGate{w}, Store: w, Cfg: Config{BatchSize: 2, BatchTimeout: time.Hour}}
 	if _, err := r.Run(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+// A push that is never a fast-forward is capped: the batch is parked as failed with the reason, the
+// attempts stop at the cap, and a zero backoff does not turn the retries into a spin.
+func TestRunNonFFIsCappedAndParked(t *testing.T) {
+	for _, attempts := range []int{0, 3} { // 0 is the default
+		want := attempts
+		if want == 0 {
+			want = DefaultPushAttempts
+		}
+		w := newWorld(2)
+		g := &failFF{world: w, n: 1 << 30, err: ErrBaseMoved}
+		r := &Runner{Git: g, Gate: w, Store: w, Cfg: Config{BatchSize: 2, PushAttempts: attempts}, Sleep: func(context.Context, time.Duration) error { return nil }}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		rep, err := r.Run(ctx)
+		cancel()
+		if err != nil {
+			t.Fatalf("attempts %d: %v", attempts, err)
+		}
+		if g.ffs != want || len(rep.Landed) != 0 || len(rep.Ejected) != 2 {
+			t.Fatalf("attempts %d: pushes=%d rep=%+v, want %d pushes and the batch ejected", attempts, g.ffs, rep, want)
+		}
+		for _, e := range rep.Ejected {
+			if !strings.Contains(e.LogTail, "not a fast-forward") || !strings.Contains(e.LogTail, fmt.Sprint(want)) {
+				t.Fatalf("reason %q", e.LogTail)
+			}
+		}
 	}
 }

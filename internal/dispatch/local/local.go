@@ -314,7 +314,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			}
 			switch v := loop.Feed(sc.Bytes()); v.Kind {
 			case stuck.Nudge:
-				_ = d.Steer(runCtx, session(p), v.Message) // unsupported today, so the nudge is not delivered
+				_ = d.Steer(runCtx, session(p), v.Message) // best effort: a local session has no Steer, so this only counts the nudge and delivers nothing
 			case stuck.Abort:
 				stuckErr = fmt.Errorf("%w: %s (%s)", ErrStuck, v.Pattern, v.Message)
 				cancel()
@@ -326,10 +326,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 				}
 			}
 		}
-		p.err = cmd.Wait()
-		if stuckErr != nil {
-			p.err = stuckErr
-		}
+		p.err = exitErr(cmd.Wait(), cmd.ProcessState, stuckErr)
 		_ = killGroup(cmd) // anything the agent left behind
 		if guard != nil {
 			restore()
@@ -348,6 +345,19 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		close(p.done)
 	}()
 	return session(p), nil
+}
+
+// exitErr is a run's result. An abort replaces the exit error only when the kill did the ending: a
+// process that exited 0 before the kill took effect was a clean exit, and Wait reports the
+// cancelled context for it all the same.
+func exitErr(waitErr error, ps *os.ProcessState, stuckErr error) error {
+	if stuckErr == nil || (ps != nil && ps.Success()) {
+		if stuckErr != nil {
+			return nil
+		}
+		return waitErr
+	}
+	return stuckErr
 }
 
 // command builds the agent process. With Sandbox set it is the jail helper, which applies the
