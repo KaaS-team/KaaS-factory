@@ -16,3 +16,4 @@ dist/
 __pycache__/
 *.pyc
 
+.factory/shadow.ndjson
