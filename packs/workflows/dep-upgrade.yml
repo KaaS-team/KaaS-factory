@@ -4,6 +4,7 @@ name: dep-upgrade
 steps:
   triage: { uses: triage, label: "factory:triaging", next: build, tier: small, budget: 150000 }
   build: { uses: build, label: "factory:building", next: tests, tier: large, budget: 600000, skills: [factory-build] }
-  tests: { uses: check, label: "factory:testing", run: ".factory/gates.sh", reject: build, next: verify }
+  tests: { uses: check, label: "factory:testing", run: ".factory/gates.sh", reject: build, next: residue }
+  residue: { uses: check, label: "factory:residue", run: "sh packs/checks/ast-grep-residue/check.sh", reject: build, next: verify }
   verify: { uses: verify, label: "factory:verifying", next: pr, reject: build, tier: large, budget: 300000, skills: [factory-verify] }
   pr: { uses: pr, label: "factory:in-review", revise: build, tier: small, budget: 100000, skills: [factory-pr] }
