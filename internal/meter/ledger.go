@@ -3,6 +3,7 @@ package meter
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
@@ -24,6 +25,27 @@ type Spend struct {
 	CostUSD        float64
 	UnreportedRuns int
 	Runs           int
+	// Attempts holds per-attempt token rows. Comments written before they existed have none.
+	Attempts []AttemptTokens
+}
+
+// AttemptTokens is the absolute token totals one attempt on a ticket reported.
+type AttemptTokens struct {
+	N          int
+	Input      int64
+	Output     int64
+	CacheRead  int64
+	CacheWrite int64
+}
+
+// attemptWire is AttemptTokens as it sits in the marker. Fields are pointers so a row with a
+// missing or mistyped number is dropped rather than read as zero.
+type attemptWire struct {
+	N          *float64 `json:"n"`
+	Input      *float64 `json:"in"`
+	Output     *float64 `json:"out"`
+	CacheRead  *float64 `json:"cacheRead"`
+	CacheWrite *float64 `json:"cacheWrite"`
 }
 
 // EncodeSpend returns the comment body the TypeScript ledger writes for s:
@@ -39,6 +61,16 @@ func EncodeSpend(s Spend) string {
 	b.WriteString(",\"costUsd\":" + jsNumber(s.CostUSD))
 	b.WriteString(",\"unreportedRuns\":" + strconv.Itoa(s.UnreportedRuns))
 	b.WriteString(",\"runs\":" + strconv.Itoa(s.Runs))
+	if len(s.Attempts) > 0 {
+		b.WriteString(",\"attempts\":[")
+		for i, a := range s.Attempts {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			fmt.Fprintf(&b, `{"n":%d,"in":%d,"out":%d,"cacheRead":%d,"cacheWrite":%d}`, a.N, a.Input, a.Output, a.CacheRead, a.CacheWrite)
+		}
+		b.WriteByte(']')
+	}
 	b.WriteString("} -->")
 	return b.String()
 }
@@ -50,11 +82,12 @@ func DecodeSpend(body string) ([]Spend, error) {
 	var out []Spend
 	for _, m := range spendMarker.FindAllStringSubmatch(body, -1) {
 		var raw struct {
-			Holder         *string  `json:"holder"`
-			Day            string   `json:"day"`
-			CostUSD        *float64 `json:"costUsd"`
-			UnreportedRuns *float64 `json:"unreportedRuns"`
-			Runs           *float64 `json:"runs"`
+			Holder         *string           `json:"holder"`
+			Day            string            `json:"day"`
+			CostUSD        *float64          `json:"costUsd"`
+			UnreportedRuns *float64          `json:"unreportedRuns"`
+			Runs           *float64          `json:"runs"`
+			Attempts       []json.RawMessage `json:"attempts"`
 		}
 		if json.Unmarshal([]byte(m[1]), &raw) != nil {
 			continue
@@ -68,9 +101,28 @@ func DecodeSpend(body string) ([]Spend, error) {
 			CostUSD:        *raw.CostUSD,
 			UnreportedRuns: int(*raw.UnreportedRuns),
 			Runs:           int(*raw.Runs),
+			Attempts:       attempts(raw.Attempts),
 		})
 	}
 	return out, nil
+}
+
+// attempts keeps the well-formed rows: attempt number at least one, every count a finite
+// non-negative number.
+func attempts(in []json.RawMessage) []AttemptTokens {
+	var out []AttemptTokens
+	for _, r := range in {
+		var w attemptWire
+		if json.Unmarshal(r, &w) != nil {
+			continue
+		}
+		if !count(w.N) || *w.N < 1 || !count(w.Input) || !count(w.Output) || !count(w.CacheRead) || !count(w.CacheWrite) {
+			continue
+		}
+		out = append(out, AttemptTokens{N: int(*w.N), Input: int64(*w.Input), Output: int64(*w.Output),
+			CacheRead: int64(*w.CacheRead), CacheWrite: int64(*w.CacheWrite)})
+	}
+	return out
 }
 
 func count(f *float64) bool { return f != nil && !math.IsNaN(*f) && !math.IsInf(*f, 0) && *f >= 0 }

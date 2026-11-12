@@ -37,7 +37,7 @@ func TestLedgerRoundTripsTheTypeScriptComments(t *testing.T) {
 		}
 	}
 	got, _ := DecodeSpend(bodies["7:100"])
-	if got[0] != (Spend{Holder: "worker-1", CostUSD: 0.30000000000000004, UnreportedRuns: 1, Runs: 3}) {
+	if g := got[0]; g.Holder != "worker-1" || g.CostUSD != 0.30000000000000004 || g.UnreportedRuns != 1 || g.Runs != 3 || g.Attempts != nil {
 		t.Errorf("decoded %+v", got[0])
 	}
 	day, _ := DecodeSpend(bodies["1:101"])
@@ -78,5 +78,50 @@ func TestEncodeSpendNumbersMatchJavaScript(t *testing.T) {
 		if got := jsNumber(f); got != want {
 			t.Errorf("jsNumber(%v) = %s, want %s", f, got, want)
 		}
+	}
+}
+
+// A stored v1 comment from before per-attempt rows: it decodes with no attempts and re-encodes
+// byte for byte. The marker carries no version string, so rows ride in one optional field.
+func TestLedgerOldV1CommentHasNoAttempts(t *testing.T) {
+	old := "Factory usage record (operator data, hidden).\n" +
+		`<!-- factory:spend {"holder":"worker-1","costUsd":0.54,"unreportedRuns":0,"runs":2} -->`
+	got, err := DecodeSpend(old)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("%v %v", got, err)
+	}
+	if len(got[0].Attempts) != 0 {
+		t.Fatalf("attempts = %+v", got[0].Attempts)
+	}
+	if enc := EncodeSpend(got[0]); enc != old {
+		t.Fatalf("re-encoded %q", enc)
+	}
+}
+
+func TestLedgerAttemptRowsRoundTrip(t *testing.T) {
+	in := Spend{Holder: "worker-1", CostUSD: 1.5, Runs: 2, Attempts: []AttemptTokens{
+		{N: 1, Input: 1000, Output: 500, CacheRead: 20, CacheWrite: 7},
+		{N: 2, Input: 400, Output: 100},
+	}}
+	body := EncodeSpend(in)
+	want := "Factory usage record (operator data, hidden).\n" +
+		`<!-- factory:spend {"holder":"worker-1","costUsd":1.5,"unreportedRuns":0,"runs":2,` +
+		`"attempts":[{"n":1,"in":1000,"out":500,"cacheRead":20,"cacheWrite":7},{"n":2,"in":400,"out":100,"cacheRead":0,"cacheWrite":0}]} -->`
+	if body != want {
+		t.Fatalf("body\n%q\nwant\n%q", body, want)
+	}
+	got, _ := DecodeSpend(body)
+	if len(got) != 1 || len(got[0].Attempts) != 2 || got[0].Attempts[0] != in.Attempts[0] || got[0].Attempts[1] != in.Attempts[1] {
+		t.Fatalf("decoded %+v", got)
+	}
+}
+
+func TestDecodeSpendDropsBadAttemptRowsOnly(t *testing.T) {
+	body := `<!-- factory:spend {"holder":"x","costUsd":1,"unreportedRuns":0,"runs":2,"attempts":[` +
+		`{"n":1,"in":5,"out":6,"cacheRead":0,"cacheWrite":0},{"n":0,"in":1,"out":1,"cacheRead":0,"cacheWrite":0},` +
+		`{"n":2,"in":-1,"out":1,"cacheRead":0,"cacheWrite":0},{"n":3,"in":"x"}]} -->`
+	got, _ := DecodeSpend(body)
+	if len(got) != 1 || len(got[0].Attempts) != 1 || got[0].Attempts[0].N != 1 {
+		t.Fatalf("decoded %+v", got)
 	}
 }
