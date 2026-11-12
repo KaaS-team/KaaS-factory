@@ -1,15 +1,22 @@
 package mcp_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/spf13/pflag"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/api/porttest"
@@ -649,5 +656,207 @@ func TestCreateTaskReturnsTheNewID(t *testing.T) {
 	raw, _ := json.Marshal(r.StructuredContent)
 	if string(raw) != `{"id":"new-1"}` {
 		t.Errorf("create_task = %s", raw)
+	}
+}
+
+const httpToken = "secret-token"
+
+const initBody = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}`
+
+func httpServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	h, err := factorymcp.Handler(factorymcp.NewServer(newFake(), factorymcp.Handlers{}), httpToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(h)
+	t.Cleanup(ts.Close)
+	return ts
+}
+
+func post(t *testing.T, url, auth, body string) (int, string) {
+	t.Helper()
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, url, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	if auth != "" {
+		req.Header.Set("Authorization", auth)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<16))
+	return res.StatusCode, strings.TrimSpace(string(b))
+}
+
+// http.test.ts "no token or a wrong token gets 401; the right token is let through", plus the 404 rule.
+func TestHTTPAuthAndPaths(t *testing.T) {
+	ts := httpServer(t)
+	cases := []struct {
+		name, path, auth string
+		status           int
+	}{
+		{"no token", "/mcp", "", 401},
+		{"wrong token", "/mcp", "Bearer nope", 401},
+		{"token without Bearer", "/mcp", httpToken, 401},
+		{"prefix of the token", "/mcp", "Bearer secret", 401},
+		{"token plus suffix", "/mcp", "Bearer " + httpToken + "x", 401},
+		{"right token", "/mcp", "Bearer " + httpToken, 200},
+		{"other path, right token", "/other", "Bearer " + httpToken, 404},
+		{"root, right token", "/", "Bearer " + httpToken, 404},
+		{"other path, no token", "/other", "", 401},
+	}
+	for _, c := range cases {
+		status, body := post(t, ts.URL+c.path, c.auth, initBody)
+		if status != c.status {
+			t.Errorf("%s: status %d, want %d", c.name, status, c.status)
+		}
+		if c.status == 401 && body != "unauthorized" {
+			t.Errorf("%s: body %q", c.name, body)
+		}
+	}
+}
+
+type headerAdder struct{ auth string }
+
+func (h headerAdder) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", h.auth)
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+// http.test.ts "with the token, tools/list answers every tool and a tool call works".
+func TestHTTPClientListsToolsAndCalls(t *testing.T) {
+	ts := httpServer(t)
+	tr := &sdk.StreamableClientTransport{Endpoint: ts.URL + "/mcp", HTTPClient: &http.Client{Transport: headerAdder{"Bearer " + httpToken}}}
+	cs, err := sdk.NewClient(&sdk.Implementation{Name: "t", Version: "0"}, nil).Connect(t.Context(), tr, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	got := listTools(t, cs)
+	for _, n := range toolNames {
+		if got[n] == nil {
+			t.Errorf("tool %s missing over HTTP", n)
+		}
+	}
+	r, err := cs.CallTool(t.Context(), &sdk.CallToolParams{Name: "list_tickets", Arguments: map[string]any{}})
+	if err != nil || r.IsError || !strings.Contains(text(t, r), "seven") {
+		t.Errorf("list_tickets: err=%v r=%+v", err, r)
+	}
+}
+
+// http.test.ts "an empty token is refused at startup", for the handler and for the command.
+func TestHTTPEmptyTokenIsRefused(t *testing.T) {
+	if _, err := factorymcp.Handler(factorymcp.NewServer(newFake(), factorymcp.Handlers{}), ""); err == nil {
+		t.Error("Handler accepted an empty token")
+	}
+	t.Setenv(factorymcp.TokenEnv, "")
+	opened := false
+	cmd := factorymcp.NewCommand(factorymcp.WithControl(func() (api.Control, factorymcp.Handlers, error) {
+		opened = true
+		return newFake(), factorymcp.Handlers{}, nil
+	}))
+	cmd.SetArgs([]string{"--http", "127.0.0.1:0"})
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second) // a command that does not refuse would serve until here
+	defer cancel()
+	if err := cmd.ExecuteContext(ctx); err == nil || !strings.Contains(err.Error(), factorymcp.TokenEnv) {
+		t.Errorf("err = %v", err)
+	}
+	if opened {
+		t.Error("the command built a control plane before refusing")
+	}
+}
+
+// Default bind is loopback; an explicit host is kept.
+func TestBindAddr(t *testing.T) {
+	for in, want := range map[string]string{
+		"8080": "127.0.0.1:8080", ":8080": "127.0.0.1:8080", "127.0.0.1:0": "127.0.0.1:0",
+		"0.0.0.0:9": "0.0.0.0:9", "localhost:7": "localhost:7",
+	} {
+		if got := factorymcp.BindAddr(in); got != want {
+			t.Errorf("BindAddr(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+type lockedBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+func (l *lockedBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+// The command serves /mcp with the token from the environment, never logs it, and stops with its context.
+func TestHTTPCommandServesWithEnvToken(t *testing.T) {
+	t.Setenv(factorymcp.TokenEnv, httpToken)
+	var logs lockedBuf
+	cmd := factorymcp.NewCommand(factorymcp.WithControl(func() (api.Control, factorymcp.Handlers, error) {
+		return newFake(), factorymcp.Handlers{}, nil
+	}))
+	cmd.SetArgs([]string{"--http", "127.0.0.1:0"})
+	cmd.SetOut(&logs)
+	cmd.SetErr(&logs)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- cmd.ExecuteContext(ctx) }()
+	re := regexp.MustCompile(`http://(127\.0\.0\.1:\d+)/mcp`)
+	var addr string
+	for i := 0; i < 300 && addr == ""; i++ {
+		if m := re.FindStringSubmatch(logs.String()); m != nil {
+			addr = m[1]
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if addr == "" {
+		t.Fatalf("command did not report its address: %q", logs.String())
+	}
+	if status, _ := post(t, "http://"+addr+"/mcp", "", initBody); status != 401 {
+		t.Errorf("no token: %d", status)
+	}
+	if status, _ := post(t, "http://"+addr+"/mcp", "Bearer "+httpToken, initBody); status != 200 {
+		t.Errorf("env token: %d", status)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Errorf("shutdown: %v", err)
+	}
+	if strings.Contains(logs.String(), httpToken) {
+		t.Errorf("token in the log: %q", logs.String())
+	}
+}
+
+// http.test.ts "bin reads credentials from env only and offers --http": the token has no flag, and the
+// comparison in mcp.go is the one constant-time check.
+func TestTokenIsEnvOnlyAndComparedInConstantTime(t *testing.T) {
+	cmd := factorymcp.NewCommand()
+	if cmd.Flags().Lookup("http") == nil {
+		t.Error("no --http flag")
+	}
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Name != "http" && f.Name != "help" {
+			t.Errorf("unexpected flag --%s", f.Name)
+		}
+	})
+	src, err := os.ReadFile("mcp.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(src), "subtle.ConstantTimeCompare("); n != 1 {
+		t.Errorf("ConstantTimeCompare appears %d times, want 1", n)
+	}
+	if regexp.MustCompile(`(?i)Header\.Get\("Authorization"\)\s*[!=]=`).Match(src) {
+		t.Error("the Authorization header is compared with ==")
 	}
 }

@@ -4,8 +4,14 @@ package mcp
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -423,6 +429,60 @@ func ticketView(ctx context.Context, ctl api.Control, b api.Board, id string) (T
 	return v, true, nil
 }
 
+// TokenEnv is the environment variable holding the bearer token of the HTTP transport.
+// The token is never a flag and is never written to a log or an error.
+const TokenEnv = "FACTORY_MCP_TOKEN"
+
+// Handler serves srv over streamable HTTP at /mcp. Every request needs "Authorization: Bearer <token>"
+// (401 otherwise); any other path is 404. The token is compared in constant time.
+func Handler(srv *sdk.Server, token string) (http.Handler, error) {
+	if token == "" {
+		return nil, fmt.Errorf("mcp: %s must not be empty", TokenEnv)
+	}
+	want := sha256.Sum256([]byte("Bearer " + token))
+	mcp := sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return srv }, nil)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got := sha256.Sum256([]byte(r.Header.Get("Authorization")))
+		if subtle.ConstantTimeCompare(got[:], want[:]) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path != "/mcp" {
+			http.NotFound(w, r)
+			return
+		}
+		mcp.ServeHTTP(w, r)
+	}), nil
+}
+
+var portOnly = regexp.MustCompile(`^\d+$`)
+
+// BindAddr completes a listen address: a bare port or an empty host binds loopback, never every interface.
+func BindAddr(addr string) string {
+	if portOnly.MatchString(addr) {
+		return "127.0.0.1:" + addr
+	}
+	if host, port, err := net.SplitHostPort(addr); err == nil && host == "" {
+		return "127.0.0.1:" + port
+	}
+	return addr
+}
+
+// Serve answers on ln until ctx ends.
+func Serve(ctx context.Context, ln net.Listener, h http.Handler) error {
+	hs := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		<-ctx.Done()
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = hs.Shutdown(sctx)
+	}()
+	if err := hs.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
 // Option configures NewCommand.
 type Option func(*cmdConfig)
 
@@ -442,19 +502,39 @@ func NewCommand(opts ...Option) *cobra.Command {
 	for _, o := range opts {
 		o(&cfg)
 	}
-	return &cobra.Command{
+	var httpAddr string
+	cmd := &cobra.Command{
 		Use:   "mcp",
-		Short: "Serve the factory to Claude Code over stdio (MCP)",
+		Short: "Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if cfg.open == nil {
 				return errors.New("mcp: no control plane wired in this build")
 			}
+			token := os.Getenv(TokenEnv)
+			if httpAddr != "" && token == "" {
+				return fmt.Errorf("mcp: --http needs %s set to a bearer token", TokenEnv)
+			}
 			c, h, err := cfg.open()
 			if err != nil {
 				return err
 			}
-			return NewServer(c, h).Run(cmd.Context(), &sdk.StdioTransport{})
+			srv := NewServer(c, h)
+			if httpAddr == "" {
+				return srv.Run(cmd.Context(), &sdk.StdioTransport{})
+			}
+			handler, err := Handler(srv, token)
+			if err != nil {
+				return err
+			}
+			ln, err := net.Listen("tcp", BindAddr(httpAddr))
+			if err != nil {
+				return fmt.Errorf("mcp: listen: %w", err)
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "mcp: serving http://%s/mcp\n", ln.Addr())
+			return Serve(cmd.Context(), ln, handler)
 		},
 	}
+	cmd.Flags().StringVar(&httpAddr, "http", "", "serve streamable HTTP at /mcp on this address (default host 127.0.0.1); the bearer token is read from "+TokenEnv)
+	return cmd
 }
