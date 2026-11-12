@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,6 +34,12 @@ type Fixture struct {
 	Gate    string          `json:"gate,omitempty"` // command that says main is green after a ticket
 	Tickets []FixtureTicket `json:"tickets"`
 	Hidden  string          `json:"hidden"`
+	// Scorers are commands run cheapest first through HiddenTest; the first to pass decides.
+	// Empty means just Hidden.
+	Scorers []string `json:"scorers,omitempty"`
+	Epochs  int      `json:"epochs,omitempty"`  // runs per ticket, 0 means 1
+	Reducer string   `json:"reducer,omitempty"` // mean (default), max, pass_at_k or at_least_k
+	K       int      `json:"k,omitempty"`       // for pass_at_k and at_least_k
 }
 
 // Matrix is the set of fixtures one eval run covers.
@@ -72,6 +79,15 @@ type TicketResult struct {
 	WallTime     time.Duration `json:"wall_time"`
 	Attempts     int           `json:"attempts"`
 	HumanTouches int           `json:"human_touches"`
+	// Epochs holds each run's score; Reduced is the Fixture's reducer applied to them.
+	Epochs  []EpochResult `json:"epochs"`
+	Reduced float64       `json:"reduced_score"`
+}
+
+// EpochResult is one run of a ticket: its score and the scorer stage that decided it.
+type EpochResult struct {
+	Score     float64 `json:"score"`
+	DecidedBy string  `json:"decided_by,omitempty"`
 }
 
 // Aggregate is the summary the pack upgrade loop compares.
@@ -123,29 +139,78 @@ func Run(ctx context.Context, m Matrix, d Deps) (Scorecard, error) {
 			if err := ctx.Err(); err != nil {
 				return sc, err
 			}
-			t := ft.Ticket
-			o, err := d.Dispatch(ctx, t)
+			r, err := runTicket(ctx, f, ft.Ticket, d)
 			if err != nil {
-				return sc, fmt.Errorf("dispatch %s/%s: %w", f.Name, t.ID, err)
+				return sc, err
 			}
-			green, err := d.Gate(ctx, t)
-			if err != nil {
-				return sc, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
-			}
-			pass, err := d.HiddenTest(ctx, t, f.Hidden)
-			if err != nil {
-				return sc, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
-			}
-			in, out := AbsoluteTotals(o.Updates)
-			sc.Tickets = append(sc.Tickets, TicketResult{
-				Fixture: f.Name, Ticket: t.ID, HiddenPass: pass, BaseGreen: green, Merged: pass && green,
-				InputTokens: in, OutputTokens: out, CostUSD: maxCost(o.Updates),
-				WallTime: o.Wall, Attempts: o.Attempts, HumanTouches: o.HumanTouches,
-			})
+			sc.Tickets = append(sc.Tickets, r)
 		}
 	}
 	sc.Aggregate = aggregate(sc.Tickets)
 	return sc, nil
+}
+
+// runTicket runs one ticket for the fixture's epochs. Each epoch is scored by a cascade of the
+// fixture's scorers; the reducer folds the epoch scores. The ticket passes at PassThreshold,
+// and base is green only when it was after every epoch. Usage and wall time add up over epochs.
+func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps) (TicketResult, error) {
+	if f.Epochs < 0 {
+		return TicketResult{}, fmt.Errorf("fixture %s: epochs %d is negative", f.Name, f.Epochs)
+	}
+	epochs := max(f.Epochs, 1)
+	red, err := ParseReducer(f.Reducer, f.K, epochs)
+	if err != nil {
+		return TicketResult{}, fmt.Errorf("fixture %s: %w", f.Name, err)
+	}
+	cmds := f.Scorers
+	if len(cmds) == 0 {
+		cmds = []string{f.Hidden}
+	}
+	r := TicketResult{Fixture: f.Name, Ticket: t.ID, BaseGreen: true}
+	var scores []float64
+	for range epochs {
+		o, err := d.Dispatch(ctx, t)
+		if err != nil {
+			return r, fmt.Errorf("dispatch %s/%s: %w", f.Name, t.ID, err)
+		}
+		green, err := d.Gate(ctx, t)
+		if err != nil {
+			return r, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
+		}
+		stages := make([]Stage, len(cmds))
+		for i, c := range cmds {
+			stages[i] = Stage{Name: c, Score: func(ctx context.Context) (float64, bool, error) {
+				ok, err := d.HiddenTest(ctx, t, c)
+				if err != nil {
+					return 0, false, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
+				}
+				if ok {
+					return 1, true, nil
+				}
+				return 0, true, nil
+			}}
+		}
+		dec, err := Cascade(ctx, 1, stages)
+		if err != nil {
+			return r, err
+		}
+		in, out := AbsoluteTotals(o.Updates)
+		r.InputTokens += in
+		r.OutputTokens += out
+		r.CostUSD += maxCost(o.Updates)
+		r.WallTime += o.Wall
+		r.Attempts += o.Attempts
+		r.HumanTouches += o.HumanTouches
+		r.BaseGreen = r.BaseGreen && green
+		r.Epochs = append(r.Epochs, EpochResult{Score: dec.Value, DecidedBy: dec.DecidedBy})
+		scores = append(scores, dec.Value)
+	}
+	if r.Reduced = red.Reduce(scores); math.IsNaN(r.Reduced) {
+		r.Reduced = 0
+	}
+	r.HiddenPass = r.Reduced >= PassThreshold
+	r.Merged = r.HiddenPass && r.BaseGreen
+	return r, nil
 }
 
 func aggregate(rs []TicketResult) Aggregate {
@@ -259,13 +324,22 @@ func Markdown(sc Scorecard, customer bool) string {
 	if !customer && (sc.Workflow != "" || sc.Agent != "") {
 		fmt.Fprintf(&b, "Workflow: %s\n\nAgent: %s\n\n", sc.Workflow, sc.Agent)
 	}
-	fmt.Fprintf(&b, "- Pass rate: %.2f (%d of %d)\n", a.PassRate, a.Merged, a.Total)
+	fmt.Fprintf(&b, "- Pass rate: %.2f (%d of %d)", a.PassRate, a.Merged, a.Total)
+	if lo, hi, err := Wilson(float64(a.Merged), a.Total, 0.95); err == nil && a.Total > 0 {
+		fmt.Fprintf(&b, ", 95%% Wilson interval %.2f to %.2f", lo, hi)
+	}
+	b.WriteString("\n")
 	fmt.Fprintf(&b, "- Main green rate: %.2f\n", a.MainGreenRate)
 	if !customer {
 		fmt.Fprintf(&b, "- Tokens per merged PR: %d\n", a.TokensPerMergedPR)
 	}
 	fmt.Fprintf(&b, "- Median wall time: %s\n", a.MedianWallTime)
 	fmt.Fprintf(&b, "- Human touches per PR: %.2f\n\n", a.HumanTouchesPerPR)
+	for _, r := range sc.Tickets {
+		if len(r.Epochs) > 1 {
+			fmt.Fprintf(&b, "- %s/%s: reduced score %.2f over %d epochs\n", r.Fixture, r.Ticket, r.Reduced, len(r.Epochs))
+		}
+	}
 	if customer {
 		b.WriteString("| Fixture | Ticket | Passed | Base green | Attempts |\n|---|---|---|---|---|\n")
 		for _, r := range sc.Tickets {

@@ -90,3 +90,11 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## UKGovernmentBEIS/inspect_ai@26f6d05
+
+Source: https://github.com/UKGovernmentBEIS/inspect_ai (MIT, Copyright (c) 2024 UK AI Security Institute). The MIT permission notice is the same text as in "License text (both projects)" above.
+
+- `internal/eval/cascade.go` from `src/inspect_ai/scorer/_cascade.py` [tested by `internal/eval/cascade_test.go`, cases from `tests/scorer/test_cascade.py`]
+- `internal/eval/wilson.go` from `src/inspect_ai/scorer/_metrics/std.py` (`ci_wilson`, without clustering) [tested by `internal/eval/wilson_test.go`, values from `tests/scorer/test_metric.py`]
+- `internal/eval/epochs.go` from `src/inspect_ai/scorer/_reducer/reducer.py` (mean, max, pass_at, at_least) [tested by `internal/eval/epochs_test.go`]
