@@ -83,7 +83,7 @@ func LoadMarkdown(path string) (*Graph, error) {
 	body = strings.TrimSpace(body)
 	var g *Graph
 	if m != nil && child(m, "nodes") != nil {
-		if g, err = build(name, m, "nodes", body, checkNodePrompt); err != nil {
+		if g, err = build(name, m, "nodes", body, 1, checkNodePrompt); err != nil {
 			return nil, err
 		}
 	} else {
@@ -147,8 +147,8 @@ func checkMarkdownVars(text string, line int) error {
 	return nil
 }
 
-func checkNodePrompt(p string) error {
-	if err := checkMarkdownVars(p, 0); err != nil {
+func checkNodePrompt(p string, line int) error {
+	if err := checkMarkdownVars(p, line); err != nil {
 		return err
 	}
 	_, err := parseTemplate(p)

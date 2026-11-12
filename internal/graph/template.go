@@ -128,3 +128,18 @@ func (g *Graph) RenderPrompt(node string, vars map[string]any) (string, error) {
 	}
 	return Render(tmpl, vars)
 }
+
+// validateTemplateAt is ValidateTemplate for text that starts on file line (0 leaves the line out); an
+// unknown variable error carries the line it is on.
+func validateTemplateAt(tmpl string, line int) error {
+	err := ValidateTemplate(tmpl)
+	if err == nil || line == 0 || strings.HasPrefix(err.Error(), "template_parse_error") {
+		return err
+	}
+	for i, l := range strings.Split(tmpl, "\n") {
+		if lerr := ValidateTemplate(l); lerr != nil {
+			return fmt.Errorf("template_render_error: line %d: %s", line+i, strings.TrimPrefix(lerr.Error(), "template_render_error: "))
+		}
+	}
+	return err
+}
