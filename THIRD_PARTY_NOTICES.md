@@ -90,3 +90,10 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## dagger/dagger@835b0ef806b277fb216735a180d1a542c2937024
+
+Source: https://github.com/dagger/dagger (Apache-2.0, Copyright The Dagger Authors).
+
+- `internal/eval/replay/replay.go` from `core/llm_recording.go` (algorithm and diff shape; re-implemented against our message type, no go-cmp) [tested by `internal/eval/replay/replay_test.go`]
+- `internal/eval/replay/scrub.go` from `util/scrub/scrub.go` (regex table and `Stabilize` only; Dagger rules replaced with ours) [tested by `internal/eval/replay/scrub_test.go`]
