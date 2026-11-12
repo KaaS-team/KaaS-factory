@@ -1,0 +1,253 @@
+// Package eval runs a matrix of fixtures through injected dispatch, gate and
+// hidden-test interfaces and scores the result. It never calls a model.
+package eval
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/KaaS-team/factory/internal/api"
+)
+
+// SchemaV1 is the version string written into every scorecard.
+const SchemaV1 = "factory.scorecard/v1"
+
+// DefaultMargin is how much tokens per merged PR may rise before Compare says worse.
+const DefaultMargin = 0.10
+
+// FixtureTicket is one ticket in a fixture.
+type FixtureTicket struct {
+	api.Ticket
+}
+
+// Fixture is a repo seed, its tickets and the hidden acceptance command.
+type Fixture struct {
+	Name    string          `json:"name"`
+	Seed    string          `json:"seed,omitempty"`
+	Tickets []FixtureTicket `json:"tickets"`
+	Hidden  string          `json:"hidden"`
+}
+
+// Matrix is the set of fixtures one eval run covers.
+type Matrix struct {
+	Fixtures []Fixture `json:"fixtures"`
+}
+
+// Outcome is what a dispatcher run reports for one ticket: absolute usage
+// updates as they arrived (Symphony §13.5), attempts, wall time and human touches.
+type Outcome struct {
+	Attempts     int
+	Updates      []api.Usage
+	Wall         time.Duration
+	HumanTouches int
+}
+
+// Deps are the injected collaborators; tests pass fakes, never a model.
+type Deps interface {
+	// Dispatch runs the workflow for one ticket.
+	Dispatch(ctx context.Context, t api.Ticket) (Outcome, error)
+	// Gate reports whether the base branch stayed green after the ticket.
+	Gate(ctx context.Context, t api.Ticket) (bool, error)
+	// HiddenTest runs the fixture's hidden acceptance command for the ticket.
+	HiddenTest(ctx context.Context, t api.Ticket, command string) (bool, error)
+}
+
+// TicketResult is the scorecard row for one ticket.
+type TicketResult struct {
+	Fixture      string        `json:"fixture"`
+	Ticket       api.TicketID  `json:"ticket"`
+	HiddenPass   bool          `json:"hidden_pass"`
+	BaseGreen    bool          `json:"base_green"`
+	Merged       bool          `json:"merged"`
+	InputTokens  int64         `json:"input_tokens"`
+	OutputTokens int64         `json:"output_tokens"`
+	CostUSD      float64       `json:"cost_usd,omitempty"`
+	WallTime     time.Duration `json:"wall_time"`
+	Attempts     int           `json:"attempts"`
+	HumanTouches int           `json:"human_touches"`
+}
+
+// Aggregate is the summary the pack upgrade loop compares.
+type Aggregate struct {
+	PassRate          float64       `json:"pass_rate"`
+	TokensPerMergedPR int64         `json:"tokens_per_merged_pr"`
+	MedianWallTime    time.Duration `json:"median_wall_time"`
+	HumanTouchesPerPR float64       `json:"human_touches_per_pr"`
+	Merged            int           `json:"merged"`
+	Total             int           `json:"total"`
+}
+
+// Scorecard is the versioned eval result (schema factory.scorecard/v1).
+type Scorecard struct {
+	Schema    string         `json:"schema"`
+	Model     string         `json:"model,omitempty"`
+	Tickets   []TicketResult `json:"tickets"`
+	Aggregate Aggregate      `json:"aggregate"`
+}
+
+// AbsoluteTotals folds usage updates that carry absolute totals: the largest
+// seen per counter wins, so a repeated update counts once (Symphony §13.5).
+func AbsoluteTotals(updates []api.Usage) (in, out int64) {
+	for _, u := range updates {
+		in = max(in, u.InputTokens)
+		out = max(out, u.OutputTokens)
+	}
+	return in, out
+}
+
+func maxCost(updates []api.Usage) float64 {
+	var c float64
+	for _, u := range updates {
+		c = max(c, u.CostUSD)
+	}
+	return c
+}
+
+// Run executes every ticket of every fixture and returns the scorecard.
+func Run(ctx context.Context, m Matrix, d Deps) (Scorecard, error) {
+	sc := Scorecard{Schema: SchemaV1}
+	for _, f := range m.Fixtures {
+		for _, ft := range f.Tickets {
+			if err := ctx.Err(); err != nil {
+				return sc, err
+			}
+			t := ft.Ticket
+			o, err := d.Dispatch(ctx, t)
+			if err != nil {
+				return sc, fmt.Errorf("dispatch %s/%s: %w", f.Name, t.ID, err)
+			}
+			green, err := d.Gate(ctx, t)
+			if err != nil {
+				return sc, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
+			}
+			pass, err := d.HiddenTest(ctx, t, f.Hidden)
+			if err != nil {
+				return sc, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
+			}
+			in, out := AbsoluteTotals(o.Updates)
+			sc.Tickets = append(sc.Tickets, TicketResult{
+				Fixture: f.Name, Ticket: t.ID, HiddenPass: pass, BaseGreen: green, Merged: pass && green,
+				InputTokens: in, OutputTokens: out, CostUSD: maxCost(o.Updates),
+				WallTime: o.Wall, Attempts: o.Attempts, HumanTouches: o.HumanTouches,
+			})
+		}
+	}
+	sc.Aggregate = aggregate(sc.Tickets)
+	return sc, nil
+}
+
+func aggregate(rs []TicketResult) Aggregate {
+	a := Aggregate{Total: len(rs)}
+	var tokens int64
+	var touches int
+	var walls []time.Duration
+	for _, r := range rs {
+		tokens += r.InputTokens + r.OutputTokens
+		walls = append(walls, r.WallTime)
+		if r.Merged {
+			a.Merged++
+			touches += r.HumanTouches
+		}
+	}
+	if a.Total > 0 {
+		a.PassRate = float64(a.Merged) / float64(a.Total)
+	}
+	if a.Merged > 0 {
+		a.TokensPerMergedPR = tokens / int64(a.Merged)
+		a.HumanTouchesPerPR = float64(touches) / float64(a.Merged)
+	}
+	a.MedianWallTime = median(walls)
+	return a
+}
+
+func median(ds []time.Duration) time.Duration {
+	if len(ds) == 0 {
+		return 0
+	}
+	s := append([]time.Duration(nil), ds...)
+	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	if len(s)%2 == 1 {
+		return s[len(s)/2]
+	}
+	return (s[len(s)/2-1] + s[len(s)/2]) / 2
+}
+
+// Verdict is the Compare result: Worse with the reason, or not worse.
+type Verdict struct {
+	Worse  bool   `json:"worse"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// Compare says whether next is worse than prev: pass rate dropped, or tokens
+// per merged PR rose by more than margin (0 means DefaultMargin).
+func Compare(prev, next Scorecard, margin float64) Verdict {
+	if margin <= 0 {
+		margin = DefaultMargin
+	}
+	p, n := prev.Aggregate, next.Aggregate
+	if n.PassRate < p.PassRate {
+		return Verdict{Worse: true, Reason: fmt.Sprintf("pass rate fell from %.2f to %.2f", p.PassRate, n.PassRate)}
+	}
+	if p.TokensPerMergedPR > 0 && float64(n.TokensPerMergedPR-p.TokensPerMergedPR) > float64(p.TokensPerMergedPR)*margin {
+		return Verdict{Worse: true, Reason: fmt.Sprintf("tokens per merged PR rose from %d to %d, more than %.0f%%", p.TokensPerMergedPR, n.TokensPerMergedPR, margin*100)}
+	}
+	return Verdict{}
+}
+
+// Markdown renders the scorecard. The customer view leaves out the model,
+// token counts and cost.
+func Markdown(sc Scorecard, customer bool) string {
+	var b strings.Builder
+	a := sc.Aggregate
+	b.WriteString("# Eval scorecard\n\n")
+	if !customer && sc.Model != "" {
+		fmt.Fprintf(&b, "Model: %s\n\n", sc.Model)
+	}
+	fmt.Fprintf(&b, "- Pass rate: %.2f (%d of %d)\n", a.PassRate, a.Merged, a.Total)
+	if !customer {
+		fmt.Fprintf(&b, "- Tokens per merged PR: %d\n", a.TokensPerMergedPR)
+	}
+	fmt.Fprintf(&b, "- Median wall time: %s\n", a.MedianWallTime)
+	fmt.Fprintf(&b, "- Human touches per PR: %.2f\n\n", a.HumanTouchesPerPR)
+	if customer {
+		b.WriteString("| Fixture | Ticket | Passed | Base green | Attempts |\n|---|---|---|---|---|\n")
+		for _, r := range sc.Tickets {
+			fmt.Fprintf(&b, "| %s | %s | %t | %t | %d |\n", r.Fixture, r.Ticket, r.HiddenPass, r.BaseGreen, r.Attempts)
+		}
+		return b.String()
+	}
+	b.WriteString("| Fixture | Ticket | Passed | Base green | Tokens in | Tokens out | Wall | Attempts | Touches |\n|---|---|---|---|---|---|---|---|---|\n")
+	for _, r := range sc.Tickets {
+		fmt.Fprintf(&b, "| %s | %s | %t | %t | %d | %d | %s | %d | %d |\n", r.Fixture, r.Ticket, r.HiddenPass, r.BaseGreen, r.InputTokens, r.OutputTokens, r.WallTime, r.Attempts, r.HumanTouches)
+	}
+	return b.String()
+}
+
+// LoadMatrix reads every <dir>/*/fixture.yaml. The file is JSON, which is
+// valid YAML, so no YAML dependency is needed.
+func LoadMatrix(dir string) (Matrix, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "*", "fixture.yaml"))
+	if err != nil {
+		return Matrix{}, err
+	}
+	sort.Strings(files)
+	var m Matrix
+	for _, p := range files {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			return Matrix{}, err
+		}
+		var f Fixture
+		if err := json.Unmarshal(raw, &f); err != nil {
+			return Matrix{}, fmt.Errorf("%s: %w", p, err)
+		}
+		m.Fixtures = append(m.Fixtures, f)
+	}
+	return m, nil
+}
