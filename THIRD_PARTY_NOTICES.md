@@ -278,3 +278,9 @@ Source: https://github.com/dagger/dagger (Apache-2.0, Copyright The Dagger Autho
 
 - `internal/eval/replay/replay.go` from `core/llm_recording.go` (algorithm and diff shape; re-implemented against our message type, no go-cmp) [tested by `internal/eval/replay/replay_test.go`]
 - `internal/eval/replay/scrub.go` from `util/scrub/scrub.go` (regex table and `Stabilize` only; Dagger rules replaced with ours) [tested by `internal/eval/replay/scrub_test.go`]
+
+## dagger/dagger@835b0ef
+
+Source: https://github.com/dagger/dagger (Apache-2.0, Copyright 2022 Dagger, Inc.). The licence text is `LICENSES/Apache-2.0.txt`. Dagger's NOTICE file reads: "This product includes software developed at Dagger, Inc. (https://www.dagger.io)."
+
+- `pkg/sandbox/cachevol/store.go` from `engine/cachevolumedir/store.go`, with the Dagger naming removed, a tenant field added to the identity, and the test hooks dropped [tested by `pkg/sandbox/cachevol/store_test.go`]
