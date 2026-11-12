@@ -1,16 +1,20 @@
 package a2a
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/api/porttest"
@@ -255,4 +259,43 @@ func TestCommandRefusesEmptyToken(t *testing.T) {
 	if opened {
 		t.Error("deps were opened before the token check")
 	}
+}
+
+// TestCommandRejectsRebindingHost: the a2a listener answers 403 to a Host that is not loopback,
+// before the bearer token is even looked at.
+func TestCommandRejectsRebindingHost(t *testing.T) {
+	t.Setenv(TokenEnv, "tok")
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := probe.Addr().String()
+	_ = probe.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	pr, pw := io.Pipe()
+	cmd := NewCommand(func(context.Context) (Deps, error) { return Deps{}, nil })
+	cmd.SetErr(pw)
+	cmd.SetArgs([]string{"--addr", addr})
+	done := make(chan error, 1)
+	go func() { done <- cmd.ExecuteContext(ctx) }()
+	if _, err := bufio.NewReader(pr).ReadString('\n'); err != nil {
+		t.Fatal(err)
+	}
+	var code int
+	for i := 0; i < 50; i++ { // the line prints just before the listener binds
+		req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/", nil)
+		req.Host = "evil.example.com"
+		if resp, err := http.DefaultClient.Do(req); err == nil {
+			code = resp.StatusCode
+			_ = resp.Body.Close()
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if code != http.StatusForbidden {
+		t.Errorf("status %d, want 403", code)
+	}
+	cancel()
+	<-done
 }

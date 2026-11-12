@@ -207,3 +207,46 @@ func TestServe_OpenEventStreamDoesNotBlockDrain(t *testing.T) {
 		t.Fatal("blocked by open stream")
 	}
 }
+
+// TestServe_RejectsForeignHostAndOrigin: a DNS-rebinding Host or a foreign Origin gets 403 on the
+// real listener; a loopback Host passes (Symphony 8.1: loopback is the default control surface).
+func TestServe_RejectsForeignHostAndOrigin(t *testing.T) {
+	fc := newFakeCore()
+	close(fc.release)
+	s := New(fc, Options{Interval: time.Second})
+	ctx, cancel := context.WithCancel(context.Background())
+	ln := make(chan string, 1)
+	s.onListen = func(a string) { ln <- a }
+	done := make(chan error, 1)
+	go func() { done <- s.Serve(ctx, "127.0.0.1:0", time.Second) }()
+	addr := <-ln
+	for _, c := range []struct {
+		name, host, origin string
+		want               int
+	}{
+		{"loopback", "", "", http.StatusServiceUnavailable}, // reaches the handler: no tick yet
+		{"rebinding host", "evil.example.com", "", http.StatusForbidden},
+		{"foreign origin", "", "https://evil.example.com", http.StatusForbidden},
+	} {
+		req, err := http.NewRequest(http.MethodGet, "http://"+addr+"/healthz", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.host != "" {
+			req.Host = c.host
+		}
+		if c.origin != "" {
+			req.Header.Set("Origin", c.origin)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != c.want {
+			t.Errorf("%s: status %d, want %d", c.name, resp.StatusCode, c.want)
+		}
+	}
+	cancel()
+	<-done
+}

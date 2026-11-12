@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/serve/hostguard"
 )
 
 // Core is the loop the server hosts: a Control that also owns the poll loop (Symphony 8.1).
@@ -155,7 +157,7 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 			}
 		}
 	}()
-	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second,
+	srv := &http.Server{Handler: hostguard.New(addr, os.Getenv)(s.Handler()), ReadHeaderTimeout: 10 * time.Second,
 		BaseContext: func(net.Listener) context.Context { return ctx }} // ends open /events streams on stop
 	httpDone := make(chan error, 1)
 	go func() { httpDone <- srv.Serve(ln) }()

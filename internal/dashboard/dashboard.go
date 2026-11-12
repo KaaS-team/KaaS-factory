@@ -13,12 +13,14 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/serve/hostguard"
 )
 
 //go:embed templates/*.html
@@ -237,7 +239,7 @@ func NewCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			srv := &http.Server{Handler: Handler(ctl, Options{Operator: operator}), ReadHeaderTimeout: 10 * time.Second}
+			srv := &http.Server{Handler: hostguard.New(addr, os.Getenv)(Handler(ctl, Options{Operator: operator})), ReadHeaderTimeout: 10 * time.Second}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "dashboard on http://%s\n", ln.Addr())
 			done := make(chan struct{})
 			go func() {

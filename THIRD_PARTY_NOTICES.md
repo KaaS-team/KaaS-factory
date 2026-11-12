@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## coder/agentapi@7c468d5
+
+Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technologies, Inc.). The licence text above applies; the notice is kept with the copied code.
+
+- `internal/serve/hostguard/hostguard.go` from `lib/httpapi/server.go` (parseAllowedHosts, parseAllowedOrigins, hostAuthorizationMiddleware; huma and chi dropped) [tested by `internal/serve/hostguard/hostguard_test.go`]
