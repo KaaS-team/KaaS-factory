@@ -263,7 +263,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			}
 			switch v := guard.Feed(sc.Bytes()); v.Kind {
 			case stuck.Nudge:
-				_ = d.Steer(runCtx, session(p), v.Message) // unsupported today, so the nudge is not delivered
+				_ = d.Steer(runCtx, session(p), v.Message) // best effort: a local session has no Steer, so this only counts the nudge and delivers nothing
 			case stuck.Abort:
 				stuckErr = fmt.Errorf("%w: %s (%s)", ErrStuck, v.Pattern, v.Message)
 				cancel()
