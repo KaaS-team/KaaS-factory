@@ -471,9 +471,6 @@ func TestJobs_StuckRunOutOfAttemptsFails(t *testing.T) {
 // The controls are reachable over HTTP from the served handler, and Serve opens the database itself.
 func TestServe_JobControlsOverHTTP(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jobs.db")
-	seed, _ := openJobs(t, path, nil)
-	_ = seed.Add(context.Background(), "a", "0 0 1 1 *")
-	_ = seed.Close()
 	block := make(chan struct{})
 	started := make(chan struct{}, 1)
 	s := New(newFakeCore(), Options{Interval: 50 * time.Millisecond, JobsPath: path,
@@ -504,6 +501,8 @@ func TestServe_JobControlsOverHTTP(t *testing.T) {
 		method, path, body string
 		want               int
 	}{
+		{"PUT", "/jobs/a", "bogus", 400},
+		{"PUT", "/jobs/a", "0 0 1 1 *", 204},
 		{"POST", "/jobs/a/pause", "", 204},
 		{"POST", "/jobs/a/unpause", "", 204},
 		{"PUT", "/jobs/a/cron", "*/5 * * * *", 204},

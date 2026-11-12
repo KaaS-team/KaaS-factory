@@ -546,3 +546,21 @@ func (s *Server) jobRuns(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(h)
 }
+
+// jobAdd serves PUT /jobs/{id}: create the job, or replace its cron; the body is the cron expression.
+func (s *Server) jobAdd(w http.ResponseWriter, r *http.Request) {
+	if s.jobs == nil {
+		http.Error(w, "no jobs configured", http.StatusNotFound)
+		return
+	}
+	b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<10))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+		return
+	}
+	if err := s.jobs.Add(r.Context(), r.PathValue("id"), strings.TrimSpace(string(b))); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/events", s.events)
 	mux.HandleFunc("POST /jobs/{id}/{action}", s.jobAction)
 	mux.HandleFunc("PUT /jobs/{id}/cron", s.jobCron)
+	mux.HandleFunc("PUT /jobs/{id}", s.jobAdd)
 	mux.HandleFunc("GET /jobs/{id}/runs", s.jobRuns)
 	return mux
 }
