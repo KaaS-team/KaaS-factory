@@ -13,7 +13,7 @@ You are the review pass on `next` of KaaS-team/KaaS-factory (Go) after about 60 
 2. Read in this order, as a hostile reviewer: `internal/api`, `internal/reconcile`, `internal/pick`, `internal/mergeq`, `internal/gitx`, `internal/dispatch/*`, `internal/tracker/github`, `internal/meter`, `pkg/sandbox`, egress and credential code, then `cmd/factory`.
 3. Look for: SSRF, path traversal, command injection, a guard a crafted input bypasses, a secret or provider key that could reach a dispatch env or a PR body, two implementations of one concept (two retry clocks, two rankers, two marker codecs), a test that cannot fail, a comment claiming what the code does not do, a goroutine or file handle that leaks, a data race `-race -count=5` finds.
 4. Fix each real defect with a test that fails without the fix (bite check: revert, watch it fail, quote the line, restore). One commit per defect. Two implementations of one concept: keep the one `cmd/factory` uses, delete the other, and say which.
-5. Known lead from a merge review: `factory packs run <pack.yaml>` loads the manifest with an empty hash (`LoadManifest(args[0], "")`) and runs its `sh -c` checks without checking `factory.lock`. Decide: refuse an unlocked pack unless an explicit `--unlocked` flag is given, with a test.
+5. `factory packs run` should now refuse a pack not in `factory.lock` (ticket m3-packs-lock). Confirm with its test; if it did not land, fix it.
 6. Anything too big to fix safely: write it up under "Open" with file:line and a one-paragraph fix plan.
 7. `go run ./tools/ratchet --update`, `just check`, `git push origin HEAD:next` (retry rule).
 
