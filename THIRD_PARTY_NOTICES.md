@@ -91,6 +91,13 @@ Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepl
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
 
+## github/gh-aw@741ff0c
+
+Source: https://github.com/github/gh-aw (MIT, Copyright GitHub, Inc.)
+
+- `internal/tracker/sanitize/publish.go` from `actions/setup/js/sanitize_content_core.cjs` [tested by `internal/tracker/sanitize/publish_test.go`]
+- `internal/tracker/sanitize/url.go` from `actions/setup/js/sanitize_content_core.cjs` [tested by `internal/tracker/sanitize/publish_test.go`]
+
 ## anthropics/claude-code-action@8a29bc6
 
 Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) 2025 Anthropic, PBC)

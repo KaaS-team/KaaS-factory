@@ -349,7 +349,7 @@ func TestCommentNeutralisesMarkers(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := r.h.bodies(7)
-	if len(got) != 1 || strings.Contains(got[0], "<!--") || !strings.Contains(got[0], "&lt;!-- factory:status") {
+	if len(got) != 1 || strings.Contains(got[0], "<!--") || strings.Contains(got[0], "factory:status") {
 		t.Fatalf("posted %q", got)
 	}
 	th, err := r.tr.Thread(ctx, "7")

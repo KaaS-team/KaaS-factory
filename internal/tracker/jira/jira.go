@@ -3,6 +3,9 @@
 package jira
 
 import (
+	"github.com/KaaS-team/factory/internal/marker"
+	"github.com/KaaS-team/factory/internal/tracker/sanitize"
+
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -246,7 +249,8 @@ func (t *Tracker) Get(ctx context.Context, id api.TicketID) (api.Ticket, error) 
 	return t.ticket(i), nil
 }
 
-// Comment adds a comment. Markers survive a renderer that drops HTML comments through a sealed footer.
+// Comment adds a comment through sanitize.Publication, unless ctx came from marker.Allow: the caller
+// then built body itself and its markers survive a renderer that drops HTML comments through a sealed footer.
 func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) error {
 	p, err := t.issuePath(id)
 	if err != nil {
@@ -255,6 +259,9 @@ func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) err
 	tok, err := t.token()
 	if err != nil {
 		return err
+	}
+	if !marker.Allowed(ctx) {
+		body = sanitize.Publication(body, sanitize.DefaultOptions())
 	}
 	text := vendorkit.EncodeBody(body, vendorkit.HMACSeal(tok), "comment")
 	return t.call(ctx, http.MethodPost, p+"/comment", nil, map[string]any{"body": toADF(text)}, nil)
@@ -349,7 +356,7 @@ func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body str
 		return err
 	}
 	if c == "" {
-		return t.Comment(ctx, id, body)
+		return t.Comment(marker.Allow(ctx), id, body)
 	}
 	tok, _ := t.token()
 	text := vendorkit.EncodeBody(body, vendorkit.HMACSeal(tok), "comment")

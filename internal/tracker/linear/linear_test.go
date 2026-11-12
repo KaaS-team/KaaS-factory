@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/tracker/linear"
 	"github.com/KaaS-team/factory/internal/tracker/vendorkit"
 )
@@ -141,7 +142,7 @@ func TestCommentCarriesMarkers(t *testing.T) {
 	f := newFakeLinear(t)
 	i := f.add(1, "s-ready")
 	body := "plan ready\n<!-- factory:plan -->\n"
-	if err := newTracker(t, f, nil).Comment(context.Background(), "ENG-1", body); err != nil {
+	if err := newTracker(t, f, nil).Comment(marker.Allow(context.Background()), "ENG-1", body); err != nil {
 		t.Fatal(err)
 	}
 	stored := i.Comments[0]["body"].(string)
@@ -343,5 +344,18 @@ func TestSpendCommentRoundTrip(t *testing.T) {
 	}
 	if err := tr.PutSpendComment(ctx, "ENG-9", v1); err == nil {
 		t.Fatal("unknown issue should fail")
+	}
+}
+
+// Text posted without marker.Allow goes through the publication sanitizer: markers, mentions and
+// foreign URLs do not reach the tracker.
+func TestCommentSanitizesUntrustedText(t *testing.T) {
+	f := newFakeLinear(t)
+	i := f.add(1, "s-ready")
+	if err := newTracker(t, f, nil).Comment(context.Background(), "ENG-1", "hi @octocat <!-- factory:plan --> https://evil.example.com/x"); err != nil {
+		t.Fatal(err)
+	}
+	if got := i.Comments[0]["body"].(string); got != "hi `@octocat`  (evil.example.com/redacted)" {
+		t.Fatalf("stored = %q", got)
 	}
 }
