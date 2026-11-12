@@ -1,5 +1,5 @@
 {
-  "go_lines": 22894,
-  "deadcode": 68,
-  "reason": "raised to 22894 by the reviewed merge of go/k5-packs-manifest; lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 22910,
+  "deadcode": 70,
+  "reason": "deadcode now counted on linux/amd64 (the CI platform); the darwin count hid 2 darwin-only funcs. Lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }

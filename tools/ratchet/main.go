@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,6 +18,9 @@ const (
 	// deadcodeRef is the pinned deadcode version; deadcodeGo is the toolchain it needs.
 	deadcodeRef = "golang.org/x/tools/cmd/deadcode@v0.39.0"
 	deadcodeGo  = "go1.26.7"
+	// deadcodeOS and deadcodeArch are the platform deadcode analyses: the one CI runs on.
+	deadcodeOS   = "linux"
+	deadcodeArch = "amd64"
 )
 
 // Counts holds the two measured numbers.
@@ -122,8 +126,20 @@ func measureRepo() (Counts, error) {
 	if err != nil {
 		return Counts{}, err
 	}
-	cmd := exec.Command("go", "run", deadcodeRef, "./...")
-	cmd.Env = append(os.Environ(), "GOTOOLCHAIN="+deadcodeGo)
+	// Build deadcode for the host, then analyse as linux/amd64 (the CI platform), so a laptop and
+	// CI count the same files: darwin-only funcs are unreachable on linux and vice versa.
+	bin, err := os.MkdirTemp("", "ratchet")
+	if err != nil {
+		return Counts{}, err
+	}
+	defer func() { _ = os.RemoveAll(bin) }()
+	install := exec.Command("go", "install", deadcodeRef)
+	install.Env = append(os.Environ(), "GOTOOLCHAIN="+deadcodeGo, "GOBIN="+bin)
+	if out, err := install.CombinedOutput(); err != nil {
+		return Counts{}, fmt.Errorf("install deadcode: %w\n%s", err, out)
+	}
+	cmd := exec.Command(filepath.Join(bin, "deadcode"), "./...")
+	cmd.Env = append(os.Environ(), "GOTOOLCHAIN="+deadcodeGo, "GOOS="+deadcodeOS, "GOARCH="+deadcodeArch)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	dead, err := cmd.Output()
