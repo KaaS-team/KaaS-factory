@@ -144,3 +144,106 @@ func TestSandboxBlocksGitHooksAndConfigButNotTheWorktree(t *testing.T) {
 		t.Errorf("worktree write rc %s, commit rc %s: %s", rc("own.rc"), rc("commit.rc"), read(t, filepath.Join(wt, "commit.err")))
 	}
 }
+
+// sessionRoot points the per-session config dirs at an empty directory the test can list.
+func sessionRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", root)
+	t.Setenv("HOME", root)
+	return filepath.Join(root, "factory", "sessions")
+}
+
+func entries(t *testing.T, dir string) []string {
+	t.Helper()
+	ents, err := os.ReadDir(dir)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range ents {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// The session config dir holds a copy of the operator's login, so it must be gone when the
+// session ends, be mode 0700, and sit outside the temp dir every jail may write.
+func TestSessionConfigDirIsRemovedWhenTheSessionEnds(t *testing.T) {
+	skipWithoutJail(t)
+	root := sessionRoot(t)
+	t.Setenv("TMPDIR", t.TempDir()) // the jail's temp dir, apart from the cache root above
+	op := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", op)
+	if err := os.WriteFile(filepath.Join(op, ".credentials.json"), []byte("login"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, wt := sandboxed(t, "echo $CLAUDE_CONFIG_DIR > cfg.txt\nstat -c %a $CLAUDE_CONFIG_DIR > mode.txt\ncat $CLAUDE_CONFIG_DIR/.credentials.json > cred.txt\n", []string{"PATH=" + os.Getenv("PATH")})
+	s, err := d.Dispatch(context.Background(), bf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait(t, d, s)
+	dir := strings.TrimSpace(read(t, filepath.Join(wt, "cfg.txt")))
+	if got := read(t, filepath.Join(wt, "cred.txt")); strings.TrimSpace(got) != "login" {
+		t.Fatalf("the agent saw credentials %q, want the operator's login", got)
+	}
+	if m := strings.TrimSpace(read(t, filepath.Join(wt, "mode.txt"))); m != "700" {
+		t.Errorf("session dir mode %s, want 700", m)
+	}
+	if strings.HasPrefix(dir, os.TempDir()+string(filepath.Separator)) {
+		t.Errorf("session dir %s is under the temp dir, which every jail can write", dir)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("session dir %s still exists after the run (err %v)", dir, err)
+	}
+	if left := entries(t, root); len(left) != 0 {
+		t.Errorf("session root still holds %v", left)
+	}
+}
+
+// A start that fails after the dir was made, here because the agent binary is missing, removes it.
+func TestSessionConfigDirIsRemovedWhenStartFails(t *testing.T) {
+	skipWithoutJail(t)
+	root := sessionRoot(t)
+	op := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", op)
+	if err := os.WriteFile(filepath.Join(op, ".credentials.json"), []byte("login"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	d, err := New(ctx, Config{Worktrees: dirWorktrees{t.TempDir()}, Binary: "/nonexistent/agent", Sandbox: true,
+		Environ: []string{"PATH=" + os.Getenv("PATH")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Dispatch(ctx, bf); err == nil {
+		t.Fatal("dispatch of a missing binary succeeded")
+	}
+	if left := entries(t, root); len(left) != 0 {
+		t.Errorf("session root still holds %v after a failed start", left)
+	}
+}
+
+// A copy that fails half way leaves nothing behind.
+func TestSessionConfigDirIsRemovedWhenTheLoginCopyFails(t *testing.T) {
+	root := sessionRoot(t)
+	op := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", op)
+	if err := os.WriteFile(filepath.Join(op, ".credentials.json"), []byte("login"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	prev := writeLogin
+	writeLogin = func(string, []byte) error { return os.ErrPermission }
+	t.Cleanup(func() { writeLogin = prev })
+	if _, err := sessionConfigDir(); err == nil {
+		t.Fatal("copy failure was swallowed")
+	}
+	if left := entries(t, root); len(left) != 0 {
+		t.Errorf("failed copy left %v", left)
+	}
+}

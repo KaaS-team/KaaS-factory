@@ -248,6 +248,14 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		}
 		env = append(env, "CLAUDE_CONFIG_DIR="+cfgDir)
 	}
+	// The dir holds a copy of the operator's login: it goes when the session ends, and on every
+	// way out of Dispatch before the session's goroutine owns it.
+	started := false
+	defer func() {
+		if !started && cfgDir != "" {
+			_ = os.RemoveAll(cfgDir)
+		}
+	}()
 	cmd, err := d.command(runCtx, argv, dir, env, cfgDir)
 	if err != nil {
 		cancel()
@@ -278,6 +286,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	}
 	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now(), q: q}
 	d.runs[key] = p
+	started = true
 	go func() { // ends when the process exits; the run context kills it
 		sc := bufio.NewScanner(out)
 		sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
@@ -317,6 +326,9 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			if restoreErr != nil && p.err == nil {
 				p.err = fmt.Errorf("local: restore after untrusted session: %w", restoreErr)
 			}
+		}
+		if cfgDir != "" {
+			_ = os.RemoveAll(cfgDir)
 		}
 		p.end = d.cfg.Now()
 		cancel()
