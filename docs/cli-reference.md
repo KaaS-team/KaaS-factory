@@ -231,6 +231,7 @@ Audit this repo and show what the factory would fix, at no cost
 |---|---|---|---|
 | `--annotations` | string | `.factory/annotations.yml` | reason-tagged suppressions file; the default is optional |
 | `--dry-run` | bool | `false` | stop after the report; say what would be dispatched |
+| `--fix` | bool | `false` | dispatch one build for the first covered finding and open a draft pull request |
 | `--gh` | string | `` | also audit this GitHub repo (owner/repo) |
 | `--sarif` | string | `` | also write the findings to this file as SARIF 2.1.0 |
 
