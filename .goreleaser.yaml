@@ -30,5 +30,6 @@ brews:
     repository:
       owner: KaaS-team
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     test: |
       system "#{bin}/factory", "version"
