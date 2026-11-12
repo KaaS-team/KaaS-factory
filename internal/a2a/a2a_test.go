@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -304,7 +305,8 @@ func TestCommandRejectsRebindingHost(t *testing.T) {
 	pr, pw := io.Pipe()
 	cmd := NewCommand(func(context.Context) (Deps, error) { return Deps{}, nil })
 	cmd.SetErr(pw)
-	cmd.SetArgs([]string{"--addr", addr})
+	audit := filepath.Join(t.TempDir(), "data", "a2a-audit.jsonl") // the dir is made on start
+	cmd.SetArgs([]string{"--addr", addr, "--audit-log", audit})
 	done := make(chan error, 1)
 	go func() { done <- cmd.ExecuteContext(ctx) }()
 	if _, err := bufio.NewReader(pr).ReadString('\n'); err != nil {
@@ -326,4 +328,15 @@ func TestCommandRejectsRebindingHost(t *testing.T) {
 	}
 	cancel()
 	<-done
+	if _, err := os.Stat(audit); err != nil {
+		t.Errorf("the audit file is not at the path given: %v", err)
+	}
+}
+
+// The default audit path is under the data directory, not the working directory.
+func TestDefaultAuditLogIsUnderDataDir(t *testing.T) {
+	f := NewCommand(func(context.Context) (Deps, error) { return Deps{}, nil }).Flags().Lookup("audit-log")
+	if f == nil || f.DefValue != DefaultAuditLog || filepath.Dir(DefaultAuditLog) != ".factory" {
+		t.Fatalf("audit-log default %v, want %s under .factory", f, DefaultAuditLog)
+	}
 }
