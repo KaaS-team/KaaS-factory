@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LicenseRef-KaaS-EE
 
 // Package sso signs people in through the company IdP with OIDC (authorization code with PKCE).
-// The IdP proves who someone is; the caller decides what a session may do. SAML is not supported.
+// The IdP proves who someone is; the caller decides what a session may do. SAML sign-in is in saml.go.
 package sso
 
 import (
