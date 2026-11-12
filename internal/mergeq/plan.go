@@ -12,8 +12,9 @@ const DefaultBatchSize = 4
 
 // Entry is one queued PR and the head it had when it was queued.
 type Entry struct {
-	ID   string
-	Head string
+	ID     string
+	Head   string
+	Single bool // tested alone, never in a batch with other PRs
 }
 
 // PRState is what the outside world says about a PR now. A PR missing from State.PRs counts as closed.
@@ -119,7 +120,7 @@ func Plan(queue []Entry, st State) []Action {
 	if size <= 0 {
 		size = DefaultBatchSize
 	}
-	limit := min(size, len(live))
+	limit := len(Take(live, size))
 	// A red prefix means a bisect is in progress: continue inside the shortest one, the tightest
 	// set known to hold a culprit.
 	for n := 1; n <= limit; n++ {
@@ -144,7 +145,7 @@ func resolve(st State, set []Entry) Action {
 			}
 			return Action{Kind: KindEject, ID: set[0].ID, Log: r.Log}
 		}
-		half := set[:(len(set)+1)/2]
+		half, _, _ := Halve(set)
 		r, ok := lookup(st, half)
 		switch {
 		case !ok:

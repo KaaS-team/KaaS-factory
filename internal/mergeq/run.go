@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // ErrConflict is returned by Git.Merge when the heads do not merge cleanly onto the base.
@@ -71,7 +72,10 @@ type Report struct {
 
 // Config holds the queue settings.
 type Config struct {
-	BatchSize int // PRs tested together; DefaultBatchSize when not positive
+	BatchSize      int           // PRs tested together; DefaultBatchSize when not positive
+	BatchTimeout   time.Duration // a gate run longer than this counts as a red result; no limit when zero
+	PushBackoff    time.Duration // first wait after a push that was not a fast-forward; no wait when zero
+	PushBackoffMax time.Duration // cap on that wait
 }
 
 // Runner applies Plan through its interfaces.
@@ -80,12 +84,14 @@ type Runner struct {
 	Gate  Gate
 	Store Store
 	Cfg   Config
+	Sleep func(ctx context.Context, d time.Duration) error // waits between push retries; real time when nil
 }
 
 // Run plans and applies actions until the queue has nothing left to do or ctx ends. The base only
 // advances to a ref whose gate passed on exactly the heads being landed.
 func (r *Runner) Run(ctx context.Context) (Report, error) {
 	var rep Report
+	pushRetries := 0
 	results := map[string]Result{}
 	for {
 		if err := ctx.Err(); err != nil {
@@ -109,14 +115,14 @@ func (r *Runner) Run(ctx context.Context) (Report, error) {
 			return rep, nil
 		}
 		for _, a := range actions {
-			if results, err = r.apply(ctx, a, st, results, &rep); err != nil {
+			if results, err = r.apply(ctx, a, st, results, &rep, &pushRetries); err != nil {
 				return rep, err
 			}
 		}
 	}
 }
 
-func (r *Runner) apply(ctx context.Context, a Action, st State, results map[string]Result, rep *Report) (map[string]Result, error) {
+func (r *Runner) apply(ctx context.Context, a Action, st State, results map[string]Result, rep *Report, pushRetries *int) (map[string]Result, error) {
 	switch a.Kind {
 	case KindDrop:
 		rep.Dropped = append(rep.Dropped, a.ID)
@@ -138,7 +144,7 @@ func (r *Runner) apply(ctx context.Context, a Action, st State, results map[stri
 		next[Key(a.IDs, a.Heads)] = res
 		return next, nil
 	case KindLand:
-		return r.land(ctx, a, st, results, rep)
+		return r.land(ctx, a, st, results, rep, pushRetries)
 	}
 	return results, fmt.Errorf("mergeq: unknown action %q", a.Kind)
 }
@@ -154,7 +160,18 @@ func (r *Runner) test(ctx context.Context, a Action, rep *Report) (Result, error
 		return res, fmt.Errorf("merge: %w", err)
 	}
 	res.Base, res.Ref = m.Base, m.Ref
-	v, err := r.Gate.Run(ctx, m.Ref)
+	gctx := ctx
+	if r.Cfg.BatchTimeout > 0 {
+		var cancel context.CancelFunc
+		gctx, cancel = context.WithTimeout(ctx, r.Cfg.BatchTimeout)
+		defer cancel()
+	}
+	v, err := r.Gate.Run(gctx, m.Ref)
+	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil && gctx.Err() != nil {
+		rep.GateRuns++
+		res.Log = TimeoutLog // a timeout is a red result, split like a CI failure
+		return res, nil
+	}
 	if err != nil {
 		return res, fmt.Errorf("gate: %w", err)
 	}
@@ -163,7 +180,7 @@ func (r *Runner) test(ctx context.Context, a Action, rep *Report) (Result, error
 	return res, nil
 }
 
-func (r *Runner) land(ctx context.Context, a Action, st State, results map[string]Result, rep *Report) (map[string]Result, error) {
+func (r *Runner) land(ctx context.Context, a Action, st State, results map[string]Result, rep *Report, pushRetries *int) (map[string]Result, error) {
 	// A head that moved since the plan was made invalidates the green result: plan again.
 	for i, id := range a.IDs {
 		p, err := r.Store.PR(ctx, id)
@@ -175,11 +192,24 @@ func (r *Runner) land(ctx context.Context, a Action, st State, results map[strin
 		}
 	}
 	if err := r.Git.FastForward(ctx, a.Ref); err != nil {
-		if errors.Is(err, ErrBaseMoved) {
+		if PushOutcome(err) == OutcomeRetryBatch {
+			// The gate passed, so the whole batch is tested again on the new base, without a bisect.
+			wait := Backoff(*pushRetries, r.Cfg.PushBackoff, r.Cfg.PushBackoffMax)
+			*pushRetries++
+			if wait > 0 {
+				sl := r.Sleep
+				if sl == nil {
+					sl = sleep
+				}
+				if err := sl(ctx, wait); err != nil {
+					return results, err
+				}
+			}
 			return results, nil
 		}
 		return results, fmt.Errorf("fast-forward: %w", err)
 	}
+	*pushRetries = 0
 	rep.Landed = append(rep.Landed, a.IDs...)
 	if err := r.Store.Landed(ctx, a.IDs); err != nil {
 		return results, fmt.Errorf("landed: %w", err)
