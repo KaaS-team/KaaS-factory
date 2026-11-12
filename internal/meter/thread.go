@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 )
 
 // Thread is api.Thread: the tracker comment the ledger reads and rewrites.
@@ -63,6 +64,9 @@ func (l Ledger) Add(ctx context.Context, id api.TicketID, attempt int, total, de
 	parts := make([]string, len(spends))
 	for i, sp := range spends {
 		parts[i] = EncodeSpend(sp)
+	}
+	for _, o := range marker.Find(body, "cap") { // the cap marker belongs to internal/meter/cap
+		parts = append(parts, marker.Wrap("cap", o))
 	}
 	return l.Thread.PutSpendComment(ctx, id, strings.Join(parts, "\n"))
 }

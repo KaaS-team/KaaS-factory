@@ -70,6 +70,7 @@ type Config struct {
 	Reconcile   reconcile.Config
 	Team        string     // meter key team
 	Budget      api.Budget // per-ticket cap shown on the board
+	SessionCap  float64    // USD a ticket may spend before a new dispatch is refused; 0 is no cap
 	EventBuffer int        // events a subscriber may fall behind by before it is dropped (64)
 }
 
