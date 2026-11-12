@@ -1,5 +1,6 @@
 # The gate. `just check` is what CI and the pre-push hook run; it must end with zero errors and zero warnings.
-# golangci-lint runs from PATH when installed, otherwise at the pinned version through `go run`.
+# lint runs through gate.sh: the PATH golangci-lint only when it is exactly lint_version, otherwise `go run` at the pin.
+# gate.sh is the fallback for hosts without just; tools/gate checks its steps and the pin against this file and go.yml.
 
 lint_version := "v2.13.2"
 # golangci-lint v2.13.2 is built with Go 1.26 and cannot type-check a newer standard library.
@@ -24,11 +25,7 @@ vet:
     go vet ./...
 
 lint:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export GOTOOLCHAIN={{lint_go}}
-    if command -v golangci-lint >/dev/null; then golangci-lint run ./...
-    else go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{lint_version}} run ./...; fi
+    ./gate.sh lint
 
 # Fails when non-test Go lines or deadcode entries exceed .ratchet.json; `go run ./tools/ratchet --update` lowers it.
 ratchet:
