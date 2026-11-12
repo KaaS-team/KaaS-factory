@@ -2,7 +2,7 @@
 // Exit codes: 0 done, 2 the edit cannot be made deterministically (the caller falls back to an
 // agent), 1 a usage or I/O error. Every result is one JSON object on stdout.
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { findDynamicOids } from './dynamic.js';
 import { getOidFromJsxElement } from './helpers.js';
 import { addOidsToAst } from './ids.js';
@@ -109,6 +109,13 @@ export function requestsFor(changes) {
 // are computed first and written only if every change applies.
 export function tweak(dir, delta, opts) {
   const byFile = new Map();
+  for (const c of delta.changes || []) {
+    // A delta file is data from a design tool: it must name a file inside dir.
+    const rel = typeof c.file === 'string' ? relative(dir, join(dir, c.file)) : '..';
+    if (!c.file || isAbsolute(c.file) || rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
+      throw new Fallback('bad-path', `change file ${JSON.stringify(c.file)} is not inside the tree`, c.oid);
+    }
+  }
   for (const c of delta.changes || []) byFile.set(c.file, [...(byFile.get(c.file) || []), c]);
   if (byFile.size === 0) throw new Fallback('empty', 'the delta has no changes');
   const results = [];

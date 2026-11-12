@@ -156,3 +156,13 @@ test('cli: a dynamic request exits 2 with the oid; bad usage exits 1', () => {
   assert.deepEqual([r.code, r.out.error, r.out.oid], [2, 'dynamic', 'cond']);
   assert.equal(main(['nope']).code, 1);
 });
+
+test('tweak: a file outside the tree is refused and nothing is written', () => {
+  const dir = tree({ 'App.tsx': SRC });
+  const outside = join(dir, '..', 'design-outside.tsx');
+  writeFileSync(outside, SRC);
+  for (const file of ['../design-outside.tsx', outside, '']) {
+    assert.throws(() => tweak(dir, { changes: [{ file, oid: 'e', kind: 'remove' }] }), (e) => e.code === 'bad-path');
+  }
+  assert.equal(readFileSync(outside, 'utf8'), SRC);
+});
