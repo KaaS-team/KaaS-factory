@@ -187,3 +187,9 @@ Source: https://github.com/onlook-dev/onlook (Apache-2.0; the LICENSE is kept at
 - `packs/design/src/transform.js` from `packages/parser/src/code-edit/transform.ts` [tested by `packs/design/test/edits.test.js`]
 - `packs/design/src/dynamic.js` from `packages/parser/src/template-node/map.ts` [tested by `packs/design/test/edits.test.js`]
 - `packs/design/test/data/` from `packages/parser/test/data/{ids,parse}` [tested by `packs/design/test/parser.test.js`]
+
+## continuedev/continue@5522c6f
+
+Source: https://github.com/continuedev/continue (Apache-2.0, Copyright (c) Continue Dev, Inc.).
+
+- `internal/review/worktree.go` from `extensions/cli/src/commands/review/worktree.ts` [tested by `internal/review/review_test.go`]
