@@ -1,9 +1,18 @@
 # Use to build UI from a design file: a Penpot MCP export or a screenshot path named in the ticket.
 # Plan the components against the repo's design system, build test-first, run the visual check,
 # then a fresh session verifies before the PR.
+# A delta of only style, text, move or remove changes on static elements skips the agents: the
+# tweak step edits the files with packs/design and goes straight to the PR. Anything else, a
+# missing oid or a node inside a map or a conditional, falls back to the design step.
 name: design-to-pr
 steps:
-  triage: { uses: triage, label: "factory:triaging", next: design, tier: small, budget: 150000 }
+  triage: { uses: triage, label: "factory:triaging", next: tweak, tier: small, budget: 150000 }
+  tweak:
+    uses: check
+    label: "factory:tweaking"
+    run: node packs/design/bin/design.js tweak . .factory/design-delta.json
+    reject: design
+    next: pr
   design:
     uses: plan
     label: "factory:planning"
