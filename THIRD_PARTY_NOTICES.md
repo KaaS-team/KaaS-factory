@@ -174,6 +174,9 @@ Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trig
 Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
 
 - `internal/eval/infra/infra.go` from `swebench/harness/infra_failure.py` [no upstream test]
+- `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
+- `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
+- `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)
 
 ## sourcegraph/zoekt@9e78667
 
@@ -212,10 +215,6 @@ Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technol
 
 The bracketed-paste framing, the SIGINT-then-kill close and the stability gate are written after
 `lib/httpapi/claude.go`, `lib/termexec/termexec.go` and `lib/screentracker` and copy none of their code.
-
-- `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
-- `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
-- `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)
 
 ## coder/agentapi@7c468d5
 
@@ -284,3 +283,10 @@ Source: https://github.com/dagger/dagger (Apache-2.0, Copyright The Dagger Autho
 Source: https://github.com/dagger/dagger (Apache-2.0, Copyright 2022 Dagger, Inc.). The licence text is `LICENSES/Apache-2.0.txt`. Dagger's NOTICE file reads: "This product includes software developed at Dagger, Inc. (https://www.dagger.io)."
 
 - `pkg/sandbox/cachevol/store.go` from `engine/cachevolumedir/store.go`, with the Dagger naming removed, a tenant field added to the identity, and the test hooks dropped [tested by `pkg/sandbox/cachevol/store_test.go`]
+
+## temporalio/temporal@bfabec7
+
+Source: https://github.com/temporalio/temporal (MIT, Copyright (c) 2025 Temporal Technologies Inc.; Copyright (c) 2020 Uber Technologies, Inc.)
+
+- `pkg/retry/retrypolicy.go` from `common/backoff/retrypolicy.go` (clock, global rand and ConditionalRetryPolicy dropped) [tested by `pkg/retry/retry_test.go`]
+- `pkg/retry/retry.go` from `common/backoff/retry.go` (proto helpers and serviceerror dropped; throttle becomes `Loop.MinDelay`) [tested by `pkg/retry/retry_test.go`]

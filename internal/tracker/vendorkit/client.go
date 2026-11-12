@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/KaaS-team/factory/pkg/retry"
 )
 
 // StatusError is a non-2xx answer. Its message names the path, never the query.
@@ -25,14 +26,13 @@ func (e *StatusError) Error() string {
 }
 
 // Client sends requests with a per-attempt timeout and bounded, jittered retries.
-// Zero fields take defaults; Sleep and Jitter exist so tests need no clock.
+// Zero fields take defaults; Sleep exists so tests need no clock.
 type Client struct {
 	HTTP       *http.Client
 	Timeout    time.Duration // per attempt, default 30s
 	MaxRetries int           // retries after the first attempt, default 3
 	Base       time.Duration // first backoff, default 500ms
 	Sleep      func(ctx context.Context, d time.Duration) error
-	Jitter     func(d time.Duration) time.Duration // extra wait added to a backoff d
 }
 
 const maxWait = 30 * time.Second
@@ -54,27 +54,6 @@ func (c *Client) defaults() (h *http.Client, timeout time.Duration, retries int,
 	return
 }
 
-func (c *Client) wait(ctx context.Context, d time.Duration) error {
-	if c.Sleep != nil {
-		return c.Sleep(ctx, d)
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
-	}
-}
-
-func (c *Client) jitter(d time.Duration) time.Duration {
-	if c.Jitter != nil {
-		return c.Jitter(d)
-	}
-	return rand.N(d/2 + 1)
-}
-
 // Do sends one request and returns the body of a 2xx answer. A 429, a 5xx or a transport error is
 // retried up to MaxRetries times; any other status is returned at once as a *StatusError.
 func (c *Client) Do(ctx context.Context, method, rawURL string, header http.Header, body []byte) ([]byte, error) {
@@ -83,33 +62,30 @@ func (c *Client) Do(ctx context.Context, method, rawURL string, header http.Head
 	if u, err := url.Parse(rawURL); err == nil {
 		path = u.Path
 	}
-	var last error
-	for attempt := 0; attempt <= retries; attempt++ {
-		out, retryAfter, err := c.once(ctx, h, timeout, method, rawURL, path, header, body)
-		if err == nil {
-			return out, nil
-		}
-		last = err
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		var se *StatusError
-		if errors.As(err, &se) && se.Status != http.StatusTooManyRequests && se.Status < 500 {
-			return nil, err
-		}
-		if attempt == retries {
-			break
-		}
-		backoff := base << attempt
-		d := min(backoff+c.jitter(backoff), maxWait)
-		if retryAfter > d {
-			d = min(retryAfter, maxWait)
-		}
-		if err := c.wait(ctx, d); err != nil {
-			return nil, err
-		}
+	var retryAfter time.Duration
+	loop := retry.Loop{
+		Policy: retry.NewExponentialRetryPolicy(base).WithMaximumInterval(maxWait).
+			WithExpirationInterval(retry.NoInterval).WithMaximumAttempts(retries + 1),
+		IsRetryable: func(err error) bool {
+			var se *StatusError
+			return !errors.As(err, &se) || se.Status == http.StatusTooManyRequests || se.Status >= 500
+		},
+		MinDelay: func(error) time.Duration { return min(retryAfter, maxWait) },
+		Sleep:    c.Sleep,
 	}
-	return nil, last
+	var out []byte
+	err := loop.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, retryAfter, err = c.once(ctx, h, timeout, method, rawURL, path, header, body)
+		if err != nil && ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *Client) once(ctx context.Context, h *http.Client, timeout time.Duration, method, rawURL, path string, header http.Header, body []byte) ([]byte, time.Duration, error) {
