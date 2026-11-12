@@ -36,7 +36,7 @@ last one. Chain the gate and the push with `&&`, never `;`.
 - No provider key in code, tests or environment. No model name, token count or cost in any commit,
   file or report.
 - No session link and no session trailer in any commit or file.
-- Do not comment on, label or close issues, and do not open a pull request unless the ticket says so.
+- Do not comment on, label or close issues.
 - If one acceptance line is blocked, record why and continue with the next.
 - No em dashes in prose. Plain sentences.
 
@@ -69,6 +69,12 @@ the report to its own branch with git plumbing, never into the tree:
 ```
 b=$(git hash-object -w /tmp/report.md); t=$(printf '100644 blob %s\treport.md\n' "$b" | git mktree); c=$(git commit-tree "$t" -m report); git push origin "$c:refs/heads/report/<t>"
 ```
+
+## Draft pull request
+
+After the last push, open a draft pull request from `factory/<t>-a<n>` into the base branch the ticket
+names, mirroring the repo's PR template. The body has the summary and gate result only: no model name,
+token count, cost, session link or trailer.
 
 ## Final message
 

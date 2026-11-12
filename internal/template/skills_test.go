@@ -129,6 +129,25 @@ func TestCloudWorkerReportHeadings(t *testing.T) {
 	}
 }
 
+// TestCloudWorkerNamesObserverBranches fails when the skill stops naming the branches the observer
+// reads: the work branch (factory/<t>-a<n>, observe.WorkBranch) and the report branch
+// (report/<t>, observe.ReportBranch), plus the draft pull request step.
+func TestCloudWorkerNamesObserverBranches(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join(skillsDir, "factory-cloud-worker", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	for _, want := range []string{"factory/<t>-a<n>", "refs/heads/report/<t>", "draft pull request"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("skill does not contain %q", want)
+		}
+	}
+	if strings.Contains(s, "do not open a pull request") {
+		t.Error("skill still forbids opening the pull request")
+	}
+}
+
 func TestMissingHeadingsDetectsRemoval(t *testing.T) {
 	full := "## Report format\n\n```\n" + strings.Join(reportHeadings, "\nx\n") + "\n```\n"
 	if m := missingHeadings(full); len(m) != 0 {
