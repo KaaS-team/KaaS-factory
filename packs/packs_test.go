@@ -18,7 +18,7 @@ const (
 	skillsDir    = "../template/.claude/skills"
 )
 
-var wantPacks = []string{"dep-upgrade", "framework-upgrade", "migration", "coverage-ramp", "bugfix", "review-only", "onboarding", "sustain-retest", "design-to-pr"}
+var wantPacks = []string{"dep-upgrade", "framework-upgrade", "migration", "coverage-ramp", "bugfix", "review-only", "onboarding", "sustain-retest", "design-to-pr", "transform"}
 
 // blueprintPins lists skills the blueprint pins that are not in the template. None yet.
 var blueprintPins = []string{}
@@ -222,5 +222,19 @@ func TestCoverageRampLoopsOnCheck(t *testing.T) {
 	}
 	if to, err := g.Next("coverage", graph.Pass); err != nil || to != "verify" {
 		t.Errorf("target reached must go to verify, got %q %v", to, err)
+	}
+}
+
+func TestTransformAppliesRulesBeforeGate(t *testing.T) {
+	g, _ := load(t, "transform")
+	n, _ := g.Node("apply")
+	if n.Kind != graph.KindTransform || n.Rules == "" || n.Tier != "" {
+		t.Fatalf("apply must be a transform step with a rules dir and no agent settings: %+v", n)
+	}
+	if to, err := g.Next("apply", graph.Fail); err != nil || to != "author" {
+		t.Errorf("a failing rule must go back to the author, got %q %v", to, err)
+	}
+	if to, err := g.Next("author", graph.Pass); err != nil || to != "apply" {
+		t.Errorf("the author must be followed by apply, got %q %v", to, err)
 	}
 }

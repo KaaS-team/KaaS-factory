@@ -16,6 +16,8 @@ const (
 	KindCheck  NodeKind = "check"  // a shell command, exit 0 passes
 	KindHuman  NodeKind = "human"  // parks until a person approves or asks for a revision
 	KindFanout NodeKind = "fanout" // starts every outgoing pass edge in parallel
+	// KindTransform tests the agent's ast-grep rules then applies them, with no model call.
+	KindTransform NodeKind = "transform"
 )
 
 // Outcome labels an edge.
@@ -43,8 +45,10 @@ type Node struct {
 	Run   string // a check node's shell command
 	// Runtime names where a check node's command runs.
 	Runtime string
-	Gates   []string
-	MCP     []string
+	// Rules is a transform node's dir of ast-grep rule files.
+	Rules string
+	Gates []string
+	MCP   []string
 	// Approval is a human node's policy: "always" or "on-risk:<level>"; empty when the edge itself parks.
 	Approval string
 	// After is a human node's auto-approve window such as 4h; empty waits for a person.
