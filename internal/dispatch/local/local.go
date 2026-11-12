@@ -551,3 +551,7 @@ func (s *usageState) get() api.Usage {
 }
 
 var _ api.Dispatcher = (*Dispatcher)(nil)
+
+// ChildEnv is parent without provider keys, plus extra: the environment every agent process of
+// the operator's login gets, wherever it is started.
+func ChildEnv(parent []string, extra map[string]string) []string { return childEnv(parent, extra) }
