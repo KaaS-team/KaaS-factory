@@ -197,6 +197,16 @@ List the skill packs whose paths or keywords match
 
 Run a command and retry it while the manifest's success checks fail
 
+## factory packs migrate
+
+`factory packs migrate <owner/repo#path> [flags]`
+
+Run a migration pack pinned in factory.lock over the repository
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
+
 ## factory packs upgrade
 
 `factory packs upgrade [flags]`

@@ -32,10 +32,10 @@ func NewAddCommand() *cobra.Command {
 	})
 }
 
-// NewPacksCommand returns `packs` with the `list` and `verify` subcommands.
+// NewPacksCommand returns `packs` with the `list`, `verify` and `migrate` subcommands.
 func NewPacksCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "packs", Short: "Inspect the packs pinned in factory.lock"}
-	cmd.AddCommand(newListCommand(), newVerifyCommand(), newRunCommand(), newMatchCommand())
+	cmd.AddCommand(newListCommand(), newVerifyCommand(), newRunCommand(), newMatchCommand(), newMigrateCommand())
 	return cmd
 }
 
