@@ -164,6 +164,16 @@ func (f *fakeLinear) run(op string, v map[string]any) (any, string) {
 		id := "c-" + itoa(len(i.Comments)+1)
 		i.Comments = append(i.Comments, map[string]any{"id": id, "body": commentRe.ReplaceAllString(in["body"].(string), ""), "createdAt": "2026-01-02T03:04:05.000Z", "user": map[string]any{"id": "bot"}})
 		return map[string]any{"commentCreate": map[string]any{"comment": map[string]any{"id": id}}}, ""
+	case "CommentUpdate":
+		for _, i := range f.Issues {
+			for _, c := range i.Comments {
+				if c["id"] == v["id"] {
+					c["body"] = commentRe.ReplaceAllString(v["input"].(map[string]any)["body"].(string), "")
+					return map[string]any{"commentUpdate": map[string]any{"success": true}}, ""
+				}
+			}
+		}
+		return nil, "Entity not found: Comment"
 	case "IssueUpdate":
 		i := f.find(v["id"].(string))
 		if i == nil {

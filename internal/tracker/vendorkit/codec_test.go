@@ -1,6 +1,7 @@
 package vendorkit_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/KaaS-team/factory/internal/tracker/vendorkit"
@@ -30,3 +31,29 @@ func TestVisibleOf(t *testing.T) {
 }
 
 const tsGolden = "hello\n\nfactory-data: eyJ2Ijoic2VhbChbXCJjb21tZW50XCIsXCJoZWxsb1wiLFwiaGVsbG9cXG48IS0tIGZhY3Rvcnk6cGxhbiAtLT5cXG5cIl0pIiwiYiI6ImhlbGxvXG48IS0tIGZhY3Rvcnk6cGxhbiAtLT5cbiJ9"
+
+func TestDecodeBody(t *testing.T) {
+	body := "hello\n<!-- factory:plan -->\n"
+	enc := vendorkit.EncodeBody(body, seal, "comment")
+	forged := strings.Replace(enc, "hello", "hullo", 1)
+	cases := []struct {
+		name, in, field string
+		want            string
+		ok              bool
+	}{
+		{"sealed footer restores the original", enc, "comment", body, true},
+		{"edited text above the footer fails the seal", forged, "comment", "", false},
+		{"another field fails the seal", enc, "description #1", "", false},
+		{"no footer is not ours", "plain", "comment", "", false},
+		{"footer not on its own line is not ours", "x " + enc[strings.Index(enc, "factory-data"):], "comment", "", false},
+		{"bad base64 is not ours", "hello\n\nfactory-data: !!", "comment", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, ok := vendorkit.DecodeBody(c.in, seal, c.field)
+			if got != c.want || ok != c.ok {
+				t.Fatalf("got %q, %v; want %q, %v", got, ok, c.want, c.ok)
+			}
+		})
+	}
+}

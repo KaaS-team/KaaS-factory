@@ -106,3 +106,16 @@ func TestControlSatisfiesBothAndControlOnlyHidesHistory(t *testing.T) {
 		t.Fatal("subscriber not removed")
 	}
 }
+
+func TestTrackerSpendCommentIsOneEditedInPlace(t *testing.T) {
+	tr := NewTracker(api.Ticket{ID: "1"})
+	ctx := context.Background()
+	if got, _ := tr.SpendComment(ctx, "1"); got != "" {
+		t.Fatalf("empty thread read %q", got)
+	}
+	_ = tr.PutSpendComment(ctx, "1", "a")
+	_ = tr.PutSpendComment(ctx, "1", "b")
+	if got, _ := tr.SpendComment(ctx, "1"); got != "b" || len(tr.Comments["1"]) != 0 {
+		t.Fatalf("spend = %q, comments = %v; want b and no extra comment", got, tr.Comments["1"])
+	}
+}

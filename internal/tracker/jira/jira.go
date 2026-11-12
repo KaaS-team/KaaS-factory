@@ -32,7 +32,10 @@ type Config struct {
 	Client      *vendorkit.Client    // timeout and retry policy, default zero value
 }
 
-var _ api.Lister = (*Tracker)(nil)
+var (
+	_ api.Lister = (*Tracker)(nil)
+	_ api.Thread = (*Tracker)(nil)
+)
 
 // Tracker is a Jira-backed api.Tracker.
 type Tracker struct {
@@ -304,4 +307,51 @@ func (t *Tracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) er
 		}
 	}
 	return fmt.Errorf("jira: %s has no transition to status %q (mapped from phase %q)", id, target, p)
+}
+
+// spend finds the issue's spend comment: the one whose sealed footer holds and whose original
+// carries the marker. It returns the issue path, the comment id and the original body.
+func (t *Tracker) spend(ctx context.Context, id api.TicketID) (path, commentID, body string, err error) {
+	if path, err = t.issuePath(id); err != nil {
+		return "", "", "", err
+	}
+	tok, err := t.token()
+	if err != nil {
+		return "", "", "", err
+	}
+	var cs struct {
+		Comments []struct {
+			ID   string          `json:"id"`
+			Body json.RawMessage `json:"body"`
+		} `json:"comments"`
+	}
+	if err = t.call(ctx, http.MethodGet, path+"/comment", url.Values{"maxResults": {"1000"}}, nil, &cs); err != nil {
+		return "", "", "", err
+	}
+	for _, c := range cs.Comments {
+		if b, ok := vendorkit.DecodeBody(adfText(c.Body), vendorkit.HMACSeal(tok), "comment"); ok && strings.Contains(b, vendorkit.SpendMarker) {
+			return path, c.ID, b, nil
+		}
+	}
+	return path, "", "", nil
+}
+
+// SpendComment returns the spend ledger comment on the issue, or "" when none exists.
+func (t *Tracker) SpendComment(ctx context.Context, id api.TicketID) (string, error) {
+	_, _, b, err := t.spend(ctx, id)
+	return b, err
+}
+
+// PutSpendComment updates the issue's spend ledger comment in place, or adds it the first time.
+func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body string) error {
+	path, c, _, err := t.spend(ctx, id)
+	if err != nil {
+		return err
+	}
+	if c == "" {
+		return t.Comment(ctx, id, body)
+	}
+	tok, _ := t.token()
+	text := vendorkit.EncodeBody(body, vendorkit.HMACSeal(tok), "comment")
+	return t.call(ctx, http.MethodPut, path+"/comment/"+c, nil, map[string]any{"body": toADF(text)}, nil)
 }

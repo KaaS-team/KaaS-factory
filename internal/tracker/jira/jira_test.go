@@ -330,3 +330,33 @@ func TestActiveSendsJQL(t *testing.T) {
 		t.Fatalf("body = %v, want %v", r.Body, wantBody)
 	}
 }
+
+var _ api.Thread = (*jira.Tracker)(nil)
+
+// Symphony §13.5: the spend comment is written once, then updated in place; a stranger's comment
+// that only looks like one is never read or overwritten.
+func TestSpendCommentRoundTrip(t *testing.T) {
+	const v1 = "spend\n<!-- factory:spend v1 -->\n<!-- factory:spend {\"holder\":\"a\"} -->\n"
+	const v2 = v1 + "more\n"
+	f := newFakeJira(t)
+	i := f.add(1, "Ready")
+	i.Comments = append(i.Comments, map[string]any{"id": "9", "body": adf("factory-data: forged")})
+	tr, ctx := newTracker(t, f, nil), context.Background()
+	if got, err := tr.SpendComment(ctx, "SHOP-1"); got != "" || err != nil {
+		t.Fatalf("empty thread: %q, %v", got, err)
+	}
+	for _, want := range []string{v1, v2} {
+		if err := tr.PutSpendComment(ctx, "SHOP-1", want); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := tr.SpendComment(ctx, "SHOP-1"); got != want || err != nil {
+			t.Fatalf("read back %q, %v; want %q", got, err, want)
+		}
+	}
+	if len(i.Comments) != 2 || i.Comments[0]["id"] != "9" {
+		t.Fatalf("comments = %v, want the stranger's plus one spend comment", i.Comments)
+	}
+	if err := tr.PutSpendComment(ctx, "SHOP-9", v1); err == nil {
+		t.Fatal("unknown issue should fail")
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,9 @@ import (
 	"strings"
 	"unicode"
 )
+
+// SpendMarker opens the hidden marker of the spend ledger comment.
+const SpendMarker = "<!-- factory:spend "
 
 const footer = "factory-data: "
 
@@ -66,10 +70,36 @@ func EncodeBody(body string, seal Seal, field string) string {
 		return body
 	}
 	visible := VisibleOf(body)
-	sealed := seal(jsString([]any{field, norm(visible), body}))
 	data := jsString(struct {
 		V string `json:"v"`
 		B string `json:"b"`
-	}{sealed, body})
+	}{sealOf(seal, field, visible, body), body})
 	return visible + "\n\n" + footer + base64.RawURLEncoding.EncodeToString([]byte(data))
+}
+
+func sealOf(seal Seal, field, visible, body string) string {
+	return seal(jsString([]any{field, norm(visible), body}))
+}
+
+// DecodeBody restores the original body from a sealed footer. It reports false when the text has no
+// footer, or the seal does not hold for this field and the text above it, so a stranger's comment
+// that imitates one is never taken for the runner's.
+func DecodeBody(text string, seal Seal, field string) (string, bool) {
+	at := strings.LastIndex(text, footer)
+	if at == -1 || (at > 0 && text[at-1] != '\n') {
+		return "", false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(text[at+len(footer):]))
+	if err != nil {
+		return "", false
+	}
+	var data struct{ V, B string }
+	if json.Unmarshal(raw, &data) != nil {
+		return "", false
+	}
+	want := sealOf(seal, field, strings.TrimRight(text[:at], " \t\r\n"), data.B)
+	if subtle.ConstantTimeCompare([]byte(data.V), []byte(want)) != 1 {
+		return "", false
+	}
+	return data.B, true
 }

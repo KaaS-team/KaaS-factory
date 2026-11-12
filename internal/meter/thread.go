@@ -7,12 +7,8 @@ import (
 	"github.com/KaaS-team/factory/internal/api"
 )
 
-// Thread reads and rewrites the one spend comment on a ticket's thread. A tracker that can edit a
-// comment in place implements it; the body is empty when no spend comment exists yet.
-type Thread interface {
-	SpendComment(ctx context.Context, id api.TicketID) (string, error)
-	PutSpendComment(ctx context.Context, id api.TicketID, body string) error
-}
+// Thread is api.Thread: the tracker comment the ledger reads and rewrites.
+type Thread = api.Thread
 
 // Ledger keeps a holder's per-attempt token totals in the ticket's spend comment.
 type Ledger struct {
