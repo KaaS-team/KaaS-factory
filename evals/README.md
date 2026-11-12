@@ -14,3 +14,6 @@ tokens per merged PR (more than 10 percent up). Sample files here are fake-agent
 
 `factory eval` copies each seed under `fixtures/<name>/seed` into a scratch repo, runs the agent
 through the local dispatcher, then adds `hidden/<ticket>` and runs the fixture's `hidden` command.
+
+`--arm preset,control` adds the bare-bash baseline per fixture, `--tries N` adds pass_rate_1..N, and
+`--run-dir <dir>` keeps results and trajectories so a killed run resumes; `--replay` re-scores them.

@@ -46,10 +46,13 @@ type Matrix struct {
 // Outcome is what a dispatcher run reports for one ticket: absolute usage
 // updates as they arrived (Symphony §13.5), attempts, wall time and human touches.
 type Outcome struct {
-	Attempts     int
-	Updates      []api.Usage
-	Wall         time.Duration
-	HumanTouches int
+	Attempts     int           `json:"attempts"`
+	Updates      []api.Usage   `json:"updates,omitempty"`
+	Wall         time.Duration `json:"wall"`
+	HumanTouches int           `json:"human_touches"`
+	Malformed    int           `json:"malformed,omitempty"`   // replies or edits that could not be parsed
+	Output       string        `json:"output,omitempty"`      // what the agent produced, kept so --replay can re-score it
+	ExitStatus   string        `json:"exit_status,omitempty"` // control arm exit_status
 }
 
 // Deps are the injected collaborators; tests pass fakes, never a model.
@@ -75,6 +78,12 @@ type TicketResult struct {
 	WallTime     time.Duration `json:"wall_time"`
 	Attempts     int           `json:"attempts"`
 	HumanTouches int           `json:"human_touches"`
+	Arm          string        `json:"arm,omitempty"`
+	Agent        string        `json:"agent,omitempty"`
+	Format       string        `json:"format,omitempty"`
+	PassedOn     int           `json:"passed_on,omitempty"` // first try that merged, 0 when none did
+	Malformed    int           `json:"malformed_count,omitempty"`
+	ExitStatus   string        `json:"exit_status,omitempty"`
 }
 
 // Aggregate is the summary the pack upgrade loop compares.
@@ -96,7 +105,9 @@ type Scorecard struct {
 	Workflow  string         `json:"workflow,omitempty"`
 	Agent     string         `json:"agent,omitempty"` // preset name, never a model name
 	Packs     string         `json:"packs,omitempty"` // sha256 of the lock file the run used
+	Tries     int            `json:"tries,omitempty"`
 	Tickets   []TicketResult `json:"tickets"`
+	Cells     []Cell         `json:"cells,omitempty"`
 	Aggregate Aggregate      `json:"aggregate"`
 }
 
@@ -116,39 +127,6 @@ func maxCost(updates []api.Usage) float64 {
 		c = max(c, u.CostUSD)
 	}
 	return c
-}
-
-// Run executes every ticket of every fixture and returns the scorecard.
-func Run(ctx context.Context, m Matrix, d Deps) (Scorecard, error) {
-	sc := Scorecard{Schema: SchemaV1}
-	for _, f := range m.Fixtures {
-		for _, ft := range f.Tickets {
-			if err := ctx.Err(); err != nil {
-				return sc, err
-			}
-			t := ft.Ticket
-			o, err := d.Dispatch(ctx, t)
-			if err != nil {
-				return sc, fmt.Errorf("dispatch %s/%s: %w", f.Name, t.ID, err)
-			}
-			green, err := d.Gate(ctx, t)
-			if err != nil {
-				return sc, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
-			}
-			pass, err := d.HiddenTest(ctx, t, f.Hidden)
-			if err != nil {
-				return sc, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
-			}
-			in, out := AbsoluteTotals(o.Updates)
-			sc.Tickets = append(sc.Tickets, TicketResult{
-				Fixture: f.Name, Ticket: t.ID, HiddenPass: pass, BaseGreen: green, Merged: pass && green,
-				InputTokens: in, OutputTokens: out, CostUSD: maxCost(o.Updates),
-				WallTime: o.Wall, Attempts: o.Attempts, HumanTouches: o.HumanTouches,
-			})
-		}
-	}
-	sc.Aggregate = aggregate(sc.Tickets)
-	return sc, nil
 }
 
 func aggregate(rs []TicketResult) Aggregate {
@@ -269,6 +247,7 @@ func Markdown(sc Scorecard, customer bool) string {
 	}
 	fmt.Fprintf(&b, "- Median wall time: %s\n", a.MedianWallTime)
 	fmt.Fprintf(&b, "- Human touches per PR: %.2f\n\n", a.HumanTouchesPerPR)
+	b.WriteString(cellTable(sc.Cells, customer))
 	if customer {
 		b.WriteString("| Fixture | Ticket | Passed | Base green | Attempts |\n|---|---|---|---|---|\n")
 		for _, r := range sc.Tickets {
@@ -304,4 +283,34 @@ func LoadMatrix(dir string) (Matrix, error) {
 		m.Fixtures = append(m.Fixtures, f)
 	}
 	return m, nil
+}
+
+// cellTable renders one row per cell, so control and preset sit side by side per fixture.
+func cellTable(cs []Cell, customer bool) string {
+	if len(cs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("| Cell | Tickets | Pass rate by try | Malformed |")
+	if !customer {
+		b.WriteString(" Cost |")
+	}
+	b.WriteString("\n|---|---|---|---|")
+	if !customer {
+		b.WriteString("---|")
+	}
+	b.WriteString("\n")
+	for _, c := range cs {
+		var rs []string
+		for _, r := range c.PassRates {
+			rs = append(rs, fmt.Sprintf("%.2f", r))
+		}
+		fmt.Fprintf(&b, "| %s | %d | %s | %d |", c.Key(), c.Tickets, strings.Join(rs, " / "), c.Malformed)
+		if !customer {
+			fmt.Fprintf(&b, " %.4f |", c.CostUSD)
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	return b.String()
 }
