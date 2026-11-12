@@ -2,6 +2,8 @@
 # golangci-lint runs from PATH when installed, otherwise at the pinned version through `go run`.
 
 lint_version := "v2.13.2"
+# golangci-lint v2.13.2 is built with Go 1.26 and cannot type-check a newer standard library.
+lint_go := "go1.26.7"
 
 default: check
 
@@ -24,6 +26,7 @@ vet:
 lint:
     #!/usr/bin/env bash
     set -euo pipefail
+    export GOTOOLCHAIN={{lint_go}}
     if command -v golangci-lint >/dev/null; then golangci-lint run ./...
     else go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{lint_version}} run ./...; fi
 
