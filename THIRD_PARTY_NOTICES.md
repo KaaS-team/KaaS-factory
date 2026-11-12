@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## sst/opencode@a1aa513
+
+Source: https://github.com/sst/opencode (MIT, Copyright (c) 2025 opencode). Ported to Go by hand.
+
+- `internal/dispatch/local/rules.go` from `packages/core/src/permission.ts` (evaluate, Unattended) and `packages/core/src/util/wildcard.ts` [tested by `internal/dispatch/local/rules_test.go`]
