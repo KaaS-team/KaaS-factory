@@ -25,23 +25,26 @@ var catalogueYAML []byte
 type Finding struct {
 	ID        string `json:"id"`
 	Title     string `json:"title"`
+	Severity  string `json:"severity"`
 	File      string `json:"file"`
 	Line      int    `json:"line"`
+	RiskArea  string `json:"risk_area"`
+	Pack      string `json:"pack"`
+	Effort    string `json:"effort"`
 	ScoreGain int    `json:"score_gain"`
 }
 
-// Audit is the auditor's JSON output.
+// Schema is the auditor report contract first-run reads (auditor docs/json.md).
+const Schema = "auditor.report/v1"
+
+// Audit is the part of `auditor report --json` (auditor.report/v1) that first-run reads.
 type Audit struct {
-	Score    int       `json:"score"`
+	Schema string `json:"schema"`
+	Scores struct {
+		Overall int `json:"overall"`
+	} `json:"scores"`
 	TopRisks []Finding `json:"top_risks"`
 	Findings []Finding `json:"findings"`
-}
-
-// Entry maps one finding id to a pack, a fix size and a fix risk.
-type Entry struct {
-	Pack string `yaml:"pack"`
-	Size string `yaml:"size"`
-	Risk string `yaml:"risk"`
 }
 
 // Prior is the fixed estimate for one size.
@@ -57,7 +60,6 @@ type Catalogue struct {
 		Install string `yaml:"install"`
 	} `yaml:"auditor"`
 	Priors map[string]Prior `yaml:"priors"`
-	Packs  map[string]Entry `yaml:"packs"`
 }
 
 // LoadCatalogue parses the embedded catalogue.yaml.
@@ -121,12 +123,19 @@ func Run(ctx context.Context, o Options) (Report, error) {
 	if err != nil {
 		return Report{}, fmt.Errorf("auditor binary %q not found on PATH; install it with: %s", cat.Auditor.Binary, cat.Auditor.Install)
 	}
-	a, err := runAudit(ctx, bin, o.Dir, "audit", "--json")
+	dir := o.Dir
+	if dir == "" {
+		dir = "."
+	}
+	a, err := runAudit(ctx, bin, o.Dir, "report", "--json", dir)
 	if err != nil {
 		return Report{}, err
 	}
+	if a.Schema != Schema {
+		return Report{}, fmt.Errorf("auditor report schema %q, want %q; upgrade the auditor", a.Schema, Schema)
+	}
 	if o.GH != "" {
-		g, err := runAudit(ctx, bin, o.Dir, "audit", "--json", "--gh", o.GH)
+		g, err := runAudit(ctx, bin, o.Dir, "audit", "--json", "--gh", o.GH, dir)
 		if err != nil {
 			return Report{}, err
 		}
@@ -177,27 +186,39 @@ func merge(a, b Audit) Audit {
 
 // Build maps findings to packs and projects the after-score. It is pure.
 func Build(a Audit, cat Catalogue) Report {
-	r := Report{Score: a.Score, TopRisks: a.TopRisks}
+	score := a.Scores.Overall
+	r := Report{Score: score, TopRisks: a.TopRisks}
 	if len(r.TopRisks) > 3 {
 		r.TopRisks = r.TopRisks[:3]
 	}
 	total := 0
 	for _, f := range a.Findings {
-		e, ok := cat.Packs[f.ID]
-		if !ok {
+		if f.Severity == "ok" {
+			continue
+		}
+		p, ok := cat.Priors[f.Effort]
+		if f.Pack == "" || !ok {
 			r.NotCovered = append(r.NotCovered, f)
 			continue
 		}
-		p := cat.Priors[e.Size]
 		total += f.ScoreGain
-		r.Rows = append(r.Rows, Row{Finding: f, Pack: e.Pack, Size: e.Size, Risk: e.Risk,
-			Tokens: p.Tokens, Minutes: p.Minutes, ScoreAfter: clamp(a.Score + f.ScoreGain)})
+		r.Rows = append(r.Rows, Row{Finding: f, Pack: f.Pack, Size: f.Effort, Risk: fixRisk(f.RiskArea),
+			Tokens: p.Tokens, Minutes: p.Minutes, ScoreAfter: clamp(score + f.ScoreGain)})
 	}
-	r.ScoreAfter = clamp(a.Score + total)
+	r.ScoreAfter = clamp(score + total)
 	return r
 }
 
 func clamp(n int) int { return min(n, 100) }
+
+// fixRisk is the risk of changing code for a finding: high inside a risk area the auditor names
+// (auth, payments, migrations, db, infra, secrets), low outside one.
+func fixRisk(area string) string {
+	if area == "" || area == "none" {
+		return "low"
+	}
+	return "high"
+}
 
 var riskRank = map[string]int{"low": 0, "medium": 1, "high": 2}
 
