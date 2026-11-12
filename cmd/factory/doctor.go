@@ -40,7 +40,29 @@ func runChecks() []checkRow {
 	} else {
 		rows = append(rows, checkRow{Name: "config", Status: statusPass, Detail: "loads"})
 	}
+	if l, err := loadConfig(nil); err == nil {
+		if r, ok := dispatcherCheck(l.Config.Dispatcher); ok {
+			rows = append(rows, r)
+		}
+	}
 	return append(rows, envCheck(os.Environ()))
+}
+
+// dispatcherCheck fails when the configured dispatcher's prerequisite is missing: `claude` on PATH
+// for local, a routine id for fire. Other dispatchers have no row here.
+func dispatcherCheck(name string) (checkRow, bool) {
+	switch name {
+	case "local":
+		r := onPath("claude", statusFail, "install Claude Code and put `claude` on PATH, or set dispatcher to another value")
+		r.Name = "dispatcher"
+		return r, true
+	case "fire":
+		if os.Getenv(envRoutine) == "" {
+			return checkRow{"dispatcher", statusFail, envRoutine + " is not set", "set " + envRoutine + " to the routine id to fire"}, true
+		}
+		return checkRow{Name: "dispatcher", Status: statusPass, Detail: "routine id set"}, true
+	}
+	return checkRow{}, false
 }
 
 func onPath(bin string, missing checkStatus, fix string) checkRow {

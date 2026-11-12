@@ -192,10 +192,11 @@ func TestTicketCommandNeedsExactlyOneArg(t *testing.T) {
 	}
 }
 
-func TestDefaultControlSaysCoreNotWired(t *testing.T) {
+// TestDefaultControlNamesTheMissingKey: the real newControl fails by naming the config key to set.
+func TestDefaultControlNamesTheMissingKey(t *testing.T) {
 	t.Chdir(t.TempDir())
 	_, _, err := runCLI(t, "status")
-	if err == nil || !strings.Contains(err.Error(), "core not wired yet") {
+	if err == nil || !strings.Contains(err.Error(), "key repo") {
 		t.Fatalf("err = %v", err)
 	}
 }

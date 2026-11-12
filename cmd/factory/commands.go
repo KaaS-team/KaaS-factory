@@ -157,6 +157,12 @@ func runCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// A Control that owns a loop (core.Core) is started here; the loop ends with ctx.
+			if l, ok := c.(interface{ Run(context.Context) error }); ok {
+				loopDone := make(chan struct{})
+				go func() { defer close(loopDone); _ = l.Run(ctx) }()
+				defer func() { stop(); <-loopDone }()
+			}
 			out, logs := cmd.OutOrStdout(), cmd.ErrOrStderr()
 			if !headless {
 				_, _ = fmt.Fprintln(logs, "factory run: streaming events (use --headless for NDJSON on stdout)")

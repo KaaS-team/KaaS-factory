@@ -86,3 +86,40 @@ func TestDoctorAllGreenHasNoFailRows(t *testing.T) {
 		t.Fatalf("err = %v\n%s", err, out)
 	}
 }
+
+// TestDoctorDispatcherPrerequisite: the configured dispatcher's prerequisite is a fail row (spec 'doctor').
+func TestDoctorDispatcherPrerequisite(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		dispatcher string
+		tools      map[string]string
+		env        map[string]string
+		wantFail   string
+	}{
+		{"local with claude", "local", map[string]string{"git": "exit 0", "gh": "exit 0", "claude": "exit 0", "go": "exit 0"}, nil, ""},
+		{"local without claude", "local", map[string]string{"git": "exit 0", "gh": "exit 0", "go": "exit 0"}, nil, "dispatcher"},
+		{"fire with routine", "fire", map[string]string{"git": "exit 0", "gh": "exit 0", "claude": "exit 0", "go": "exit 0"}, map[string]string{"CLAUDE_ROUTINE_ID": "rt_1"}, ""},
+		{"fire without routine", "fire", map[string]string{"git": "exit 0", "gh": "exit 0", "claude": "exit 0", "go": "exit 0"}, map[string]string{"CLAUDE_ROUTINE_ID": ""}, "dispatcher"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doctorEnv(t, tc.tools)
+			t.Setenv("FACTORY_DISPATCHER", tc.dispatcher)
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			var got *checkRow
+			for _, r := range runChecks() {
+				if r.Name == "dispatcher" {
+					r := r
+					got = &r
+				}
+			}
+			if got == nil {
+				t.Fatal("no dispatcher row")
+			}
+			if (tc.wantFail != "") != (got.Status == statusFail) {
+				t.Fatalf("row = %+v, wantFail %q", got, tc.wantFail)
+			}
+		})
+	}
+}
