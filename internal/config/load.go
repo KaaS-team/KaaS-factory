@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/knadh/koanf/parsers/yaml"
@@ -68,7 +70,7 @@ func Load(s Sources) (*Loaded, error) {
 		if err := k.Load(rawbytes.Provider(f.src.Data), yaml.Parser()); err != nil {
 			return nil, fmt.Errorf("%s layer %s: %w", f.layer, f.src.Name, err)
 		}
-		vals, err := fromKoanf(k, f.layer, f.layer == LayerOrg || f.layer == LayerTeam)
+		vals, err := fromKoanf(k, f.layer == LayerOrg || f.layer == LayerTeam)
 		if err != nil {
 			return nil, fmt.Errorf("%s layer %s: %w", f.layer, f.src.Name, err)
 		}
@@ -97,7 +99,7 @@ func Load(s Sources) (*Loaded, error) {
 		if err := k.Load(posflag.Provider(s.Flags, ".", nil), nil); err != nil {
 			return nil, fmt.Errorf("flags layer: %w", err)
 		}
-		vals, err := fromKoanf(k, LayerFlags, false)
+		vals, err := fromKoanf(k, false)
 		if err != nil {
 			return nil, fmt.Errorf("flags layer: %w", err)
 		}
@@ -115,42 +117,76 @@ func builtin() layerValues {
 	return out
 }
 
-// fromKoanf coerces every key a koanf layer holds.
-func fromKoanf(k *koanf.Koanf, layer Layer, allowForeign bool) (layerValues, error) {
-	out := layerValues{}
-	for key, raw := range k.All() {
-		if raw == nil {
-			continue
-		}
-		sp, ok := lookup(key)
-		if !ok {
-			continue
-		}
-		v, err := coerce(sp, raw)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", key, err)
-		}
-		out[key] = v
-	}
-	return out, nil
+// fromKoanf coerces every key a koanf layer holds. Org and team files may also carry the
+// factory-config metadata keys and "policy" aliases.
+func fromKoanf(k *koanf.Koanf, allowFactoryConfig bool) (layerValues, error) {
+	return collect(k.All(), allowFactoryConfig, func(key string) string { return key })
 }
 
 // fromEnv maps FACTORY_BUDGETS_TEAM_DAY style names to keys and coerces their values.
 func fromEnv(k *koanf.Koanf) (layerValues, error) {
+	raw := map[string]any{}
+	for name, v := range k.All() {
+		raw[envKey(name)] = v
+	}
+	return collect(raw, false, func(key string) string { return EnvPrefix + strings.ToUpper(strings.ReplaceAll(key, ".", "_")) })
+}
+
+// collect resolves each raw key to a spec and coerces its value. Every unknown key is reported,
+// sorted, with its full path; label names a key in a type error.
+func collect(raw map[string]any, allowFactoryConfig bool, label func(string) string) (layerValues, error) {
 	out := layerValues{}
-	for name, raw := range k.All() {
-		key := envKey(name)
+	var unknown, bad []string
+	for key, v := range raw {
+		if allowFactoryConfig {
+			if ignored, alias := factoryConfigKey(key); ignored {
+				continue
+			} else if alias != "" {
+				key = alias
+			}
+		}
 		sp, ok := lookup(key)
 		if !ok {
+			unknown = append(unknown, key)
 			continue
 		}
-		v, err := coerce(sp, raw)
-		if err != nil {
-			return nil, fmt.Errorf("%s%s: %w", EnvPrefix, strings.ToUpper(name), err)
+		if v == nil {
+			continue
 		}
-		out[key] = v
+		cv, err := coerce(sp, v)
+		if err != nil {
+			bad = append(bad, fmt.Sprintf("%s: %v", label(key), err))
+			continue
+		}
+		out[key] = cv
 	}
-	return out, nil
+	sort.Strings(unknown)
+	sort.Strings(bad)
+	var errs []error
+	for _, key := range unknown {
+		errs = append(errs, fmt.Errorf("unknown key %q", key))
+	}
+	for _, m := range bad {
+		errs = append(errs, errors.New(m))
+	}
+	return out, errors.Join(errs...)
+}
+
+// factoryConfigKey classifies a key of a factory-config org or team file: ignored metadata, or an
+// alias to the key it sets here.
+func factoryConfigKey(key string) (ignored bool, alias string) {
+	top, rest, _ := strings.Cut(key, ".")
+	if foreign[top] {
+		return true, ""
+	}
+	if top != "policy" {
+		return false, ""
+	}
+	if a, ok := policyAlias[key]; ok {
+		return false, a
+	}
+	second, _, _ := strings.Cut(rest, ".")
+	return foreignPolicy[second], ""
 }
 
 // envKey turns a lowercased variable name without the prefix into a key path.
