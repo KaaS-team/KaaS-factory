@@ -152,3 +152,9 @@ licence text is at https://www.apache.org/licenses/LICENSE-2.0 and in the upstre
 this commit. The files below are ported to Go and changed from the originals.
 
 - `internal/gitx/checkpoint/checkpoint.go` from `sdk/packages/core/src/hooks/checkpoint-hooks.ts` and `sdk/packages/core/src/session/checkpoint-restore.ts` [tested by `internal/gitx/checkpoint/checkpoint_test.go`]
+
+## triggerdotdev/trigger.dev@2fbd5c7
+
+Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trigger.dev)
+
+- `internal/pick/fair.go` from `packages/redis-worker/src/fair-queue/schedulers/drr.ts` (algorithm only, in process, no Redis or Lua) [tested by `internal/pick/fair_test.go`]
