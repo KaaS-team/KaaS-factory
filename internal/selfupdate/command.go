@@ -1,16 +1,14 @@
-package upgrade
+package selfupdate
 
 import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
-	"github.com/KaaS-team/factory/internal/selfupdate"
 )
 
-// NewSelfCommand returns `upgrade`: it replaces the running binary at exe (this process when empty)
+// NewCommand returns `upgrade`: it replaces the running binary at exe (this process when empty)
 // with the latest release from src, after checking its checksum. With --check it only reports.
-func NewSelfCommand(current string, src selfupdate.Source, exe string) *cobra.Command {
+func NewCommand(current string, src Source, exe string) *cobra.Command {
 	var check bool
 	cmd := &cobra.Command{
 		Use:   "upgrade",
@@ -18,7 +16,7 @@ func NewSelfCommand(current string, src selfupdate.Source, exe string) *cobra.Co
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out := cmd.OutOrStdout()
-			rel, newer, err := selfupdate.Check(cmd.Context(), current, src)
+			rel, newer, err := Check(cmd.Context(), current, src)
 			if err != nil {
 				return err
 			}
@@ -30,7 +28,7 @@ func NewSelfCommand(current string, src selfupdate.Source, exe string) *cobra.Co
 				_, _ = fmt.Fprintf(out, "factory %s is available (this is %s); run `factory upgrade`\n", rel.Version, current)
 				return nil
 			}
-			if err := selfupdate.Apply(cmd.Context(), rel, src, exe, "", ""); err != nil {
+			if err := Apply(cmd.Context(), rel, src, exe, "", ""); err != nil {
 				return err
 			}
 			_, _ = fmt.Fprintf(out, "upgraded factory %s to %s\n", current, rel.Version)
