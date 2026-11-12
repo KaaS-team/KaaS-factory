@@ -1,7 +1,7 @@
 BRANCH: go/k3f-surface
 HEAD: 509e59c7a93defed08ef6484492f5cfe2a752692
 ## Summary
-serve, a2a and browsercheck are mounted; local agents run through pkg/sandbox; `factory upgrade` self-updates through selfupdate (pack bumps moved to `factory packs upgrade`); GitHub App auth is used when its config keys are set. Deadcode in my packages went from 65 to 4 (non-test Go lines 20032 to 20060 since wiring added code; no deletions were needed apart from Report.String).
+serve, a2a and browsercheck are mounted; local agents run through pkg/sandbox; `factory upgrade` self-updates through selfupdate (pack bumps moved to `factory packs upgrade`); GitHub App auth is used when its config keys are set. Deadcode in my packages went from 65 to 4 (non-test Go lines 20032 to 20257 since wiring added code; no deletions were needed apart from Report.String).
 ## Acceptance
 - TestRootCommandTree lists serve, a2a, browsercheck, each mounted -> TestRootCommandTree -> done
 - Browser pack command parses against the mounted command -> TestBrowserPackCommandParses -> done
