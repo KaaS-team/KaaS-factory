@@ -1,6 +1,7 @@
 package mergeq
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -76,7 +77,11 @@ type Config struct {
 	BatchTimeout   time.Duration // a gate run longer than this counts as a red result; no limit when zero
 	PushBackoff    time.Duration // first wait after a push that was not a fast-forward; no wait when zero
 	PushBackoffMax time.Duration // cap on that wait
+	PushAttempts   int           // pushes of one batch that may be rejected as not a fast-forward before it is parked as failed; DefaultPushAttempts when not positive
 }
+
+// DefaultPushAttempts is Config.PushAttempts when it is not positive.
+const DefaultPushAttempts = 5
 
 // Runner applies Plan through its interfaces.
 type Runner struct {
@@ -194,8 +199,20 @@ func (r *Runner) land(ctx context.Context, a Action, st State, results map[strin
 	if err := r.Git.FastForward(ctx, a.Ref); err != nil {
 		if PushOutcome(err) == OutcomeRetryBatch {
 			// The gate passed, so the whole batch is tested again on the new base, without a bisect.
-			wait := Backoff(*pushRetries, r.Cfg.PushBackoff, r.Cfg.PushBackoffMax)
 			*pushRetries++
+			if limit := cmp.Or(max(r.Cfg.PushAttempts, 0), DefaultPushAttempts); *pushRetries >= limit {
+				// Never a fast-forward: park the batch as failed, with the reason, instead of testing it forever.
+				reason := fmt.Sprintf("mergeq: push was not a fast-forward in %d attempts: %v", *pushRetries, err)
+				*pushRetries = 0
+				for _, id := range a.IDs {
+					rep.Ejected = append(rep.Ejected, Ejection{ID: id, LogTail: reason})
+					if err := r.Store.Eject(ctx, id, reason); err != nil {
+						return results, fmt.Errorf("eject %s: %w", id, err)
+					}
+				}
+				return results, nil
+			}
+			wait := Backoff(*pushRetries-1, r.Cfg.PushBackoff, r.Cfg.PushBackoffMax)
 			if wait > 0 {
 				sl := r.Sleep
 				if sl == nil {
