@@ -8,8 +8,9 @@ import (
 
 // Network is the egress allow and deny config for one session. An entry is a
 // CIDR block, a bare IP, an exact domain, or a leading wildcard such as
-// "*.example.com" (any depth, never the apex). Allow wins over deny, and a
-// destination that matches neither list is allowed.
+// "*.example.com" (any depth, never the apex). A non-public address is always
+// refused; otherwise allow wins over deny, and a destination that matches
+// neither list is allowed.
 type Network struct {
 	AllowOut []string `json:"allowOut,omitempty"`
 	DenyOut  []string `json:"denyOut,omitempty"`
@@ -19,16 +20,63 @@ type Network struct {
 }
 
 // Allowed reports whether a connection to host, which resolved to ips, may go
-// out. Allow is checked first and wins; then deny; otherwise the answer is yes.
+// out. Any non-public address refuses it whatever the lists say, so no allow
+// entry can open the host, its network or a cloud metadata service. Then allow
+// is checked and wins; then deny; otherwise the answer is yes.
 func (n Network) Allowed(host string, ips []net.IP) bool {
 	host = normalizeHost(host)
 	if hostIP := net.ParseIP(host); hostIP != nil {
 		ips = append(ips[:len(ips):len(ips)], hostIP)
 	}
+	for _, ip := range ips {
+		if NonPublic(ip) {
+			return false
+		}
+	}
 	if matchAny(n.AllowOut, host, ips) {
 		return true
 	}
 	return !matchAny(n.DenyOut, host, ips)
+}
+
+// nonPublicNets are the ranges Go's net.IP predicates miss: "this network",
+// carrier-grade NAT, and the IPv4 broadcast address.
+var nonPublicNets = func() []*net.IPNet {
+	var out []*net.IPNet
+	for _, c := range []string{"0.0.0.0/8", "100.64.0.0/10", "255.255.255.255/32"} {
+		_, n, _ := net.ParseCIDR(c)
+		out = append(out, n)
+	}
+	return out
+}()
+
+// nat64 is the well-known NAT64 prefix; its last four bytes are an IPv4 address.
+var _, nat64, _ = net.ParseCIDR("64:ff9b::/96")
+
+// NonPublic reports whether ip is an address a session must never reach:
+// loopback, private (RFC 1918 and IPv6 ULA), link-local (which holds the cloud
+// metadata address 169.254.169.254), multicast, unspecified, carrier-grade NAT,
+// or one of those inside an IPv4-mapped or NAT64 IPv6 address. A malformed ip
+// counts as non-public.
+func NonPublic(ip net.IP) bool {
+	if len(ip) == net.IPv6len && nat64.Contains(ip) {
+		ip = ip[12:16]
+	}
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	} else if len(ip) != net.IPv6len {
+		return true
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return true
+	}
+	for _, n := range nonPublicNets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // DNS returns the resolvers the session may reach, applying the default.
