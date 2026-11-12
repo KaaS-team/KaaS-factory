@@ -23,22 +23,25 @@ var wantPacks = []string{"dep-upgrade", "framework-upgrade", "migration", "cover
 // blueprintPins lists skills the blueprint pins that are not in the template. None yet.
 var blueprintPins = []string{}
 
-var tiers = []string{"none", "light", "standard", "deep"}
+var tiers = []string{"small", "large"}
 
 var modelName = regexp.MustCompile(`(?i)\b(claude|opus|sonnet|haiku|fable|gpt[-\w.]*|gemini|llama|mistral|o[134]-\w+)\b`)
 
-type meta struct {
-	Agents map[string]struct {
-		Tier   string `yaml:"tier"`
-		Budget struct {
-			Turns   *int `yaml:"turns"`
-			Minutes int  `yaml:"minutes"`
-		} `yaml:"budget"`
-		Skills []string `yaml:"skills"`
-	} `yaml:"agents"`
+// topKeys is the set of top-level keys of a workflow file.
+func topKeys(t *testing.T, text string) map[string]bool {
+	t.Helper()
+	var m map[string]any
+	if err := yaml.Unmarshal([]byte(text), &m); err != nil {
+		t.Fatal(err)
+	}
+	keys := map[string]bool{}
+	for k := range m {
+		keys[k] = true
+	}
+	return keys
 }
 
-func load(t *testing.T, name string) (*graph.Graph, meta, string) {
+func load(t *testing.T, name string) (*graph.Graph, string) {
 	t.Helper()
 	path := filepath.Join(workflowsDir, name+".yml")
 	g, err := graph.Load(path)
@@ -49,11 +52,7 @@ func load(t *testing.T, name string) (*graph.Graph, meta, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var m meta
-	if err := yaml.Unmarshal(data, &m); err != nil {
-		t.Fatalf("%s: %v", name, err)
-	}
-	return g, m, string(data)
+	return g, string(data)
 }
 
 func TestSevenPacksLoadThroughGraph(t *testing.T) {
@@ -65,7 +64,7 @@ func TestSevenPacksLoadThroughGraph(t *testing.T) {
 		t.Errorf("want exactly %d workflows, found %d", len(wantPacks), len(all))
 	}
 	for _, name := range wantPacks {
-		g, _, text := load(t, name)
+		g, text := load(t, name)
 		if g.Name != name || g.Start == "" {
 			t.Errorf("%s: name %q start %q", name, g.Name, g.Start)
 		}
@@ -99,7 +98,7 @@ func reaches(g *graph.Graph, from, to string) bool {
 
 func TestBuildIsFollowedByFreshVerify(t *testing.T) {
 	for _, name := range wantPacks {
-		g, _, _ := load(t, name)
+		g, _ := load(t, name)
 		for _, b := range g.Nodes() {
 			if b.Uses != "build" {
 				continue
@@ -117,42 +116,50 @@ func TestBuildIsFollowedByFreshVerify(t *testing.T) {
 	}
 }
 
+// Every shipped workflow carries agent settings on its nodes: no top-level agents map, no warning.
 func TestEveryNodeNamesTierAndBudget(t *testing.T) {
 	for _, name := range wantPacks {
-		g, m, _ := load(t, name)
-		ids := map[string]bool{}
+		g, text := load(t, name)
+		if topKeys(t, text)["agents"] {
+			t.Errorf("%s: still has a top-level agents map", name)
+		}
+		if len(g.Warnings) != 0 {
+			t.Errorf("%s: warnings %v", name, g.Warnings)
+		}
 		for _, n := range g.Nodes() {
-			if n.Kind == graph.KindFanout || n.Kind == graph.KindHuman {
+			if n.Kind != graph.KindAgent {
+				if n.Tier != "" || n.Budget != 0 || len(n.Skills) != 0 {
+					t.Errorf("%s: %s node %s carries agent settings", name, n.Kind, n.ID)
+				}
 				continue
 			}
-			ids[n.ID] = true
-			a, ok := m.Agents[n.ID]
-			switch {
-			case !ok:
-				t.Errorf("%s: node %s has no agents entry", name, n.ID)
-			case !slices.Contains(tiers, a.Tier):
-				t.Errorf("%s: node %s tier %q not one of %v", name, n.ID, a.Tier, tiers)
-			case a.Budget.Turns == nil || a.Budget.Minutes <= 0:
-				t.Errorf("%s: node %s needs a budget with turns and minutes", name, n.ID)
-			case n.Kind == graph.KindAgent && (a.Tier == "none" || *a.Budget.Turns <= 0):
-				t.Errorf("%s: agent node %s needs a real tier and turn budget", name, n.ID)
-			}
-		}
-		for id := range m.Agents {
-			if !ids[id] {
-				t.Errorf("%s: agents entry %q names no node", name, id)
+			if !slices.Contains(tiers, n.Tier) || n.Budget <= 0 {
+				t.Errorf("%s: agent node %s needs a tier (%v) and a token budget, has %q and %d", name, n.ID, tiers, n.Tier, n.Budget)
 			}
 		}
 	}
 }
 
+// The old agents map still loads, with a warning, for one release.
+func TestOldAgentsMapStillLoads(t *testing.T) {
+	old := "name: old\nagents:\n  build: { tier: standard, budget: { turns: 5, minutes: 5 }, skills: [factory-build] }\nsteps:\n  build: { uses: build }\n"
+	g, err := graph.ParseYAML("old", []byte(old))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, _ := g.Node("build")
+	if len(g.Warnings) != 1 || n.Tier != "large" || len(n.Skills) != 1 {
+		t.Errorf("warnings %v node %+v", g.Warnings, n)
+	}
+}
+
 func TestEverySkillExists(t *testing.T) {
 	for _, name := range wantPacks {
-		_, m, _ := load(t, name)
-		for id, a := range m.Agents {
-			for _, s := range a.Skills {
+		g, _ := load(t, name)
+		for _, n := range g.Nodes() {
+			for _, s := range n.Skills {
 				if _, err := os.Stat(filepath.Join(skillsDir, s, "SKILL.md")); err != nil && !slices.Contains(blueprintPins, s) {
-					t.Errorf("%s: node %s names unknown skill %q", name, id, s)
+					t.Errorf("%s: node %s names unknown skill %q", name, n.ID, s)
 				}
 			}
 		}
@@ -174,7 +181,7 @@ func TestNoModelNames(t *testing.T) {
 
 func TestFanoutPacksJoinBeforeGate(t *testing.T) {
 	for _, name := range []string{"migration", "framework-upgrade"} {
-		g, _, _ := load(t, name)
+		g, _ := load(t, name)
 		var fan graph.Node
 		for _, n := range g.Nodes() {
 			if n.Kind == graph.KindFanout {
@@ -204,7 +211,7 @@ func TestFanoutPacksJoinBeforeGate(t *testing.T) {
 }
 
 func TestCoverageRampLoopsOnCheck(t *testing.T) {
-	g, _, _ := load(t, "coverage-ramp")
+	g, _ := load(t, "coverage-ramp")
 	n, _ := g.Node("coverage")
 	if n.Kind != graph.KindCheck || !strings.Contains(n.Run, "coverage.txt") ||
 		!strings.Contains(n.Run, "COVERAGE_TARGET") || !strings.Contains(n.Run, "COVERAGE_MAX_STEPS") {

@@ -2,15 +2,9 @@
 # check reads the number: it fails back to build until the target (COVERAGE_TARGET, default 80) or
 # the step limit (COVERAGE_MAX_STEPS, default 5) is reached, then verify runs in a fresh session.
 name: coverage-ramp
-agents:
-  triage: { tier: light, budget: { turns: 15, minutes: 10 } }
-  build: { tier: standard, budget: { turns: 50, minutes: 30 }, skills: [factory-build] }
-  coverage: { tier: none, budget: { turns: 0, minutes: 10 } }
-  verify: { tier: standard, budget: { turns: 30, minutes: 20 }, skills: [factory-verify] }
-  pr: { tier: light, budget: { turns: 10, minutes: 5 }, skills: [factory-pr] }
 steps:
-  triage: { uses: triage, label: "factory:triaging", next: build }
-  build: { uses: build, label: "factory:building", next: coverage }
+  triage: { uses: triage, label: "factory:triaging", next: build, tier: small, budget: 150000 }
+  build: { uses: build, label: "factory:building", next: coverage, tier: large, budget: 500000, skills: [factory-build] }
   coverage:
     uses: check
     label: "factory:measuring"
@@ -20,5 +14,5 @@ steps:
       [ "${cov%.*}" -ge "${COVERAGE_TARGET:-80}" ] || [ "$n" -ge "${COVERAGE_MAX_STEPS:-5}" ]
     reject: build
     next: verify
-  verify: { uses: verify, label: "factory:verifying", next: pr, reject: build }
-  pr: { uses: pr, label: "factory:in-review", revise: build }
+  verify: { uses: verify, label: "factory:verifying", next: pr, reject: build, tier: large, budget: 300000, skills: [factory-verify] }
+  pr: { uses: pr, label: "factory:in-review", revise: build, tier: small, budget: 100000, skills: [factory-pr] }

@@ -54,6 +54,12 @@ type Node struct {
 	Verify bool
 	// FreshSession is true for every verify node, whatever the workflow file says.
 	FreshSession bool
+	// Tier is the agent size for this node, "small" or "large"; empty leaves it to the runner.
+	Tier string
+	// Budget is the node's token budget; zero means none set.
+	Budget int
+	// Skills names the skills the node's agent loads.
+	Skills []string
 }
 
 // Edge leads from one node to another when From ends with outcome On. If is an optional condition
@@ -79,8 +85,10 @@ type Graph struct {
 	ModelTier   string
 	Budget      float64
 	SafeOutputs []WriteKind
-	nodes       []Node
-	edges       []Edge
+	// Warnings lists deprecated forms the file used, such as the top-level agents map. Load does not print them.
+	Warnings []string
+	nodes    []Node
+	edges    []Edge
 }
 
 // Nodes returns the nodes in file order.

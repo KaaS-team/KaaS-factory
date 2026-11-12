@@ -18,8 +18,12 @@ var stepTypes = map[string]NodeKind{
 var stepKeys = map[string]bool{
 	"uses": true, "label": true, "next": true, "reject": true, "revise": true, "run": true, "runtime": true,
 	"mcp": true, "needs": true, "approval": true, "gates": true, "after": true, "fresh_session": true,
-	"verify": true, "prompt": true,
+	"verify": true, "prompt": true, "tier": true, "budget": true, "skills": true,
 }
+
+// agentsDeprecated is the warning for the old top-level agents map, which is accepted for one more release.
+const agentsDeprecated = "agents: the top-level map is deprecated; put tier, budget and skills on each step " +
+	"(its budget turns and minutes are not carried over)"
 
 type step struct {
 	Uses         string    `yaml:"uses"`
@@ -86,7 +90,7 @@ func ParseYAML(name string, data []byte) (*Graph, error) {
 	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("workflow_front_matter_not_a_map: %s", name)
 	}
-	return build(name, root.Content[0], "steps", "", ValidateTemplate)
+	return build(name, root.Content[0], "steps", "", 0, validateTemplateAt)
 }
 
 // ParseMarkdown parses a .md workflow. Front matter with a stages key is the factory stages format;
@@ -121,7 +125,7 @@ func ParseMarkdown(name string, data []byte) (*Graph, error) {
 		m = root.Content[0]
 	}
 	if m != nil && child(m, "stages") != nil {
-		return build(name, m, "stages", body, ValidateTemplate)
+		return build(name, m, "stages", body, 1, validateTemplateAt)
 	}
 	return symphony(name, m, body)
 }
@@ -155,11 +159,17 @@ func child(m *yaml.Node, key string) *yaml.Node {
 type namedStep struct {
 	id string
 	step
+	tier       string
+	budget     int
+	skills     []string
+	keyLine    map[string]int // file line of each tier, budget and skills key
+	promptLine int            // file line of the prompt text, 0 when there is no prompt
 }
 
 // build turns the steps (key "steps" or "nodes") or stages of a mapping into a graph. check validates every
-// node prompt template.
-func build(name string, m *yaml.Node, key, body string, check func(string) error) (*Graph, error) {
+// node prompt template given the file line its text starts on. lineOff is the number of file lines before
+// the YAML, so error lines are lines of the file.
+func build(name string, m *yaml.Node, key, body string, lineOff int, check func(string, int) error) (*Graph, error) {
 	g := &Graph{Name: name, Prompt: body}
 	var top struct {
 		Name string `yaml:"name"`
@@ -197,7 +207,14 @@ func build(name string, m *yaml.Node, key, body string, check func(string) error
 		if s.Uses == "" {
 			s.Uses = id
 		}
-		steps = append(steps, namedStep{id, s})
+		ns := namedStep{id: id, step: s, keyLine: map[string]int{}}
+		if err := ns.readAgentKeys(node, lineOff); err != nil {
+			return nil, fmt.Errorf("%s: step %s: %w", g.Name, id, err)
+		}
+		steps = append(steps, ns)
+	}
+	if err := g.applyAgentsMap(m, steps); err != nil {
+		return nil, fmt.Errorf("%s: %w", g.Name, err)
 	}
 	md := key == "stages"
 	for _, s := range steps {
@@ -218,12 +235,20 @@ func build(name string, m *yaml.Node, key, body string, check func(string) error
 	return g, nil
 }
 
-func (g *Graph) addStep(s namedStep, md bool, check func(string) error) error {
+func (g *Graph) addStep(s namedStep, md bool, check func(string, int) error) error {
 	kind, ok := stepTypes[s.Uses]
 	if !ok {
 		return fmt.Errorf("step %s: unknown step type %q", s.id, s.Uses)
 	}
-	n := Node{ID: s.id, Kind: kind, Uses: s.Uses, Label: s.Label, Run: s.Run, Runtime: s.Runtime, Gates: s.Gates, MCP: s.MCP, Prompt: s.Prompt}
+	n := Node{ID: s.id, Kind: kind, Uses: s.Uses, Label: s.Label, Run: s.Run, Runtime: s.Runtime, Gates: s.Gates, MCP: s.MCP, Prompt: s.Prompt,
+		Tier: s.tier, Budget: s.budget, Skills: s.skills}
+	if kind != KindAgent {
+		for _, k := range []string{"tier", "budget", "skills"} {
+			if line, set := s.keyLine[k]; set {
+				return fmt.Errorf("step %s: line %d: key %q belongs on an agent step", s.id, line, k)
+			}
+		}
+	}
 	if kind == KindHuman {
 		n.Uses = ""
 	}
@@ -239,7 +264,7 @@ func (g *Graph) addStep(s namedStep, md bool, check func(string) error) error {
 	n.Verify = n.Verify || s.Uses == "verify"
 	n.FreshSession = n.Verify || (s.FreshSession != nil && *s.FreshSession)
 	if n.Prompt != "" {
-		if err := check(n.Prompt); err != nil {
+		if err := check(n.Prompt, s.promptLine); err != nil {
 			return fmt.Errorf("step %s: %w", s.id, err)
 		}
 	}
