@@ -38,6 +38,12 @@ type Spec struct {
 	MaxCPUSeconds uint64
 	// MaxProcs is RLIMIT_NPROC; zero means no limit.
 	MaxProcs uint64
+	// Limits are baseline rlimits by name (see ValidateLimits), applied before exec so the child inherits them.
+	Limits map[string]uint64
+	// ExecLimits override Limits for this one exec.
+	ExecLimits map[string]uint64
+	// Policy bounds the session lifetime; Command stops the child at MaxDuration.
+	Policy Policy
 	// Env is the only environment the child receives, as KEY=value entries.
 	Env []string
 }
@@ -65,6 +71,9 @@ type request struct {
 // Command returns a command that runs name with args under the jail described by spec.
 // The command re-executes the current binary, whose main must call MaybeEnter first.
 func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec.Cmd, error) {
+	if err := ValidateLimits(spec); err != nil {
+		return nil, err
+	}
 	path, err := exec.LookPath(name)
 	if err != nil {
 		return nil, fmt.Errorf("sandbox: %w", err)
@@ -77,7 +86,14 @@ func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec
 	if err != nil {
 		return nil, fmt.Errorf("sandbox: %w", err)
 	}
+	cancel := func() {}
+	if spec.Policy.MaxDuration > 0 {
+		ctx, cancel = context.WithTimeout(ctx, spec.Policy.MaxDuration)
+	}
 	cmd := exec.CommandContext(ctx, self)
+	// The timer frees itself at MaxDuration; cancel also runs if the caller's ctx ends first.
+	kill := cmd.Cancel
+	cmd.Cancel = func() error { cancel(); return kill() }
 	cmd.Dir = spec.Workdir
 	cmd.Env = []string{helperEnv + "=" + string(payload)}
 	return cmd, nil

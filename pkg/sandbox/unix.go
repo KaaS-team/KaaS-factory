@@ -17,6 +17,16 @@ func applyRlimits(limits []Rlimit) error {
 			res = syscall.RLIMIT_CPU
 		case "nproc":
 			res = rlimitNproc
+		case "core":
+			res = syscall.RLIMIT_CORE
+		case "data":
+			res = syscall.RLIMIT_DATA
+		case "fsize":
+			res = syscall.RLIMIT_FSIZE
+		case "nofile":
+			res = syscall.RLIMIT_NOFILE
+		case "stack":
+			res = syscall.RLIMIT_STACK
 		default:
 			return fmt.Errorf("sandbox: unknown rlimit %q", l.Name)
 		}
