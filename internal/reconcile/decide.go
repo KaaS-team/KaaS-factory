@@ -69,6 +69,8 @@ type State struct {
 	CancelRequested map[api.TicketID]bool
 	Locks           pick.Locks
 	FiresLeft       int
+
+	fired []time.Time // dispatch times in the last hour, kept by Tick
 }
 
 // Kind names an action.
