@@ -12,12 +12,12 @@ import (
 
 // Step is one parsed browser step.
 type Step struct {
-	Kind     string // goto, click, fill, expect_text, expect_no_console_error or screenshot
+	Kind     string // goto, click, fill, type_secret, expect_text, expect_no_console_error or screenshot
 	URL      string // goto target
 	Selector string // click and fill target
 	Value    string // fill value
 	Text     string // expect_text needle
-	Name     string // screenshot file name without extension
+	Name     string // screenshot file name without extension, or the secret name for type_secret
 }
 
 // ParseSteps reads a YAML list of single-key step maps and validates each one.
@@ -80,6 +80,18 @@ func parseStep(m map[string]yaml.Node) (Step, error) {
 				return s, errors.New("fill needs a value")
 			}
 			s.Selector, s.Value = f.Selector, *f.Value
+		case "type_secret":
+			var f struct {
+				Name     string `yaml:"name"`
+				Selector string `yaml:"selector"`
+			}
+			if err := n.Decode(&f); err != nil {
+				return s, errors.New("type_secret needs {name, selector}")
+			}
+			if f.Name == "" || f.Selector == "" {
+				return s, errors.New("type_secret needs a name and a selector")
+			}
+			s.Name, s.Selector = f.Name, f.Selector
 		case "expect_text":
 			if err := n.Decode(&s.Text); err != nil {
 				return s, err

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,7 +37,8 @@ type Options struct {
 	// Profile is a Chrome user-data-dir whose Local State and Default profile are copied, without
 	// caches, into a temp dir for the run. Empty runs with a fresh profile.
 	Profile  string
-	TempRoot string // where the run's temp dir goes; os.TempDir() when empty
+	Secrets  Secrets // values type_secret may type; they never appear in the result
+	TempRoot string  // where the run's temp dir goes; os.TempDir() when empty
 }
 
 // Result is the outcome of one run.
@@ -113,9 +115,9 @@ func Run(ctx context.Context, o Options) Result {
 		mu.Lock()
 		errs := consoleErrs
 		mu.Unlock()
-		if err := runStep(bctx, env, s, o.OutDir, errs); err != nil {
+		if err := runStep(bctx, env, s, o, errs); err != nil {
 			res.Failed = 1
-			res.Message = fmt.Sprintf("browser: step %d %s: %v", i+1, s.Kind, err)
+			res.Message = o.Secrets.Redact(fmt.Sprintf("browser: step %d %s: %v", i+1, s.Kind, err))
 			return res
 		}
 		res.Passed++
@@ -131,7 +133,7 @@ const (
 	quietWindow = 80 * time.Millisecond
 )
 
-func runStep(ctx context.Context, env *pageEnv, s Step, outDir string, consoleErrs int) error {
+func runStep(ctx context.Context, env *pageEnv, s Step, o Options, consoleErrs int) error {
 	began := env.now()
 	switch s.Kind {
 	case "goto":
@@ -146,6 +148,19 @@ func runStep(ctx context.Context, env *pageEnv, s Step, outDir string, consoleEr
 		Settle(env, settleAll, actionCap, quietWindow, began)
 	case "fill":
 		if err := chromedp.Do(ctx, chromedp.SetValue(chromedp.CSS(s.Selector), s.Value)); err != nil {
+			return err
+		}
+		Settle(env, settleAll, actionCap, quietWindow, began)
+	case "type_secret":
+		host, err := pageHost(ctx)
+		if err != nil {
+			return err
+		}
+		v, err := o.Secrets.Lookup(s.Name, host)
+		if err != nil {
+			return err
+		}
+		if err := chromedp.Do(ctx, chromedp.Clear(chromedp.CSS(s.Selector)), chromedp.SendKeys(chromedp.CSS(s.Selector), v)); err != nil {
 			return err
 		}
 		Settle(env, settleAll, actionCap, quietWindow, began)
@@ -166,7 +181,20 @@ func runStep(ctx context.Context, env *pageEnv, s Step, outDir string, consoleEr
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(outDir, s.Name+".png"), buf, 0o644)
+		return os.WriteFile(filepath.Join(o.OutDir, s.Name+".png"), buf, 0o644)
 	}
 	return nil
+}
+
+// pageHost returns the host of the page the run is on, empty when it cannot be read.
+func pageHost(ctx context.Context) (string, error) {
+	loc, err := chromedp.Run(ctx, chromedp.Location())
+	if err != nil {
+		return "", err
+	}
+	u, err := url.Parse(loc)
+	if err != nil {
+		return "", nil
+	}
+	return u.Hostname(), nil
 }
