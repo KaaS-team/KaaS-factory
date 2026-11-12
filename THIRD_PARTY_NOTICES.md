@@ -55,6 +55,13 @@ Source: https://github.com/owainlewis/agent-skills (MIT, Copyright (c) 2026 Owai
 
 Referenced, not copied: the herdr-issue-coordinator merge-gate checklist (`skills/herdr-issue-coordinator/SKILL.md:209-226`) informed `src/merge-policy.ts`'s ten named refusal reasons; see that file's own header for the deviation note.
 
+## ossf/scorecard@4ddc782c70ebba1d65f0dd1b3470f24ed4ea18b1
+
+Source: https://github.com/ossf/scorecard (Apache-2.0, Copyright OpenSSF Scorecard Authors)
+
+- `internal/firstrun/sarif/annotations.go` from `config/annotations.go` [no upstream test]
+- `internal/firstrun/sarif/sarif.go` from `pkg/scorecard/sarif.go` (result, rule and level shapes) [no upstream test]
+
 ## License text (both projects)
 
 MIT License
