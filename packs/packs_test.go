@@ -18,7 +18,7 @@ const (
 	skillsDir    = "../template/.claude/skills"
 )
 
-var wantPacks = []string{"dep-upgrade", "framework-upgrade", "migration", "coverage-ramp", "bugfix", "review-only", "onboarding"}
+var wantPacks = []string{"dep-upgrade", "framework-upgrade", "migration", "coverage-ramp", "bugfix", "review-only", "onboarding", "sustain-retest", "design-to-pr"}
 
 // blueprintPins lists skills the blueprint pins that are not in the template. None yet.
 var blueprintPins = []string{}
@@ -55,7 +55,7 @@ func load(t *testing.T, name string) (*graph.Graph, string) {
 	return g, string(data)
 }
 
-func TestSevenPacksLoadThroughGraph(t *testing.T) {
+func TestAllPacksLoadThroughGraph(t *testing.T) {
 	all, err := graph.LoadDir(workflowsDir)
 	if err != nil {
 		t.Fatal(err)

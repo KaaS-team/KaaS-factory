@@ -1,0 +1,38 @@
+# Use for the monthly Sustain re-test of a client's repo and AI solutions: re-audit against the last
+# report, run each solution's eval command from repo config, write the client report from both
+# outputs, have a fresh session check it, and park for a person to sign it off.
+name: sustain-retest
+steps:
+  reaudit:
+    uses: check
+    label: "factory:reauditing"
+    run: |
+      mkdir -p .factory
+      auditor reaudit --json > .factory/reaudit.json
+    next: evals
+  evals:
+    uses: check
+    label: "factory:evaluating"
+    run: |
+      mkdir -p .factory
+      : > .factory/evals.txt
+      jq -r '.solutions[]? | "\(.name)\t\(.eval)"' .factory/config.json | while IFS="$(printf '\t')" read -r name cmd; do
+        if sh -c "$cmd" > ".factory/eval-$name.log" 2>&1; then r=pass; else r=fail; fi
+        printf '%s\t%s\n' "$name" "$r" >> .factory/evals.txt
+      done
+    next: report
+  report:
+    uses: report
+    label: "factory:reporting"
+    tier: large
+    budget: 400000
+    skills: [factory-comment]
+    prompt: |
+      Write this month's client report for {{ issue.title }} from .factory/reaudit.json and
+      .factory/evals.txt, and nothing else. Use these sections in order:
+      Summary, Repo re-audit (what changed since the last report), AI solutions (one line per
+      solution: eval passed or failed, and what moved), Recommended next steps.
+      Plain sentences for a client. Leave out how the run was done: no run figures of any kind.
+    next: verify
+  verify: { uses: verify, label: "factory:verifying", next: signoff, reject: report, tier: large, budget: 300000, skills: [factory-verify] }
+  signoff: { uses: human, label: "factory:awaiting-signoff", after: 72h }
