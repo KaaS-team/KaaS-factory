@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -344,4 +345,45 @@ done
 		t.Fatal(err)
 	}
 	wait(t, d, s)
+}
+
+// An abort that lands as the process exits 0 must not turn the clean exit into ErrStuck; a kill
+// that did the ending still does.
+func TestAbortDoesNotReplaceCleanExit(t *testing.T) {
+	stuck := fmt.Errorf("%w: test", ErrStuck)
+	for i := 0; i < 20; i++ { // the exit and the abort's cancel race
+		ctx, cancel := context.WithCancel(context.Background())
+		cmd := exec.CommandContext(ctx, "sh", "-c", "exit 0")
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		go cancel()
+		err := exitErr(cmd.Wait(), cmd.ProcessState, stuck)
+		cancel()
+		if cmd.ProcessState.Success() && err != nil {
+			t.Fatalf("exit 0 became %v", err)
+		}
+		if !cmd.ProcessState.Success() && !errors.Is(err, ErrStuck) {
+			t.Fatalf("killed run became %v, want ErrStuck", err)
+		}
+	}
+	// The kill lands after the exit: Wait reports the cancelled context for a process that exited 0.
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd := exec.CommandContext(ctx, "sh", "-c", "exit 0")
+	cmd.Cancel = func() error { return nil }
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+	if err := exitErr(cmd.Wait(), cmd.ProcessState, stuck); err != nil {
+		t.Fatalf("exit 0 before the kill: %v, want nil", err)
+	}
+	for _, sc := range []string{"kill -9 $$", "exit 1"} { // the abort did the ending
+		bad := exec.Command("sh", "-c", sc)
+		werr := bad.Run()
+		if err := exitErr(werr, bad.ProcessState, stuck); !errors.Is(err, ErrStuck) {
+			t.Fatalf("%s: %v, want ErrStuck", sc, err)
+		}
+	}
 }

@@ -269,16 +269,26 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 				cancel()
 			}
 		}
-		p.err = cmd.Wait()
-		if stuckErr != nil {
-			p.err = stuckErr
-		}
+		p.err = exitErr(cmd.Wait(), cmd.ProcessState, stuckErr)
 		_ = killGroup(cmd) // anything the agent left behind
 		p.end = d.cfg.Now()
 		cancel()
 		close(p.done)
 	}()
 	return session(p), nil
+}
+
+// exitErr is a run's result. An abort replaces the exit error only when the kill did the ending: a
+// process that exited 0 before the kill took effect was a clean exit, and Wait reports the
+// cancelled context for it all the same.
+func exitErr(waitErr error, ps *os.ProcessState, stuckErr error) error {
+	if stuckErr == nil || (ps != nil && ps.Success()) {
+		if stuckErr != nil {
+			return nil
+		}
+		return waitErr
+	}
+	return stuckErr
 }
 
 // command builds the agent process. With Sandbox set it is the jail helper, which applies the
