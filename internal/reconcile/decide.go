@@ -1,5 +1,5 @@
 // Package reconcile is the orchestrator's brain: a pure Decide that turns the
-// state and the observations into actions, and a Run loop that applies them
+// state and the observations into actions, and a Tick pass that applies them
 // through the api ports. Completion is read from observations (branch, report
 // and PR), never from session status.
 package reconcile
@@ -42,9 +42,7 @@ func (c Config) withDefaults() Config {
 	return c
 }
 
-// Backoff is the wait before retrying after failed attempt n: min(10s*2^(n-1), 5m) (Symphony 8.4).
-func Backoff(n int) time.Duration { return backoffCap(n, 5*time.Minute) }
-
+// backoffCap is the wait before retrying after failed attempt n: min(10s*2^(n-1), limit) (Symphony 8.4).
 func backoffCap(n int, limit time.Duration) time.Duration {
 	d := 10 * time.Second
 	for i := 1; i < n && d < limit; i++ {

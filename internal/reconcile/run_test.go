@@ -2,7 +2,6 @@ package reconcile
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"sort"
 	"sync/atomic"
@@ -134,7 +133,7 @@ func TestTickStallRetryNeedsHuman(t *testing.T) {
 		if state.Entries["a"].Phase != api.PhaseRetryQueue || state.Entries["a"].Attempt != attempt {
 			t.Fatalf("attempt %d: %+v", attempt, state.Entries["a"])
 		}
-		c.t = c.t.Add(Backoff(attempt))
+		c.t = c.t.Add(backoffCap(attempt, 5*time.Minute))
 		Tick(ctx, deps, &state, cf) // redispatched
 		if state.Entries["a"].Attempt != attempt+1 {
 			t.Fatalf("attempt %d not redispatched: %+v", attempt, state.Entries["a"])
@@ -199,24 +198,17 @@ func (g *guard) Observe(c context.Context, id api.TicketID, n int) (api.Observat
 	return g.Observer.Observe(c, id, n)
 }
 
-func TestRunStopsOnCancel(t *testing.T) {
+func TestTickStopsOnCancel(t *testing.T) {
 	for _, cancelAt := range []int32{1, 2, 3, 5} {
 		ctx, cancel := context.WithCancel(context.Background())
 		tr := activeTracker{porttest.NewTracker(tkt("a"), tkt("b"))}
 		g := &guard{Tracker: tr, Observer: porttest.NewObserver(), Dispatcher: porttest.NewDispatcher(2), ctx: ctx, cancelAt: cancelAt, cancel: cancel}
-		cf := cfg()
-		cf.Tick = time.Millisecond
-		done := make(chan error, 1)
-		go func() {
-			done <- Run(ctx, Deps{Dispatcher: g, Tracker: g, Observer: g}, cf)
-		}()
-		select {
-		case err := <-done:
-			if !errors.Is(err, context.Canceled) {
-				t.Fatalf("cancelAt %d: err %v", cancelAt, err)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatalf("cancelAt %d: Run did not stop", cancelAt)
+		var state *State
+		for range 4 {
+			Tick(ctx, Deps{Dispatcher: g, Tracker: g, Observer: g}, &state, cfg())
+		}
+		if ctx.Err() == nil {
+			t.Fatalf("cancelAt %d: never reached", cancelAt)
 		}
 		if g.late.Load() != 0 {
 			t.Fatalf("cancelAt %d: %d port calls after cancel", cancelAt, g.late.Load())
@@ -224,13 +216,12 @@ func TestRunStopsOnCancel(t *testing.T) {
 	}
 }
 
-func TestRunCancelledBeforeStartMakesNoCall(t *testing.T) {
+func TestTickCancelledBeforeStartMakesNoCall(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	g := &guard{Tracker: activeTracker{porttest.NewTracker(tkt("a"))}, Observer: porttest.NewObserver(), Dispatcher: porttest.NewDispatcher(1), ctx: ctx}
-	if err := Run(ctx, Deps{Dispatcher: g, Tracker: g, Observer: g}, cfg()); !errors.Is(err, context.Canceled) {
-		t.Fatal(err)
-	}
+	var state *State
+	Tick(ctx, Deps{Dispatcher: g, Tracker: g, Observer: g}, &state, cfg())
 	if g.calls.Load() != 0 {
 		t.Fatalf("%d calls", g.calls.Load())
 	}

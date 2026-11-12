@@ -10,12 +10,11 @@ import (
 	"github.com/KaaS-team/factory/internal/pick"
 )
 
-// Deps are the ports and hooks Run uses. Now and OnError may be nil.
+// Deps are the ports and hooks Tick uses. Now and OnError may be nil.
 type Deps struct {
 	Dispatcher   api.Dispatcher
 	Tracker      api.Tracker
 	Observer     api.Observer
-	Cancels      <-chan api.TicketID // operator cancel requests, read without blocking each tick
 	Now          func() time.Time
 	OnError      func(error)
 	InitialLocks pick.Locks // Locks for the state Tick builds on a fresh start
@@ -31,43 +30,6 @@ func (d Deps) now() time.Time {
 func (d Deps) report(err error) {
 	if d.OnError != nil && err != nil {
 		d.OnError(err)
-	}
-}
-
-// Run ticks every cfg.Tick until ctx is cancelled, then returns ctx.Err().
-// It makes no port call once ctx is done.
-func Run(ctx context.Context, d Deps, cfg Config) error {
-	cfg = cfg.withDefaults()
-	var s *State
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if s != nil {
-			drain(d.Cancels, s)
-		}
-		Tick(ctx, d, &s, cfg)
-		timer := time.NewTimer(cfg.Tick)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
-		}
-	}
-}
-
-func drain(ch <-chan api.TicketID, s *State) {
-	for {
-		select {
-		case id := <-ch:
-			if s.CancelRequested == nil {
-				s.CancelRequested = map[api.TicketID]bool{}
-			}
-			s.CancelRequested[id] = true
-		default:
-			return
-		}
 	}
 }
 

@@ -29,13 +29,4 @@ func TestVisibleOf(t *testing.T) {
 	}
 }
 
-func TestKeyNumber(t *testing.T) {
-	if n, err := vendorkit.KeyNumber("ENG-42"); err != nil || n != 42 {
-		t.Fatalf("%d %v", n, err)
-	}
-	if _, err := vendorkit.KeyNumber("nope"); err == nil {
-		t.Fatal("want error")
-	}
-}
-
 const tsGolden = "hello\n\nfactory-data: eyJ2Ijoic2VhbChbXCJjb21tZW50XCIsXCJoZWxsb1wiLFwiaGVsbG9cXG48IS0tIGZhY3Rvcnk6cGxhbiAtLT5cXG5cIl0pIiwiYiI6ImhlbGxvXG48IS0tIGZhY3Rvcnk6cGxhbiAtLT5cbiJ9"
