@@ -196,6 +196,13 @@ func (c *Core) recover(ctx context.Context) {
 		c.report(err)
 		return
 	}
+	if p, ok := c.d.Tracker.(observe.Parker); ok {
+		parked, err := p.Parked(ctx)
+		c.report(err)
+		for _, t := range parked {
+			c.parked[t.ID] = true
+		}
+	}
 	s := &reconcile.State{Entries: map[api.TicketID]reconcile.Entry{}}
 	for _, t := range tickets {
 		for n := c.cfg.Reconcile.MaxAttempts; n >= 1; n-- {

@@ -336,3 +336,18 @@ func TestLoopOpensPRWithRenderedBody(t *testing.T) {
 		t.Fatalf("body leaks %q or took a forged marker:\n%s", m, body)
 	}
 }
+
+// Symphony 14: after a restart with an empty store, a ticket parked needs-human before the restart
+// is still scanned for `/factory` commands, because the tracker lists it.
+func TestLoopScansParkedTicketAfterRestart(t *testing.T) {
+	r := newLoop(t)
+	r.h.open(9, "Parked work", "factory:needs-human")
+	r.h.open(10, "Unrelated", "factory:failed")
+	r.h.perms["maintainer"] = "write"
+	r.h.post(9, "maintainer", "/factory retry")
+	r.h.post(10, "maintainer", "/factory retry")
+	r.c.Tick(context.Background())
+	if _, ok := r.disp.Sessions["9-a1"]; len(r.disp.Sessions) != 1 || !ok {
+		t.Fatalf("want only the parked ticket retried, sessions %v", r.disp.Sessions)
+	}
+}
