@@ -180,9 +180,9 @@ func TestGitHubSourceAgainstLocalServer(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/releases/latest":
-			fmt.Fprint(w, `{"tag_name":"v2.0.0"}`)
+			_, _ = fmt.Fprint(w, `{"tag_name":"v2.0.0"}`)
 		case "/dl/v2.0.0/checksums.txt":
-			fmt.Fprintf(w, "%s  %s\n", sum(a), n)
+			_, _ = fmt.Fprintf(w, "%s  %s\n", sum(a), n)
 		case "/dl/v2.0.0/" + n:
 			_, _ = w.Write(a)
 		default:

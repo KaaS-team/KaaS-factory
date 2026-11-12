@@ -147,7 +147,7 @@ func (a *App) Token(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("request installation token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponse))
 	if err != nil {
 		return "", err

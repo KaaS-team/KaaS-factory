@@ -163,7 +163,7 @@ func extractBinary(archive []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open release archive: %w", err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	tr := tar.NewReader(gz)
 	for {
 		h, err := tr.Next()
@@ -197,21 +197,21 @@ func replaceExecutable(path string, bin []byte) error {
 		return fmt.Errorf("create update beside %s: %w", resolved, err)
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 	mode := info.Mode().Perm()
 	if mode&0o111 == 0 {
 		mode = 0o755
 	}
 	if err := tmp.Chmod(mode); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("set update permissions: %w", err)
 	}
 	if _, err := tmp.Write(bin); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("write update: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return fmt.Errorf("sync update: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
@@ -274,7 +274,7 @@ func (g GitHubSource) get(ctx context.Context, url string, limit int64) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("%s returned %s", url, resp.Status)
 	}

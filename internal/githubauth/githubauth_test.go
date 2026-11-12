@@ -96,7 +96,7 @@ func TestTokenCacheRefreshWindow(t *testing.T) {
 			t.Errorf("bad request %s %s", r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]any{"token": "tok" + string(rune('0'+n)), "expires_at": expiry})
+		_ = json.NewEncoder(w).Encode(map[string]any{"token": "tok" + string('0'+n), "expires_at": expiry})
 	}))
 	defer srv.Close()
 	a := &App{ID: 1, InstallationID: 77, PrivateKeyPEM: pemBytes, APIBase: srv.URL, Now: func() time.Time { return now }}
