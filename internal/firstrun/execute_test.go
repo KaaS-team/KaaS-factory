@@ -170,3 +170,47 @@ func TestScorecardMissingActualIsNotMeasured(t *testing.T) {
 		})
 	}
 }
+
+// TestPRBodySeparatesEnvironmentFromTestFailure: advisory classification of the session log (Symphony §14.3 keeps the run counted).
+func TestPRBodySeparatesEnvironmentFromTestFailure(t *testing.T) {
+	red, green := false, true
+	tests := []struct {
+		name    string
+		log     string
+		logErr  error
+		green   *bool
+		want    []string
+		notWant []string
+	}{
+		{"environment failure", "Cannot allocate memory", nil, &red, []string{"environment failure (out_of_memory)"}, []string{"Tests failed"}},
+		{"ambiguous", "ModuleNotFoundError", nil, &red, []string{"possible environment failure (missing_module)", "Tests failed"}, nil},
+		{"tests failed, clean log", "--- FAIL: TestX", nil, &red, []string{"Tests failed"}, []string{"nvironment failure"}},
+		{"green", "ok", nil, &green, nil, []string{"Tests failed", "nvironment failure"}},
+		{"log unreadable is not an environment claim", "", errors.New("gone"), &red, []string{"Tests failed"}, []string{"nvironment failure"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prs := &fakePRs{}
+			obs := porttest.NewObserver()
+			obs.Obs["first-run-low"] = api.Observation{ChecksGreen: tc.green}
+			_, err := Execute(context.Background(), report2(row("low", "low", 1, "S")), Exec{
+				Dispatcher: porttest.NewDispatcher(1), PRs: prs, Observer: obs,
+				Log: func(context.Context, api.Session) (string, error) { return tc.log, tc.logErr },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := prs.calls[0].Body
+			for _, w := range tc.want {
+				if !strings.Contains(body, w) {
+					t.Errorf("body lacks %q:\n%s", w, body)
+				}
+			}
+			for _, w := range tc.notWant {
+				if strings.Contains(body, w) {
+					t.Errorf("body has %q:\n%s", w, body)
+				}
+			}
+		})
+	}
+}
