@@ -115,3 +115,9 @@ Source: https://github.com/block/goose (Apache-2.0, Copyright Block, Inc.)
 Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors)
 
 - `internal/packs/triggers.go` from `openhands-sdk/openhands/sdk/skills/skill.py` (path glob, keyword match, trigger selection) [tested by `internal/packs/triggers_test.go`]
+
+## SWE-agent/mini-swe-agent@04d809c
+
+Source: https://github.com/SWE-agent/mini-swe-agent (MIT, Copyright (c) 2025 Kilian A. Lieret and Carlos E. Jimenez). The licence text is the MIT text above.
+
+- `internal/eval/bare.go` from `src/minisweagent/agents/default.py` and the submission sentinel of `environments/local.py` [tested by `internal/eval/bare_test.go`]
