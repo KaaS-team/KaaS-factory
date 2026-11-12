@@ -90,3 +90,10 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## ast-grep/ast-grep@c7e005c
+
+Source: https://github.com/ast-grep/ast-grep (MIT, Copyright (c) 2022 Herrington Darkholme). Only field lists and output formats were read; no Rust was ported. The release binary is pinned by checksum, not vendored.
+
+- `internal/packs/astgrep/astgrep.go` from `crates/cli/src/print/json_print.rs` [tested by `internal/packs/astgrep/astgrep_test.go`]
+- `internal/packs/astgrep/pack.go` from `crates/config/src/rule_config.rs` and `crates/cli/src/verify/reporter.rs` [tested by `internal/packs/astgrep/pack_test.go`]
