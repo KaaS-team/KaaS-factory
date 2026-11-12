@@ -86,7 +86,7 @@ func ParseYAML(name string, data []byte) (*Graph, error) {
 	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("workflow_front_matter_not_a_map: %s", name)
 	}
-	return build(name, root.Content[0], "steps", "")
+	return build(name, root.Content[0], "steps", "", ValidateTemplate)
 }
 
 // ParseMarkdown parses a .md workflow. Front matter with a stages key is the factory stages format;
@@ -121,7 +121,7 @@ func ParseMarkdown(name string, data []byte) (*Graph, error) {
 		m = root.Content[0]
 	}
 	if m != nil && child(m, "stages") != nil {
-		return build(name, m, "stages", body)
+		return build(name, m, "stages", body, ValidateTemplate)
 	}
 	return symphony(name, m, body)
 }
@@ -157,7 +157,9 @@ type namedStep struct {
 	step
 }
 
-func build(name string, m *yaml.Node, key, body string) (*Graph, error) {
+// build turns the steps (key "steps" or "nodes") or stages of a mapping into a graph. check validates every
+// node prompt template.
+func build(name string, m *yaml.Node, key, body string, check func(string) error) (*Graph, error) {
 	g := &Graph{Name: name, Prompt: body}
 	var top struct {
 		Name string `yaml:"name"`
@@ -199,7 +201,7 @@ func build(name string, m *yaml.Node, key, body string) (*Graph, error) {
 	}
 	md := key == "stages"
 	for _, s := range steps {
-		if err := g.addStep(s, md); err != nil {
+		if err := g.addStep(s, md, check); err != nil {
 			return nil, fmt.Errorf("%s: %w", g.Name, err)
 		}
 	}
@@ -216,7 +218,7 @@ func build(name string, m *yaml.Node, key, body string) (*Graph, error) {
 	return g, nil
 }
 
-func (g *Graph) addStep(s namedStep, md bool) error {
+func (g *Graph) addStep(s namedStep, md bool, check func(string) error) error {
 	kind, ok := stepTypes[s.Uses]
 	if !ok {
 		return fmt.Errorf("step %s: unknown step type %q", s.id, s.Uses)
@@ -237,7 +239,7 @@ func (g *Graph) addStep(s namedStep, md bool) error {
 	n.Verify = n.Verify || s.Uses == "verify"
 	n.FreshSession = n.Verify || (s.FreshSession != nil && *s.FreshSession)
 	if n.Prompt != "" {
-		if err := ValidateTemplate(n.Prompt); err != nil {
+		if err := check(n.Prompt); err != nil {
 			return fmt.Errorf("step %s: %w", s.id, err)
 		}
 	}

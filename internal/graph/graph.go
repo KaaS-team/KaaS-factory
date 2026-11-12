@@ -72,8 +72,15 @@ type Graph struct {
 	Prompt string
 	// Config holds the front matter of a Symphony-style WORKFLOW.md, unchanged.
 	Config map[string]any
-	nodes  []Node
-	edges  []Edge
+	// On, Agent, ModelTier, Budget and SafeOutputs come from the front matter of a markdown workflow
+	// loaded with LoadMarkdown. Budget is in dollars. SafeOutputs is empty when the file lists none.
+	On          Trigger
+	Agent       string
+	ModelTier   string
+	Budget      float64
+	SafeOutputs []WriteKind
+	nodes       []Node
+	edges       []Edge
 }
 
 // Nodes returns the nodes in file order.
