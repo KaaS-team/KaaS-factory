@@ -94,6 +94,8 @@ type cachedRole struct {
 // is not enough, since a read-only collaborator is a COLLABORATOR too.
 type Trust struct {
 	self   string
+	kindOf KindOf
+	bots   string
 	roleOf func(ctx context.Context, login string) (Role, error)
 	now    func() time.Time
 	mu     sync.Mutex
@@ -106,13 +108,25 @@ func NewTrust(self string, roleOf func(ctx context.Context, login string) (Role,
 	return &Trust{self: self, roleOf: roleOf, now: now, cache: map[string]cachedRole{}}
 }
 
-// Trusted reports whether login is the runner or has write access or higher.
+// WithActors makes Trusted also require a human account, or a bot on the allowedBots list.
+func (t *Trust) WithActors(kindOf KindOf, allowedBots string) *Trust {
+	t.kindOf, t.bots = kindOf, allowedBots
+	return t
+}
+
+// Trusted reports whether login is the runner or has write access or higher, and, once
+// WithActors is set, a human or an allow-listed bot.
 func (t *Trust) Trusted(ctx context.Context, login string) bool {
 	if login == "" {
 		return false
 	}
-	if t.self != "" && login == t.self {
+	if t.self != "" && SameLogin(login, t.self) {
 		return true
+	}
+	if t.kindOf != nil {
+		if ok, err := CheckActor(ctx, t.kindOf, login, t.bots); err != nil || !ok {
+			return false
+		}
 	}
 	t.mu.Lock()
 	hit, ok := t.cache[login]
@@ -135,6 +149,9 @@ func (t *Trust) Trusted(ctx context.Context, login string) bool {
 // so a read-only collaborator's text never becomes a command or an answer.
 func (t *Trust) Command(ctx context.Context, c Comment) (Command, bool) {
 	if strings.Contains(c.Body, "<!-- factory:") || !t.Trusted(ctx, c.Author) {
+		return Command{}, false
+	}
+	if c.Actor != "" && !(Event{Kind: EvComment, Action: "edited", Actor: c.Actor, Author: c.Author}).Fires(TriggerConfig{}) {
 		return Command{}, false
 	}
 	return ParseChatOps(c.Body), true

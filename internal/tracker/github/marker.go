@@ -9,8 +9,10 @@ import (
 
 // Comment is one issue comment as the codec and trust rules see it.
 type Comment struct {
-	ID        int64
-	Author    string
+	ID     int64
+	Author string
+	// Actor is who last created or edited the comment when that is known; empty means the author.
+	Actor     string
 	Body      string
 	CreatedAt time.Time
 }

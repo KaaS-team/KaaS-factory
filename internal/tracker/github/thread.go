@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -53,7 +54,7 @@ func (t *Tracker) trust(ctx context.Context) (*Trust, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.trusted == nil {
-		t.trusted = NewTrust(self, t.role, t.clock)
+		t.trusted = NewTrust(self, t.role, t.clock).WithActors(t.kindOf, t.bots)
 	}
 	return t.trusted, nil
 }
@@ -68,6 +69,15 @@ func (t *Tracker) role(ctx context.Context, login string) (Role, error) {
 		return Role(name), nil
 	}
 	return Role(lv.GetPermission()), nil
+}
+
+// kindOf reads a login's account type. A 404 means an App with no user account.
+func (t *Tracker) kindOf(ctx context.Context, login string) (string, error) {
+	u, resp, err := t.client.Users.Get(ctx, login)
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
+		return "", ErrNoSuchUser
+	}
+	return u.GetType(), err
 }
 
 // thread returns the issue's comments oldest first. A comment with a factory marker counts only
