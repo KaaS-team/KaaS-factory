@@ -306,3 +306,24 @@ func TestGitWorktreesAddsABranchFromTheBase(t *testing.T) {
 		t.Error("option-shaped branch accepted")
 	}
 }
+
+// Stall hook: a run whose stream shows the same failing tool call three times reads as stalled.
+func TestStalledReadsRepeatedFailingToolCallsFromTheStream(t *testing.T) {
+	d, _ := newLocal(t, `for i in 1 2 3; do
+echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t'$i'","name":"Bash","input":{"command":"make"}}]}}'
+echo '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t'$i'","is_error":true}]}}'
+done
+`, []string{"PATH=" + os.Getenv("PATH")})
+	s, err := d.Dispatch(context.Background(), bf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait(t, d, s)
+	got, err := d.Stalled(s)
+	if err != nil || !got {
+		t.Fatalf("Stalled = %v, %v; want true", got, err)
+	}
+	if _, err := d.Stalled(api.Session{Key: "nope"}); err == nil {
+		t.Error("unknown session: want error")
+	}
+}

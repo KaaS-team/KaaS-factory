@@ -1,0 +1,12 @@
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "c0", "name": "Read", "input": {"path": "a.go"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c0", "is_error": false, "content": "x"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "c1", "name": "Edit", "input": {"path": "a.go", "new": "x"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c1", "is_error": false, "content": "x"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "c2", "name": "Bash", "input": {"command": "go test"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c2", "is_error": true, "content": "x"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "c3", "name": "Read", "input": {"path": "b.go"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c3", "is_error": false, "content": "x"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "c4", "name": "Edit", "input": {"path": "b.go", "new": "y"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c4", "is_error": false, "content": "x"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "c5", "name": "Bash", "input": {"command": "go test"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c5", "is_error": false, "content": "x"}]}}

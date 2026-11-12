@@ -18,6 +18,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
+	"github.com/KaaS-team/factory/internal/dispatch/stall"
 	"github.com/KaaS-team/factory/pkg/sandbox"
 )
 
@@ -76,6 +77,7 @@ type process struct {
 	err    error // set before done closes
 	start  time.Time
 	usage  usageState
+	turns  stall.Log
 	end    time.Time
 }
 
@@ -225,6 +227,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
 		for sc.Scan() {
 			p.usage.feed(sc.Bytes())
+			p.turns.Feed(sc.Bytes())
 		}
 		p.err = cmd.Wait()
 		_ = killGroup(cmd) // anything the agent left behind
@@ -308,6 +311,18 @@ func (d *Dispatcher) Usage(_ context.Context, s api.Session) (api.Usage, error) 
 		u.WallTime = d.cfg.Now().Sub(p.start)
 	}
 	return u, nil
+}
+
+// Stall windows: a run is stalled when its newest tool call repeated or errored 3 times in its last 8.
+const stallWindow, stallThreshold = 8, 3
+
+// Stalled reports whether the run's recent tool calls look stuck in a loop or a run of errors.
+func (d *Dispatcher) Stalled(s api.Session) (bool, error) {
+	p, err := d.run(s)
+	if err != nil {
+		return false, err
+	}
+	return p.turns.Stalled(stallWindow, stallThreshold), nil
 }
 
 type tokenUsage struct {
