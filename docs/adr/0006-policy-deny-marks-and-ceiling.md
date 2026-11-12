@@ -39,7 +39,7 @@ The org level itself is not checked against marks. The org sets its own values.
 ## Consequences
 
 - An org can make a rule a fixed floor (`hard`) or a floor that one named person can lower (`soft`),
-  and `factory explain` can print which kind holds a marked rule.
+  and `factory config explain` can print which kind holds a marked rule.
 - A refusal is a sentence in `problems`; the value is not applied, and the rest of the file still
   loads.
 - A lifted soft rule takes the team's value as written, so the team's own approver is the only check

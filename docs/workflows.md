@@ -3,7 +3,7 @@
 An issue runs a workflow: named steps, each a built-in step type, the label it holds while it runs,
 and where it goes next. `config.workflow` names it (default `feature-to-pr`). The runner reads
 `.factory/workflows/<name>.yml` from the repo, else its own copy in
-`template/.factory/workflows/`. A file that does not parse stops `factory watch` at boot, and
+`template/.factory/workflows/`. A file that does not parse stops `factory run` at boot, and
 `factory doctor` lists every problem.
 
 ## The library, and a workflow per issue type
@@ -20,7 +20,7 @@ The runner ships these. Each one stops a bad output at a different rung:
 | `dependency-update` | triage, build, verify, pr | verify rejects a bump the tests do not cover; files itself weekly |
 | `security-audit` | triage, plan, build, verify, pr | every plan parks for a person; files itself daily |
 | `flaky-tests` | triage, build, verify, pr | verify rejects a fix that is not stable; files itself weekly |
-| `pr-review` | triage, review (plan), report | no PR: findings go on the issue, filed per `factory.pr.opened` event |
+| `pr-review` | triage, review (plan), report | no PR: findings go on the issue, filed |
 | `test-authoring` | triage, plan, build, verify, pr | the unit gate on build; verify rejects a test that covers nothing |
 | `coverage-gap` | triage, build, verify, pr | the unit gate; files itself weekly |
 | `ci-fix` | triage, build, verify, pr | lint and unit gates on build, then verify |
@@ -44,22 +44,7 @@ new one until a maintainer closes it.
 filed with. At pickup the runner comments which workflow it chose and records it on the thread, so a
 restart or another machine resumes the same one. Only the first choice in a trusted comment counts,
 so a marker someone pastes later cannot move an issue off a workflow that parks every plan. An issue whose type names none runs
-`config.workflow`. Every named workflow loads at boot, so a typo stops `factory watch`.
-
-`factory harness validate` loads every workflow file, the repo's and the runner's, and every one the
-config names, and exits 4 on a problem. `factory harness inventory` lists each one's steps, cron
-triggers and the types routed to it. `factory harness scaffold <name>` writes a starting
-`.factory/workflows/<name>.md` (the five stages, a risky plan parks, build held to lint and unit
-gates) and never overwrites one the repo has. `factory harness eval [--since <days>]` scores each
-workflow from the event log: runs, outcomes, shipped rate, the steps that failed and the cost of its
-issues (default the last 30 days).
-
-`factory teach "<how we ship>"` runs one agent in a fresh clone. It reads the code, the CI in
-`.github/workflows/` and, when `.factory/mcp.json` names a `brain` server, the company brain. Its
-answer is a set of workflows, minions and skills. Each file is checked with the parser the watcher
-uses, and the set opens as one PR on a `factory/teach-*` branch. A file outside
-`.factory/workflows/`, `.factory/minions/` or `.claude/skills/`, or one that does not load, opens
-no PR.
+`config.workflow`. Every named workflow loads at boot, so a typo stops `factory run`.
 
 A repo needs no `.claude/` config to run. Before each stage the runner puts every factory skill and
 subagent the repo lacks where the agent reads skills, taken from the runner's `template/`, and lists
@@ -76,7 +61,6 @@ them in the worktree's git exclude so no PR carries them. A skill or subagent th
 | `reject` | where a rejection goes; required on `verify` |
 | `revise` | where `/factory revise` goes when the issue is parked on this step's label |
 | `run` | a `check` step's shell command; exit 0 moves on, anything else parks the issue as failed |
-| `runtime` | where a `check` step's command runs, by name ([runtimes.md](runtimes.md)); default `runtime.check` in config, else `local` |
 | `mcp` | MCP server names from `.factory/mcp.json` this step's agent may use; not on a `check` step |
 
 An edge is `{ to: <step> }` or `{ park: awaiting-approval, approve: <step>, revise: <step> }`,
@@ -99,9 +83,9 @@ comment does not. Every park edge of one step takes the same `after:`.
 
 `limits.questions` caps needs-info rounds and `limits.rejects` caps rejections (both default 2).
 
-## `on:` schedules and events
+## `on:` schedules
 
-A workflow can file its own issues on a schedule, on an event, or both:
+A workflow can file its own issues on a schedule:
 
 ```yaml
 on:
@@ -115,15 +99,6 @@ on:
 At the matching minute the watcher files an issue labelled `factory:ready`, which the workflow then
 runs like any other. A poll that skipped past the minute catches up for up to an hour, and while an
 issue from the same trigger is still open no new one is filed.
-
-```yaml
-on:
-  event: wiki.page.updated       # one type from docs/events.md, or a list
-```
-
-Each event files one issue per event id with the event data in its body; a redelivered event files
-nothing new. A factory event's issue is `factory:ready`. Another app's event files it unlabelled, for
-a maintainer to read and label (see [events.md](events.md)).
 
 ## `mcp:` servers per step
 

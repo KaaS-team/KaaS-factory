@@ -27,7 +27,7 @@ A repo belongs to at most one team. `applyTeam` refuses a repo that two team fil
 Gates are not team fields: they stay in the repo's own `.factory/config.json`.
 
 Teams are config, not code, so a change to a team is a change to a tracked file, and
-`factory explain` can print the level that set each key.
+`factory config explain` can print the level that set each key.
 
 ## Consequences
 
@@ -40,4 +40,4 @@ Teams are config, not code, so a change to a team is a change to a tracked file,
 - Keep every rule in the repo's single config file. Rejected: one file cannot hold an org default
   that several repos share.
 - Store rules in the tracker or a database. Rejected: a rule change would not appear in the repo's
-  history or in `factory explain`.
+  history or in `factory config explain`.
