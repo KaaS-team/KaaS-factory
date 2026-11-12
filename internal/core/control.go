@@ -58,6 +58,9 @@ func (c *Core) firesLeft() int {
 func (c *Core) admit(ctx context.Context, id api.TicketID) error {
 	th, ok := c.d.Tracker.(meter.Thread)
 	if !ok {
+		if c.cfg.SessionCap > 0 { // a cap that cannot be read must not fail open
+			return fmt.Errorf("core: session cap is set but tracker %T cannot return the spend ledger", c.d.Tracker)
+		}
 		return nil
 	}
 	return spendcap.Gate{Thread: th, Holder: c.cfg.Team, USD: c.cfg.SessionCap}.Allow(ctx, id)
