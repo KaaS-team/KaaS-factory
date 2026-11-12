@@ -1,6 +1,6 @@
 # Two teams, two resolutions
 
-This walkthrough sets up two team files in one repo and shows how `factory explain` reports which
+This walkthrough sets up two team files in one repo and shows how `factory config explain` reports which
 file set each value. The rules are in [ADR 0001](../adr/0001-team-model.md) and
 [ADR 0002](../adr/0002-resolution-rules.md).
 
@@ -33,11 +33,10 @@ file set each value. The rules are in [ADR 0001](../adr/0001-team-model.md) and
        model: sonnet
    ```
 
-3. Ask which file set each key. `explain` needs the issue to exist on GitHub, so run it on a real
-   issue number.
+3. Ask which file set each key. `factory config explain` takes the key.
 
    ```
-   factory explain <N> --repo <owner/name>
+   factory config explain <key>
    ```
 
    The lines for the two policy keys above, produced by the same resolver on a scratch copy of these

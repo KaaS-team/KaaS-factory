@@ -30,7 +30,7 @@ Preferences (`model`, `workflow`, `labels`, `timeouts`) are not ceilings: the mo
 
 ## Consequences
 
-- A team cannot raise a limit the org set. `factory explain` shows `policy.risk_max = "medium" (org)`
+- A team cannot raise a limit the org set. `factory config explain` shows `policy.risk_max = "medium" (org)`
   when a team asks for `high`.
 - A stage row can be matched to the exact config it ran with.
 - A preference set at the repo level overrides the team's, and the explain output names the repo.

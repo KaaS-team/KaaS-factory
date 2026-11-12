@@ -74,7 +74,6 @@ layers may lower a limit but never raise it.
 
 - [docs/config.md](docs/config.md): every config key, generated from the code.
 - [docs/install.md](docs/install.md): install and upgrade.
-- [docs/self-host.md](docs/self-host.md): running the factory yourself.
 - [CONTRIBUTING.md](CONTRIBUTING.md): working on the factory itself.
 
 ## License
