@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -45,7 +47,7 @@ func expandImports(path string, front *yaml.Node) ([]imported, error) {
 			if done[rel] {
 				continue
 			}
-			data, err := os.ReadFile(filepath.Join(root, rel))
+			data, err := readInside(root, rel)
 			if err != nil {
 				return fmt.Errorf("import %s: %w", rel, err)
 			}
@@ -158,14 +160,55 @@ func suggest(got string, allowed map[string]bool) string {
 	return fmt.Sprintf("; did you mean %q?", best)
 }
 
+// secretSubstrings and secretWords are the one list of credential names an agent may not ask for. A
+// substring matches anywhere in the upper-cased name; a word matches one segment between
+// non-alphanumerics, so PAT catches GH_PAT but not PATH.
+var (
+	secretSubstrings = []string{"TOKEN", "SECRET", "PASSWORD", "PASSWD", "APIKEY", "PRIVATEKEY", "CREDENTIAL"}
+	secretWords      = []string{"KEY", "PAT", "PWD", "PASS", "AUTH"}
+)
+
+// writeCredential reports whether a credential name is a write grant: :write, or a secret by name.
+func writeCredential(c string) bool {
+	u := strings.ToUpper(c)
+	if strings.HasSuffix(c, ":write") {
+		return true
+	}
+	for _, s := range secretSubstrings {
+		if strings.Contains(u, s) {
+			return true
+		}
+	}
+	for _, w := range strings.FieldsFunc(u, func(r rune) bool { return (r < 'A' || r > 'Z') && (r < '0' || r > '9') }) {
+		if slices.Contains(secretWords, w) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkNoWriteCredential refuses a write credential on an agent: a name ending in :write, or one that
-// is a bare token, key or secret name. Agents write only through safe outputs.
+// names a secret (writeCredential). Agents write only through safe outputs.
 func checkNoWriteCredential(where string, creds []string) error {
 	for _, c := range creds {
-		u := strings.ToUpper(c)
-		if strings.HasSuffix(c, ":write") || strings.Contains(u, "TOKEN") || strings.Contains(u, "SECRET") || strings.HasSuffix(u, "_KEY") {
+		if writeCredential(c) {
 			return fmt.Errorf("%s asks for write credential %q; an agent writes only through safe_outputs", where, c)
 		}
 	}
 	return nil
+}
+
+// readInside reads rel under root through os.Root, which refuses a symlink that leaves root.
+func readInside(root, rel string) ([]byte, error) {
+	r, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = r.Close() }()
+	f, err := r.Open(rel)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	return io.ReadAll(f)
 }
