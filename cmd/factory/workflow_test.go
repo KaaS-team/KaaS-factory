@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,8 @@ import (
 	"github.com/KaaS-team/factory/internal/api/porttest"
 	"github.com/KaaS-team/factory/internal/config"
 	"github.com/KaaS-team/factory/internal/core"
+	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/graph/checkpoint"
 	"github.com/KaaS-team/factory/internal/meter"
 )
 
@@ -236,5 +239,25 @@ func TestRunRefusesBadWorkflow(t *testing.T) {
 	_, err := workflowGraph(".", "")
 	if err == nil || !strings.Contains(err.Error(), "issue-to-pr.yml") || !strings.Contains(err.Error(), "line 8") || !strings.Contains(err.Error(), "nope") {
 		t.Fatalf("got %v, want the file, line 8 and the variable", err)
+	}
+}
+
+// TestRunSavesWorkflowCheckpoints: `factory run` keeps each ticket's place in its workflow in
+// .factory/cache/checkpoints.db, so a restart resumes there; without the store it leaves no file.
+func TestRunSavesWorkflowCheckpoints(t *testing.T) {
+	tk := api.Ticket{ID: "1", Title: "one", Body: "body", Repo: "a/b"}
+	runStages(t, map[string]string{".factory/config.json": tierConfig}, tk, 0, api.PhaseDone)
+	st, err := checkpoint.Open(checkpointPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	cp, ok, err := st.Latest(context.Background(), string(tk.ID))
+	if err != nil || !ok {
+		t.Fatalf("no checkpoint for ticket %s: ok=%v err=%v", tk.ID, ok, err)
+	}
+	var s struct{ Node string }
+	if err := json.Unmarshal(cp.State, &s); err != nil || s.Node != graph.End {
+		t.Fatalf("latest checkpoint node = %q (err %v), want %q", s.Node, err, graph.End)
 	}
 }
