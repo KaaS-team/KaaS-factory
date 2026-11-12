@@ -1,0 +1,6 @@
+{
+ "query": "query Issue($id: String!) { issue(id: $id) { id number title description state { type } creator { id } createdAt labels { nodes { id name updatedAt } }\n  comments(first: 250) { nodes { id body createdAt user { id } } } } }",
+ "variables": {
+  "id": "ENG-42"
+ }
+}
