@@ -8,6 +8,16 @@ Generated from the command tree. Do not edit by hand.
 
 Plan work into tickets and run them on parallel coding-agent sessions
 
+## factory a2a
+
+`factory a2a [flags]`
+
+Serve the factory as an A2A agent
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--addr` | string | `127.0.0.1:8787` | listen address |
+
 ## factory add
 
 `factory add <repo>#<path>[@ref] [flags]`
@@ -24,6 +34,17 @@ Pin a file from a GitHub repository (MIT or Apache-2.0 only) in factory.lock
 `factory board`
 
 Open the terminal board
+
+## factory browsercheck
+
+`factory browsercheck [flags]`
+
+Run browser steps in headless Chrome and print one FACTORY_GATES line
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--out` | string | `.factory/browser-out` | directory for screenshots |
+| `--steps` | string | `.factory/browser-steps.yaml` | YAML file of browser steps |
 
 ## factory cancel
 
@@ -213,6 +234,17 @@ Run the factory; --headless streams one JSON event per line
 |---|---|---|---|
 | `--headless` | bool | `false` | print one api.Event JSON object per line and nothing else on stdout |
 | `--slots` | int | `0` | number of parallel slots (overrides config) |
+
+## factory serve
+
+`factory serve [flags]`
+
+Run the factory loop as a service with /healthz, /readyz and /events
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--addr` | string | `127.0.0.1:8787` | address for /healthz, /readyz and /events |
+| `--drain` | duration | `30s` | how long to wait for the tick in flight on SIGTERM |
 
 ## factory status
 

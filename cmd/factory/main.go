@@ -12,7 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/KaaS-team/factory/internal/a2a"
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/browsercheck"
 	"github.com/KaaS-team/factory/internal/dashboard"
 	"github.com/KaaS-team/factory/internal/eval"
 	"github.com/KaaS-team/factory/internal/firstrun"
@@ -80,7 +82,7 @@ func mountClients(root *cobra.Command) {
 		}),
 		plancmd.WithFiler(lazyFiler{}),
 	), eval.NewCommand(), packs.NewAddCommand(), packs.NewPacksCommand())
-	root.AddCommand(logs.NewCommand(logBackends()))
+	root.AddCommand(logs.NewCommand(logBackends()), newServe(), a2a.NewCommand(a2aDeps), browsercheck.NewCommand())
 }
 
 // logBackends reads the session the run loop recorded for a ticket and its cloud run log.

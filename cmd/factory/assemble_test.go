@@ -28,7 +28,7 @@ func TestRootCommandTree(t *testing.T) {
 	}
 	for _, name := range []string{"version", "status", "run", "dispatch", "steer", "cancel", "retry", "queue",
 		"config", "doctor", "board", "mcp", "dashboard", "first-run", "upgrade", "report",
-		"init", "plan", "eval", "add", "packs", "logs"} {
+		"init", "plan", "eval", "add", "packs", "logs", "serve", "a2a", "browsercheck"} {
 		if !have[name] {
 			t.Errorf("command %q is not mounted on the root", name)
 		}
