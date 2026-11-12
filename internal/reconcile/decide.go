@@ -93,6 +93,7 @@ const (
 	MarkDone   Kind = "mark-done"
 	NeedsHuman Kind = "needs-human"
 	Requeue    Kind = "requeue" // a due retry found no free slot; Reason is the error to record
+	Skip       Kind = "skip"    // Refill passed over a ready ticket; Reason says why. No state changes.
 )
 
 // Action is a plain value describing one thing to do. Attempt is the attempt
@@ -180,7 +181,11 @@ func Decide(s State, obs []api.Observation, now time.Time, cfg Config) []Action 
 			ranked = append(ranked, t)
 		}
 	}
-	for _, t := range pick.Refill(free, pick.Rank(ranked), running, s.Locks, fires) {
+	picked, skips := pick.Refill(free, pick.Rank(ranked), running, s.Locks, fires)
+	for _, k := range skips {
+		out = append(out, Action{Kind: Skip, ID: k.ID, Reason: k.Reason})
+	}
+	for _, t := range picked {
 		out = append(out, Action{Kind: Dispatch, ID: t.ID, Ticket: t, Attempt: 1})
 	}
 	return out
