@@ -14,6 +14,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/graph/interrupt"
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/observe"
@@ -59,7 +60,10 @@ type Deps struct {
 	Meter      *meter.Meter
 	Queue      MergeQueue
 	Stages     *Stages // nil runs each ticket as one session
-	Clock      Clock   // RealClock when nil
+	// Interrupts records each plan-approval wait as a durable interrupt and checks the answer against
+	// its schema before the ticket resumes. New fills it from a Store that has an Interrupts method.
+	Interrupts *interrupt.Book
+	Clock      Clock // RealClock when nil
 	OnError    func(error)
 }
 
@@ -107,6 +111,14 @@ func New(d Deps, cfg Config) (*Core, error) {
 		return nil, errors.New("core: Deps.Meter is required")
 	case d.Queue == nil:
 		return nil, errors.New("core: Deps.Queue is required")
+	}
+	if ib, ok := d.Store.(interface {
+		Interrupts() (*interrupt.Book, error)
+	}); ok && d.Interrupts == nil {
+		var err error
+		if d.Interrupts, err = ib.Interrupts(); err != nil {
+			return nil, err
+		}
 	}
 	if d.Clock == nil {
 		d.Clock = RealClock{}

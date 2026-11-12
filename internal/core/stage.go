@@ -2,11 +2,13 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/graph/interrupt"
 	"github.com/KaaS-team/factory/internal/tutor"
 )
 
@@ -131,6 +133,7 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	c.hub.emit(KindStage, id, map[string]any{"node": next, "after": n.ID, "outcome": string(outcome)})
 	if h, _ := st.g.Node(next); h.Kind == graph.KindHuman {
 		c.escalate(ctx, id, "plan approval")
+		c.raise(ctx, id, next)
 		c.stages[id] = st // escalate forgets the stage; approve and revise need it
 	}
 	return true, nil
@@ -148,6 +151,9 @@ func (c *Core) resume(ctx context.Context, id api.TicketID, outcome graph.Outcom
 	}
 	next, err := st.g.Next(st.node, outcome)
 	if err != nil {
+		return err
+	}
+	if err := c.answer(ctx, id, st.node, outcome, text); err != nil {
 		return err
 	}
 	if err := c.d.Tracker.SetPhase(ctx, id, api.PhaseReady); err != nil {
@@ -170,4 +176,36 @@ func (st *stageRun) record(n graph.Node) {
 	if !n.Verify {
 		st.history = append(st.history, tutor.Attempt{Tier: st.tier})
 	}
+}
+
+// approvalSchema is what an answer to a plan-approval interrupt must satisfy.
+const approvalSchema = `{"type":"object","properties":{"outcome":{"enum":["pass","revise"]},"text":{"type":"string"}},"required":["outcome"]}`
+
+func approvalThread(id api.TicketID, node string) string { return string(id) + "/" + node }
+
+// raise stores the plan-approval wait of a human node as an interrupt; without Deps.Interrupts it does nothing.
+func (c *Core) raise(ctx context.Context, id api.TicketID, node string) {
+	if c.d.Interrupts == nil {
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{"ticket": string(id), "node": node})
+	_, err := c.d.Interrupts.Task(approvalThread(id, node)).Interrupt(ctx, payload, json.RawMessage(approvalSchema))
+	var p *interrupt.Pending
+	if err != nil && !errors.As(err, &p) {
+		c.report(err)
+	}
+}
+
+// answer resumes the stored interrupt with the person's verdict. A value the schema rejects, or a
+// store failure, stops the resume so the ticket stays parked.
+func (c *Core) answer(ctx context.Context, id api.TicketID, node string, outcome graph.Outcome, text string) error {
+	if c.d.Interrupts == nil {
+		return nil
+	}
+	thread := approvalThread(id, node)
+	value, _ := json.Marshal(map[string]string{"outcome": string(outcome), "text": text})
+	if err := c.d.Interrupts.Resume(ctx, thread, value); err != nil && !errors.Is(err, interrupt.ErrNothingPending) {
+		return err
+	}
+	return c.d.Interrupts.Done(ctx, thread)
 }
