@@ -1,0 +1,5 @@
+Factory design pack
+This pack contains source ported from Onlook (https://github.com/onlook-dev/onlook),
+packages/parser at commit 423e2e9, licensed under the Apache License, Version 2.0 (see LICENSE).
+Upstream ships no NOTICE file. Copyright (c) Onlook contributors.
+Each ported file starts with a "Ported from" line naming its upstream path and says what changed.

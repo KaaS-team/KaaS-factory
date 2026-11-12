@@ -170,3 +170,20 @@ Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E
 Source: https://github.com/sourcegraph/zoekt (Apache-2.0)
 
 - `internal/packs/category.go` from `index/file_category.go` [tested by `internal/packs/category_test.go`]
+
+## onlook-dev/onlook@423e2e9
+
+Source: https://github.com/onlook-dev/onlook (Apache-2.0; the LICENSE is kept at `packs/design/LICENSE`, upstream ships no NOTICE, ours is `packs/design/NOTICE`)
+
+- `packs/design/src/packages.js` from `packages/parser/src/packages.ts` [no upstream test]
+- `packs/design/src/helpers.js` from `packages/parser/src/helpers.ts` and `packages/parser/src/code-edit/helpers.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/parse.js` from `packages/parser/src/parse.ts` [tested by `packs/design/test/parser.test.js`]
+- `packs/design/src/ids.js` from `packages/parser/src/ids.ts` [tested by `packs/design/test/parser.test.js`]
+- `packs/design/src/style.js` from `packages/parser/src/code-edit/style.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/text.js` from `packages/parser/src/code-edit/text.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/move.js` from `packages/parser/src/code-edit/move.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/remove.js` from `packages/parser/src/code-edit/remove.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/insert.js` from `packages/parser/src/code-edit/insert.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/transform.js` from `packages/parser/src/code-edit/transform.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/src/dynamic.js` from `packages/parser/src/template-node/map.ts` [tested by `packs/design/test/edits.test.js`]
+- `packs/design/test/data/` from `packages/parser/test/data/{ids,parse}` [tested by `packs/design/test/parser.test.js`]
