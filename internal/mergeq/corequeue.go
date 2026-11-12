@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"sync"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 )
 
 // Tracker is the tracker access CoreQueue needs: the api.Tracker writes plus two reads.
@@ -44,25 +44,23 @@ type CoreQueue struct {
 // NewCoreQueue returns a queue over d.
 func NewCoreQueue(d Deps) *CoreQueue { return &CoreQueue{d: d} }
 
-// queuedMarker is the comment marker that records a queued PR number and its head.
-type marker struct {
+// queued is the payload of the comment marker that records a queued PR number and its head.
+type queued struct {
 	PR   int    `json:"pr"`
 	Head string `json:"head"`
 }
 
-var markerRE = regexp.MustCompile(`<!-- factory:queued (\{.*?\}) -->`)
-
 func queuedMarker(pr int, head string) string {
-	b, _ := json.Marshal(marker{PR: pr, Head: head})
-	return "<!-- factory:queued " + string(b) + " -->"
+	b, _ := json.Marshal(queued{PR: pr, Head: head})
+	return marker.Wrap("queued", string(b))
 }
 
-func parseQueuedMarker(body string) (marker, bool) {
-	var found marker
+func parseQueuedMarker(body string) (queued, bool) {
+	var found queued
 	ok := false
-	for _, m := range markerRE.FindAllStringSubmatch(body, -1) {
-		var x marker
-		if json.Unmarshal([]byte(m[1]), &x) == nil && x.PR > 0 {
+	for _, obj := range marker.Find(body, "queued") {
+		var x queued
+		if json.Unmarshal([]byte(obj), &x) == nil && x.PR > 0 {
 			found, ok = x, true
 		}
 	}
@@ -70,12 +68,12 @@ func parseQueuedMarker(body string) (marker, bool) {
 }
 
 // latestMarker returns the newest queued marker on the ticket.
-func (q *CoreQueue) latestMarker(ctx context.Context, id api.TicketID) (marker, error) {
+func (q *CoreQueue) latestMarker(ctx context.Context, id api.TicketID) (queued, error) {
 	bodies, err := q.d.Tracker.Comments(ctx, id)
 	if err != nil {
-		return marker{}, fmt.Errorf("comments %s: %w", id, err)
+		return queued{}, fmt.Errorf("comments %s: %w", id, err)
 	}
-	var out marker
+	var out queued
 	found := false
 	for _, b := range bodies {
 		if m, ok := parseQueuedMarker(b); ok {
@@ -83,7 +81,7 @@ func (q *CoreQueue) latestMarker(ctx context.Context, id api.TicketID) (marker, 
 		}
 	}
 	if !found {
-		return marker{}, fmt.Errorf("mergeq: ticket %s is queued but has no queue marker", id)
+		return queued{}, fmt.Errorf("mergeq: ticket %s is queued but has no queue marker", id)
 	}
 	return out, nil
 }
@@ -104,7 +102,7 @@ func (q *CoreQueue) Enqueue(ctx context.Context, id api.TicketID, pr int) error 
 	if err != nil {
 		return fmt.Errorf("pr %d: %w", pr, err)
 	}
-	if err := q.d.Tracker.Comment(ctx, id, "Queued for merge as PR #"+strconv.Itoa(pr)+".\n\n"+queuedMarker(pr, st.Head)); err != nil {
+	if err := q.d.Tracker.Comment(marker.Allow(ctx), id, "Queued for merge as PR #"+strconv.Itoa(pr)+".\n\n"+queuedMarker(pr, st.Head)); err != nil {
 		return err
 	}
 	return q.d.Tracker.SetPhase(ctx, id, api.PhaseQueued)
@@ -180,5 +178,5 @@ func (s coreStore) Requeue(ctx context.Context, id, head string) error {
 	if err != nil {
 		return err
 	}
-	return s.q.d.Tracker.Comment(ctx, api.TicketID(id), "The PR moved; queued again at its new head.\n\n"+queuedMarker(m.PR, head))
+	return s.q.d.Tracker.Comment(marker.Allow(ctx), api.TicketID(id), "The PR moved; queued again at its new head.\n\n"+queuedMarker(m.PR, head))
 }

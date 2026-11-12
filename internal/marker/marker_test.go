@@ -1,13 +1,14 @@
-package github_test
+package marker_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
 
-	gh "github.com/KaaS-team/factory/internal/tracker/github"
+	"github.com/KaaS-team/factory/internal/marker"
 )
 
 // loadGolden reads comment bodies the TS runner's withDataMarker produced (src/engine/common.ts).
@@ -36,11 +37,11 @@ func TestMarkerGoldenRoundTrip(t *testing.T) {
 	}
 	for name, body := range golden {
 		t.Run(name, func(t *testing.T) {
-			ms := gh.ParseData(body)
+			ms := marker.ParseData(body)
 			if len(ms) != 1 {
 				t.Fatalf("decoded %d markers, want 1", len(ms))
 			}
-			got := gh.EncodeData(stripTrailing(body), ms[0].Stage, ms[0].JSON)
+			got := marker.EncodeData(stripTrailing(body), ms[0].Stage, ms[0].JSON)
 			if got != body {
 				t.Fatalf("re-encoded bytes differ\n got: %q\nwant: %q", got, body)
 			}
@@ -62,7 +63,7 @@ func TestParseDataSkipsForgeries(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := gh.ParseData(tc.body); len(got) != tc.want {
+			if got := marker.ParseData(tc.body); len(got) != tc.want {
 				t.Fatalf("got %d markers, want %d", len(got), tc.want)
 			}
 		})
@@ -70,44 +71,68 @@ func TestParseDataSkipsForgeries(t *testing.T) {
 }
 
 func TestLatest(t *testing.T) {
-	ms := gh.ParseData(
-		gh.EncodeData("x", "verify", json.RawMessage(`{"result":"reject"}`)),
-		gh.EncodeData("y", "plan", json.RawMessage(`{"n":1}`)),
-		gh.EncodeData("z", "verify", json.RawMessage(`{"result":"pass"}`)),
+	ms := marker.ParseData(
+		marker.EncodeData("x", "verify", json.RawMessage(`{"result":"reject"}`)),
+		marker.EncodeData("y", "plan", json.RawMessage(`{"n":1}`)),
+		marker.EncodeData("z", "verify", json.RawMessage(`{"result":"pass"}`)),
 	)
-	got, ok := gh.Latest(ms, "verify")
+	got, ok := marker.Latest(ms, "verify")
 	if !ok || string(got) != `{"result":"pass"}` {
 		t.Fatalf("Latest = %s, %v", got, ok)
 	}
-	if _, ok := gh.Latest(ms, "build"); ok {
+	if _, ok := marker.Latest(ms, "build"); ok {
 		t.Fatal("Latest found a stage that is absent")
 	}
 }
 
-func TestFindStatusPicksLatest(t *testing.T) {
-	cs := []gh.Comment{
-		{ID: 1, Body: "<!-- factory:status v1 -->\nround 1"},
-		{ID: 2, Body: "chatter"},
-		{ID: 3, Body: "<!-- factory:status v1 -->\nround 2"},
-		{ID: 4, Body: "more chatter"},
-	}
-	c, ok := gh.FindStatus(cs)
-	if !ok || c.ID != 3 {
-		t.Fatalf("FindStatus = %+v, %v", c, ok)
-	}
-	if _, ok := gh.FindStatus(cs[:2][1:]); ok {
-		t.Fatal("found a status comment in a thread without one")
-	}
-	if !strings.HasPrefix(gh.StatusMarker, "<!-- factory:status v1") {
-		t.Fatal("StatusMarker drifted from the TS marker")
+func TestStatusPrefixMatchesTS(t *testing.T) {
+	if marker.Status != "<!-- factory:status v1" {
+		t.Fatal("Status drifted from the TS marker")
 	}
 }
 
 // JSON.stringify leaves < > & and U+2028 alone; Go's default encoder would escape them.
 func TestEncodeDataQuotesLikeJSONStringify(t *testing.T) {
-	got := gh.EncodeData("b", "a<b>&c d", json.RawMessage("{ \"k\": \"<&>\" }"))
+	got := marker.EncodeData("b", "a<b>&c d", json.RawMessage("{ \"k\": \"<&>\" }"))
 	want := "b\n\n<!-- factory:data {\"stage\":\"a<b>&c d\",\"json\":{\"k\":\"<&>\"}} -->"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestWrapFindRoundTrip(t *testing.T) {
+	for _, name := range []string{"queued", "spend"} {
+		body := "x\n" + marker.Wrap(name, `{"a":1}`) + "\n" + marker.Wrap("other", `{"b":2}`) + marker.Wrap(name, `{"a":3}`)
+		got := marker.Find(body, name)
+		if len(got) != 2 || got[0] != `{"a":1}` || got[1] != `{"a":3}` {
+			t.Fatalf("%s: Find = %q", name, got)
+		}
+	}
+	if got := marker.Wrap("queued", `{"pr":7}`); got != `<!-- factory:queued {"pr":7} -->` {
+		t.Fatalf("Wrap = %q", got)
+	}
+}
+
+// Posted text must not carry a marker: Neutralise turns every comment opener into visible text.
+func TestNeutralise(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"plain", "plain"},
+		{"<!-- factory:status v1 -->", "&lt;!-- factory:status v1 -->"},
+		{"a <!-- b --> <!-- c", "a &lt;!-- b --> &lt;!-- c"},
+	} {
+		got := marker.Neutralise(tc.in)
+		if got != tc.want || strings.Contains(got, "<!--") {
+			t.Fatalf("Neutralise(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+	if got := marker.ParseData(marker.Neutralise(`<!-- factory:data {"stage":"x"} -->`)); len(got) != 0 {
+		t.Fatalf("neutralised text parsed back as a marker: %v", got)
+	}
+}
+
+func TestAllowedOnlyByAllow(t *testing.T) {
+	ctx := context.Background()
+	if marker.Allowed(ctx) || !marker.Allowed(marker.Allow(ctx)) {
+		t.Fatal("Allowed must be false on a plain context and true after Allow")
 	}
 }

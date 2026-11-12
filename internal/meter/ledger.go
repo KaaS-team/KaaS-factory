@@ -1,11 +1,10 @@
 package meter
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/KaaS-team/factory/internal/marker"
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -13,8 +12,6 @@ import (
 // spendNote is the visible line above the hidden marker, as the TypeScript
 // ledger writes it (src/adapters/github-store/spend.ts).
 const spendNote = "Factory usage record (operator data, hidden)."
-
-var spendMarker = regexp.MustCompile(`<!-- factory:spend (\{.*?\}) -->`)
 
 // Spend is one worker's running total in a `<!-- factory:spend v1 -->`
 // comment. Day is set on a ledger issue's per-day comment and empty on a
@@ -53,10 +50,9 @@ type attemptWire struct {
 // number format.
 func EncodeSpend(s Spend) string {
 	var b strings.Builder
-	b.WriteString(spendNote + "\n<!-- factory:spend {\"holder\":")
-	b.WriteString(jsString(s.Holder))
+	b.WriteString(`{"holder":` + marker.JSString(s.Holder))
 	if s.Day != "" {
-		b.WriteString(",\"day\":" + jsString(s.Day))
+		b.WriteString(",\"day\":" + marker.JSString(s.Day))
 	}
 	b.WriteString(",\"costUsd\":" + jsNumber(s.CostUSD))
 	b.WriteString(",\"unreportedRuns\":" + strconv.Itoa(s.UnreportedRuns))
@@ -71,8 +67,8 @@ func EncodeSpend(s Spend) string {
 		}
 		b.WriteByte(']')
 	}
-	b.WriteString("} -->")
-	return b.String()
+	b.WriteByte('}')
+	return spendNote + "\n" + marker.Wrap("spend", b.String())
 }
 
 // DecodeSpend returns every well-formed marker in body. A marker with a
@@ -80,7 +76,7 @@ func EncodeSpend(s Spend) string {
 // a forged one can add spend but never lift a cap.
 func DecodeSpend(body string) ([]Spend, error) {
 	var out []Spend
-	for _, m := range spendMarker.FindAllStringSubmatch(body, -1) {
+	for _, obj := range marker.Find(body, "spend") {
 		var raw struct {
 			Holder         *string           `json:"holder"`
 			Day            string            `json:"day"`
@@ -89,7 +85,7 @@ func DecodeSpend(body string) ([]Spend, error) {
 			Runs           *float64          `json:"runs"`
 			Attempts       []json.RawMessage `json:"attempts"`
 		}
-		if json.Unmarshal([]byte(m[1]), &raw) != nil {
+		if json.Unmarshal([]byte(obj), &raw) != nil {
 			continue
 		}
 		if raw.Holder == nil || !count(raw.CostUSD) || !count(raw.UnreportedRuns) || !count(raw.Runs) {
@@ -126,18 +122,6 @@ func attempts(in []json.RawMessage) []AttemptTokens {
 }
 
 func count(f *float64) bool { return f != nil && !math.IsNaN(*f) && !math.IsInf(*f, 0) && *f >= 0 }
-
-// jsString is JSON.stringify for a string: no HTML escaping, and U+2028 and
-// U+2029 left as they are.
-func jsString(s string) string {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	_ = enc.Encode(s) // a string always encodes
-	out := strings.TrimSuffix(buf.String(), "\n")
-	out = strings.ReplaceAll(out, ` `, " ")
-	return strings.ReplaceAll(out, ` `, " ")
-}
 
 // jsNumber formats f the way JavaScript's Number.prototype.toString does:
 // plain digits from 1e-6 up to below 1e21, exponent form outside that.

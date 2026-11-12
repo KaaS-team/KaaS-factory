@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/meter"
 	gogithub "github.com/google/go-github/v79/github"
 )
@@ -59,7 +60,7 @@ func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body str
 		return err
 	}
 	if c == nil {
-		return t.Comment(ctx, id, body)
+		return t.Comment(marker.Allow(ctx), id, body)
 	}
 	if _, _, err := t.client.Issues.EditComment(ctx, t.owner, t.repo, c.GetID(), &gogithub.IssueComment{Body: &body}); err != nil {
 		return fmt.Errorf("github tracker: edit spend comment on %d: %w", n, err)

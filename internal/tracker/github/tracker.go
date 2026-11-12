@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 	gogithub "github.com/google/go-github/v79/github"
 )
 
@@ -162,11 +163,15 @@ func (t *Tracker) Get(ctx context.Context, id api.TicketID) (api.Ticket, error) 
 	return t.ticket(is), nil
 }
 
-// Comment posts body on the issue thread.
+// Comment posts body on the issue thread with every `<!--` neutralised, unless ctx came from
+// marker.Allow: the caller then built body itself and its markers go out as written.
 func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) error {
 	n, err := number(id)
 	if err != nil {
 		return err
+	}
+	if !marker.Allowed(ctx) {
+		body = marker.Neutralise(body)
 	}
 	if _, _, err := t.client.Issues.CreateComment(ctx, t.owner, t.repo, n, &gogithub.IssueComment{Body: &body}); err != nil {
 		return fmt.Errorf("github tracker: comment on %d: %w", n, err)
