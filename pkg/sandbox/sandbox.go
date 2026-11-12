@@ -38,6 +38,9 @@ type Spec struct {
 	MaxCPUSeconds uint64
 	// MaxProcs is RLIMIT_NPROC; zero means no limit.
 	MaxProcs uint64
+	// Backend selects the isolation: "" or "jail" for the helper below, "runsc" for gVisor
+	// when a pinned runsc is installed; otherwise the jail runs.
+	Backend string
 	// Env is the only environment the child receives, as KEY=value entries.
 	Env []string
 }
@@ -65,6 +68,10 @@ type request struct {
 // Command returns a command that runs name with args under the jail described by spec.
 // The command re-executes the current binary, whose main must call MaybeEnter first.
 func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec.Cmd, error) {
+	return commandFor(ctx, spec, DefaultRunscPin, name, args...)
+}
+
+func jailCommand(ctx context.Context, spec Spec, name string, args ...string) (*exec.Cmd, error) {
 	path, err := exec.LookPath(name)
 	if err != nil {
 		return nil, fmt.Errorf("sandbox: %w", err)
