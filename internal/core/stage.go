@@ -256,7 +256,7 @@ func (c *Core) answer(ctx context.Context, id api.TicketID, node string, outcome
 	}
 	thread := approvalThread(id, node)
 	value, _ := json.Marshal(map[string]string{"outcome": string(outcome), "text": text})
-	if err := c.d.Interrupts.Resume(ctx, thread, value); err != nil && !errors.Is(err, interrupt.ErrNothingPending) {
+	if err := c.d.Interrupts.Resume(ctx, thread, value); err != nil {
 		return err
 	}
 	return c.d.Interrupts.Done(ctx, thread)
