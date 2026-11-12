@@ -32,6 +32,7 @@ func (realClock) Now() time.Time { return time.Now() }
 type Options struct {
 	Interval time.Duration // the loop's tick interval; /healthz allows 3 of them since the last tick
 	Clock    Clock         // defaults to the wall clock
+	Schedule *Scheduler    // optional cron schedules, ticked once per Interval
 }
 
 // Server hosts a Core and serves /healthz, /readyz and /events.
@@ -39,6 +40,7 @@ type Server struct {
 	core     Core
 	interval time.Duration
 	clock    Clock
+	sched    *Scheduler
 	mu       sync.Mutex
 	lastTick time.Time
 	ticked   bool
@@ -54,7 +56,7 @@ func New(core Core, o Options) *Server {
 	if o.Clock == nil {
 		o.Clock = realClock{}
 	}
-	return &Server{core: core, interval: o.Interval, clock: o.Clock}
+	return &Server{core: core, interval: o.Interval, clock: o.Clock, sched: o.Schedule}
 }
 
 func (s *Server) markTick() {
@@ -161,6 +163,9 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 	go func() { httpDone <- srv.Serve(ln) }()
 	runDone := make(chan error, 1)
 	s.ready.Store(true)
+	if s.sched != nil {
+		go s.runSchedules(ctx)
+	}
 	go func() { runDone <- s.core.Run(ctx) }()
 
 	select {
@@ -195,4 +200,18 @@ func (s *Server) stopHTTP(srv *http.Server, d time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
+}
+
+// runSchedules ticks the scheduler every interval until ctx ends. A failed tick is retried on the next one.
+func (s *Server) runSchedules(ctx context.Context) {
+	t := time.NewTicker(s.interval)
+	defer t.Stop()
+	for {
+		_ = s.sched.Tick(ctx, s.clock.Now())
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }

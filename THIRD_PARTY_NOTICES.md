@@ -90,3 +90,10 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## triggerdotdev/trigger.dev@2fbd5c7cf4e9c8e19b88e2b72a7133795611e33d
+
+Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright (c) Trigger.dev)
+
+- `internal/serve/schedule.go` from `internal-packages/schedule-engine/src/engine/scheduleCalculation.ts` [tested by `internal/serve/schedule_test.go`]
+- `internal/serve/schedule.go` from `internal-packages/schedule-engine/src/engine/distributedScheduling.ts` [tested by `internal/serve/schedule_test.go`]
