@@ -1,0 +1,9 @@
+{
+ "query": "mutation CommentCreate($input: CommentCreateInput!) { commentCreate(input: $input) { comment { id } } }",
+ "variables": {
+  "input": {
+   "issueId": "uuid-1",
+   "body": "hello"
+  }
+ }
+}
