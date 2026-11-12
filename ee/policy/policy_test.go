@@ -92,3 +92,16 @@ func TestDenyBeatsAllowRegardlessOfOrder(t *testing.T) {
 		t.Fatalf("got %+v", d)
 	}
 }
+
+// An engine whose policy has expired denies everything, even what an allow rule names.
+func TestExpiredPolicyDenies(t *testing.T) {
+	e, err := policy.Parse([]byte("expires_at: 2020-01-01T00:00:00Z\n" + rules))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, act := range []policy.Action{policy.ActionDispatch, policy.ActionMerge, policy.ActionSetPhase} {
+		if d := e.Check(context.Background(), policy.Actor{ID: "a", Role: "agent"}, act, policy.Resource{Repo: "r"}); d.Allow || d.RuleID != policy.RuleExpired {
+			t.Errorf("%s: %+v, want a denial by %s", act, d, policy.RuleExpired)
+		}
+	}
+}

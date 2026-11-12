@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/KaaS-team/factory/internal/packs"
 )
@@ -25,12 +26,19 @@ func ParsePublicKey(s string) (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(b), nil
 }
 
-// LoadSigned loads the rules file at path only when path+".sig" verifies against pub, then validates
+// LoadSigned loads the rules file at path only when path+".sig" verifies against pub and an expires_at it carries has not passed, then validates
 // every rule and reports all bad ones at once. Any failure returns no engine.
 func LoadSigned(path string, pub ed25519.PublicKey) (*Engine, error) {
 	data, err := packs.ReadFileSigned(path, pub)
 	if err != nil {
 		return nil, fmt.Errorf("policy: %w", err)
 	}
-	return Parse(data)
+	e, err := Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	if e.Expired(time.Now()) {
+		return nil, fmt.Errorf("policy: %s: signed policy has expired", path)
+	}
+	return e, nil
 }

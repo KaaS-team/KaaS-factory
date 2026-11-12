@@ -34,7 +34,9 @@ func TestCombine(t *testing.T) {
 		{"no match denies", []policy.CombinerRule{fixed("p1", P, false), fixed("f1", F, false)}, false, nil, nil},
 		{"permit allows", []policy.CombinerRule{fixed("p1", P, true), fixed("p2", P, false), fixed("p3", P, true)}, true, []string{"p1", "p3"}, nil},
 		{"forbid beats permit", []policy.CombinerRule{fixed("p1", P, true), fixed("f1", F, true), fixed("f2", F, true)}, false, []string{"f1", "f2"}, nil},
-		{"erroring forbid is a non-match and reported", []policy.CombinerRule{fixed("p1", P, true), broken("f1", F)}, true, []string{"p1"}, []string{"f1"}},
+		{"erroring forbid fails closed and is reported", []policy.CombinerRule{fixed("p1", P, true), broken("f1", F)}, false, []string{"f1"}, []string{"f1"}},
+		{"matching rule with an unknown effect fails closed", []policy.CombinerRule{fixed("p1", P, true), fixed("x1", policy.Effect("allow"), true)}, false, []string{"x1"}, []string{"x1"}},
+		{"rule with no matcher fails closed", []policy.CombinerRule{fixed("p1", P, true), {ID: "f1", Effect: F}}, false, []string{"f1"}, []string{"f1"}},
 		{"erroring permit is a non-match and reported", []policy.CombinerRule{broken("p1", P)}, false, nil, []string{"p1"}},
 		{"error beside matching forbid still denies", []policy.CombinerRule{broken("p1", P), fixed("f1", F, true)}, false, []string{"f1"}, []string{"p1"}},
 	}

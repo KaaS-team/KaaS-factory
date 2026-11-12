@@ -31,6 +31,8 @@ func TestLoadSigned(t *testing.T) {
 		{"missing signature", rules, nil, pub, []string{"signature file"}},
 		{"wrong key", rules, ptr(sign(rules)), otherPub, []string{"does not verify"}},
 		{"edited after signing", rules + "\n", ptr(sign(rules)), pub, []string{"does not verify"}},
+		{"expired", "expires_at: 2020-01-01T00:00:00Z\n" + rules, ptr(sign("expires_at: 2020-01-01T00:00:00Z\n" + rules)), pub, []string{"expired"}},
+		{"not yet expired", "expires_at: 2999-01-01T00:00:00Z\n" + rules, ptr(sign("expires_at: 2999-01-01T00:00:00Z\n" + rules)), pub, nil},
 		{"no key", rules, ptr(sign(rules)), nil, []string{"no public key"}},
 		{"all bad rules listed", bad, ptr(sign(bad)), pub, []string{`"a": effect`, `"b": actions is required`, `duplicate rule id "a"`, `unknown action "fly"`}},
 	}

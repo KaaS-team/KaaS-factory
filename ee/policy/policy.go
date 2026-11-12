@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -30,6 +31,7 @@ const (
 const (
 	RuleDefaultDeny   = "default-deny"
 	RuleUnknownAction = "unknown-action"
+	RuleExpired       = "expired"
 )
 
 // Actor is the identity an action runs as: one per agent or person.
@@ -63,8 +65,12 @@ type Rule struct {
 
 // Engine holds parsed rules and answers Check.
 type Engine struct {
-	rules []Rule
+	rules   []Rule
+	expires *time.Time // nil: the policy does not expire
 }
+
+// Expired reports whether the policy's expires_at is at or before now.
+func (e *Engine) Expired(now time.Time) bool { return e.expires != nil && !now.Before(*e.expires) }
 
 var known = map[Action]bool{ActionDispatch: true, ActionMerge: true, ActionSetPhase: true}
 
@@ -72,7 +78,8 @@ var known = map[Action]bool{ActionDispatch: true, ActionMerge: true, ActionSetPh
 // duplicate ids. It reports every bad rule in one error.
 func Parse(data []byte) (*Engine, error) {
 	var doc struct {
-		Rules []Rule `yaml:"rules"`
+		ExpiresAt *time.Time `yaml:"expires_at"`
+		Rules     []Rule     `yaml:"rules"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
@@ -95,7 +102,7 @@ func Parse(data []byte) (*Engine, error) {
 	if len(bad) > 0 {
 		return nil, fmt.Errorf("policy: %d bad rules: %w", len(bad), errors.Join(bad...))
 	}
-	return &Engine{rules: doc.Rules}, nil
+	return &Engine{rules: doc.Rules, expires: doc.ExpiresAt}, nil
 }
 
 // Check evaluates the rules for one action. Deny rules are tried first, then allow rules; an
@@ -103,6 +110,9 @@ func Parse(data []byte) (*Engine, error) {
 func (e *Engine) Check(_ context.Context, who Actor, act Action, res Resource) Decision {
 	if !known[act] {
 		return Decision{RuleID: RuleUnknownAction, Reason: fmt.Sprintf("action %q is not known", act)}
+	}
+	if e.Expired(time.Now()) {
+		return Decision{RuleID: RuleExpired, Reason: "the policy has expired, so every action is denied"}
 	}
 	for _, r := range e.rules {
 		if r.Effect == "deny" && r.matches(who, act, res) {
