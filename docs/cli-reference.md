@@ -178,6 +178,23 @@ Print each lock entry
 | `--json` | bool | `false` | print JSON |
 | `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
 
+## factory packs match
+
+`factory packs match <dir> [flags]`
+
+List the skill packs whose paths or keywords match
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--path` | stringSlice | `[]` | a file the task touches (repeatable) |
+| `--text` | string | `` | the task text |
+
+## factory packs run
+
+`factory packs run <pack.yaml> -- <command> [args]`
+
+Run a command and retry it while the manifest's success checks fail
+
 ## factory packs upgrade
 
 `factory packs upgrade [flags]`
