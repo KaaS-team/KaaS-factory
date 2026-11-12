@@ -103,3 +103,27 @@ func TestFmtPicksPinned(t *testing.T) {
 		t.Fatalf("gate.sh fmt used the PATH gofmt, not the %s one: %v: %s", pin, err, out)
 	}
 }
+
+// CI runs on linux only; the gate vets darwin too so a linux-only test helper used from a portable file fails here.
+func TestVetCoversBothOSes(t *testing.T) {
+	bin := t.TempDir()
+	log := filepath.Join(bin, "log")
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho \"$GOOS $*\" >> "+log+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "gate.sh", "vet")
+	cmd.Dir = filepath.Join("..", "..")
+	cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("gate.sh vet: %v: %s", err, out)
+	}
+	got, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, goos := range []string{"linux", "darwin"} {
+		if !strings.Contains(string(got), goos+" vet ./...") {
+			t.Fatalf("gate.sh vet did not vet GOOS=%s; ran:\n%s", goos, got)
+		}
+	}
+}

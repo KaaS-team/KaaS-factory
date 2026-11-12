@@ -14,7 +14,8 @@ step_fmt() {
 	bad=$("$fmt" -l $(git ls-files -co --exclude-standard '*.go'))
 	if [ -n "$bad" ]; then echo "gofmt needed:"; echo "$bad"; exit 1; fi
 }
-step_vet() { go vet ./...; }
+# Vet both release OSes: CI runs on linux only, so a linux-only test helper used from a portable file breaks darwin unseen.
+step_vet() { GOOS=linux go vet ./... && GOOS=darwin go vet ./...; }
 step_lint() {
 	ver=$(pin lint_version)
 	GOTOOLCHAIN=$(pin lint_go)

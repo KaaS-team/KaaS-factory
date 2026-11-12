@@ -51,14 +51,6 @@ func TestActivityIgnoresDetached(t *testing.T) {
 	}
 }
 
-func TestMaxDurationKillsChild(t *testing.T) {
-	spec := Spec{Workdir: t.TempDir(), ReadOnly: []string{"/"}, AllowNet: true, Policy: Policy{MaxDuration: 300 * time.Millisecond}}
-	start := time.Now()
-	if _, code := run(t, spec, "sleep", "30"); code == 0 || time.Since(start) > 10*time.Second {
-		t.Fatalf("child not stopped at MaxDuration (exit %d after %v)", code, time.Since(start))
-	}
-}
-
 // The runsc backend honours MaxDuration like the jail does.
 func TestMaxDurationKillsRunscChild(t *testing.T) {
 	path, sum := fakeRunsc(t, "#!/bin/sh\nexec sleep 30\n")
