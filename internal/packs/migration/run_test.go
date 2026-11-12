@@ -154,7 +154,7 @@ func TestVerify(t *testing.T) {
 
 func TestExecRunnerPromptHandsOff(t *testing.T) {
 	var out bytes.Buffer
-	if err := (ExecRunner{Out: &out}).Prompt(context.Background(), "", "do it", []string{"a", "b"}); err != nil || out.String() != "prompt: do it\nfiles: a b\n" {
+	if err := (ExecRunner{Out: &out}).Prompt(context.Background(), "", "do it", []string{"a", "b"}); !errors.Is(err, ErrNoAgent) || out.String() != "prompt: do it\nfiles: a b\n" {
 		t.Fatalf("%q %v", out.String(), err)
 	}
 	if err := (ExecRunner{Out: &out}).Exec(context.Background(), t.TempDir(), []string{"true"}); err != nil {
@@ -189,5 +189,27 @@ func TestDashFileSurvivesRealCommand(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "-rf") || !strings.Contains(out.String(), "ok.txt") {
 		t.Fatalf("output %q", out.String())
+	}
+}
+
+// With the default runner a prompt step fails the run and is not reported as ran.
+func TestDefaultRunnerPromptStepIsNotReportedAsRan(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pack{Name: "p", Steps: []Step{{Name: "ask", Prompt: "do it"}}}
+	var log bytes.Buffer
+	res, err := Run(context.Background(), p, Options{Root: root, Exec: ExecRunner{Out: &log}, Log: &log})
+	if !errors.Is(err, ErrNoAgent) {
+		t.Fatalf("want ErrNoAgent, got %v", err)
+	}
+	for _, r := range res {
+		if r.Ran {
+			t.Fatalf("prompt step reported ran: %+v", res)
+		}
+	}
+	if strings.Contains(log.String(), "ran on") {
+		t.Fatalf("log claims it ran: %s", log.String())
 	}
 }

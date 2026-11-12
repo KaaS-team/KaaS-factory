@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -142,8 +143,12 @@ func Verify(pinnedSHA256 string, data []byte) error {
 	return nil
 }
 
-// ExecRunner runs commands as child processes with no shell. Prompt steps have no agent here: it
-// writes the prompt and the file list to Out for the operator's agent and succeeds.
+// ErrNoAgent is what the default runner returns for a prompt step: nothing here can run a prompt.
+var ErrNoAgent = errors.New("no agent configured for prompt steps")
+
+// ExecRunner runs commands as child processes with no shell. It has no agent, so a prompt step fails
+// with ErrNoAgent rather than reporting work that did not happen; the prompt and files go to Out so
+// the operator can run them by hand.
 type ExecRunner struct{ Out io.Writer }
 
 // Exec runs argv in dir.
@@ -153,10 +158,12 @@ func (e ExecRunner) Exec(ctx context.Context, dir string, argv []string) error {
 	return c.Run()
 }
 
-// Prompt writes the prompt and the files it applies to.
+// Prompt writes the prompt and the files it applies to, then returns ErrNoAgent.
 func (e ExecRunner) Prompt(_ context.Context, _, prompt string, files []string) error {
-	_, err := fmt.Fprintf(e.Out, "prompt: %s\nfiles: %s\n", prompt, strings.Join(files, " "))
-	return err
+	if e.Out != nil {
+		_, _ = fmt.Fprintf(e.Out, "prompt: %s\nfiles: %s\n", prompt, strings.Join(files, " "))
+	}
+	return ErrNoAgent
 }
 
 func sha256Sum(b []byte) string {
