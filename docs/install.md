@@ -16,6 +16,7 @@ The script detects your OS (macOS or Linux) and CPU (amd64 or arm64), downloads 
 |---|---|
 | `FACTORY_VERSION` | Install a release tag such as `v9.0.0` instead of the latest. |
 | `FACTORY_BIN_DIR` | Install somewhere other than `$HOME/.local/bin`. |
+| `PREFIX` | Install to `$PREFIX/bin` when `FACTORY_BIN_DIR` is unset. |
 
 ## Homebrew
 

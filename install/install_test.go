@@ -4,9 +4,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const fakeBinary = "#!/bin/sh\necho factory-fake 1.2.3\n"
@@ -265,5 +268,72 @@ func TestFlagErrorsAndHelp(t *testing.T) {
 				t.Fatalf("missing %q:\n%s", c.want, out)
 			}
 		})
+	}
+}
+
+// TestPrefixInstallsUnderPrefixBin: PREFIX selects $PREFIX/bin when no dir flag or FACTORY_BIN_DIR is set.
+func TestPrefixInstallsUnderPrefixBin(t *testing.T) {
+	a := archive(t, fakeBinary)
+	var paths []string
+	base := serve(t, "factory_linux_amd64.tar.gz", a, a, &paths)
+	prefix := t.TempDir()
+	out, err := run(t, base, "", "PREFIX="+prefix)
+	if err != nil {
+		t.Fatalf("install failed: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(prefix, "bin", "factory")); err != nil {
+		t.Fatalf("not installed under PREFIX/bin: %v\n%s", err, out)
+	}
+}
+
+// TestInstallsFromPythonHTTPServer: the script works against a plain static file server serving a fake release.
+func TestInstallsFromPythonHTTPServer(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not installed")
+	}
+	root := t.TempDir()
+	dir := filepath.Join(root, "releases", "latest", "download")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a := archive(t, fakeBinary)
+	sum := sha256.Sum256(a)
+	name := "factory_linux_amd64.tar.gz"
+	if err := os.WriteFile(filepath.Join(dir, name), a, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "checksums.txt"), []byte(hex.EncodeToString(sum[:])+"  "+name+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	_ = l.Close()
+	srv := exec.CommandContext(ctx, py, "-m", "http.server", fmt.Sprint(port), "--bind", "127.0.0.1", "--directory", root)
+	if err := srv.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { cancel(); _ = srv.Wait() }()
+	base := fmt.Sprintf("http://127.0.0.1:%d", port)
+	for i := 0; i < 100; i++ {
+		if r, err := http.Get(base + "/"); err == nil {
+			_ = r.Body.Close()
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	binDir := t.TempDir()
+	out, err := run(t, base, binDir)
+	if err != nil {
+		t.Fatalf("install failed: %v\n%s", err, out)
+	}
+	got, err := exec.Command(filepath.Join(binDir, "factory")).Output()
+	if err != nil || !strings.Contains(string(got), "factory-fake") {
+		t.Fatalf("installed binary did not run: %v %q", err, got)
 	}
 }
