@@ -128,6 +128,12 @@ Lint the fixtures; exit 1 when one is malformed
 
 Compare two scorecards; exit 1 when the new one is worse
 
+## factory eval replay
+
+`factory eval replay <run.trace.jsonl>`
+
+Print the spans a run recorded, gate spans with their triggered flag
+
 ## factory first-run
 
 `factory first-run [flags]`

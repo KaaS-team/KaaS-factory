@@ -296,3 +296,9 @@ Source: https://github.com/temporalio/temporal (MIT, Copyright (c) 2025 Temporal
 Source: https://github.com/openrewrite/rewrite (Apache-2.0). The design is ported to Go, no Java is copied.
 
 - `internal/graph/scanedit/scanedit.go` from `rewrite-core/src/main/java/org/openrewrite/ScanningRecipe.java` [tested by `internal/graph/scanedit/scanedit_test.go`]
+
+## openai/openai-agents-python@64fbde5
+
+Source: https://github.com/openai/openai-agents-python (MIT, Copyright (c) 2025 OpenAI). Design only, no text copied.
+
+- `internal/trace/trace.go` from `src/agents/tracing/span_data.py` and `src/agents/tracing/processor_interface.py` [tested by `internal/trace/trace_test.go`]
