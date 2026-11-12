@@ -96,6 +96,34 @@ func TestNonPublic(t *testing.T) {
 	}
 }
 
+// TestNonPublicSpecialPurposeRanges: one address per IANA special-purpose range the net.IP
+// predicates miss, plus public controls.
+func TestNonPublicSpecialPurposeRanges(t *testing.T) {
+	blocked := map[string]string{
+		"6to4 with private v4":   "2002:0a00:0001::1",
+		"6to4 with metadata v4":  "2002:a9fe:a9fe::1",
+		"teredo":                 "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+		"ietf protocol":          "192.0.0.8",
+		"benchmarking low":       "198.18.0.1",
+		"benchmarking high":      "198.19.255.254",
+		"reserved":               "240.0.0.1",
+		"reserved top":           "254.1.2.3",
+		"cgnat":                  "100.64.0.1",
+		"nat64 private":          "64:ff9b::a00:1",
+		"v4-mapped benchmarking": "::ffff:198.18.0.1",
+	}
+	for name, a := range blocked {
+		if !NonPublic(net.ParseIP(a)) {
+			t.Errorf("%s: %s counted as public", name, a)
+		}
+	}
+	for _, a := range []string{"8.8.8.8", "2606:4700::1111", "2002:0808:0808::1", "198.20.0.1", "192.0.1.1"} {
+		if NonPublic(net.ParseIP(a)) {
+			t.Errorf("%s counted as non-public", a)
+		}
+	}
+}
+
 func TestDNSServersDefault(t *testing.T) {
 	// e2b openapi.yml: omit for 8.8.8.8, an empty list allows none.
 	if got := (Network{}).DNS(); len(got) != 1 || got[0] != "8.8.8.8" {

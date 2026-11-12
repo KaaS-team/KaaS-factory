@@ -3,6 +3,7 @@ package egress
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 )
 
@@ -39,40 +40,52 @@ func (n Network) Allowed(host string, ips []net.IP) bool {
 	return !matchAny(n.DenyOut, host, ips)
 }
 
-// nonPublicNets are the ranges Go's net.IP predicates miss: "this network",
-// carrier-grade NAT, and the IPv4 broadcast address.
-var nonPublicNets = func() []*net.IPNet {
-	var out []*net.IPNet
-	for _, c := range []string{"0.0.0.0/8", "100.64.0.0/10", "255.255.255.255/32"} {
-		_, n, _ := net.ParseCIDR(c)
-		out = append(out, n)
-	}
-	return out
-}()
+// nonPublicPrefixes are the IANA special-purpose ranges Go's net.IP predicates miss: "this
+// network", IETF protocol assignments, carrier-grade NAT, benchmarking, reserved and broadcast,
+// and the Teredo tunnel prefix.
+var nonPublicPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("192.0.0.0/24"),
+	netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("240.0.0.0/4"), // reserved, and the broadcast address inside it
+	netip.MustParsePrefix("2001::/32"),
+}
 
-// nat64 is the well-known NAT64 prefix; its last four bytes are an IPv4 address.
-var _, nat64, _ = net.ParseCIDR("64:ff9b::/96")
+var (
+	nat64  = netip.MustParsePrefix("64:ff9b::/96")
+	sixTo4 = netip.MustParsePrefix("2002::/16")
+)
 
-// NonPublic reports whether ip is an address a session must never reach:
-// loopback, private (RFC 1918 and IPv6 ULA), link-local (which holds the cloud
-// metadata address 169.254.169.254), multicast, unspecified, carrier-grade NAT,
-// or one of those inside an IPv4-mapped or NAT64 IPv6 address. A malformed ip
-// counts as non-public.
+// NonPublic reports whether ip is an address a session must never reach: loopback, private
+// (RFC 1918 and IPv6 ULA), link-local (which holds the cloud metadata address 169.254.169.254),
+// multicast, unspecified, carrier-grade NAT, benchmarking, reserved, Teredo, or an IPv4 address
+// of those kinds inside an IPv4-mapped, NAT64 or 6to4 IPv6 address. A malformed ip counts as
+// non-public.
 func NonPublic(ip net.IP) bool {
-	if len(ip) == net.IPv6len && nat64.Contains(ip) {
-		ip = ip[12:16]
-	}
-	if v4 := ip.To4(); v4 != nil {
-		ip = v4
-	} else if len(ip) != net.IPv6len {
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
 		return true
 	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+	return nonPublicAddr(addr.Unmap())
+}
+
+func nonPublicAddr(a netip.Addr) bool {
+	b := a.As16()
+	switch {
+	case a.Is4In6():
+		return nonPublicAddr(a.Unmap())
+	case a.Is6() && nat64.Contains(a):
+		return nonPublicAddr(netip.AddrFrom4([4]byte(b[12:16])))
+	case a.Is6() && sixTo4.Contains(a):
+		return nonPublicAddr(netip.AddrFrom4([4]byte(b[2:6])))
+	}
+	if a.IsLoopback() || a.IsPrivate() || a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast() ||
+		a.IsInterfaceLocalMulticast() || a.IsMulticast() || a.IsUnspecified() {
 		return true
 	}
-	for _, n := range nonPublicNets {
-		if n.Contains(ip) {
+	for _, p := range nonPublicPrefixes {
+		if p.Contains(a) {
 			return true
 		}
 	}
