@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/KaaS-team/factory/internal/graph"
 )
 
 // checkStatus is the outcome of one doctor check.
@@ -45,7 +48,24 @@ func runChecks() []checkRow {
 			rows = append(rows, r)
 		}
 	}
+	if r, ok := workflowsCheck("."); ok {
+		rows = append(rows, r)
+	}
 	return append(rows, envCheck(os.Environ()))
+}
+
+// workflowsCheck fails when a file in the repo's .factory/workflows does not load, so a typo shows up
+// here and not when a ticket reaches it. A repo with no such directory has no row.
+func workflowsCheck(root string) (checkRow, bool) {
+	dir := filepath.Join(root, ".factory", "workflows")
+	if _, err := os.Stat(dir); err != nil {
+		return checkRow{}, false
+	}
+	gs, err := graph.LoadDir(dir)
+	if err != nil {
+		return checkRow{"workflows", statusFail, err.Error(), "fix the named file under .factory/workflows"}, true
+	}
+	return checkRow{Name: "workflows", Status: statusPass, Detail: fmt.Sprintf("%d load", len(gs))}, true
 }
 
 // dispatcherCheck fails when the configured dispatcher's prerequisite is missing: `claude` on PATH

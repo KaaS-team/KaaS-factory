@@ -56,6 +56,42 @@ Run browser steps in headless Chrome and print one FACTORY_GATES line
 
 Cancel a ticket's running session
 
+## factory checkpoint
+
+`factory checkpoint`
+
+Snapshot and restore the worktree around an agent session
+
+## factory checkpoint diff
+
+`factory checkpoint diff <session> <run>`
+
+List the paths that differ between run N and the worktree now
+
+## factory checkpoint drop
+
+`factory checkpoint drop <session>`
+
+Delete a session's snapshots
+
+## factory checkpoint reap
+
+`factory checkpoint reap`
+
+Delete snapshots and scratch dirs left by sessions that never ended
+
+## factory checkpoint restore
+
+`factory checkpoint restore <session> <run>`
+
+Put the worktree back as run N saved it
+
+## factory checkpoint save
+
+`factory checkpoint save <session> <run>`
+
+Snapshot tracked, staged and untracked files as run N
+
 ## factory config
 
 `factory config`
