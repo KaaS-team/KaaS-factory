@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/firstrun/sarif"
 )
 
 //go:embed catalogue.yaml
@@ -82,6 +83,8 @@ type Options struct {
 	Dispatcher api.Dispatcher
 	// Catalogue overrides the embedded data; nil uses it.
 	Catalogue *Catalogue
+	// Annotations suppress findings with a reason; the zero value suppresses nothing.
+	Annotations sarif.Config
 }
 
 // Row is one line of the "What the factory would fix" table.
@@ -101,6 +104,8 @@ type Report struct {
 	TopRisks   []Finding
 	Rows       []Row
 	NotCovered []Finding
+	// Suppressed are the findings an annotation removed from the score, with their reasons.
+	Suppressed []sarif.Suppressed
 	ScoreAfter int
 	// First is the row to fix first; nil when nothing is covered.
 	First *Row
@@ -141,13 +146,61 @@ func Run(ctx context.Context, o Options) (Report, error) {
 		}
 		a = merge(a, g)
 	}
+	a, sup := annotate(a, o.Annotations)
 	r := Build(a, *cat)
+	r.Suppressed = sup
 	r.DryRun = o.DryRun
 	r.First = Pick(r.Rows)
 	if r.First != nil && !o.DryRun {
 		r.Command = "factory approve first-run " + r.First.Finding.ID
 	}
 	return r, nil
+}
+
+// annotate removes the findings an annotation suppresses, from the findings and the top risks. A
+// suppressed finding counts as satisfied, so the score gain it offered is added to the score now.
+func annotate(a Audit, c sarif.Config) (Audit, []sarif.Suppressed) {
+	if len(c.Annotations) == 0 {
+		return a, nil
+	}
+	var sup []sarif.Suppressed
+	var kept []Finding
+	for _, f := range a.Findings {
+		r, ok := c.Reason(f.ID)
+		if !ok {
+			kept = append(kept, f)
+			continue
+		}
+		sup = append(sup, sarif.Suppressed{Finding: toSARIF(f), Reason: r})
+		if f.Severity != "ok" {
+			a.Scores.Overall = clamp(a.Scores.Overall + f.ScoreGain)
+		}
+	}
+	a.Findings = kept
+	var risks []Finding
+	for _, f := range a.TopRisks {
+		if _, ok := c.Reason(f.ID); !ok {
+			risks = append(risks, f)
+		}
+	}
+	a.TopRisks = risks
+	return a, sup
+}
+
+func toSARIF(f Finding) sarif.Finding {
+	return sarif.Finding{ID: f.ID, Title: f.Title, Severity: f.Severity, File: f.File, Line: f.Line}
+}
+
+// SARIF renders the report as SARIF 2.1.0: open findings as results, suppressed ones with their reason.
+func (r Report) SARIF(version string) ([]byte, error) {
+	var fs []sarif.Finding
+	for _, w := range r.Rows {
+		fs = append(fs, toSARIF(w.Finding))
+	}
+	for _, f := range r.NotCovered {
+		fs = append(fs, toSARIF(f))
+	}
+	return sarif.Marshal(version, fs, r.Suppressed)
 }
 
 func runAudit(ctx context.Context, bin, dir string, args ...string) (Audit, error) {
@@ -267,6 +320,12 @@ func (r Report) Markdown() (string, error) {
 		b.WriteString("\n## Not covered\n\n")
 		for _, f := range r.NotCovered {
 			fmt.Fprintf(&b, "- %s (%s)\n", f.ID, loc(f))
+		}
+	}
+	if len(r.Suppressed) > 0 {
+		b.WriteString("\n## Suppressed\n\n")
+		for _, s := range r.Suppressed {
+			fmt.Fprintf(&b, "- %s (%s): %s\n", s.Finding.ID, loc(Finding{File: s.Finding.File, Line: s.Finding.Line}), s.Reason)
 		}
 	}
 	b.WriteString("\n## 30/60/90\n\n")
