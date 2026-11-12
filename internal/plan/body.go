@@ -3,13 +3,21 @@
 package plan
 
 import (
-	"errors"
 	"regexp"
 	"strings"
 )
 
 // Marker opens every planned body.
 const Marker = "<!-- factory:planned v1 -->"
+
+// markerError is the TS wording, which ends in a period.
+type markerError struct{}
+
+// Error returns the TS message for a body without the marker.
+func (markerError) Error() string { return "The body does not start with " + Marker + "." }
+
+// ErrNoMarker is returned by ParseBody when the body lacks the planned marker.
+var ErrNoMarker error = markerError{}
 
 // Section is one "## " block of a body, kept as the exact text from its heading line to the next one.
 type Section struct {
@@ -37,7 +45,7 @@ type Body struct {
 // ParseBody splits a planned body without losing a byte; it errors when the marker is missing.
 func ParseBody(text string) (Body, error) {
 	if !strings.HasPrefix(strings.TrimLeft(text, " \t\r\n"), Marker) {
-		return Body{}, errors.New("The body does not start with " + Marker + ".")
+		return Body{}, ErrNoMarker
 	}
 	var starts []int
 	for i := 0; i < len(text); {
