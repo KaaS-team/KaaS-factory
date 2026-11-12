@@ -121,3 +121,30 @@ func TestDCOUsageAndBadRange(t *testing.T) {
 		t.Fatalf("bad base: code %d, stderr %q", code, errb.String())
 	}
 }
+
+// The pre-push hook checks only what the push sends: commits already on the remote were checked
+// when they landed, so an old unsigned one there must not block every later push.
+func TestDCOUnpushedSkipsCommitsOnTheRemote(t *testing.T) {
+	remote := gitRepo(t)
+	dir := t.TempDir()
+	git(t, dir, nil, "clone", "-q", remote, ".")
+	git(t, dir, nil, "config", "commit.gpgsign", "false")
+	commit(t, dir, "old.txt", "o\n", "old unsigned", "Dev <dev@x.io>")
+	git(t, dir, nil, "push", "-q", "origin", "HEAD:refs/heads/next")
+	git(t, dir, nil, "fetch", "-q", "origin")
+	signed := commit(t, dir, "new.txt", "n\n", "new\n\nSigned-off-by: Dev <dev@x.io>", "Dev <dev@x.io>")
+	var out, errb bytes.Buffer
+	if code := run(dir, []string{"dco", "--unpushed"}, func(string) string { return "" }, &out, &errb); code != 0 {
+		t.Fatalf("signed local commit on top of a pushed unsigned one: code %d, stderr %q", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "every unpushed commit is signed off") {
+		t.Fatalf("stdout %q", out.String())
+	}
+	bad := commit(t, dir, "bad.txt", "b\n", "new unsigned", "Dev <dev@x.io>")
+	out.Reset()
+	errb.Reset()
+	code := run(dir, []string{"dco", "--unpushed"}, func(string) string { return "" }, &out, &errb)
+	if code != 1 || !strings.Contains(errb.String(), bad[:7]) || strings.Contains(errb.String(), signed[:7]) {
+		t.Fatalf("unsigned local commit: code %d, stderr %q; want code 1 naming only %s", code, errb.String(), bad[:7])
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMain(m *testing.M) {
@@ -105,5 +106,13 @@ func TestBestEffortWithoutLandlock(t *testing.T) {
 	}
 	if !NewReport(spec, caps).Has("landlock: unavailable") {
 		t.Fatal("report does not record landlock: unavailable")
+	}
+}
+
+func TestMaxDurationKillsChild(t *testing.T) {
+	spec := Spec{Workdir: t.TempDir(), ReadOnly: []string{"/"}, AllowNet: true, Policy: Policy{MaxDuration: 300 * time.Millisecond}}
+	start := time.Now()
+	if _, code := run(t, spec, "sleep", "30"); code == 0 || time.Since(start) > 10*time.Second {
+		t.Fatalf("child not stopped at MaxDuration (exit %d after %v)", code, time.Since(start))
 	}
 }

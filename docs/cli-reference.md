@@ -196,9 +196,13 @@ Print what a ticket's session is doing
 
 ## factory mcp
 
-`factory mcp`
+`factory mcp [flags]`
 
-Serve the factory to Claude Code over stdio (MCP)
+Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--http` | string | `` | serve streamable HTTP at /mcp on this address (default host 127.0.0.1); the bearer token is read from FACTORY_MCP_TOKEN |
 
 ## factory packs
 
@@ -324,6 +328,17 @@ Show tokens per merged PR, rework, human touches and cycle time (operator only)
 `factory retry <ticket>`
 
 Queue a new attempt for a ticket
+
+## factory review
+
+`factory review [flags]`
+
+Run the check packs in .factory/checks against the uncommitted changes, edits returned as patches
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--base` | string | `` | ref the prompt's diff starts from (empty: only the uncommitted changes) |
+| `--timeout` | duration | `10m0s` | limit per check |
 
 ## factory run
 

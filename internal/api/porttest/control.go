@@ -2,6 +2,7 @@ package porttest
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/KaaS-team/factory/internal/api"
@@ -13,6 +14,7 @@ import (
 type Control struct {
 	mu        sync.Mutex
 	BoardVal  api.Board
+	ReposVal  []string          // served by Repos
 	OnWrite   func(call string) // called after a write is recorded; may be nil
 	calls     []string
 	history   map[api.TicketID][]api.Event
@@ -82,6 +84,35 @@ func (c *Control) Cancel(_ context.Context, id api.TicketID) error {
 // Retry records "retry <id>".
 func (c *Control) Retry(_ context.Context, id api.TicketID) error {
 	return c.write("retry " + string(id))
+}
+
+// CreateTicket records "create: <title>: <body>" and returns the id "new-<n>", n counting from 1.
+func (c *Control) CreateTicket(_ context.Context, title, body string) (api.TicketID, error) {
+	err := c.write("create: " + title + ": " + body)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return api.TicketID("new-" + strconv.Itoa(len(c.calls))), err
+}
+
+// HandOff records "hand_off <id> to <to>" (with ": <note>" when there is one).
+func (c *Control) HandOff(_ context.Context, id api.TicketID, to, note string) error {
+	s := "hand_off " + string(id) + " to " + to
+	if note != "" {
+		s += ": " + note
+	}
+	return c.write(s)
+}
+
+// QueueFollowup records "followup <id>: <message>".
+func (c *Control) QueueFollowup(_ context.Context, id api.TicketID, m string) error {
+	return c.write("followup " + string(id) + ": " + m)
+}
+
+// Repos returns ReposVal.
+func (c *Control) Repos(context.Context) ([]string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.ReposVal...), nil
 }
 
 // Events opens a live stream that Push feeds; it closes when ctx ends.

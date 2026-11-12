@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -217,6 +218,13 @@ func TestGitHubDepsAreReal(t *testing.T) {
 	}
 	if _, ok := live.Queue.(*mergeq.CoreQueue); !ok {
 		t.Errorf("github queue is %T, want *mergeq.CoreQueue", live.Queue)
+	}
+	// The loop gets the step log, so a restart replays what the last run completed.
+	if live.Log == nil {
+		t.Error("deps carry no step log")
+	}
+	if _, err := os.Stat(stepLogDir); err != nil {
+		t.Errorf("step log directory: %v", err)
 	}
 	d, err := buildDeps(config.Config{Tracker: "github", Repo: "acme/shop", Dispatcher: "local", Slots: 1, Shadow: true, Base: "main"})
 	if err != nil {

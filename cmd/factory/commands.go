@@ -27,7 +27,7 @@ func addCommands(root *cobra.Command) {
 	} {
 		root.AddCommand(ticketCmd(a.name, a.short, a.call))
 	}
-	root.AddCommand(steerCmd())
+	root.AddCommand(steerCmd(), reviewCmd())
 }
 
 // control loads the config and builds the Control through the newControl seam.

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const usage = "usage: prcheck dco <base> [head] | body | tests-only <base> <head>"
+const usage = "usage: prcheck dco <base> [head] | dco --unpushed | body | tests-only <base> <head>"
 
 // run dispatches one subcommand in the repo at dir and returns the exit code.
 func run(dir string, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
