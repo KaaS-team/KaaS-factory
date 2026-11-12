@@ -90,23 +90,16 @@ ON CONFLICT (id) DO UPDATE SET repo=excluded.repo, title=excluded.title, body=ex
   labels=excluded.labels, files=excluded.files, blocked_by=excluded.blocked_by,
   priority=excluded.priority, workflow=excluded.workflow, created_at=excluded.created_at`,
 		string(t.ID), t.Repo, t.Title, t.Body, jsonOf(nonNil(t.Labels)), jsonOf(nonNil(t.Files)),
-		jsonOf(nonNilIDs(t.BlockedBy)), t.Priority, t.Workflow, t.CreatedAt.UnixNano(), string(api.PhaseReady))
+		jsonOf(nonNil(t.BlockedBy)), t.Priority, t.Workflow, t.CreatedAt.UnixNano(), string(api.PhaseReady))
 	if err != nil {
 		return err
 	}
 	return s.putMeta(ctx, t)
 }
 
-func nonNil(s []string) []string {
+func nonNil[T any](s []T) []T {
 	if s == nil {
-		return []string{}
-	}
-	return s
-}
-
-func nonNilIDs(s []api.TicketID) []api.TicketID {
-	if s == nil {
-		return []api.TicketID{}
+		return []T{}
 	}
 	return s
 }

@@ -92,3 +92,28 @@ func TestSummaryDaysUTC(t *testing.T) {
 		t.Fatalf("out = %q", out.String())
 	}
 }
+
+func TestShadowCommandSummarizesWhatTheWriterRecorded(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.ndjson")
+	d := shadow.New(porttest.NewDispatcher(1), shadow.NewFileWriter(path))
+	if _, err := d.Dispatch(context.Background(), brief("7", 1)); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	cmd := shadow.NewCommand()
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--file", path})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "  7: 1 dispatch (would use") {
+		t.Fatalf("out %q", out.String())
+	}
+	out.Reset()
+	cmd = shadow.NewCommand()
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--file", filepath.Join(t.TempDir(), "none")})
+	if err := cmd.Execute(); err != nil || out.String() != "no shadow records\n" {
+		t.Fatalf("missing file: %v %q", err, out.String())
+	}
+}

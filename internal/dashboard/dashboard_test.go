@@ -129,7 +129,7 @@ func TestNoWriteRoutes(t *testing.T) {
 	f := newFake(t)
 	f.BoardVal = sampleBoard()
 	h := Handler(f, Options{Operator: true})
-	for _, pat := range routes() {
+	for pat := range (&server{}).routes() {
 		method, path, ok := strings.Cut(pat, " ")
 		if !ok || method != http.MethodGet {
 			t.Fatalf("route %q is not GET only", pat)

@@ -6,14 +6,7 @@ import (
 	"net/http"
 
 	"github.com/KaaS-team/factory/internal/api"
-	"github.com/KaaS-team/factory/internal/store"
 )
-
-// StoreLookup returns a SessionLookup that reads the newest recorded session from st.
-// A ticket with none gives store.ErrSessionNotRecorded.
-func StoreLookup(st *store.Store) SessionLookup {
-	return st.LatestSession
-}
 
 // RunLogClient reads one page of a routines session's run log after a cursor.
 type RunLogClient interface {
@@ -58,16 +51,4 @@ func (h httpRunLog) RunLog(ctx context.Context, sessionID, cursor string) (Page,
 		return Page{}, err
 	}
 	return r.Poll(ctx, cursor)
-}
-
-// LocalFactory returns the Backends factory for sessions run by the local dispatcher. path names
-// the session's output file and ended says whether its process has exited.
-func LocalFactory(path func(api.Session) string, ended func(context.Context, api.Session) (bool, error)) func(api.Session) (Source, error) {
-	return func(s api.Session) (Source, error) {
-		l := &Local{Path: path(s)}
-		if ended != nil {
-			l.Ended = func(ctx context.Context) (bool, error) { return ended(ctx, s) }
-		}
-		return l, nil
-	}
 }

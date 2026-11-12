@@ -149,46 +149,6 @@ func TestRoutinesErrorsHideSecrets(t *testing.T) {
 	}
 }
 
-func TestLocalTailsGrowingFile(t *testing.T) {
-	path := t.TempDir() + "/session.out"
-	ended := false
-	l := &Local{Path: path, Ended: func(context.Context) (bool, error) { return ended, nil }, Now: func() time.Time { return time.Unix(0, 0) }}
-	var out bytes.Buffer
-	cursor := ""
-	step := func(add string) {
-		t.Helper()
-		if add != "" {
-			f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, _ = f.WriteString(add)
-			_ = f.Close()
-		}
-		p, err := l.Poll(context.Background(), cursor)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cursor = p.Next
-		for _, e := range p.Events {
-			_ = writeEvent(&out, e, false)
-		}
-	}
-	step("") // no file yet
-	step("plain line\n" + `{"type":"assistant","message":{"content":[{"type":"text","text":"hello"}]}}` + "\n")
-	step("half")    // incomplete line is held back
-	step(" done\n") // completed now
-	ended = true
-	step(`{"type":"result","result":"ok"}`) // last line without newline, read because the run ended
-	want := "1970-01-01T00:00:00Z  output  plain line\n" +
-		"1970-01-01T00:00:00Z  assistant  hello\n" +
-		"1970-01-01T00:00:00Z  output  half done\n" +
-		"1970-01-01T00:00:00Z  result  ok\n"
-	if out.String() != want {
-		t.Fatalf("got:\n%s\nwant:\n%s", out.String(), want)
-	}
-}
-
 func TestRedact(t *testing.T) {
 	for _, tc := range []struct{ name, in string }{
 		{"github", "pushed with ghp_abcdefghijklmnopqrstuvwxyz0123456789 ok"},
@@ -251,7 +211,7 @@ func TestCommandAndBackends(t *testing.T) {
 			return api.Session{Dispatcher: "local", Attempt: 2}, nil
 		},
 		Factories: map[string]func(api.Session) (Source, error){
-			"local": func(s api.Session) (Source, error) { return &Local{Path: "x"}, nil },
+			"local": func(s api.Session) (Source, error) { return &fakeSource{}, nil },
 		},
 	}
 	if got, err := b.Source(context.Background(), "1"); err != nil || got == nil {

@@ -115,7 +115,7 @@ type StatusOutput struct {
 }
 
 func boardView(b api.Board) BoardView {
-	v := BoardView{Slots: []SlotView{}, Ready: nonNil(b.Ready), MergeQueue: nonNilIDs(b.MergeQueue), FiresLeft: b.FiresLeft}
+	v := BoardView{Slots: []SlotView{}, Ready: nonNil(b.Ready), MergeQueue: nonNil(b.MergeQueue), FiresLeft: b.FiresLeft}
 	for _, s := range b.Slots {
 		sv := SlotView{Ticket: s.Ticket, Phase: s.Phase, LastPush: s.LastPush}
 		if s.Session != nil {
@@ -126,16 +126,9 @@ func boardView(b api.Board) BoardView {
 	return v
 }
 
-func nonNil(t []api.Ticket) []api.Ticket {
+func nonNil[T any](t []T) []T {
 	if t == nil {
-		return []api.Ticket{}
-	}
-	return t
-}
-
-func nonNilIDs(t []api.TicketID) []api.TicketID {
-	if t == nil {
-		return []api.TicketID{}
+		return []T{}
 	}
 	return t
 }
@@ -212,7 +205,7 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 	sdk.AddTool(s, &sdk.Tool{Name: "queue", Description: "Show the merge queue"},
 		func(ctx context.Context, _ *sdk.CallToolRequest, _ Empty) (*sdk.CallToolResult, QueueOutput, error) {
 			b, err := ctl.Board(ctx)
-			return nil, QueueOutput{MergeQueue: nonNilIDs(b.MergeQueue)}, err
+			return nil, QueueOutput{MergeQueue: nonNil(b.MergeQueue)}, err
 		})
 
 	sdk.AddTool(s, &sdk.Tool{Name: "dispatch", Description: "Dispatch a ready ticket"},

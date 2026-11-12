@@ -181,3 +181,12 @@ func TestLayering_LayerRowsCoverEveryKey(t *testing.T) {
 		}
 	}
 }
+
+// Keys lists every fixed key path, in table order.
+func Keys() []string {
+	out := make([]string, len(specs))
+	for i, s := range specs {
+		out[i] = s.key
+	}
+	return out
+}

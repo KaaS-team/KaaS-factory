@@ -214,6 +214,16 @@ Run the factory; --headless streams one JSON event per line
 | `--headless` | bool | `false` | print one api.Event JSON object per line and nothing else on stdout |
 | `--slots` | int | `0` | number of parallel slots (overrides config) |
 
+## factory shadow
+
+`factory shadow [flags]`
+
+Summarize what shadow mode would have dispatched
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--file` | string | `.factory/shadow.ndjson` | shadow log to read |
+
 ## factory status
 
 `factory status [flags]`

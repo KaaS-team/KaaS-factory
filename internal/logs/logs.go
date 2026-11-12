@@ -1,7 +1,7 @@
 // Package logs prints what a ticket's session is doing: `factory logs <ticket> [-f]`.
 //
-// A Source yields pages of events from one session, from the routines API or
-// a local output file. Print turns them into lines and, when following, keeps
+// A Source yields pages of events from one session, from the routines API.
+// Print turns them into lines and, when following, keeps
 // polling until the session ends or the context is canceled. Every line is
 // redacted before it is written.
 package logs
