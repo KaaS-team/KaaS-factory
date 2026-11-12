@@ -133,3 +133,9 @@ Source: https://github.com/Aider-AI/aider (Apache-2.0, Copyright (c) Paul Gauthi
 - `internal/packs/repomap/tags.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
 - `internal/packs/repomap/rank.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
 - `internal/packs/repomap/budget.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+## ast-grep/ast-grep@c7e005c
+
+Source: https://github.com/ast-grep/ast-grep (MIT, Copyright (c) 2022 Herrington Darkholme). Only field lists and output formats were read; no Rust was ported. The release binary is pinned by checksum, not vendored.
+
+- `internal/packs/astgrep/astgrep.go` from `crates/cli/src/print/json_print.rs` [tested by `internal/packs/astgrep/astgrep_test.go`]
+- `internal/packs/astgrep/pack.go` from `crates/config/src/rule_config.rs` and `crates/cli/src/verify/reporter.rs` [tested by `internal/packs/astgrep/pack_test.go`]
