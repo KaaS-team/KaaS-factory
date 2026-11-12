@@ -115,7 +115,33 @@ func (t *Tracker) Thread(ctx context.Context, id api.TicketID) (store.Thread, er
 			th.ChatopsCommands++
 		}
 	}
-	return th, nil
+	th.ManualPushes, err = t.manualPushes(ctx, id, tr.self)
+	return th, err
+}
+
+// manualPushes counts the repository's recent push events to the ticket's work branches whose
+// actor is not the runner's login. GitHub keeps events for 90 days, which covers every ticket a
+// rebuild lists (ready, active or parked).
+func (t *Tracker) manualPushes(ctx context.Context, id api.TicketID, self string) (int, error) {
+	prefix := "refs/heads/factory/" + string(id) + "-a"
+	opts := &gogithub.ListOptions{PerPage: 100}
+	n := 0
+	for {
+		evs, resp, err := t.client.Activity.ListRepositoryEvents(ctx, t.owner, t.repo, opts)
+		if err != nil {
+			return 0, fmt.Errorf("github tracker: list events: %w", err)
+		}
+		for _, e := range evs {
+			p, _ := e.ParsePayload()
+			if push, ok := p.(*gogithub.PushEvent); ok && strings.HasPrefix(push.GetRef(), prefix) && e.GetActor().GetLogin() != self {
+				n++
+			}
+		}
+		if resp.NextPage == 0 {
+			return n, nil
+		}
+		opts.Page = resp.NextPage
+	}
 }
 
 func readStatus(cs []Comment) (statusData, bool) {
