@@ -41,6 +41,15 @@ var newControl = func(cfg config.Config) (api.Control, error) {
 		return nil, err
 	}
 	d.Stages = stagesFor(cfg)
+	// An empty store (first start, or a deleted file) is rebuilt from the thread. Only the GitHub
+	// tracker has an observer and thread reads to rebuild from.
+	if st, ok := d.Store.(*store.Store); ok {
+		if _, gh := d.Tracker.(*github.Tracker); gh {
+			if _, err := st.RebuildIfEmpty(context.Background(), d.Tracker, d.Observer); err != nil {
+				return nil, fmt.Errorf("rebuild the store from the thread: %w", err)
+			}
+		}
+	}
 	return core.New(d, coreConfig(cfg))
 }
 

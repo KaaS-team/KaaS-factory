@@ -137,3 +137,23 @@ func TestPhasesStored(t *testing.T) {
 		}
 	}
 }
+
+// RebuildIfEmpty rebuilds an empty store once and leaves a filled one alone (Symphony 14).
+func TestRebuildIfEmpty(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "f.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	tr, o := fakes()
+	for i, want := range []bool{true, false} {
+		got, err := s.RebuildIfEmpty(ctx, tr, o)
+		if err != nil || got != want {
+			t.Fatalf("call %d: rebuilt = %v, err = %v, want %v", i, got, err, want)
+		}
+	}
+	if p, err := s.Phase(ctx, "1"); err != nil || p != api.PhaseDone {
+		t.Fatalf("phase of 1 = %q, %v", p, err)
+	}
+}
