@@ -66,8 +66,7 @@ func FileName(task string) string {
 // Seal sets the schema and the final diff's checksum, so a later Replay can tell the file was cut or edited.
 func (t *Trajectory) Seal() {
 	t.Schema = Schema
-	sum := sha256.Sum256([]byte(t.Submission))
-	t.DiffSHA256 = hex.EncodeToString(sum[:])
+	t.DiffSHA256 = sha(t.Submission)
 }
 
 // Write seals t and writes it to dir/FileName(t.Task), creating dir. It returns the path.
@@ -137,19 +136,26 @@ func Load(path string) ([]Trajectory, error) {
 	return out, nil
 }
 
-// Replay returns the final diff of a recorded run from its steps alone: the diff of the last step
-// that has one. It fails when that diff does not match the recorded checksum of the submission, so
-// a cut or edited file is not replayed as if it were whole.
+// Replay returns the final diff of a recorded run: the diff of the last step that has one, or the
+// submission when no step has a diff. It fails when the submission, or that step diff, does not match
+// the recorded checksum, so a cut or edited file is not replayed as if it were whole.
 func Replay(t Trajectory) (string, error) {
-	var diff string
+	if sha(t.Submission) != t.DiffSHA256 {
+		return "", fmt.Errorf("trajectory %s: submission does not match the recorded checksum", t.Task)
+	}
+	diff := t.Submission
 	for _, s := range t.Steps {
 		if s.Diff != "" {
 			diff = s.Diff
 		}
 	}
-	sum := sha256.Sum256([]byte(diff))
-	if hex.EncodeToString(sum[:]) != t.DiffSHA256 {
+	if sha(diff) != t.DiffSHA256 {
 		return "", fmt.Errorf("trajectory %s: last step diff does not match the recorded checksum", t.Task)
 	}
 	return diff, nil
+}
+
+func sha(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }
