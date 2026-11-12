@@ -77,6 +77,9 @@ type ClaudeInput struct {
 	Commands     Commands
 	Model        string // replaces the stage's default model
 	JSONSchema   string // the schema itself, not a path
+	// ReadOnly makes a plan run: no Write, Edit or NotebookEdit tool, no Edit allow rule, and every
+	// Bash allow pattern must pass FindFileEditingCommand.
+	ReadOnly bool
 }
 
 func bashRules(patterns []string) []string {
@@ -87,7 +90,21 @@ func bashRules(patterns []string) []string {
 	return out
 }
 
-func allowRules(stage, issue string, c Commands) []string {
+// readOnlyPatterns keeps the patterns whose command passes the plan-mode prefilter.
+func readOnlyPatterns(patterns []string) []string {
+	var out []string
+	for _, p := range patterns {
+		if FindFileEditingCommand(strings.TrimSuffix(p, " *")) == "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func allowRules(stage, issue string, c Commands, readOnly bool) []string {
+	if readOnly {
+		return append(bashRules(readOnlyPatterns(readOnlyBash)), bashRules(readOnlyPatterns(safeCommands(c.Read)))...)
+	}
 	rules := []string{"Edit(.factory/runs/issue-" + issue + "/**)"}
 	rules = append(rules, bashRules(readOnlyBash)...)
 	rules = append(rules, bashRules(safeCommands(c.Read))...)
@@ -112,7 +129,7 @@ func jsJSON(v any) string {
 }
 
 func settings(in ClaudeInput) string {
-	allow := allowRules(in.Stage, in.Issue, in.Commands)
+	allow := allowRules(in.Stage, in.Issue, in.Commands, in.ReadOnly)
 	for _, s := range in.MCPServers {
 		allow = append(allow, "mcp__"+s)
 	}
@@ -141,6 +158,9 @@ func ClaudeArgv(in ClaudeInput) ([]string, error) {
 	}
 	if in.Issue == "" {
 		return nil, errors.New("local: issue is required")
+	}
+	if in.ReadOnly {
+		tools = withoutEditTools(tools)
 	}
 	command := in.Prompt
 	if command == "" {
@@ -191,4 +211,15 @@ func ClaudeArgv(in ClaudeInput) ([]string, error) {
 		argv = append(argv, "--json-schema", in.JSONSchema)
 	}
 	return argv, nil
+}
+
+// withoutEditTools drops the tools that write files.
+func withoutEditTools(tools []string) []string {
+	var out []string
+	for _, t := range tools {
+		if t != "Write" && t != "Edit" && t != "NotebookEdit" {
+			out = append(out, t)
+		}
+	}
+	return out
 }

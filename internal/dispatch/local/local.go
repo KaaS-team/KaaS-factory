@@ -49,10 +49,18 @@ var ClaudePreset = Preset{
 	Env: map[string]string{"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"},
 }
 
+// ClaudePlanPreset is ClaudePreset without edit tools and with the plan-mode shell prefilter.
+var ClaudePlanPreset = Preset{
+	Argv: func(r Run) ([]string, error) {
+		return ClaudeArgv(ClaudeInput{Stage: r.Stage, Issue: string(r.Brief.Ticket), MaxBudgetUSD: r.Budget, Prompt: r.Prompt, Model: r.Brief.Model, ReadOnly: true})
+	},
+	Env: ClaudePreset.Env,
+}
+
 // Config holds what the caller injects.
 type Config struct {
 	Worktrees     Worktrees
-	Presets       map[string]Preset // default: {"claude": ClaudePreset}
+	Presets       map[string]Preset // default: claude and claude-plan
 	Binary        string            // replaces argv[0] of the preset, for tests and wrappers
 	Environ       []string          // the parent environment; default os.Environ()
 	Stage         string            // default "build"
@@ -94,7 +102,7 @@ func New(ctx context.Context, cfg Config) (*Dispatcher, error) {
 		return nil, errors.New("local: worktrees are required")
 	}
 	if cfg.Presets == nil {
-		cfg.Presets = map[string]Preset{"claude": ClaudePreset}
+		cfg.Presets = map[string]Preset{"claude": ClaudePreset, "claude-plan": ClaudePlanPreset}
 	}
 	if cfg.Environ == nil {
 		cfg.Environ = os.Environ()

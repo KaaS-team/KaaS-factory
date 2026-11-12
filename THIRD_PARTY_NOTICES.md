@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## cline/cline@50e77bc
+
+Source: https://github.com/cline/cline (Apache-2.0, Copyright Cline Bot Inc.). The Apache-2.0 licence text is at the repository root. The Go port is a translation and carries no upstream code.
+
+- `internal/dispatch/local/guard.go` from `sdk/packages/core/src/extensions/tools/command-guard.ts` [tested by `internal/dispatch/local/guard_test.go`, whose corpus is `command-guard.test.ts`]
