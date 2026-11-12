@@ -40,22 +40,14 @@ func TestRenderWhatChanged(t *testing.T) {
 func TestRenderPRBodyAssembly(t *testing.T) {
 	parts := gh.PRParts{
 		WhatChanged: "## What changed\n\ng",
-		Tasks:       "| Task |\n| --- |",
 		Acceptance:  "## Acceptance\n\n- [x] one",
-		QA:          &gh.QA{Routes: []gh.QARoute{{Path: "/", Status: 200, OK: true}, {Path: "/x", Status: 500}}},
-		Shots:       []gh.Shot{{Name: "home", After: "http://img/after.png"}, {Name: "list", Before: "http://img/b.png", After: "http://img/a.png"}},
-		TryIt:       &gh.TryIt{Command: "just fast", Output: "ok ```x``` done"},
 		Closes:      "Closes #4",
 		RunDetails:  gh.IssueRef(12),
 	}
 	want := strings.Join([]string{
 		"## What changed\n\ng",
-		"| Task |\n| --- |",
 		"the body",
 		"## Acceptance\n\n- [x] one",
-		"## QA\n\n| Route | Status | Result |\n| --- | --- | --- |\n| `/` | 200 | ok |\n| `/x` | 500 | failed |",
-		"## Screenshots\n\n| Route | Before | After |\n| --- | --- | --- |\n| `home` | _none_ | ![](http://img/after.png) |\n| `list` | ![](http://img/b.png) | ![](http://img/a.png) |",
-		"## Try it\n\n```\njust fast\n```\n\nExpected output:\n\n````\nok ```x``` done\n````",
 		"Closes #4",
 		"The receipt is in the run-details comment on #12.",
 	}, "\n\n")
@@ -96,13 +88,9 @@ func TestRenderPRBodyLeaksNothing(t *testing.T) {
 			"body":        {},
 			"whatChanged": {WhatChanged: gh.RenderWhatChanged(leak, []string{"a.go"}, nil)},
 			"acceptance":  {Acceptance: "## Acceptance\n\n- " + leak},
-			"tasks":       {Tasks: leak},
 			"closes":      {Closes: leak},
 			"runDetails":  {RunDetails: leak},
-			"tryIt":       {TryIt: &gh.TryIt{Command: "just fast", Output: leak}},
 			"proof":       {WhatChanged: gh.RenderWhatChanged("g", []string{leak}, &gh.Proof{Status: "bites", Tests: []string{leak}, Reverted: []string{leak}})},
-			"shots":       {Shots: []gh.Shot{{Name: leak, After: leak}}},
-			"qa":          {QA: &gh.QA{Routes: []gh.QARoute{{Path: leak, Status: 200, OK: true}}}},
 		}
 		for name, parts := range inputs {
 			body := leak

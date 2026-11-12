@@ -7,12 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/meter"
+	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/reconcile"
 )
 
@@ -83,6 +86,7 @@ type Core struct {
 	warned   map[api.TicketID]bool // budget steer already sent
 	stages   map[api.TicketID]*stageRun
 	tickets  map[api.TicketID]api.Ticket // last read of each ticket, for prompt templates
+	parked   map[api.TicketID]bool       // handed to a human; still scanned for /factory commands
 }
 
 var _ api.Control = (*Core)(nil)
@@ -122,7 +126,7 @@ func New(d Deps, cfg Config) (*Core, error) {
 		d: d, cfg: cfg, hub: newHub(cfg.EventBuffer, d.Clock.Now),
 		attempts: map[api.TicketID]int{}, lastPush: map[api.TicketID]time.Time{},
 		lastObs: map[api.TicketID]api.Observation{}, sessions: map[api.TicketID]api.Session{},
-		warned: map[api.TicketID]bool{}, stages: map[api.TicketID]*stageRun{}, tickets: map[api.TicketID]api.Ticket{},
+		warned: map[api.TicketID]bool{}, parked: map[api.TicketID]bool{}, stages: map[api.TicketID]*stageRun{}, tickets: map[api.TicketID]api.Ticket{},
 	}, nil
 }
 
@@ -157,6 +161,7 @@ func (c *Core) Tick(ctx context.Context) {
 		return
 	}
 	c.recover(ctx)
+	c.chatops(ctx)
 	c.meterPass(ctx)
 	reconcile.Tick(ctx, c.reconcileDeps(), &c.state, c.cfg.Reconcile)
 	if ctx.Err() != nil {
@@ -288,6 +293,7 @@ func (c *Core) escalate(ctx context.Context, id api.TicketID, reason string) {
 		c.report(err)
 		return
 	}
+	c.parked[id] = true
 	delete(c.state.Entries, id)
 	delete(c.stages, id)
 	c.hub.emit(KindNeedsHuman, id, map[string]any{"reason": reason})
@@ -313,6 +319,8 @@ func (c *Core) finish(ctx context.Context, id api.TicketID) {
 		lid := api.TicketID(l)
 		if err := c.d.Tracker.SetPhase(ctx, lid, api.PhaseMerged); err != nil {
 			c.report(err)
+		} else {
+			c.record(ctx, lid, api.PhaseMerged)
 		}
 		c.hub.emit(KindMerged, lid, map[string]any{"pr": c.lastObs[lid].PR})
 	}
@@ -330,4 +338,74 @@ func (c *Core) finish(ctx context.Context, id api.TicketID) {
 // when the subscriber falls EventBuffer events behind.
 func (c *Core) Events(ctx context.Context) (<-chan api.Event, error) {
 	return c.hub.subscribe(ctx), nil
+}
+
+// record writes a run's status into the ticket thread when the tracker keeps one (Symphony 14: the
+// thread is the state). Running is written when the first push is seen, so a shadow run, which never
+// pushes, stays silent. Only running and merged carry a time, so only they are written.
+func (c *Core) record(ctx context.Context, id api.TicketID, p api.Phase) {
+	if p != api.PhaseRunning && p != api.PhaseMerged {
+		return
+	}
+	if r, ok := c.d.Tracker.(observe.Recorder); ok {
+		c.report(r.RecordStatus(ctx, id, p))
+	}
+}
+
+// openPR opens the draft pull request for a branch that has its report but no pull request yet,
+// and returns the observation with the new number. The body is rendered by the tracker, which
+// never writes a model name, token count or cost into it (#210).
+func (c *Core) openPR(ctx context.Context, o api.Observation) api.Observation {
+	po, ok := c.d.Tracker.(observe.PROpener)
+	if !ok || o.Branch == "" || !o.HasReport || o.PR != 0 {
+		return o
+	}
+	n, err := po.OpenPR(ctx, o.Ticket, o.Branch, c.cfg.Reconcile.Base, o.DiffFiles)
+	if err != nil {
+		c.report(err)
+		return o
+	}
+	if n > 0 {
+		o.PR = n
+	}
+	return o
+}
+
+// chatops applies the retry and cancel commands trusted humans wrote in the threads of tracked and
+// parked tickets. A command is acknowledged before it runs, so a failure cannot run it twice.
+func (c *Core) chatops(ctx context.Context) {
+	cm, ok := c.d.Tracker.(observe.Commander)
+	if !ok || c.state == nil {
+		return
+	}
+	seen := map[api.TicketID]bool{}
+	for id := range c.state.Entries {
+		seen[id] = true
+	}
+	for id := range c.parked {
+		seen[id] = true
+	}
+	for _, id := range slices.Sorted(maps.Keys(seen)) {
+		cmds, err := cm.Commands(ctx, id)
+		if err != nil {
+			c.report(err)
+			continue
+		}
+		for _, cmd := range cmds {
+			if ctx.Err() != nil {
+				return
+			}
+			if err := cm.Ack(ctx, id, cmd.Ref); err != nil {
+				c.report(err)
+				break
+			}
+			switch cmd.Verb {
+			case observe.VerbRetry:
+				err = c.retry(ctx, id)
+			case observe.VerbCancel:
+				err = c.cancel(ctx, id)
+			}
+			c.report(err)
+		}
+	}
 }

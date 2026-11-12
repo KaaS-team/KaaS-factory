@@ -140,17 +140,6 @@ func (g Git) FFPush(ctx context.Context, remote, src, branch string) error {
 
 var treeID = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
 
-var leaseName = regexp.MustCompile(`^[\w.-]{1,100}$`)
-
-// LeaseRef returns refs/factory/lease/<name>. A name is 1 to 100 letters,
-// digits, underscores, dots or dashes, and never "." or "..".
-func LeaseRef(name string) (string, error) {
-	if !leaseName.MatchString(name) || strings.Trim(name, ".") == "" {
-		return "", fmt.Errorf("gitx: lease name %q: use 1 to 100 of letters, digits, _ . and -", name)
-	}
-	return "refs/factory/lease/" + name, nil
-}
-
 // NewLeaseCommit writes an empty-tree commit whose message is the lease record
 // and returns its id. A non-empty parent makes it a child of the lease it replaces.
 func (g Git) NewLeaseCommit(ctx context.Context, parent, message string) (string, error) {

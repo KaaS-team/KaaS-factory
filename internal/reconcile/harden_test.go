@@ -129,7 +129,7 @@ func TestMaxRetryBackoff(t *testing.T) {
 	}
 	for _, tc := range cases {
 		cf := Config{MaxRetryBackoff: tc.max}.withDefaults()
-		if got := cf.backoff(tc.n); got != tc.want {
+		if got := cf.Backoff(tc.n); got != tc.want {
 			t.Errorf("%s: got %v want %v", tc.name, got, tc.want)
 		}
 	}

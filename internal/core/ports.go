@@ -116,6 +116,7 @@ func (l loopTracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase)
 		if err := l.c.d.Tracker.SetPhase(ctx, id, p); err != nil {
 			return err
 		}
+		l.c.parked[id] = true
 		l.c.hub.emit(KindNeedsHuman, id, nil)
 		return nil
 	}
@@ -133,9 +134,13 @@ func (l loopObserver) Observe(ctx context.Context, id api.TicketID, attempt int)
 	if err != nil {
 		return o, err
 	}
+	o = l.c.openPR(ctx, o)
 	l.c.lastObs[id] = o
 	l.c.report(l.c.d.Store.Apply(ctx, o))
 	if o.Attempt == attempt+base && o.Branch != "" && o.LastPush.After(l.c.lastPush[id]) {
+		if l.c.lastPush[id].IsZero() {
+			l.c.record(ctx, id, api.PhaseRunning)
+		}
 		l.c.lastPush[id] = o.LastPush
 		l.c.hub.emit(KindPushed, id, map[string]any{"attempt": attempt + base, "branch": o.Branch})
 	}

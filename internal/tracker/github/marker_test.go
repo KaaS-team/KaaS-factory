@@ -3,6 +3,7 @@ package github_test
 import (
 	"encoding/json"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -23,6 +24,11 @@ func loadGolden(t *testing.T) map[string]string {
 	return m
 }
 
+// stripTrailing removes the marker that ends body, with the blank lines before it.
+func stripTrailing(body string) string {
+	return strings.TrimRight(regexp.MustCompile(`(?s)\n*<!-- factory:data \{.*?\} -->\s*$`).ReplaceAllString(body, ""), " \t\r\n")
+}
+
 func TestMarkerGoldenRoundTrip(t *testing.T) {
 	golden := loadGolden(t)
 	if len(golden) < 8 {
@@ -34,7 +40,7 @@ func TestMarkerGoldenRoundTrip(t *testing.T) {
 			if len(ms) != 1 {
 				t.Fatalf("decoded %d markers, want 1", len(ms))
 			}
-			got := gh.EncodeData(gh.StripData(body), ms[0].Stage, ms[0].JSON)
+			got := gh.EncodeData(stripTrailing(body), ms[0].Stage, ms[0].JSON)
 			if got != body {
 				t.Fatalf("re-encoded bytes differ\n got: %q\nwant: %q", got, body)
 			}
@@ -63,18 +69,7 @@ func TestParseDataSkipsForgeries(t *testing.T) {
 	}
 }
 
-func TestStripDataOnlyTrailingMarker(t *testing.T) {
-	body := "text\n\n<!-- factory:data {\"stage\":\"plan\",\"json\":{}} -->"
-	if got := gh.StripData(body); got != "text" {
-		t.Fatalf("StripData = %q", got)
-	}
-	mid := "a <!-- factory:data {\"stage\":\"plan\"} --> b"
-	if got := gh.StripData(mid); got != mid {
-		t.Fatalf("a marker that is not last must stay, got %q", got)
-	}
-}
-
-func TestLatestAndCount(t *testing.T) {
+func TestLatest(t *testing.T) {
 	ms := gh.ParseData(
 		gh.EncodeData("x", "verify", json.RawMessage(`{"result":"reject"}`)),
 		gh.EncodeData("y", "plan", json.RawMessage(`{"n":1}`)),
@@ -86,9 +81,6 @@ func TestLatestAndCount(t *testing.T) {
 	}
 	if _, ok := gh.Latest(ms, "build"); ok {
 		t.Fatal("Latest found a stage that is absent")
-	}
-	if gh.Count(ms, "verify") != 2 {
-		t.Fatal("Count(verify) != 2")
 	}
 }
 

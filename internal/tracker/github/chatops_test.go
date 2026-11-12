@@ -52,16 +52,13 @@ func TestParseChatOps(t *testing.T) {
 	}
 }
 
-func TestSignedByRoundTrip(t *testing.T) {
-	signed := gh.SignedBy("/factory approve", "bob")
-	if signed != "/factory approve\n\n<sub>Sent from the factory control plane by bob</sub>" {
-		t.Fatalf("SignedBy = %q", signed)
-	}
+func TestUnsignedStripsSignatureLine(t *testing.T) {
+	signed := "/factory approve\n\n<sub>Sent from the factory control plane by bob</sub>"
 	if got := gh.Unsigned(signed); got != "/factory approve" {
 		t.Fatalf("Unsigned = %q", got)
 	}
-	if got := gh.SignedBy("", "bob"); got != "<sub>Sent from the factory control plane by bob</sub>" {
-		t.Fatalf("SignedBy empty = %q", got)
+	if got := gh.Unsigned("<sub>Sent from the factory control plane by bob</sub>"); got != "" {
+		t.Fatalf("Unsigned of a bare signature = %q", got)
 	}
 }
 

@@ -143,33 +143,11 @@ func TestFFPush(t *testing.T) {
 	}
 }
 
-func TestLeaseRefName(t *testing.T) {
-	cases := []struct {
-		name string
-		want string
-		bad  bool
-	}{
-		{"merge-queue", "refs/factory/lease/merge-queue", false},
-		{"issue_12.a", "refs/factory/lease/issue_12.a", false},
-		{"", "", true},
-		{"a/b", "", true},
-		{"a b", "", true},
-		{"..", "", true},
-		{strings.Repeat("x", 101), "", true},
-	}
-	for _, tc := range cases {
-		got, err := gitx.LeaseRef(tc.name)
-		if (err != nil) != tc.bad || got != tc.want {
-			t.Errorf("LeaseRef(%q) = %q, %v", tc.name, got, err)
-		}
-	}
-}
-
 func TestUpdateRefCAS(t *testing.T) {
 	dir := newRepo(t)
 	g := gitx.New(dir)
 	ctx := context.Background()
-	ref, _ := gitx.LeaseRef("x")
+	ref := "refs/factory/lease/x"
 	c1, err := g.NewLeaseCommit(ctx, "", "holder=a")
 	if err != nil {
 		t.Fatal(err)
@@ -222,7 +200,7 @@ func TestPushLeaseCASOneWinner(t *testing.T) {
 			b := filepath.Join(t.TempDir(), "b")
 			run(t, t.TempDir(), "clone", "-q", remote, b)
 
-			ref, _ := gitx.LeaseRef("merge-queue")
+			ref := "refs/factory/lease/merge-queue"
 			ga, gb := gitx.New(a), gitx.New(b)
 			old := ""
 			if tc.initial {

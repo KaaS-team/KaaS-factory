@@ -10,9 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -74,17 +72,4 @@ func EncodeBody(body string, seal Seal, field string) string {
 		B string `json:"b"`
 	}{sealed, body})
 	return visible + "\n\n" + footer + base64.RawURLEncoding.EncodeToString([]byte(data))
-}
-
-// KeyNumber is the number in an issue key such as ENG-42.
-func KeyNumber(key string) (int, error) {
-	i := strings.LastIndex(key, "-")
-	if i < 0 {
-		return 0, fmt.Errorf("not an issue key: %q", key)
-	}
-	n, err := strconv.Atoi(key[i+1:])
-	if err != nil {
-		return 0, fmt.Errorf("not an issue key: %q", key)
-	}
-	return n, nil
 }
