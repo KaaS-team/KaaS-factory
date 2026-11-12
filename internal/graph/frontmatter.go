@@ -39,8 +39,24 @@ type Trigger struct {
 const (
 	// DefaultWorkflowName is the file name of the repo's default workflow (Symphony spec 5.1).
 	DefaultWorkflowName = "WORKFLOW.md"
-	defaultWorkflowFile = ".factory/workflows/feature-to-pr.yml"
+	// DefaultWorkflow is the name of the workflow a ticket runs when it names none.
+	DefaultWorkflow = "issue-to-pr"
+	// workflowDir holds the repo's workflow files; a file there named like the default replaces it.
+	workflowDir = ".factory/workflows"
 )
+
+// defaultSteps is the built-in default workflow: build, then a verify in a fresh session; a rejected
+// verify goes back to build.
+const defaultSteps = `steps:
+  build:
+    uses: build
+    label: factory:building
+    next: verify
+  verify:
+    uses: verify
+    label: factory:verifying
+    reject: build
+`
 
 // markdownVars are the template variables a markdown workflow body may use.
 var markdownVars = map[string]bool{"ticket.title": true, "ticket.body": true, "attempt": true}
@@ -105,14 +121,41 @@ func LoadMarkdown(path string) (*Graph, error) {
 	return g, nil
 }
 
-// LoadDefault loads the repo's default workflow: WORKFLOW.md at root when it exists, else the factory's
-// existing default. A WORKFLOW.md that fails to load is an error; it never falls back (Symphony spec 5.4).
+// LoadDefault loads the repo's default workflow: WORKFLOW.md at root when it exists, else
+// .factory/workflows/issue-to-pr.yml, .yaml or .md, else the built-in issue-to-pr. A file that fails to
+// load is an error; it never falls back (Symphony spec 5.4).
 func LoadDefault(root string) (*Graph, error) {
-	p := filepath.Join(root, DefaultWorkflowName)
-	if _, err := os.Stat(p); err == nil {
-		return LoadMarkdown(p)
+	if p := filepath.Join(root, DefaultWorkflowName); fileExists(p) {
+		return loadNamed(p, LoadMarkdown)
 	}
-	return Load(filepath.Join(root, defaultWorkflowFile))
+	if p := WorkflowFile(root, DefaultWorkflow); p != "" {
+		return loadNamed(p, Load)
+	}
+	return ParseYAML(DefaultWorkflow, []byte(defaultSteps))
+}
+
+// loadNamed loads p and prefixes a failure with the file, so the error says where to look.
+func loadNamed(p string, load func(string) (*Graph, error)) (*Graph, error) {
+	g, err := load(p)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", p, err)
+	}
+	return g, nil
+}
+
+// WorkflowFile returns the path of the repo's workflow file called name, or "" when there is none.
+func WorkflowFile(root, name string) string {
+	for _, ext := range []string{".yml", ".yaml", ".md"} {
+		if p := filepath.Join(root, workflowDir, name+ext); fileExists(p) {
+			return p
+		}
+	}
+	return ""
+}
+
+func fileExists(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && !st.IsDir()
 }
 
 // splitFrontMatter returns the front matter text, the body, and the 1-based file line the body starts on.

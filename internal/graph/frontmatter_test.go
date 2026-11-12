@@ -179,11 +179,12 @@ func TestLoadDefault(t *testing.T) {
 		files map[string]string
 		want  string // the graph name, or "" for an error
 	}{
-		{"root WORKFLOW.md wins", map[string]string{"WORKFLOW.md": "---\nname: mine\non: manual\n---\nGo.\n", defaultWorkflowFile: fallback}, "mine"},
+		{"root WORKFLOW.md wins", map[string]string{"WORKFLOW.md": "---\nname: mine\non: manual\n---\nGo.\n", workflowDir + "/issue-to-pr.yml": fallback}, "mine"},
 		{"WORKFLOW.md without front matter", map[string]string{"WORKFLOW.md": "Just a prompt.\n"}, "WORKFLOW"},
-		{"none keeps the existing default", map[string]string{defaultWorkflowFile: fallback}, "feature-to-pr"},
-		{"nothing at all", map[string]string{}, ""},
-		{"broken WORKFLOW.md does not fall back", map[string]string{"WORKFLOW.md": "---\non: sometimes\n---\n", defaultWorkflowFile: fallback}, ""},
+		{"repo issue-to-pr file replaces the built-in", map[string]string{workflowDir + "/issue-to-pr.yml": fallback}, "issue-to-pr"},
+		{"nothing at all is the built-in", map[string]string{}, "issue-to-pr"},
+		{"broken repo file does not fall back", map[string]string{workflowDir + "/issue-to-pr.yml": "steps: 3\n"}, ""},
+		{"broken WORKFLOW.md does not fall back", map[string]string{"WORKFLOW.md": "---\non: sometimes\n---\n", workflowDir + "/issue-to-pr.yml": fallback}, ""},
 	}
 	for _, c := range cases {
 		root := t.TempDir()
@@ -199,6 +200,15 @@ func TestLoadDefault(t *testing.T) {
 		}
 		if err != nil || g.Name != c.want {
 			t.Errorf("%s: %v %+v", c.name, err, g)
+			continue
+		}
+		if c.name == "repo issue-to-pr file replaces the built-in" && len(g.Nodes()) != 1 {
+			t.Errorf("%s: loaded %d nodes, want the repo file's one", c.name, len(g.Nodes()))
+		}
+		if c.name == "nothing at all is the built-in" {
+			if next, err := g.Next("verify", Fail); err != nil || next != "build" {
+				t.Errorf("%s: verify fail goes to %q, %v", c.name, next, err)
+			}
 		}
 	}
 }

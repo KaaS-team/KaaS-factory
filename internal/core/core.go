@@ -54,7 +54,8 @@ type Deps struct {
 	Store      Store
 	Meter      *meter.Meter
 	Queue      MergeQueue
-	Clock      Clock // RealClock when nil
+	Stages     *Stages // nil runs each ticket as one session
+	Clock      Clock   // RealClock when nil
 	OnError    func(error)
 }
 
@@ -80,6 +81,8 @@ type Core struct {
 	lastObs  map[api.TicketID]api.Observation
 	sessions map[api.TicketID]api.Session
 	warned   map[api.TicketID]bool // budget steer already sent
+	stages   map[api.TicketID]*stageRun
+	tickets  map[api.TicketID]api.Ticket // last read of each ticket, for prompt templates
 }
 
 var _ api.Control = (*Core)(nil)
@@ -119,7 +122,7 @@ func New(d Deps, cfg Config) (*Core, error) {
 		d: d, cfg: cfg, hub: newHub(cfg.EventBuffer, d.Clock.Now),
 		attempts: map[api.TicketID]int{}, lastPush: map[api.TicketID]time.Time{},
 		lastObs: map[api.TicketID]api.Observation{}, sessions: map[api.TicketID]api.Session{},
-		warned: map[api.TicketID]bool{},
+		warned: map[api.TicketID]bool{}, stages: map[api.TicketID]*stageRun{}, tickets: map[api.TicketID]api.Ticket{},
 	}, nil
 }
 
@@ -282,6 +285,7 @@ func (c *Core) escalate(ctx context.Context, id api.TicketID, reason string) {
 		return
 	}
 	delete(c.state.Entries, id)
+	delete(c.stages, id)
 	c.hub.emit(KindNeedsHuman, id, map[string]any{"reason": reason})
 	c.report(c.d.Tracker.Comment(ctx, id, "Needs a human: "+reason+"."))
 }

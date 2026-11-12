@@ -38,6 +38,7 @@ var newControl = func(cfg config.Config) (api.Control, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.Stages = stagesFor(cfg)
 	return core.New(d, coreConfig(cfg))
 }
 

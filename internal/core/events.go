@@ -27,6 +27,8 @@ const (
 	KindMerged = "merged"
 	// KindNeedsHuman is the factory giving up on a ticket. Data: reason, when known.
 	KindNeedsHuman = "needs_human"
+	// KindStage is a ticket moving to another workflow node. Data: node, after, outcome.
+	KindStage = "stage"
 	// KindBudget is the meter asking a session to wrap up or stopping it. Data: verdict.
 	KindBudget = "budget"
 	// KindSubscriberDropped is sent to the remaining subscribers when one fell behind
