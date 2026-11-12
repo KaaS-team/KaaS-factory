@@ -313,3 +313,9 @@ Source: https://github.com/dagger/dagger (Apache-2.0, Copyright 2022 Dagger, Inc
 - `pkg/sandbox/cachevol/store.go` from `engine/cachevolumedir/store.go`, with the Dagger naming removed, a tenant field added to the identity, and the test hooks dropped [tested by `pkg/sandbox/cachevol/store_test.go`]
 
 - `internal/tracker/sanitize/prompt.go` from `src/github/utils/sanitizer.ts` [tested by `internal/tracker/sanitize/prompt_test.go`]
+
+## sst/opencode@a1aa513f78c7e9c57ea6c1237de09b702e18f934
+
+Source: https://github.com/sst/opencode (MIT, Copyright (c) 2025 opencode)
+
+- `internal/dispatch/local/auth.go` from `packages/server/src/auth.ts` [tests in `internal/dispatch/local/auth_test.go`]
