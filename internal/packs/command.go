@@ -35,7 +35,7 @@ func NewAddCommand() *cobra.Command {
 // NewPacksCommand returns `packs` with the `list` and `verify` subcommands.
 func NewPacksCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "packs", Short: "Inspect the packs pinned in factory.lock"}
-	cmd.AddCommand(newListCommand(), newVerifyCommand())
+	cmd.AddCommand(newListCommand(), newVerifyCommand(), newRunCommand(), newMatchCommand())
 	return cmd
 }
 
@@ -240,6 +240,13 @@ func newVerifyCommand() *cobra.Command {
 			r, err := ParseRef(e.Ref)
 			if err != nil {
 				return err
+			}
+			if path.Base(r.Path) == "pack.yaml" {
+				if _, err := LoadManifest(cachePath(*root, r), e.SHA256); err != nil {
+					bad++
+					_, _ = fmt.Fprintf(out, "manifest: %s (%s): %v\n", r.Path, e.Ref, err)
+				}
+				continue
 			}
 			b, err := os.ReadFile(cachePath(*root, r))
 			switch {

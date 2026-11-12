@@ -90,3 +90,16 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## block/goose@910d084
+
+Source: https://github.com/block/goose (Apache-2.0, Copyright Block, Inc.)
+
+- `internal/packs/retry.go` from `crates/goose/src/agents/retry.rs` and `agents/types.rs` (RetryConfig, SuccessCheck) [tested by `internal/packs/retry_test.go`]
+- `internal/packs/manifest.go` from `crates/goose/src/recipe/validate_recipe.rs` (parameter caps only) [tested by `internal/packs/manifest_test.go`]
+
+## OpenHands/software-agent-sdk@10be259c4fc89b23999e8c653f2130a358e02116
+
+Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors)
+
+- `internal/packs/triggers.go` from `openhands-sdk/openhands/sdk/skills/skill.py` (path glob, keyword match, trigger selection) [tested by `internal/packs/triggers_test.go`]
