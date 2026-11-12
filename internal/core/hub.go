@@ -16,10 +16,11 @@ type hub struct {
 	now    func() time.Time
 	nextID int
 	subs   map[int]chan api.Event
+	hist   *history
 }
 
 func newHub(buf int, now func() time.Time) *hub {
-	return &hub{buf: buf, now: now, subs: map[int]chan api.Event{}}
+	return &hub{buf: buf, now: now, subs: map[int]chan api.Event{}, hist: newHistory()}
 }
 
 // subscribe returns a channel that is closed when ctx ends or the subscriber is dropped.
@@ -50,6 +51,7 @@ func (h *hub) emit(kind string, id api.TicketID, data map[string]any) {
 	for len(queue) > 0 {
 		ev := queue[0]
 		queue = queue[1:]
+		h.hist.add(ev)
 		for sid, ch := range h.subs {
 			select {
 			case ch <- ev:

@@ -4,6 +4,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -62,6 +63,7 @@ type Model struct {
 	stalled       map[api.TicketID]bool
 	events        <-chan api.Event
 	timelines     map[api.TicketID][]api.Event
+	loaded        map[api.TicketID]bool // history asked for
 
 	screen  screen
 	mode    mode
@@ -78,6 +80,11 @@ type (
 	eventMsg  api.Event
 	errMsg    struct{ err error }
 	doneMsg   struct{ note string }
+	// historyMsg is a ticket's past events from an api.Historian.
+	historyMsg struct {
+		id  api.TicketID
+		evs []api.Event
+	}
 )
 
 // New returns the board model for ctl.
@@ -90,6 +97,7 @@ func New(ctl api.Control) tea.Model {
 		width: defaultWidth, height: defaultHeight,
 		stalled:   map[api.TicketID]bool{},
 		timelines: map[api.TicketID][]api.Event{},
+		loaded:    map[api.TicketID]bool{},
 		input:     in,
 	}
 }
@@ -155,6 +163,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case eventsMsg:
 		m.events = msg.ch
 		return m, m.waitEvent()
+	case historyMsg:
+		m.mergeHistory(msg.id, msg.evs)
 	case eventMsg:
 		return m, tea.Batch(m.applyEvent(api.Event(msg)), m.waitEvent())
 	case errMsg:
@@ -170,12 +180,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // applyEvent records the event, handles stalled and merged locally, and reloads the board for the rest.
 func (m *Model) applyEvent(e api.Event) tea.Cmd {
-	if e.Ticket != "" {
-		tl := append(m.timelines[e.Ticket], e)
-		if len(tl) > maxTimeline {
-			tl = tl[len(tl)-maxTimeline:]
-		}
-		m.timelines[e.Ticket] = tl
+	if e.Ticket != "" && !hasEvent(m.timelines[e.Ticket], e) {
+		m.timelines[e.Ticket] = trimTimeline(append(m.timelines[e.Ticket], e))
 	}
 	switch e.Kind {
 	case "stalled":
@@ -280,14 +286,14 @@ func (m *Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		if m.screen == screenTimeline && m.tlID == "" {
 			if id, ok := m.firstBoardTicket(); ok {
-				m.tlID = id
+				return m, m.openTimeline(id)
 			}
 		}
 	case "enter":
 		if m.screen != screenTimeline {
 			if id, ok := m.selected(); ok {
-				m.tlID = id
 				m.screen = screenTimeline
+				return m, m.openTimeline(id)
 			}
 		}
 	case "esc":
@@ -313,6 +319,52 @@ func (m *Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func trimTimeline(tl []api.Event) []api.Event {
+	if len(tl) > maxTimeline {
+		return tl[len(tl)-maxTimeline:]
+	}
+	return tl
+}
+
+// hasEvent reports whether tl already holds an event equal to e. History and the live
+// stream overlap when an event is emitted between subscribing and reading history.
+func hasEvent(tl []api.Event, e api.Event) bool {
+	for _, x := range tl {
+		if x.Time.Equal(e.Time) && x.Kind == e.Kind && reflect.DeepEqual(x.Data, e.Data) {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeHistory puts a ticket's past events before the live ones already held, without repeats.
+func (m *Model) mergeHistory(id api.TicketID, past []api.Event) {
+	merged := append([]api.Event(nil), past...)
+	for _, e := range m.timelines[id] {
+		if !hasEvent(merged, e) {
+			merged = append(merged, e)
+		}
+	}
+	m.timelines[id] = trimTimeline(merged)
+}
+
+// openTimeline shows a ticket's timeline and, when the Control keeps history, loads it once.
+func (m *Model) openTimeline(id api.TicketID) tea.Cmd {
+	m.tlID = id
+	h, ok := m.ctl.(api.Historian)
+	if !ok || m.loaded[id] {
+		return nil
+	}
+	m.loaded[id] = true
+	return func() tea.Msg {
+		evs, err := h.History(m.ctx, id)
+		if err != nil {
+			return errMsg{err}
+		}
+		return historyMsg{id, evs}
+	}
 }
 
 func (m *Model) firstBoardTicket() (api.TicketID, bool) {

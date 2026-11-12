@@ -93,11 +93,25 @@ type EventView struct {
 	Ticket api.TicketID `json:"ticket,omitempty"`
 }
 
-// TicketView is the ticket resource: the ticket, its phase and its events.
+// TicketView is the ticket resource: the ticket, its phase and its past events.
+// HistoryAvailable is false when the Control keeps no history; HistoryNote then says so.
 type TicketView struct {
-	Ticket api.Ticket  `json:"ticket"`
-	Phase  api.Phase   `json:"phase"`
-	Events []EventView `json:"events"`
+	Ticket           api.Ticket  `json:"ticket"`
+	Phase            api.Phase   `json:"phase"`
+	Events           []EventView `json:"events"`
+	HistoryAvailable bool        `json:"history_available"`
+	HistoryNote      string      `json:"history_note,omitempty"`
+}
+
+// StatusInput selects the board (no ticket) or one ticket's detail.
+type StatusInput struct {
+	Ticket string `json:"ticket,omitempty" jsonschema:"ticket id; leave out for the whole board"`
+}
+
+// StatusOutput is the board, plus the named ticket's detail when one was asked for.
+type StatusOutput struct {
+	BoardView
+	Detail *TicketView `json:"detail,omitempty"`
 }
 
 func boardView(b api.Board) BoardView {
@@ -168,10 +182,22 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 	sdk.AddTool(s, &sdk.Tool{Name: "first_run", Description: "Walk through a first run"}, textTool("first_run", noArg(extra.FirstRun)))
 	sdk.AddTool(s, &sdk.Tool{Name: "report", Description: "Report on finished work"}, textTool("report", noArg(extra.Report)))
 
-	sdk.AddTool(s, &sdk.Tool{Name: "status", Description: "Show the board"},
-		func(ctx context.Context, _ *sdk.CallToolRequest, _ Empty) (*sdk.CallToolResult, BoardView, error) {
+	sdk.AddTool(s, &sdk.Tool{Name: "status", Description: "Show the board, or one ticket with its history"},
+		func(ctx context.Context, _ *sdk.CallToolRequest, in StatusInput) (*sdk.CallToolResult, StatusOutput, error) {
 			b, err := ctl.Board(ctx)
-			return nil, boardView(b), err
+			out := StatusOutput{BoardView: boardView(b)}
+			if err != nil || in.Ticket == "" {
+				return nil, out, err
+			}
+			v, ok, err := ticketView(ctx, ctl, b, in.Ticket)
+			if err != nil {
+				return nil, out, err
+			}
+			if !ok {
+				return nil, out, fmt.Errorf("status: ticket %s is not on the board", in.Ticket)
+			}
+			out.Detail = &v
+			return nil, out, nil
 		})
 	sdk.AddTool(s, &sdk.Tool{Name: "list_tickets", Description: "List running and ready tickets"},
 		func(ctx context.Context, _ *sdk.CallToolRequest, _ Empty) (*sdk.CallToolResult, TicketsOutput, error) {
@@ -235,6 +261,18 @@ func ticketResource(ctx context.Context, ctl api.Control, uri string) (*sdk.Read
 	if err != nil {
 		return nil, err
 	}
+	v, found, err := ticketView(ctx, ctl, b, id)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, sdk.ResourceNotFoundError(uri)
+	}
+	return jsonResource(uri, v)
+}
+
+// ticketView finds the ticket on the board and adds its history when the Control is an api.Historian.
+func ticketView(ctx context.Context, ctl api.Control, b api.Board, id string) (TicketView, bool, error) {
 	v := TicketView{Events: []EventView{}}
 	found := false
 	for _, sl := range b.Slots {
@@ -248,30 +286,22 @@ func ticketResource(ctx context.Context, ctl api.Control, uri string) (*sdk.Read
 		}
 	}
 	if !found {
-		return nil, sdk.ResourceNotFoundError(uri)
+		return v, false, nil
 	}
-	// Events is a live stream: take what is buffered, stop at close or a short idle.
-	ectx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-	defer cancel()
-	ch, err := ctl.Events(ectx)
+	h, ok := ctl.(api.Historian)
+	if !ok {
+		v.HistoryNote = "history is unavailable: this control plane does not keep past events"
+		return v, true, nil
+	}
+	evs, err := h.History(ctx, api.TicketID(id))
 	if err != nil {
-		return nil, err
+		return v, true, err
 	}
-loop:
-	for {
-		select {
-		case e, open := <-ch:
-			if !open {
-				break loop
-			}
-			if string(e.Ticket) == id {
-				v.Events = append(v.Events, EventView{Time: e.Time, Kind: e.Kind, Ticket: e.Ticket})
-			}
-		case <-ectx.Done():
-			break loop
-		}
+	v.HistoryAvailable = true
+	for _, e := range evs {
+		v.Events = append(v.Events, EventView{Time: e.Time, Kind: e.Kind, Ticket: e.Ticket})
 	}
-	return jsonResource(uri, v)
+	return v, true, nil
 }
 
 // Option configures NewCommand.

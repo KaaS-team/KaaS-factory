@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/KaaS-team/factory/internal/api/porttest"
 )
 
 func TestCommandWithoutControlFails(t *testing.T) {
@@ -19,7 +21,7 @@ func TestCommandWithoutControlFails(t *testing.T) {
 }
 
 func TestCommandRunsAndQuits(t *testing.T) {
-	f := newFake(fixedBoard())
+	f := porttest.NewControl(fixedBoard())
 	c := NewCommand()
 	c.SetContext(WithControl(context.Background(), f))
 	c.SetIn(strings.NewReader("q"))

@@ -4,10 +4,17 @@
 {{if not .Slot.LastPush.IsZero}}<p>Last push {{.Slot.LastPush.Format "2006-01-02 15:04:05"}}</p>{{end}}
 {{if .Operator}}<p>Tokens {{.Slot.Usage.InputTokens}} in, {{.Slot.Usage.OutputTokens}} out. Spend {{printf "%.2f" .Slot.Usage.CostUSD}}. Token cap {{.Slot.Budget.Tokens}}.</p>{{end}}
 <h2>Timeline</h2>
-<ul id="timeline"></ul>
+<div id="history">
+{{if .HasHistory}}<ul id="timeline">
+{{range .History}}<li data-key="{{.Key}}">{{.Time}} {{.Kind}}</li>
+{{end}}</ul>{{else}}<p class="note">History is unavailable; showing live events only.</p>
+<ul id="timeline"></ul>{{end}}
+</div>
 <script>
 (function(){if(!window.EventSource)return;var id={{.Slot.Ticket.ID}};var ul=document.getElementById("timeline");
 var s=new EventSource("/events");s.onmessage=function(m){var e=JSON.parse(m.data);if(e.ticket!==id)return;
-var li=document.createElement("li");li.textContent=e.time+" "+e.kind;ul.appendChild(li)}})();
+var key=e.time+" "+e.kind;var seen=false;ul.querySelectorAll("li").forEach(function(li){if(li.getAttribute("data-key")===key)seen=true});
+if(seen)return;
+var li=document.createElement("li");li.setAttribute("data-key",key);li.textContent=e.time+" "+e.kind;ul.appendChild(li)}})();
 </script>
 {{template "foot"}}

@@ -4,69 +4,26 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/api/porttest"
 )
 
-// fakeControl is a read-side Control. Any write call fails the test.
-type fakeControl struct {
-	t      *testing.T
-	board  api.Board
-	events chan api.Event
-	subs   atomic.Int32
-	subbed chan struct{}
-	once   sync.Once
-}
+var update = flag.Bool("update", false, "rewrite golden files")
 
-func newFake(t *testing.T) *fakeControl {
-	return &fakeControl{t: t, events: make(chan api.Event, 8), subbed: make(chan struct{})}
-}
-
-func (f *fakeControl) Board(context.Context) (api.Board, error) { return f.board, nil }
-func (f *fakeControl) Dispatch(context.Context, api.TicketID) error {
-	f.t.Error("dashboard called Dispatch")
-	return nil
-}
-func (f *fakeControl) Steer(context.Context, api.TicketID, string) error {
-	f.t.Error("dashboard called Steer")
-	return nil
-}
-func (f *fakeControl) Cancel(context.Context, api.TicketID) error {
-	f.t.Error("dashboard called Cancel")
-	return nil
-}
-func (f *fakeControl) Retry(context.Context, api.TicketID) error {
-	f.t.Error("dashboard called Retry")
-	return nil
-}
-func (f *fakeControl) Events(ctx context.Context) (<-chan api.Event, error) {
-	f.subs.Add(1)
-	out := make(chan api.Event)
-	go func() {
-		defer f.subs.Add(-1)
-		f.once.Do(func() { close(f.subbed) })
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case e := <-f.events:
-				select {
-				case out <- e:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
-	return out, nil
+// newFake is a read-side Control. Any write call fails the test.
+func newFake(t *testing.T) *porttest.Control {
+	f := porttest.NewControl(api.Board{})
+	f.OnWrite = func(call string) { t.Errorf("dashboard wrote: %s", call) }
+	return f
 }
 
 func sampleBoard() api.Board {
@@ -102,12 +59,12 @@ func get(t *testing.T, h http.Handler, path string) (int, string) {
 // Acceptance: GET / renders every slot of a fake Board.
 func TestBoardRendersEverySlot(t *testing.T) {
 	f := newFake(t)
-	f.board = sampleBoard()
+	f.BoardVal = sampleBoard()
 	code, body := get(t, Handler(f, Options{}), "/")
 	if code != 200 {
 		t.Fatalf("status %d", code)
 	}
-	for _, s := range f.board.Slots {
+	for _, s := range f.BoardVal.Slots {
 		if !strings.Contains(body, string(s.Ticket.ID)) || !strings.Contains(body, string(s.Phase)) {
 			t.Errorf("slot %s missing from board", s.Ticket.ID)
 		}
@@ -119,7 +76,7 @@ func TestBoardRendersEverySlot(t *testing.T) {
 
 func TestQueueAndTimelinePages(t *testing.T) {
 	f := newFake(t)
-	f.board = sampleBoard()
+	f.BoardVal = sampleBoard()
 	h := Handler(f, Options{})
 	_, q := get(t, h, "/queue")
 	if !strings.Contains(q, "201") || !strings.Contains(q, "103") {
@@ -146,7 +103,7 @@ func TestOperatorGate(t *testing.T) {
 	}{{"off", false}, {"on", true}} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFake(t)
-			f.board = sampleBoard()
+			f.BoardVal = sampleBoard()
 			h := Handler(f, Options{Operator: tc.op})
 			for _, p := range []string{"/", "/queue", "/ticket/101"} {
 				_, body := get(t, h, p)
@@ -170,7 +127,7 @@ func TestOperatorGate(t *testing.T) {
 // Acceptance: no route accepts POST, PUT, PATCH or DELETE.
 func TestNoWriteRoutes(t *testing.T) {
 	f := newFake(t)
-	f.board = sampleBoard()
+	f.BoardVal = sampleBoard()
 	h := Handler(f, Options{Operator: true})
 	for _, pat := range routes() {
 		method, path, ok := strings.Cut(pat, " ")
@@ -219,8 +176,8 @@ func TestEventsStreamsAndReleases(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
 		t.Errorf("content type %q", ct)
 	}
-	<-f.subbed
-	f.events <- api.Event{V: api.EventVersion, Kind: "phase", Ticket: "101", Data: map[string]any{"to": "running"}}
+	<-f.Subscribed()
+	f.Push(api.Event{V: api.EventVersion, Kind: "phase", Ticket: "101", Data: map[string]any{"to": "running"}})
 	got := readEvent(t, bufio.NewReader(resp.Body))
 	if got.Kind != "phase" || got.Ticket != "101" {
 		t.Errorf("event %+v", got)
@@ -228,7 +185,7 @@ func TestEventsStreamsAndReleases(t *testing.T) {
 	cancel()
 	_ = resp.Body.Close()
 	deadline := time.Now().Add(3 * time.Second)
-	for f.subs.Load() != 0 {
+	for f.Subscribers() != 0 {
 		if time.Now().After(deadline) {
 			t.Fatal("subscription not released after client closed")
 		}
@@ -245,9 +202,9 @@ func TestEventsHideUsageWithoutOperator(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	<-f.subbed
-	f.events <- api.Event{V: 1, Kind: "usage", Ticket: "101", Data: map[string]any{"cost_usd": 3.2}}
-	f.events <- api.Event{V: 1, Kind: "phase", Ticket: "101", Data: map[string]any{"model": "x", "to": "done"}}
+	<-f.Subscribed()
+	f.Push(api.Event{V: 1, Kind: "usage", Ticket: "101", Data: map[string]any{"cost_usd": 3.2}})
+	f.Push(api.Event{V: 1, Kind: "phase", Ticket: "101", Data: map[string]any{"model": "x", "to": "done"}})
 	got := readEvent(t, bufio.NewReader(resp.Body))
 	if got.Kind != "phase" || got.Data != nil {
 		t.Errorf("want the phase event with no data, got %+v", got)
@@ -281,7 +238,7 @@ func TestCommandNeedsControl(t *testing.T) {
 
 func TestCommandServesAndStops(t *testing.T) {
 	f := newFake(t)
-	f.board = sampleBoard()
+	f.BoardVal = sampleBoard()
 	ctx, cancel := context.WithCancel(WithControl(context.Background(), f))
 	cmd := NewCommand()
 	cmd.SetOut(io.Discard)
@@ -297,5 +254,80 @@ func TestCommandServesAndStops(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("command did not stop on context cancel")
+	}
+}
+
+// timelineFragment returns the <ul id="timeline"> element of a ticket page.
+func timelineFragment(t *testing.T, body string) string {
+	t.Helper()
+	i := strings.Index(body, `<div id="history">`)
+	j := strings.Index(body, "<script>")
+	if i < 0 || j < i {
+		t.Fatalf("no history fragment in page:\n%s", body)
+	}
+	return strings.TrimSpace(body[i:j]) + "\n"
+}
+
+func seededControl(t *testing.T) *porttest.Control {
+	f := newFake(t)
+	f.BoardVal = sampleBoard()
+	f.Seed("101",
+		api.Event{V: 1, Time: time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC), Kind: "dispatched", Ticket: "101", Data: map[string]any{"attempt": 1}},
+		api.Event{V: 1, Time: time.Date(2026, 1, 2, 3, 1, 0, 0, time.UTC), Kind: "budget", Ticket: "101", Data: map[string]any{"verdict": "steer"}},
+		api.Event{V: 1, Time: time.Date(2026, 1, 2, 3, 2, 0, 0, time.UTC), Kind: "pushed <b>", Ticket: "101", Data: map[string]any{"branch": "b"}},
+	)
+	return f
+}
+
+// Acceptance: the ticket page renders history (golden HTML fragment). Budget events stay hidden without the operator flag.
+func TestTicketPageRendersHistoryGolden(t *testing.T) {
+	tests := []struct {
+		name   string
+		opts   Options
+		golden string
+		ctl    func(*porttest.Control) api.Control
+	}{
+		{"history", Options{}, "testdata/ticket_history.golden", func(f *porttest.Control) api.Control { return f }},
+		{"operator history", Options{Operator: true}, "testdata/ticket_history_operator.golden", func(f *porttest.Control) api.Control { return f }},
+		{"no historian", Options{}, "testdata/ticket_no_historian.golden", func(f *porttest.Control) api.Control { return f.ControlOnly() }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := seededControl(t)
+			_, body := get(t, Handler(tc.ctl(f), tc.opts), "/ticket/101")
+			got := timelineFragment(t, body)
+			if *update {
+				if err := os.WriteFile(tc.golden, []byte(got), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			want, err := os.ReadFile(tc.golden)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != string(want) {
+				t.Fatalf("fragment differs from %s\n--- got\n%s\n--- want\n%s", tc.golden, got, want)
+			}
+		})
+	}
+}
+
+func TestTicketPageAsksHistoryForThatTicketOnly(t *testing.T) {
+	f := seededControl(t)
+	get(t, Handler(f, Options{}), "/ticket/101")
+	if got := f.HistoryCalls(); len(got) != 1 || got[0] != "101" {
+		t.Fatalf("History calls = %v", got)
+	}
+	get(t, Handler(f, Options{}), "/ticket/nope")
+	if got := f.HistoryCalls(); len(got) != 1 {
+		t.Fatalf("History asked for an unknown ticket: %v", got)
+	}
+}
+
+// The page script skips a live event whose key is already in the history list.
+func TestTicketPageScriptDedupesByKey(t *testing.T) {
+	_, body := get(t, Handler(seededControl(t), Options{}), "/ticket/101")
+	if !strings.Contains(body, "data-key") || !strings.Contains(body, "querySelector") {
+		t.Fatalf("page lacks key-based dedupe:\n%s", body)
 	}
 }
