@@ -2,7 +2,9 @@ package tui
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -166,8 +168,8 @@ func TestKeysCallControl(t *testing.T) {
 		{"j at bottom stays", []string{"j", "j", "j", "j", "r"}, []string{"retry 103"}, screenBoard},
 		{"enter opens timeline", []string{"enter"}, nil, screenTimeline},
 		{"esc leaves timeline", []string{"enter", "esc"}, nil, screenBoard},
-		{"tab to queue", []string{"tab"}, nil, screenQueue},
-		{"tab twice to timeline", []string{"tab", "tab"}, nil, screenTimeline},
+		{"tab to waves", []string{"tab"}, nil, screenWaves},
+		{"tab twice to queue", []string{"tab", "tab"}, nil, screenQueue},
 		{"tab thrice back to board", []string{"tab", "tab", "tab"}, nil, screenBoard},
 		{"steer sends prompt", []string{"s", "h", "i", "enter"}, []string{"steer 101: hi"}, screenBoard},
 		{"steer esc sends nothing", []string{"s", "h", "esc", "r"}, []string{"retry 101"}, screenBoard},
@@ -175,7 +177,7 @@ func TestKeysCallControl(t *testing.T) {
 		{"cancel n aborts", []string{"c", "n"}, nil, screenBoard},
 		{"cancel needs confirm", []string{"c"}, nil, screenBoard},
 		{"retry", []string{"r"}, []string{"retry 101"}, screenBoard},
-		{"queue enter targets ready ticket", []string{"tab", "j", "j", "r"}, []string{"retry 104"}, screenQueue},
+		{"queue enter targets ready ticket", []string{"tab", "tab", "j", "j", "r"}, []string{"retry 104"}, screenQueue},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -233,6 +235,7 @@ func cardLine(v, id, word string) bool {
 
 func TestMergedEventLeavesQueue(t *testing.T) {
 	m, f := newModel(t, fixedBoard())
+	m, _ = press(t, m, "tab")
 	m, _ = press(t, m, "tab")
 	if !strings.Contains(view(m), "#99") {
 		t.Fatalf("99 missing from queue:\n%s", view(m))
@@ -364,5 +367,101 @@ func TestTimelineWithoutHistorianStillWorks(t *testing.T) {
 	}
 	if !strings.Contains(view(m), "no events yet") {
 		t.Fatalf("timeline:\n%s", view(m))
+	}
+}
+
+func wavesBoard() api.Board {
+	b := fixedBoard()
+	b.Slots[0].Ticket.BlockedBy = nil
+	b.Slots[1].Ticket.BlockedBy = []api.TicketID{"101"}
+	b.Slots[2].Ticket.BlockedBy = []api.TicketID{"101", "102"}
+	b.Ready[0].BlockedBy = []api.TicketID{"103", "999"} // 999 is done, not on the board
+	return b
+}
+
+func TestWaves(t *testing.T) {
+	tests := []struct {
+		name string
+		b    api.Board
+		want [][]api.TicketID
+	}{
+		{"empty", api.Board{}, nil},
+		{"no deps is one wave", fixedBoard(), [][]api.TicketID{{"101", "102", "103", "104"}}},
+		{"chain and fan in", wavesBoard(), [][]api.TicketID{{"101"}, {"102"}, {"103"}, {"104"}}},
+		{"cycle lands in a last wave", api.Board{Ready: []api.Ticket{
+			{ID: "1", BlockedBy: []api.TicketID{"2"}}, {ID: "2", BlockedBy: []api.TicketID{"1"}}}},
+			[][]api.TicketID{{"1", "2"}}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := waves(tc.b)
+			if fmt.Sprint(got) != fmt.Sprint(tc.want) {
+				t.Fatalf("waves = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func goldenCheck(t *testing.T, path, got string) {
+	t.Helper()
+	if *update {
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != string(want) {
+		t.Fatalf("view differs from golden %s\n--- got\n%s\n--- want\n%s", path, got, want)
+	}
+}
+
+// Symphony §8.2 (dispatch eligibility): a ticket waits for every blocker, so the DAG reads as waves.
+func TestGoldenWaves100x30(t *testing.T) {
+	m, _ := newModel(t, wavesBoard())
+	m, _ = press(t, m, "tab")
+	if m.screen != screenWaves {
+		t.Fatalf("tab did not open waves, screen = %v", m.screen)
+	}
+	goldenCheck(t, "testdata/waves_100x30.golden", view(m))
+}
+
+// Symphony §13.7: the queue screen shows the merge queue and the gate's last output.
+func TestGoldenQueue100x30(t *testing.T) {
+	m, f := newModel(t, fixedBoard())
+	m = emit(t, m, f, api.Event{V: 1, Time: t0, Kind: "gate", Data: map[string]any{"runs": 2, "log": "ok  pkg/a\nFAIL pkg/b\n--- FAIL: TestB"}})
+	m, _ = press(t, m, "tab")
+	m, _ = press(t, m, "tab")
+	if m.screen != screenQueue {
+		t.Fatalf("screen = %v", m.screen)
+	}
+	goldenCheck(t, "testdata/queue_100x30.golden", view(m))
+}
+
+// The board and queue are driven by a stream: a gate event shows without a reload of the queue screen.
+func TestQueueShowsEjectionReason(t *testing.T) {
+	m, f := newModel(t, fixedBoard())
+	m = emit(t, m, f, api.Event{V: 1, Time: t0, Kind: "needs-human", Ticket: "100", Data: map[string]any{"reason": "gate failed"}})
+	m, _ = press(t, m, "tab")
+	m, _ = press(t, m, "tab")
+	if !cardLine(view(m), "100", "gate failed") {
+		t.Fatalf("queue lacks reason:\n%s", view(m))
+	}
+}
+
+// Only internal/api may be an internal dependency of the TUI.
+func TestImportsOnlyAPI(t *testing.T) {
+	out, err := exec.Command("go", "list", "-deps", "-f", "{{if not .Standard}}{{.ImportPath}}{{end}}", ".").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range strings.Fields(string(out)) {
+		if strings.HasPrefix(p, "github.com/KaaS-team/factory/internal/") &&
+			p != "github.com/KaaS-team/factory/internal/tui" &&
+			p != "github.com/KaaS-team/factory/internal/api" {
+			t.Errorf("internal/tui depends on %s", p)
+		}
 	}
 }

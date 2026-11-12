@@ -1,4 +1,4 @@
-factory  [board]  queue   timeline 
+factory  [board]  waves   queue 
 
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
 │> #101 Add the TUI board  [running]                                                             │

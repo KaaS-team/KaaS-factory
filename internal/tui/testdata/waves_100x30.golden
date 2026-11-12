@@ -1,0 +1,30 @@
+factory   board  [waves]  queue 
+
+wave 1
+  #101 Add the TUI board [running]
+wave 2
+  #102 Port the merge queue [running]
+wave 3
+  #103 Wire the dashboard [stalled]
+wave 4
+  #104 Docs sweep [ready]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fires left: 7
+j/k move  enter timeline  s steer  c cancel  r retry  tab screen  q quit

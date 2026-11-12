@@ -1,0 +1,30 @@
+factory   board   waves  [queue]
+
+merge queue
+> #99 queued
+  #100 queued
+ready
+  #104 P2 Docs sweep
+gate  12:00:00  runs=2
+  ok  pkg/a
+  FAIL pkg/b
+  --- FAIL: TestB
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fires left: 7
+j/k move  enter timeline  s steer  c cancel  r retry  tab screen  q quit
