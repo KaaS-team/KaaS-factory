@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## OpenHands/software-agent-sdk@10be259
+
+Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). Only the stuck detector was ported; `openhands-sdk/` outside `ee/` directories.
+
+- `internal/dispatch/local/stuck/stuck.go` from `openhands-sdk/openhands/sdk/conversation/stuck_detector.py` [tested by `internal/dispatch/local/stuck/stuck_test.go`]

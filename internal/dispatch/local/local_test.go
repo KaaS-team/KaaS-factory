@@ -306,3 +306,42 @@ func TestGitWorktreesAddsABranchFromTheBase(t *testing.T) {
 		t.Error("option-shaped branch accepted")
 	}
 }
+
+func TestStuckRunIsNudgedThenAborted(t *testing.T) {
+	// Eight identical tool calls and results, then a sleep the abort must cut short.
+	body := `i=0
+while [ $i -lt 8 ]; do
+  echo '{"type":"assistant","message":{"id":"r'$i'","content":[{"type":"tool_use","id":"t'$i'","name":"Bash","input":{"cmd":"ls"}}]}}'
+  echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t'$i'","content":"same","is_error":false}]}}'
+  i=$((i+1))
+done
+sleep 30
+`
+	d, _ := newLocal(t, body, nil)
+	s, err := d.Dispatch(context.Background(), bf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err = d.Wait(ctx, s)
+	if !errors.Is(err, ErrStuck) || !strings.Contains(err.Error(), "action-observation") {
+		t.Fatalf("wait: %v, want ErrStuck naming the pattern", err)
+	}
+}
+
+func TestVariedRunIsNotStuck(t *testing.T) {
+	body := `i=0
+while [ $i -lt 8 ]; do
+  echo '{"type":"assistant","message":{"id":"r'$i'","content":[{"type":"tool_use","id":"t'$i'","name":"Bash","input":{"cmd":"ls '$i'"}}]}}'
+  echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t'$i'","content":"out'$i'","is_error":false}]}}'
+  i=$((i+1))
+done
+`
+	d, _ := newLocal(t, body, nil)
+	s, err := d.Dispatch(context.Background(), bf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait(t, d, s)
+}
