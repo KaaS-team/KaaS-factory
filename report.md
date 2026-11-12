@@ -3,7 +3,7 @@ NEXT: 9f7be7628306a8922e98cad7b3e3a4b0c564f6df
 ## Merged
 - none
 ## Skipped
-- go/k4-sandbox-harden-fix -> push rejected as non-fast-forward 7 times (6 retries used up). The merge passed the full gate every time (last local merge cca2382 on e36218c), and `go test -race -count=20 ./internal/dispatch/local` passed. Another session landed on next about once a minute (21:32 to 21:41 UTC), faster than one gate run, so every push lost the race.
+- go/k4-sandbox-harden-fix -> push rejected as non-fast-forward 8 times (the 6-try limit plus 2 earlier attempts). The merge passed the full gate every time (last local merge cca2382 on e36218c), and `go test -race -count=20 ./internal/dispatch/local` passed. Another session landed on next about once a minute (21:32 to 21:41 UTC), faster than one gate run, so every push lost the race.
 - go/k5-eval-arms-fix, go/fix-egress-ssrf -> not attempted: the brief orders them after k4-sandbox-harden-fix. Both merge cleanly on top of it (checked locally).
 - go/k5-local-auth, go/k5-preset-rules, go/k5-sandbox-runsc -> not attempted: they depend on the three fix branches above.
 - go/k5-sandbox-lifecycle -> not attempted. It merges cleanly on next+k4, and `go vet ./pkg/sandbox` passes there: the `undefined: run` error did not reproduce without go/k5-sandbox-limits.
