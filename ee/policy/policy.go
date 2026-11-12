@@ -9,6 +9,7 @@ package policy
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path"
 
@@ -68,7 +69,7 @@ type Engine struct {
 var known = map[Action]bool{ActionDispatch: true, ActionMerge: true, ActionSetPhase: true}
 
 // Parse reads a YAML rule list and rejects unknown fields, effects and actions, bad globs and
-// duplicate ids.
+// duplicate ids. It reports every bad rule in one error.
 func Parse(data []byte) (*Engine, error) {
 	var doc struct {
 		Rules []Rule `yaml:"rules"`
@@ -79,33 +80,20 @@ func Parse(data []byte) (*Engine, error) {
 		return nil, fmt.Errorf("policy: %w", err)
 	}
 	seen := map[string]bool{}
+	var bad []error
 	for _, r := range doc.Rules {
 		if r.ID == "" {
-			return nil, fmt.Errorf("policy: a rule has no id")
+			bad = append(bad, fmt.Errorf("a rule has no id"))
+			continue
 		}
 		if seen[r.ID] {
-			return nil, fmt.Errorf("policy: duplicate rule id %q", r.ID)
+			bad = append(bad, fmt.Errorf("duplicate rule id %q", r.ID))
 		}
 		seen[r.ID] = true
-		if r.Effect != "allow" && r.Effect != "deny" {
-			return nil, fmt.Errorf("policy: rule %q: effect must be allow or deny", r.ID)
-		}
-		if len(r.Action) == 0 {
-			return nil, fmt.Errorf("policy: rule %q: actions is required", r.ID)
-		}
-		for _, a := range r.Action {
-			if !known[Action(a)] {
-				return nil, fmt.Errorf("policy: rule %q: unknown action %q", r.ID, a)
-			}
-		}
-		for _, g := range r.Repos {
-			if _, err := path.Match(g, ""); err != nil {
-				return nil, fmt.Errorf("policy: rule %q: bad repo glob %q", r.ID, g)
-			}
-		}
-		if r.MaxUSD != nil && *r.MaxUSD < 0 {
-			return nil, fmt.Errorf("policy: rule %q: max_usd must be 0 or more", r.ID)
-		}
+		bad = append(bad, r.problems()...)
+	}
+	if len(bad) > 0 {
+		return nil, fmt.Errorf("policy: %d bad rules: %w", len(bad), errors.Join(bad...))
 	}
 	return &Engine{rules: doc.Rules}, nil
 }
@@ -138,6 +126,32 @@ func (e *Engine) Check(_ context.Context, who Actor, act Action, res Resource) D
 		return Decision{RuleID: over, Reason: fmt.Sprintf("rule %s caps spend and %.2f USD is over it", over, res.USD)}
 	}
 	return Decision{RuleID: RuleDefaultDeny, Reason: fmt.Sprintf("no rule allows %s for role %s on %s", act, who.Role, res.Repo)}
+}
+
+// problems lists everything wrong with one rule.
+func (r Rule) problems() []error {
+	var bad []error
+	add := func(f string, a ...any) { bad = append(bad, fmt.Errorf("rule %q: "+f, append([]any{r.ID}, a...)...)) }
+	if r.Effect != "allow" && r.Effect != "deny" {
+		add("effect must be allow or deny")
+	}
+	if len(r.Action) == 0 {
+		add("actions is required")
+	}
+	for _, a := range r.Action {
+		if !known[Action(a)] {
+			add("unknown action %q", a)
+		}
+	}
+	for _, g := range r.Repos {
+		if _, err := path.Match(g, ""); err != nil {
+			add("bad repo glob %q", g)
+		}
+	}
+	if r.MaxUSD != nil && *r.MaxUSD < 0 {
+		add("max_usd must be 0 or more")
+	}
+	return bad
 }
 
 func (r Rule) matches(who Actor, act Action, res Resource) bool {
