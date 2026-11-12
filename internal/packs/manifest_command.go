@@ -3,6 +3,7 @@ package packs
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 
@@ -18,8 +19,19 @@ func newRunCommand() *cobra.Command {
 		Args:         cobra.MinimumNArgs(2),
 		SilenceUsage: true,
 	}
+	root := rootFlag(cmd)
+	unlocked := cmd.Flags().Bool("unlocked", false, "run a pack that is not pinned in factory.lock (local authoring only)")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		m, err := LoadManifest(args[0], "")
+		want := ""
+		if *unlocked {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: running %s without a factory.lock pin\n", args[0])
+		} else {
+			var err error
+			if want, err = lockedSHA256(*root, args[0]); err != nil {
+				return err
+			}
+		}
+		m, err := LoadManifest(args[0], want)
 		if err != nil {
 			return err
 		}
@@ -36,6 +48,43 @@ func newRunCommand() *cobra.Command {
 	return cmd
 }
 
+// lockedSHA256 returns the factory.lock hash a pack file must have before its checks may run: the entry
+// whose cache path is the file, else an entry whose hash is the file's. A pack in neither is refused.
+func lockedSHA256(root, pack string) (string, error) {
+	lockPath := filepath.Join(root, LockFile)
+	lock, err := ReadLock(lockPath)
+	if err != nil {
+		return "", err
+	}
+	abs, err := filepath.Abs(pack)
+	if err != nil {
+		return "", err
+	}
+	b, err := readBounded(pack)
+	if err != nil {
+		return "", err
+	}
+	sum := digest(b)
+	for _, e := range lock.Entries {
+		r, err := ParseRef(e.Ref)
+		if err != nil {
+			return "", err
+		}
+		if c, err := filepath.Abs(cachePath(root, r)); err == nil && c == abs {
+			return e.SHA256, nil
+		}
+	}
+	for _, e := range lock.Entries {
+		if e.SHA256 == sum {
+			return e.SHA256, nil
+		}
+	}
+	if _, err := os.Stat(lockPath); err != nil {
+		return "", fmt.Errorf("pack %s is not pinned: no %s (use --unlocked to author locally)", pack, lockPath)
+	}
+	return "", fmt.Errorf("pack %s (sha256 %s) is not pinned in %s (use --unlocked to author locally)", pack, sum, lockPath)
+}
+
 // newMatchCommand returns `match <dir>`: it prints the skills in dir whose body would be injected.
 func newMatchCommand() *cobra.Command {
 	var touched []string
@@ -50,6 +99,7 @@ func newMatchCommand() *cobra.Command {
 		}
 		var all []Manifest
 		for _, f := range files {
+			// Safe unlocked: match only parses the manifest and prints names; it never runs a retry check.
 			m, err := LoadManifest(f, "")
 			if err != nil {
 				return err

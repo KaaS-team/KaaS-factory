@@ -216,9 +216,14 @@ Run a migration pack pinned in factory.lock over the repository
 
 ## factory packs run
 
-`factory packs run <pack.yaml> -- <command> [args]`
+`factory packs run <pack.yaml> -- <command> [args] [flags]`
 
 Run a command and retry it while the manifest's success checks fail
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
+| `--unlocked` | bool | `false` | run a pack that is not pinned in factory.lock (local authoring only) |
 
 ## factory packs upgrade
 
