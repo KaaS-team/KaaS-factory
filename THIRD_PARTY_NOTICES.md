@@ -271,3 +271,10 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## dagger/dagger@835b0ef806b277fb216735a180d1a542c2937024
+
+Source: https://github.com/dagger/dagger (Apache-2.0, Copyright The Dagger Authors).
+
+- `internal/eval/replay/replay.go` from `core/llm_recording.go` (algorithm and diff shape; re-implemented against our message type, no go-cmp) [tested by `internal/eval/replay/replay_test.go`]
+- `internal/eval/replay/scrub.go` from `util/scrub/scrub.go` (regex table and `Stabilize` only; Dagger rules replaced with ours) [tested by `internal/eval/replay/scrub_test.go`]
