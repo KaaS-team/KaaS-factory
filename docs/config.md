@@ -35,6 +35,7 @@ Keys under `models.` are open: any tier name takes a string.
 | `auto_merge` | bool | `false` | when the org sets false, lower layers cannot set true |
 | `auto_merge_max_risk` | risk | `"low"` | lower layers may pick a risk at or below the org's |
 | `requester_cannot_approve` | bool | `true` | when the org sets true, lower layers cannot set false |
+| `sandbox` | bool | `true` | run local agents under the pkg/sandbox jail where the host can enforce it |
 | `shadow` | bool | `false` | when the org sets true the value is true; lower layers cannot turn it off |
 | `trust.min_role` | role | `"write"` | the org value is a floor; lower layers may only pick a role at or above it |
 | `trust.allow` | list | `[]` | any layer may set it |

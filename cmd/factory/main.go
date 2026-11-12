@@ -28,6 +28,7 @@ import (
 	"github.com/KaaS-team/factory/internal/tracker/github"
 	"github.com/KaaS-team/factory/internal/tui"
 	"github.com/KaaS-team/factory/internal/upgrade"
+	"github.com/KaaS-team/factory/pkg/sandbox"
 )
 
 // version is set at release time with -ldflags "-X main.version=...".
@@ -159,6 +160,10 @@ func attach(cmd *cobra.Command, with func(context.Context, api.Control) context.
 }
 
 func main() {
+	if err := sandbox.MaybeEnter(); err != nil {
+		fmt.Fprintln(os.Stderr, "factory:", err)
+		os.Exit(1)
+	}
 	if err := newRoot().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "factory:", err)
 		os.Exit(1)

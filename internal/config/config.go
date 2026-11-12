@@ -52,6 +52,7 @@ type Config struct {
 	AutoMergeMaxRisk       string            `key:"auto_merge_max_risk"`
 	RequesterCannotApprove bool              `key:"requester_cannot_approve"`
 	Shadow                 bool              `key:"shadow"`
+	Sandbox                bool              `key:"sandbox"`
 	Trust                  Trust             `key:"trust"`
 }
 

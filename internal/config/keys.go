@@ -94,6 +94,7 @@ var specs = []spec{
 	{key: "auto_merge_max_risk", kind: kRisk, ceil: ceilRisk, def: "low"},
 	{key: "requester_cannot_approve", kind: kBool, ceil: ceilTrue, def: true},
 	{key: "shadow", kind: kBool, ceil: ceilForceTrue, def: false},
+	{key: "sandbox", kind: kBool, def: true},
 	{key: "trust.min_role", kind: kRole, ceil: ceilFloor, def: "write"},
 	{key: "trust.allow", kind: kList, def: []string{}},
 }

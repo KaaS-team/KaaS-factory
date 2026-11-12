@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
+	"github.com/KaaS-team/factory/pkg/sandbox"
 )
 
 const defaultBudgetUSD = 5.0
@@ -56,6 +58,10 @@ type Config struct {
 	Stage         string            // default "build"
 	MaxConcurrent int
 	Now           func() time.Time
+	// Sandbox runs each agent under pkg/sandbox: reads anywhere, writes only in its worktree,
+	// Writable and the agent's own state under the home directory.
+	Sandbox  bool
+	Writable []string
 }
 
 type usageState struct {
@@ -195,9 +201,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	}
 
 	runCtx, cancel := context.WithCancel(d.ctx)
-	cmd := exec.CommandContext(runCtx, argv[0], argv[1:]...)
-	cmd.Dir = dir
-	cmd.Env = childEnv(d.cfg.Environ, preset.Env)
+	cmd, err := d.command(runCtx, argv, dir, childEnv(d.cfg.Environ, preset.Env))
+	if err != nil {
+		cancel()
+		return api.Session{}, err
+	}
 	ownGroup(cmd)
 	cmd.Cancel = func() error { return killGroup(cmd) }
 	cmd.WaitDelay = 2 * time.Second
@@ -225,6 +233,21 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		close(p.done)
 	}()
 	return session(p), nil
+}
+
+// command builds the agent process. With Sandbox set it is the jail helper, which applies the
+// restrictions and then execs argv with env as its whole environment.
+func (d *Dispatcher) command(ctx context.Context, argv []string, dir string, env []string) (*exec.Cmd, error) {
+	if !d.cfg.Sandbox {
+		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+		cmd.Dir, cmd.Env = dir, env
+		return cmd, nil
+	}
+	rw := append([]string{os.TempDir()}, d.cfg.Writable...)
+	if home, err := os.UserHomeDir(); err == nil {
+		rw = append(rw, filepath.Join(home, ".claude"), filepath.Join(home, ".claude.json"))
+	}
+	return sandbox.Command(ctx, sandbox.Spec{Workdir: dir, ReadOnly: []string{"/"}, ReadWrite: rw, AllowNet: true, Env: env}, argv[0], argv[1:]...)
 }
 
 // Wait blocks until the session's process has exited. It returns the exit

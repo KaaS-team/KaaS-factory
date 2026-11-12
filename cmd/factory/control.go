@@ -29,6 +29,7 @@ import (
 	"github.com/KaaS-team/factory/internal/tracker/github"
 	"github.com/KaaS-team/factory/internal/tracker/jira"
 	"github.com/KaaS-team/factory/internal/tracker/linear"
+	"github.com/KaaS-team/factory/pkg/sandbox"
 	gogithub "github.com/google/go-github/v79/github"
 )
 
@@ -103,9 +104,13 @@ var dispatchers = map[string]func(context.Context, config.Config) (api.Dispatche
 			return nil, err
 		}
 		root := filepath.Join(repo, ".factory", "worktrees")
-		return local.New(ctx, local.Config{Worktrees: local.GitWorktrees{Repo: repo, Root: root}, MaxConcurrent: c.Slots})
+		return local.New(ctx, local.Config{Worktrees: local.GitWorktrees{Repo: repo, Root: root}, MaxConcurrent: c.Slots,
+			Sandbox: c.Sandbox && canJail(sandbox.Probe()), Writable: []string{filepath.Join(repo, ".git")}})
 	},
 }
+
+// canJail says whether this host can enforce a jail; where it cannot, sandbox: true is a no-op.
+func canJail(c sandbox.Capabilities) bool { return c.Landlock || c.SandboxExec }
 
 // gitHubConn is what the GitHub tracker, observer source and merge queue share: one repo, one token.
 type gitHubConn struct {
