@@ -159,6 +159,7 @@ Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trig
 
 - `internal/pick/fair.go` from `packages/redis-worker/src/fair-queue/schedulers/drr.ts` (algorithm only, in process, no Redis or Lua) [tested by `internal/pick/fair_test.go`]
 
+
 ## SWE-bench/SWE-bench@02e7a74
 
 Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
@@ -193,3 +194,7 @@ Source: https://github.com/onlook-dev/onlook (Apache-2.0; the LICENSE is kept at
 Source: https://github.com/continuedev/continue (Apache-2.0, Copyright (c) Continue Dev, Inc.).
 
 - `internal/review/worktree.go` from `extensions/cli/src/commands/review/worktree.ts` [tested by `internal/review/review_test.go`]
+
+- `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
+- `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
+- `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)
