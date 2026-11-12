@@ -121,7 +121,7 @@ Audit this repo and show what the factory would fix, at no cost
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--dry-run` | bool | `false` | stop after the report; name no first fix |
+| `--dry-run` | bool | `false` | stop after the report; say what would be dispatched |
 | `--gh` | string | `` | also audit this GitHub repo (owner/repo) |
 
 ## factory init
