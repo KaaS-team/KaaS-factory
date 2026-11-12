@@ -98,3 +98,8 @@ Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Greg
 - `internal/browsercheck/settle.go` from `browser_use/ax.py` (`settle`, `PROBE_JS` reduced to ready and idle)
 - `internal/browsercheck/profile.go` from `browser_use/browser/local.py` (`SKIP_COPY`, `copy_profile`, `_try_lock`, `sweep_stale_dirs`)
 - `internal/browsercheck/secrets.go` from `browser_use/repl/session.py` (`secret_forms`, `redact_forms`) and `browser_use/repl/worker.py` (`type_secret`)
+## OpenHands/software-agent-sdk@10be259
+
+Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). Only the stuck detector was ported; `openhands-sdk/` outside `ee/` directories.
+
+- `internal/dispatch/local/stuck/stuck.go` from `openhands-sdk/openhands/sdk/conversation/stuck_detector.py` [tested by `internal/dispatch/local/stuck/stuck_test.go`]

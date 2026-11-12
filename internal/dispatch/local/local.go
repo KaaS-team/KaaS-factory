@@ -18,6 +18,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
+	"github.com/KaaS-team/factory/internal/dispatch/local/stuck"
 	"github.com/KaaS-team/factory/pkg/sandbox"
 )
 
@@ -25,6 +26,9 @@ const defaultBudgetUSD = 5.0
 
 // ErrUnsupported is returned for what a local run cannot do.
 var ErrUnsupported = errors.New("local: not supported by a local run")
+
+// ErrStuck is what Wait returns for a run the loop guard aborted; the message names the pattern.
+var ErrStuck = errors.New("local: run is stuck in a loop")
 
 // Run is what a preset turns into an argv.
 type Run struct {
@@ -223,10 +227,25 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	go func() { // ends when the process exits; the run context kills it
 		sc := bufio.NewScanner(out)
 		sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
+		guard := stuck.New(stuck.DefaultThresholds)
+		var stuckErr error
 		for sc.Scan() {
 			p.usage.feed(sc.Bytes())
+			if stuckErr != nil {
+				continue // drain until the kill lands
+			}
+			switch v := guard.Feed(sc.Bytes()); v.Kind {
+			case stuck.Nudge:
+				_ = d.Steer(runCtx, session(p), v.Message) // unsupported today, so the nudge is not delivered
+			case stuck.Abort:
+				stuckErr = fmt.Errorf("%w: %s (%s)", ErrStuck, v.Pattern, v.Message)
+				cancel()
+			}
 		}
 		p.err = cmd.Wait()
+		if stuckErr != nil {
+			p.err = stuckErr
+		}
 		_ = killGroup(cmd) // anything the agent left behind
 		p.end = d.cfg.Now()
 		cancel()
