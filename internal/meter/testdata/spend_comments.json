@@ -1,0 +1,9 @@
+{
+ "_note": "bodies written by src/adapters/github-store/spend.ts at ts-final, last edit per comment; key is issue:commentId",
+ "bodies": {
+  "7:100": "Factory usage record (operator data, hidden).\n<!-- factory:spend {\"holder\":\"worker-1\",\"costUsd\":0.30000000000000004,\"unreportedRuns\":1,\"runs\":3} -->",
+  "1:101": "Factory usage record (operator data, hidden).\n<!-- factory:spend {\"holder\":\"worker-1\",\"day\":\"2026-11-12\",\"costUsd\":0.30000000000000004,\"unreportedRuns\":1,\"runs\":3} -->",
+  "8:102": "Factory usage record (operator data, hidden).\n<!-- factory:spend {\"holder\":\"ünï <w> & \\\"q\\\"\",\"costUsd\":0.54,\"unreportedRuns\":0,\"runs\":1} -->",
+  "1:103": "Factory usage record (operator data, hidden).\n<!-- factory:spend {\"holder\":\"ünï <w> & \\\"q\\\"\",\"day\":\"2026-11-12\",\"costUsd\":0.54,\"unreportedRuns\":0,\"runs\":1} -->"
+ }
+}
