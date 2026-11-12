@@ -193,3 +193,12 @@ Source: https://github.com/onlook-dev/onlook (Apache-2.0; the LICENSE is kept at
 Source: https://github.com/continuedev/continue (Apache-2.0, Copyright (c) Continue Dev, Inc.).
 
 - `internal/review/worktree.go` from `extensions/cli/src/commands/review/worktree.ts` [tested by `internal/review/review_test.go`]
+
+## coder/agentapi@7c468d5
+
+Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technologies, Inc.)
+
+- `internal/dispatch/local/input/ringbuffer.go` from `lib/screentracker/ringbuffer.go` [no upstream test; `internal/dispatch/local/input/gate_test.go`]
+
+The bracketed-paste framing, the SIGINT-then-kill close and the stability gate are written after
+`lib/httpapi/claude.go`, `lib/termexec/termexec.go` and `lib/screentracker` and copy none of their code.
