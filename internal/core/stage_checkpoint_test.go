@@ -12,6 +12,7 @@ import (
 	"github.com/KaaS-team/factory/internal/graph"
 	"github.com/KaaS-team/factory/internal/graph/checkpoint"
 	"github.com/KaaS-team/factory/internal/meter"
+	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/reconcile"
 )
 
@@ -125,5 +126,25 @@ func TestRestartAppliesSavedResultOfFinishedNode(t *testing.T) {
 	// Base 2 is the saved result's attempt count; the live observation alone would say 1.
 	if !strings.Contains(string(got.State), `"Node":"build"`) || !strings.Contains(string(got.State), `"Base":2`) || len(got.Writes) != 0 {
 		t.Fatalf("after the restart the checkpoint is %s with %d writes, want node build, base 2 and none", got.State, len(got.Writes))
+	}
+}
+
+// A ticket with both a checkpoint and a thread position, which disagree: the thread position is the
+// newer truth (GitHub keeps it when the local checkpoint store is lost or restored from a backup),
+// so the restart resumes at the node it names.
+func TestRestartPrefersThreadPositionOverCheckpoint(t *testing.T) {
+	ctx := context.Background()
+	cp := openCP(t)
+	if _, err := cp.Put(ctx, "5", []byte(`{"Workflow":"","Node":"plan","Base":0}`), nil); err != nil {
+		t.Fatal(err)
+	}
+	c, _, _ := daemon(t, cp)
+	c.d.Tracker.(listTracker).Position["5"] = observe.Position{Node: "ship", Base: 2}
+	st, err := c.stageOf(ctx, "5", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.node != "ship" || st.base != 2 {
+		t.Fatalf("stage at %s base %d, want the thread position (ship, 2) over the checkpoint (plan)", st.node, st.base)
 	}
 }

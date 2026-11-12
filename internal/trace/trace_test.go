@@ -3,6 +3,7 @@ package trace
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -82,5 +83,24 @@ func TestFileSinkClosesWithContext(t *testing.T) {
 	<-s.Done()
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Traces can hold prompts and tool output, so the file is private to its owner.
+func TestFileSinkCreatesPrivateFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.jsonl")
+	ctx, cancel := context.WithCancel(context.Background())
+	s, err := NewFileSink(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	<-s.Done()
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o600 {
+		t.Fatalf("trace file mode = %o, want 600", got)
 	}
 }

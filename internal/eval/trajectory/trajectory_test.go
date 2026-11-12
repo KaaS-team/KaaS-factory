@@ -26,7 +26,7 @@ func TestWriteReadReplayReproducesDiff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Base(p) != "fx-T-1.json" {
+	if filepath.Base(p) != "fx%2FT-1.json" {
 		t.Fatalf("file name %s", p)
 	}
 	got, err := Read(p)
@@ -43,12 +43,14 @@ func TestReplayRejectsBrokenFiles(t *testing.T) {
 	good := rec("a", StatePass, 2, 1, 1, "diff1")
 	good.Seal()
 	cut := good
-	cut.Steps = cut.Steps[:1] // last step's diff is gone
+	cut.Submission = "" // the final diff is gone
+	subEdited := good
+	subEdited.Submission = "tampered" // steps and checksum still agree with each other
 	edited := good
 	edited.Submission, edited.Steps = "other", []Step{{Diff: "other"}}
 	stepEdited := good
 	stepEdited.Steps = []Step{{Diff: "diff1"}, {Diff: "tampered"}} // submission and checksum still agree with each other
-	for name, tr := range map[string]Trajectory{"cut": cut, "edited": edited, "step edited": stepEdited} {
+	for name, tr := range map[string]Trajectory{"cut": cut, "submission edited": subEdited, "edited": edited, "step edited": stepEdited} {
 		if _, err := Replay(tr); err == nil {
 			t.Errorf("%s: replay succeeded", name)
 		}
@@ -152,5 +154,38 @@ func TestCommandsOffline(t *testing.T) {
 	cp.SetErr(&out)
 	if err := cp.Execute(); err == nil {
 		t.Fatal("missing path accepted")
+	}
+}
+
+// "a/b" and "a-b" are different tasks and must not share a file.
+func TestFileNameIsInjective(t *testing.T) {
+	dir := t.TempDir()
+	for _, task := range []string{"a/b", "a-b", "a%2Fb"} {
+		if _, err := Write(dir, rec(task, StatePass, 1, 1, 1, "d-"+task)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if FileName("a/b") == FileName("a-b") || FileName("a%2Fb") == FileName("a/b") {
+		t.Fatalf("collision: %s %s %s", FileName("a/b"), FileName("a-b"), FileName("a%2Fb"))
+	}
+	got, err := Load(dir)
+	if err != nil || len(got) != 3 {
+		t.Fatalf("load = %d trajectories, %v; want 3", len(got), err)
+	}
+}
+
+// A file with a submission and no step diff loads and replays to the submission.
+func TestSubmissionOnlyFileLoads(t *testing.T) {
+	dir := t.TempDir()
+	tr := Trajectory{Task: "s", State: StatePass, Submission: "the diff", Steps: []Step{{Action: "edit"}}}
+	if _, err := Write(dir, tr); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(dir)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("load = %v, %v", got, err)
+	}
+	if diff, err := Replay(got[0]); err != nil || diff != "the diff" {
+		t.Fatalf("replay = %q, %v", diff, err)
 	}
 }
