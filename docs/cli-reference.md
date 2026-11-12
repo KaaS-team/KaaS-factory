@@ -176,6 +176,16 @@ Print each lock entry
 | `--json` | bool | `false` | print JSON |
 | `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
 
+## factory packs migrate
+
+`factory packs migrate <owner/repo#path> [flags]`
+
+Run a migration pack pinned in factory.lock over the repository
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
+
 ## factory packs upgrade
 
 `factory packs upgrade [flags]`
