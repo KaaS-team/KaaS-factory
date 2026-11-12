@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -27,6 +28,8 @@ type Config struct {
 	Getenv     func(string) string  // default os.Getenv
 	Client     *vendorkit.Client    // timeout and retry policy, default zero value
 }
+
+var _ api.Lister = (*Tracker)(nil)
 
 // Tracker is a Linear-backed api.Tracker.
 type Tracker struct {
@@ -159,6 +162,43 @@ func (t *Tracker) readyFilter() map[string]any {
 
 // Ready lists open issues in the ready state or carrying the ready label.
 func (t *Tracker) Ready(ctx context.Context) ([]api.Ticket, error) {
+	return t.list(ctx, t.readyFilter())
+}
+
+// activeStatuses are the state names mapped to a phase from claimed to merge-queue, sorted. A name
+// that also maps to a finished or parked phase (ready, done, merged, needs-human, canceled) is left out.
+func (t *Tracker) activeStatuses() []string {
+	active := map[string]bool{}
+	for _, p := range []api.Phase{api.PhaseClaimed, api.PhaseRunning, api.PhaseStalled, api.PhaseRetryQueue, api.PhaseQueued} {
+		if n := t.cfg.Phases[p]; n != "" {
+			active[n] = true
+		}
+	}
+	for _, p := range []api.Phase{api.PhaseReady, api.PhaseDone, api.PhaseMerged, api.PhaseNeedsHuman, api.PhaseCanceled} {
+		delete(active, t.cfg.Phases[p])
+	}
+	out := make([]string, 0, len(active))
+	for n := range active {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Active lists issues sitting in a state mapped to a phase from claimed to merge-queue, in one
+// Issues query (Symphony §14). With no such state mapped it returns nothing and makes no request.
+func (t *Tracker) Active(ctx context.Context) ([]api.Ticket, error) {
+	names := t.activeStatuses()
+	if len(names) == 0 {
+		return nil, nil
+	}
+	return t.list(ctx, map[string]any{
+		"team":  map[string]any{"key": map[string]any{"eq": t.cfg.Team}},
+		"state": map[string]any{"name": map[string]any{"in": names}},
+	})
+}
+
+func (t *Tracker) list(ctx context.Context, filter map[string]any) ([]api.Ticket, error) {
 	var out []api.Ticket
 	var after any
 	for {
@@ -171,7 +211,7 @@ func (t *Tracker) Ready(ctx context.Context) ([]api.Ticket, error) {
 				} `json:"pageInfo"`
 			} `json:"issues"`
 		}
-		if err := t.gql(ctx, qIssues, map[string]any{"filter": t.readyFilter(), "after": after}, &d); err != nil {
+		if err := t.gql(ctx, qIssues, map[string]any{"filter": filter, "after": after}, &d); err != nil {
 			return nil, err
 		}
 		for _, i := range d.Issues.Nodes {

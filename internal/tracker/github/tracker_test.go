@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"reflect"
 	"sort"
@@ -283,5 +284,43 @@ func TestOwnedLabels(t *testing.T) {
 		if gh.OwnsLabel(l) {
 			t.Errorf("%s must not be owned", l)
 		}
+	}
+}
+
+var _ api.Lister = (*gh.Tracker)(nil)
+
+// Symphony §14: restart lists claimed, unfinished tickets in one query; ready, in-review and parked ones are not active.
+func TestActiveListsBuildingAndVerifyingWithOneQuery(t *testing.T) {
+	f := newFake(t)
+	f.serve(t, "GET /repos/o/r/issues", "issues_active.json", http.StatusOK)
+	got, err := f.tracker(t).Active(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []api.TicketID
+	for _, tk := range got {
+		ids = append(ids, tk.ID)
+	}
+	if want := []api.TicketID{"21", "23"}; !reflect.DeepEqual(ids, want) {
+		t.Fatalf("ids = %v, want %v", ids, want)
+	}
+	reqs := f.requests()
+	if len(reqs) != 1 {
+		t.Fatalf("requests = %d, want 1", len(reqs))
+	}
+	q, err := url.ParseQuery(reqs[0].Query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotReq, want := reqs[0].Method+" "+reqs[0].Path+"?"+q.Encode(), strings.TrimSpace(string(golden(t, "active_request.golden"))); gotReq != want {
+		t.Fatalf("request = %q, golden %q", gotReq, want)
+	}
+}
+
+func TestActivePropagatesAPIError(t *testing.T) {
+	f := newFake(t)
+	f.serve(t, "GET /repos/o/r/issues", "not_found.json", http.StatusNotFound)
+	if _, err := f.tracker(t).Active(context.Background()); err == nil {
+		t.Fatal("want an error from a 404")
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,6 +31,8 @@ type Config struct {
 	Getenv      func(string) string  // default os.Getenv
 	Client      *vendorkit.Client    // timeout and retry policy, default zero value
 }
+
+var _ api.Lister = (*Tracker)(nil)
 
 // Tracker is a Jira-backed api.Tracker.
 type Tracker struct {
@@ -151,10 +154,49 @@ func (t *Tracker) readyJQL() string {
 
 // Ready lists open issues in the ready status or carrying the ready label, oldest first.
 func (t *Tracker) Ready(ctx context.Context) ([]api.Ticket, error) {
+	return t.search(ctx, t.readyJQL())
+}
+
+// activeStatuses are the status names mapped to a phase from claimed to merge-queue, sorted. A name
+// that also maps to a finished or parked phase (ready, done, merged, needs-human, canceled) is left out.
+func (t *Tracker) activeStatuses() []string {
+	active := map[string]bool{}
+	for _, p := range []api.Phase{api.PhaseClaimed, api.PhaseRunning, api.PhaseStalled, api.PhaseRetryQueue, api.PhaseQueued} {
+		if n := t.cfg.Phases[p]; n != "" {
+			active[n] = true
+		}
+	}
+	for _, p := range []api.Phase{api.PhaseReady, api.PhaseDone, api.PhaseMerged, api.PhaseNeedsHuman, api.PhaseCanceled} {
+		delete(active, t.cfg.Phases[p])
+	}
+	out := make([]string, 0, len(active))
+	for n := range active {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Active lists open issues in a status mapped to a phase from claimed to merge-queue, oldest first,
+// in one JQL search (Symphony §14). With no such status mapped it returns nothing and makes no request.
+func (t *Tracker) Active(ctx context.Context) ([]api.Ticket, error) {
+	names := t.activeStatuses()
+	if len(names) == 0 {
+		return nil, nil
+	}
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = jqlString(n)
+	}
+	return t.search(ctx, fmt.Sprintf("project = %s AND statusCategory != Done AND status in (%s) ORDER BY created ASC",
+		jqlString(t.cfg.Project), strings.Join(quoted, ", ")))
+}
+
+func (t *Tracker) search(ctx context.Context, jql string) ([]api.Ticket, error) {
 	var out []api.Ticket
 	token := ""
 	for {
-		req := map[string]any{"jql": t.readyJQL(), "fields": strings.Split(fields, ","), "maxResults": 100}
+		req := map[string]any{"jql": jql, "fields": strings.Split(fields, ","), "maxResults": 100}
 		if token != "" {
 			req["nextPageToken"] = token
 		}

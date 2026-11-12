@@ -1,0 +1,9 @@
+[
+ {"number": 21, "title": "Running", "body": "", "state": "open", "created_at": "2026-03-01T00:00:00Z", "labels": [{"name": "factory:building"}, {"name": "feature"}]},
+ {"number": 22, "title": "Ready", "body": "", "state": "open", "created_at": "2026-03-02T00:00:00Z", "labels": [{"name": "factory:ready"}]},
+ {"number": 23, "title": "Verifying", "body": "", "state": "open", "created_at": "2026-03-03T00:00:00Z", "labels": [{"name": "factory:verifying"}]},
+ {"number": 24, "title": "In review", "body": "", "state": "open", "created_at": "2026-03-04T00:00:00Z", "labels": [{"name": "factory:in-review"}]},
+ {"number": 25, "title": "Needs human", "body": "", "state": "open", "created_at": "2026-03-05T00:00:00Z", "labels": [{"name": "factory:needs-human"}]},
+ {"number": 26, "title": "A pull request", "body": "", "state": "open", "created_at": "2026-03-06T00:00:00Z", "labels": [{"name": "factory:building"}], "pull_request": {"url": "x"}},
+ {"number": 27, "title": "Unlabeled", "body": "", "state": "open", "created_at": "2026-03-07T00:00:00Z", "labels": []}
+]

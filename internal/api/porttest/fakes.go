@@ -4,6 +4,7 @@ package porttest
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -101,6 +102,21 @@ func (t *Tracker) Ready(context.Context) ([]api.Ticket, error) {
 	return out, nil
 }
 
+// Active lists tickets claimed and not finished: claimed, running, stalled, retry or merge-queue, by id.
+func (t *Tracker) Active(context.Context) ([]api.Ticket, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var out []api.Ticket
+	for id, x := range t.Tickets {
+		switch t.Phases[id] {
+		case api.PhaseClaimed, api.PhaseRunning, api.PhaseStalled, api.PhaseRetryQueue, api.PhaseQueued:
+			out = append(out, x)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (t *Tracker) Get(_ context.Context, id api.TicketID) (api.Ticket, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -127,18 +143,34 @@ func (t *Tracker) SetPhase(_ context.Context, id api.TicketID, p api.Phase) erro
 
 // Observer returns canned observations.
 type Observer struct {
-	mu  sync.Mutex
-	Obs map[api.TicketID]api.Observation
+	mu     sync.Mutex
+	Obs    map[api.TicketID]api.Observation
+	newest map[api.TicketID]api.Observation // highest attempt Set per ticket
 }
 
 // NewObserver returns an empty observer.
-func NewObserver() *Observer { return &Observer{Obs: map[api.TicketID]api.Observation{}} }
+func NewObserver() *Observer {
+	return &Observer{Obs: map[api.TicketID]api.Observation{}, newest: map[api.TicketID]api.Observation{}}
+}
 
 // Set stores the observation for its ticket.
 func (o *Observer) Set(x api.Observation) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.Obs[x.Ticket] = x
+	if cur, ok := o.newest[x.Ticket]; !ok || x.Attempt >= cur.Attempt {
+		o.newest[x.Ticket] = x
+	}
+}
+
+// Latest returns the observation with the highest attempt Set for id, or an empty one.
+func (o *Observer) Latest(_ context.Context, id api.TicketID) (api.Observation, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if x, ok := o.newest[id]; ok {
+		return x, nil
+	}
+	return api.Observation{Ticket: id}, nil
 }
 
 func (o *Observer) Observe(_ context.Context, id api.TicketID, attempt int) (api.Observation, error) {
@@ -153,7 +185,9 @@ func (o *Observer) Observe(_ context.Context, id api.TicketID, attempt int) (api
 
 // Compile-time checks that the fakes satisfy the ports.
 var (
-	_ api.Dispatcher = (*Dispatcher)(nil)
-	_ api.Tracker    = (*Tracker)(nil)
-	_ api.Observer   = (*Observer)(nil)
+	_ api.Dispatcher     = (*Dispatcher)(nil)
+	_ api.Tracker        = (*Tracker)(nil)
+	_ api.Observer       = (*Observer)(nil)
+	_ api.Lister         = (*Tracker)(nil)
+	_ api.LatestObserver = (*Observer)(nil)
 )

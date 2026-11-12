@@ -30,3 +30,51 @@ func TestTrackerReadyDropsClaimed(t *testing.T) {
 		t.Fatalf("ready = %+v, want only 2", got)
 	}
 }
+
+// Symphony §14: restart reads every claimed and unfinished ticket.
+func TestTrackerActiveFollowsPhase(t *testing.T) {
+	tr := NewTracker(api.Ticket{ID: "1"}, api.Ticket{ID: "2"})
+	ctx := context.Background()
+	ids := func() []api.TicketID {
+		got, err := tr.Active(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []api.TicketID
+		for _, x := range got {
+			out = append(out, x.ID)
+		}
+		return out
+	}
+	if got := ids(); len(got) != 0 {
+		t.Fatalf("active before any claim = %v", got)
+	}
+	for _, c := range []struct {
+		phase api.Phase
+		want  int
+	}{
+		{api.PhaseClaimed, 1}, {api.PhaseRunning, 1}, {api.PhaseStalled, 1}, {api.PhaseRetryQueue, 1}, {api.PhaseQueued, 1},
+		{api.PhaseReady, 0}, {api.PhaseDone, 0}, {api.PhaseMerged, 0}, {api.PhaseNeedsHuman, 0}, {api.PhaseCanceled, 0},
+	} {
+		_ = tr.SetPhase(ctx, "1", c.phase)
+		if got := ids(); len(got) != c.want {
+			t.Errorf("phase %s: active = %v, want %d", c.phase, got, c.want)
+		}
+	}
+}
+
+func TestObserverLatestReturnsHighestAttempt(t *testing.T) {
+	o := NewObserver()
+	ctx := context.Background()
+	o.Set(api.Observation{Ticket: "7", Attempt: 1})
+	o.Set(api.Observation{Ticket: "7", Attempt: 2})
+	o.Set(api.Observation{Ticket: "7", Attempt: 1})
+	got, err := o.Latest(ctx, "7")
+	if err != nil || got.Attempt != 2 {
+		t.Fatalf("Latest = %+v, %v; want attempt 2", got, err)
+	}
+	empty, err := o.Latest(ctx, "8")
+	if err != nil || empty.Ticket != "8" || empty.Attempt != 0 {
+		t.Fatalf("Latest of unknown = %+v, %v", empty, err)
+	}
+}

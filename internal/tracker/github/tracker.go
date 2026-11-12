@@ -28,7 +28,10 @@ type Tracker struct {
 	owner, repo string
 }
 
-var _ api.Tracker = (*Tracker)(nil)
+var (
+	_ api.Tracker = (*Tracker)(nil)
+	_ api.Lister  = (*Tracker)(nil)
+)
 
 // New returns a Tracker for cfg.Owner/cfg.Repo.
 func New(cfg Config) (*Tracker, error) {
@@ -92,6 +95,38 @@ func (t *Tracker) Ready(ctx context.Context) ([]api.Ticket, error) {
 		for _, is := range issues {
 			if !is.IsPullRequest() {
 				out = append(out, t.ticket(is))
+			}
+		}
+		if resp.NextPage == 0 {
+			return out, nil
+		}
+		opts.ListOptions.Page = resp.NextPage
+	}
+}
+
+// Active lists open issues labeled factory:building or factory:verifying, oldest first, in one
+// paged query (the issues API cannot OR labels, so the label test is made here). Ready, in-review
+// and parked issues are not active. Pull requests are skipped.
+func (t *Tracker) Active(ctx context.Context) ([]api.Ticket, error) {
+	opts := &gogithub.IssueListByRepoOptions{
+		State: "open", Sort: "created", Direction: "asc",
+		ListOptions: gogithub.ListOptions{PerPage: 100},
+	}
+	var out []api.Ticket
+	for {
+		issues, resp, err := t.client.Issues.ListByRepo(ctx, t.owner, t.repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("github tracker: list active issues: %w", err)
+		}
+		for _, is := range issues {
+			if is.IsPullRequest() {
+				continue
+			}
+			for _, l := range is.Labels {
+				if n := l.GetName(); n == LabelBuilding || n == LabelVerifying {
+					out = append(out, t.ticket(is))
+					break
+				}
 			}
 		}
 		if resp.NextPage == 0 {

@@ -21,6 +21,8 @@ var (
 	}
 	issuePath   = regexp.MustCompile(`^/rest/api/3/issue/([A-Z]+-\d+)(?:/(comment|transitions))?$`)
 	statusJQL   = regexp.MustCompile(`status = "([^"]+)"`)
+	statusInJQL = regexp.MustCompile(`status in \(([^)]*)\)`)
+	quotedJQL   = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
 	labelJQL    = regexp.MustCompile(`labels = "([^"]+)"`)
 	projectJQL  = regexp.MustCompile(`^project = "([^"]+)" AND statusCategory != Done`)
 	commentMark = regexp.MustCompile(`(?s)<!--.*?-->`)
@@ -152,6 +154,13 @@ func (f *fakeJira) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		st, lb := statusJQL.FindStringSubmatch(jql), labelJQL.FindStringSubmatch(jql)
+		var inSet []string
+		if sm := statusInJQL.FindStringSubmatch(jql); sm != nil {
+			for _, q := range quotedJQL.FindAllStringSubmatch(sm[1], -1) {
+				inSet = append(inSet, q[1])
+			}
+			st = nil
+		}
 		or := strings.Contains(jql, " OR ")
 		rows := []any{}
 		for _, i := range f.Issues {
@@ -166,6 +175,12 @@ func (f *fakeJira) serve(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			ok := (st == nil || hasSt) && (lb == nil || hasLb)
+			if inSet != nil {
+				ok = false
+				for _, n := range inSet {
+					ok = ok || i.Status == n
+				}
+			}
 			if or {
 				ok = hasSt || hasLb
 			}

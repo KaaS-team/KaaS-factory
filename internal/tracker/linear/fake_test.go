@@ -190,8 +190,17 @@ func (f *fakeLinear) issues(filter map[string]any) any {
 					}
 				}
 			}
-			if n, ok := s["name"].(map[string]any); ok && n["eq"] != st.Name {
+			if n, ok := s["name"].(map[string]any); ok && n["eq"] != nil && n["eq"] != st.Name {
 				return false
+			}
+			if n, ok := s["name"].(map[string]any); ok && n["in"] != nil {
+				found := false
+				for _, x := range n["in"].([]any) {
+					found = found || x == st.Name
+				}
+				if !found {
+					return false
+				}
 			}
 		}
 		if l, ok := flt["labels"].(map[string]any); ok {
