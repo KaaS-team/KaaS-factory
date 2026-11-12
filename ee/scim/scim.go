@@ -3,132 +3,130 @@
 // SPDX-License-Identifier: LicenseRef-KaaS-EE
 
 // Package scim serves SCIM 2.0 Users and Groups (RFC 7643, 7644) over a Store, enough for Okta
-// and Entra to create, find, deactivate and delete people. The wire shapes follow the TypeScript
-// plane in ee/plane/scim.ts.
+// and Entra to create, find, deactivate and delete people. The protocol, schemas, filters and
+// PATCH parsing come from github.com/elimity-com/scim; this package adds the bearer-token
+// tenant check, the audit event per call and the Store-backed resource handlers.
 package scim
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
-	"regexp"
+	"os"
 	"strings"
+
+	lib "github.com/elimity-com/scim"
+	scimerr "github.com/elimity-com/scim/errors"
+	"github.com/elimity-com/scim/optional"
+	"github.com/elimity-com/scim/schema"
 )
 
 const (
-	schemaUser  = "urn:ietf:params:scim:schemas:core:2.0:User"
-	schemaGroup = "urn:ietf:params:scim:schemas:core:2.0:Group"
-	schemaList  = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-	schemaError = "urn:ietf:params:scim:api:messages:2.0:Error"
-	schemaPatch = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-	mediaType   = "application/scim+json"
-	usersPath   = "/scim/v2/Users"
-	groupsPath  = "/scim/v2/Groups"
+	basePath  = "/scim/v2"
+	mediaType = "application/scim+json"
 )
 
-// An email can never be a GitHub login, so an IdP user cannot take over a GitHub member.
-var emailLike = regexp.MustCompile(`^[^@\s]+@[^@\s]+$`)
+type tenantKey struct{}
 
-// The one filter IdPs send before a create: attr eq "value".
-var eqFilter = regexp.MustCompile(`(?i)^(userName|displayName) eq "([^"]*)"$`)
+// Event is the audit record of one SCIM call. Tenant is empty when the bearer token was refused.
+type Event struct {
+	Tenant string `json:"tenant"`
+	Method string `json:"method"`
+	Path   string `json:"path"`
+	Status int    `json:"status"`
+}
 
 type handler struct {
-	store Store
-	token string
+	srv    lib.Server
+	tokens map[string]string
+	audit  func(Event)
 }
 
-// NewHandler serves /scim/v2/Users and /scim/v2/Groups over store. Every request needs the bearer
-// token; an empty token refuses everything.
+// NewHandler serves /scim/v2 over store for one tenant, "default", behind one bearer token. Every
+// call is written to stderr as a JSON audit line. An empty token refuses everything.
 func NewHandler(store Store, bearerToken string) http.Handler {
-	return &handler{store: store, token: bearerToken}
+	tokens := map[string]string{}
+	if bearerToken != "" {
+		tokens[bearerToken] = "default"
+	}
+	enc := json.NewEncoder(os.Stderr)
+	return NewTenantHandler(store, tokens, func(e Event) { _ = enc.Encode(e) })
 }
+
+// NewTenantHandler serves /scim/v2 over store. tokens maps each accepted bearer token to the
+// tenant it may read and write; audit receives one Event per call, refused calls included.
+func NewTenantHandler(store Store, tokens map[string]string, audit func(Event)) http.Handler {
+	cfg := &lib.ServiceProviderConfig{
+		AuthenticationSchemes: []lib.AuthenticationScheme{{
+			Type: lib.AuthenticationTypeOauthBearerToken, Name: "Bearer token", Description: "A static bearer token per tenant", Primary: true,
+		}},
+		MaxResults: 100, SupportFiltering: true, SupportPatch: true,
+	}
+	srv, err := lib.NewServer(&lib.ServerArgs{ServiceProviderConfig: cfg, ResourceTypes: []lib.ResourceType{
+		{ID: optional.NewString("User"), Name: "User", Endpoint: "/Users", Schema: schema.CoreUserSchema(), Handler: userHandler{store}},
+		{ID: optional.NewString("Group"), Name: "Group", Endpoint: "/Groups", Schema: schema.CoreGroupSchema(), Handler: groupHandler{store}},
+	}}, lib.WithBaseURL(basePath))
+	if err != nil {
+		panic("scim: built-in schemas rejected: " + err.Error())
+	}
+	return &handler{srv: srv, tokens: tokens, audit: audit}
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) { w.status = code; w.ResponseWriter.WriteHeader(code) }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !h.authed(r) {
-		fail(w, 401, "", "a valid SCIM bearer token is required")
-		return
-	}
+	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+	tenant, ok := h.tenantOf(r)
+	rest, underBase := strings.CutPrefix(r.URL.Path, "/scim")
 	switch {
-	case r.URL.Path == usersPath:
-		h.collection(w, r, h.listUsers, h.createUser)
-	case strings.HasPrefix(r.URL.Path, usersPath+"/"):
-		h.item(w, r, strings.TrimPrefix(r.URL.Path, usersPath+"/"), h.getUser, h.patchUser, h.deleteUser)
-	case r.URL.Path == groupsPath:
-		h.collection(w, r, h.listGroups, h.createGroup)
-	case strings.HasPrefix(r.URL.Path, groupsPath+"/"):
-		h.item(w, r, strings.TrimPrefix(r.URL.Path, groupsPath+"/"), h.getGroup, h.patchGroup, h.deleteGroup)
+	case !ok:
+		sw.Header().Set("Content-Type", mediaType)
+		sw.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(sw).Encode(scimerr.ScimError{Status: 401, Detail: "a valid SCIM bearer token is required"})
+	case !underBase || !strings.HasPrefix(rest, "/v2"):
+		sw.Header().Set("Content-Type", mediaType)
+		sw.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(sw).Encode(scimerr.ScimError{Status: 404, Detail: "no such resource"})
 	default:
-		fail(w, 404, "", "no such resource")
+		r2 := r.Clone(context.WithValue(r.Context(), tenantKey{}, tenant))
+		r2.URL.Path = rest
+		if r.Method == http.MethodPatch {
+			entraBools(r2)
+		}
+		h.srv.ServeHTTP(sw, r2)
+	}
+	if h.audit != nil {
+		h.audit(Event{Tenant: map[bool]string{true: tenant}[ok], Method: r.Method, Path: r.URL.Path, Status: sw.status})
 	}
 }
 
-func (h *handler) authed(r *http.Request) bool {
-	got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	return h.token != "" && ok && subtle.ConstantTimeCompare([]byte(got), []byte(h.token)) == 1
-}
-
-type (
-	listFn   func(http.ResponseWriter, *http.Request)
-	createFn func(http.ResponseWriter, *http.Request)
-	itemFn   func(http.ResponseWriter, *http.Request, string)
-)
-
-func (h *handler) collection(w http.ResponseWriter, r *http.Request, list listFn, create createFn) {
-	switch r.Method {
-	case http.MethodGet:
-		list(w, r)
-	case http.MethodPost:
-		create(w, r)
-	default:
-		fail(w, 405, "", "method not allowed")
+// tenantOf compares the bearer token against every configured token, so timing does not reveal
+// which one matched.
+func (h *handler) tenantOf(r *http.Request) (tenant string, ok bool) {
+	got, has := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !has || got == "" {
+		return "", false
 	}
-}
-
-func (h *handler) item(w http.ResponseWriter, r *http.Request, id string, get, patch, del itemFn) {
-	switch r.Method {
-	case http.MethodGet:
-		get(w, r, id)
-	case http.MethodPatch:
-		patch(w, r, id)
-	case http.MethodDelete:
-		del(w, r, id)
-	default:
-		fail(w, 405, "", "method not allowed")
+	for tok, t := range h.tokens {
+		if subtle.ConstantTimeCompare([]byte(got), []byte(tok)) == 1 {
+			tenant, ok = t, true
+		}
 	}
+	return tenant, ok
 }
 
-func write(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", mediaType)
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func fail(w http.ResponseWriter, status int, scimType, detail string) {
-	body := map[string]any{"schemas": []string{schemaError}, "status": fmt.Sprint(status), "detail": detail}
-	if scimType != "" {
-		body["scimType"] = scimType
-	}
-	write(w, status, body)
-}
-
-// storeFail maps a Store error to a SCIM error response.
-func storeFail(w http.ResponseWriter, err error, what string) {
-	switch {
-	case errors.Is(err, ErrNotFound):
-		fail(w, 404, "", "no such "+what)
-	case errors.Is(err, ErrConflict):
-		fail(w, 409, "uniqueness", what+" name is taken")
-	default:
-		fail(w, 500, "", "the store failed")
-	}
-}
-
-func decodeBody(r *http.Request, v any) bool {
-	return json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20)).Decode(v) == nil
-}
+func tenantFrom(r *http.Request) string { t, _ := r.Context().Value(tenantKey{}).(string); return t }
 
 func newID() string {
 	b := make([]byte, 16)
@@ -137,49 +135,89 @@ func newID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
-// filterValue returns the value of an `attr eq "x"` filter, whether one was given, and whether
-// it is one we support.
-func filterValue(r *http.Request, attr string) (val string, given, ok bool) {
-	f := r.URL.Query().Get("filter")
-	if f == "" {
-		return "", false, true
+// storeErr maps a Store error to a SCIM error the library renders.
+func storeErr(err error, id string) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrNotFound):
+		return scimerr.ScimErrorResourceNotFound(id)
+	case errors.Is(err, ErrConflict):
+		return scimerr.ScimErrorUniqueness
+	default:
+		return scimerr.ScimErrorInternal
 	}
-	m := eqFilter.FindStringSubmatch(f)
-	if m == nil || !strings.EqualFold(m[1], attr) {
-		return "", true, false
-	}
-	return m[2], true, true
 }
 
-func listResponse(resources []any) map[string]any {
-	if resources == nil {
-		resources = []any{}
-	}
-	return map[string]any{"schemas": []string{schemaList}, "totalResults": len(resources), "itemsPerPage": len(resources), "startIndex": 1, "Resources": resources}
-}
-
-type patchOp struct {
-	Op    string          `json:"op"`
-	Path  string          `json:"path"`
-	Value json.RawMessage `json:"value"`
-}
-
-type patchBody struct {
-	Schemas    []string  `json:"schemas"`
-	Operations []patchOp `json:"Operations"`
-}
-
-func readPatch(w http.ResponseWriter, r *http.Request) (patchBody, bool) {
-	var b patchBody
-	if !decodeBody(r, &b) {
-		fail(w, 400, "invalidSyntax", "the body is not JSON")
-		return b, false
-	}
-	for _, s := range b.Schemas {
-		if s == schemaPatch {
-			return b, true
+// page filters resources with the request's filter, then slices the requested window.
+func page(all []lib.Resource, view func(lib.Resource) map[string]any, p lib.ListRequestParams) lib.Page {
+	var kept []lib.Resource
+	for _, res := range all {
+		if p.FilterValidator == nil || p.FilterValidator.PassesFilter(view(res)) == nil {
+			kept = append(kept, res)
 		}
 	}
-	fail(w, 400, "invalidSyntax", "expected a PatchOp")
-	return b, false
+	from := min(max(p.StartIndex-1, 0), len(kept))
+	to := min(from+p.Count, len(kept))
+	return lib.Page{TotalResults: len(kept), Resources: kept[from:to]}
+}
+
+// withIdentity adds the id and externalId a filter may name to a copy of the attributes.
+func withIdentity(r lib.Resource) map[string]any {
+	m := map[string]any{"id": r.ID}
+	for k, v := range r.Attributes {
+		m[k] = v
+	}
+	if r.ExternalID.Present() {
+		m["externalId"] = r.ExternalID.Value()
+	}
+	return m
+}
+
+func externalID(a lib.ResourceAttributes) optional.String {
+	if s, ok := a["externalId"].(string); ok && s != "" {
+		return optional.NewString(s)
+	}
+	return optional.String{}
+}
+
+// patchTarget names the attribute a PATCH operation addresses, "" for a whole-resource value.
+func patchTarget(op lib.PatchOperation) string {
+	if op.Path == nil {
+		return ""
+	}
+	return op.Path.AttributePath.AttributeName
+}
+
+// entraBools rewrites the strings "True" and "False" Entra sends for active in a PATCH body into
+// booleans, which the library's schema check requires. A body that is not JSON passes through.
+func entraBools(r *http.Request) {
+	data, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, 1<<20))
+	r.Body = io.NopCloser(bytes.NewReader(data))
+	var body struct {
+		Schemas    json.RawMessage  `json:"schemas"`
+		Operations []map[string]any `json:"Operations"`
+	}
+	if err != nil || json.Unmarshal(data, &body) != nil {
+		return
+	}
+	fix := func(m map[string]any, key string) {
+		if b, ok := boolOf(m[key]); ok {
+			if _, isString := m[key].(string); isString {
+				m[key] = b
+			}
+		}
+	}
+	for _, op := range body.Operations {
+		if p, _ := op["path"].(string); strings.EqualFold(p, "active") {
+			fix(op, "value")
+		} else if v, ok := op["value"].(map[string]any); ok {
+			fix(v, "active")
+		}
+	}
+	out, err := json.Marshal(map[string]any{"schemas": body.Schemas, "Operations": body.Operations})
+	if err == nil {
+		r.Body = io.NopCloser(bytes.NewReader(out))
+		r.ContentLength = int64(len(out))
+	}
 }
