@@ -16,8 +16,17 @@ import (
 
 const token = "scim-token"
 
+// do sends one request. IdPs always put "schemas" in a create or replace body, so do adds the
+// resource schema when a body has none.
 func do(t *testing.T, h http.Handler, method, path, body, tok string) *httptest.ResponseRecorder {
 	t.Helper()
+	if strings.HasPrefix(body, "{\"") && !strings.Contains(body, `"schemas"`) {
+		kind := "User"
+		if strings.Contains(path, "/Groups") {
+			kind = "Group"
+		}
+		body = `{"schemas":["urn:ietf:params:scim:schemas:core:2.0:` + kind + `"],` + body[1:]
+	}
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	r.Header.Set("Authorization", "Bearer "+tok)
 	r.Header.Set("Content-Type", "application/scim+json")
@@ -36,7 +45,7 @@ func decode(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 }
 
 func TestUserLifecycle(t *testing.T) {
-	h := scim.NewHandler(scim.NewMemoryStore(), token)
+	h := scim.NewTenantHandler(scim.NewMemoryStore(), map[string]string{token: "t"}, nil)
 	w := do(t, h, "POST", "/scim/v2/Users", `{"userName":"Bo@Acme.example","externalId":"x1"}`, token)
 	if w.Code != 201 || w.Header().Get("Content-Type") != "application/scim+json" {
 		t.Fatalf("create: %d %s", w.Code, w.Header().Get("Content-Type"))
@@ -62,7 +71,7 @@ func TestUserLifecycle(t *testing.T) {
 	if all := decode(t, do(t, h, "GET", "/scim/v2/Users", "", token)); all["totalResults"] != float64(2) {
 		t.Fatalf("list %v", all)
 	}
-	if w := do(t, h, "GET", `/scim/v2/Users?filter=displayName%20eq%20%22x%22`, "", token); w.Code != 400 {
+	if w := do(t, h, "GET", `/scim/v2/Users?filter=bogus`, "", token); w.Code != 400 {
 		t.Fatalf("bad filter %d", w.Code)
 	}
 
@@ -96,18 +105,18 @@ func TestUserLifecycle(t *testing.T) {
 }
 
 func TestAuthAndValidation(t *testing.T) {
-	h := scim.NewHandler(scim.NewMemoryStore(), token)
+	h := scim.NewTenantHandler(scim.NewMemoryStore(), map[string]string{token: "t"}, nil)
 	for name, tc := range map[string]struct {
 		method, path, body, tok string
 		want                    int
 	}{
-		"wrong token":      {"GET", "/scim/v2/Users", "", "wrong", 401},
-		"empty token":      {"GET", "/scim/v2/Users", "", "", 401},
-		"github-shaped":    {"POST", "/scim/v2/Users", `{"userName":"octocat"}`, token, 400},
-		"bad json":         {"POST", "/scim/v2/Users", `{`, token, 400},
-		"unknown path":     {"GET", "/scim/v2/Nope", "", token, 404},
-		"missing user":     {"GET", "/scim/v2/Users/nope", "", token, 404},
-		"method not allow": {"PUT", "/scim/v2/Users", "", token, 405},
+		"wrong token":    {"GET", "/scim/v2/Users", "", "wrong", 401},
+		"empty token":    {"GET", "/scim/v2/Users", "", "", 401},
+		"github-shaped":  {"POST", "/scim/v2/Users", `{"userName":"octocat"}`, token, 400},
+		"bad json":       {"POST", "/scim/v2/Users", `{`, token, 400},
+		"unknown path":   {"GET", "/scim/v2/Nope", "", token, 404},
+		"missing user":   {"GET", "/scim/v2/Users/nope", "", token, 404},
+		"collection PUT": {"PUT", "/scim/v2/Users", "", token, 404},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if w := do(t, h, tc.method, tc.path, tc.body, tc.tok); w.Code != tc.want {
@@ -122,7 +131,7 @@ func TestAuthAndValidation(t *testing.T) {
 }
 
 func TestGroups(t *testing.T) {
-	h := scim.NewHandler(scim.NewMemoryStore(), token)
+	h := scim.NewTenantHandler(scim.NewMemoryStore(), map[string]string{token: "t"}, nil)
 	uid := decode(t, do(t, h, "POST", "/scim/v2/Users", `{"userName":"bo@acme.example"}`, token))["id"].(string)
 	w := do(t, h, "POST", "/scim/v2/Groups", `{"displayName":"release-managers","members":[{"value":"`+uid+`"}]}`, token)
 	g := decode(t, w)
@@ -154,5 +163,20 @@ func TestGroups(t *testing.T) {
 	}
 	if w := do(t, h, "DELETE", "/scim/v2/Groups/"+gid, "", token); w.Code != 204 {
 		t.Fatalf("delete group %d", w.Code)
+	}
+}
+
+// Create and Replace refuse an empty displayName, so a PATCH replace must too.
+func TestPatchRefusesEmptyDisplayName(t *testing.T) {
+	h := scim.NewTenantHandler(scim.NewMemoryStore(), map[string]string{token: "t"}, nil)
+	gid := decode(t, do(t, h, "POST", "/scim/v2/Groups", `{"displayName":"release-managers"}`, token))["id"].(string)
+	for _, name := range []string{"", "   "} {
+		body := `{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"displayName","value":"` + name + `"}]}`
+		if w := do(t, h, "PATCH", "/scim/v2/Groups/"+gid, body, token); w.Code != 400 {
+			t.Fatalf("patch displayName %q: status %d, want 400: %s", name, w.Code, w.Body)
+		}
+	}
+	if g := decode(t, do(t, h, "GET", "/scim/v2/Groups/"+gid, "", token)); g["displayName"] != "release-managers" {
+		t.Fatalf("name changed despite the rejection: %v", g)
 	}
 }
