@@ -145,6 +145,18 @@ type Observer interface {
 	Observe(ctx context.Context, id TicketID, attempt int) (Observation, error)
 }
 
+// Lister is the optional Tracker read for restart (Symphony §14): every ticket
+// the factory has claimed and not finished, so a rebuilt cache sees running work.
+type Lister interface {
+	Active(ctx context.Context) ([]Ticket, error)
+}
+
+// LatestObserver is the optional Observer read for a ticket's newest attempt,
+// for callers that do not know the attempt number.
+type LatestObserver interface {
+	Latest(ctx context.Context, id TicketID) (Observation, error)
+}
+
 // Event is one line of the NDJSON stream (`factory run --headless`).
 type Event struct {
 	V      int            `json:"v"`
