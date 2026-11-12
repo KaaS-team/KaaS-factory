@@ -119,15 +119,6 @@ var policyAlias = map[string]string{
 	"policy.protected_paths":                    "protected_paths",
 }
 
-// Keys lists every fixed key path, in table order. Keys under "models." are open and not listed.
-func Keys() []string {
-	out := make([]string, len(specs))
-	for i, s := range specs {
-		out[i] = s.key
-	}
-	return out
-}
-
 // lookup finds the spec of a key, including the open "models.<tier>" keys.
 func lookup(key string) (spec, bool) {
 	for _, s := range specs {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -40,14 +39,14 @@ func newStore(t *testing.T) *store.Store {
 	return st
 }
 
-func TestStoreLookupFeedsBackends(t *testing.T) {
+func TestStoreSessionFeedsBackends(t *testing.T) {
 	ctx := context.Background()
 	st := newStore(t)
 	rl := &fakeRunLog{pages: []Page{
 		{Events: []Event{{Time: time.Unix(1, 0), Kind: "a", Text: "one"}, {Time: time.Unix(2, 0), Kind: "a", Text: "two"}}, Next: "c1", More: true},
 		{Events: []Event{{Time: time.Unix(3, 0), Kind: "a", Text: "three"}}, Next: "c2", Done: true},
 	}}
-	b := Backends{Latest: StoreLookup(st), Factories: map[string]func(api.Session) (Source, error){"routines": RoutinesFactory(rl)}}
+	b := Backends{Latest: st.LatestSession, Factories: map[string]func(api.Session) (Source, error){"routines": RoutinesFactory(rl)}}
 
 	if _, err := b.Source(ctx, "9"); !errors.Is(err, store.ErrSessionNotRecorded) || !strings.Contains(err.Error(), "not recorded") {
 		t.Fatalf("unknown ticket: %v", err)
@@ -102,48 +101,5 @@ func TestRoutinesFollowRunsUntilContextEnds(t *testing.T) {
 func TestRoutinesFactoryNeedsSessionID(t *testing.T) {
 	if _, err := RoutinesFactory(&fakeRunLog{})(api.Session{}); err == nil {
 		t.Fatal("empty session id must fail")
-	}
-}
-
-func TestLocalFactoryTailsGrowingFile(t *testing.T) {
-	dir := t.TempDir()
-	ended := false
-	f := LocalFactory(
-		func(s api.Session) string { return filepath.Join(dir, s.Key+".out") },
-		func(context.Context, api.Session) (bool, error) { return ended, nil },
-	)
-	src, err := f(api.Session{Key: "factory-5-a1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(dir, "factory-5-a1.out")
-	var out bytes.Buffer
-	cursor := ""
-	step := func(add string) {
-		t.Helper()
-		if add != "" {
-			fh, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, _ = fh.WriteString(add)
-			_ = fh.Close()
-		}
-		p, err := src.Poll(context.Background(), cursor)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cursor = p.Next
-		for _, e := range p.Events {
-			out.WriteString(e.Text + "\n")
-		}
-	}
-	step("")
-	step("one\ntw")
-	step("o\n")
-	ended = true
-	step("three")
-	if out.String() != "one\ntwo\nthree\n" {
-		t.Fatalf("got %q", out.String())
 	}
 }

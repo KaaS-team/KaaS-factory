@@ -14,6 +14,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dashboard"
+	"github.com/KaaS-team/factory/internal/dispatch/shadow"
 	"github.com/KaaS-team/factory/internal/eval"
 	"github.com/KaaS-team/factory/internal/firstrun"
 	"github.com/KaaS-team/factory/internal/initwiz"
@@ -79,7 +80,7 @@ func mountClients(root *cobra.Command) {
 			return github.Epic(tr)(ctx, n)
 		}),
 		plancmd.WithFiler(lazyFiler{}),
-	), eval.NewCommand(), packs.NewAddCommand(), packs.NewPacksCommand())
+	), eval.NewCommand(), shadow.NewCommand(), packs.NewAddCommand(), packs.NewPacksCommand())
 	root.AddCommand(logs.NewCommand(logBackends()))
 }
 

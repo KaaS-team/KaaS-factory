@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/spf13/cobra"
 )
 
 // DefaultPath is where the file writer logs, relative to the repo root. The
@@ -138,4 +139,29 @@ func (t *tally) describe() string {
 		}
 	}
 	return strings.Join(parts, ", ")
+}
+
+// NewCommand returns `shadow`: a per-day, per-ticket summary of what shadow mode would have run.
+func NewCommand() *cobra.Command {
+	path := DefaultPath
+	cmd := &cobra.Command{
+		Use:          "shadow",
+		Short:        "Summarize what shadow mode would have dispatched",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			f, err := os.Open(path)
+			if os.IsNotExist(err) {
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), "no shadow records")
+				return err
+			}
+			if err != nil {
+				return err
+			}
+			defer func() { _ = f.Close() }()
+			return Summary(f, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&path, "file", DefaultPath, "shadow log to read")
+	return cmd
 }

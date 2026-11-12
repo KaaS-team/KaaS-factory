@@ -33,11 +33,6 @@ type Options struct {
 	Operator bool
 }
 
-// routes lists every route pattern the handler registers. All are GET.
-func routes() []string {
-	return []string{"GET /{$}", "GET /queue", "GET /ticket/{id}", "GET /events"}
-}
-
 type server struct {
 	ctl  api.Control
 	opts Options
@@ -52,11 +47,18 @@ func Handler(ctl api.Control, opts Options) http.Handler {
 		tpl:  template.Must(template.ParseFS(templateFS, "templates/*.html")),
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", s.page("board.html"))
-	mux.HandleFunc("GET /queue", s.page("queue.html"))
-	mux.HandleFunc("GET /ticket/{id}", s.ticket)
-	mux.HandleFunc("GET /events", s.events)
+	for pat, h := range s.routes() {
+		mux.HandleFunc(pat, h)
+	}
 	return mux
+}
+
+// routes maps every route pattern the handler registers to its handler. All are GET.
+func (s *server) routes() map[string]http.HandlerFunc {
+	return map[string]http.HandlerFunc{
+		"GET /{$}": s.page("board.html"), "GET /queue": s.page("queue.html"),
+		"GET /ticket/{id}": s.ticket, "GET /events": s.events,
+	}
 }
 
 // groupOf puts a phase in one of the three groups the factory-plane home screen used.
