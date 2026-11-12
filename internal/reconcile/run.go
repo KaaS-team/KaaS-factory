@@ -2,6 +2,7 @@ package reconcile
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/pick"
+	"github.com/KaaS-team/factory/internal/reconcile/eventlog"
 )
 
 // Deps are the ports and hooks Tick uses. Now and OnError may be nil.
@@ -18,7 +20,19 @@ type Deps struct {
 	Observer     api.Observer
 	Now          func() time.Time
 	OnError      func(error)
-	InitialLocks pick.Locks // Locks for the state Tick builds on a fresh start
+	InitialLocks pick.Locks      // Locks for the state Tick builds on a fresh start
+	Log          *eventlog.Store // append-only step log replayed on a fresh start; nil keeps none
+}
+
+// logStep records a completed step; a write error is reported and the tick goes on.
+func (d Deps) logStep(id api.TicketID, ev eventlog.Event) {
+	if d.Log == nil {
+		return
+	}
+	if ev.Time.IsZero() {
+		ev.Time = d.now()
+	}
+	d.report(d.Log.Append(id, ev))
 }
 
 func (d Deps) now() time.Time {
@@ -151,7 +165,28 @@ func recoverState(ctx context.Context, d Deps, ready []api.Ticket, cfg Config, n
 			}
 		}
 	}
+	d.Restore(s, ready)
 	return s
+}
+
+// Restore replays the step log over s for the listed active tickets. The log knows steps the observer
+// cannot see (a dispatch before the first push, a queued retry), so it wins unless the observer found
+// a newer attempt. A log that failed its checksum is rebuilt and the audit goes to OnError.
+func (d Deps) Restore(s *State, active []api.Ticket) {
+	if d.Log == nil {
+		return
+	}
+	logged, audits, err := d.Log.Replay()
+	d.report(err)
+	for _, a := range audits {
+		d.report(errors.New(a))
+	}
+	for _, t := range active {
+		if l, ok := logged[t.ID]; ok && l.Attempt >= s.Entries[t.ID].Attempt {
+			s.Entries[t.ID] = Entry{Ticket: t, Phase: l.Phase, Attempt: l.Attempt, Session: l.Session,
+				StartedAt: l.StartedAt, SteeredAt: l.SteeredAt, RetryAt: l.RetryAt, Error: l.Error}
+		}
+	}
 }
 
 func newState() *State { return &State{Entries: map[api.TicketID]Entry{}} }
@@ -178,6 +213,7 @@ func apply(ctx context.Context, d Deps, s *State, a Action, now time.Time, cfg C
 		}
 		e.Phase, e.SteeredAt = api.PhaseStalled, now
 		s.Entries[a.ID] = e
+		d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindSteer, Time: now})
 	case Retry:
 		if err := d.Dispatcher.Cancel(ctx, sessionOf(d, e)); err != nil {
 			d.report(err)
@@ -192,48 +228,54 @@ func apply(ctx context.Context, d Deps, s *State, a Action, now time.Time, cfg C
 		}
 		e.Phase, e.RetryAt, e.Session, e.SteeredAt, e.Error = api.PhaseRetryQueue, a.At, nil, time.Time{}, a.Reason
 		s.Entries[a.ID] = e
+		d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindRetry, Time: now, Ticket: &e.Ticket, Attempt: e.Attempt, At: a.At, Reason: a.Reason})
 	case Requeue:
 		e.Error = a.Reason
 		s.Entries[a.ID] = e
 	case Cancel:
-		cancelEntry(ctx, d, s, e, a)
+		if cancelEntry(ctx, d, s, e, a) {
+			d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindEnd, Time: now, Reason: a.Reason})
+		}
 	case MarkDone:
 		if err := d.Tracker.SetPhase(ctx, a.ID, api.PhaseDone); err != nil {
 			d.report(err)
 			return
 		}
 		delete(s.Entries, a.ID)
+		d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindEnd, Time: now, Reason: string(MarkDone)})
 	case NeedsHuman:
 		if err := d.Dispatcher.Cancel(ctx, sessionOf(d, e)); err != nil {
 			d.report(err)
 			return
 		}
-		escalate(ctx, d, s, a.ID, a.Reason)
+		escalate(ctx, d, s, a.ID, a.Reason, now)
 	}
 }
 
-func cancelEntry(ctx context.Context, d Deps, s *State, e Entry, a Action) {
+// cancelEntry reports whether the entry was removed.
+func cancelEntry(ctx context.Context, d Deps, s *State, e Entry, a Action) bool {
 	if holdsSlot(e.Phase) {
 		if err := d.Dispatcher.Cancel(ctx, sessionOf(d, e)); err != nil {
 			d.report(err)
-			return
+			return false
 		}
 	}
 	// A terminal ticket already has its final phase in the tracker; only an operator cancel writes one.
 	if a.Reason == "canceled" {
 		if ctx.Err() != nil {
-			return
+			return false
 		}
 		if err := d.Tracker.SetPhase(ctx, a.ID, api.PhaseCanceled); err != nil {
 			d.report(err)
-			return
+			return false
 		}
 	}
 	delete(s.Entries, a.ID)
 	delete(s.CancelRequested, a.ID)
+	return true
 }
 
-func escalate(ctx context.Context, d Deps, s *State, id api.TicketID, reason string) {
+func escalate(ctx context.Context, d Deps, s *State, id api.TicketID, reason string, now time.Time) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -242,6 +284,7 @@ func escalate(ctx context.Context, d Deps, s *State, id api.TicketID, reason str
 		return
 	}
 	delete(s.Entries, id)
+	d.logStep(id, eventlog.Event{Kind: eventlog.KindEnd, Time: now, Reason: string(NeedsHuman)})
 	if ctx.Err() != nil {
 		return
 	}
@@ -272,16 +315,19 @@ func dispatch(ctx context.Context, d Deps, s *State, a Action, now time.Time, cf
 			return
 		}
 		if a.Attempt >= cfg.MaxAttempts {
-			escalate(ctx, d, s, a.ID, fmt.Sprintf("dispatch failed after %d attempts", a.Attempt))
+			escalate(ctx, d, s, a.ID, fmt.Sprintf("dispatch failed after %d attempts", a.Attempt), now)
 			return
 		}
 		if d.Tracker.SetPhase(ctx, a.ID, api.PhaseRetryQueue) == nil {
-			s.Entries[a.ID] = Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.Backoff(a.Attempt)), Error: err.Error()}
+			e := Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.Backoff(a.Attempt)), Error: err.Error()}
+			s.Entries[a.ID] = e
+			d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindRetry, Time: now, Ticket: &t, Attempt: a.Attempt, At: e.RetryAt, Reason: e.Error})
 		}
 		return
 	}
 	s.fired = append(s.fired, now)
 	s.Entries[a.ID] = Entry{Ticket: t, Phase: api.PhaseRunning, Attempt: a.Attempt, Session: &sess, StartedAt: now}
+	d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindDispatch, Time: now, Ticket: &t, Attempt: a.Attempt, Session: &sess})
 	if ctx.Err() != nil {
 		return
 	}

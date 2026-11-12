@@ -13,6 +13,7 @@ import (
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/reconcile"
+	"github.com/KaaS-team/factory/internal/reconcile/eventlog"
 	"github.com/KaaS-team/factory/internal/store"
 )
 
@@ -535,5 +536,32 @@ func TestNewValidatesDeps(t *testing.T) {
 		if _, err := New(d, Config{}); (err == nil) != tc.ok {
 			t.Errorf("%s: err = %v, want ok=%v", tc.name, err, tc.ok)
 		}
+	}
+}
+
+// Symphony 14.3: a dispatch that was logged but never pushed is not dispatched again after a restart.
+func TestRestartReplaysStepLog(t *testing.T) {
+	r := newRig(t, 2, meter.Budgets{}, tkt("a", 0))
+	r.tr.Phases["a"] = api.PhaseRunning
+	lg, err := eventlog.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := tkt("a", 0)
+	if err := lg.Append("a", eventlog.Event{Kind: eventlog.KindDispatch, Time: t0, Ticket: &a, Attempt: 1,
+		Session: &api.Session{Key: "a-a1", Ticket: "a", Attempt: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := New(Deps{Tracker: r.tr, Dispatcher: r.disp, Observer: r.obs, Store: r.st, Meter: r.m, Queue: r.mq, Clock: r.clk, Log: lg},
+		Config{Reconcile: reconcile.Config{Tick: 30 * time.Second}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Tick(context.Background())
+	if len(r.disp.Sessions) != 0 {
+		t.Fatalf("logged dispatch was repeated: %v", r.disp.Sessions)
+	}
+	if b, _ := c.Board(context.Background()); len(b.Slots) != 1 || b.Slots[0].Phase != api.PhaseRunning {
+		t.Fatalf("board %+v", b.Slots)
 	}
 }
