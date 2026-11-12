@@ -18,6 +18,7 @@ import (
 	"github.com/KaaS-team/factory/internal/meter"
 	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/reconcile"
+	"github.com/KaaS-team/factory/internal/reconcile/eventlog"
 )
 
 // Clock is the time source of the loop.
@@ -61,6 +62,7 @@ type Deps struct {
 	Stages     *Stages // nil runs each ticket as one session
 	Clock      Clock   // RealClock when nil
 	OnError    func(error)
+	Log        *eventlog.Store // step log replayed on restart; nil keeps none
 }
 
 // Config holds the loop settings.
@@ -224,13 +226,17 @@ func (c *Core) recover(ctx context.Context) {
 			}
 		}
 	}
+	c.reconcileDeps().Restore(s, tickets)
+	for id, e := range s.Entries {
+		c.attempts[id] = max(c.attempts[id], e.Attempt)
+	}
 	c.state, c.started = s, true
 }
 
 func (c *Core) reconcileDeps() reconcile.Deps {
 	return reconcile.Deps{
 		Dispatcher: loopDispatcher{c}, Tracker: loopTracker{c}, Observer: loopObserver{c},
-		Now: c.d.Clock.Now, OnError: c.d.OnError,
+		Now: c.d.Clock.Now, OnError: c.d.OnError, Log: c.d.Log,
 	}
 }
 
