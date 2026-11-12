@@ -90,3 +90,11 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## cline/cline@50e77bc1e8f7ab023b7986821e4b5f82ff51b8c4
+
+Source: https://github.com/cline/cline (Apache License 2.0, Copyright Cline Bot Inc.). The full
+licence text is at https://www.apache.org/licenses/LICENSE-2.0 and in the upstream `LICENSE` file at
+this commit. The files below are ported to Go and changed from the originals.
+
+- `internal/gitx/checkpoint/checkpoint.go` from `sdk/packages/core/src/hooks/checkpoint-hooks.ts` and `sdk/packages/core/src/session/checkpoint-restore.ts` [tested by `internal/gitx/checkpoint/checkpoint_test.go`]
