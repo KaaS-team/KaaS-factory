@@ -131,3 +131,37 @@ func mustSum(t *testing.T, path string) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
+
+// TestRunscSwapAfterHashRunsCheckedBytes: the original file is replaced after it was hashed; the
+// command must run the bytes that were hashed, never the swapped ones.
+func TestRunscSwapAfterHashRunsCheckedBytes(t *testing.T) {
+	path, sum := fakeRunsc(t, "#!/bin/sh\necho checked\n")
+	t.Setenv(runscPathEnv, path)
+	afterRunscHash = func() {
+		evil := path + ".evil"
+		if err := os.WriteFile(evil, []byte("#!/bin/sh\necho swapped\n"), 0o755); err != nil {
+			t.Error(err)
+		}
+		if err := os.Rename(evil, path); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(func() { afterRunscHash = func() {} })
+	cmd, err := commandFor(context.Background(), Spec{Backend: "runsc", Workdir: t.TempDir()}, RunscPin{SHA256: sum}, "/bin/echo", "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cmd.Path == path {
+		t.Fatalf("command executes the original path %s", path)
+	}
+	if st, err := os.Stat(filepath.Dir(cmd.Path)); err != nil || st.Mode().Perm() != 0o700 {
+		t.Fatalf("copy dir = %v, %v; want mode 0700", st, err)
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "checked" {
+		t.Fatalf("ran %q, want the checked bytes", got)
+	}
+}
