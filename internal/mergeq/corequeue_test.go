@@ -17,6 +17,7 @@ import (
 	"github.com/KaaS-team/factory/internal/api/porttest"
 	"github.com/KaaS-team/factory/internal/gate"
 	"github.com/KaaS-team/factory/internal/gitx"
+	"github.com/KaaS-team/factory/internal/marker"
 )
 
 // coreMergeQueue mirrors core.MergeQueue; mergeq cannot import internal/core (cycle).
@@ -31,8 +32,9 @@ var _ coreMergeQueue = (*CoreQueue)(nil)
 // qtracker is porttest.Tracker plus the two reads CoreQueue needs, ordered by phase entry.
 type qtracker struct {
 	*porttest.Tracker
-	mu    sync.Mutex
-	order []api.TicketID // phase entry order, newest last
+	mu      sync.Mutex
+	order   []api.TicketID // phase entry order, newest last
+	allowed []bool         // per Comment call: was ctx from marker.Allow
 }
 
 func (k *qtracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) error {
@@ -41,6 +43,14 @@ func (k *qtracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) e
 	k.order = append(k.order, id)
 	k.mu.Unlock()
 	return k.Tracker.SetPhase(ctx, id, p)
+}
+
+// Comment records whether the body arrived as the runner's own, as a tracker that neutralises text needs.
+func (k *qtracker) Comment(ctx context.Context, id api.TicketID, body string) error {
+	k.mu.Lock()
+	k.allowed = append(k.allowed, marker.Allowed(ctx))
+	k.mu.Unlock()
+	return k.Tracker.Comment(ctx, id, body)
 }
 
 func (k *qtracker) InPhase(_ context.Context, p api.Phase) ([]api.TicketID, error) {
@@ -327,6 +337,12 @@ func TestCoreQueueEnqueueTwiceIsNoOp(t *testing.T) {
 	}
 }
 
+func TestQueuedMarkerWireFormat(t *testing.T) {
+	if got, want := queuedMarker(7, "abc"), `<!-- factory:queued {"pr":7,"head":"abc"} -->`; got != want {
+		t.Fatalf("queue marker = %q, want %q", got, want)
+	}
+}
+
 func TestMarkerRoundTrip(t *testing.T) {
 	for _, tc := range []struct {
 		name, body string
@@ -369,5 +385,22 @@ func TestCoreQueueStoreBranches(t *testing.T) {
 		if p := g.k.Phases["T1"]; p != want {
 			t.Errorf("drop %s -> %s, want %s", reason, p, want)
 		}
+	}
+}
+
+// A queue marker must reach the tracker as the runner's body; ejection text, which carries gate
+// output, must not.
+func TestQueueMarkersAllowedGateOutputNot(t *testing.T) {
+	g := newRig(t, 1)
+	q := g.queue()
+	g.enqueue(t, q, 1)
+	if err := (coreStore{q}).Requeue(context.Background(), "T1", "h2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := (coreStore{q}).Eject(context.Background(), "T1", "<!-- factory:queued {} -->"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(g.k.allowed, []bool{true, true, false}) {
+		t.Fatalf("allowed per comment = %v, want [true true false]", g.k.allowed)
 	}
 }

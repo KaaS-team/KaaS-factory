@@ -186,8 +186,8 @@ func TestComment(t *testing.T) {
 	}
 	reqs := f.requests()
 	var sent struct{ Body string }
-	if err := json.Unmarshal([]byte(reqs[0].Body), &sent); err != nil || sent.Body != body {
-		t.Fatalf("sent %q (%v), want %q", reqs[0].Body, err, body)
+	if err := json.Unmarshal([]byte(reqs[0].Body), &sent); err != nil || sent.Body != "hello &lt;!-- factory:status v1 -->" {
+		t.Fatalf("sent %q (%v), want it neutralised", reqs[0].Body, err)
 	}
 	if err := tr.Comment(context.Background(), "x", "b"); err == nil {
 		t.Fatal("a bad id must be rejected")

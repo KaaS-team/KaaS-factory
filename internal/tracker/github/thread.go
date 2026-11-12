@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/store"
 	gogithub "github.com/google/go-github/v79/github"
@@ -106,8 +107,12 @@ func (t *Tracker) Thread(ctx context.Context, id api.TicketID) (store.Thread, er
 	if err != nil {
 		return store.Thread{}, err
 	}
+	self, err := t.self(ctx)
+	if err != nil {
+		return store.Thread{}, err
+	}
 	var th store.Thread
-	if st, ok := readStatus(cs); ok {
+	if st, ok := readStatus(ownBy(cs, self)); ok {
 		th.FirstDispatch, th.MergedAt = st.FirstDispatch, st.MergedAt
 	}
 	for _, c := range cs {
@@ -118,12 +123,24 @@ func (t *Tracker) Thread(ctx context.Context, id api.TicketID) (store.Thread, er
 	return th, nil
 }
 
+// ownBy keeps the comments login wrote. Status and ack markers are read from these alone: a
+// maintainer is trusted for commands, but a marker in their comment says nothing about the run.
+func ownBy(cs []Comment, login string) []Comment {
+	var own []Comment
+	for _, c := range cs {
+		if c.Author == login {
+			own = append(own, c)
+		}
+	}
+	return own
+}
+
 func readStatus(cs []Comment) (statusData, bool) {
 	c, ok := FindStatus(cs)
 	if !ok {
 		return statusData{}, false
 	}
-	raw, ok := Latest(ParseData(c.Body), stageStatus)
+	raw, ok := marker.Latest(marker.ParseData(c.Body), stageStatus)
 	var st statusData
 	if !ok || json.Unmarshal(raw, &st) != nil {
 		return statusData{}, false
@@ -146,12 +163,7 @@ func (t *Tracker) RecordStatus(ctx context.Context, id api.TicketID, p api.Phase
 	if err != nil {
 		return err
 	}
-	var own []Comment
-	for _, c := range cs {
-		if c.Author == self {
-			own = append(own, c)
-		}
-	}
+	own := ownBy(cs, self)
 	prev, _ := FindStatus(own)
 	st, _ := readStatus(own)
 	st.Phase = string(p)
@@ -166,7 +178,7 @@ func (t *Tracker) RecordStatus(ctx context.Context, id api.TicketID, p api.Phase
 	if err != nil {
 		return err
 	}
-	body := EncodeData(StatusMarker+" -->\nFactory status: "+string(p)+".", stageStatus, raw)
+	body := marker.EncodeData(marker.Status+" -->\nFactory status: "+string(p)+".", stageStatus, raw)
 	if prev.ID != 0 {
 		_, _, err = t.client.Issues.EditComment(ctx, t.owner, t.repo, prev.ID, &gogithub.IssueComment{Body: &body})
 	} else {
@@ -178,11 +190,11 @@ func (t *Tracker) RecordStatus(ctx context.Context, id api.TicketID, p api.Phase
 	return nil
 }
 
-// acked lists the comment ids the loop already handled.
+// acked lists the comment ids the loop already handled, from the runner's own comments.
 func acked(cs []Comment) map[int64]bool {
 	out := map[int64]bool{}
 	for _, c := range cs {
-		for _, m := range ParseData(c.Body) {
+		for _, m := range marker.ParseData(c.Body) {
 			var d struct {
 				Ref int64 `json:"ref"`
 			}
@@ -210,7 +222,11 @@ func (t *Tracker) Commands(ctx context.Context, id api.TicketID) ([]observe.Comm
 	if err != nil {
 		return nil, err
 	}
-	done := acked(cs)
+	self, err := t.self(ctx)
+	if err != nil {
+		return nil, err
+	}
+	done := acked(ownBy(cs, self))
 	var out []observe.Command
 	for _, c := range cs {
 		cmd, ok := tr.Command(ctx, c)
@@ -233,7 +249,7 @@ func (t *Tracker) Ack(ctx context.Context, id api.TicketID, ref int64) error {
 	if err != nil {
 		return err
 	}
-	return t.Comment(ctx, id, EncodeData("Handled the command in comment "+fmt.Sprint(ref)+".", stageAck, raw))
+	return t.Comment(marker.Allow(ctx), id, marker.EncodeData("Handled the command in comment "+fmt.Sprint(ref)+".", stageAck, raw))
 }
 
 // stageText reads the latest marker for stage into v; false when there is none or it does not fit.
@@ -242,7 +258,7 @@ func stageText(cs []Comment, stage string, v any) bool {
 	for _, c := range cs {
 		bodies = append(bodies, c.Body)
 	}
-	raw, ok := Latest(ParseData(bodies...), stage)
+	raw, ok := marker.Latest(marker.ParseData(bodies...), stage)
 	return ok && json.Unmarshal(raw, v) == nil
 }
 
