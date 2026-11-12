@@ -14,10 +14,12 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
+	"github.com/KaaS-team/factory/internal/dispatch/local/autosubmit"
 	"github.com/KaaS-team/factory/pkg/sandbox"
 )
 
@@ -62,6 +64,9 @@ type Config struct {
 	// Writable and the agent's own state under the home directory.
 	Sandbox  bool
 	Writable []string
+	// Autosubmit, when set, stops a run that passes its caps and opens a partial PR for it and for
+	// any run that dies. Nil turns it off.
+	Autosubmit *autosubmit.Submitter
 }
 
 type usageState struct {
@@ -77,6 +82,10 @@ type process struct {
 	start  time.Time
 	usage  usageState
 	end    time.Time
+
+	canceled   atomic.Bool
+	partialURL string // set before done closes
+	partialErr error
 }
 
 // Dispatcher implements api.Dispatcher over child processes.
@@ -220,15 +229,31 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	}
 	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now()}
 	d.runs[key] = p
+	var guard *autosubmit.Guard
+	if d.cfg.Autosubmit != nil {
+		guard = d.cfg.Autosubmit.Guard()
+	}
 	go func() { // ends when the process exits; the run context kills it
+		var breach autosubmit.Reason
 		sc := bufio.NewScanner(out)
 		sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
 		for sc.Scan() {
 			p.usage.feed(sc.Bytes())
+			if guard != nil && breach == "" {
+				if breach = guard.Feed(sc.Bytes()); breach != "" {
+					cancel()
+				}
+			}
 		}
 		p.err = cmd.Wait()
 		_ = killGroup(cmd) // anything the agent left behind
 		p.end = d.cfg.Now()
+		if guard != nil && d.ctx.Err() == nil && !p.canceled.Load() && (breach != "" || p.err != nil) {
+			if breach == "" {
+				breach = autosubmit.Died
+			}
+			p.partialURL, p.partialErr = d.cfg.Autosubmit.Submit(d.ctx, autosubmit.Exit{Brief: b, Dir: dir, Reason: breach})
+		}
 		cancel()
 		close(p.done)
 	}()
@@ -265,6 +290,24 @@ func (d *Dispatcher) Wait(ctx context.Context, s api.Session) error {
 	}
 }
 
+// Autosubmitted returns the partial PR's URL once the run has ended and was submitted early. The
+// error is why it was not: ErrNothing when there was no diff, or a git or PR failure.
+func (d *Dispatcher) Autosubmitted(s api.Session) (string, error) {
+	p, err := d.run(s)
+	if err != nil {
+		return "", err
+	}
+	select {
+	case <-p.done:
+		if p.partialURL == "" && p.partialErr == nil {
+			return "", errors.New("local: run was not submitted early")
+		}
+		return p.partialURL, p.partialErr
+	default:
+		return "", errors.New("local: run has not ended")
+	}
+}
+
 func (d *Dispatcher) run(s api.Session) (*process, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -285,6 +328,7 @@ func (d *Dispatcher) Cancel(ctx context.Context, s api.Session) error {
 	if err != nil {
 		return nil
 	}
+	p.canceled.Store(true)
 	p.cancel()
 	select {
 	case <-p.done:
