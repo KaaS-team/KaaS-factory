@@ -1,0 +1,34 @@
+version: 2
+project_name: factory
+
+builds:
+  - id: factory
+    main: ./cmd/factory
+    binary: factory
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: factory
+    formats: [tar.gz]
+    name_template: "factory_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+brews:
+  - name: factory
+    ids: [factory]
+    homepage: https://github.com/KaaS-team/KaaS-factory
+    description: Plans work into tickets and runs them on parallel coding-agent sessions
+    license: Apache-2.0
+    repository:
+      owner: KaaS-team
+      name: homebrew-tap
+    test: |
+      system "#{bin}/factory", "version"
