@@ -139,3 +139,9 @@ Source: https://github.com/ast-grep/ast-grep (MIT, Copyright (c) 2022 Herrington
 
 - `internal/packs/astgrep/astgrep.go` from `crates/cli/src/print/json_print.rs` [tested by `internal/packs/astgrep/astgrep_test.go`]
 - `internal/packs/astgrep/pack.go` from `crates/config/src/rule_config.rs` and `crates/cli/src/verify/reporter.rs` [tested by `internal/packs/astgrep/pack_test.go`]
+## continuedev/continue@5522c6f
+
+Source: https://github.com/continuedev/continue (Apache-2.0, Copyright 2023 Continue Dev, Inc.). Logic was ported to Go and rewritten, not pasted; the prompt scope rules are reworded.
+
+- `internal/packs/checkmd/pack.go` from `core/llm/rules/getSystemMessageWithRules.ts` (glob, regex and colocation applicability) [tested by `internal/packs/checkmd/pack_test.go`]
+- `internal/packs/checkmd/run.go` from `extensions/cli/src/commands/review/worktree.ts` and the prompt block of `reviewWorker.ts` [tested by `internal/packs/checkmd/run_test.go`]
