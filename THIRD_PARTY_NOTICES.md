@@ -314,3 +314,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 Source: https://github.com/ast-grep/ast-grep (MIT, Copyright (c) 2022 Herrington Darkholme). Only `schemas/rule.json` was used.
 
 - `internal/graph/rule.schema.json` from `schemas/rule.json`, unchanged, embedded by `internal/graph/transform.go` [tested by `internal/graph/transform_test.go`]
+
+## cline/cline@50e77bc
+
+Source: https://github.com/cline/cline (Apache-2.0, Copyright Cline Bot Inc.). The Apache-2.0 licence text is at the repository root. The Go port is a translation and carries no upstream code.
+
+- `internal/dispatch/local/guard.go` from `sdk/packages/core/src/extensions/tools/command-guard.ts` [tested by `internal/dispatch/local/guard_test.go`, whose corpus is `command-guard.test.ts`]
