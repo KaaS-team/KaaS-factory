@@ -1,0 +1,13 @@
+name planned-to-pr
+start triage
+node triage kind=agent uses=triage label=factory:triaging fresh=false
+node import-plan kind=agent uses=import-plan label=factory:planning fresh=false
+node build kind=agent uses=build label=factory:building fresh=false
+node verify kind=agent uses=verify label=factory:verifying fresh=true
+node pr kind=agent uses=pr label=factory:in-review fresh=false
+edge triage -pass-> import-plan
+edge import-plan -pass-> build
+edge build -pass-> verify
+edge verify -fail-> build
+edge verify -pass-> pr
+edge pr -revise-> build
