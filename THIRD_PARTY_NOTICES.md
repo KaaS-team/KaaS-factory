@@ -145,3 +145,10 @@ Source: https://github.com/continuedev/continue (Apache-2.0, Copyright 2023 Cont
 
 - `internal/packs/checkmd/pack.go` from `core/llm/rules/getSystemMessageWithRules.ts` (glob, regex and colocation applicability) [tested by `internal/packs/checkmd/pack_test.go`]
 - `internal/packs/checkmd/run.go` from `extensions/cli/src/commands/review/worktree.ts` and the prompt block of `reviewWorker.ts` [tested by `internal/packs/checkmd/run_test.go`]
+## cline/cline@50e77bc1e8f7ab023b7986821e4b5f82ff51b8c4
+
+Source: https://github.com/cline/cline (Apache License 2.0, Copyright Cline Bot Inc.). The full
+licence text is at https://www.apache.org/licenses/LICENSE-2.0 and in the upstream `LICENSE` file at
+this commit. The files below are ported to Go and changed from the originals.
+
+- `internal/gitx/checkpoint/checkpoint.go` from `sdk/packages/core/src/hooks/checkpoint-hooks.ts` and `sdk/packages/core/src/session/checkpoint-restore.ts` [tested by `internal/gitx/checkpoint/checkpoint_test.go`]
