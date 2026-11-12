@@ -20,6 +20,8 @@ type Locks struct {
 	// Merge returns the paths that conflict when two branches merge, nil when clean.
 	// With Merge nil, an overlap always blocks.
 	Merge func(a, b string) ([]string, error)
+	// Parked are tickets in the dead-letter park; Refill never picks them.
+	Parked map[api.TicketID]bool
 }
 
 // Rank returns a copy of ready ordered by priority (lower first), then oldest
@@ -118,6 +120,10 @@ func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, fi
 			break
 		}
 		if isRunning[t.ID] {
+			continue
+		}
+		if locks.Parked[t.ID] {
+			skips = append(skips, Skip{t.ID, "parked in DLQ"})
 			continue
 		}
 		if b := blocker(t, open); b != "" {
