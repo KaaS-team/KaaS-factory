@@ -1,0 +1,24 @@
+name: go
+# The Go gate for the v9 rewrite. ci.yml keeps gating the frozen TS tree until cutover.
+on:
+  push:
+    branches: [next, "go/**"]
+  pull_request:
+    branches: [next]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: extractions/setup-just@v3
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.13.2
+          install-only: true
+      - run: just check

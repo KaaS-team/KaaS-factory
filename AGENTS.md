@@ -1,39 +1,41 @@
-# KaaS Factory
+# KaaS Factory (Go, branch `next`)
 
-A GitHub-native loop for coding agents: triage, plan, build, verify, PR. `src/` is the runner,
-`bin/factory` the CLI (its code is `src/cli.ts`), `dashboard/` the web view. `src/install-template.ts` copies `template/` into a target repo;
-`template-ci/` holds the inert CI workflow. Reasoning goes in `docs/decisions/`.
+Plans work into tickets and runs them on parallel coding-agent sessions (cloud routines or local
+`claude -p`), then lands them through a merge queue. This branch is the v9 Go rewrite.
+
+`src/`, `tests/`, `dashboard/`, `scripts/` and the other TS files are the frozen v8 tree (tag
+`ts-final`). Read them for porting; never edit them. They are deleted at cutover.
+
+## Stack
+
+Go (go.mod `go 1.25.0`; set `GOTOOLCHAIN=auto` if yours is older), cobra, `just`, golangci-lint
+v2.13.2, `CGO_ENABLED=0`.
 
 ## Commands
 
-- `make fast`: about 7 seconds. Biome, typecheck, test-only check, mutation check against `BASE` (default origin/main), line-cap baseline and anchors. Run it before every push.
-- `make check`: typecheck, `bun test`, then `skills-ref validate` on every template skill. It needs
-  `uvx` and fails without it. This is the gate.
-- `make check-mutations`: applies each mutation entry to a copy of the repo, and its test must go red.
-  Each entry is one file, `tests/mutations/<slug>.json`, named by `mutationSlug` of its name.
-  `tests/mutations.json` is the old list, still read until `scripts/split-mutations.ts` moves it. A new
-  check lands with its mutation file in the same change. It runs in `mutations.yml`, off the push verdict: on a pull request, a push that changes a
-  test or a check, and nightly.
-- `make agent-matrix` spends tokens on real agents, so it is never part of the gate.
+- `just check`: the gate (gofmt, vet, golangci-lint, `go test -race`, static build). CI runs it
+  (`.github/workflows/go.yml`) and so does the pre-push hook (`.agents/repo.json`).
+- `just fast`: gofmt, vet, `go test` without race or lint. Run it before every push.
 
-## Things that change together
+## Boundaries
 
-- **Claude argv.** `src/agents/presets/claude.ts` is pinned byte for byte by `tests/agents.test.ts`.
-  Check a new flag against `claude --help` first.
-- **Stage artifacts.** `stageSchema` in `src/schemas.ts` is the one source of truth.
-  - `src/artifacts.ts` validates against it (`tests/schemas.test.ts`).
-  - `template/.claude/hooks/stop-artifact.sh` checks against it, through the schema file the runner
-    writes (`tests/stop-artifact.test.ts`).
-  - Of the field names a stage skill lists, tests check only `outcome`. Edit the skill in the same change.
-- **Stage shell rules.** `STAGE_GUIDANCE` and the allow-lists live in `src/stage-permissions.ts`.
-  Template agents carry `STAGE_GUIDANCE` verbatim (`tests/skills.test.ts`), and every git, bash,
-  gates.sh or mutate.sh command in a stage skill must be on its allow-list (`tests/stage-permissions.test.ts`).
-- **Presets.** `docs/agents.md`'s table is generated from `PRESETS` by `scripts/gen-agents-doc.ts`,
-  and `tests/agents-registry.test.ts` fails when they differ.
-- **Version.** `package.json` and `template-ci/factory.yml.example`'s `FACTORY_RUNNER_REF` move
-  together (`tests/release.test.ts`).
+- `internal/api` is the one contract: the core reaches the world only through its ports, and the
+  CLI, TUI, MCP and dashboard reach the core only through `Control` and `Event`.
+- A copied file starts with `// Ported from <repo>@<sha> <path>`, MIT or Apache-2.0 only, and its
+  `repo@sha` gets a section in `THIRD_PARTY_NOTICES.md` (`internal/provenance` test).
+- No `ANTHROPIC_*` or other provider key anywhere; sessions run under the operator's login.
+- Token counts, cost and model names never go in a PR body or a customer-facing view.
+- Cloud sessions cannot push `.github/workflows/**`; leave workflow changes for a local session.
 
-## The template
+## Session reports
 
-`template/` ships to other people's repos, so it depends on nothing on this machine: no plugin, and no
-`~/.claude` or `/Users/` path. `.claude/rules/template.md` loads when you edit it.
+A session finishes by pushing its branch with `.factory/reports/<ticket>.md`: what changed, the
+`just check` result, what was left out and why.
+
+## Tests
+
+| Package | Covers |
+|---|---|
+| `internal/api/porttest` | fakes for every port; dispatch is idempotent per attempt |
+| `internal/provenance` | notices match ported-file headers |
+| `cmd/factory` | root command and `version` |

@@ -15,3 +15,6 @@ relay/target/
 dist/
 __pycache__/
 *.pyc
+
+# Session reports are committed; the generic reports/ rule above would hide them.
+!.factory/reports/
