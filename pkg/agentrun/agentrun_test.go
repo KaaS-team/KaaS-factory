@@ -48,16 +48,18 @@ echo '{"type":"result","usage":{"input_tokens":12,"output_tokens":6,"cache_read_
 	if err != nil {
 		t.Fatal(err)
 	}
-	var u agentrun.Usage
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if u, err = d.Usage(ctx, s); err != nil {
-			t.Fatal(err)
-		}
-		if u.CostUSD == 0.25 {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
+	w, ok := d.(interface {
+		Wait(context.Context, agentrun.Session) error
+	})
+	if !ok {
+		t.Fatal("the local dispatcher has no Wait")
+	}
+	if err := w.Wait(ctx, s); err != nil { // returns once the output is fully read
+		t.Fatal(err)
+	}
+	u, err := d.Usage(ctx, s)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if u.InputTokens != 12 || u.OutputTokens != 6 || u.CacheReadTokens != 2 || u.CacheWriteTokens != 1 || u.CostUSD != 0.25 {
 		t.Fatalf("usage %+v", u)
