@@ -1,0 +1,13 @@
+Wave 1:
+  T1  Add parser
+      Files: internal/a/a.go
+  T2  Add store
+      Files: internal/b/b.go
+Wave 2:
+  T3  Add command
+      Files: internal/c/c.go
+  T4  Add report
+      Files: internal/d/d.go
+Wave 3:
+  T5  Wire it
+      Files: internal/e/e.go
