@@ -78,3 +78,31 @@ func TestObserverLatestReturnsHighestAttempt(t *testing.T) {
 		t.Fatalf("Latest of unknown = %+v, %v", empty, err)
 	}
 }
+
+func TestControlSatisfiesBothAndControlOnlyHidesHistory(t *testing.T) {
+	c := NewControl(api.Board{})
+	var ctl api.Control = c
+	if _, ok := ctl.(api.Historian); !ok {
+		t.Fatal("Control is not a Historian")
+	}
+	if _, ok := c.ControlOnly().(api.Historian); ok {
+		t.Fatal("ControlOnly still exposes History")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, _ := c.Events(ctx)
+	c.Seed("1", api.Event{Kind: "old"})
+	c.Push(api.Event{Kind: "live"})
+	if e := <-ch; e.Kind != "live" {
+		t.Fatalf("got %q", e.Kind)
+	}
+	h, _ := c.History(ctx, "1")
+	if len(h) != 1 || h[0].Kind != "old" {
+		t.Fatalf("history %v", h)
+	}
+	cancel()
+	for range ch {
+	}
+	if c.Subscribers() != 0 {
+		t.Fatal("subscriber not removed")
+	}
+}
