@@ -5,7 +5,9 @@ package eval
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/eval/grade"
+	"github.com/KaaS-team/factory/internal/trace"
 )
 
 // SchemaV1 is the version string written into every scorecard.
@@ -148,7 +151,7 @@ func maxCost(updates []api.Usage) float64 {
 // runTicket runs one ticket for the fixture's epochs. Each epoch is scored by a cascade of the
 // fixture's scorers; the reducer folds the epoch scores. The ticket passes at PassThreshold,
 // and base is green only when it was after every epoch. Usage and wall time add up over epochs.
-func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps) (TicketResult, []Outcome, error) {
+func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps, sink trace.Sink) (TicketResult, []Outcome, error) {
 	if f.Epochs < 0 {
 		return TicketResult{}, nil, fmt.Errorf("fixture %s: epochs %d is negative", f.Name, f.Epochs)
 	}
@@ -192,6 +195,9 @@ func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps) (TicketResu
 		}
 		outs = append(outs, o)
 		in, out := AbsoluteTotals(o.Updates)
+		if sink != nil {
+			recordTicket(sink, f.Name, t.ID, o, in, out, green, dec.Value >= PassThreshold)
+		}
 		r.InputTokens += in
 		r.OutputTokens += out
 		r.CostUSD += maxCost(o.Updates)
@@ -403,4 +409,52 @@ func cellTable(cs []Cell, customer bool) string {
 	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+// recordTicket emits the trace of one ticket. Times are not set: the trace is a record of
+// verdicts, and replay must not depend on the clock.
+func recordTicket(s trace.Sink, fixture string, id api.TicketID, o Outcome, in, out int64, green, pass bool) {
+	tid := fixture + "/" + string(id)
+	s.OnTraceStart(trace.Trace{ID: tid, Name: tid})
+	span := func(sp trace.Span) {
+		sp.TraceID = tid
+		s.OnSpanStart(sp)
+		s.OnSpanEnd(sp)
+	}
+	span(trace.Span{ID: tid + "#agent", Type: trace.SpanAgent, Name: "dispatch", Output: fmt.Sprintf("%d attempts", o.Attempts)})
+	span(trace.Span{ID: tid + "#gen", ParentID: tid + "#agent", Type: trace.SpanGeneration, Name: "usage", InputTokens: in, OutputTokens: out})
+	failed := func(ok bool) *bool { f := !ok; return &f }
+	span(trace.Span{ID: tid + "#base", Type: trace.SpanGate, Name: "base-green", Triggered: failed(green)})
+	span(trace.Span{ID: tid + "#hidden", Type: trace.SpanGate, Name: "hidden", Triggered: failed(pass)})
+	s.OnTraceEnd(trace.Trace{ID: tid, Name: tid})
+}
+
+// Replay prints what a trace file recorded: each span in order, gate spans with their triggered flag.
+func Replay(w io.Writer, lines []trace.Line) error {
+	for _, l := range lines {
+		if l.Event != trace.EventSpanEnd {
+			continue
+		}
+		sp := l.Span
+		if sp == nil {
+			return errors.New("eval: span_end line has no span")
+		}
+		var err error
+		if sp.Type == trace.SpanGate && sp.Triggered == nil {
+			return fmt.Errorf("eval: gate span %s has no triggered flag", sp.Name)
+		}
+		if sp.Type == trace.SpanGate {
+			verdict := "passed"
+			if *sp.Triggered {
+				verdict = "triggered"
+			}
+			_, err = fmt.Fprintf(w, "%s gate %s %s\n", sp.TraceID, sp.Name, verdict)
+		} else {
+			_, err = fmt.Fprintf(w, "%s %s %s\n", sp.TraceID, sp.Type, sp.Name)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

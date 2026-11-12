@@ -9,8 +9,10 @@ package policy
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,6 +31,7 @@ const (
 const (
 	RuleDefaultDeny   = "default-deny"
 	RuleUnknownAction = "unknown-action"
+	RuleExpired       = "expired"
 )
 
 // Actor is the identity an action runs as: one per agent or person.
@@ -62,16 +65,21 @@ type Rule struct {
 
 // Engine holds parsed rules and answers Check.
 type Engine struct {
-	rules []Rule
+	rules   []Rule
+	expires *time.Time // nil: the policy does not expire
 }
+
+// Expired reports whether the policy's expires_at is at or before now.
+func (e *Engine) Expired(now time.Time) bool { return e.expires != nil && !now.Before(*e.expires) }
 
 var known = map[Action]bool{ActionDispatch: true, ActionMerge: true, ActionSetPhase: true}
 
 // Parse reads a YAML rule list and rejects unknown fields, effects and actions, bad globs and
-// duplicate ids.
+// duplicate ids. It reports every bad rule in one error.
 func Parse(data []byte) (*Engine, error) {
 	var doc struct {
-		Rules []Rule `yaml:"rules"`
+		ExpiresAt *time.Time `yaml:"expires_at"`
+		Rules     []Rule     `yaml:"rules"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
@@ -79,35 +87,22 @@ func Parse(data []byte) (*Engine, error) {
 		return nil, fmt.Errorf("policy: %w", err)
 	}
 	seen := map[string]bool{}
+	var bad []error
 	for _, r := range doc.Rules {
 		if r.ID == "" {
-			return nil, fmt.Errorf("policy: a rule has no id")
+			bad = append(bad, fmt.Errorf("a rule has no id"))
+			continue
 		}
 		if seen[r.ID] {
-			return nil, fmt.Errorf("policy: duplicate rule id %q", r.ID)
+			bad = append(bad, fmt.Errorf("duplicate rule id %q", r.ID))
 		}
 		seen[r.ID] = true
-		if r.Effect != "allow" && r.Effect != "deny" {
-			return nil, fmt.Errorf("policy: rule %q: effect must be allow or deny", r.ID)
-		}
-		if len(r.Action) == 0 {
-			return nil, fmt.Errorf("policy: rule %q: actions is required", r.ID)
-		}
-		for _, a := range r.Action {
-			if !known[Action(a)] {
-				return nil, fmt.Errorf("policy: rule %q: unknown action %q", r.ID, a)
-			}
-		}
-		for _, g := range r.Repos {
-			if _, err := path.Match(g, ""); err != nil {
-				return nil, fmt.Errorf("policy: rule %q: bad repo glob %q", r.ID, g)
-			}
-		}
-		if r.MaxUSD != nil && *r.MaxUSD < 0 {
-			return nil, fmt.Errorf("policy: rule %q: max_usd must be 0 or more", r.ID)
-		}
+		bad = append(bad, r.problems()...)
 	}
-	return &Engine{rules: doc.Rules}, nil
+	if len(bad) > 0 {
+		return nil, fmt.Errorf("policy: %d bad rules: %w", len(bad), errors.Join(bad...))
+	}
+	return &Engine{rules: doc.Rules, expires: doc.ExpiresAt}, nil
 }
 
 // Check evaluates the rules for one action. Deny rules are tried first, then allow rules; an
@@ -115,6 +110,9 @@ func Parse(data []byte) (*Engine, error) {
 func (e *Engine) Check(_ context.Context, who Actor, act Action, res Resource) Decision {
 	if !known[act] {
 		return Decision{RuleID: RuleUnknownAction, Reason: fmt.Sprintf("action %q is not known", act)}
+	}
+	if e.Expired(time.Now()) {
+		return Decision{RuleID: RuleExpired, Reason: "the policy has expired, so every action is denied"}
 	}
 	for _, r := range e.rules {
 		if r.Effect == "deny" && r.matches(who, act, res) {
@@ -138,6 +136,32 @@ func (e *Engine) Check(_ context.Context, who Actor, act Action, res Resource) D
 		return Decision{RuleID: over, Reason: fmt.Sprintf("rule %s caps spend and %.2f USD is over it", over, res.USD)}
 	}
 	return Decision{RuleID: RuleDefaultDeny, Reason: fmt.Sprintf("no rule allows %s for role %s on %s", act, who.Role, res.Repo)}
+}
+
+// problems lists everything wrong with one rule.
+func (r Rule) problems() []error {
+	var bad []error
+	add := func(f string, a ...any) { bad = append(bad, fmt.Errorf("rule %q: "+f, append([]any{r.ID}, a...)...)) }
+	if r.Effect != "allow" && r.Effect != "deny" {
+		add("effect must be allow or deny")
+	}
+	if len(r.Action) == 0 {
+		add("actions is required")
+	}
+	for _, a := range r.Action {
+		if !known[Action(a)] {
+			add("unknown action %q", a)
+		}
+	}
+	for _, g := range r.Repos {
+		if _, err := path.Match(g, ""); err != nil {
+			add("bad repo glob %q", g)
+		}
+	}
+	if r.MaxUSD != nil && *r.MaxUSD < 0 {
+		add("max_usd must be 0 or more")
+	}
+	return bad
 }
 
 func (r Rule) matches(who Actor, act Action, res Resource) bool {

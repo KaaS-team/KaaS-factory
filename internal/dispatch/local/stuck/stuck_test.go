@@ -206,3 +206,22 @@ func TestWindowIsTwentyEventsForAlternation(t *testing.T) {
 		t.Fatalf("got %v", vs)
 	}
 }
+
+func TestNudgeResetsAfterProgress(t *testing.T) {
+	g := New(DefaultThresholds)
+	vs := feed(g, repeat(3, "Bash", map[string]any{"cmd": "false"}, "boom", true))
+	if !same(kinds(vs), []Kind{Nudge}) {
+		t.Fatalf("action-error setup: %v", vs)
+	}
+	// A different action is progress; the unrelated stall that follows gets its own nudge, not an abort.
+	feed(g, pair(50, "Read", map[string]any{"path": "a"}, "ok", false))
+	vs = feed(g, [][]byte{say("a"), say("b"), say("c")})
+	if !same(kinds(vs), []Kind{Nudge}) {
+		t.Fatalf("stall after progress: %v, want one nudge", vs)
+	}
+	// With no progress in between, the next hit still aborts.
+	vs = feed(g, [][]byte{say("d"), say("e"), say("f")})
+	if !same(kinds(vs), []Kind{Abort}) {
+		t.Fatalf("stall without progress: %v, want one abort", vs)
+	}
+}

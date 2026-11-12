@@ -64,13 +64,13 @@ func TestSettle(t *testing.T) {
 }
 
 func TestStageRulesDenyWriteWithoutAllow(t *testing.T) {
-	if got := Settle("edit", []string{"src/a.go"}, stageRules("plan", "7", Commands{}), []Rule{}); got != "deny" {
+	if got := Settle("edit", []string{"src/a.go"}, stageRules("plan", "7", Commands{}, false), []Rule{}); got != "deny" {
 		t.Fatalf("plan stage may only edit its run dir, got %q", got)
 	}
-	if got := Settle("edit", []string{".factory/runs/issue-7/plan.json"}, stageRules("plan", "7", Commands{}), []Rule{}); got != "allow" {
+	if got := Settle("edit", []string{".factory/runs/issue-7/plan.json"}, stageRules("plan", "7", Commands{}, false), []Rule{}); got != "allow" {
 		t.Fatalf("run dir edit: got %q", got)
 	}
-	if got := Settle("edit", []string{"src/a.go"}, stageRules("build", "7", Commands{}), []Rule{}); got != "allow" {
+	if got := Settle("edit", []string{"src/a.go"}, stageRules("build", "7", Commands{}, false), []Rule{}); got != "allow" {
 		t.Fatalf("build may edit: got %q", got)
 	}
 }

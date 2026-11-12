@@ -5,159 +5,155 @@
 package scim
 
 import (
-	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
+
+	lib "github.com/elimity-com/scim"
+	scimerr "github.com/elimity-com/scim/errors"
 )
 
-func userView(u User) map[string]any {
-	v := map[string]any{
-		"schemas":  []string{schemaUser},
-		"id":       u.ID,
+// An email can never be a GitHub login, so an IdP user cannot take over a GitHub member.
+var emailLike = regexp.MustCompile(`^[^@\s]+@[^@\s]+$`)
+
+type userHandler struct{ store Store }
+
+func userResource(u User) lib.Resource {
+	return lib.Resource{ID: u.ID, ExternalID: externalID(lib.ResourceAttributes{"externalId": u.ExternalID}), Attributes: lib.ResourceAttributes{
 		"userName": u.UserName,
 		"active":   u.Active,
-		"emails":   []map[string]any{{"value": u.UserName, "primary": true}},
-		"meta":     map[string]any{"resourceType": "User", "location": usersPath + "/" + u.ID},
-	}
-	if u.ExternalID != "" {
-		v["externalId"] = u.ExternalID
-	}
-	return v
+		"emails":   []any{map[string]any{"value": u.UserName, "primary": true}},
+	}}
 }
 
-func (h *handler) listUsers(w http.ResponseWriter, r *http.Request) {
-	name, _, ok := filterValue(r, "userName")
-	if !ok {
-		fail(w, 400, "invalidFilter", `only the filter userName eq "<value>" is supported`)
-		return
-	}
-	users, err := h.store.ListUsers(strings.ToLower(name))
-	if err != nil {
-		storeFail(w, err, "user")
-		return
-	}
-	out := make([]any, 0, len(users))
-	for _, u := range users {
-		out = append(out, userView(u))
-	}
-	write(w, 200, listResponse(out))
-}
-
-func (h *handler) getUser(w http.ResponseWriter, _ *http.Request, id string) {
+// own returns the user when it belongs to the request's tenant; another tenant's id is not found.
+func (h userHandler) own(r *http.Request, id string) (User, error) {
 	u, err := h.store.GetUser(id)
-	if err != nil {
-		storeFail(w, err, "user")
-		return
+	if err == nil && u.Tenant != tenantFrom(r) {
+		err = ErrNotFound
 	}
-	write(w, 200, userView(u))
+	return u, storeErr(err, id)
 }
 
-func (h *handler) createUser(w http.ResponseWriter, r *http.Request) {
-	var b struct {
-		UserName   string `json:"userName"`
-		ExternalID string `json:"externalId"`
-		Active     *bool  `json:"active"`
-	}
-	if !decodeBody(r, &b) {
-		fail(w, 400, "invalidSyntax", "the body is not JSON")
-		return
-	}
-	name := strings.ToLower(strings.TrimSpace(b.UserName))
+// fill sets the fields a Create or Replace body carries; the userName must be an email address.
+func fill(u User, a lib.ResourceAttributes) (User, error) {
+	name, _ := a["userName"].(string)
+	name = strings.ToLower(strings.TrimSpace(name))
 	if !emailLike.MatchString(name) {
-		fail(w, 400, "invalidValue", "userName must be an email address")
-		return
+		return u, scimerr.ScimErrorBadRequest("userName must be an email address")
 	}
-	u := User{ID: newID(), UserName: name, ExternalID: b.ExternalID, Active: b.Active == nil || *b.Active}
-	if err := h.store.CreateUser(u); err != nil {
-		storeFail(w, err, "user")
-		return
+	u.UserName, u.ExternalID, u.Active = name, externalID(a).Value(), true
+	if active, ok := a["active"].(bool); ok {
+		u.Active = active
 	}
-	write(w, 201, userView(u))
+	return u, nil
 }
 
-// patchUser supports `replace` of active, as a value object or as path "active".
-func (h *handler) patchUser(w http.ResponseWriter, r *http.Request, id string) {
-	u, err := h.store.GetUser(id)
+func (h userHandler) Create(r *http.Request, a lib.ResourceAttributes) (lib.Resource, error) {
+	u, err := fill(User{ID: newID(), Tenant: tenantFrom(r)}, a)
 	if err != nil {
-		storeFail(w, err, "user")
-		return
+		return lib.Resource{}, err
 	}
-	b, ok := readPatch(w, r)
-	if !ok {
-		return
+	if err := h.store.CreateUser(u); err != nil {
+		return lib.Resource{}, storeErr(err, "")
 	}
-	for _, op := range b.Operations {
-		if !strings.EqualFold(op.Op, "replace") {
-			fail(w, 400, "invalidValue", "op "+op.Op+" is not supported")
-			return
+	return userResource(u), nil
+}
+
+func (h userHandler) Get(r *http.Request, id string) (lib.Resource, error) {
+	u, err := h.own(r, id)
+	return userResource(u), err
+}
+
+func (h userHandler) GetAll(r *http.Request, p lib.ListRequestParams) (lib.Page, error) {
+	users, err := h.store.ListUsers(tenantFrom(r))
+	if err != nil {
+		return lib.Page{}, storeErr(err, "")
+	}
+	all := make([]lib.Resource, 0, len(users))
+	for _, u := range users {
+		all = append(all, userResource(u))
+	}
+	return page(all, withIdentity, p), nil
+}
+
+func (h userHandler) Replace(r *http.Request, id string, a lib.ResourceAttributes) (lib.Resource, error) {
+	u, err := h.own(r, id)
+	if err != nil {
+		return lib.Resource{}, err
+	}
+	if u, err = fill(u, a); err != nil {
+		return lib.Resource{}, err
+	}
+	if err := h.store.UpdateUser(u); err != nil {
+		return lib.Resource{}, storeErr(err, id)
+	}
+	return userResource(u), nil
+}
+
+// Delete also drops the user from every group of the tenant, so no group lists a person who is gone.
+func (h userHandler) Delete(r *http.Request, id string) error {
+	if _, err := h.own(r, id); err != nil {
+		return err
+	}
+	if err := h.store.DeleteUser(id); err != nil {
+		return storeErr(err, id)
+	}
+	groups, err := h.store.ListGroups(tenantFrom(r))
+	if err != nil {
+		return storeErr(err, "")
+	}
+	for _, g := range groups {
+		if kept := without(g.Members, id); len(kept) != len(g.Members) {
+			g.Members = kept
+			if err := h.store.UpdateGroup(g); err != nil {
+				return storeErr(err, g.ID)
+			}
 		}
-		if active, found := activeOf(op); found {
+	}
+	return nil
+}
+
+// Patch supports replace of active, as a value object or as path "active". Entra sends the
+// strings "True" and "False" for the boolean.
+func (h userHandler) Patch(r *http.Request, id string, ops []lib.PatchOperation) (lib.Resource, error) {
+	u, err := h.own(r, id)
+	if err != nil {
+		return lib.Resource{}, err
+	}
+	for _, op := range ops {
+		if !strings.EqualFold(op.Op, lib.PatchOperationReplace) {
+			return lib.Resource{}, scimerr.ScimErrorBadRequest("op " + op.Op + " is not supported")
+		}
+		v := op.Value
+		if obj, ok := v.(map[string]any); ok && patchTarget(op) == "" {
+			v = obj["active"]
+		} else if patchTarget(op) != "active" {
+			continue
+		}
+		if active, ok := boolOf(v); ok {
 			u.Active = active
 		}
 	}
 	if err := h.store.UpdateUser(u); err != nil {
-		storeFail(w, err, "user")
-		return
+		return lib.Resource{}, storeErr(err, id)
 	}
-	write(w, 200, userView(u))
+	return userResource(u), nil
 }
 
-func activeOf(op patchOp) (active, found bool) {
-	if op.Path != "" {
-		if !strings.EqualFold(op.Path, "active") {
-			return false, false
-		}
-		return boolOf(op.Value)
-	}
-	var obj map[string]json.RawMessage
-	if json.Unmarshal(op.Value, &obj) != nil {
-		return false, false
-	}
-	for k, v := range obj {
-		if strings.EqualFold(k, "active") {
-			return boolOf(v)
-		}
-	}
-	return false, false
-}
-
-func boolOf(raw json.RawMessage) (val, ok bool) {
-	// Entra sends the strings "True" and "False".
-	var s string
-	if json.Unmarshal(raw, &s) == nil {
-		switch strings.ToLower(s) {
+func boolOf(v any) (val, ok bool) {
+	switch x := v.(type) {
+	case bool:
+		return x, true
+	case string:
+		switch strings.ToLower(x) {
 		case "true":
 			return true, true
 		case "false":
 			return false, true
 		}
-		return false, false
 	}
-	return val, json.Unmarshal(raw, &val) == nil
-}
-
-// deleteUser also drops the user from every group, so no group lists a person who is gone.
-func (h *handler) deleteUser(w http.ResponseWriter, _ *http.Request, id string) {
-	if err := h.store.DeleteUser(id); err != nil {
-		storeFail(w, err, "user")
-		return
-	}
-	groups, err := h.store.ListGroups("")
-	if err != nil {
-		storeFail(w, err, "group")
-		return
-	}
-	for _, g := range groups {
-		kept := without(g.Members, id)
-		if len(kept) != len(g.Members) {
-			g.Members = kept
-			if err := h.store.UpdateGroup(g); err != nil {
-				storeFail(w, err, "group")
-				return
-			}
-		}
-	}
-	w.WriteHeader(204)
+	return false, false
 }
 
 func without(list []string, id string) []string {

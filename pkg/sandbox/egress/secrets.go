@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 const (
@@ -66,8 +68,12 @@ func Placeholder(name string) (string, error) {
 
 // NewSecrets is the gate: it rejects bad names, empty values, secrets with no
 // host, hosts that are not domains, and wildcards with fewer than minLabels
-// suffix labels (so "*.com" cannot carry a credential to every .com).
+// suffix labels or a public suffix as base (so "*.com" and "*.co.uk" cannot carry a credential to
+// every host under them). A minLabels below 1 means DefaultMinWildcardLabels; the gate is never off.
 func NewSecrets(minLabels int, list ...Secret) (*Secrets, error) {
+	if minLabels < 1 {
+		minLabels = DefaultMinWildcardLabels
+	}
 	seen := map[string]bool{}
 	for _, s := range list {
 		if err := ValidateTokenName(s.Name); err != nil {
@@ -103,6 +109,9 @@ func checkHost(h string, minLabels int) error {
 		}
 		if n := strings.Count(suffix, ".") + 1; n < minLabels {
 			return fmt.Errorf("wildcard %q is broader than the allowed depth: it has %d suffix labels, the minimum is %d", h, n, minLabels)
+		}
+		if ps, _ := publicsuffix.PublicSuffix(strings.ToLower(suffix)); ps == strings.ToLower(suffix) {
+			return fmt.Errorf("wildcard %q covers the public suffix %q, so it would match unrelated hosts", h, suffix)
 		}
 	}
 	return nil

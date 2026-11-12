@@ -220,3 +220,34 @@ func TestEvalsReadme(t *testing.T) {
 		t.Fatal("em dash")
 	}
 }
+
+// Trajectory acceptance: two eval runs each leave one trajectory file per ticket, and `eval compare`
+// and `eval stats` read them with no runner, model or network.
+func TestEvalWritesTrajectoriesAndCompareStatsReadThem(t *testing.T) {
+	dir := t.TempDir()
+	runOnce := func(agent string, solves map[api.TicketID]bool) string {
+		_, run := newTestCommand(t, dir, solves)
+		if err := run("--workflow", "default", "--agent", agent, "--fixtures", fixturesDir, "--out", dir); err != nil {
+			t.Fatal(err)
+		}
+		return filepath.Join(dir, "2026-11-12-default-"+agent+"-trajectories")
+	}
+	oldDir := runOnce("old", map[api.TicketID]bool{})
+	newDir := runOnce("new", map[api.TicketID]bool{"1": true})
+	if files, _ := filepath.Glob(filepath.Join(newDir, "*.json")); len(files) != 5 {
+		t.Fatalf("want 5 trajectory files, got %d", len(files))
+	}
+	for _, args := range [][]string{{"compare", oldDir, newDir}, {"stats", newDir}} {
+		var out bytes.Buffer
+		cmd := NewCommand() // no runner: the subcommands must not need one
+		cmd.SetOut(&out)
+		cmd.SetArgs(args)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		want := map[string]string{"compare": "Fixed: 4. Regressed: 0.", "stats": "Pass rate: 0.80"}[args[0]]
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("%v: want %q in\n%s", args, want, out.String())
+		}
+	}
+}

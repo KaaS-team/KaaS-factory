@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/trace"
 )
 
 // Arm is one run of the matrix: the axes it covers, how many tries per ticket, and where it keeps state.
@@ -19,8 +20,9 @@ type Arm struct {
 	Arm, Agent, Format string // arm is "preset" or "control"
 	Tries              int    // tries per ticket, 0 means 1
 	Store              *RunStore
-	Replay             bool // re-score stored outcomes, never dispatch
-	Redo               bool // ignore finished tickets in the store
+	Replay             bool       // re-score stored outcomes, never dispatch
+	Redo               bool       // ignore finished tickets in the store
+	Sink               trace.Sink // when set, one trace per scored run
 }
 
 // Cell is one (arm, agent, format, fixture) scorecard cell. pass_rate_k is the share of its
@@ -126,7 +128,7 @@ func RunArm(ctx context.Context, m Matrix, d Deps, a Arm) (Scorecard, error) {
 			var cost float64
 			for try := 1; try <= tries; try++ {
 				tctx := context.WithValue(ctx, runKey{}, runInfo{key: key, save: a.Store.trajectory(key, a.Replay)})
-				tr, os, err := runTicket(tctx, f, t, d)
+				tr, os, err := runTicket(tctx, f, t, d, a.Sink)
 				if err != nil {
 					return sc, err
 				}

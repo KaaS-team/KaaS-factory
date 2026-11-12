@@ -14,10 +14,12 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
+	"github.com/KaaS-team/factory/internal/dispatch/local/autosubmit"
 	"github.com/KaaS-team/factory/internal/dispatch/local/input"
 	"github.com/KaaS-team/factory/internal/dispatch/local/stuck"
 	"github.com/KaaS-team/factory/internal/dispatch/untrusted"
@@ -58,10 +60,18 @@ var ClaudePreset = Preset{
 	Env: map[string]string{"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"},
 }
 
+// ClaudePlanPreset is ClaudePreset without edit tools and with the plan-mode shell prefilter.
+var ClaudePlanPreset = Preset{
+	Argv: func(r Run) ([]string, error) {
+		return ClaudeArgv(ClaudeInput{Stage: r.Stage, Issue: string(r.Brief.Ticket), MaxBudgetUSD: r.Budget, Prompt: r.Prompt, Model: r.Brief.Model, ReadOnly: true})
+	},
+	Env: ClaudePreset.Env,
+}
+
 // Config holds what the caller injects.
 type Config struct {
 	Worktrees     Worktrees
-	Presets       map[string]Preset // default: {"claude": ClaudePreset}
+	Presets       map[string]Preset // default: claude and claude-plan
 	Binary        string            // replaces argv[0] of the preset, for tests and wrappers
 	Environ       []string          // the parent environment; default os.Environ()
 	Stage         string            // default "build"
@@ -76,6 +86,9 @@ type Config struct {
 	CloseTimeout time.Duration
 	// Clock times the steer gate and the close wait; default the real clock.
 	Clock clockwork.Clock
+	// Autosubmit, when set, stops a run that passes its caps and opens a partial PR for it and for
+	// any run that dies. Nil turns it off.
+	Autosubmit *autosubmit.Submitter
 	// Untrusted returns the tools to deny for a brief whose pull request author lacks write
 	// access, or nil. A non-nil result is added to the argv's --disallowedTools, the Bash rules the
 	// settings allow are cut to the untrusted allowlist (the run must be in dontAsk mode, or
@@ -98,6 +111,10 @@ type process struct {
 	usage  usageState
 	end    time.Time
 	q      *input.Queue // nil unless the preset steers
+
+	canceled   atomic.Bool
+	partialURL string // set before done closes
+	partialErr error
 }
 
 // Dispatcher implements api.Dispatcher over child processes.
@@ -115,7 +132,7 @@ func New(ctx context.Context, cfg Config) (*Dispatcher, error) {
 		return nil, errors.New("local: worktrees are required")
 	}
 	if cfg.Presets == nil {
-		cfg.Presets = map[string]Preset{"claude": ClaudePreset}
+		cfg.Presets = map[string]Preset{"claude": ClaudePreset, "claude-plan": ClaudePlanPreset}
 	}
 	if cfg.Environ == nil {
 		cfg.Environ = os.Environ()
@@ -287,7 +304,12 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now(), q: q}
 	d.runs[key] = p
 	started = true
+	var capGuard *autosubmit.Guard
+	if d.cfg.Autosubmit != nil {
+		capGuard = d.cfg.Autosubmit.Guard()
+	}
 	go func() { // ends when the process exits; the run context kills it
+		var breach autosubmit.Reason
 		sc := bufio.NewScanner(out)
 		sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
 		loop := stuck.New(stuck.DefaultThresholds)
@@ -310,16 +332,19 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			}
 			switch v := loop.Feed(sc.Bytes()); v.Kind {
 			case stuck.Nudge:
-				_ = d.Steer(runCtx, session(p), v.Message) // unsupported today, so the nudge is not delivered
+				_ = d.Steer(runCtx, session(p), v.Message) // best effort: a local session has no Steer, so this only counts the nudge and delivers nothing
 			case stuck.Abort:
 				stuckErr = fmt.Errorf("%w: %s (%s)", ErrStuck, v.Pattern, v.Message)
 				cancel()
+				continue
+			}
+			if capGuard != nil && breach == "" {
+				if breach = capGuard.Feed(sc.Bytes()); breach != "" {
+					cancel()
+				}
 			}
 		}
-		p.err = cmd.Wait()
-		if stuckErr != nil {
-			p.err = stuckErr
-		}
+		p.err = exitErr(cmd.Wait(), cmd.ProcessState, stuckErr)
 		_ = sandbox.KillGroup(cmd) // anything the agent left behind
 		if guard != nil {
 			restore()
@@ -331,10 +356,29 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			_ = os.RemoveAll(cfgDir)
 		}
 		p.end = d.cfg.Now()
+		if capGuard != nil && d.ctx.Err() == nil && !p.canceled.Load() && (breach != "" || p.err != nil) {
+			if breach == "" {
+				breach = autosubmit.Died
+			}
+			p.partialURL, p.partialErr = d.cfg.Autosubmit.Submit(d.ctx, autosubmit.Exit{Brief: b, Dir: dir, Reason: breach})
+		}
 		cancel()
 		close(p.done)
 	}()
 	return session(p), nil
+}
+
+// exitErr is a run's result. An abort replaces the exit error only when the kill did the ending: a
+// process that exited 0 before the kill took effect was a clean exit, and Wait reports the
+// cancelled context for it all the same.
+func exitErr(waitErr error, ps *os.ProcessState, stuckErr error) error {
+	if stuckErr == nil || (ps != nil && ps.Success()) {
+		if stuckErr != nil {
+			return nil
+		}
+		return waitErr
+	}
+	return stuckErr
 }
 
 // command builds the agent process. With Sandbox set it is the jail helper, which applies the
@@ -360,6 +404,24 @@ func (d *Dispatcher) Wait(ctx context.Context, s api.Session) error {
 		return p.err
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+// Autosubmitted returns the partial PR's URL once the run has ended and was submitted early. The
+// error is why it was not: ErrNothing when there was no diff, or a git or PR failure.
+func (d *Dispatcher) Autosubmitted(s api.Session) (string, error) {
+	p, err := d.run(s)
+	if err != nil {
+		return "", err
+	}
+	select {
+	case <-p.done:
+		if p.partialURL == "" && p.partialErr == nil {
+			return "", errors.New("local: run was not submitted early")
+		}
+		return p.partialURL, p.partialErr
+	default:
+		return "", errors.New("local: run has not ended")
 	}
 }
 
@@ -401,6 +463,7 @@ func (d *Dispatcher) Cancel(ctx context.Context, s api.Session) error {
 	if err != nil {
 		return nil
 	}
+	p.canceled.Store(true)
 	if err := input.Close(ctx, d.cfg.Clock, func() error { return interruptGroup(p.cmd) }, func() error { p.cancel(); return nil }, p.done, d.cfg.CloseTimeout); err != nil {
 		return err
 	}

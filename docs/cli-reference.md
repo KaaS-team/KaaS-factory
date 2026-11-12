@@ -17,7 +17,7 @@ Serve the factory as an A2A agent
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--addr` | string | `127.0.0.1:8787` | listen address |
-| `--audit-log` | string | `a2a-audit.jsonl` | file that gets one JSON line per call |
+| `--audit-log` | string | `.factory/a2a-audit.jsonl` | file that gets one JSON line per call |
 | `--signing-key` | string | `` | ECDSA P-256 PEM key that signs the agent card (a new key per start when empty) |
 
 ## factory add
@@ -128,11 +128,29 @@ Lint the fixtures; exit 1 when one is malformed
 | `--fix` | bool | `false` | write back the data the tree determines |
 | `--fixtures` | string | `evals/fixtures` | directory of fixtures |
 
+## factory eval compare
+
+`factory eval compare <old> <new>`
+
+Compare two sets of trajectory files offline
+
 ## factory eval diff
 
 `factory eval diff <old.json> <new.json>`
 
 Compare two scorecards; exit 1 when the new one is worse
+
+## factory eval replay
+
+`factory eval replay <run.trace.jsonl>`
+
+Print the spans a run recorded, gate spans with their triggered flag
+
+## factory eval stats
+
+`factory eval stats <trajectories>`
+
+Summarise trajectory files offline
 
 ## factory first-run
 
