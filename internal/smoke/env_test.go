@@ -32,3 +32,20 @@ func TestFromEnv(t *testing.T) {
 		})
 	}
 }
+
+func TestGitAuthEnv(t *testing.T) {
+	got := GitAuthEnv("tok")
+	want := map[string]string{
+		"GIT_CONFIG_COUNT":   "1",
+		"GIT_CONFIG_KEY_0":   "http.https://github.com/.extraheader",
+		"GIT_CONFIG_VALUE_0": "Authorization: Basic eC1hY2Nlc3MtdG9rZW46dG9r", // base64 of x-access-token:tok
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("got %d entries, want %d", len(got), len(want))
+	}
+}

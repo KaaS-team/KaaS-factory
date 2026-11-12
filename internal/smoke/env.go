@@ -3,6 +3,7 @@
 package smoke
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 )
@@ -36,4 +37,15 @@ func FromEnv(getenv func(string) string) (Env, string) {
 		return Env{}, fmt.Sprintf("%s %q is not owner/name", EnvRepo, repo)
 	}
 	return Env{Owner: owner, Repo: name, Token: token}, ""
+}
+
+// GitAuthEnv returns the environment entries that make git send token to github.com over HTTPS.
+// They travel in the environment, so the token is on no command line and in no remote URL.
+func GitAuthEnv(token string) map[string]string {
+	basic := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + token))
+	return map[string]string{
+		"GIT_CONFIG_COUNT":   "1",
+		"GIT_CONFIG_KEY_0":   "http.https://github.com/.extraheader",
+		"GIT_CONFIG_VALUE_0": "Authorization: Basic " + basic,
+	}
 }
