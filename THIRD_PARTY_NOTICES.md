@@ -90,3 +90,21 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## langfuse/langfuse@2e6d034
+
+Source: https://github.com/langfuse/langfuse (MIT, Copyright (c) 2023-2026 ClickHouse, Inc.). Nothing under its `ee/` directories was read or copied.
+
+- `internal/meter/price/matcher.go` from `packages/shared/src/server/pricing-tiers/matcher.ts` [cases in `matcher_test.go`]
+- `internal/meter/price/cost.go` from `packages/shared/src/server/pricing-tiers/calculateModelUsageCosts.ts` [cases ported from `calculateModelUsageCosts.test.ts` in `cost_test.go`]
+- `internal/meter/price/catalog.json` is `worker/src/constants/default-model-prices.json` filtered to Anthropic and OpenAI models, tokenizer fields dropped.
+
+MIT License
+
+Copyright (c) 2023-2026 ClickHouse, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
