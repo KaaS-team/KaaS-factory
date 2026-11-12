@@ -91,6 +91,7 @@ Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepl
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
 
+
 ## browser-use/browser-use@dfb6a73
 
 Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Gregor Zunic)
@@ -98,6 +99,7 @@ Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Greg
 - `internal/browsercheck/settle.go` from `browser_use/ax.py` (`settle`, `PROBE_JS` reduced to ready and idle)
 - `internal/browsercheck/profile.go` from `browser_use/browser/local.py` (`SKIP_COPY`, `copy_profile`, `_try_lock`, `sweep_stale_dirs`)
 - `internal/browsercheck/secrets.go` from `browser_use/repl/session.py` (`secret_forms`, `redact_forms`) and `browser_use/repl/worker.py` (`type_secret`)
+
 ## OpenHands/software-agent-sdk@10be259
 
 Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). Only the stuck detector was ported; `openhands-sdk/` outside `ee/` directories.
@@ -126,6 +128,7 @@ Source: https://github.com/e2b-dev/E2B (Apache-2.0). Licence text: https://www.a
 Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). The MIT permission notice above applies, with this copyright line in place of the one it carries.
 
 - `pkg/sandbox/egress/mask.go` from `openhands-sdk/openhands/sdk/conversation/secret_registry.py` (`StreamOutputMask`, `mask_secrets_in_output`) [tests ported in spirit from `tests/sdk/agent/test_stream_context.py`; fixtures in `pkg/sandbox/egress/mask_test.go`]
+
 ## Aider-AI/aider@5dc9490
 
 Source: https://github.com/Aider-AI/aider (Apache-2.0, Copyright (c) Paul Gauthier). The ranking and budget search of `aider/repomap.py` are ported to Go; the tree-sitter `.scm` query files are not copied (they need CGO).
