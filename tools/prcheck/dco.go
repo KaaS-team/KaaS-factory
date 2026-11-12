@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os/exec"
 	"regexp"
 	"strings"
 )
@@ -43,15 +42,9 @@ func unsigned(commits []Commit) []Commit {
 
 // commitsBetween lists the non-merge commits in base..head.
 func commitsBetween(dir, base, head string) ([]Commit, error) {
-	cmd := exec.Command("git", "log", "--no-merges", "--format=%H%x1f%ae%x1f%B%x1e", base+".."+head)
-	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, err := gitOut(dir, "log", "--no-merges", "--format=%H%x1f%ae%x1f%B%x1e", base+".."+head)
 	if err != nil {
-		msg := err.Error()
-		if ee, ok := err.(*exec.ExitError); ok {
-			msg = strings.TrimSpace(string(ee.Stderr))
-		}
-		return nil, fmt.Errorf("git log %s..%s: %s", base, head, msg)
+		return nil, fmt.Errorf("git log %s..%s: %w", base, head, err)
 	}
 	var commits []Commit
 	for _, rec := range strings.Split(string(out), "\x1e") {
@@ -70,7 +63,7 @@ func commitsBetween(dir, base, head string) ([]Commit, error) {
 
 func runDCO(dir string, args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "usage: prcheck dco <base> [head]")
+		sayln(stderr, "usage: prcheck dco <base> [head]")
 		return 2
 	}
 	base, head := args[0], "HEAD"
@@ -79,16 +72,16 @@ func runDCO(dir string, args []string, stdout, stderr io.Writer) int {
 	}
 	commits, err := commitsBetween(dir, base, head)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		sayln(stderr, err)
 		return 2
 	}
 	bad := unsigned(commits)
 	for _, c := range bad {
-		fmt.Fprintf(stderr, "%s has no Signed-off-by for %s (git commit -s)\n", c.SHA[:min(7, len(c.SHA))], c.Email)
+		sayf(stderr, "%s has no Signed-off-by for %s (git commit -s)\n", c.SHA[:min(7, len(c.SHA))], c.Email)
 	}
 	if len(bad) > 0 {
 		return 1
 	}
-	fmt.Fprintf(stdout, "dco: every commit in %s..%s is signed off\n", base, head)
+	sayf(stdout, "dco: every commit in %s..%s is signed off\n", base, head)
 	return 0
 }

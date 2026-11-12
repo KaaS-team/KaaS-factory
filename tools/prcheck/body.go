@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -87,25 +86,25 @@ func runBody(dir string, args []string, getenv func(string) string, stdout, stde
 			continue
 		}
 		if i+1 >= len(args) || args[i+1] == "" {
-			fmt.Fprintln(stderr, "check-pr-body: --file needs a path")
+			sayln(stderr, "check-pr-body: --file needs a path")
 			return 1
 		}
 		b, err := os.ReadFile(args[i+1])
 		if err != nil {
-			fmt.Fprintln(stderr, "check-pr-body:", err)
+			sayln(stderr, "check-pr-body:", err)
 			return 2
 		}
 		body = string(b)
 	}
 	tpl, err := os.ReadFile(filepath.Join(dir, templatePath))
 	if err != nil {
-		fmt.Fprintln(stderr, "check-pr-body:", err)
+		sayln(stderr, "check-pr-body:", err)
 		return 2
 	}
 	if found := bodyProblems(body, string(tpl)); len(found) > 0 {
-		fmt.Fprintf(stderr, "check-pr-body: the PR body does not follow %s\n- %s\n", templatePath, strings.Join(found, "\n- "))
+		sayf(stderr, "check-pr-body: the PR body does not follow %s\n- %s\n", templatePath, strings.Join(found, "\n- "))
 		return 1
 	}
-	fmt.Fprintln(stdout, "check-pr-body: ok")
+	sayln(stdout, "check-pr-body: ok")
 	return 0
 }

@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os/exec"
 	"regexp"
 	"strings"
 )
@@ -140,34 +139,28 @@ func diffProblems(diff, body string) []string {
 
 func runTestsOnly(dir string, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	if len(args) < 2 || args[0] == "" || args[1] == "" {
-		fmt.Fprintln(stderr, "usage: prcheck tests-only <base> <head>")
+		sayln(stderr, "usage: prcheck tests-only <base> <head>")
 		return 2
 	}
 	base, head := args[0], args[1]
-	cmd := exec.Command("git", "diff", "--unified=0", "--no-color", base+"..."+head)
-	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, err := gitOut(dir, "diff", "--unified=0", "--no-color", base+"..."+head)
 	if err != nil {
-		msg := err.Error()
-		if ee, ok := err.(*exec.ExitError); ok {
-			msg = strings.TrimSpace(string(ee.Stderr))
-		}
-		fmt.Fprintf(stderr, "git diff %s...%s: %s\n", base, head, msg)
+		sayf(stderr, "git diff %s...%s: %v\n", base, head, err)
 		return 2
 	}
 	if found := diffProblems(string(out), getenv("PR_BODY")); len(found) > 0 {
-		fmt.Fprintf(stderr, "check-tests-only:\n- %s\n", strings.Join(found, "\n- "))
+		sayf(stderr, "check-tests-only:\n- %s\n", strings.Join(found, "\n- "))
 		return 1
 	}
 	all := findings(parseDiff(string(out)))
 	if len(all) == 0 {
-		fmt.Fprintln(stdout, "check-tests-only: ok")
+		sayln(stdout, "check-tests-only: ok")
 		return 0
 	}
 	lines := make([]string, len(all))
 	for i, f := range all {
 		lines[i] = f.String()
 	}
-	fmt.Fprintf(stdout, "check-tests-only: reason given:\n- %s\n", strings.Join(lines, "\n- "))
+	sayf(stdout, "check-tests-only: reason given:\n- %s\n", strings.Join(lines, "\n- "))
 	return 0
 }
