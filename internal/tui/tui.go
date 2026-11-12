@@ -20,11 +20,12 @@ type screen int
 
 const (
 	screenBoard screen = iota
+	screenWaves
 	screenQueue
 	screenTimeline
 )
 
-func (s screen) String() string { return [...]string{"board", "queue", "timeline"}[s] }
+func (s screen) String() string { return [...]string{"board", "waves", "queue", "timeline"}[s] }
 
 type mode int
 
@@ -64,6 +65,8 @@ type Model struct {
 	events        <-chan api.Event
 	timelines     map[api.TicketID][]api.Event
 	loaded        map[api.TicketID]bool // history asked for
+	reasons       map[api.TicketID]string
+	gate          api.Event // newest gate event
 
 	screen  screen
 	mode    mode
@@ -98,6 +101,7 @@ func New(ctl api.Control) tea.Model {
 		stalled:   map[api.TicketID]bool{},
 		timelines: map[api.TicketID][]api.Event{},
 		loaded:    map[api.TicketID]bool{},
+		reasons:   map[api.TicketID]string{},
 		input:     in,
 	}
 }
@@ -184,6 +188,12 @@ func (m *Model) applyEvent(e api.Event) tea.Cmd {
 		m.timelines[e.Ticket] = trimTimeline(append(m.timelines[e.Ticket], e))
 	}
 	switch e.Kind {
+	case "gate":
+		m.gate = e
+	case "needs-human":
+		if r, ok := e.Data["reason"].(string); ok {
+			m.reasons[e.Ticket] = r
+		}
 	case "stalled":
 		m.stalled[e.Ticket] = true
 		return nil
@@ -282,13 +292,8 @@ func (m *Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.cursor--
 		}
 	case "tab":
-		m.screen = (m.screen + 1) % 3
+		m.screen = (m.screen + 1) % screenTimeline
 		m.cursor = 0
-		if m.screen == screenTimeline && m.tlID == "" {
-			if id, ok := m.firstBoardTicket(); ok {
-				return m, m.openTimeline(id)
-			}
-		}
 	case "enter":
 		if m.screen != screenTimeline {
 			if id, ok := m.selected(); ok {
@@ -367,13 +372,6 @@ func (m *Model) openTimeline(id api.TicketID) tea.Cmd {
 	}
 }
 
-func (m *Model) firstBoardTicket() (api.TicketID, bool) {
-	if len(m.board.Slots) == 0 {
-		return "", false
-	}
-	return m.board.Slots[0].Ticket.ID, true
-}
-
 func (m *Model) keySteer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
@@ -425,7 +423,7 @@ func (m *Model) View() tea.View {
 
 func (m *Model) header(w int) string {
 	var parts []string
-	for s := screenBoard; s <= screenTimeline; s++ {
+	for s := screenBoard; s <= m.screen || s < screenTimeline; s++ {
 		if s == m.screen {
 			parts = append(parts, styleSelected.Render("["+s.String()+"]"))
 		} else {
@@ -452,8 +450,10 @@ func (m *Model) footer(w int) []string {
 
 func (m *Model) body(w, h int) string {
 	switch m.screen {
+	case screenWaves:
+		return m.wavesView(w)
 	case screenQueue:
-		return m.queueView(w)
+		return m.queueView(w, h)
 	case screenTimeline:
 		return m.timelineView(w, h)
 	}
@@ -508,13 +508,16 @@ func (m *Model) card(s api.Slot, sel bool, w int) string {
 	return style.Render(clip(l1, inner) + "\n" + clip(l2, inner))
 }
 
-func (m *Model) queueView(w int) string {
+func (m *Model) queueView(w, h int) string {
 	var sb strings.Builder
 	row := 0
 	line := func(id api.TicketID, label string) {
 		mark := "  "
 		if row == m.cursor {
 			mark = "> "
+		}
+		if r := m.reasons[id]; r != "" {
+			label = r
 		}
 		sb.WriteString(clip(fmt.Sprintf("%s#%s %s", mark, id, label), w) + "\n")
 		row++
@@ -533,7 +536,98 @@ func (m *Model) queueView(w int) string {
 	for _, t := range m.board.Ready {
 		line(t.ID, fmt.Sprintf("P%d %s", t.Priority, t.Title))
 	}
+	sb.WriteString(m.gateView(w, h))
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// gateView shows the newest gate event: how many runs, then the tail of its log when it carries one.
+func (m *Model) gateView(w, h int) string {
+	if m.gate.Kind == "" {
+		return styleDim.Render("gate") + "\n  (no runs yet)\n"
+	}
+	out := styleDim.Render(fmt.Sprintf("gate  %s  runs=%v", m.gate.Time.Format("15:04:05"), m.gate.Data["runs"])) + "\n"
+	log, _ := m.gate.Data["log"].(string)
+	lines := strings.Split(strings.TrimRight(log, "\n"), "\n")
+	if keep := max(h-12, 3); len(lines) > keep {
+		lines = lines[len(lines)-keep:]
+	}
+	for _, l := range lines {
+		if l != "" {
+			out += clip("  "+l, w) + "\n"
+		}
+	}
+	return out
+}
+
+// waves groups the board's tickets by dependency depth: wave 0 has no open blocker, wave n waits on wave n-1.
+// A blocker that is not on the board is done. Tickets in a cycle share the last wave.
+func waves(b api.Board) [][]api.TicketID {
+	var ids []api.TicketID
+	blockers := map[api.TicketID][]api.TicketID{}
+	add := func(t api.Ticket) {
+		ids = append(ids, t.ID)
+		blockers[t.ID] = t.BlockedBy
+	}
+	for _, s := range b.Slots {
+		add(s.Ticket)
+	}
+	for _, t := range b.Ready {
+		add(t)
+	}
+	placed := map[api.TicketID]bool{}
+	var out [][]api.TicketID
+	for len(placed) < len(ids) {
+		var wave []api.TicketID
+		for _, id := range ids {
+			if placed[id] {
+				continue
+			}
+			open := false
+			for _, d := range blockers[id] {
+				if _, onBoard := blockers[d]; onBoard && !placed[d] {
+					open = true
+				}
+			}
+			if !open {
+				wave = append(wave, id)
+			}
+		}
+		if len(wave) == 0 { // cycle: everything left goes in one wave
+			for _, id := range ids {
+				if !placed[id] {
+					wave = append(wave, id)
+				}
+			}
+		}
+		for _, id := range wave {
+			placed[id] = true
+		}
+		out = append(out, wave)
+	}
+	return out
+}
+
+func (m *Model) wavesView(w int) string {
+	ws := waves(m.board)
+	if len(ws) == 0 {
+		return styleDim.Render("no tickets")
+	}
+	title := map[api.TicketID]string{}
+	phase := map[api.TicketID]api.Phase{}
+	for _, s := range m.board.Slots {
+		title[s.Ticket.ID], phase[s.Ticket.ID] = s.Ticket.Title, s.Phase
+	}
+	for _, t := range m.board.Ready {
+		title[t.ID], phase[t.ID] = t.Title, api.PhaseReady
+	}
+	var out []string
+	for i, wave := range ws {
+		out = append(out, styleDim.Render(fmt.Sprintf("wave %d", i+1)))
+		for _, id := range wave {
+			out = append(out, clip(fmt.Sprintf("  #%s %s [%s]", id, title[id], phase[id]), w))
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 func (m *Model) timelineView(w, h int) string {
