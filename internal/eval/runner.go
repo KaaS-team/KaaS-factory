@@ -12,6 +12,7 @@ import (
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/dispatch/local"
+	"github.com/KaaS-team/factory/internal/eval/grade"
 )
 
 // LocalConfig says where the fixtures are and how the agent is started.
@@ -97,22 +98,35 @@ func (l *localDeps) HiddenTest(ctx context.Context, t api.Ticket, command string
 	if err := copyTree(filepath.Join(l.cfg.Fixtures, f.Name, "hidden", string(t.ID)), dir); err != nil {
 		return false, err
 	}
-	return l.sh(ctx, f.Name, command)
+	for _, ft := range f.Tickets {
+		if ft.ID == t.ID && ft.Grade != nil && command != "" {
+			out, _, err := l.run(ctx, f.Name, grade.Script(command))
+			return grade.Grade(string(out), *ft.Grade).Resolved, err
+		}
+	}
+	_, ok, err := l.run(ctx, f.Name, command)
+	return ok, err
 }
 
 // sh runs command in the fixture's repo. A failing exit is false, not an error.
 func (l *localDeps) sh(ctx context.Context, fixture, command string) (bool, error) {
+	_, ok, err := l.run(ctx, fixture, command)
+	return ok, err
+}
+
+// run is sh that also returns the combined output.
+func (l *localDeps) run(ctx context.Context, fixture, command string) ([]byte, bool, error) {
 	if command == "" {
-		return true, nil
+		return nil, true, nil
 	}
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Dir = filepath.Join(l.cfg.Work, fixture)
-	err := cmd.Run()
+	out, err := cmd.CombinedOutput()
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
-		return false, nil
+		return out, false, nil
 	}
-	return err == nil, err
+	return out, err == nil, err
 }
 
 // copyTree copies the files under src into dst, over what is there.

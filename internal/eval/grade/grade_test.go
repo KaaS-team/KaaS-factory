@@ -110,7 +110,7 @@ func TestParseGoTest(t *testing.T) {
 func TestScriptWritesExitCodeAfterEndMarker(t *testing.T) {
 	s := Script("go test ./...")
 	end, code := strings.Index(s, EndOutput), strings.Index(s, ExitCode)
-	if strings.Index(s, StartOutput) < 0 || end < 0 || code < end {
+	if !strings.Contains(s, StartOutput) || end < 0 || code < end {
 		t.Fatalf("markers out of order:\n%s", s)
 	}
 	if !strings.Contains(s, "go test ./...") {

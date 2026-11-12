@@ -23,7 +23,7 @@ func ParsePytest(out string) map[string]Status {
 				line = strings.ReplaceAll(line, " - ", " ")
 			}
 			f := strings.Fields(line)
-			if len(f) > 1 && !(Status(f[0]) == Skipped && skipSummaryCount.MatchString(f[1])) {
+			if len(f) > 1 && (Status(f[0]) != Skipped || !skipSummaryCount.MatchString(f[1])) {
 				m[f[1]] = Status(f[0])
 			}
 			break

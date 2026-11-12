@@ -2,6 +2,8 @@ package eval
 
 import (
 	"context"
+	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/eval/grade"
 	"os"
 	"path/filepath"
 	"strings"
@@ -156,5 +158,31 @@ func TestEvalCommandDefaultRunnerUsesLocalDispatcher(t *testing.T) {
 	}
 	if sc.Aggregate.Merged != 1 || sc.Aggregate.Total != 1 {
 		t.Fatalf("aggregate %+v", sc.Aggregate)
+	}
+}
+
+// A ticket with a grade spec is graded from the hidden command's log, so a command that prints PASSED
+// but exits non-zero does not count.
+func TestLocalHiddenTestIsGradedFromTheLog(t *testing.T) {
+	work := t.TempDir()
+	fx := t.TempDir()
+	put(t, fx, "g/hidden/1/x", "")
+	spec := &grade.Spec{FailToPass: []string{"t::a"}}
+	f := Fixture{Name: "g", Tickets: []FixtureTicket{{Ticket: api.Ticket{ID: "1", Repo: "g"}, Grade: spec}}}
+	l := &localDeps{cfg: LocalConfig{Fixtures: fx, Work: work}, fixtures: map[string]Fixture{"g": f}}
+	cases := []struct {
+		command string
+		want    bool
+	}{
+		{"echo PASSED t::a", true},
+		{"echo FAILED t::a", false},
+		{"echo PASSED t::a; exit 2", false},
+		{"echo PASSED t::b", false},
+	}
+	for _, c := range cases {
+		got, err := l.HiddenTest(context.Background(), f.Tickets[0].Ticket, c.command)
+		if err != nil || got != c.want {
+			t.Fatalf("%q: got %v, %v", c.command, got, err)
+		}
 	}
 }
