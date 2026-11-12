@@ -1,5 +1,5 @@
 {
-  "go_lines": 27632,
-  "deadcode": 189,
-  "reason": "raised by the reviewed merge of go/k6-depup-rules (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 27797,
+  "deadcode": 194,
+  "reason": "raised by the reviewed merge of go/k6-lintdelta (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
