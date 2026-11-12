@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs the factory CLI from a GitHub release. No sudo.
-# Env: FACTORY_VERSION (tag, default latest), FACTORY_BIN_DIR (default $HOME/.local/bin),
+# Env: FACTORY_VERSION (tag, default latest), FACTORY_BIN_DIR (default $PREFIX/bin when PREFIX is set, else $HOME/.local/bin),
 # FACTORY_BASE_URL (release host, for tests), FACTORY_UNAME_S and FACTORY_UNAME_M (override uname).
 # Flags --version, --dir and --uninstall win over their env twins.
 set -eu
@@ -48,7 +48,8 @@ while [ $# -gt 0 ]; do
 done
 
 base="${FACTORY_BASE_URL:-https://github.com/KaaS-team/KaaS-factory}"
-bin_dir="${flag_dir:-${FACTORY_BIN_DIR:-${HOME:?install: no home directory, pass --dir}/.local/bin}}"
+bin_dir="${flag_dir:-${FACTORY_BIN_DIR:-${PREFIX:+$PREFIX/bin}}}"
+[ -n "$bin_dir" ] || bin_dir="${HOME:?install: no home directory, pass --dir}/.local/bin"
 if [ -n "$flag_version" ]; then
 	FACTORY_VERSION="v${flag_version#v}"
 fi

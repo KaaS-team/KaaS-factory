@@ -1,0 +1,39 @@
+# Template for the Homebrew formula. goreleaser renders the live one into KaaS-team/homebrew-tap from
+# .goreleaser.yaml; this copy pins the archive names so a rename there fails packaging/homebrew's test.
+# {{ .Version }}, {{ .Sha.* }} are filled at release time.
+class Factory < Formula
+  desc "Plans work into tickets and runs them on parallel coding-agent sessions"
+  homepage "https://github.com/KaaS-team/KaaS-factory"
+  version "{{ .Version }}"
+  license "Apache-2.0"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/KaaS-team/KaaS-factory/releases/download/v{{ .Version }}/factory_darwin_arm64.tar.gz"
+      sha256 "{{ .Sha.DarwinArm64 }}"
+    end
+    on_intel do
+      url "https://github.com/KaaS-team/KaaS-factory/releases/download/v{{ .Version }}/factory_darwin_amd64.tar.gz"
+      sha256 "{{ .Sha.DarwinAmd64 }}"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/KaaS-team/KaaS-factory/releases/download/v{{ .Version }}/factory_linux_arm64.tar.gz"
+      sha256 "{{ .Sha.LinuxArm64 }}"
+    end
+    on_intel do
+      url "https://github.com/KaaS-team/KaaS-factory/releases/download/v{{ .Version }}/factory_linux_amd64.tar.gz"
+      sha256 "{{ .Sha.LinuxAmd64 }}"
+    end
+  end
+
+  def install
+    bin.install "factory"
+  end
+
+  test do
+    system "#{bin}/factory", "version"
+  end
+end
