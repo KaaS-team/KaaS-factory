@@ -12,6 +12,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/marker"
+	"github.com/KaaS-team/factory/internal/observe"
 	gogithub "github.com/google/go-github/v79/github"
 )
 
@@ -40,8 +41,9 @@ type Tracker struct {
 }
 
 var (
-	_ api.Tracker = (*Tracker)(nil)
-	_ api.Lister  = (*Tracker)(nil)
+	_ api.Tracker    = (*Tracker)(nil)
+	_ api.Lister     = (*Tracker)(nil)
+	_ observe.Parker = (*Tracker)(nil)
 )
 
 // New returns a Tracker for cfg.Owner/cfg.Repo.
@@ -92,16 +94,23 @@ func number(id api.TicketID) (int, error) {
 }
 
 // Ready lists the open issues that carry the factory:ready label, oldest first. Pull requests are skipped.
-func (t *Tracker) Ready(ctx context.Context) ([]api.Ticket, error) {
+func (t *Tracker) Ready(ctx context.Context) ([]api.Ticket, error) { return t.labeled(ctx, LabelReady) }
+
+// Parked lists the open issues that carry the factory:needs-human label, oldest first.
+func (t *Tracker) Parked(ctx context.Context) ([]api.Ticket, error) {
+	return t.labeled(ctx, LabelNeedsHuman)
+}
+
+func (t *Tracker) labeled(ctx context.Context, label string) ([]api.Ticket, error) {
 	opts := &gogithub.IssueListByRepoOptions{
-		State: "open", Labels: []string{LabelReady}, Sort: "created", Direction: "asc",
+		State: "open", Labels: []string{label}, Sort: "created", Direction: "asc",
 		ListOptions: gogithub.ListOptions{PerPage: 100},
 	}
 	var out []api.Ticket
 	for {
 		issues, resp, err := t.client.Issues.ListByRepo(ctx, t.owner, t.repo, opts)
 		if err != nil {
-			return nil, fmt.Errorf("github tracker: list ready issues: %w", err)
+			return nil, fmt.Errorf("github tracker: list %s issues: %w", label, err)
 		}
 		for _, is := range issues {
 			if !is.IsPullRequest() {

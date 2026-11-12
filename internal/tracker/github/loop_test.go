@@ -34,8 +34,11 @@ type hub struct {
 	comments []hubComment
 	perms    map[string]string
 	pulls    []map[string]any
+	pushes   []hubPush
 	nextID   int64
 }
+
+type hubPush struct{ Actor, Ref string }
 
 type hubComment struct {
 	ID    int64
@@ -137,6 +140,16 @@ func newHub(t *testing.T) (*hub, *gh.Tracker) {
 		in["number"] = 40 + len(h.pulls)
 		h.pulls = append(h.pulls, in)
 		writeJSON(w, map[string]any{"number": in["number"]})
+	})
+	mux.HandleFunc("GET /repos/o/r/events", func(w http.ResponseWriter, _ *http.Request) {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		out := []map[string]any{}
+		for _, p := range h.pushes {
+			out = append(out, map[string]any{"type": "PushEvent", "actor": map[string]any{"login": p.Actor},
+				"payload": map[string]any{"ref": p.Ref}})
+		}
+		writeJSON(w, append(out, map[string]any{"type": "WatchEvent", "actor": map[string]any{"login": "x"}}))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -384,5 +397,38 @@ func TestLoopOpensPRWithRenderedBody(t *testing.T) {
 	}
 	if m := leakWord.FindString(body); m != "" || strings.Contains(body, "forged") {
 		t.Fatalf("body leaks %q or took a forged marker:\n%s", m, body)
+	}
+}
+
+// Symphony 14: after a restart with an empty store, a ticket parked needs-human before the restart
+// is still scanned for `/factory` commands, because the tracker lists it.
+func TestLoopScansParkedTicketAfterRestart(t *testing.T) {
+	r := newLoop(t)
+	r.h.open(9, "Parked work", "factory:needs-human")
+	r.h.open(10, "Unrelated", "factory:failed")
+	r.h.perms["maintainer"] = "write"
+	r.h.post(9, "maintainer", "/factory retry")
+	r.h.post(10, "maintainer", "/factory retry")
+	r.c.Tick(context.Background())
+	if _, ok := r.disp.Sessions["9-a1"]; len(r.disp.Sessions) != 1 || !ok {
+		t.Fatalf("want only the parked ticket retried, sessions %v", r.disp.Sessions)
+	}
+}
+
+// ManualPushes counts pushes to the ticket's work branches by anyone but the runner's login, and
+// only that ticket's: factory/7-a1 is not factory/70-a1.
+func TestThreadCountsManualPushes(t *testing.T) {
+	h, tr := newHub(t)
+	h.open(7, "Add lease", "factory:building")
+	h.pushes = []hubPush{
+		{"bot", "refs/heads/factory/7-a1"}, {"alice", "refs/heads/factory/7-a1"}, {"alice", "refs/heads/factory/7-a2"},
+		{"alice", "refs/heads/factory/70-a1"}, {"alice", "refs/heads/main"},
+	}
+	th, err := tr.Thread(context.Background(), "7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if th.ManualPushes != 2 {
+		t.Fatalf("ManualPushes = %d, want 2", th.ManualPushes)
 	}
 }

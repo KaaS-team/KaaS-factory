@@ -47,11 +47,6 @@ CREATE TABLE IF NOT EXISTS spend (
 // Store is the cache. Open one per database file.
 type Store struct{ db *sql.DB }
 
-// Lister is implemented by trackers that can list tickets beyond the ready ones.
-type Lister interface {
-	Active(ctx context.Context) ([]api.Ticket, error)
-}
-
 // Open opens or creates the database at path and ensures the tables exist.
 func Open(path string) (*Store, error) {
 	q := url.Values{}
@@ -181,7 +176,7 @@ func (s *Store) Rebuild(ctx context.Context, tr api.Tracker, ob api.Observer) er
 	if err != nil {
 		return fmt.Errorf("list ready tickets: %w", err)
 	}
-	if l, ok := tr.(Lister); ok {
+	if l, ok := tr.(api.Lister); ok {
 		active, err := l.Active(ctx)
 		if err != nil {
 			return fmt.Errorf("list active tickets: %w", err)
@@ -226,6 +221,16 @@ func (s *Store) Rebuild(ctx context.Context, tr api.Tracker, ob api.Observer) er
 		}
 	}
 	return nil
+}
+
+// RebuildIfEmpty runs Rebuild when the store holds no ticket, as after its file was deleted, and
+// reports whether it did.
+func (s *Store) RebuildIfEmpty(ctx context.Context, tr api.Tracker, ob api.Observer) (bool, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tickets`).Scan(&n); err != nil || n > 0 {
+		return false, err
+	}
+	return true, s.Rebuild(ctx, tr, ob)
 }
 
 // Dump returns every row of every table as one sorted line each, for comparing two stores.

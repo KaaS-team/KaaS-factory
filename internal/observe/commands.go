@@ -39,3 +39,9 @@ type PROpener interface {
 type Recorder interface {
 	RecordStatus(ctx context.Context, id api.TicketID, p api.Phase) error
 }
+
+// Parker is the optional Tracker read of tickets parked for a human, so a restart still scans
+// their threads for commands.
+type Parker interface {
+	Parked(ctx context.Context) ([]api.Ticket, error)
+}
