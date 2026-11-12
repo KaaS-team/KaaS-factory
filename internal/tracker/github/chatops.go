@@ -120,7 +120,8 @@ func (t *Trust) Trusted(ctx context.Context, login string) bool {
 	if login == "" {
 		return false
 	}
-	if t.self != "" && SameLogin(login, t.self) {
+	// Exact, not SameLogin: a user named "app" must not pass for the runner "app[bot]".
+	if t.self != "" && strings.EqualFold(login, t.self) {
 		return true
 	}
 	if t.kindOf != nil {

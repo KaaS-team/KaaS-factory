@@ -143,3 +143,13 @@ func TestTrustedOnlyFiltersThread(t *testing.T) {
 		t.Fatalf("kept %v, want [2 3]", ids)
 	}
 }
+
+func TestTrustedSelfIsNotAHumanWithTheBotsName(t *testing.T) {
+	tr := gh.NewTrust("factory-app[bot]", roles(nil), time.Now)
+	if !tr.Trusted(context.Background(), "factory-app[bot]") {
+		t.Fatal("the runner itself must be trusted")
+	}
+	if tr.Trusted(context.Background(), "factory-app") {
+		t.Fatal("a user named like the bot without its suffix was trusted as the runner")
+	}
+}
