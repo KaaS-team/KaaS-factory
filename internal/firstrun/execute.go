@@ -114,10 +114,13 @@ func Execute(ctx context.Context, r Report, e Exec) (Result, error) {
 	var verdict string
 	if e.Log != nil {
 		if text, err := e.Log(ctx, s); err == nil {
-			c, ok := infra.Classify(text)
-			verdict = infra.Summary(c, ok)
-			if ok && c.Tier == infra.TierEnvironment {
-				sc.GatesGreen = nil
+			// A red gate with a test runner's own failure line is a test failure whatever else the log says.
+			if sc.GatesGreen == nil || *sc.GatesGreen || !infra.HasTestFailure(text) {
+				c, ok := infra.Classify(text)
+				verdict = infra.Summary(c, ok)
+				if ok && c.Tier == infra.TierEnvironment {
+					sc.GatesGreen = nil
+				}
 			}
 		}
 	}

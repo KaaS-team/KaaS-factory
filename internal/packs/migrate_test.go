@@ -37,10 +37,11 @@ func pinnedRoot(t *testing.T, content string, pinSHA string) string {
 	return root
 }
 
-func TestMigrateRunsPinnedPack(t *testing.T) {
+func TestMigratePromptStepWithoutAgentFails(t *testing.T) {
 	root := pinnedRoot(t, migrationPack, "")
 	out, err := run(t, NewPacksCommand(), "migrate", "--root", root, "o/r#workflows/m.yaml")
-	if err != nil || !strings.Contains(out, "prompt: hello\nfiles: x.txt") {
+	// No agent is wired into the command, so the prompt step is handed off and the run fails, not "ran".
+	if err == nil || !strings.Contains(err.Error(), "no agent configured") || !strings.Contains(out, "prompt: hello\nfiles: x.txt") {
 		t.Fatalf("%q %v", out, err)
 	}
 }

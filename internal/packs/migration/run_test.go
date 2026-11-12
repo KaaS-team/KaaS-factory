@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -153,7 +154,7 @@ func TestVerify(t *testing.T) {
 
 func TestExecRunnerPromptHandsOff(t *testing.T) {
 	var out bytes.Buffer
-	if err := (ExecRunner{Out: &out}).Prompt(context.Background(), "", "do it", []string{"a", "b"}); err != nil || out.String() != "prompt: do it\nfiles: a b\n" {
+	if err := (ExecRunner{Out: &out}).Prompt(context.Background(), "", "do it", []string{"a", "b"}); !errors.Is(err, ErrNoAgent) || out.String() != "prompt: do it\nfiles: a b\n" {
 		t.Fatalf("%q %v", out.String(), err)
 	}
 	if err := (ExecRunner{Out: &out}).Exec(context.Background(), t.TempDir(), []string{"true"}); err != nil {
@@ -161,5 +162,54 @@ func TestExecRunnerPromptHandsOff(t *testing.T) {
 	}
 	if err := (ExecRunner{Out: &out}).Exec(context.Background(), t.TempDir(), []string{"false"}); err == nil {
 		t.Fatal("want exit error")
+	}
+}
+
+// A matched file named like a flag reaches the command as a path, not as an option.
+func TestFilesStartingWithDashAreNotFlags(t *testing.T) {
+	got := expand([]string{"rm", "{files}"}, []string{"-rf", "--force", "-x/y.go", "normal.go", "d/-n"})
+	want := []string{"rm", "./-rf", "./--force", "./-x/y.go", "normal.go", "d/-n"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v want %v", got, want)
+	}
+}
+
+// End to end: a real command sees a file called -rf as an operand and leaves it be.
+func TestDashFileSurvivesRealCommand(t *testing.T) {
+	root := t.TempDir()
+	for _, n := range []string{"-rf", "ok.txt"} {
+		if err := os.WriteFile(filepath.Join(root, n), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	argv := expand([]string{"ls", "{files}"}, []string{"-rf", "ok.txt"})
+	var out bytes.Buffer
+	if err := (ExecRunner{Out: &out}).Exec(context.Background(), root, argv); err != nil {
+		t.Fatalf("ls %v: %v: %s", argv, err, out.String())
+	}
+	if !strings.Contains(out.String(), "-rf") || !strings.Contains(out.String(), "ok.txt") {
+		t.Fatalf("output %q", out.String())
+	}
+}
+
+// With the default runner a prompt step fails the run and is not reported as ran.
+func TestDefaultRunnerPromptStepIsNotReportedAsRan(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pack{Name: "p", Steps: []Step{{Name: "ask", Prompt: "do it"}}}
+	var log bytes.Buffer
+	res, err := Run(context.Background(), p, Options{Root: root, Exec: ExecRunner{Out: &log}, Log: &log})
+	if !errors.Is(err, ErrNoAgent) {
+		t.Fatalf("want ErrNoAgent, got %v", err)
+	}
+	for _, r := range res {
+		if r.Ran {
+			t.Fatalf("prompt step reported ran: %+v", res)
+		}
+	}
+	if strings.Contains(log.String(), "ran on") {
+		t.Fatalf("log claims it ran: %s", log.String())
 	}
 }

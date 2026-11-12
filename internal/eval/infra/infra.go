@@ -28,17 +28,19 @@ type signature struct {
 	re     *regexp.Regexp
 }
 
+// Signatures that name a condition a test can print (rate limit, launch failure) are anchored to the start
+// of a line in the runner's own wording, so a test name or message that mentions them stays a test failure.
 // signatures are tried in order; the first hit wins. sandbox_oom, sandbox_killed and rate_limited are ours;
 // the rest are upstream's table.
 var signatures = []signature{
-	{"browser_launch_failed", TierEnvironment, regexp.MustCompile(`Failed to launch|Failed to connect to the bus`)},
+	{"browser_launch_failed", TierEnvironment, regexp.MustCompile(`(?m)^(?:Error: |browserType\.launch: )?Failed to launch (?:the )?(?:browser|chrom)|^Failed to connect to the bus`)},
 	{"display_unavailable", TierEnvironment, regexp.MustCompile(`cannot open display|Missing X server|unable to open X display`)},
 	{"sandbox_oom", TierEnvironment, regexp.MustCompile(`sandbox: out of memory`)},
 	{"sandbox_killed", TierEnvironment, regexp.MustCompile(`sandbox: process killed`)},
 	{"out_of_memory", TierEnvironment, regexp.MustCompile(`(?m)Cannot allocate memory|OutOfMemoryError|^Killed$`)},
 	{"container_unavailable", TierEnvironment, regexp.MustCompile(`Error response from daemon|Cannot connect to the Docker daemon`)},
 	{"network_unreachable", TierEnvironment, regexp.MustCompile(`Could not resolve host|Temporary failure in name resolution`)},
-	{"rate_limited", TierEnvironment, regexp.MustCompile(`(?i)\b429\b.*too many requests|too many requests|rate limit`)},
+	{"rate_limited", TierEnvironment, regexp.MustCompile(`(?mi)^(?:api error: |error: )?(?:http )?429 too many requests|^(?:api error: |error: )?rate limit (?:exceeded|reached)`)},
 	{"missing_module", TierAmbiguous, regexp.MustCompile(`Cannot find module|MODULE_NOT_FOUND|ModuleNotFoundError`)},
 	{"no_tests_collected", TierAmbiguous, regexp.MustCompile(`no tests ran|collected 0 items`)},
 	{"tests_timed_out", TierAmbiguous, regexp.MustCompile(`Timeout error: \d+ seconds exceeded`)},
@@ -66,3 +68,9 @@ func Summary(c Class, ok bool) string {
 		return "possible environment failure (" + c.Reason + "); tests may also have failed."
 	}
 }
+
+var testFailure = regexp.MustCompile(`(?m)^(?:--- FAIL: |FAIL\t|FAIL$|not ok |FAILED )`)
+
+// HasTestFailure reports whether the log has a test runner's own failure line (go test, TAP, pytest), which
+// outranks any environment signature: a gate that failed a test is red, not unknown.
+func HasTestFailure(log string) bool { return testFailure.MatchString(log) }

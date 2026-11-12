@@ -133,3 +133,21 @@ func TestAfterLandInfersRedRemainder(t *testing.T) {
 		t.Fatalf("want no inferred results, got %d entries", len(out))
 	}
 }
+
+// A Single PR is tested alone and never joins a batch (bors divider is_single).
+func TestPlanIsolatesSinglePRs(t *testing.T) {
+	st := State{Base: "B", BatchSize: 4, PRs: prs(4)}
+	two := q(4)
+	two[2].Single = true
+	got := Plan(two, st)
+	want := []Action{{Kind: KindTest, IDs: ids("1", "2"), Heads: ids("h1", "h2")}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v", got)
+	}
+	front := q(3)
+	front[0].Single = true
+	want = []Action{{Kind: KindTest, IDs: ids("1"), Heads: ids("h1")}}
+	if got := Plan(front, st); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v", got)
+	}
+}

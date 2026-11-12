@@ -20,6 +20,9 @@ func TestClassifyTable(t *testing.T) {
 		{"sandbox oom", "sandbox: out of memory", "sandbox_oom", TierEnvironment, true},
 		{"rate limit 429", "HTTP 429 Too Many Requests", "rate_limited", TierEnvironment, true},
 		{"rate limit text", "rate limit exceeded, retry later", "rate_limited", TierEnvironment, true},
+		{"test name mentioning rate limit is not rate_limited", "--- FAIL: TestRateLimitBackoff (0.00s)\n    x_test.go:9: too many requests handled, rate limit ok", "", "", false},
+		{"prose mentioning Failed to launch is not a browser failure", "    x_test.go:3: Failed to launch worker", "", "", false},
+		{"api error 429", "API Error: 429 Too Many Requests", "rate_limited", TierEnvironment, true},
 		{"missing module", "ModuleNotFoundError: No module named x", "missing_module", TierAmbiguous, true},
 		{"no tests", "collected 0 items", "no_tests_collected", TierAmbiguous, true},
 		{"timeout", "Timeout error: 1800 seconds exceeded", "tests_timed_out", TierAmbiguous, true},
@@ -55,5 +58,13 @@ func TestSummary(t *testing.T) {
 				t.Fatalf("got %q want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestHasTestFailure(t *testing.T) {
+	for log, want := range map[string]bool{"--- FAIL: TestX": true, "ok\nFAIL\tpkg\t1s": true, "ok pkg": false, "a --- FAIL: x": false, "": false} {
+		if HasTestFailure(log) != want {
+			t.Errorf("%q: want %v", log, want)
+		}
 	}
 }

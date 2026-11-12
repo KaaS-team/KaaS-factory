@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -66,11 +67,29 @@ func writeFile(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644)
+	f, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	_, werr := f.Write(b)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr == nil {
+		werr = os.Chmod(tmp, 0o644)
+	}
+	if werr == nil {
+		werr = os.Rename(tmp, path)
+	}
+	if werr != nil {
+		_ = os.Remove(tmp)
+	}
+	return werr
 }
 
 // Judge returns the stored verdict for r, or asks the wrapped judge and stores the answer.
-// A missing or unreadable entry is a miss. A judge error is returned and never stored.
+// A missing or unreadable entry is a miss. A judge error is returned and never stored; a failed cache write is logged and the verdict still returned.
 func (c *Cache) Judge(ctx context.Context, r Request) (Result, error) {
 	p := entryPath(c.dir, r)
 	if raw, err := os.ReadFile(p); err == nil {
@@ -88,7 +107,8 @@ func (c *Cache) Judge(ctx context.Context, r Request) (Result, error) {
 		return Result{}, err
 	}
 	if err := writeFile(p, raw); err != nil {
-		return Result{}, fmt.Errorf("judgecache: store verdict: %w", err)
+		// The verdict was paid for; a failed store only costs the next run a second call.
+		slog.Warn("judgecache: store verdict", "err", err)
 	}
 	return Result{Verdict: v}, nil
 }
