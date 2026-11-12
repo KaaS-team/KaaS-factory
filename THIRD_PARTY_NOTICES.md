@@ -285,3 +285,9 @@ Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) Ant
 
 - `internal/dispatch/untrusted/untrusted.go` from `src/github/validation/untrusted-pr.ts` [tested by `internal/dispatch/untrusted/untrusted_test.go`]
 - `internal/dispatch/untrusted/guard.go` from `src/github/operations/session-guard.ts` and the SENSITIVE_PATHS list of `src/github/operations/restore-config.ts` [tested by `internal/dispatch/untrusted/untrusted_test.go`]
+
+## dagger/dagger@835b0ef
+
+Source: https://github.com/dagger/dagger (Apache-2.0, Copyright Dagger, Inc. contributors).
+
+- `internal/packs/lock.go` from `util/lockfile/lockfile.go`: sorted, versioned JSON-lines lockfile with a commit-me header and merge-conflict detection. Namespaces, header text and entry shape changed; the v1 JSON `factory.lock` is still read. [tested by `internal/packs/lockfile_test.go`]
