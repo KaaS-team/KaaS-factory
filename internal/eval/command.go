@@ -23,14 +23,21 @@ var ErrWorse = errors.New("new scorecard is worse")
 type Option func(*options)
 
 type options struct {
-	runner func(ctx context.Context, workflow, agent string) (Deps, error)
-	now    func() time.Time
+	runner  func(ctx context.Context, workflow, agent, format string) (Deps, error)
+	control func(ctx context.Context, agent string) (BareModel, BareShell, error)
+	now     func() time.Time
 }
 
 // WithRunner sets how the command builds the Deps that run one workflow with one agent preset.
 // Without it `eval` fails; tests pass a fake.
-func WithRunner(f func(ctx context.Context, workflow, agent string) (Deps, error)) Option {
+func WithRunner(f func(ctx context.Context, workflow, agent, format string) (Deps, error)) Option {
 	return func(o *options) { o.runner = f }
+}
+
+// WithControl sets how the command builds the model and shell of the bare-bash control arm.
+// Without it `--arm control` fails; tests pass fakes.
+func WithControl(f func(ctx context.Context, agent string) (BareModel, BareShell, error)) Option {
+	return func(o *options) { o.control = f }
 }
 
 // WithNow sets the clock that names the scorecard file.
@@ -50,7 +57,10 @@ func NewCommand(opts ...Option) *cobra.Command {
 	for _, f := range opts {
 		f(&o)
 	}
-	var workflow, agent, packs, fixtures, outDir string
+	var workflow, agent, format, packs, fixtures, outDir, runDir string
+	var arms []string
+	var tries int
+	var replay, redo bool
 	cmd := &cobra.Command{
 		Use:           "eval",
 		Short:         "Run the fixtures matrix and write a scorecard",
@@ -61,7 +71,22 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if o.runner == nil {
 				return errors.New("eval: no agent runner configured")
 			}
-			for flag, v := range map[string]string{"workflow": workflow, "agent": agent} {
+			if tries < 1 {
+				return fmt.Errorf("eval: --tries %d must be at least 1", tries)
+			}
+			if (replay || redo) && runDir == "" {
+				return errors.New("eval: --replay and --redo need --run-dir")
+			}
+			checked := map[string]string{"workflow": workflow, "agent": agent}
+			if format != "" {
+				checked["format"] = format
+			}
+			for _, a := range arms {
+				if a != "preset" && a != "control" {
+					return fmt.Errorf("eval: --arm %q must be preset or control", a)
+				}
+			}
+			for flag, v := range checked {
 				if !safeName.MatchString(v) {
 					return fmt.Errorf("eval: --%s %q must be lowercase letters, digits, dot, dash or underscore", flag, v)
 				}
@@ -85,13 +110,38 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if len(m.Fixtures) == 0 {
 				return fmt.Errorf("eval: no fixtures under %s", fixtures)
 			}
-			deps, err := o.runner(cmd.Context(), workflow, agent)
-			if err != nil {
-				return err
+			var store *RunStore
+			if runDir != "" {
+				if store, err = OpenRunStore(runDir); err != nil {
+					return err
+				}
 			}
-			sc, err := Run(cmd.Context(), m, deps)
-			if err != nil {
-				return err
+			sc := Scorecard{Schema: SchemaV1, Tries: tries}
+			for _, arm := range arms {
+				deps, err := o.runner(cmd.Context(), workflow, agent, format)
+				if err != nil {
+					return err
+				}
+				if arm == "control" {
+					if o.control == nil {
+						return errors.New("eval: no control model configured")
+					}
+					model, shell, err := o.control(cmd.Context(), agent)
+					if err != nil {
+						return err
+					}
+					deps = controlDeps{Deps: deps, model: model, shell: shell}
+				}
+				part, err := RunArm(cmd.Context(), m, deps, Arm{Arm: arm, Agent: agent, Format: format, Tries: tries, Store: store, Replay: replay, Redo: redo})
+				if err != nil {
+					return err
+				}
+				sc.Tickets = append(sc.Tickets, part.Tickets...)
+				sc.Cells = append(sc.Cells, part.Cells...)
+			}
+			sc.Aggregate = aggregate(sc.Tickets)
+			if preset := presetOnly(sc.Tickets); len(preset) > 0 {
+				sc.Aggregate = aggregate(preset) // the control arm is a baseline, not part of the headline
 			}
 			sc.Workflow, sc.Agent, sc.Packs = workflow, agent, lockSum
 			raw, err := json.MarshalIndent(sc, "", "  ")
@@ -114,11 +164,27 @@ func NewCommand(opts ...Option) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&workflow, "workflow", "", "workflow name (required)")
 	cmd.Flags().StringVar(&agent, "agent", "", "agent preset name, never a model name (required)")
+	cmd.Flags().StringVar(&format, "format", "", "edit format axis, e.g. diff or whole")
+	cmd.Flags().StringSliceVar(&arms, "arm", []string{"preset"}, "arms to run: preset, control (bare-bash baseline)")
+	cmd.Flags().IntVar(&tries, "tries", 1, "tries per ticket; the scorecard gets pass_rate_1..N")
+	cmd.Flags().StringVar(&runDir, "run-dir", "", "keep results and trajectories here so a killed run resumes")
+	cmd.Flags().BoolVar(&replay, "replay", false, "re-score the outputs stored in --run-dir without dispatching")
+	cmd.Flags().BoolVar(&redo, "redo", false, "rerun tickets --run-dir already finished")
 	cmd.Flags().StringVar(&packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
 	cmd.Flags().StringVar(&fixtures, "fixtures", "internal/eval/testdata", "directory of fixtures")
 	cmd.Flags().StringVar(&outDir, "out", "evals", "directory the scorecard is written to")
 	cmd.AddCommand(newDiffCommand())
 	return cmd
+}
+
+func presetOnly(rs []TicketResult) []TicketResult {
+	var out []TicketResult
+	for _, r := range rs {
+		if r.Arm != "control" {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func readScorecard(path string) (Scorecard, error) {
@@ -160,6 +226,7 @@ func newDiffCommand() *cobra.Command {
 			fmt.Fprintf(&b, "| main green rate | %.2f | %.2f | %+.2f |\n", o.MainGreenRate, n.MainGreenRate, n.MainGreenRate-o.MainGreenRate)
 			fmt.Fprintf(&b, "| tokens per merged PR | %d | %d | %+d (%s) |\n", o.TokensPerMergedPR, n.TokensPerMergedPR, n.TokensPerMergedPR-o.TokensPerMergedPR, pct(o.TokensPerMergedPR, n.TokensPerMergedPR))
 			fmt.Fprintf(&b, "| median wall time | %s | %s | %s |\n", o.MedianWallTime, n.MedianWallTime, signed(n.MedianWallTime-o.MedianWallTime))
+			b.WriteString(cellDiff(oldSC.Cells, newSC.Cells))
 			v := Compare(oldSC, newSC, 0)
 			if v.Worse {
 				fmt.Fprintf(&b, "\nworse: %s\n", v.Reason)
@@ -189,4 +256,24 @@ func signed(d time.Duration) string {
 		return "+" + d.String()
 	}
 	return d.String()
+}
+
+// cellDiff lists pass_rate_1 and malformed count per cell present in both scorecards.
+func cellDiff(oldCells, newCells []Cell) string {
+	prev := map[string]Cell{}
+	for _, c := range oldCells {
+		prev[c.Key()] = c
+	}
+	var b strings.Builder
+	for _, n := range newCells {
+		o, ok := prev[n.Key()]
+		if !ok || len(o.PassRates) == 0 || len(n.PassRates) == 0 {
+			continue
+		}
+		if b.Len() == 0 {
+			b.WriteString("\n| cell | pass_rate_1 old | new | delta | malformed old | new |\n|---|---|---|---|---|---|\n")
+		}
+		fmt.Fprintf(&b, "| %s | %.2f | %.2f | %+.2f | %d | %d |\n", n.Key(), o.PassRates[0], n.PassRates[0], n.PassRates[0]-o.PassRates[0], o.Malformed, n.Malformed)
+	}
+	return b.String()
 }

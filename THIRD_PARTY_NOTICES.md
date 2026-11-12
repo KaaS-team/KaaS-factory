@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## SWE-agent/mini-swe-agent@04d809c
+
+Source: https://github.com/SWE-agent/mini-swe-agent (MIT, Copyright (c) 2025 Kilian A. Lieret and Carlos E. Jimenez). The licence text is the MIT text above.
+
+- `internal/eval/bare.go` from `src/minisweagent/agents/default.py` and the submission sentinel of `environments/local.py` [tested by `internal/eval/bare_test.go`]

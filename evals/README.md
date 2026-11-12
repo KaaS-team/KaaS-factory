@@ -11,3 +11,6 @@ Pack upgrades compare two of them:
 
 It prints each metric with its delta and exits 1 when the new one is worse on pass rate or on
 tokens per merged PR (more than 10 percent up). Sample files here are fake-agent output.
+
+`--arm preset,control` adds the bare-bash baseline per fixture, `--tries N` adds pass_rate_1..N, and
+`--run-dir <dir>` keeps results and trajectories so a killed run resumes; `--replay` re-scores them.

@@ -46,7 +46,7 @@ func TestScorecardPassRateAndTokensPerMergedPR(t *testing.T) {
 		passIDs: map[api.TicketID]bool{"1": true, "2": true, "3": true},
 		usage:   map[api.TicketID][]api.Usage{"1": u(100, 50), "2": u(100, 50), "3": u(100, 50), "4": u(200, 100)},
 	}
-	sc, err := Run(context.Background(), matrix4(), d)
+	sc, err := RunArm(context.Background(), matrix4(), d, Arm{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestCompare(t *testing.T) {
 // Acceptance 4: JSON round trip, and customer markdown hides model and cost.
 func TestScorecardRoundTripAndCustomerView(t *testing.T) {
 	d := fakeDeps{passIDs: map[api.TicketID]bool{"1": true}, usage: map[api.TicketID][]api.Usage{"1": {{InputTokens: 5, OutputTokens: 5, CostUSD: 1.5}}}}
-	sc, err := Run(context.Background(), matrix4(), d)
+	sc, err := RunArm(context.Background(), matrix4(), d, Arm{})
 	if err != nil {
 		t.Fatal(err)
 	}

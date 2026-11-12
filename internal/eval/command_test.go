@@ -30,7 +30,7 @@ func newTestCommand(t *testing.T, dir string, solves map[api.TicketID]bool) (*by
 	t.Helper()
 	var out bytes.Buffer
 	cmd := NewCommand(
-		WithRunner(func(_ context.Context, workflow, agent string) (Deps, error) { return solver{solves}, nil }),
+		WithRunner(func(_ context.Context, workflow, agent, format string) (Deps, error) { return solver{solves}, nil }),
 		WithNow(func() time.Time { return time.Date(2026, 11, 12, 3, 0, 0, 0, time.UTC) }),
 	)
 	cmd.SetOut(&out)
