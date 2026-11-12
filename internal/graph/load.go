@@ -281,6 +281,9 @@ func (g *Graph) addStep(s namedStep, md bool, check func(string, int) error) err
 	if (kind == KindTransform) != (s.Rules != "") {
 		return fmt.Errorf("step %s: rules belongs on a transform step, which needs it", s.id)
 	}
+	if s.Rules != "" && !filepath.IsLocal(s.Rules) {
+		return fmt.Errorf("step %s: rules %q must be a path inside the repo", s.id, s.Rules)
+	}
 	if s.Verify != nil {
 		n.Verify = *s.Verify
 	}

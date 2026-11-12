@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -24,6 +25,7 @@ var ruleSchema []byte
 var (
 	ErrNoRule     = errors.New("transform: the rules dir has no rule file")
 	ErrRuleSchema = errors.New("transform: rule does not match the ast-grep schema")
+	ErrRulePath   = errors.New("transform: rule id or file leaves the rules dir")
 	ErrRuleCases  = errors.New("transform: rule needs a tests file with a valid and an invalid case")
 )
 
@@ -71,6 +73,9 @@ func RunTransform(ctx context.Context, ag AstGrep, spec TransformSpec) (Transfor
 		if err != nil {
 			return res, err
 		}
+		if err := regularFile(f); err != nil {
+			return res, err
+		}
 		res.Land = append(res.Land, filepath.Base(f))
 		cases := filepath.Join("tests", id+"-test.yml")
 		if err := checkCases(filepath.Join(spec.Rules, cases)); err != nil {
@@ -78,6 +83,9 @@ func RunTransform(ctx context.Context, ag AstGrep, spec TransformSpec) (Transfor
 		}
 		res.Land = append(res.Land, cases)
 		if snap := filepath.Join("__snapshots__", id+"-snapshot.yml"); exists(filepath.Join(spec.Rules, snap)) {
+			if err := regularFile(filepath.Join(spec.Rules, snap)); err != nil {
+				return res, err
+			}
 			res.Land = append(res.Land, snap)
 		}
 	}
@@ -131,10 +139,29 @@ func checkRule(sch *jsonschema.Resolved, path string) (string, error) {
 	if err := sch.Validate(doc); err != nil {
 		return "", fmt.Errorf("%w: %s: %w", ErrRuleSchema, filepath.Base(path), err)
 	}
+	if !ruleID.MatchString(id) {
+		return "", fmt.Errorf("%w: %s: id %q must be letters, digits, dot, dash or underscore", ErrRulePath, filepath.Base(path), id)
+	}
 	return id, nil
 }
 
+// ruleID names files in the rules dir, so it has no separator and does not start with a dot.
+var ruleID = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]*$`)
+
+// regularFile refuses a symlink or other non-regular file, which could point outside the rules dir.
+func regularFile(path string) error {
+	if fi, err := os.Lstat(path); err != nil || !fi.Mode().IsRegular() {
+		return fmt.Errorf("%w: %s is not a regular file", ErrRulePath, filepath.Base(path))
+	}
+	return nil
+}
+
 func checkCases(path string) error {
+	if _, err := os.Lstat(path); err == nil {
+		if err := regularFile(path); err != nil {
+			return err
+		}
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrRuleCases, filepath.Base(path))

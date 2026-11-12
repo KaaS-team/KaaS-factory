@@ -138,3 +138,42 @@ func TestTransformStep(t *testing.T) {
 		}
 	}
 }
+
+// The id names the tests and snapshot files, so it must not climb out of the rules dir, and a rule,
+// tests or snapshot file that is a symlink must not pull in a file from elsewhere.
+func TestTransformRefusesPathEscape(t *testing.T) {
+	for _, id := range []string{"../../etc/passwd", "a/b", `a\b`, "..", ".hidden"} {
+		rule := "id: " + id + "\nlanguage: typescript\nrule:\n  pattern: var $A = $B\n"
+		dir := rulesDir(t, rule, goodCases, false)
+		ag := &fakeAstGrep{}
+		if _, err := RunTransform(context.Background(), ag, TransformSpec{Rules: dir, Root: t.TempDir()}); !errors.Is(err, ErrRulePath) {
+			t.Errorf("id %q: want ErrRulePath, got %v", id, err)
+		}
+		if len(ag.calls) != 0 {
+			t.Errorf("id %q: ast-grep ran: %v", id, ag.calls)
+		}
+	}
+	dir := rulesDir(t, goodRule, goodCases, false)
+	outside := filepath.Join(t.TempDir(), "outside.yml")
+	if err := os.WriteFile(outside, []byte(goodCases), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cases := filepath.Join(dir, "tests", "no-var-test.yml")
+	if err := os.Remove(cases); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, cases); err != nil {
+		t.Skip("no symlinks here")
+	}
+	if _, err := RunTransform(context.Background(), &fakeAstGrep{}, TransformSpec{Rules: dir, Root: t.TempDir()}); !errors.Is(err, ErrRulePath) {
+		t.Errorf("symlinked tests file: want ErrRulePath, got %v", err)
+	}
+}
+
+func TestTransformRulesDirStaysInTheRepo(t *testing.T) {
+	for _, r := range []string{"/etc", "../rules", "a/../../b"} {
+		if _, err := ParseYAML("w", []byte("steps:\n  t: { uses: transform, rules: "+r+" }\n")); err == nil {
+			t.Errorf("rules %q: want an error", r)
+		}
+	}
+}
