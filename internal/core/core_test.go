@@ -375,6 +375,9 @@ func TestSlowSubscriberDroppedLoopKeepsTicking(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	// The fast reader gets room for a whole tick's burst; with the slow one's two
+	// slots it was dropped too whenever its goroutine had not run yet (1 in ~40).
+	r.c.hub.buf = 64
 	fast, err := r.c.Events(ctx)
 	if err != nil {
 		t.Fatal(err)

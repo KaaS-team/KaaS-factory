@@ -102,6 +102,8 @@ func TestRestartResumesAtTheNodeReached(t *testing.T) {
 		if st.base != 1 || st.pr != 3 {
 			t.Fatalf("position %+v, want base 1 and pr 3", st)
 		}
+		// The restarted Core has a fresh store, so put back the interrupt a persistent one would still hold.
+		r.c.raise(ctx, "5", st.node)
 		tt2.comments = append(tt2.comments, gh.Comment{ID: 1, Author: "maintainer", Body: "/factory approve"})
 		r.c.Tick(ctx)
 		r.c.Tick(ctx)

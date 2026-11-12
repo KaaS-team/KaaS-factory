@@ -277,7 +277,7 @@ func TestCommandRefusesEmptyToken(t *testing.T) {
 	t.Setenv(TokenEnv, "")
 	opened := false
 	cmd := NewCommand(func(context.Context) (Deps, error) { opened = true; return Deps{}, nil })
-	cmd.SetArgs([]string{"--addr", "127.0.0.1:0"})
+	cmd.SetArgs([]string{"--addr", "127.0.0.1:0", "--audit-log", filepath.Join(t.TempDir(), "a2a-audit.jsonl")})
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), TokenEnv) {

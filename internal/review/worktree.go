@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/KaaS-team/factory/internal/gitx"
 	"io"
 	"os"
 	"os/exec"
@@ -26,6 +27,10 @@ func git(ctx context.Context, dir string, stdin []byte, args ...string) (string,
 		return out.String(), fmt.Errorf("review: git %s: %w: %s", args[0], err, strings.TrimSpace(errb.String()))
 	}
 	return out.String(), nil
+}
+
+func stageAll(ctx context.Context, dir string) error {
+	return gitx.StageAll(ctx, func(ctx context.Context, args ...string) (string, error) { return git(ctx, dir, nil, args...) })
 }
 
 // worktree is a disposable checkout of repo at HEAD with the repo's uncommitted state committed on top.
@@ -72,7 +77,7 @@ func addWorktree(ctx context.Context, repo string) (w *worktree, err error) {
 			return nil, err
 		}
 	}
-	if _, err = git(ctx, dir, nil, "add", "-A"); err != nil {
+	if err = stageAll(ctx, dir); err != nil {
 		return nil, err
 	}
 	if _, err = git(ctx, dir, nil, "commit", "-q", "--allow-empty", "--no-verify", "-m", "factory-review: working tree state"); err != nil {
@@ -107,7 +112,7 @@ func copyFile(src, dst string) error {
 
 // patch returns the diff of everything the agent changed since the seeded commit, new files included.
 func (w *worktree) patch(ctx context.Context) (string, error) {
-	if _, err := git(ctx, w.dir, nil, "add", "-A"); err != nil {
+	if err := stageAll(ctx, w.dir); err != nil {
 		return "", err
 	}
 	return git(ctx, w.dir, nil, "diff", "--cached", "--binary")

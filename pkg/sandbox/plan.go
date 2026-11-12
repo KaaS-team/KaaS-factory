@@ -27,15 +27,7 @@ func MakePlan(spec Spec, caps Capabilities) Plan {
 		p.DenyNet = !spec.AllowNet
 	}
 	if caps.Rlimits {
-		if spec.MaxMemBytes > 0 {
-			p.Rlimits = append(p.Rlimits, Rlimit{"as", spec.MaxMemBytes})
-		}
-		if spec.MaxCPUSeconds > 0 {
-			p.Rlimits = append(p.Rlimits, Rlimit{"cpu", spec.MaxCPUSeconds})
-		}
-		if spec.MaxProcs > 0 {
-			p.Rlimits = append(p.Rlimits, Rlimit{"nproc", spec.MaxProcs})
-		}
+		p.Rlimits = mergeLimits(spec.Baseline, spec.Exec)
 	}
 	return p
 }

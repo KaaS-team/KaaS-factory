@@ -167,6 +167,7 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 			return err
 		}
 		defer func() { _ = j.Close() }()
+		j.SetJitter(DefaultJitterWindow, j.holder)
 		s.jobs = j
 	}
 	ev, err := s.core.Events(ctx)

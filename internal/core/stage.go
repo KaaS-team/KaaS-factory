@@ -42,14 +42,21 @@ type stageRun struct {
 	saved   bool      // a checkpoint of this run exists
 }
 
-// stageOf is the ticket's place in its graph: the one in memory, else the one the checkpoint store holds,
-// else the one its thread holds (a restart lost the map), else the graph's first node.
+// stageOf is the ticket's place in its graph: the one in memory, else the one its thread holds (GitHub
+// keeps it when the local store is lost or stale), else the checkpoint store's when the thread has none
+// or agrees with it (the checkpoint adds tier, history and a saved result), else the graph's first node.
 func (c *Core) stageOf(ctx context.Context, id api.TicketID, workflow string) (*stageRun, error) {
 	if st, ok := c.stages[id]; ok {
 		return st, nil
 	}
-	if st, err := c.restore(ctx, id); st != nil || err != nil {
+	if st, err := c.restore(ctx, id); err != nil {
 		return st, err
+	} else if st != nil {
+		p, ok := c.savedPosition(ctx, id)
+		if _, known := st.g.Node(p.Node); !ok || !known || p.Node == st.node {
+			return st, nil
+		}
+		delete(c.stages, id) // the checkpoint disagrees with the thread: the thread wins
 	}
 	g, err := c.d.Stages.Graph(workflow)
 	if err != nil {
@@ -256,7 +263,7 @@ func (c *Core) answer(ctx context.Context, id api.TicketID, node string, outcome
 	}
 	thread := approvalThread(id, node)
 	value, _ := json.Marshal(map[string]string{"outcome": string(outcome), "text": text})
-	if err := c.d.Interrupts.Resume(ctx, thread, value); err != nil && !errors.Is(err, interrupt.ErrNothingPending) {
+	if err := c.d.Interrupts.Resume(ctx, thread, value); err != nil {
 		return err
 	}
 	return c.d.Interrupts.Done(ctx, thread)

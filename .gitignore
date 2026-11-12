@@ -17,4 +17,4 @@ __pycache__/
 *.pyc
 
 .factory/shadow.ndjson
-.factory/a2a-audit.jsonl
+a2a-audit.jsonl

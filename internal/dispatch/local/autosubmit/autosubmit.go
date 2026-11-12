@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/KaaS-team/factory/internal/gitx"
 	"os/exec"
 	"strings"
 
@@ -108,17 +109,18 @@ type Submitter struct {
 // partial. It returns ErrNothing when the worktree has no change against the base.
 func (s *Submitter) Submit(ctx context.Context, e Exit) (string, error) {
 	b := e.Brief
-	git := func(args ...string) error {
+	gitOut := func(_ context.Context, args ...string) (string, error) {
 		cmd := exec.CommandContext(ctx, "git", append([]string{"-c", "user.name=factory", "-c", "user.email=factory@localhost"}, args...)...)
 		cmd.Dir = e.Dir
-		var out bytes.Buffer
-		cmd.Stdout, cmd.Stderr = &out, &out
+		var out, errb bytes.Buffer
+		cmd.Stdout, cmd.Stderr = &out, &errb
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("autosubmit: git %s: %w: %s", args[0], err, strings.TrimSpace(out.String()))
+			return "", fmt.Errorf("autosubmit: git %s: %w: %s", args[0], err, strings.TrimSpace(errb.String()))
 		}
-		return nil
+		return out.String(), nil
 	}
-	if err := git("add", "-A"); err != nil {
+	git := func(args ...string) error { _, err := gitOut(ctx, args...); return err }
+	if err := gitx.StageAll(ctx, gitOut); err != nil {
 		return "", err
 	}
 	if exec.CommandContext(ctx, "git", "-C", e.Dir, "diff", "--cached", "--quiet").Run() != nil { // staged work exists

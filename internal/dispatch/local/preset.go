@@ -35,14 +35,14 @@ var readOnlyBash = []string{
 	"cat *", "ls *", "grep *", "find *", "mkdir -p *", "echo *", "head *", "tail *", "wc *", "diff *", "pwd",
 }
 
-var buildExtra = []string{
-	"Edit(**)", "Bash(git add *)", "Bash(git commit *)", "Bash(git rm *)",
-	"Bash(.factory/gates.sh*)", "Bash(bash .factory/gates.sh*)",
+var buildExtra = []Rule{
+	{"edit", "**", "allow"}, {"bash", "git add *", "allow"}, {"bash", "git commit *", "allow"}, {"bash", "git rm *", "allow"},
+	{"bash", ".factory/gates.sh*", "allow"}, {"bash", "bash .factory/gates.sh*", "allow"},
 }
 
-var verifyExtra = []string{
-	"Bash(git stash *)", "Bash(git checkout *)", "Bash(git restore *)",
-	"Bash(.factory/mutate.sh *)", "Bash(bash .factory/mutate.sh *)",
+var verifyExtra = []Rule{
+	{"bash", "git stash *", "allow"}, {"bash", "git checkout *", "allow"}, {"bash", "git restore *", "allow"},
+	{"bash", ".factory/mutate.sh *", "allow"}, {"bash", "bash .factory/mutate.sh *", "allow"},
 }
 
 // The stages that only classify or fill a template run on a small model at low effort.
@@ -82,10 +82,10 @@ type ClaudeInput struct {
 	ReadOnly bool
 }
 
-func bashRules(patterns []string) []string {
-	out := make([]string, 0, len(patterns))
+func bashRules(patterns []string) []Rule {
+	out := make([]Rule, 0, len(patterns))
 	for _, p := range patterns {
-		out = append(out, "Bash("+p+")")
+		out = append(out, Rule{"bash", p, "allow"})
 	}
 	return out
 }
@@ -101,11 +101,13 @@ func readOnlyPatterns(patterns []string) []string {
 	return out
 }
 
-func allowRules(stage, issue string, c Commands, readOnly bool) []string {
+// stageRules is the ordered ruleset of a stage: nothing is allowed unless a rule says so. A
+// read-only run gets only the read commands that pass the plan-mode prefilter.
+func stageRules(stage, issue string, c Commands, readOnly bool) []Rule {
 	if readOnly {
 		return append(bashRules(readOnlyPatterns(readOnlyBash)), bashRules(readOnlyPatterns(safeCommands(c.Read)))...)
 	}
-	rules := []string{"Edit(.factory/runs/issue-" + issue + "/**)"}
+	rules := []Rule{{"edit", ".factory/runs/issue-" + issue + "/**", "allow"}}
 	rules = append(rules, bashRules(readOnlyBash)...)
 	rules = append(rules, bashRules(safeCommands(c.Read))...)
 	switch stage {
@@ -117,6 +119,18 @@ func allowRules(stage, issue string, c Commands, readOnly bool) []string {
 		rules = append(rules, bashRules(safeCommands(c.Verify))...)
 	}
 	return rules
+}
+
+// allowRules renders the rules the unattended settle allows as Claude permission strings.
+func allowRules(stage, issue string, c Commands, readOnly bool) []string {
+	rules := stageRules(stage, issue, c, readOnly)
+	out := make([]string, 0, len(rules))
+	for _, r := range rules {
+		if Settle(r.Action, []string{r.Resource}, rules, nil) == "allow" {
+			out = append(out, strings.ToUpper(r.Action[:1])+r.Action[1:]+"("+r.Resource+")")
+		}
+	}
+	return out
 }
 
 // jsJSON is JSON.stringify: compact and without HTML escaping.
