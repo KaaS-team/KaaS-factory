@@ -8,7 +8,7 @@ Plans work into tickets and runs them on parallel coding-agent sessions (cloud r
 
 ## Stack
 
-Go (go.mod `go 1.25.0`; set `GOTOOLCHAIN=auto` if yours is older), cobra, `just`, golangci-lint
+Go (go.mod `go 1.26.0`, which modernc sqlite needs; set `GOTOOLCHAIN=auto` if yours is older), cobra, `just`, golangci-lint
 v2.13.2, `CGO_ENABLED=0`.
 
 ## Commands
