@@ -8,23 +8,25 @@ import (
 // KeyInfo describes one config key for generated documentation.
 type KeyInfo struct {
 	Key     string // key path such as "budgets.node"
-	Type    string // string, int, number, duration, list, bool or risk
+	Type    string // string, int, number, duration, list, bool, risk or role
 	Default string // the builtin value as text
 	Rule    string // what the org layer lets lower layers do with the key
 }
 
 var kindNames = map[kind]string{
 	kString: "string", kInt: "int", kFloat: "number", kDuration: "duration",
-	kList: "list", kBool: "bool", kRisk: "risk",
+	kList: "list", kBool: "bool", kRisk: "risk", kRole: "role",
 }
 
 var ceilRules = map[ceiling]string{
-	ceilNone:   "any layer may set it",
-	ceilMax:    "org value is a cap; lower layers may lower it, never raise it",
-	ceilSubset: "org value is an allow-list; lower layers may only remove entries",
-	ceilRisk:   "lower layers may pick a risk at or below the org's",
-	ceilFalse:  "when the org sets false, lower layers cannot set true",
-	ceilTrue:   "when the org sets true, lower layers cannot set false",
+	ceilNone:      "any layer may set it",
+	ceilMax:       "org value is a cap; lower layers may lower it, never raise it",
+	ceilSubset:    "org value is an allow-list; lower layers may only remove entries",
+	ceilRisk:      "lower layers may pick a risk at or below the org's",
+	ceilFalse:     "when the org sets false, lower layers cannot set true",
+	ceilTrue:      "when the org sets true, lower layers cannot set false",
+	ceilForceTrue: "when the org sets true the value is true; lower layers cannot turn it off",
+	ceilFloor:     "the org value is a floor; lower layers may only pick a role at or above it",
 }
 
 // Describe lists every fixed key with its type, builtin default and org ceiling rule, in table order.

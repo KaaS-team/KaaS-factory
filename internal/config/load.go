@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -36,9 +37,10 @@ type layerValues map[string]any
 
 // Loaded is the result of Load: the resolved Config and what each layer set.
 type Loaded struct {
-	Config Config
-	layers map[Layer]layerValues
-	names  map[Layer]string
+	Config  Config
+	layers  map[Layer]layerValues
+	names   map[Layer]string
+	clamped map[string]bool // keys whose resolved value came from the org layer's clamp
 }
 
 // RegisterFlags adds one flag per fixed key, named by its key path, to fs. Models tiers are set
@@ -56,7 +58,7 @@ func RegisterFlags(fs *pflag.FlagSet) {
 
 // Load resolves the layers into a Config.
 func Load(s Sources) (*Loaded, error) {
-	l := &Loaded{layers: map[Layer]layerValues{}, names: map[Layer]string{}}
+	l := &Loaded{layers: map[Layer]layerValues{}, names: map[Layer]string{}, clamped: map[string]bool{}}
 	l.layers[LayerBuiltin] = builtin()
 	files := []struct {
 		layer Layer
@@ -109,6 +111,7 @@ func Load(s Sources) (*Loaded, error) {
 		return nil, err
 	}
 	l.resolve()
+	l.clamp()
 	return l, nil
 }
 
@@ -210,6 +213,30 @@ func (l *Loaded) resolve() {
 	for _, layer := range Layers() {
 		for key, v := range l.layers[layer] {
 			l.Config.put(key, v)
+		}
+	}
+}
+
+// clamp applies the org value of the keys whose ceiling resolves instead of failing: shadow stays
+// on when the org turned it on, and trust.min_role never drops below the org's role.
+func (l *Loaded) clamp() {
+	for _, sp := range specs {
+		orgVal, ok := l.layers[LayerOrg][sp.key]
+		if !ok {
+			continue
+		}
+		cur, _ := l.Config.Get(sp.key)
+		switch sp.ceil {
+		case ceilForceTrue:
+			if orgVal == true && cur != true {
+				l.Config.put(sp.key, true)
+				l.clamped[sp.key] = true
+			}
+		case ceilFloor:
+			if slices.Index(roles, cur.(string)) < slices.Index(roles, orgVal.(string)) {
+				l.Config.put(sp.key, orgVal)
+				l.clamped[sp.key] = true
+			}
 		}
 	}
 }

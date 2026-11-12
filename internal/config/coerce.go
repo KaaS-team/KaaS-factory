@@ -58,6 +58,12 @@ func coerce(sp spec, raw any) (any, error) {
 			}
 		}
 		return nil, fmt.Errorf("expected true or false, got %v", raw)
+	case kRole:
+		s, _ := raw.(string)
+		if !slices.Contains(roles, s) {
+			return nil, fmt.Errorf("expected one of %s, got %v", strings.Join(roles, ", "), raw)
+		}
+		return s, nil
 	case kRisk:
 		s, _ := raw.(string)
 		if !slices.Contains(risks, s) {

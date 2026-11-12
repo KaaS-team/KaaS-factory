@@ -33,18 +33,21 @@ const (
 	kList
 	kBool
 	kRisk
+	kRole
 )
 
 // ceiling is how an org value bounds the layers below it.
 type ceiling int
 
 const (
-	ceilNone   ceiling = iota
-	ceilMax            // a lower layer may lower the number, never raise it
-	ceilSubset         // a lower layer may only remove entries from the list
-	ceilRisk           // a lower layer may only pick a risk at or below the org's
-	ceilFalse          // when the org sets false, a lower layer cannot set true
-	ceilTrue           // when the org sets true, a lower layer cannot set false
+	ceilNone      ceiling = iota
+	ceilMax               // a lower layer may lower the number, never raise it
+	ceilSubset            // a lower layer may only remove entries from the list
+	ceilRisk              // a lower layer may only pick a risk at or below the org's
+	ceilFalse             // when the org sets false, a lower layer cannot set true
+	ceilTrue              // when the org sets true, a lower layer cannot set false
+	ceilForceTrue         // when the org sets true the value is true, whatever a lower layer sets
+	ceilFloor             // the value is never below the org's role; a lower layer may only raise it
 )
 
 // spec describes one config key: its type, its bound, its minimum and its builtin value.
@@ -57,6 +60,9 @@ type spec struct {
 }
 
 var risks = []string{"low", "medium", "high"}
+
+// roles lists the repository roles from least to most access.
+var roles = []string{"read", "triage", "write", "maintain", "admin"}
 
 // specs is the one table of keys. Keys under "models." are open: any tier name is a string.
 var specs = []spec{
@@ -87,6 +93,9 @@ var specs = []spec{
 	{key: "auto_merge", kind: kBool, ceil: ceilFalse, def: false},
 	{key: "auto_merge_max_risk", kind: kRisk, ceil: ceilRisk, def: "low"},
 	{key: "requester_cannot_approve", kind: kBool, ceil: ceilTrue, def: true},
+	{key: "shadow", kind: kBool, ceil: ceilForceTrue, def: false},
+	{key: "trust.min_role", kind: kRole, ceil: ceilFloor, def: "write"},
+	{key: "trust.allow", kind: kList, def: []string{}},
 }
 
 // foreign lists the top-level keys of the factory-config org and team files that this package

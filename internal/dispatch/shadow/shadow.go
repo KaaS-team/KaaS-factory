@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/config"
 )
 
 // Action names what a record stands for.
@@ -93,4 +94,12 @@ func (d *dispatcher) record(a Action, s api.Session, msg string) error {
 		return fmt.Errorf("shadow: record %s: %w", a, err)
 	}
 	return nil
+}
+
+// Wrap returns the shadow dispatcher over d, recording to w, when cfg.Shadow is on, and d itself otherwise.
+func Wrap(d api.Dispatcher, cfg config.Config, w Writer) api.Dispatcher {
+	if !cfg.Shadow {
+		return d
+	}
+	return New(d, w)
 }

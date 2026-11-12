@@ -39,6 +39,9 @@ func (l *Loaded) Explain(key string) (Explanation, error) {
 			ex.Overrode = append(ex.Overrode, a.Layer)
 		}
 	}
+	if l.clamped[key] {
+		ex.Winner = LayerOrg
+	}
 	return ex, nil
 }
 

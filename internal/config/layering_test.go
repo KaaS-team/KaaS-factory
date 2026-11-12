@@ -14,6 +14,7 @@ type layerRow struct {
 	key, hi, lo string // YAML scalar or flow list forms
 	wantHi      string // fmt.Sprint of the typed value; empty means the same as hi
 	wantLo      string
+	clamped     bool // the org layer clamps this key, so a layer directly above it does not win over it
 }
 
 var layerRows = []layerRow{
@@ -45,6 +46,9 @@ var layerRows = []layerRow{
 	{key: "auto_merge", hi: "true", lo: "false"},
 	{key: "auto_merge_max_risk", hi: "high", lo: "medium"},
 	{key: "requester_cannot_approve", hi: "false", lo: "true"},
+	{key: "shadow", hi: "true", lo: "false", clamped: true},
+	{key: "trust.min_role", hi: "maintain", lo: "triage", clamped: true},
+	{key: "trust.allow", hi: "[alice, bob]", lo: "[alice]", wantHi: "[alice bob]", wantLo: "[alice]"},
 }
 
 func yamlFor(key, val string) []byte {
@@ -108,6 +112,9 @@ func TestLayering_EachLayerWinsOverTheOneBelow(t *testing.T) {
 		}
 		for i, l := range order {
 			t.Run(fmt.Sprintf("%s/%s", row.key, l), func(t *testing.T) {
+				if row.clamped && i == 1 {
+					t.Skip("org clamps this key; see TestShadowTrust_LayerTable")
+				}
 				var s Sources
 				if i > 0 {
 					set(t, &s, order[i-1], row.key, row.hi)

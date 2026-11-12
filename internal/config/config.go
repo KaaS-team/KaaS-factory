@@ -17,6 +17,12 @@ type Budgets struct {
 	Month   float64 `key:"month"`
 }
 
+// Trust says who may run /factory chatops: logins in Allow, and anyone whose role is at least MinRole.
+type Trust struct {
+	MinRole string   `key:"min_role"`
+	Allow   []string `key:"allow"`
+}
+
 // Config is the resolved runner configuration. The key tags are the paths used in
 // .factory/factory.yaml, in FACTORY_* variable names and in flag names.
 type Config struct {
@@ -45,6 +51,8 @@ type Config struct {
 	AutoMerge              bool              `key:"auto_merge"`
 	AutoMergeMaxRisk       string            `key:"auto_merge_max_risk"`
 	RequesterCannotApprove bool              `key:"requester_cannot_approve"`
+	Shadow                 bool              `key:"shadow"`
+	Trust                  Trust             `key:"trust"`
 }
 
 // field finds the struct field a key path names. For "models.<tier>" it returns the map and the tier.
