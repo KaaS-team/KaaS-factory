@@ -5,74 +5,32 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/api/porttest"
 	factorymcp "github.com/KaaS-team/factory/internal/mcp"
 )
 
-// fakeControl is a Control that records mutating calls (Symphony §8 operator actions).
-type fakeControl struct {
-	mu    sync.Mutex
-	calls []string
-	board api.Board
-	evs   []api.Event
-}
-
-func (f *fakeControl) rec(s string, id api.TicketID) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls = append(f.calls, s+":"+string(id))
-}
-func (f *fakeControl) Board(context.Context) (api.Board, error) { return f.board, nil }
-func (f *fakeControl) Dispatch(_ context.Context, id api.TicketID) error {
-	f.rec("dispatch", id)
-	return nil
-}
-func (f *fakeControl) Steer(_ context.Context, id api.TicketID, m string) error {
-	f.rec("steer", id)
-	return nil
-}
-func (f *fakeControl) Cancel(_ context.Context, id api.TicketID) error {
-	f.rec("cancel", id)
-	return nil
-}
-func (f *fakeControl) Retry(_ context.Context, id api.TicketID) error {
-	f.rec("retry", id)
-	return nil
-}
-func (f *fakeControl) Events(context.Context) (<-chan api.Event, error) {
-	ch := make(chan api.Event, len(f.evs))
-	for _, e := range f.evs {
-		ch <- e
-	}
-	close(ch)
-	return ch, nil
-}
-
-func newFake() *fakeControl {
+func newFake() *porttest.Control {
 	t7 := api.Ticket{ID: "7", Repo: "o/r", Title: "seven", CreatedAt: time.Unix(0, 0).UTC()}
 	t8 := api.Ticket{ID: "8", Repo: "o/r", Title: "eight", CreatedAt: time.Unix(0, 0).UTC()}
-	return &fakeControl{
-		board: api.Board{
-			Slots: []api.Slot{{
-				Ticket: t7, Phase: api.PhaseRunning,
-				Usage:  api.Usage{InputTokens: 12345, CostUSD: 9.99},
-				Budget: api.Budget{Tokens: 777777, USD: 5},
-			}},
-			Ready:      []api.Ticket{t8},
-			MergeQueue: []api.TicketID{"7"},
-			FiresLeft:  3,
-		},
-		evs: []api.Event{
-			{V: 1, Kind: "dispatched", Ticket: "7", Data: map[string]any{"model": "secret-model", "tokens": 5}},
-			{V: 1, Kind: "dispatched", Ticket: "8"},
-		},
-	}
+	f := porttest.NewControl(api.Board{
+		Slots: []api.Slot{{
+			Ticket: t7, Phase: api.PhaseRunning,
+			Usage:  api.Usage{InputTokens: 12345, CostUSD: 9.99},
+			Budget: api.Budget{Tokens: 777777, USD: 5},
+		}},
+		Ready:      []api.Ticket{t8},
+		MergeQueue: []api.TicketID{"7"},
+		FiresLeft:  3,
+	})
+	f.Seed("7", api.Event{V: 1, Time: time.Unix(10, 0).UTC(), Kind: "dispatched", Ticket: "7", Data: map[string]any{"model": "secret-model", "tokens": 5}})
+	f.Seed("7", api.Event{V: 1, Time: time.Unix(20, 0).UTC(), Kind: "pushed", Ticket: "7"})
+	return f
 }
 
 func connect(t *testing.T, ctl api.Control, h factorymcp.Handlers) *sdk.ClientSession {
@@ -184,9 +142,9 @@ func TestMutatingToolsReachControlOnce(t *testing.T) {
 			t.Fatalf("%s: err=%v r=%+v", n, err, r)
 		}
 	}
-	want := []string{"dispatch:7", "steer:7", "cancel:7", "retry:7"}
-	if strings.Join(f.calls, ",") != strings.Join(want, ",") {
-		t.Errorf("calls = %v", f.calls)
+	want := []string{"dispatch 7", "steer 7: hi", "cancel 7", "retry 7"}
+	if got := f.Calls(); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("calls = %v", got)
 	}
 }
 
@@ -225,8 +183,9 @@ func TestResources(t *testing.T) {
 			Kind   string
 			Ticket string
 		} `json:"events"`
+		HistoryAvailable bool `json:"history_available"`
 	}
-	if err := json.Unmarshal([]byte(r.Contents[0].Text), &tk); err != nil || tk.Ticket.ID != "7" || len(tk.Events) != 1 || tk.Events[0].Ticket != "7" {
+	if err := json.Unmarshal([]byte(r.Contents[0].Text), &tk); err != nil || tk.Ticket.ID != "7" || len(tk.Events) != 2 || tk.Events[0].Ticket != "7" || !tk.HistoryAvailable {
 		t.Errorf("ticket: %v %s", err, r.Contents[0].Text)
 	}
 	if _, err := cs.ReadResource(t.Context(), &sdk.ReadResourceParams{URI: "factory://ticket/99"}); err == nil {
@@ -270,5 +229,103 @@ func TestCommandWithoutControlFails(t *testing.T) {
 	cmd.SetArgs(nil)
 	if err := cmd.ExecuteContext(t.Context()); err == nil || !strings.Contains(err.Error(), "no control plane") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+type ticketRes struct {
+	Ticket api.Ticket `json:"ticket"`
+	Events []struct {
+		Kind string `json:"kind"`
+	} `json:"events"`
+	HistoryAvailable bool   `json:"history_available"`
+	HistoryNote      string `json:"history_note"`
+}
+
+func readTicket(t *testing.T, cs *sdk.ClientSession, id string) ticketRes {
+	t.Helper()
+	r, err := cs.ReadResource(t.Context(), &sdk.ReadResourceParams{URI: "factory://ticket/" + id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tk ticketRes
+	if err := json.Unmarshal([]byte(r.Contents[0].Text), &tk); err != nil {
+		t.Fatal(err)
+	}
+	return tk
+}
+
+func TestTicketResourceHistory(t *testing.T) {
+	tests := []struct {
+		name      string
+		ctl       func(*porttest.Control) api.Control
+		wantKinds []string
+		available bool
+	}{
+		{"with Historian", func(f *porttest.Control) api.Control { return f }, []string{"dispatched", "pushed"}, true},
+		{"without Historian", func(f *porttest.Control) api.Control { return f.ControlOnly() }, []string{}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFake()
+			cs := connect(t, tc.ctl(f), factorymcp.Handlers{})
+			tk := readTicket(t, cs, "7")
+			var kinds []string = []string{}
+			for _, e := range tk.Events {
+				kinds = append(kinds, e.Kind)
+			}
+			if strings.Join(kinds, ",") != strings.Join(tc.wantKinds, ",") {
+				t.Errorf("events = %v, want %v", kinds, tc.wantKinds)
+			}
+			if tk.HistoryAvailable != tc.available {
+				t.Errorf("history_available = %v", tk.HistoryAvailable)
+			}
+			if !tc.available && !strings.Contains(tk.HistoryNote, "history is unavailable") {
+				t.Errorf("note = %q", tk.HistoryNote)
+			}
+			if tk.Ticket.ID != "7" {
+				t.Errorf("ticket = %+v", tk.Ticket)
+			}
+		})
+	}
+}
+
+func TestStatusForOneTicketIncludesHistory(t *testing.T) {
+	f := newFake()
+	cs := connect(t, f, factorymcp.Handlers{})
+	r, err := cs.CallTool(t.Context(), &sdk.CallToolParams{Name: "status", Arguments: map[string]any{"ticket": "7"}})
+	if err != nil || r.IsError {
+		t.Fatalf("err=%v r=%+v", err, r)
+	}
+	var out struct {
+		Slots  []any `json:"slots"`
+		Detail *ticketRes
+	}
+	raw, _ := json.Marshal(r.StructuredContent)
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Detail == nil || len(out.Detail.Events) != 2 || !out.Detail.HistoryAvailable || len(out.Slots) != 1 {
+		t.Fatalf("status = %s", raw)
+	}
+	if m := leak.FindString(string(raw)); m != "" {
+		t.Errorf("status leaks %q: %s", m, raw)
+	}
+	// Without a ticket the board alone comes back.
+	r, _ = cs.CallTool(t.Context(), &sdk.CallToolParams{Name: "status", Arguments: map[string]any{}})
+	raw, _ = json.Marshal(r.StructuredContent)
+	if strings.Contains(string(raw), "history") {
+		t.Errorf("board status carries history: %s", raw)
+	}
+	// An unknown ticket is a tool error.
+	r, err = cs.CallTool(t.Context(), &sdk.CallToolParams{Name: "status", Arguments: map[string]any{"ticket": "99"}})
+	if err != nil || !r.IsError {
+		t.Errorf("unknown ticket: err=%v r=%+v", err, r)
+	}
+	// A Control without Historian still answers and says so.
+	cs2 := connect(t, newFake().ControlOnly(), factorymcp.Handlers{})
+	r, _ = cs2.CallTool(t.Context(), &sdk.CallToolParams{Name: "status", Arguments: map[string]any{"ticket": "7"}})
+	raw, _ = json.Marshal(r.StructuredContent)
+	if !strings.Contains(string(raw), "history is unavailable") {
+		t.Errorf("no unavailable note: %s", raw)
 	}
 }
