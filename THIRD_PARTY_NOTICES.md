@@ -308,3 +308,9 @@ Source: https://github.com/openai/openai-agents-python (MIT, Copyright (c) 2025 
 Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangChain, Inc.). Only the checkpoint-sqlite table layout was used, ported to Go.
 
 - `internal/graph/checkpoint/checkpoint.go` from `libs/checkpoint-sqlite/langgraph/checkpoint/sqlite/__init__.py` [tested by `internal/graph/checkpoint/checkpoint_test.go`]
+
+## langchain-ai/langgraph@a054ed0
+
+Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangChain, Inc.). Design and constants only, ported from Python to Go.
+
+- `internal/graph/interrupt/interrupt.go` from `libs/langgraph/langgraph/types.py` (Interrupt, interrupt) [tested by `internal/graph/interrupt/interrupt_test.go`]

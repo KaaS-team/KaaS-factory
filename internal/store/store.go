@@ -18,6 +18,7 @@ import (
 	_ "modernc.org/sqlite" // pure Go driver, registers "sqlite"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/graph/interrupt"
 	"github.com/KaaS-team/factory/internal/observe"
 )
 
@@ -63,6 +64,9 @@ func Open(path string) (*Store, error) {
 	}
 	return &Store{db: db}, nil
 }
+
+// Interrupts returns the durable interrupt book kept in this database.
+func (s *Store) Interrupts() (*interrupt.Book, error) { return interrupt.Open(s.db) }
 
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
