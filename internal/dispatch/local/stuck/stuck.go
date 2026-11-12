@@ -37,6 +37,7 @@ const (
 	Monologue         Pattern = "monologue"
 	Alternating       Pattern = "alternating"
 	Compaction        Pattern = "compaction"
+	ErrorRun          Pattern = "error-run"
 )
 
 // Kind is what the caller should do.
@@ -268,6 +269,8 @@ func (g *Guard) pattern(evs, acts, obs []event) Pattern {
 		return Alternating
 	case len(evs) >= 10 && g.compaction(evs):
 		return Compaction
+	case g.errorRun(evs):
+		return ErrorRun
 	}
 	return ""
 }
@@ -386,4 +389,32 @@ func (g *Guard) compaction(evs []event) bool {
 		n++
 	}
 	return n >= g.th.Monologue
+}
+
+// errorWindow is how many of the newest observations the error run looks at.
+const errorWindow = 8
+
+// errorRun is the newest observation being an error, with at least ActionError errors among the
+// last errorWindow observations that came from more than one distinct call. One repeated call
+// belongs to scenario 2. Ported from go/k9-stall internal/dispatch/stall/stall.go, which counted
+// errors whatever the calls were.
+func (g *Guard) errorRun(evs []event) bool {
+	_, obs := collect(evs, errorWindow)
+	if len(obs) == 0 || obs[0].kind != kErr {
+		return false
+	}
+	calls := map[string]string{} // tool_use_id to the call's name and arguments
+	for _, e := range evs {
+		if e.kind == kAction {
+			calls[e.toolID] = e.name + "\x00" + e.content
+		}
+	}
+	n, distinct := 0, map[string]bool{}
+	for _, o := range obs {
+		if o.kind == kErr {
+			n++
+			distinct[calls[o.toolID]] = true
+		}
+	}
+	return n >= g.th.ActionError && len(distinct) > 1
 }

@@ -168,6 +168,7 @@ this commit. The files below are ported to Go and changed from the originals.
 Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trigger.dev)
 
 - `internal/pick/fair.go` from `packages/redis-worker/src/fair-queue/schedulers/drr.ts` (algorithm only, in process, no Redis or Lua) [tested by `internal/pick/fair_test.go`]
+- `internal/serve/jitter.go` from `internal-packages/schedule-engine/src/engine/distributedScheduling.ts` [tested by `internal/serve/jitter_test.go`]
 
 ## SWE-bench/SWE-bench@02e7a74
 

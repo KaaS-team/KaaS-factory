@@ -2,7 +2,7 @@
 // and SQLite) that the conformance suite in internal/store/conformance runs against.
 //
 // Design follows langgraph's EncryptedSerializer: a row's Type is tagged "<type>+aesgcm" when the
-// payload is encrypted, so rows written before a key was configured still load.
+// payload is encrypted. With a key configured an untagged row is refused, not read as plaintext.
 package crypt
 
 import (
@@ -70,8 +70,8 @@ func LoadKey(path string) ([]byte, error) {
 	return b, nil
 }
 
-// Encrypted is a Store that encrypts Data on Put and decrypts it on read. Rows whose Type has no
-// CipherTag pass through unchanged, so plain rows still load.
+// Encrypted is a Store that encrypts Data on Put and decrypts it on read. A row whose Type has no
+// CipherTag is refused, so a row planted with write access to the database is never trusted.
 type Encrypted struct {
 	inner Store
 	aead  cipher.AEAD
@@ -108,8 +108,11 @@ func (e *Encrypted) Put(ctx context.Context, r Row) error {
 }
 
 func (e *Encrypted) open(r Row, ok bool, err error) (Row, bool, error) {
-	if err != nil || !ok || !strings.HasSuffix(r.Type, CipherTag) {
+	if err != nil || !ok {
 		return r, ok, err
+	}
+	if !strings.HasSuffix(r.Type, CipherTag) {
+		return Row{}, false, fmt.Errorf("row %s/%s is not encrypted but a key is configured; refusing it", r.Thread, r.ID)
 	}
 	n := e.aead.NonceSize()
 	if len(r.Data) < n {
