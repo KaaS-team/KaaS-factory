@@ -30,6 +30,7 @@ type stageRun struct {
 	fails   int
 	pr      int
 	history []tutor.Attempt
+	input   string // revise feedback for the next brief of this node
 }
 
 func (c *Core) stageOf(id api.TicketID, workflow string) (*stageRun, error) {
@@ -70,7 +71,6 @@ func (c *Core) stageBrief(b api.Brief) (api.Brief, error) {
 	}
 	st.tier = c.tierFor(st, n)
 	b.Attempt += st.base
-	b.Name = fmt.Sprintf("%s-a%d.md", b.Ticket, b.Attempt)
 	b.Branch = fmt.Sprintf("factory/%s-a%d", b.Ticket, b.Attempt)
 	b.Workflow, b.Node, b.Model = st.g.Name, n.ID, st.tier
 	if n.Budget > 0 {
@@ -83,6 +83,9 @@ func (c *Core) stageBrief(b api.Brief) (api.Brief, error) {
 			return b, err
 		}
 		b.Text = text
+	}
+	if st.input != "" {
+		b.Text += "\n\nRevision requested:\n" + st.input
 	}
 	return b, nil
 }
@@ -126,7 +129,33 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	}
 	st.node, st.base = next, st.base+e.Attempt
 	c.hub.emit(KindStage, id, map[string]any{"node": next, "after": n.ID, "outcome": string(outcome)})
+	if h, _ := st.g.Node(next); h.Kind == graph.KindHuman {
+		c.escalate(ctx, id, "plan approval")
+		c.stages[id] = st // escalate forgets the stage; approve and revise need it
+	}
 	return true, nil
+}
+
+// resume answers a ticket waiting at a human node: approve takes the pass edge, revise the revise edge
+// with text as the next brief's input. The ticket goes back to ready, so the loop dispatches the node.
+func (c *Core) resume(ctx context.Context, id api.TicketID, outcome graph.Outcome, text string) error {
+	st, ok := c.stages[id]
+	if !ok || !c.parked[id] {
+		return fmt.Errorf("ticket %s is not waiting on plan approval", id)
+	}
+	if h, _ := st.g.Node(st.node); h.Kind != graph.KindHuman {
+		return fmt.Errorf("ticket %s is not waiting on plan approval", id)
+	}
+	next, err := st.g.Next(st.node, outcome)
+	if err != nil {
+		return err
+	}
+	if err := c.d.Tracker.SetPhase(ctx, id, api.PhaseReady); err != nil {
+		return err
+	}
+	st.node, st.input = next, text
+	delete(c.parked, id)
+	return nil
 }
 
 func withPR(o api.Observation, pr int) api.Observation {

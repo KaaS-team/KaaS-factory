@@ -232,7 +232,7 @@ func acked(cs []Comment) map[int64]bool {
 	return out
 }
 
-// Commands returns the retry and cancel commands trusted humans wrote that the loop has not yet
+// Commands returns the retry, cancel, approve and revise commands trusted humans wrote that the loop has not yet
 // acknowledged, oldest first. A comment from anyone else, or one that only looks like a command
 // inside a marker, is ignored.
 func (t *Tracker) Commands(ctx context.Context, id api.TicketID) ([]observe.Command, error) {
@@ -264,6 +264,10 @@ func (t *Tracker) Commands(ctx context.Context, id api.TicketID) ([]observe.Comm
 			out = append(out, observe.Command{Verb: observe.VerbRetry, Ref: c.ID, Force: cmd.Force})
 		case CmdCancel:
 			out = append(out, observe.Command{Verb: observe.VerbCancel, Ref: c.ID})
+		case CmdApprove:
+			out = append(out, observe.Command{Verb: observe.VerbApprove, Ref: c.ID})
+		case CmdRevise:
+			out = append(out, observe.Command{Verb: observe.VerbRevise, Ref: c.ID, Text: cmd.Text})
 		}
 	}
 	return out, nil

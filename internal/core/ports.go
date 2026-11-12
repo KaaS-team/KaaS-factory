@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/dispatch/brief"
 )
 
 // The loop reaches the ports through these wrappers, so each decision the
@@ -23,9 +24,17 @@ func (l loopDispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session,
 			return api.Session{}, err
 		}
 	}
+	name, err := brief.Name(b.Ticket, b.Attempt)
+	if err != nil {
+		return api.Session{}, err
+	}
+	b.Name = name
 	s, err := l.c.d.Dispatcher.Dispatch(ctx, b)
 	if err != nil {
 		return s, err
+	}
+	if st := l.c.stages[b.Ticket]; st != nil {
+		st.input = "" // the feedback is delivered
 	}
 	l.c.sessions[b.Ticket] = s
 	l.c.attempts[b.Ticket] = max(l.c.attempts[b.Ticket], b.Attempt)

@@ -8,20 +8,23 @@ import (
 
 // The verbs the loop acts on. Other `/factory` verbs belong to the plan stage.
 const (
-	VerbRetry  = "retry"
-	VerbCancel = "cancel"
+	VerbRetry   = "retry"
+	VerbCancel  = "cancel"
+	VerbApprove = "approve"
+	VerbRevise  = "revise"
 )
 
 // Command is a trusted operator command found in a ticket's thread. Ref names the comment that
-// carries it, so the loop can acknowledge it exactly once.
+// carries it, so the loop can acknowledge it exactly once. Text is the feedback of a revise.
 type Command struct {
 	Verb  string
 	Ref   int64
 	Force bool
+	Text  string
 }
 
 // Commander is the optional Tracker read of operator commands (chatops). Commands returns the
-// unacknowledged retry and cancel commands from trusted authors, oldest first; Ack records that
+// unacknowledged retry, cancel, approve and revise commands from trusted authors, oldest first; Ack records that
 // one was handled so it is never returned again.
 type Commander interface {
 	Commands(ctx context.Context, id api.TicketID) ([]Command, error)
