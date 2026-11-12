@@ -114,6 +114,21 @@ func (b Body) Files() []string {
 	return out
 }
 
+// UsesFiles returns the backticked paths listed under "## Uses": the repo files the ticket reads.
+func (b Body) UsesFiles() []string {
+	s, ok := b.Section("Uses")
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, l := range strings.Split(s.Text(), "\n") {
+		if m := fileLine.FindStringSubmatch(l); m != nil {
+			out = append(out, m[1])
+		}
+	}
+	return out
+}
+
 // Acceptance returns the ids of the "- AC-n:" lines under "## Acceptance".
 func (b Body) Acceptance() []string {
 	s, ok := b.Section("Acceptance")

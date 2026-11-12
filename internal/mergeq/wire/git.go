@@ -23,7 +23,10 @@ type Git struct {
 	Branch string // "main" when empty
 }
 
-var _ mergeq.Git = Git{}
+var (
+	_ mergeq.Git     = Git{}
+	_ mergeq.Applier = Git{}
+)
 
 func (g Git) remote() string { return orDefault(g.Remote, "origin") }
 func (g Git) branch() string { return orDefault(g.Branch, "main") }
@@ -134,4 +137,31 @@ func short(sha string) string {
 		return sha[:7]
 	}
 	return sha
+}
+
+// Stale returns the paths where head conflicts with base, found with git merge-tree; none means head applies.
+func (g Git) Stale(ctx context.Context, base, head string) ([]string, error) {
+	for _, h := range []string{base, head} {
+		if err := g.fetch(ctx, h); err != nil {
+			return nil, err
+		}
+	}
+	out, code, err := g.git(ctx, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, head)
+	if code == 0 {
+		return nil, nil
+	}
+	if code != 1 {
+		return nil, err
+	}
+	var paths []string
+	for _, l := range strings.Split(out, "\n")[1:] { // the first line is the tree id
+		if l == "" {
+			break
+		}
+		paths = append(paths, l)
+	}
+	if len(paths) == 0 {
+		paths = []string{"(unknown)"}
+	}
+	return paths, nil
 }
