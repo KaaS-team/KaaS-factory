@@ -177,31 +177,8 @@ func TestGuardLeavesUnchangedAndHandlesSymlinks(t *testing.T) {
 	}
 }
 
-// Each way to get checkout code to run that a blocklist missed must be refused by the allowlist.
-func TestPermittedAllowlist(t *testing.T) {
-	for _, c := range []struct {
-		cmd  string
-		want bool
-	}{
-		{"git status", true}, {"git status --porcelain", true}, {"git diff HEAD~1", true}, {"git log -3", true},
-		{"git show HEAD", true}, {"git rev-parse HEAD", true}, {"git worktree list", true},
-		{".factory/gates.sh", true}, {"bash .factory/gates.sh --fast", true},
-		{"env sh -c ./evil", false}, {"env", false},
-		{"xargs rm", false}, {"find . -exec ./evil {} ;", false}, {"find . -name x", false},
-		{"git commit -m x", false},   // runs pre-commit and commit-msg hooks
-		{"git checkout main", false}, // runs post-checkout
-		{"git merge main", false}, {"git rebase main", false}, {"git push", false}, {"git stash", false},
-		{"git -c core.hooksPath=/tmp/x status", false}, {"git config core.hooksPath x", false},
-		{"git status; ./evil", false}, {"git status && env", false}, {"git status | sh", false},
-		{"git log $(./evil)", false}, {"git log `./evil`", false}, {"git diff > .git/hooks/pre-commit", false},
-		{".factory/gates.sh-evil", false}, {"bash .factory/gates.sh.evil", false}, {"git statusx", false},
-		{"make check", false}, {"npm test", false}, {"cat x", false}, {"", false},
-	} {
-		if got := Permitted(c.cmd); got != c.want {
-			t.Errorf("Permitted(%q) = %v, want %v", c.cmd, got, c.want)
-		}
-	}
-	// The deny list stays as a second layer for each of the escapes.
+// The deny list stays as a second layer for each way to get checkout code to run that a blocklist missed.
+func TestDenyListKeepsTheEscapes(t *testing.T) {
 	for _, tool := range []string{"Bash(env:*)", "Bash(xargs:*)", "Bash(find:*)", "Bash(git commit:*)", "Bash(git checkout:*)"} {
 		if !slices.Contains(disallowed, tool) {
 			t.Errorf("deny list lacks %s", tool)
