@@ -185,6 +185,8 @@ func TestPRBodySeparatesEnvironmentFromTestFailure(t *testing.T) {
 		{"environment failure", "Cannot allocate memory", nil, &red, []string{"environment failure (out_of_memory)"}, []string{"Tests failed"}},
 		{"ambiguous", "ModuleNotFoundError", nil, &red, []string{"possible environment failure (missing_module)", "Tests failed"}, nil},
 		{"tests failed, clean log", "--- FAIL: TestX", nil, &red, []string{"Tests failed"}, []string{"nvironment failure"}},
+		{"rate limit in a failing test name stays red", "=== RUN   TestRateLimit\nrate limit exceeded in fixture\n--- FAIL: TestRateLimit (0.00s)\nFAIL\nFAIL\texample.com/x\t0.01s", nil, &red, []string{"Tests failed"}, []string{"nvironment failure"}},
+		{"printed rate limit line in a red test log stays red", "--- FAIL: TestA\nrate limit exceeded\nFAIL", nil, &red, []string{"Tests failed"}, []string{"nvironment failure"}},
 		{"green", "ok", nil, &green, nil, []string{"Tests failed", "nvironment failure"}},
 		{"log unreadable is not an environment claim", "", errors.New("gone"), &red, []string{"Tests failed"}, []string{"nvironment failure"}},
 	}
