@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS spend (
   input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
   cache_read_tokens INTEGER NOT NULL, cache_write_tokens INTEGER NOT NULL,
   cost_usd REAL NOT NULL, wall_ns INTEGER NOT NULL, PRIMARY KEY (ticket, attempt));
-`
+` + reportSchema
 
 // Store is the cache. Open one per database file.
 type Store struct{ db *sql.DB }
@@ -91,7 +91,10 @@ ON CONFLICT (id) DO UPDATE SET repo=excluded.repo, title=excluded.title, body=ex
   priority=excluded.priority, workflow=excluded.workflow, created_at=excluded.created_at`,
 		string(t.ID), t.Repo, t.Title, t.Body, jsonOf(nonNil(t.Labels)), jsonOf(nonNil(t.Files)),
 		jsonOf(nonNilIDs(t.BlockedBy)), t.Priority, t.Workflow, t.CreatedAt.UnixNano(), string(api.PhaseReady))
-	return err
+	if err != nil {
+		return err
+	}
+	return s.putMeta(ctx, t)
 }
 
 func nonNil(s []string) []string {
@@ -216,6 +219,18 @@ func (s *Store) Rebuild(ctx context.Context, tr api.Tracker, ob api.Observer) er
 				return err
 			}
 		}
+		if th, ok := tr.(Threader); ok {
+			thread, err := th.Thread(ctx, t.ID)
+			if err != nil {
+				return fmt.Errorf("read thread of %s: %w", t.ID, err)
+			}
+			if thread.empty() {
+				continue // nothing happened yet: no row, as in the live store
+			}
+			if err := s.RecordThread(ctx, t.ID, thread); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -225,6 +240,7 @@ func (s *Store) Dump(ctx context.Context) ([]string, error) {
 	var out []string
 	for _, tb := range []struct{ name, order string }{
 		{"tickets", "id"}, {"sessions", "key"}, {"events", "ticket, attempt, kind"}, {"spend", "ticket, attempt"},
+		{"ticket_meta", "ticket"}, {"ticket_times", "ticket"}, {"ticket_touches", "ticket"},
 	} {
 		rows, err := s.db.QueryContext(ctx, "SELECT * FROM "+tb.name+" ORDER BY "+tb.order)
 		if err != nil {
