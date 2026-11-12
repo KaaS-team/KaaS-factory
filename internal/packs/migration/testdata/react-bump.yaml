@@ -1,0 +1,21 @@
+type: specs.factory/migration
+name: example.react.Bump18
+displayName: Bump react to 18
+description: Move a repository from react 17 to react 18.
+tags: [react, framework-bump]
+preconditions:
+  - dependency: {name: react, version: ">=17.0.0 <18.0.0"}
+steps:
+  - name: bump-dependency
+    run: [npm, install, "react@18"]
+  - name: update-render-calls
+    files:
+      - glob: "src/**/*.tsx"
+      - contains: 'ReactDOM\.render\('
+    prompt: Replace ReactDOM.render with createRoot in the listed files.
+  - name: update-tests
+    files:
+      - and:
+          - glob: "**/*.test.tsx"
+          - not: {contains: "createRoot"}
+    run: [npx, jest, "{files}"]
