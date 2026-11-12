@@ -1,0 +1,15 @@
+name: surfaces
+mission: Ship the cockpit and MCP surfaces.
+repos: [KaaS-team/factory-plane, KaaS-team/factory-mcp]
+source:
+  kind: github
+  ready: "label:factory:ready"
+roles:
+  build:
+    harness: claude-cloud
+    model: sonnet
+  qa:
+    tools: [playwright]
+policy:
+  auto_merge:
+    max_risk: low

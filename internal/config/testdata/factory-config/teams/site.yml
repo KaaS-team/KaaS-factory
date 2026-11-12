@@ -1,0 +1,13 @@
+name: site
+mission: Build the public site; it ships only on the owner's word.
+repos: [KaaS-team/kaas.team]
+source:
+  kind: plane
+  project: SITE
+roles:
+  build:
+    harness: claude-cloud
+    model: sonnet
+policy:
+  auto_merge:
+    allowed: false

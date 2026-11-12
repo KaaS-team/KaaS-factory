@@ -1,0 +1,11 @@
+name: kaas
+locked: [review, merge]
+policy:
+  risk_max: medium
+  auto_merge:
+    allowed: true
+    max_risk: low
+  models: [haiku, sonnet, opus]
+  approvals:
+    requester_cannot_approve: true
+  budget_usd_month: 200

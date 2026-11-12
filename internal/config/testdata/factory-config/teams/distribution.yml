@@ -1,0 +1,12 @@
+name: distribution
+mission: Make the factory installable everywhere.
+repos: [KaaS-team/factory-install, KaaS-team/homebrew-tap, KaaS-team/.github]
+source:
+  kind: github
+  ready: "label:factory:ready"
+roles:
+  build:
+    harness: claude-cloud
+    model: haiku
+policy:
+  protected_paths: [".github/workflows/**", "scripts/release*"]
