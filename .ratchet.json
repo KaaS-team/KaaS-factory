@@ -1,5 +1,5 @@
 {
-  "go_lines": 30680,
-  "deadcode": 233,
-  "reason": "raised by the reviewed merges of go/k7-otel-sampling and m3-packs-lock; lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 31275,
+  "deadcode": 243,
+  "reason": "raised by the reviewed merge of go/k6-price (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
