@@ -240,6 +240,18 @@ Turn a goal, epic or spec into a ticket DAG; --approve files it
 
 Show tickets ready to run and the merge queue
 
+## factory repomap
+
+`factory repomap [flags]`
+
+Print a ranked, token-budgeted symbol map of the repository for a context pack
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--budget` | int | `1024` | token budget of the map |
+| `--root` | string | `.` | repository root |
+| `--ticket` | string | `` | ticket text; files and identifiers it names seed the ranking |
+
 ## factory report
 
 `factory report [flags]`

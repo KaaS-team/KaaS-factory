@@ -126,3 +126,10 @@ Source: https://github.com/e2b-dev/E2B (Apache-2.0). Licence text: https://www.a
 Source: https://github.com/OpenHands/software-agent-sdk (MIT, Copyright (c) 2026 OpenHands contributors). The MIT permission notice above applies, with this copyright line in place of the one it carries.
 
 - `pkg/sandbox/egress/mask.go` from `openhands-sdk/openhands/sdk/conversation/secret_registry.py` (`StreamOutputMask`, `mask_secrets_in_output`) [tests ported in spirit from `tests/sdk/agent/test_stream_context.py`; fixtures in `pkg/sandbox/egress/mask_test.go`]
+## Aider-AI/aider@5dc9490
+
+Source: https://github.com/Aider-AI/aider (Apache-2.0, Copyright (c) Paul Gauthier). The ranking and budget search of `aider/repomap.py` are ported to Go; the tree-sitter `.scm` query files are not copied (they need CGO).
+
+- `internal/packs/repomap/tags.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+- `internal/packs/repomap/rank.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
+- `internal/packs/repomap/budget.go` from `aider/repomap.py` [tested by `internal/packs/repomap/repomap_test.go`]
