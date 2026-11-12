@@ -1,5 +1,5 @@
 {
-  "go_lines": 21418,
+  "go_lines": 21994,
   "deadcode": 68,
-  "reason": "raised by hand on 2026-11-12 to the merged size of next when the ratchet landed (built on an older next at 20499); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "reason": "raised to 21994 by the reviewed merge of go/k5-browsercheck-lean; lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
