@@ -21,6 +21,7 @@ import (
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/dispatch/local/input"
 	"github.com/KaaS-team/factory/internal/dispatch/local/stuck"
+	"github.com/KaaS-team/factory/internal/dispatch/untrusted"
 	"github.com/KaaS-team/factory/pkg/sandbox"
 	"github.com/jonboulle/clockwork"
 )
@@ -75,6 +76,12 @@ type Config struct {
 	CloseTimeout time.Duration
 	// Clock times the steer gate and the close wait; default the real clock.
 	Clock clockwork.Clock
+	// Untrusted returns the tools to deny for a brief whose pull request author lacks write
+	// access, or nil. A non-nil result is added to the argv's --disallowedTools, the Bash rules the
+	// settings allow are cut to the untrusted allowlist (the run must be in dontAsk mode, or
+	// Dispatch fails), and the files the agent CLI and git trust are restored while it runs and
+	// when it ends.
+	Untrusted func(context.Context, api.Brief) []string
 }
 
 type usageState struct {
@@ -219,6 +226,17 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	if err != nil {
 		return api.Session{}, err
 	}
+	var guard *untrusted.Guard
+	if d.cfg.Untrusted != nil {
+		if deny := d.cfg.Untrusted(ctx, b); len(deny) > 0 {
+			if argv, err = untrusted.Restrict(argv, deny); err != nil {
+				return api.Session{}, err
+			}
+			if guard, err = untrusted.Snapshot(dir); err != nil {
+				return api.Session{}, err
+			}
+		}
+	}
 
 	runCtx, cancel := context.WithCancel(d.ctx)
 	cmd, err := d.command(runCtx, argv, dir, childEnv(d.cfg.Environ, preset.Env))
@@ -254,14 +272,25 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	go func() { // ends when the process exits; the run context kills it
 		sc := bufio.NewScanner(out)
 		sc.Buffer(make([]byte, 0, 64<<10), 8<<20)
-		guard := stuck.New(stuck.DefaultThresholds)
-		var stuckErr error
+		loop := stuck.New(stuck.DefaultThresholds)
+		var stuckErr, restoreErr error
+		var lastRestore time.Time
+		restore := func() {
+			if _, rerr := guard.Restore(); rerr != nil && restoreErr == nil {
+				restoreErr = rerr
+			}
+		}
 		for sc.Scan() {
 			p.usage.feed(sc.Bytes())
+			// The agent CLI re-reads its settings while it runs, so put them back at most once a second.
+			if guard != nil && d.cfg.Clock.Since(lastRestore) >= time.Second {
+				lastRestore = d.cfg.Clock.Now()
+				restore()
+			}
 			if stuckErr != nil {
 				continue // drain until the kill lands
 			}
-			switch v := guard.Feed(sc.Bytes()); v.Kind {
+			switch v := loop.Feed(sc.Bytes()); v.Kind {
 			case stuck.Nudge:
 				_ = d.Steer(runCtx, session(p), v.Message) // unsupported today, so the nudge is not delivered
 			case stuck.Abort:
@@ -274,6 +303,12 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			p.err = stuckErr
 		}
 		_ = killGroup(cmd) // anything the agent left behind
+		if guard != nil {
+			restore()
+			if restoreErr != nil && p.err == nil {
+				p.err = fmt.Errorf("local: restore after untrusted session: %w", restoreErr)
+			}
+		}
 		p.end = d.cfg.Now()
 		cancel()
 		close(p.done)

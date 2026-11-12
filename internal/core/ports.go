@@ -18,6 +18,9 @@ func (l loopDispatcher) Name() string   { return l.c.d.Dispatcher.Name() }
 func (l loopDispatcher) Caps() api.Caps { return l.c.d.Dispatcher.Caps() }
 
 func (l loopDispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, error) {
+	if err := l.c.admit(ctx, b.Ticket); err != nil {
+		return api.Session{}, err
+	}
 	if l.c.d.Stages != nil {
 		var err error
 		if b, err = l.c.stageBrief(ctx, b); err != nil {

@@ -12,6 +12,7 @@ type Ticket struct {
 	Title      string
 	Body       Body
 	Files      []string
+	UsesFiles  []string // repo files the ticket reads; empty means load the default context
 	Depends    []string
 	Acceptance []string
 }
@@ -22,7 +23,7 @@ func NewTicket(id, title, body string) (Ticket, error) {
 	if err != nil {
 		return Ticket{}, err
 	}
-	return Ticket{ID: id, Title: title, Body: b, Files: b.Files(), Depends: b.Deps(), Acceptance: b.Acceptance()}, nil
+	return Ticket{ID: id, Title: title, Body: b, Files: b.Files(), UsesFiles: b.UsesFiles(), Depends: b.Deps(), Acceptance: b.Acceptance()}, nil
 }
 
 // Plan is a set of tickets whose Depends lines form a graph.
