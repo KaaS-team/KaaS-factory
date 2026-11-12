@@ -23,6 +23,8 @@ type Locks struct {
 	Merge func(a, b string) ([]string, error)
 	// Fair, when set, interleaves repos by deficit round robin and caps tickets per repo.
 	Fair *Fair
+	// Parked are tickets in the dead-letter park; Refill never picks them.
+	Parked map[api.TicketID]bool
 }
 
 // Rank returns a copy of ready ordered by priority (lower first), then oldest
@@ -128,6 +130,10 @@ func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, fi
 			break
 		}
 		if isRunning[t.ID] {
+			continue
+		}
+		if locks.Parked[t.ID] {
+			skips = append(skips, Skip{t.ID, "parked in DLQ"})
 			continue
 		}
 		if f := locks.Fair; f != nil && f.cap > 0 && perRepo[t.Repo] >= f.cap {
