@@ -9,7 +9,9 @@ STEPS="fmt vet lint test build ratchet"
 pin() { sed -n "s/^$1 := \"\\(.*\\)\"\$/\\1/p" justfile; }
 
 step_fmt() {
-	bad=$(gofmt -l $(git ls-files -co --exclude-standard '*.go'))
+	# The pinned toolchain's gofmt, the one golangci-lint formats with: a newer gofmt on PATH can disagree.
+	fmt="$(GOTOOLCHAIN=$(pin lint_go) go env GOROOT)/bin/gofmt"
+	bad=$("$fmt" -l $(git ls-files -co --exclude-standard '*.go'))
 	if [ -n "$bad" ]; then echo "gofmt needed:"; echo "$bad"; exit 1; fi
 }
 step_vet() { go vet ./...; }
