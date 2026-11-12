@@ -1,0 +1,11 @@
+# Use to get a review of a pull request or branch with no code change: findings go on the
+# thread and no PR opens.
+name: review-only
+agents:
+  triage: { tier: light, budget: { turns: 15, minutes: 10 } }
+  review: { tier: deep, budget: { turns: 40, minutes: 30 }, skills: [factory-verify] }
+  report: { tier: light, budget: { turns: 10, minutes: 5 }, skills: [factory-comment] }
+steps:
+  triage: { uses: triage, label: "factory:triaging", next: review }
+  review: { uses: agent, label: "factory:reviewing", next: report }
+  report: { uses: report, label: "factory:reporting" }

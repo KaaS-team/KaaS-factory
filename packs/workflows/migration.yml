@@ -1,0 +1,29 @@
+# Use to move a codebase from one system to another (a database, an API, a library) module by module:
+# the plan splits the work into up to three lanes, each lane builds its share in parallel, and the
+# join check runs the gate before a fresh session verifies the whole change.
+name: migration
+agents:
+  triage: { tier: light, budget: { turns: 15, minutes: 10 } }
+  plan: { tier: deep, budget: { turns: 40, minutes: 30 }, skills: [factory-plan, factory-architecture] }
+  build-lane-1: { tier: standard, budget: { turns: 60, minutes: 40 }, skills: [factory-build] }
+  build-lane-2: { tier: standard, budget: { turns: 60, minutes: 40 }, skills: [factory-build] }
+  build-lane-3: { tier: standard, budget: { turns: 60, minutes: 40 }, skills: [factory-build] }
+  join: { tier: none, budget: { turns: 0, minutes: 20 } }
+  verify: { tier: deep, budget: { turns: 40, minutes: 30 }, skills: [factory-verify] }
+  pr: { tier: light, budget: { turns: 10, minutes: 5 }, skills: [factory-pr] }
+steps:
+  triage: { uses: triage, label: "factory:triaging", next: plan }
+  plan:
+    uses: plan
+    label: "factory:planning"
+    next:
+      - { park: awaiting-approval, approve: split, revise: plan }
+  split:
+    uses: fanout
+    next: [{ to: build-lane-1 }, { to: build-lane-2 }, { to: build-lane-3 }]
+  build-lane-1: { uses: build, label: "factory:building-1", prompt: "Build lane 1: the first third of the modules in the plan.", next: join }
+  build-lane-2: { uses: build, label: "factory:building-2", prompt: "Build lane 2: the second third of the modules in the plan.", next: join }
+  build-lane-3: { uses: build, label: "factory:building-3", prompt: "Build lane 3: the last third of the modules in the plan.", next: join }
+  join: { uses: check, label: "factory:joining", run: ".factory/gates.sh", reject: plan, next: verify }
+  verify: { uses: verify, label: "factory:verifying", next: pr, reject: plan }
+  pr: { uses: pr, label: "factory:in-review", revise: plan }
