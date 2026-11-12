@@ -98,8 +98,6 @@ Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepl
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
 
-
-
 ## browser-use/browser-use@dfb6a73
 
 Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Gregor Zunic)
@@ -171,7 +169,6 @@ Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trig
 
 - `internal/pick/fair.go` from `packages/redis-worker/src/fair-queue/schedulers/drr.ts` (algorithm only, in process, no Redis or Lua) [tested by `internal/pick/fair_test.go`]
 
-
 ## SWE-bench/SWE-bench@02e7a74
 
 Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
@@ -225,3 +222,9 @@ The bracketed-paste framing, the SIGINT-then-kill close and the stability gate a
 Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technologies, Inc.). The licence text above applies; the notice is kept with the copied code.
 
 - `internal/serve/hostguard/hostguard.go` from `lib/httpapi/server.go` (parseAllowedHosts, parseAllowedOrigins, hostAuthorizationMiddleware; huma and chi dropped) [tested by `internal/serve/hostguard/hostguard_test.go`]
+
+## langfuse/langfuse@2e6d034
+
+Source: https://github.com/langfuse/langfuse (MIT, Copyright (c) 2023-2026 ClickHouse, Inc.; files outside `ee/` only)
+
+- `internal/observe/sampling/sampling.go` from `worker/src/features/evaluation/deterministicSampling.ts` (domain string changed) [tested by `internal/observe/sampling/sampling_test.go`]
