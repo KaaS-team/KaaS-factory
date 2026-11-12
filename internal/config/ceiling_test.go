@@ -43,6 +43,8 @@ func TestCeiling_OrgBoundsLowerLayers(t *testing.T) {
 		{"requester_cannot_approve", "true", "false", false},
 		{"requester_cannot_approve", "false", "true", true},
 		{"requester_cannot_approve", "true", "true", true},
+		{"sandbox", "true", "false", false},
+		{"sandbox", "false", "true", true},
 	}
 	for _, tc := range tests {
 		for _, l := range []Layer{LayerTeam, LayerRepo, LayerEnv, LayerFlags} {
