@@ -281,14 +281,3 @@ func parseSafeOutputs(v *yaml.Node) ([]WriteKind, error) {
 	}
 	return out, nil
 }
-
-// CanWrite reports whether the harness may do a write of kind k for the agent. A workflow with no
-// safe_outputs allows none.
-func (g *Graph) CanWrite(k WriteKind) bool {
-	for _, have := range g.SafeOutputs {
-		if have == k {
-			return true
-		}
-	}
-	return false
-}

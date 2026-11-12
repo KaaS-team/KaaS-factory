@@ -40,7 +40,7 @@ func TestLoadMarkdownEqualsYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(a, b) {
-		t.Errorf("graphs differ:\n--- md\n%s--- yaml\n%s", a.Describe(), b.Describe())
+		t.Errorf("graphs differ:\n--- md\n%s--- yaml\n%s", describe(a), describe(b))
 	}
 	// The body is the default prompt of every node without its own.
 	body := writeFile(t, dir, "body.md", "---\nname: flow\nnodes:\n"+equalSteps+"---\nWork on {{ticket.title}}.\n")
@@ -48,8 +48,8 @@ func TestLoadMarkdownEqualsYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(g.Nodes(), b.Nodes()) || !reflect.DeepEqual(g.Edges(), b.Edges()) || g.Start != b.Start {
-		t.Errorf("body changed the graph:\n%s", g.Describe())
+	if !reflect.DeepEqual(g.Nodes(), b.Nodes()) || !reflect.DeepEqual(g.edges, b.edges) || g.Start != b.Start {
+		t.Errorf("body changed the graph:\n%s", describe(g))
 	}
 	out, err := g.RenderPrompt("build", map[string]any{"ticket": map[string]any{"title": "crash"}})
 	if err != nil || out != "Work on crash." {
@@ -121,9 +121,6 @@ func TestLoadMarkdownSafeOutputs(t *testing.T) {
 		}
 		if len(g.SafeOutputs) != len(c.want) || (len(c.want) > 0 && !reflect.DeepEqual(g.SafeOutputs, c.want)) {
 			t.Errorf("%s: %v want %v", c.name, g.SafeOutputs, c.want)
-		}
-		if g.CanWrite(WritePR) != (len(c.want) == 3) {
-			t.Errorf("%s: CanWrite(pr) = %v", c.name, g.CanWrite(WritePR))
 		}
 	}
 }

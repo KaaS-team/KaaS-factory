@@ -104,7 +104,7 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	if n.Verify && o.ChecksGreen != nil && !*o.ChecksGreen {
 		outcome = graph.Fail
 	}
-	st.record(n, outcome)
+	st.record(n)
 	next, err := st.g.Next(st.node, outcome)
 	switch {
 	case errors.Is(err, graph.ErrNoEdge):
@@ -136,18 +136,9 @@ func withPR(o api.Observation, pr int) api.Observation {
 	return o
 }
 
-// record adds the finished node to the tutor's history: a build counts as an attempt, a verify judges the last one.
-func (st *stageRun) record(n graph.Node, outcome graph.Outcome) {
+// record adds the finished node to the tutor's history: each build counts as an attempt on its tier.
+func (st *stageRun) record(n graph.Node) {
 	if !n.Verify {
 		st.history = append(st.history, tutor.Attempt{Tier: st.tier})
-		return
-	}
-	if len(st.history) == 0 {
-		return
-	}
-	last := &st.history[len(st.history)-1]
-	last.ReviewedBy, last.Verdict = st.tier, tutor.Pass
-	if outcome == graph.Fail {
-		last.Verdict = tutor.Reject
 	}
 }
