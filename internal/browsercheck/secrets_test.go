@@ -100,7 +100,7 @@ func TestLoadSecrets(t *testing.T) {
 		t.Fatalf("got %+v, %v", s, err)
 	}
 	for name, body := range map[string]string{"no value": "a: {domain: x.com}\n", "not a map": "- a\n", "empty": "a: ''\n"} {
-		os.WriteFile(p, []byte(body), 0o600)
+		_ = os.WriteFile(p, []byte(body), 0o600)
 		if _, err := LoadSecrets(p); err == nil {
 			t.Errorf("%s: want an error", name)
 		}
