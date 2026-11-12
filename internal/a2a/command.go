@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/KaaS-team/factory/internal/serve/hostguard"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +60,7 @@ func NewCommand(open DepsFunc) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second}
+			srv := &http.Server{Addr: addr, Handler: hostguard.New(addr, os.Getenv)(h), ReadHeaderTimeout: 10 * time.Second}
 			go func() {
 				<-ctx.Done()
 				sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
