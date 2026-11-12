@@ -90,3 +90,11 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## SWE-bench/SWE-bench@02e7a74
+
+Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
+
+- `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
+- `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
+- `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)
