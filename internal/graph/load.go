@@ -18,7 +18,7 @@ var stepTypes = map[string]NodeKind{
 var stepKeys = map[string]bool{
 	"uses": true, "label": true, "next": true, "reject": true, "revise": true, "run": true, "runtime": true,
 	"mcp": true, "needs": true, "approval": true, "gates": true, "after": true, "fresh_session": true,
-	"verify": true, "prompt": true, "tier": true, "budget": true, "skills": true,
+	"verify": true, "prompt": true, "tier": true, "budget": true, "skills": true, "credentials": true,
 }
 
 // agentsDeprecated is the warning for the old top-level agents map, which is accepted for one more release.
@@ -41,6 +41,7 @@ type step struct {
 	FreshSession *bool     `yaml:"fresh_session"`
 	Verify       *bool     `yaml:"verify"`
 	Prompt       string    `yaml:"prompt"`
+	Credentials  []string  `yaml:"credentials"`
 }
 
 // Load reads a workflow file: .yml or .yaml is the steps format, .md is stages or a Symphony WORKFLOW.md.
@@ -90,7 +91,12 @@ func ParseYAML(name string, data []byte) (*Graph, error) {
 	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("workflow_front_matter_not_a_map: %s", name)
 	}
-	return build(name, root.Content[0], "steps", "", 0, validateTemplateAt)
+	g, err := build(name, root.Content[0], "steps", "", 0, validateTemplateAt)
+	if err != nil {
+		return nil, err
+	}
+	g.Hash = frontHash(&root, "")
+	return g, nil
 }
 
 // ParseMarkdown parses a .md workflow. Front matter with a stages key is the factory stages format;
@@ -197,7 +203,7 @@ func build(name string, m *yaml.Node, key, body string, lineOff int, check func(
 		}
 		for j := 0; j+1 < len(node.Content); j += 2 {
 			if k := node.Content[j].Value; !stepKeys[k] {
-				return nil, fmt.Errorf("%s: step %s: unknown key %q", g.Name, id, k)
+				return nil, fmt.Errorf("%s: step %s: unknown key %q%s", g.Name, id, k, suggest(k, stepKeys))
 			}
 		}
 		var s step
@@ -235,12 +241,25 @@ func build(name string, m *yaml.Node, key, body string, lineOff int, check func(
 	return g, nil
 }
 
+func suggestType(got string) string {
+	allowed := map[string]bool{}
+	for k := range stepTypes {
+		allowed[k] = true
+	}
+	return suggest(got, allowed)
+}
+
 func (g *Graph) addStep(s namedStep, md bool, check func(string, int) error) error {
 	kind, ok := stepTypes[s.Uses]
 	if !ok {
-		return fmt.Errorf("step %s: unknown step type %q", s.id, s.Uses)
+		return fmt.Errorf("step %s: unknown step type %q%s", s.id, s.Uses, suggestType(s.Uses))
 	}
-	n := Node{ID: s.id, Kind: kind, Uses: s.Uses, Label: s.Label, Run: s.Run, Runtime: s.Runtime, Gates: s.Gates, MCP: s.MCP, Prompt: s.Prompt,
+	if kind == KindAgent {
+		if err := checkNoWriteCredential("step "+s.id, s.Credentials); err != nil {
+			return err
+		}
+	}
+	n := Node{Credentials: s.Credentials, ID: s.id, Kind: kind, Uses: s.Uses, Label: s.Label, Run: s.Run, Runtime: s.Runtime, Gates: s.Gates, MCP: s.MCP, Prompt: s.Prompt,
 		Tier: s.tier, Budget: s.budget, Skills: s.skills}
 	if kind != KindAgent {
 		for _, k := range []string{"tier", "budget", "skills"} {
