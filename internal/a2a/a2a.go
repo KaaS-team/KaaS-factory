@@ -286,7 +286,6 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	e := &executor{deps: deps}
 	opts := []a2asrv.RequestHandlerOption{
 		a2asrv.WithTaskStore(liveStore{Store: taskstore.NewInMemory(nil), e: e}),
-		a2asrv.WithCapabilityChecks(&sdk.AgentCapabilities{Streaming: true}),
 	}
 	if deps.Audit != nil {
 		opts = append(opts, a2asrv.WithCallInterceptors(&auditor{sink: deps.Audit}))

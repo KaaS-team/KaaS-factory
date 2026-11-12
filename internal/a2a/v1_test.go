@@ -336,9 +336,13 @@ func TestLoadKeyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	pub, err := k.PublicKey.Bytes() // 0x04 || X || Y
+	if err != nil {
+		t.Fatal(err)
+	}
 	var set struct{ Keys []struct{ X string } }
 	_ = json.NewDecoder(resp.Body).Decode(&set)
-	if len(set.Keys) != 1 || set.Keys[0].X != base64.RawURLEncoding.EncodeToString(k.PublicKey.X.FillBytes(make([]byte, 32))) {
+	if len(set.Keys) != 1 || set.Keys[0].X != base64.RawURLEncoding.EncodeToString(pub[1:33]) {
 		t.Errorf("jwks = %+v does not hold the supplied key", set)
 	}
 }
