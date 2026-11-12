@@ -280,7 +280,8 @@ func checkFind(args []string) string {
 }
 
 // FindFileEditingCommand returns a short description of the first file-modifying construct in a
-// shell command line, or "" when it looks read-only. It is a prefilter, never an isolation boundary.
+// shell command line, or "" when it looks read-only. It is a denylist and defence in depth only:
+// the sandbox is the isolation boundary, so a command it passes is not thereby safe.
 func FindFileEditingCommand(command string) string {
 	masked := maskNonCommandText(command)
 	for _, m := range redirect.FindAllStringSubmatch(masked, -1) {
