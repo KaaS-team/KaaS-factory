@@ -98,8 +98,6 @@ Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepl
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
 
-
-
 ## browser-use/browser-use@dfb6a73
 
 Source: https://github.com/browser-use/browser-use (MIT, Copyright (c) 2024 Gregor Zunic)
@@ -170,7 +168,6 @@ this commit. The files below are ported to Go and changed from the originals.
 Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trigger.dev)
 
 - `internal/pick/fair.go` from `packages/redis-worker/src/fair-queue/schedulers/drr.ts` (algorithm only, in process, no Redis or Lua) [tested by `internal/pick/fair_test.go`]
-
 
 ## SWE-bench/SWE-bench@02e7a74
 
@@ -255,3 +252,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## langfuse/langfuse@2e6d034
+
+Source: https://github.com/langfuse/langfuse (MIT, Copyright (c) 2023-2026 ClickHouse, Inc.; files outside `ee/` only)
+
+- `internal/observe/sampling/sampling.go` from `worker/src/features/evaluation/deterministicSampling.ts` (domain string changed) [tested by `internal/observe/sampling/sampling_test.go`]
