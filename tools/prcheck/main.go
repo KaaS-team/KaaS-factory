@@ -18,6 +18,8 @@ func run(dir string, args []string, getenv func(string) string, stdout, stderr i
 	switch args[0] {
 	case "dco":
 		return runDCO(dir, args[1:], stdout, stderr)
+	case "body":
+		return runBody(dir, args[1:], getenv, stdout, stderr)
 	}
 	fmt.Fprintf(stderr, "prcheck: unknown subcommand %q\n%s\n", args[0], usage)
 	return 2
