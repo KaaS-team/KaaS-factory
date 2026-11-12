@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## dagger/dagger@835b0ef
+
+Source: https://github.com/dagger/dagger (Apache-2.0, Copyright 2022 Dagger, Inc.). The licence text is `LICENSES/Apache-2.0.txt`. Dagger's NOTICE file reads: "This product includes software developed at Dagger, Inc. (https://www.dagger.io)."
+
+- `pkg/sandbox/cachevol/store.go` from `engine/cachevolumedir/store.go`, with the Dagger naming removed, a tenant field added to the identity, and the test hooks dropped [tested by `pkg/sandbox/cachevol/store_test.go`]
