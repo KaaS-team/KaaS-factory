@@ -40,4 +40,5 @@ out and why) as `report.md` on its own `report/<ticket>` branch. A repo hook ref
 | `internal/api/porttest` | fakes for every port; dispatch is idempotent per attempt |
 | `internal/provenance` | notices match ported-file headers |
 | `cmd/factory` | root command and `version` |
+| `tools/ratchet` | line and deadcode ratchet: below, equal, above, and `--update` never raises |
 | `pkg/agentrun` | public re-export of the dispatchers and meter; every export has a doc comment |

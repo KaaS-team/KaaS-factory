@@ -7,8 +7,8 @@ lint_go := "go1.26.7"
 
 default: check
 
-# Full gate: format, vet, lint, race tests (includes the provenance test), static build.
-check: fmt vet lint test build
+# Full gate: format, vet, lint, race tests (includes the provenance test), static build, ratchet.
+check: fmt vet lint test build ratchet
 
 # Inner loop: format, vet and tests without -race or lint.
 fast: fmt vet
@@ -29,6 +29,10 @@ lint:
     export GOTOOLCHAIN={{lint_go}}
     if command -v golangci-lint >/dev/null; then golangci-lint run ./...
     else go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{lint_version}} run ./...; fi
+
+# Fails when non-test Go lines or deadcode entries exceed .ratchet.json; `go run ./tools/ratchet --update` lowers it.
+ratchet:
+    go run ./tools/ratchet
 
 test:
     go test -race ./...

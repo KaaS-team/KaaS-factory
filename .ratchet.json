@@ -1,0 +1,5 @@
+{
+  "go_lines": 20499,
+  "deadcode": 68,
+  "reason": "initial baseline, lowered by go run ./tools/ratchet --update; a raise needs a hand edit and a new reason here"
+}
