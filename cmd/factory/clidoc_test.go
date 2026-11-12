@@ -39,3 +39,14 @@ func TestCLIReferenceFresh(t *testing.T) {
 		}
 	}
 }
+
+// TestCLIReferenceMachineFree fails when a flag default bakes in this machine's temp or home
+// directory, which made the reference pass on a laptop and go stale in CI.
+func TestCLIReferenceMachineFree(t *testing.T) {
+	here := docgen.CLI(newRoot())
+	t.Setenv("TMPDIR", "/elsewhere-tmp")
+	t.Setenv("HOME", "/elsewhere-home")
+	if docgen.CLI(newRoot()) != here {
+		t.Fatal("the CLI reference depends on TMPDIR or HOME; resolve that default when the command runs")
+	}
+}

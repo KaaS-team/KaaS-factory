@@ -239,7 +239,7 @@ Bump pinned packs to their newest upstream when the eval says it is not worse
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--baseline` | string | `` | scorecard JSON of the pinned version |
-| `--cache` | string | `/var/folders/57/8pd9jzz53rz3bydfggfv_1x40000gn/T/factory-packs` | directory for cached bare repositories |
+| `--cache` | string | `` | directory for cached bare repositories (default: factory-packs under the system temp dir) |
 | `--candidate` | string | `` | scorecard JSON of the new version |
 | `--dir` | string | `.` | directory holding factory.lock |
 | `--dry-run` | bool | `false` | report what would change and write nothing |

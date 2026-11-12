@@ -117,6 +117,9 @@ func NewCommand() *cobra.Command {
 			if oldSC == "" || nextSC == "" {
 				return fmt.Errorf("--baseline and --candidate scorecard files are required")
 			}
+			if cache == "" {
+				cache = filepath.Join(os.TempDir(), "factory-packs")
+			}
 			r := Runner{
 				Upstream: GitUpstream{packs.GitFetcher{
 					Remote: func(slug string) string { return strings.TrimSuffix(baseURL, "/") + "/" + slug + ".git" },
@@ -134,6 +137,6 @@ func NewCommand() *cobra.Command {
 	f.StringVar(&oldSC, "baseline", "", "scorecard JSON of the pinned version")
 	f.StringVar(&nextSC, "candidate", "", "scorecard JSON of the new version")
 	f.StringVar(&baseURL, "remote", "https://github.com", "base URL packs are cloned from")
-	f.StringVar(&cache, "cache", filepath.Join(os.TempDir(), "factory-packs"), "directory for cached bare repositories")
+	f.StringVar(&cache, "cache", "", "directory for cached bare repositories (default: factory-packs under the system temp dir)")
 	return cmd
 }
