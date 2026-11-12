@@ -1,0 +1,9 @@
+# Use this check pack to run a UI change against a preview URL in headless Chrome.
+# The gate runs the command; it prints one FACTORY_GATES line and writes screenshots to out_dir.
+# Without a Chrome binary the check fails with "browser: chrome not found"; it never passes.
+name: browser
+kind: check
+command: factory browsercheck --steps .factory/browser-steps.yaml --out .factory/browser-out
+steps_file: .factory/browser-steps.yaml
+out_dir: .factory/browser-out
+gate: browser
