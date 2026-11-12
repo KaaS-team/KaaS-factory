@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/KaaS-team/factory/internal/logs"
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/meter"
+	"github.com/KaaS-team/factory/internal/meter/price"
 )
 
 // TestRootCommandTree walks the root command tree: every command the ticket names is mounted.
@@ -237,8 +239,8 @@ func TestGitHubDepsAreReal(t *testing.T) {
 	if _, err := d.Queue.Run(context.Background()); err == nil || !strings.Contains(err.Error(), "shadow") {
 		t.Errorf("shadow queue Run = %v, want a shadow-mode refusal", err)
 	}
-	if _, ok := d.Dispatcher.(recorded); !ok || d.Dispatcher.Name() != "shadow:local" {
-		t.Errorf("dispatcher %T named %q, want recorded shadow:local", d.Dispatcher, d.Dispatcher.Name())
+	if r, ok := d.Dispatcher.(recorded); !ok || d.Dispatcher.Name() != "shadow:local" || r.prices == nil {
+		t.Errorf("dispatcher %T named %q, want recorded shadow:local with the price catalog", d.Dispatcher, d.Dispatcher.Name())
 	}
 	d, err = buildDeps(config.Config{Tracker: "linear", Repo: "ENG", Dispatcher: "local", Slots: 1})
 	if err != nil {
@@ -260,12 +262,50 @@ func TestLogsReadsTheRecordedSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (recorded{porttest.NewDispatcher(1), st}).Dispatch(ctx, api.Brief{Ticket: "7", Attempt: 1}); err != nil {
+	if _, err := (recorded{Dispatcher: porttest.NewDispatcher(1), st: st, models: &sessionModels{}}).Dispatch(ctx, api.Brief{Ticket: "7", Attempt: 1}); err != nil {
 		t.Fatal(err)
 	}
 	_ = st.Close()
 	_, err = logBackends().Source(ctx, "7")
 	if err == nil || !strings.Contains(err.Error(), `dispatcher "fake"`) {
 		t.Fatalf("got %v, want the recorded fake session to reach the factory lookup", err)
+	}
+}
+
+// TestRecordedPricesUnreportedUsage: tokens a dispatcher reports without a cost are priced from the
+// catalog by the model the session was briefed with; a reported cost and an unknown model stay as they are.
+func TestRecordedPricesUnreportedUsage(t *testing.T) {
+	t.Chdir(t.TempDir())
+	ctx := context.Background()
+	st, err := openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	prices, err := price.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	disp := porttest.NewDispatcher(3)
+	r := recorded{Dispatcher: disp, st: st, prices: prices, models: &sessionModels{}}
+	for _, tc := range []struct {
+		ticket api.TicketID
+		model  string
+		usage  api.Usage
+		want   float64
+	}{
+		{"1", "claude-sonnet-5", api.Usage{InputTokens: 1_000_000, OutputTokens: 100_000}, 3},
+		{"2", "claude-sonnet-5", api.Usage{InputTokens: 1_000_000, CostUSD: 9}, 9},
+		{"3", "no-such-model", api.Usage{InputTokens: 1_000_000}, 0},
+	} {
+		s, err := r.Dispatch(ctx, api.Brief{Ticket: tc.ticket, Attempt: 1, Model: tc.model})
+		if err != nil {
+			t.Fatal(err)
+		}
+		disp.UsageBy[s.Key] = tc.usage
+		u, err := r.Usage(ctx, s)
+		if err != nil || math.Abs(u.CostUSD-tc.want) > 1e-9 {
+			t.Errorf("ticket %s: cost = %v (err %v), want %v", tc.ticket, u.CostUSD, err, tc.want)
+		}
 	}
 }

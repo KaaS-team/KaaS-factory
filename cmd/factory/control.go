@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
@@ -25,6 +26,7 @@ import (
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/mergeq/wire"
 	"github.com/KaaS-team/factory/internal/meter"
+	"github.com/KaaS-team/factory/internal/meter/price"
 	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/observe/ghsource"
 	"github.com/KaaS-team/factory/internal/reconcile"
@@ -263,7 +265,48 @@ func gitHubParts(c config.Config, tr *github.Tracker) (api.Observer, core.MergeQ
 // recorded stores every session it dispatches, so `factory logs` can find a ticket's latest one.
 type recorded struct {
 	api.Dispatcher
-	st *store.Store
+	st     *store.Store
+	prices *price.Catalog
+	models *sessionModels
+}
+
+// sessionModels remembers the model each dispatched session was briefed with.
+type sessionModels struct {
+	mu sync.Mutex
+	m  map[string]string
+}
+
+func (s *sessionModels) set(key, model string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.m == nil {
+		s.m = map[string]string{}
+	}
+	s.m[key] = model
+}
+
+func (s *sessionModels) get(key string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.m[key]
+}
+
+// Usage prices a session's tokens from the embedded catalog when the dispatcher reported none. A
+// reported cost is kept as it is, and a model the catalog does not know stays at 0 (unknown), never
+// a guess.
+func (r recorded) Usage(ctx context.Context, s api.Session) (api.Usage, error) {
+	u, err := r.Dispatcher.Usage(ctx, s)
+	if err != nil || u.CostUSD != 0 || r.prices == nil {
+		return u, err
+	}
+	res := r.prices.Cost(r.models.get(s.Key), price.Input{Usage: price.Usage{
+		"input": float64(u.InputTokens), "output": float64(u.OutputTokens),
+		"input_cache_read": float64(u.CacheReadTokens), "input_cache_creation": float64(u.CacheWriteTokens),
+	}})
+	if res.Total != nil {
+		u.CostUSD = *res.Total
+	}
+	return u, nil
 }
 
 func (r recorded) Dispatch(ctx context.Context, b api.Brief) (api.Session, error) {
@@ -271,6 +314,7 @@ func (r recorded) Dispatch(ctx context.Context, b api.Brief) (api.Session, error
 	if err != nil {
 		return s, err
 	}
+	r.models.set(s.Key, b.Model)
 	// Dispatch is idempotent per attempt, so a failed write is safe to retry on the next tick.
 	if err := r.st.PutSession(ctx, s); err != nil {
 		return s, fmt.Errorf("record session %s: %w", s.Key, err)
@@ -372,8 +416,12 @@ func buildDeps(c config.Config) (core.Deps, error) {
 		return core.Deps{}, err
 	}
 	b := func(usd float64) api.Budget { return api.Budget{USD: usd} }
+	prices, err := price.Load()
+	if err != nil {
+		return core.Deps{}, fmt.Errorf("load the price catalog: %w", err)
+	}
 	return core.Deps{
-		Tracker: trk, Dispatcher: recorded{disp, st}, Observer: obs, Store: st,
+		Tracker: trk, Dispatcher: recorded{disp, st, prices, &sessionModels{}}, Observer: obs, Store: st,
 		Meter: meter.New(meter.Budgets{Node: b(c.Budgets.Node), Ticket: b(c.Budgets.Ticket), TeamDay: b(c.Budgets.TeamDay)}, time.Now),
 		Queue: queue, Clock: core.RealClock{}, Log: steps,
 	}, nil
