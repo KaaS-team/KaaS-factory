@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/KaaS-team/factory/internal/dispatch/local"
 	"github.com/KaaS-team/factory/internal/dispatch/routines"
 	"github.com/KaaS-team/factory/internal/dispatch/shadow"
+	"github.com/KaaS-team/factory/internal/dispatch/untrusted"
 	"github.com/KaaS-team/factory/internal/githubauth"
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/mergeq/wire"
@@ -116,8 +118,18 @@ var dispatchers = map[string]func(context.Context, config.Config) (api.Dispatche
 			return nil, err
 		}
 		root := filepath.Join(repo, ".factory", "worktrees")
-		return local.New(ctx, local.Config{Worktrees: local.GitWorktrees{Repo: repo, Root: root}, MaxConcurrent: c.Slots,
-			Sandbox: c.Sandbox && canJail(sandbox.Probe()), GitDir: filepath.Join(repo, ".git")})
+		cfg := local.Config{Worktrees: local.GitWorktrees{Repo: repo, Root: root}, MaxConcurrent: c.Slots,
+			Sandbox: c.Sandbox && canJail(sandbox.Probe()), GitDir: filepath.Join(repo, ".git")}
+		if c.Tracker == "github" { // a pull request's author is only known on GitHub
+			g, err := newGitHubConn(c)
+			if err != nil {
+				return nil, err
+			}
+			if cfg.Untrusted, err = g.untrusted(); err != nil {
+				return nil, err
+			}
+		}
+		return local.New(ctx, cfg)
 	},
 }
 
@@ -187,6 +199,38 @@ func (g gitHubConn) client() (*gogithub.Client, error) {
 		c.BaseURL = u
 	}
 	return c, nil
+}
+
+// access reads a login's permission level on the repository.
+type access struct {
+	c           *gogithub.Client
+	owner, repo string
+}
+
+func (a access) Permission(ctx context.Context, user string) (string, error) {
+	lv, _, err := a.c.Repositories.GetPermissionLevel(ctx, a.owner, a.repo, user)
+	return lv.GetPermission(), err
+}
+
+// untrusted returns the local dispatcher's Untrusted hook: for a brief whose ticket is a pull
+// request, the tools to deny when its author lacks write access. An issue is the operator's own
+// work and gets nil; a pull request whose author cannot be read counts as untrusted.
+func (g gitHubConn) untrusted() (func(context.Context, api.Brief) []string, error) {
+	c, err := g.client()
+	if err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context, b api.Brief) []string {
+		n, err := strconv.Atoi(string(b.Ticket))
+		if err != nil {
+			return nil
+		}
+		is, _, err := c.Issues.Get(ctx, g.owner, g.repo, n)
+		if err == nil && !is.IsPullRequest() {
+			return nil
+		}
+		return untrusted.Deny(ctx, access{c, g.owner, g.repo}, is.GetUser().GetLogin())
+	}, nil
 }
 
 // gitHubParts builds the GitHub observer source and merge queue for the repository in the working

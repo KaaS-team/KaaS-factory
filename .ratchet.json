@@ -1,5 +1,5 @@
 {
   "go_lines": 43909,
   "deadcode": 403,
-  "reason": "raised by the reviewed merges of go/k7-assert-kit, k7-astgrep-transform, k7-autosubmit, k8-plan-preset, k8-policy-combiner and k8-policy-signed, the m3-fixes-j2 fixes and the m1-fix2 merges of go/k4-sandbox-harden-fix, k5-eval-arms-fix, fix-egress-ssrf, k5-local-auth, k5-preset-rules, k5-sandbox-runsc, k5-sandbox-lifecycle, k5-sandbox-limits, k6-approval and k10-eval-scorer (packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "reason": "raised by the reviewed merges of go/k7-assert-kit, k7-astgrep-transform, k7-autosubmit, k8-plan-preset, k8-policy-combiner and k8-policy-signed, the m3-fixes (j2, g, f2, b2) and the m1-fix2 merges of go/k4-sandbox-harden-fix, k5-eval-arms-fix, fix-egress-ssrf, k5-local-auth, k5-preset-rules, k5-sandbox-runsc, k5-sandbox-lifecycle, k5-sandbox-limits, k6-approval and k10-eval-scorer (packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }

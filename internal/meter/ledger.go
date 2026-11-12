@@ -26,6 +26,18 @@ type Spend struct {
 	Attempts []AttemptTokens
 }
 
+// InWindow returns the cost of holder's rows in the window of day (YYYY-MM-DD): that day's rows
+// and the undated rows. It is the one resolver for "rows in this window".
+func InWindow(spends []Spend, holder, day string) float64 {
+	var total float64
+	for _, s := range spends {
+		if s.Holder == holder && (s.Day == "" || s.Day == day) {
+			total += s.CostUSD
+		}
+	}
+	return total
+}
+
 // AttemptTokens is the absolute token totals one attempt on a ticket reported.
 type AttemptTokens struct {
 	N          int
