@@ -52,6 +52,7 @@ func newRoot() *cobra.Command {
 		},
 	})
 	addCommands(root)
+	addEE(root)
 	mountClients(root)
 	return root
 }

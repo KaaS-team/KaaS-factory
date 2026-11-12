@@ -12,6 +12,9 @@ import (
 // TestCLIReferenceFresh fails when docs/cli-reference.md no longer matches the mounted command
 // tree. UPDATE_GOLDEN=1 go test ./cmd/factory rewrites it.
 func TestCLIReferenceFresh(t *testing.T) {
+	if eeBuild {
+		t.Skip("the reference documents the default build")
+	}
 	path := filepath.Join("..", "..", "docs", "cli-reference.md")
 	got := docgen.CLI(newRoot())
 	if os.Getenv("UPDATE_GOLDEN") != "" {
