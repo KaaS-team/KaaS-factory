@@ -191,7 +191,7 @@ func TestSessionConfigDirIsRemovedWhenTheSessionEnds(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(op, ".credentials.json"), []byte("login"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	d, wt := sandboxed(t, "echo $CLAUDE_CONFIG_DIR > cfg.txt\nstat -c %a $CLAUDE_CONFIG_DIR > mode.txt\ncat $CLAUDE_CONFIG_DIR/.credentials.json > cred.txt\n", []string{"PATH=" + os.Getenv("PATH")})
+	d, wt := sandboxed(t, "echo $CLAUDE_CONFIG_DIR > cfg.txt\n{ stat -c %a $CLAUDE_CONFIG_DIR 2>/dev/null || stat -f %Lp $CLAUDE_CONFIG_DIR; } > mode.txt\ncat $CLAUDE_CONFIG_DIR/.credentials.json > cred.txt\n", []string{"PATH=" + os.Getenv("PATH")})
 	s, err := d.Dispatch(context.Background(), bf)
 	if err != nil {
 		t.Fatal(err)
