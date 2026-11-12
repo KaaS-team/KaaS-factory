@@ -38,13 +38,28 @@ func (f *fakeStore) Create(_ context.Context, t api.Ticket) (api.TicketID, error
 	return t.ID, nil
 }
 
+func (f *fakeStore) set(id api.TicketID, p api.Phase) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.tr.Phases[id] = p
+}
+
 func (f *fakeStore) Phase(ctx context.Context, id api.TicketID) (api.Phase, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if _, err := f.tr.Get(ctx, id); err != nil {
 		return "", err
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
 	return f.tr.Phases[id], nil
+}
+
+func mustHandler(t *testing.T, deps Deps) http.Handler {
+	t.Helper()
+	h, err := NewHandler(deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
 }
 
 func newDeps() (Deps, *porttest.Tracker, *porttest.Observer) {
@@ -73,7 +88,7 @@ func sendParams(text string) map[string]any {
 	return map[string]any{"message": map[string]any{
 		"kind": "message", "messageId": "m1", "role": "user",
 		"parts": []any{map[string]any{"kind": "text", "text": text}},
-	}}
+	}, "configuration": map[string]any{"blocking": false}}
 }
 
 // Acceptance: agent card golden.
@@ -81,12 +96,19 @@ func TestAgentCardGolden(t *testing.T) {
 	deps, _, _ := newDeps()
 	req := httptest.NewRequest(http.MethodGet, "/.well-known/agent-card.json", nil)
 	rec := httptest.NewRecorder()
-	NewHandler(deps).ServeHTTP(rec, req)
+	mustHandler(t, deps).ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("card status %d, want 200 without a token: %s", rec.Code, rec.Body)
 	}
+	// The signature differs on every request; TestAgentCardSignedAndVerifies checks it.
+	var card map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &card); err != nil {
+		t.Fatal(err)
+	}
+	delete(card, "signatures")
+	unsigned, _ := json.Marshal(card)
 	var pretty bytes.Buffer
-	if err := json.Indent(&pretty, rec.Body.Bytes(), "", "  "); err != nil {
+	if err := json.Indent(&pretty, unsigned, "", "  "); err != nil {
 		t.Fatal(err)
 	}
 	pretty.WriteByte('\n')
@@ -135,7 +157,8 @@ func TestStateForPhase(t *testing.T) {
 // Acceptance: send then get round trip on porttest fakes.
 func TestSendThenGetRoundTrip(t *testing.T) {
 	deps, tr, ob := newDeps()
-	h := NewHandler(deps)
+	st := deps.Filer.(*fakeStore)
+	h := mustHandler(t, deps)
 
 	code, out := rpc(t, h, testToken, "message/send", sendParams("add a health endpoint\nreturn 200 on /healthz"))
 	if code != http.StatusOK || out["error"] != nil {
@@ -143,9 +166,10 @@ func TestSendThenGetRoundTrip(t *testing.T) {
 	}
 	res := out["result"].(map[string]any)
 	id := res["id"].(string)
-	tk, err := tr.Get(context.Background(), api.TicketID(id))
+	ticket := res["metadata"].(map[string]any)[MetaTicket].(string)
+	tk, err := tr.Get(context.Background(), api.TicketID(ticket))
 	if err != nil {
-		t.Fatalf("task id %q does not map to a ticket: %v", id, err)
+		t.Fatalf("task %q names ticket %q which does not exist: %v", id, ticket, err)
 	}
 	if tk.Title != "add a health endpoint" || !strings.Contains(tk.Body, "return 200 on /healthz") {
 		t.Errorf("ticket = %+v", tk)
@@ -168,16 +192,16 @@ func TestSendThenGetRoundTrip(t *testing.T) {
 	if s, _ := state(); s != "submitted" {
 		t.Errorf("after send: %s", s)
 	}
-	tr.Phases[api.TicketID(id)] = api.PhaseRunning
+	st.set(api.TicketID(ticket), api.PhaseRunning)
 	if s, _ := state(); s != "working" {
 		t.Errorf("running: %s", s)
 	}
-	tr.Phases[api.TicketID(id)] = api.PhaseNeedsHuman
+	st.set(api.TicketID(ticket), api.PhaseNeedsHuman)
 	if s, _ := state(); s != "input-required" {
 		t.Errorf("needs-human: %s", s)
 	}
-	ob.Set(api.Observation{Ticket: api.TicketID(id), Attempt: 1, PR: 7})
-	tr.Phases[api.TicketID(id)] = api.PhaseMerged
+	ob.Set(api.Observation{Ticket: api.TicketID(ticket), Attempt: 1, PR: 7})
+	st.set(api.TicketID(ticket), api.PhaseMerged)
 	s, r := state()
 	if s != "completed" {
 		t.Fatalf("merged: %s", s)
@@ -191,7 +215,7 @@ func TestSendThenGetRoundTrip(t *testing.T) {
 
 func TestGetUnknownTask(t *testing.T) {
 	deps, _, _ := newDeps()
-	_, out := rpc(t, NewHandler(deps), testToken, "tasks/get", map[string]any{"id": "nope"})
+	_, out := rpc(t, mustHandler(t, deps), testToken, "tasks/get", map[string]any{"id": "nope"})
 	if out["error"] == nil {
 		t.Fatalf("want an error for an unknown task, got %v", out)
 	}
@@ -199,15 +223,17 @@ func TestGetUnknownTask(t *testing.T) {
 
 // A phase the table does not map is an error, and methods the server does not serve fail.
 func TestUnmappedPhaseAndUnservedMethodsFail(t *testing.T) {
-	deps, tr, _ := newDeps()
-	h := NewHandler(deps)
+	deps, _, _ := newDeps()
+	st := deps.Filer.(*fakeStore)
+	h := mustHandler(t, deps)
 	_, out := rpc(t, h, testToken, "message/send", sendParams("x"))
-	id := out["result"].(map[string]any)["id"].(string)
-	tr.Phases[api.TicketID(id)] = "failed"
+	res := out["result"].(map[string]any)
+	id := res["id"].(string)
+	st.set(api.TicketID(res["metadata"].(map[string]any)[MetaTicket].(string)), "failed")
 	if _, out := rpc(t, h, testToken, "tasks/get", map[string]any{"id": id}); out["error"] == nil {
 		t.Errorf("phase failed is not in the table, want an error, got %v", out)
 	}
-	for _, m := range []string{"tasks/cancel", "tasks/pushNotificationConfig/list"} {
+	for _, m := range []string{"tasks/cancel", "tasks/pushNotificationConfig/list"} { // v0.3 names
 		if _, out := rpc(t, h, testToken, m, map[string]any{"id": id}); out["error"] == nil {
 			t.Errorf("%s: want an error, got %v", m, out)
 		}
@@ -216,7 +242,7 @@ func TestUnmappedPhaseAndUnservedMethodsFail(t *testing.T) {
 
 func TestSendRejectsEmptyText(t *testing.T) {
 	deps, tr, _ := newDeps()
-	_, out := rpc(t, NewHandler(deps), testToken, "message/send", sendParams("   "))
+	_, out := rpc(t, mustHandler(t, deps), testToken, "message/send", sendParams("   "))
 	if out["error"] == nil || len(tr.Tickets) != 0 {
 		t.Fatalf("empty request must be refused and file nothing: %v", out)
 	}
@@ -225,7 +251,7 @@ func TestSendRejectsEmptyText(t *testing.T) {
 // Acceptance: unauthenticated request gets 401.
 func TestAuth(t *testing.T) {
 	deps, tr, _ := newDeps()
-	h := NewHandler(deps)
+	h := mustHandler(t, deps)
 	for _, tc := range []struct{ name, token string }{{"none", ""}, {"wrong", "nope"}} {
 		code, _ := rpc(t, h, tc.token, "message/send", sendParams("x"))
 		if code != http.StatusUnauthorized {
@@ -236,7 +262,7 @@ func TestAuth(t *testing.T) {
 		t.Error("an unauthenticated send filed a ticket")
 	}
 	deps.Token = ""
-	if code, _ := rpc(t, NewHandler(deps), "", "message/send", sendParams("x")); code != http.StatusUnauthorized {
+	if code, _ := rpc(t, mustHandler(t, deps), "", "message/send", sendParams("x")); code != http.StatusUnauthorized {
 		t.Errorf("empty server token: status %d, want 401", code)
 	}
 }
@@ -256,3 +282,5 @@ func TestCommandRefusesEmptyToken(t *testing.T) {
 		t.Error("deps were opened before the token check")
 	}
 }
+
+func writeFile(p, c string) error { return os.WriteFile(p, []byte(c), 0o600) }

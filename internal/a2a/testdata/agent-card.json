@@ -1,4 +1,8 @@
 {
+  "capabilities": {
+    "pushNotifications": false,
+    "streaming": true
+  },
   "defaultInputModes": [
     "text/plain"
   ],
@@ -7,7 +11,20 @@
   ],
   "description": "Turns a request into a merged pull request.",
   "name": "factory",
-  "version": "1",
+  "securityRequirements": [
+    {
+      "schemes": {
+        "bearer": {}
+      }
+    }
+  ],
+  "securitySchemes": {
+    "bearer": {
+      "httpAuthSecurityScheme": {
+        "scheme": "Bearer"
+      }
+    }
+  },
   "skills": [
     {
       "description": "Turn a request into a merged PR. Input is text; the output artifact is the PR URL.",
@@ -24,39 +41,17 @@
       ]
     }
   ],
-  "securitySchemes": {
-    "bearer": {
-      "type": "http",
-      "scheme": "Bearer",
-      "http": {
-        "scheme": "Bearer"
-      }
-    }
-  },
-  "capabilities": {
-    "pushNotifications": false,
-    "streaming": false
-  },
   "supportedInterfaces": [
     {
-      "url": "http://factory.test/",
       "protocolBinding": "JSONRPC",
-      "protocolVersion": "0.3"
+      "protocolVersion": "1.0",
+      "url": "http://factory.test/"
+    },
+    {
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "0.3",
+      "url": "http://factory.test/"
     }
   ],
-  "securityRequirements": [
-    {
-      "schemes": {
-        "bearer": {}
-      }
-    }
-  ],
-  "url": "http://factory.test/",
-  "protocolVersion": "0.3",
-  "preferredTransport": "JSONRPC",
-  "security": [
-    {
-      "bearer": []
-    }
-  ]
+  "version": "1"
 }
