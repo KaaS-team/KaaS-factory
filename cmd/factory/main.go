@@ -25,6 +25,7 @@ func newRoot() *cobra.Command {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), version)
 		},
 	})
+	addCommands(root)
 	return root
 }
 
