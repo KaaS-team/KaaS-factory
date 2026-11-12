@@ -16,34 +16,37 @@ var (
 	ErrConflict = errors.New("scim: already exists")
 )
 
-// User is a provisioned person. UserName is lower case and unique.
+// User is a provisioned person. UserName is lower case and unique within a tenant.
 type User struct {
 	ID         string
+	Tenant     string
 	UserName   string
 	ExternalID string
 	Active     bool
 }
 
-// Group is a named set of user ids. DisplayName is unique.
+// Group is a named set of user ids. DisplayName is unique within a tenant.
 type Group struct {
 	ID          string
+	Tenant      string
 	DisplayName string
 	Members     []string
 }
 
-// Store persists SCIM users and groups. Create returns ErrConflict on a taken UserName or
-// DisplayName; Get, Update and Delete return ErrNotFound for an unknown id.
+// Store persists SCIM users and groups for every tenant. Create returns ErrConflict on a UserName or
+// DisplayName taken in the same tenant; Get, Update and Delete return ErrNotFound for an unknown id.
+// The handler, not the store, refuses an id that belongs to another tenant.
 type Store interface {
 	CreateUser(User) error
 	GetUser(id string) (User, error)
-	// ListUsers returns users ordered by UserName; a non-empty userName narrows to that one.
-	ListUsers(userName string) ([]User, error)
+	// ListUsers returns the tenant's users ordered by UserName.
+	ListUsers(tenant string) ([]User, error)
 	UpdateUser(User) error
 	DeleteUser(id string) error
 	CreateGroup(Group) error
 	GetGroup(id string) (Group, error)
-	// ListGroups returns groups ordered by DisplayName; a non-empty displayName narrows to that one.
-	ListGroups(displayName string) ([]Group, error)
+	// ListGroups returns the tenant's groups ordered by DisplayName.
+	ListGroups(tenant string) ([]Group, error)
 	UpdateGroup(Group) error
 	DeleteGroup(id string) error
 }
@@ -65,7 +68,7 @@ func (m *MemoryStore) CreateUser(u User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, o := range m.users {
-		if o.UserName == u.UserName {
+		if o.Tenant == u.Tenant && o.UserName == u.UserName {
 			return ErrConflict
 		}
 	}
@@ -84,13 +87,13 @@ func (m *MemoryStore) GetUser(id string) (User, error) {
 	return u, nil
 }
 
-// ListUsers returns users ordered by UserName, or the one named.
-func (m *MemoryStore) ListUsers(userName string) ([]User, error) {
+// ListUsers returns the tenant's users ordered by UserName.
+func (m *MemoryStore) ListUsers(tenant string) ([]User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []User
 	for _, u := range m.users {
-		if userName == "" || u.UserName == userName {
+		if u.Tenant == tenant {
 			out = append(out, u)
 		}
 	}
@@ -98,12 +101,17 @@ func (m *MemoryStore) ListUsers(userName string) ([]User, error) {
 	return out, nil
 }
 
-// UpdateUser replaces the user with the same id.
+// UpdateUser replaces the user with the same id, refusing a UserName another user of the tenant holds.
 func (m *MemoryStore) UpdateUser(u User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.users[u.ID]; !ok {
 		return ErrNotFound
+	}
+	for _, o := range m.users {
+		if o.ID != u.ID && o.Tenant == u.Tenant && o.UserName == u.UserName {
+			return ErrConflict
+		}
 	}
 	m.users[u.ID] = u
 	return nil
@@ -125,7 +133,7 @@ func (m *MemoryStore) CreateGroup(g Group) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, o := range m.groups {
-		if o.DisplayName == g.DisplayName {
+		if o.Tenant == g.Tenant && o.DisplayName == g.DisplayName {
 			return ErrConflict
 		}
 	}
@@ -144,13 +152,13 @@ func (m *MemoryStore) GetGroup(id string) (Group, error) {
 	return g, nil
 }
 
-// ListGroups returns groups ordered by DisplayName, or the one named.
-func (m *MemoryStore) ListGroups(displayName string) ([]Group, error) {
+// ListGroups returns the tenant's groups ordered by DisplayName.
+func (m *MemoryStore) ListGroups(tenant string) ([]Group, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []Group
 	for _, g := range m.groups {
-		if displayName == "" || g.DisplayName == displayName {
+		if g.Tenant == tenant {
 			out = append(out, g)
 		}
 	}
@@ -158,12 +166,17 @@ func (m *MemoryStore) ListGroups(displayName string) ([]Group, error) {
 	return out, nil
 }
 
-// UpdateGroup replaces the group with the same id.
+// UpdateGroup replaces the group with the same id, refusing a DisplayName another group of the tenant holds.
 func (m *MemoryStore) UpdateGroup(g Group) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.groups[g.ID]; !ok {
 		return ErrNotFound
+	}
+	for _, o := range m.groups {
+		if o.ID != g.ID && o.Tenant == g.Tenant && o.DisplayName == g.DisplayName {
+			return ErrConflict
+		}
 	}
 	m.groups[g.ID] = g
 	return nil

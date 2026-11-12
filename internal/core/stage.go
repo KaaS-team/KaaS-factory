@@ -2,11 +2,13 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/graph/interrupt"
 	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/tutor"
 )
@@ -18,6 +20,9 @@ type Stages struct {
 	Graph func(name string) (*graph.Graph, error)
 	// Policy picks the tier of a node that does not pin one. A zero Policy leaves the tier empty.
 	Policy tutor.Policy
+	// Checkpoints, when set, saves each ticket's place in its graph after every step, so a restart
+	// resumes there and re-runs only the node that had not finished. Nil keeps it in memory.
+	Checkpoints Checkpointer
 }
 
 // stageRun is where one ticket stands in its graph. Node runs take their own attempt numbers, so each
@@ -31,20 +36,26 @@ type stageRun struct {
 	fails   int
 	pr      int
 	history []tutor.Attempt
-	input   string // revise feedback for the next brief of this node
+	input   string    // revise feedback for the next brief of this node
+	wf      string    // the workflow name the ticket asked for, to reload the graph after a restart
+	fin     *finished // the saved result of node, when it finished before a restart
+	saved   bool      // a checkpoint of this run exists
 }
 
-// stageOf is the ticket's place in its graph: the one in memory, else the one its thread holds (a restart
-// lost the map), else the graph's first node.
+// stageOf is the ticket's place in its graph: the one in memory, else the one the checkpoint store holds,
+// else the one its thread holds (a restart lost the map), else the graph's first node.
 func (c *Core) stageOf(ctx context.Context, id api.TicketID, workflow string) (*stageRun, error) {
 	if st, ok := c.stages[id]; ok {
 		return st, nil
+	}
+	if st, err := c.restore(ctx, id); st != nil || err != nil {
+		return st, err
 	}
 	g, err := c.d.Stages.Graph(workflow)
 	if err != nil {
 		return nil, err
 	}
-	st := &stageRun{g: g, node: g.Start}
+	st := &stageRun{g: g, node: g.Start, wf: workflow}
 	if p, ok := c.savedPosition(ctx, id); ok {
 		if _, known := g.Node(p.Node); known {
 			st.node, st.base, st.fails, st.pr, st.input = p.Node, p.Base, p.Fails, p.PR, p.Input
@@ -121,9 +132,9 @@ func (c *Core) stageBrief(ctx context.Context, b api.Brief) (api.Brief, error) {
 // advance runs when a node's session has finished its work: it picks the next node from the graph.
 // It reports true when the ticket moves on to another node, so the ticket is not done yet.
 func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
-	st, ok := c.stages[id]
-	if !ok {
-		return false, nil
+	st, err := c.restore(ctx, id)
+	if err != nil || st == nil {
+		return false, err
 	}
 	e := c.state.Entries[id]
 	o := c.lastObs[id]
@@ -134,6 +145,12 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	outcome := graph.Pass
 	if n.Verify && o.ChecksGreen != nil && !*o.ChecksGreen {
 		outcome = graph.Fail
+	}
+	attempts := e.Attempt
+	if st.fin != nil { // this node finished before a restart: its recorded result stands
+		outcome, attempts = st.fin.Outcome, st.fin.Attempts
+	} else {
+		c.saveWrite(ctx, id, st, finished{outcome, attempts})
 	}
 	st.record(n)
 	next, err := st.g.Next(st.node, outcome)
@@ -146,6 +163,7 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	}
 	if outcome == graph.Fail {
 		if st.fails++; st.fails >= c.cfg.Reconcile.MaxAttempts {
+			c.save(ctx, id, st, st.node)
 			c.escalate(ctx, id, fmt.Sprintf("%s failed %d times", st.node, st.fails))
 			return true, nil
 		}
@@ -153,12 +171,15 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 	if next == graph.End {
 		c.lastObs[id] = withPR(o, st.pr)
 		delete(c.stages, id)
+		c.save(ctx, id, st, graph.End)
 		return false, nil
 	}
-	st.node, st.base = next, st.base+e.Attempt
+	st.node, st.base = next, st.base+attempts
+	c.save(ctx, id, st, next)
 	c.hub.emit(KindStage, id, map[string]any{"node": next, "after": n.ID, "outcome": string(outcome)})
 	if h, _ := st.g.Node(next); h.Kind == graph.KindHuman {
 		c.escalate(ctx, id, "plan approval")
+		c.raise(ctx, id, next)
 		c.stages[id] = st // escalate forgets the stage; approve and revise need it
 	}
 	c.savePosition(ctx, id, st)
@@ -168,8 +189,11 @@ func (c *Core) advance(ctx context.Context, id api.TicketID) (bool, error) {
 // resume answers a ticket waiting at a human node: approve takes the pass edge, revise the revise edge
 // with text as the next brief's input. The ticket goes back to ready, so the loop dispatches the node.
 func (c *Core) resume(ctx context.Context, id api.TicketID, outcome graph.Outcome, text string) error {
-	st, ok := c.stages[id]
-	if !ok || !c.parked[id] {
+	st, err := c.restore(ctx, id)
+	if err != nil {
+		return err
+	}
+	if st == nil || !c.parked[id] {
 		return fmt.Errorf("ticket %s is not waiting on plan approval", id)
 	}
 	if h, _ := st.g.Node(st.node); h.Kind != graph.KindHuman {
@@ -179,10 +203,14 @@ func (c *Core) resume(ctx context.Context, id api.TicketID, outcome graph.Outcom
 	if err != nil {
 		return err
 	}
+	if err := c.answer(ctx, id, st.node, outcome, text); err != nil {
+		return err
+	}
 	if err := c.d.Tracker.SetPhase(ctx, id, api.PhaseReady); err != nil {
 		return err
 	}
 	st.node, st.input = next, text
+	c.save(ctx, id, st, next)
 	delete(c.parked, id)
 	c.savePosition(ctx, id, st)
 	return nil
@@ -200,4 +228,36 @@ func (st *stageRun) record(n graph.Node) {
 	if !n.Verify {
 		st.history = append(st.history, tutor.Attempt{Tier: st.tier})
 	}
+}
+
+// approvalSchema is what an answer to a plan-approval interrupt must satisfy.
+const approvalSchema = `{"type":"object","properties":{"outcome":{"enum":["pass","revise"]},"text":{"type":"string"}},"required":["outcome"]}`
+
+func approvalThread(id api.TicketID, node string) string { return string(id) + "/" + node }
+
+// raise stores the plan-approval wait of a human node as an interrupt; without Deps.Interrupts it does nothing.
+func (c *Core) raise(ctx context.Context, id api.TicketID, node string) {
+	if c.d.Interrupts == nil {
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{"ticket": string(id), "node": node})
+	_, err := c.d.Interrupts.Task(approvalThread(id, node)).Interrupt(ctx, payload, json.RawMessage(approvalSchema))
+	var p *interrupt.Pending
+	if err != nil && !errors.As(err, &p) {
+		c.report(err)
+	}
+}
+
+// answer resumes the stored interrupt with the person's verdict. A value the schema rejects, or a
+// store failure, stops the resume so the ticket stays parked.
+func (c *Core) answer(ctx context.Context, id api.TicketID, node string, outcome graph.Outcome, text string) error {
+	if c.d.Interrupts == nil {
+		return nil
+	}
+	thread := approvalThread(id, node)
+	value, _ := json.Marshal(map[string]string{"outcome": string(outcome), "text": text})
+	if err := c.d.Interrupts.Resume(ctx, thread, value); err != nil && !errors.Is(err, interrupt.ErrNothingPending) {
+		return err
+	}
+	return c.d.Interrupts.Done(ctx, thread)
 }

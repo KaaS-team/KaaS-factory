@@ -174,6 +174,9 @@ Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trig
 Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
 
 - `internal/eval/infra/infra.go` from `swebench/harness/infra_failure.py` [no upstream test]
+- `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
+- `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
+- `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)
 
 ## sourcegraph/zoekt@9e78667
 
@@ -213,10 +216,6 @@ Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technol
 The bracketed-paste framing, the SIGINT-then-kill close and the stability gate are written after
 `lib/httpapi/claude.go`, `lib/termexec/termexec.go` and `lib/screentracker` and copy none of their code.
 
-- `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
-- `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
-- `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)
-
 ## coder/agentapi@7c468d5
 
 Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technologies, Inc.). The licence text above applies; the notice is kept with the copied code.
@@ -235,6 +234,7 @@ Source: https://github.com/github/gh-aw (MIT, Copyright GitHub, Inc.)
 Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) 2025 Anthropic, PBC)
 
 - `internal/tracker/github/trigger.go` from `src/github/validation/trigger.ts`, `src/github/validation/actor.ts` and `src/github/utils/actor-filter.ts` [ported to Go; tested by `internal/tracker/github/trigger_test.go`]
+- `internal/tracker/sanitize/prompt.go` from `src/github/utils/sanitizer.ts` [tested by `internal/tracker/sanitize/prompt_test.go`]
 
 ```
 MIT License
@@ -333,3 +333,34 @@ Source: https://github.com/ast-grep/ast-grep (MIT, Copyright (c) 2022 Herrington
 Source: https://github.com/cline/cline (Apache-2.0, Copyright Cline Bot Inc.). The Apache-2.0 licence text is at the repository root. The Go port is a translation and carries no upstream code.
 
 - `internal/dispatch/local/guard.go` from `sdk/packages/core/src/extensions/tools/command-guard.ts` [tested by `internal/dispatch/local/guard_test.go`, whose corpus is `command-guard.test.ts`]
+
+## temporalio/temporal@bfabec7
+
+Source: https://github.com/temporalio/temporal (MIT, Copyright (c) 2025 Temporal Technologies Inc.; Copyright (c) 2020 Uber Technologies, Inc.)
+
+- `pkg/retry/retrypolicy.go` from `common/backoff/retrypolicy.go` (clock, global rand and ConditionalRetryPolicy dropped) [tested by `pkg/retry/retry_test.go`]
+- `pkg/retry/retry.go` from `common/backoff/retry.go` (proto helpers and serviceerror dropped; throttle becomes `Loop.MinDelay`) [tested by `pkg/retry/retry_test.go`]
+
+## openrewrite/rewrite@90219c5
+
+Source: https://github.com/openrewrite/rewrite (Apache-2.0). The design is ported to Go, no Java is copied.
+
+- `internal/graph/scanedit/scanedit.go` from `rewrite-core/src/main/java/org/openrewrite/ScanningRecipe.java` [tested by `internal/graph/scanedit/scanedit_test.go`]
+
+## openai/openai-agents-python@64fbde5
+
+Source: https://github.com/openai/openai-agents-python (MIT, Copyright (c) 2025 OpenAI). Design only, no text copied.
+
+- `internal/trace/trace.go` from `src/agents/tracing/span_data.py` and `src/agents/tracing/processor_interface.py` [tested by `internal/trace/trace_test.go`]
+
+## langchain-ai/langgraph@a054ed0
+
+Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangChain, Inc.). Only the checkpoint-sqlite table layout was used, ported to Go.
+
+- `internal/graph/checkpoint/checkpoint.go` from `libs/checkpoint-sqlite/langgraph/checkpoint/sqlite/__init__.py` [tested by `internal/graph/checkpoint/checkpoint_test.go`]
+
+## langchain-ai/langgraph@a054ed0
+
+Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangChain, Inc.). Design and constants only, ported from Python to Go.
+
+- `internal/graph/interrupt/interrupt.go` from `libs/langgraph/langgraph/types.py` (Interrupt, interrupt) [tested by `internal/graph/interrupt/interrupt_test.go`]
