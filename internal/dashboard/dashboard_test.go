@@ -370,3 +370,38 @@ func TestBoardShowsGroupCounts(t *testing.T) {
 		t.Errorf("group counts missing:\n%s", body)
 	}
 }
+
+// TestCommandRejectsRebindingHost: the dashboard listener answers 403 to a Host that is not loopback.
+func TestCommandRejectsRebindingHost(t *testing.T) {
+	f := newFake(t)
+	f.BoardVal = sampleBoard()
+	ctx, cancel := context.WithCancel(WithControl(context.Background(), f))
+	defer cancel()
+	pr, pw := io.Pipe()
+	cmd := NewCommand()
+	cmd.SetOut(pw)
+	cmd.SetArgs([]string{"--addr", "127.0.0.1:0"})
+	done := make(chan error, 1)
+	go func() { done <- cmd.ExecuteContext(ctx) }()
+	line, err := bufio.NewReader(pr).ReadString('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := strings.TrimSpace(strings.TrimPrefix(line, "dashboard on "))
+	for host, want := range map[string]int{"": http.StatusOK, "evil.example.com": http.StatusForbidden} {
+		req, _ := http.NewRequest(http.MethodGet, base+"/", nil)
+		if host != "" {
+			req.Host = host
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Errorf("host %q: status %d, want %d", host, resp.StatusCode, want)
+		}
+	}
+	cancel()
+	<-done
+}

@@ -198,3 +198,9 @@ Source: https://github.com/continuedev/continue (Apache-2.0, Copyright (c) Conti
 - `internal/eval/grade/grade.go` from `swebench/harness/grading.py` (Go port; truncated-id prefix match dropped)
 - `internal/eval/grade/markers.go` from `swebench/harness/constants/__init__.py`
 - `internal/eval/grade/parse.go` from `swebench/harness/log_parsers/python.py` (pytest parser; the go test parser is ours)
+
+## coder/agentapi@7c468d5
+
+Source: https://github.com/coder/agentapi (MIT, Copyright (c) 2025 Coder Technologies, Inc.). The licence text above applies; the notice is kept with the copied code.
+
+- `internal/serve/hostguard/hostguard.go` from `lib/httpapi/server.go` (parseAllowedHosts, parseAllowedOrigins, hostAuthorizationMiddleware; huma and chi dropped) [tested by `internal/serve/hostguard/hostguard_test.go`]
