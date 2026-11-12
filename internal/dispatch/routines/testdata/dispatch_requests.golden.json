@@ -1,0 +1,32 @@
+[
+ {
+  "method": "GET",
+  "path": "/v1/code/triggers?name=factory-7-a2",
+  "authorization": "Bearer test-token-123"
+ },
+ {
+  "method": "POST",
+  "path": "/v1/code/triggers",
+  "authorization": "Bearer test-token-123",
+  "content_type": "application/json",
+  "body": {
+   "branch": "main",
+   "enabled": false,
+   "name": "factory-7-a2",
+   "prompt": "Run `git fetch origin cloud-briefs \u0026\u0026 git show origin/cloud-briefs:v9-7-a2.md`, then follow that brief exactly.",
+   "repo": "o/r"
+  }
+ },
+ {
+  "method": "GET",
+  "path": "/v1/code/sessions?trigger_id=trig_a",
+  "authorization": "Bearer test-token-123"
+ },
+ {
+  "method": "POST",
+  "path": "/v1/code/triggers/trig_a/run",
+  "authorization": "Bearer test-token-123",
+  "content_type": "application/json",
+  "body": {}
+ }
+]
