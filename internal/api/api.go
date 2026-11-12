@@ -157,6 +157,14 @@ type LatestObserver interface {
 	Latest(ctx context.Context, id TicketID) (Observation, error)
 }
 
+// Thread is the optional Tracker write for the spend ledger: the one comment carrying the
+// `<!-- factory:spend v1 -->` marker, read back and rewritten in place. SpendComment is empty
+// when no such comment exists yet.
+type Thread interface {
+	SpendComment(ctx context.Context, id TicketID) (string, error)
+	PutSpendComment(ctx context.Context, id TicketID, body string) error
+}
+
 // Event is one line of the NDJSON stream (`factory run --headless`).
 type Event struct {
 	V      int            `json:"v"`

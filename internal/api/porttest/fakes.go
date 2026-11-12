@@ -76,11 +76,12 @@ type Tracker struct {
 	Tickets  map[api.TicketID]api.Ticket
 	Phases   map[api.TicketID]api.Phase
 	Comments map[api.TicketID][]string
+	Spend    map[api.TicketID]string // the one spend comment per ticket, rewritten in place
 }
 
 // NewTracker returns a tracker holding the given ready tickets.
 func NewTracker(ts ...api.Ticket) *Tracker {
-	t := &Tracker{Tickets: map[api.TicketID]api.Ticket{}, Phases: map[api.TicketID]api.Phase{}, Comments: map[api.TicketID][]string{}}
+	t := &Tracker{Tickets: map[api.TicketID]api.Ticket{}, Phases: map[api.TicketID]api.Phase{}, Comments: map[api.TicketID][]string{}, Spend: map[api.TicketID]string{}}
 	for _, x := range ts {
 		t.Tickets[x.ID] = x
 		t.Phases[x.ID] = api.PhaseReady
@@ -131,6 +132,21 @@ func (t *Tracker) Comment(_ context.Context, id api.TicketID, body string) error
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.Comments[id] = append(t.Comments[id], body)
+	return nil
+}
+
+// SpendComment returns the ticket's spend comment, or "" before the first write.
+func (t *Tracker) SpendComment(_ context.Context, id api.TicketID) (string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.Spend[id], nil
+}
+
+// PutSpendComment replaces the ticket's spend comment.
+func (t *Tracker) PutSpendComment(_ context.Context, id api.TicketID, body string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Spend[id] = body
 	return nil
 }
 
@@ -189,5 +205,6 @@ var (
 	_ api.Tracker        = (*Tracker)(nil)
 	_ api.Observer       = (*Observer)(nil)
 	_ api.Lister         = (*Tracker)(nil)
+	_ api.Thread         = (*Tracker)(nil)
 	_ api.LatestObserver = (*Observer)(nil)
 )

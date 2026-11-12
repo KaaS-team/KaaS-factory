@@ -19,7 +19,7 @@ var (
 	statuses = []struct{ Name, Category string }{
 		{"To Do", "new"}, {"Ready", "new"}, {"In Progress", "indeterminate"}, {"In Review", "indeterminate"}, {"Done", "done"},
 	}
-	issuePath   = regexp.MustCompile(`^/rest/api/3/issue/([A-Z]+-\d+)(?:/(comment|transitions))?$`)
+	issuePath   = regexp.MustCompile(`^/rest/api/3/issue/([A-Z]+-\d+)(?:/(comment|transitions)(?:/(\d+))?)?$`)
 	statusJQL   = regexp.MustCompile(`status = "([^"]+)"`)
 	statusInJQL = regexp.MustCompile(`status in \(([^)]*)\)`)
 	quotedJQL   = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
@@ -220,6 +220,17 @@ func (f *fakeJira) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		i.Status = statuses[n-11].Name
 		reply(204, nil)
+	case m[2] == "comment" && m[3] == "" && r.Method == "GET":
+		reply(200, map[string]any{"comments": i.Comments})
+	case m[2] == "comment" && m[3] != "" && r.Method == "PUT":
+		for _, c := range i.Comments {
+			if c["id"] == m[3] {
+				c["body"] = strip(body["body"])
+				reply(200, c)
+				return
+			}
+		}
+		reply(404, map[string]any{"errorMessages": []string{"comment not found"}})
 	case m[2] == "comment" && r.Method == "POST":
 		c := map[string]any{"id": fmt.Sprint(10000 + len(i.Comments)), "body": strip(body["body"])}
 		i.Comments = append(i.Comments, c)

@@ -29,7 +29,10 @@ type Config struct {
 	Client     *vendorkit.Client    // timeout and retry policy, default zero value
 }
 
-var _ api.Lister = (*Tracker)(nil)
+var (
+	_ api.Lister = (*Tracker)(nil)
+	_ api.Thread = (*Tracker)(nil)
+)
 
 // Tracker is a Linear-backed api.Tracker.
 type Tracker struct {
@@ -50,6 +53,7 @@ var (
     states { nodes { id name type position } } } } }`
 	qIssueState    = `query IssueState($id: String!) { issue(id: $id) { id state { id name } } }`
 	qCommentCreate = "mutation CommentCreate($input: CommentCreateInput!) { commentCreate(input: $input) { comment { id } } }"
+	qCommentUpdate = "mutation CommentUpdate($id: String!, $input: CommentUpdateInput!) { commentUpdate(id: $id, input: $input) { success } }"
 	qIssueUpdate   = `mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) {
     issueUpdate(id: $id, input: $input) { success } }`
 )
@@ -81,7 +85,10 @@ func New(cfg Config) (*Tracker, error) {
 func (t *Tracker) Name() string { return "linear" }
 
 type issue struct {
-	ID          string  `json:"id"`
+	ID       string `json:"id"`
+	Comments struct {
+		Nodes []struct{ ID, Body string } `json:"nodes"`
+	} `json:"comments"`
 	Number      int     `json:"number"`
 	Title       string  `json:"title"`
 	Description *string `json:"description"`
@@ -322,4 +329,43 @@ func (t *Tracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) er
 		}
 	}
 	return fmt.Errorf("linear: team %s has no state %q (mapped from phase %q)", t.cfg.Team, target, p)
+}
+
+// spend finds the issue's spend comment: the one whose sealed footer holds and whose original
+// carries the marker. It returns the issue id, the comment id and the original body.
+func (t *Tracker) spend(ctx context.Context, id api.TicketID) (issueID, commentID, body string, err error) {
+	tok, err := t.token()
+	if err != nil {
+		return "", "", "", err
+	}
+	i, err := t.raw(ctx, id)
+	if err != nil {
+		return "", "", "", err
+	}
+	for _, c := range i.Comments.Nodes {
+		if b, ok := vendorkit.DecodeBody(c.Body, vendorkit.HMACSeal(tok), "comment"); ok && strings.Contains(b, vendorkit.SpendMarker) {
+			return i.ID, c.ID, b, nil
+		}
+	}
+	return i.ID, "", "", nil
+}
+
+// SpendComment returns the spend ledger comment on the issue, or "" when none exists.
+func (t *Tracker) SpendComment(ctx context.Context, id api.TicketID) (string, error) {
+	_, _, b, err := t.spend(ctx, id)
+	return b, err
+}
+
+// PutSpendComment updates the issue's spend ledger comment in place, or adds it the first time.
+func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body string) error {
+	_, c, _, err := t.spend(ctx, id)
+	if err != nil {
+		return err
+	}
+	if c == "" {
+		return t.Comment(ctx, id, body)
+	}
+	tok, _ := t.token()
+	var d json.RawMessage
+	return t.gql(ctx, qCommentUpdate, map[string]any{"id": c, "input": map[string]any{"body": vendorkit.EncodeBody(body, vendorkit.HMACSeal(tok), "comment")}}, &d)
 }
