@@ -3,15 +3,6 @@
 // names tiers (small, large), never models.
 package tutor
 
-// Verdict is the result of a review of one attempt.
-type Verdict string
-
-// Review results; the zero value means the attempt was not reviewed.
-const (
-	Pass   Verdict = "pass"
-	Reject Verdict = "reject"
-)
-
 // Policy is the escalation rule for one run.
 type Policy struct {
 	Student            string
@@ -20,19 +11,16 @@ type Policy struct {
 	TeacherVerifies    bool
 }
 
-// Attempt is one finished build attempt and, when reviewed, who reviewed it.
+// Attempt is one finished build attempt and the tier it ran on.
 type Attempt struct {
-	Tier       string
-	Verdict    Verdict
-	ReviewedBy string
+	Tier string
 }
 
 // Decision says what the next attempt runs on and what follows it.
 type Decision struct {
-	Tier        string // tier that builds the next attempt
-	Review      bool   // a review of that attempt runs
-	ReviewTier  string // tier that reviews it, when Review is set
-	WriteLesson bool   // the latest attempt was rejected by the teacher
+	Tier       string // tier that builds the next attempt
+	Review     bool   // a review of that attempt runs
+	ReviewTier string // tier that reviews it, when Review is set
 }
 
 // Next picks the tier for the next attempt from the attempts so far.
@@ -51,10 +39,6 @@ func (p Policy) Next(history []Attempt) Decision {
 	}
 	if p.TeacherVerifies && d.Tier != p.Teacher {
 		d.Review, d.ReviewTier = true, p.Teacher
-	}
-	if n := len(history); n > 0 {
-		last := history[n-1]
-		d.WriteLesson = last.Verdict == Reject && last.ReviewedBy == p.Teacher
 	}
 	return d
 }

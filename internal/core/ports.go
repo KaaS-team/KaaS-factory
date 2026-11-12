@@ -17,6 +17,12 @@ func (l loopDispatcher) Name() string   { return l.c.d.Dispatcher.Name() }
 func (l loopDispatcher) Caps() api.Caps { return l.c.d.Dispatcher.Caps() }
 
 func (l loopDispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, error) {
+	if l.c.d.Stages != nil {
+		var err error
+		if b, err = l.c.stageBrief(b); err != nil {
+			return api.Session{}, err
+		}
+	}
 	s, err := l.c.d.Dispatcher.Dispatch(ctx, b)
 	if err != nil {
 		return s, err
@@ -72,6 +78,7 @@ func (l loopTracker) Ready(ctx context.Context) ([]api.Ticket, error) {
 		}
 	}
 	for _, t := range ts {
+		l.c.tickets[t.ID] = t
 		l.c.report(l.c.d.Store.PutTicket(ctx, t))
 	}
 	return ts, nil
@@ -88,6 +95,11 @@ func (l loopTracker) Comment(ctx context.Context, id api.TicketID, body string) 
 func (l loopTracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) error {
 	switch p {
 	case api.PhaseDone:
+		if l.c.d.Stages != nil {
+			if more, err := l.c.advance(ctx, id); more || err != nil {
+				return err
+			}
+		}
 		// Queue and merge first: the slot frees only once the PR has landed.
 		if err := l.c.d.Tracker.SetPhase(ctx, id, p); err != nil {
 			return err
@@ -113,15 +125,22 @@ func (l loopTracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase)
 type loopObserver struct{ c *Core }
 
 func (l loopObserver) Observe(ctx context.Context, id api.TicketID, attempt int) (api.Observation, error) {
-	o, err := l.c.d.Observer.Observe(ctx, id, attempt)
+	base := 0
+	if st, ok := l.c.stages[id]; ok {
+		base = st.base
+	}
+	o, err := l.c.d.Observer.Observe(ctx, id, attempt+base)
 	if err != nil {
 		return o, err
 	}
 	l.c.lastObs[id] = o
 	l.c.report(l.c.d.Store.Apply(ctx, o))
-	if o.Attempt == attempt && o.Branch != "" && o.LastPush.After(l.c.lastPush[id]) {
+	if o.Attempt == attempt+base && o.Branch != "" && o.LastPush.After(l.c.lastPush[id]) {
 		l.c.lastPush[id] = o.LastPush
-		l.c.hub.emit(KindPushed, id, map[string]any{"attempt": attempt, "branch": o.Branch})
+		l.c.hub.emit(KindPushed, id, map[string]any{"attempt": attempt + base, "branch": o.Branch})
+	}
+	if o.Attempt == attempt+base {
+		o.Attempt = attempt // reconcile counts the current node's attempts from 1
 	}
 	return o, nil
 }

@@ -40,7 +40,7 @@ func TestLoadMarkdownEqualsYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(a, b) {
-		t.Errorf("graphs differ:\n--- md\n%s--- yaml\n%s", a.Describe(), b.Describe())
+		t.Errorf("graphs differ:\n--- md\n%s--- yaml\n%s", describe(a), describe(b))
 	}
 	// The body is the default prompt of every node without its own.
 	body := writeFile(t, dir, "body.md", "---\nname: flow\nnodes:\n"+equalSteps+"---\nWork on {{ticket.title}}.\n")
@@ -48,8 +48,8 @@ func TestLoadMarkdownEqualsYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(g.Nodes(), b.Nodes()) || !reflect.DeepEqual(g.Edges(), b.Edges()) || g.Start != b.Start {
-		t.Errorf("body changed the graph:\n%s", g.Describe())
+	if !reflect.DeepEqual(g.Nodes(), b.Nodes()) || !reflect.DeepEqual(g.edges, b.edges) || g.Start != b.Start {
+		t.Errorf("body changed the graph:\n%s", describe(g))
 	}
 	out, err := g.RenderPrompt("build", map[string]any{"ticket": map[string]any{"title": "crash"}})
 	if err != nil || out != "Work on crash." {
@@ -122,9 +122,6 @@ func TestLoadMarkdownSafeOutputs(t *testing.T) {
 		if len(g.SafeOutputs) != len(c.want) || (len(c.want) > 0 && !reflect.DeepEqual(g.SafeOutputs, c.want)) {
 			t.Errorf("%s: %v want %v", c.name, g.SafeOutputs, c.want)
 		}
-		if g.CanWrite(WritePR) != (len(c.want) == 3) {
-			t.Errorf("%s: CanWrite(pr) = %v", c.name, g.CanWrite(WritePR))
-		}
 	}
 }
 
@@ -179,11 +176,12 @@ func TestLoadDefault(t *testing.T) {
 		files map[string]string
 		want  string // the graph name, or "" for an error
 	}{
-		{"root WORKFLOW.md wins", map[string]string{"WORKFLOW.md": "---\nname: mine\non: manual\n---\nGo.\n", defaultWorkflowFile: fallback}, "mine"},
+		{"root WORKFLOW.md wins", map[string]string{"WORKFLOW.md": "---\nname: mine\non: manual\n---\nGo.\n", workflowDir + "/issue-to-pr.yml": fallback}, "mine"},
 		{"WORKFLOW.md without front matter", map[string]string{"WORKFLOW.md": "Just a prompt.\n"}, "WORKFLOW"},
-		{"none keeps the existing default", map[string]string{defaultWorkflowFile: fallback}, "feature-to-pr"},
-		{"nothing at all", map[string]string{}, ""},
-		{"broken WORKFLOW.md does not fall back", map[string]string{"WORKFLOW.md": "---\non: sometimes\n---\n", defaultWorkflowFile: fallback}, ""},
+		{"repo issue-to-pr file replaces the built-in", map[string]string{workflowDir + "/issue-to-pr.yml": fallback}, "issue-to-pr"},
+		{"nothing at all is the built-in", map[string]string{}, "issue-to-pr"},
+		{"broken repo file does not fall back", map[string]string{workflowDir + "/issue-to-pr.yml": "steps: 3\n"}, ""},
+		{"broken WORKFLOW.md does not fall back", map[string]string{"WORKFLOW.md": "---\non: sometimes\n---\n", workflowDir + "/issue-to-pr.yml": fallback}, ""},
 	}
 	for _, c := range cases {
 		root := t.TempDir()
@@ -199,6 +197,15 @@ func TestLoadDefault(t *testing.T) {
 		}
 		if err != nil || g.Name != c.want {
 			t.Errorf("%s: %v %+v", c.name, err, g)
+			continue
+		}
+		if c.name == "repo issue-to-pr file replaces the built-in" && len(g.Nodes()) != 1 {
+			t.Errorf("%s: loaded %d nodes, want the repo file's one", c.name, len(g.Nodes()))
+		}
+		if c.name == "nothing at all is the built-in" {
+			if next, err := g.Next("verify", Fail); err != nil || next != "build" {
+				t.Errorf("%s: verify fail goes to %q, %v", c.name, next, err)
+			}
 		}
 	}
 }

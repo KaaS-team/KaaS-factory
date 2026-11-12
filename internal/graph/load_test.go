@@ -42,7 +42,7 @@ func TestGoldenGraphs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := g.Describe(); got != string(want) {
+		if got := describe(g); got != string(want) {
 			t.Errorf("%s changed:\n--- got\n%s--- want\n%s", name, got, want)
 		}
 	}
@@ -234,7 +234,7 @@ func TestSymphonyWorkflowMD(t *testing.T) {
 		t.Errorf("config %v", g.Config)
 	}
 	if g.Start != "run" || len(g.Nodes()) != 1 {
-		t.Errorf("graph %s", g.Describe())
+		t.Errorf("graph %s", describe(g))
 	}
 	out, err := g.RenderPrompt("run", map[string]any{"issue": map[string]any{"title": "crash"}, "attempt": nil})
 	if err != nil || out != "Fix crash (attempt )." {

@@ -127,6 +127,7 @@ func (c *Core) Cancel(ctx context.Context, id api.TicketID) error {
 		return err
 	}
 	delete(c.state.Entries, id)
+	delete(c.stages, id)
 	c.hub.emit(KindCanceled, id, map[string]any{"attempt": e.Attempt})
 	return nil
 }
