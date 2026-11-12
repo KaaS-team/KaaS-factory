@@ -18,11 +18,12 @@ const SteerMessage = "No push seen for a while. Commit and push what you have, t
 
 // Config holds the scheduler settings. Zero values take the defaults noted.
 type Config struct {
-	Tick          time.Duration // loop period (30s)
-	StallAfter    time.Duration // no push for this long gives one Steer; twice gives Retry. 0 turns stall detection off
-	MaxAttempts   int           // attempts before NeedsHuman (3)
-	MaxConcurrent int           // slots; 0 takes the dispatcher's cap
-	Base          string        // base branch written into briefs (main)
+	Tick            time.Duration // loop period (30s)
+	StallAfter      time.Duration // no push for this long gives one Steer; twice gives Retry. 0 turns stall detection off
+	MaxAttempts     int           // attempts before NeedsHuman (3)
+	MaxConcurrent   int           // slots; 0 takes the dispatcher's cap
+	Base            string        // base branch written into briefs (main)
+	MaxRetryBackoff time.Duration // cap on the retry delay (5m)
 }
 
 func (c Config) withDefaults() Config {
@@ -32,6 +33,9 @@ func (c Config) withDefaults() Config {
 	if c.MaxAttempts <= 0 {
 		c.MaxAttempts = 3
 	}
+	if c.MaxRetryBackoff <= 0 {
+		c.MaxRetryBackoff = 5 * time.Minute
+	}
 	if c.Base == "" {
 		c.Base = "main"
 	}
@@ -39,15 +43,14 @@ func (c Config) withDefaults() Config {
 }
 
 // Backoff is the wait before retrying after failed attempt n: min(10s*2^(n-1), 5m) (Symphony 8.4).
-func Backoff(n int) time.Duration {
-	const base, limit = 10 * time.Second, 5 * time.Minute
-	if n < 1 {
-		n = 1
+func Backoff(n int) time.Duration { return backoffCap(n, 5*time.Minute) }
+
+func backoffCap(n int, limit time.Duration) time.Duration {
+	d := 10 * time.Second
+	for i := 1; i < n && d < limit; i++ {
+		d *= 2
 	}
-	if n > 6 {
-		return limit
-	}
-	return min(base<<(n-1), limit)
+	return min(d, limit)
 }
 
 // Entry is one claimed ticket.
@@ -57,8 +60,10 @@ type Entry struct {
 	Attempt   int
 	Session   *api.Session // nil after a restart; the key is rebuilt from ticket and attempt
 	StartedAt time.Time
-	SteeredAt time.Time // zero until a Steer was sent for the current stall
-	RetryAt   time.Time // when a retry-queued entry may be dispatched again
+	SteeredAt time.Time       // zero until a Steer was sent for the current stall
+	RetryAt   time.Time       // when a retry-queued entry may be dispatched again
+	Error     string          // why the entry is queued for retry
+	LastObs   api.Observation // last observation that succeeded
 }
 
 // State is everything Decide reads besides observations and the clock.
@@ -70,7 +75,11 @@ type State struct {
 	Locks           pick.Locks
 	FiresLeft       int
 
-	fired []time.Time // dispatch times in the last hour, kept by Tick
+	// Unobserved lists running tickets whose observation failed this tick; Decide makes no stall decision for them.
+	Unobserved map[api.TicketID]bool
+
+	fired      []time.Time // dispatch times in the last hour, kept by Tick
+	noDispatch bool        // the tracker read failed this tick: reconcile only
 }
 
 // Kind names an action.
@@ -84,6 +93,7 @@ const (
 	Cancel     Kind = "cancel"
 	MarkDone   Kind = "mark-done"
 	NeedsHuman Kind = "needs-human"
+	Requeue    Kind = "requeue" // a due retry found no free slot; Reason is the error to record
 )
 
 // Action is a plain value describing one thing to do. Attempt is the attempt
@@ -136,6 +146,8 @@ func Decide(s State, obs []api.Observation, now time.Time, cfg Config) []Action 
 			if !now.Before(e.RetryAt) {
 				due = append(due, e)
 			}
+		case s.Unobserved[id]:
+			// Symphony 8.5: a failed refresh keeps the worker running; decide nothing this tick.
 		default:
 			if a, ok := reconcileOne(e, byID[id], now, cfg); ok {
 				out = append(out, a)
@@ -143,14 +155,20 @@ func Decide(s State, obs []api.Observation, now time.Time, cfg Config) []Action 
 		}
 	}
 
-	if cfg.MaxConcurrent <= 0 {
+	if cfg.MaxConcurrent <= 0 || s.noDispatch {
 		return out
 	}
 	free := cfg.MaxConcurrent - used
 	fires := s.FiresLeft
 	sort.SliceStable(due, func(i, j int) bool { return due[i].RetryAt.Before(due[j].RetryAt) })
 	for _, e := range due {
-		if free <= 0 || fires <= 0 {
+		if free <= 0 {
+			if e.Error != SlotsExhausted {
+				out = append(out, Action{Kind: Requeue, ID: e.Ticket.ID, Attempt: e.Attempt, Reason: SlotsExhausted})
+			}
+			continue
+		}
+		if fires <= 0 {
 			break
 		}
 		out = append(out, Action{Kind: Dispatch, ID: e.Ticket.ID, Ticket: e.Ticket, Attempt: e.Attempt + 1})
@@ -189,9 +207,14 @@ func reconcileOne(e Entry, o api.Observation, now time.Time, cfg Config) (Action
 		if e.Attempt >= cfg.MaxAttempts {
 			return Action{Kind: NeedsHuman, ID: id, Attempt: e.Attempt, Reason: "stalled after " + strconv.Itoa(e.Attempt) + " attempts"}, true
 		}
-		return Action{Kind: Retry, ID: id, Attempt: e.Attempt, At: now.Add(Backoff(e.Attempt)), Reason: "stalled"}, true
+		return Action{Kind: Retry, ID: id, Attempt: e.Attempt, At: now.Add(cfg.backoff(e.Attempt)), Reason: "stalled"}, true
 	case elapsed >= cfg.StallAfter && e.SteeredAt.Before(since):
 		return Action{Kind: Steer, ID: id, Attempt: e.Attempt, Message: SteerMessage}, true
 	}
 	return Action{}, false
 }
+
+// SlotsExhausted is the error recorded on a retry that found no free slot (Symphony 8.4).
+const SlotsExhausted = "no available orchestrator slots"
+
+func (c Config) backoff(n int) time.Duration { return backoffCap(n, c.MaxRetryBackoff) }

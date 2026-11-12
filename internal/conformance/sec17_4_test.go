@@ -1,11 +1,13 @@
 package conformance
 
 import (
+	"context"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/pick"
 	"github.com/KaaS-team/factory/internal/reconcile"
 )
 
@@ -174,14 +176,77 @@ func Test17_4_AbnormalExitBackoff(t *testing.T) {
 	}
 }
 
-// Section 8.4 retry entry: attempt, due time and identifier are kept. The error text is not stored.
+// Section 8.4: the cap is Config.MaxRetryBackoff; 1m caps attempt 8 at 1m and the default stays 5m.
+func Test17_4_ConfiguredBackoffCap(t *testing.T) {
+	w := newWorld(t, reconcile.Config{MaxConcurrent: 1, StallAfter: time.Minute, MaxAttempts: 20, MaxRetryBackoff: time.Minute}, tk("x", 1, t0))
+	w.tick()
+	for n := 1; n <= 8; n++ {
+		w.advance(2 * time.Minute)
+		w.tick()
+		e, _ := w.entry("x")
+		want := min(delay(n), time.Minute)
+		if e.Attempt != n || e.RetryAt.Sub(w.now) != want {
+			t.Fatalf("attempt %d: entry %+v, want due in %v", n, e, want)
+		}
+		w.advance(want)
+		w.tick()
+	}
+}
+
+// Section 8.5: a failed observer refresh keeps the worker running and keeps the last good observation.
+func Test17_4_ObserverFailureKeepsWorker(t *testing.T) {
+	w := newWorld(t, reconcile.Config{MaxConcurrent: 1, StallAfter: time.Minute}, tk("x", 1, t0))
+	w.tick()
+	w.ob.Set(api.Observation{Ticket: "x", Attempt: 1, Branch: "b", LastPush: w.now})
+	w.advance(30 * time.Second)
+	w.tick()
+	w.ob.err = errBoom
+	w.advance(10 * time.Minute)
+	w.tick()
+	e, _ := w.entry("x")
+	if e.Phase != api.PhaseRunning || len(w.dp.Cancels) != 0 || w.l.count("dispatcher.Steer") != 0 || !e.LastObs.LastPush.Equal(t0) {
+		t.Fatalf("entry %+v cancels %v: want running, untouched, last observation kept", e, w.dp.Cancels)
+	}
+}
+
+// Section 8.1: when the tracker read fails, stall detection still runs and only new dispatch is skipped.
+func Test17_4_TrackerFailureStillReconciles(t *testing.T) {
+	w := newWorld(t, reconcile.Config{MaxConcurrent: 1, StallAfter: time.Minute}, tk("x", 1, t0), tk("y", 2, t0))
+	w.tick()
+	w.tr.err = errBoom
+	w.advance(time.Minute)
+	w.tick()
+	if n := w.l.count("dispatcher.Steer"); n != 1 {
+		t.Fatalf("%d steers with the tracker down, want the stall check to run", n)
+	}
+	w.advance(time.Minute)
+	w.tick()
+	w.advance(time.Hour)
+	w.tick()
+	if w.l.count("dispatcher.Dispatch") != 1 {
+		t.Fatalf("calls %v: dispatched while the tracker was down", w.l.all())
+	}
+}
+
+// Section 14.3: locks passed in Deps are known to the first Decide after a fresh start.
+func Test17_4_InitialLocksHoldFiles(t *testing.T) {
+	w := newWorld(t, reconcile.Config{MaxConcurrent: 2}, tk("x", 1, t0, "a.go"))
+	d := w.deps()
+	d.InitialLocks = pick.Locks{Files: []string{"a.go"}}
+	reconcile.Tick(context.Background(), d, &w.state, w.cfg)
+	if w.l.count("dispatcher.Dispatch") != 0 {
+		t.Fatalf("calls %v: dispatched onto a held file on the first tick", w.l.all())
+	}
+}
+
+// Section 8.4 retry entry: attempt, due time, identifier and error are kept.
 func Test17_4_RetryEntryFields(t *testing.T) {
 	w := stalledWorld(t)
 	w.advance(2 * time.Minute)
 	w.tick()
 	e, ok := w.entry("x")
-	if !ok || e.Attempt != 1 || e.Ticket.ID != "x" || !e.RetryAt.Equal(w.now.Add(10*time.Second)) {
-		t.Fatalf("entry %+v, want attempt 1, id x, due 10s from now", e)
+	if !ok || e.Attempt != 1 || e.Ticket.ID != "x" || !e.RetryAt.Equal(w.now.Add(10*time.Second)) || e.Error != "stalled" {
+		t.Fatalf("entry %+v, want attempt 1, id x, due 10s from now, error stalled", e)
 	}
 }
 
@@ -230,6 +295,10 @@ func Test17_4_SlotExhaustionKeepsRetryQueued(t *testing.T) {
 	got := reconcile.Decide(s, nil, t0, cfg)
 	if len(got) != 1 || got[0].Kind != reconcile.Dispatch || got[0].ID != "a" || got[0].Attempt != 2 {
 		t.Fatalf("actions %+v, want a dispatched as attempt 2 once the slot is free", got)
+	}
+	s.Entries["b"] = reconcile.Entry{Ticket: b, Phase: api.PhaseRunning, Attempt: 1, StartedAt: t0}
+	if got := reconcile.Decide(s, nil, t0, cfg); len(got) != 1 || got[0].Kind != reconcile.Requeue || got[0].Reason != "no available orchestrator slots" {
+		t.Fatalf("actions %+v, want a requeue with the slot exhaustion reason", got)
 	}
 }
 
