@@ -166,3 +166,64 @@ func TestGuardLeavesUnchangedAndHandlesSymlinks(t *testing.T) {
 		t.Fatalf("restore wrote through the link: %q", got)
 	}
 }
+
+// Each way to get checkout code to run that a blocklist missed must be refused by the allowlist.
+func TestPermittedAllowlist(t *testing.T) {
+	for _, c := range []struct {
+		cmd  string
+		want bool
+	}{
+		{"git status", true}, {"git status --porcelain", true}, {"git diff HEAD~1", true}, {"git log -3", true},
+		{"git show HEAD", true}, {"git rev-parse HEAD", true}, {"git worktree list", true},
+		{".factory/gates.sh", true}, {"bash .factory/gates.sh --fast", true},
+		{"env sh -c ./evil", false}, {"env", false},
+		{"xargs rm", false}, {"find . -exec ./evil {} ;", false}, {"find . -name x", false},
+		{"git commit -m x", false},   // runs pre-commit and commit-msg hooks
+		{"git checkout main", false}, // runs post-checkout
+		{"git merge main", false}, {"git rebase main", false}, {"git push", false}, {"git stash", false},
+		{"git -c core.hooksPath=/tmp/x status", false}, {"git config core.hooksPath x", false},
+		{"git status; ./evil", false}, {"git status && env", false}, {"git status | sh", false},
+		{"git log $(./evil)", false}, {"git log `./evil`", false}, {"git diff > .git/hooks/pre-commit", false},
+		{".factory/gates.sh-evil", false}, {"bash .factory/gates.sh.evil", false}, {"git statusx", false},
+		{"make check", false}, {"npm test", false}, {"cat x", false}, {"", false},
+	} {
+		if got := Permitted(c.cmd); got != c.want {
+			t.Errorf("Permitted(%q) = %v, want %v", c.cmd, got, c.want)
+		}
+	}
+	// The deny list stays as a second layer for each of the escapes.
+	for _, tool := range []string{"Bash(env:*)", "Bash(xargs:*)", "Bash(find:*)", "Bash(git commit:*)", "Bash(git checkout:*)"} {
+		if !slices.Contains(disallowed, tool) {
+			t.Errorf("deny list lacks %s", tool)
+		}
+	}
+}
+
+func TestRestrictCutsAllowRulesToAllowlist(t *testing.T) {
+	settings := `{"permissions":{"allow":["Edit(.factory/runs/issue-1/**)","Bash(find *)","Bash(env *)","Bash(git status *)","Bash(make test)","Bash(.factory/gates.sh*)","Bash(.factory/gates.sh)","Bash","mcp__gh"]},"enabledPlugins":{"p":false}}`
+	argv := []string{"claude", "-p", "x", "--permission-mode", "dontAsk", "--settings", settings}
+	got, err := Restrict(argv, []string{"Bash(npm:*)"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(got, "--settings")
+	want := `{"enabledPlugins":{"p":false},"permissions":{"allow":["Edit(.factory/runs/issue-1/**)","Bash(git status *)","Bash(.factory/gates.sh)","mcp__gh"]}}`
+	if got[i+1] != want {
+		t.Fatalf("settings = %s\nwant       %s", got[i+1], want)
+	}
+	if !slices.Contains(got, "Bash(npm:*)") || argv[6] != settings {
+		t.Fatalf("deny missing or input argv modified: %q", got)
+	}
+	// Without dontAsk, or without settings to cut, the allowlist would not bind: refuse.
+	for name, bad := range map[string][]string{
+		"no mode":       {"claude", "--settings", settings},
+		"default mode":  {"claude", "--permission-mode", "default", "--settings", settings},
+		"no settings":   {"claude", "--permission-mode", "dontAsk"},
+		"bad settings":  {"claude", "--permission-mode", "dontAsk", "--settings", "nope"},
+		"allow a list?": {"claude", "--permission-mode", "dontAsk", "--settings", `{"permissions":{"allow":"Bash"}}`},
+	} {
+		if _, err := Restrict(bad, nil); err == nil {
+			t.Errorf("%s: want an error", name)
+		}
+	}
+}
