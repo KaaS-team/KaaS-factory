@@ -28,7 +28,7 @@ type options struct {
 }
 
 // WithRunner sets how the command builds the Deps that run one workflow with one agent preset.
-// Without it `eval` fails; tests pass a fake.
+// Without it `eval` runs each ticket through the local dispatcher; tests pass a fake.
 func WithRunner(f func(ctx context.Context, workflow, agent string) (Deps, error)) Option {
 	return func(o *options) { o.runner = f }
 }
@@ -58,9 +58,6 @@ func NewCommand(opts ...Option) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if o.runner == nil {
-				return errors.New("eval: no agent runner configured")
-			}
 			for flag, v := range map[string]string{"workflow": workflow, "agent": agent} {
 				if !safeName.MatchString(v) {
 					return fmt.Errorf("eval: --%s %q must be lowercase letters, digits, dot, dash or underscore", flag, v)
@@ -85,7 +82,18 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if len(m.Fixtures) == 0 {
 				return fmt.Errorf("eval: no fixtures under %s", fixtures)
 			}
-			deps, err := o.runner(cmd.Context(), workflow, agent)
+			run := o.runner
+			if run == nil { // the default runs each ticket through the local dispatcher in a scratch directory
+				work, err := os.MkdirTemp("", "factory-eval-")
+				if err != nil {
+					return err
+				}
+				defer func() { _ = os.RemoveAll(work) }()
+				run = func(ctx context.Context, workflow, agent string) (Deps, error) {
+					return NewLocalDeps(ctx, LocalConfig{Fixtures: fixtures, Agent: agent, Workflow: workflow, Work: work})
+				}
+			}
+			deps, err := run(cmd.Context(), workflow, agent)
 			if err != nil {
 				return err
 			}
@@ -115,7 +123,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 	cmd.Flags().StringVar(&workflow, "workflow", "", "workflow name (required)")
 	cmd.Flags().StringVar(&agent, "agent", "", "agent preset name, never a model name (required)")
 	cmd.Flags().StringVar(&packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
-	cmd.Flags().StringVar(&fixtures, "fixtures", "internal/eval/testdata", "directory of fixtures")
+	cmd.Flags().StringVar(&fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
 	cmd.Flags().StringVar(&outDir, "out", "evals", "directory the scorecard is written to")
 	cmd.AddCommand(newDiffCommand())
 	return cmd
@@ -153,13 +161,8 @@ func newDiffCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			o, n := oldSC.Aggregate, newSC.Aggregate
 			var b strings.Builder
-			b.WriteString("| metric | old | new | delta |\n|---|---|---|---|\n")
-			fmt.Fprintf(&b, "| pass rate | %.2f | %.2f | %+.2f |\n", o.PassRate, n.PassRate, n.PassRate-o.PassRate)
-			fmt.Fprintf(&b, "| main green rate | %.2f | %.2f | %+.2f |\n", o.MainGreenRate, n.MainGreenRate, n.MainGreenRate-o.MainGreenRate)
-			fmt.Fprintf(&b, "| tokens per merged PR | %d | %d | %+d (%s) |\n", o.TokensPerMergedPR, n.TokensPerMergedPR, n.TokensPerMergedPR-o.TokensPerMergedPR, pct(o.TokensPerMergedPR, n.TokensPerMergedPR))
-			fmt.Fprintf(&b, "| median wall time | %s | %s | %s |\n", o.MedianWallTime, n.MedianWallTime, signed(n.MedianWallTime-o.MedianWallTime))
+			b.WriteString(Diff(oldSC, newSC))
 			v := Compare(oldSC, newSC, 0)
 			if v.Worse {
 				fmt.Fprintf(&b, "\nworse: %s\n", v.Reason)
@@ -175,18 +178,4 @@ func newDiffCommand() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func pct(old, next int64) string {
-	if old == 0 {
-		return "n/a"
-	}
-	return fmt.Sprintf("%+.1f%%", float64(next-old)/float64(old)*100)
-}
-
-func signed(d time.Duration) string {
-	if d >= 0 {
-		return "+" + d.String()
-	}
-	return d.String()
 }

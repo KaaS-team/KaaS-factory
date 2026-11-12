@@ -1,0 +1,9 @@
+{
+  "name": "uv-add",
+  "seed": "seed",
+  "gate": "python3 -m compileall -q src",
+  "hidden": "uv run pytest -q",
+  "tickets": [
+    {"id": "1", "repo": "uv-add", "title": "Add mul(a, b) to src/u.py", "body": "mul returns a*b.", "files": ["src/u.py"], "priority": 0, "created_at": "2026-01-01T00:00:00Z"}
+  ]
+}

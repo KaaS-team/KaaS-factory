@@ -102,7 +102,7 @@ Run the fixtures matrix and write a scorecard
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--agent` | string | `` | agent preset name, never a model name (required) |
-| `--fixtures` | string | `internal/eval/testdata` | directory of fixtures |
+| `--fixtures` | string | `evals/fixtures` | directory of fixtures |
 | `--out` | string | `evals` | directory the scorecard is written to |
 | `--packs` | string | `` | packs lock file the run used, e.g. factory.lock |
 | `--workflow` | string | `` | workflow name (required) |

@@ -1,0 +1,9 @@
+{
+  "name": "bun-add",
+  "seed": "seed",
+  "gate": "bun build src/add.ts --outfile /dev/null",
+  "hidden": "bun test",
+  "tickets": [
+    {"id": "1", "repo": "bun-add", "title": "Export mul(a, b) from src/add.ts", "body": "mul returns a*b.", "files": ["src/add.ts"], "priority": 0, "created_at": "2026-01-01T00:00:00Z"}
+  ]
+}

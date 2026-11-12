@@ -30,6 +30,7 @@ type FixtureTicket struct {
 type Fixture struct {
 	Name    string          `json:"name"`
 	Seed    string          `json:"seed,omitempty"`
+	Gate    string          `json:"gate,omitempty"` // command that says main is green after a ticket
 	Tickets []FixtureTicket `json:"tickets"`
 	Hidden  string          `json:"hidden"`
 }
@@ -191,6 +192,47 @@ func median(ds []time.Duration) time.Duration {
 type Verdict struct {
 	Worse  bool   `json:"worse"`
 	Reason string `json:"reason,omitempty"`
+}
+
+// Diff renders a table of each metric in old and next with its delta and whether
+// next is better, same or worse. `packs upgrade` and `eval diff` both print it.
+func Diff(old, next Scorecard) string {
+	o, n := old.Aggregate, next.Aggregate
+	var b strings.Builder
+	b.WriteString("| metric | old | new | delta | verdict |\n|---|---|---|---|---|\n")
+	fmt.Fprintf(&b, "| pass rate | %.2f | %.2f | %+.2f | %s |\n", o.PassRate, n.PassRate, n.PassRate-o.PassRate, verdict(n.PassRate-o.PassRate, true))
+	fmt.Fprintf(&b, "| main green rate | %.2f | %.2f | %+.2f | %s |\n", o.MainGreenRate, n.MainGreenRate, n.MainGreenRate-o.MainGreenRate, verdict(n.MainGreenRate-o.MainGreenRate, true))
+	tok := n.TokensPerMergedPR - o.TokensPerMergedPR
+	fmt.Fprintf(&b, "| tokens per merged PR | %d | %d | %+d (%s) | %s |\n", o.TokensPerMergedPR, n.TokensPerMergedPR, tok, pct(o.TokensPerMergedPR, n.TokensPerMergedPR), verdict(float64(tok), false))
+	wall := n.MedianWallTime - o.MedianWallTime
+	fmt.Fprintf(&b, "| median wall time | %s | %s | %s | %s |\n", o.MedianWallTime, n.MedianWallTime, signed(wall), verdict(float64(wall), false))
+	fmt.Fprintf(&b, "| human touches per PR | %.2f | %.2f | %+.2f | %s |\n", o.HumanTouchesPerPR, n.HumanTouchesPerPR, n.HumanTouchesPerPR-o.HumanTouchesPerPR, verdict(n.HumanTouchesPerPR-o.HumanTouchesPerPR, false))
+	return b.String()
+}
+
+// verdict names a delta: for a higher-is-better metric a rise is better, otherwise a rise is worse.
+func verdict(delta float64, higherBetter bool) string {
+	switch {
+	case delta == 0:
+		return "same"
+	case (delta > 0) == higherBetter:
+		return "better"
+	}
+	return "worse"
+}
+
+func pct(old, next int64) string {
+	if old == 0 {
+		return "n/a"
+	}
+	return fmt.Sprintf("%+.1f%%", float64(next-old)/float64(old)*100)
+}
+
+func signed(d time.Duration) string {
+	if d >= 0 {
+		return "+" + d.String()
+	}
+	return d.String()
 }
 
 // Compare says whether next is worse than prev: pass rate dropped, or tokens
