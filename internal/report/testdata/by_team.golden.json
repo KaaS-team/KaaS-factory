@@ -1,0 +1,40 @@
+{
+  "since": "2026-11-02T09:00:00Z",
+  "until": "2026-12-14T01:00:00Z",
+  "by": "team",
+  "total": {
+    "key": "all",
+    "merged_prs": 3,
+    "tokens_per_merged_pr": 1333,
+    "rework_rate": 0.33,
+    "human_touches_per_pr": 1.33,
+    "mean_cycle_seconds": 24000,
+    "merged_tokens": 4000,
+    "unmerged_tokens": 1100,
+    "cost_usd": 7.75
+  },
+  "rows": [
+    {
+      "key": "alpha",
+      "merged_prs": 2,
+      "tokens_per_merged_pr": 1300,
+      "rework_rate": 0.5,
+      "human_touches_per_pr": 1.5,
+      "mean_cycle_seconds": 25200,
+      "merged_tokens": 2600,
+      "unmerged_tokens": 100,
+      "cost_usd": 4.25
+    },
+    {
+      "key": "beta",
+      "merged_prs": 1,
+      "tokens_per_merged_pr": 1400,
+      "rework_rate": 0,
+      "human_touches_per_pr": 1,
+      "mean_cycle_seconds": 21600,
+      "merged_tokens": 1400,
+      "unmerged_tokens": 1000,
+      "cost_usd": 3.5
+    }
+  ]
+}
