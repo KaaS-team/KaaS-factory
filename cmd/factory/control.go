@@ -28,6 +28,7 @@ import (
 	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/observe/ghsource"
 	"github.com/KaaS-team/factory/internal/reconcile"
+	"github.com/KaaS-team/factory/internal/reconcile/eventlog"
 	"github.com/KaaS-team/factory/internal/store"
 	"github.com/KaaS-team/factory/internal/tracker/github"
 	"github.com/KaaS-team/factory/internal/tracker/jira"
@@ -74,6 +75,7 @@ const (
 	defaultRoutinesURL = "https://api.anthropic.com"
 	readyLabel         = "factory:ready"
 	dbPath             = ".factory/cache/factory.db"
+	stepLogDir         = ".factory/cache/steps"
 )
 
 // trackers is one row per tracker adapter. The key is the value of the `tracker` config key.
@@ -362,11 +364,15 @@ func buildDeps(c config.Config) (core.Deps, error) {
 		// Shadow mode writes nothing to the repo: the queue lists entries but never merges.
 		queue = shadowQueue{queue}
 	}
+	steps, err := eventlog.Open(stepLogDir)
+	if err != nil {
+		return core.Deps{}, err
+	}
 	b := func(usd float64) api.Budget { return api.Budget{USD: usd} }
 	return core.Deps{
 		Tracker: trk, Dispatcher: recorded{disp, st}, Observer: obs, Store: st,
 		Meter: meter.New(meter.Budgets{Node: b(c.Budgets.Node), Ticket: b(c.Budgets.Ticket), TeamDay: b(c.Budgets.TeamDay)}, time.Now),
-		Queue: queue, Clock: core.RealClock{},
+		Queue: queue, Clock: core.RealClock{}, Log: steps,
 	}, nil
 }
 
