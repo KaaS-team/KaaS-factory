@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -59,9 +58,10 @@ type Config struct {
 	MaxConcurrent int
 	Now           func() time.Time
 	// Sandbox runs each agent under pkg/sandbox: reads anywhere, writes only in its worktree,
-	// Writable and the agent's own state under the home directory.
-	Sandbox  bool
-	Writable []string
+	// the temp dir, the shared git objects, refs and logs plus its own worktree metadata
+	// under GitDir (never hooks or config), and a per-session Claude config dir.
+	Sandbox bool
+	GitDir  string
 }
 
 type usageState struct {
@@ -201,7 +201,16 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	}
 
 	runCtx, cancel := context.WithCancel(d.ctx)
-	cmd, err := d.command(runCtx, argv, dir, childEnv(d.cfg.Environ, preset.Env))
+	env := childEnv(d.cfg.Environ, preset.Env)
+	var cfgDir string
+	if d.cfg.Sandbox {
+		if cfgDir, err = sessionConfigDir(); err != nil {
+			cancel()
+			return api.Session{}, err
+		}
+		env = append(env, "CLAUDE_CONFIG_DIR="+cfgDir)
+	}
+	cmd, err := d.command(runCtx, argv, dir, env, cfgDir)
 	if err != nil {
 		cancel()
 		return api.Session{}, err
@@ -237,17 +246,13 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 
 // command builds the agent process. With Sandbox set it is the jail helper, which applies the
 // restrictions and then execs argv with env as its whole environment.
-func (d *Dispatcher) command(ctx context.Context, argv []string, dir string, env []string) (*exec.Cmd, error) {
+func (d *Dispatcher) command(ctx context.Context, argv []string, dir string, env []string, cfgDir string) (*exec.Cmd, error) {
 	if !d.cfg.Sandbox {
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		cmd.Dir, cmd.Env = dir, env
 		return cmd, nil
 	}
-	rw := append([]string{os.TempDir()}, d.cfg.Writable...)
-	if home, err := os.UserHomeDir(); err == nil {
-		rw = append(rw, filepath.Join(home, ".claude"), filepath.Join(home, ".claude.json"))
-	}
-	return sandbox.Command(ctx, sandbox.Spec{Workdir: dir, ReadOnly: []string{"/"}, ReadWrite: rw, AllowNet: true, Env: env}, argv[0], argv[1:]...)
+	return sandbox.Command(ctx, sandbox.Spec{Workdir: dir, ReadOnly: []string{"/"}, ReadWrite: writablePaths(d.cfg.GitDir, dir, cfgDir), AllowNet: true, Env: env}, argv[0], argv[1:]...)
 }
 
 // Wait blocks until the session's process has exited. It returns the exit
