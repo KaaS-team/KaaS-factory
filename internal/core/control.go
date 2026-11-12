@@ -7,6 +7,8 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
+	"github.com/KaaS-team/factory/internal/meter"
+	spendcap "github.com/KaaS-team/factory/internal/meter/cap"
 	"github.com/KaaS-team/factory/internal/reconcile"
 	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 )
@@ -53,8 +55,23 @@ func (c *Core) firesLeft() int {
 	return caps.FiresPerHour
 }
 
+// admit refuses a dispatch for a ticket that has spent its cap (the ledger is the tracker's spend comment).
+func (c *Core) admit(ctx context.Context, id api.TicketID) error {
+	th, ok := c.d.Tracker.(meter.Thread)
+	if !ok {
+		if c.cfg.SessionCap > 0 { // a cap that cannot be read must not fail open
+			return fmt.Errorf("core: session cap is set but tracker %T cannot return the spend ledger", c.d.Tracker)
+		}
+		return nil
+	}
+	return spendcap.Gate{Thread: th, Holder: c.cfg.Team, USD: c.cfg.SessionCap}.Allow(ctx, id)
+}
+
 // start claims a ticket, dispatches the given attempt and records it as running.
 func (c *Core) start(ctx context.Context, t api.Ticket, attempt int) (api.Session, error) {
+	if err := c.admit(ctx, t.ID); err != nil {
+		return api.Session{}, err
+	}
 	if err := c.d.Tracker.SetPhase(ctx, t.ID, api.PhaseClaimed); err != nil {
 		return api.Session{}, err
 	}

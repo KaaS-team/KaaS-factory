@@ -30,6 +30,7 @@ func New(tr *github.Tracker, dir string, cfg mergeq.Config, client *gogithub.Cli
 	return mergeq.NewCoreQueue(mergeq.Deps{
 		Tracker: tr,
 		Git:     Git{G: g},
+		Applier: Git{G: g},
 		Gate:    Gate{G: g},
 		Heads:   Heads{Client: client, Owner: owner, Repo: repo},
 		Cfg:     cfg,
