@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/eval/assert"
 	"github.com/KaaS-team/factory/internal/eval/grade"
 	"github.com/KaaS-team/factory/internal/trace"
 )
@@ -46,6 +47,10 @@ type Fixture struct {
 	Epochs  int      `json:"epochs,omitempty"`  // runs per ticket, 0 means 1
 	Reducer string   `json:"reducer,omitempty"` // mean (default), max, pass_at_k or at_least_k
 	K       int      `json:"k,omitempty"`       // for pass_at_k and at_least_k
+	// Assert are deterministic checks (internal/eval/assert) on what the arm reported: its output
+	// text, cost and wall time. An epoch whose assertions fail scores 0, decided by "assert", however
+	// the scorers did; one that passes is scored by the scorers as before. No assertion calls a model.
+	Assert []assert.Assertion `json:"assert,omitempty"`
 }
 
 // Matrix is the set of fixtures one eval run covers.
@@ -193,6 +198,9 @@ func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps, sink trace.
 		if err != nil {
 			return r, outs, err
 		}
+		if dec, err = assertGate(f.Assert, o, dec); err != nil {
+			return r, outs, fmt.Errorf("fixture %s: %w", f.Name, err)
+		}
 		outs = append(outs, o)
 		in, out := AbsoluteTotals(o.Updates)
 		if sink != nil {
@@ -214,6 +222,30 @@ func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps, sink trace.
 	r.HiddenPass = r.Reduced >= PassThreshold
 	r.Merged = r.HiddenPass && r.BaseGreen
 	return r, outs, nil
+}
+
+// assertGate applies the fixture's assertions to one epoch: a failing set replaces the decision with a 0
+// decided by "assert", a passing one leaves it. Cost and latency are given only when the run reported them.
+func assertGate(asserts []assert.Assertion, o Outcome, dec Decision) (Decision, error) {
+	if len(asserts) == 0 {
+		return dec, nil
+	}
+	out := assert.Output{Text: o.Output}
+	if c := maxCost(o.Updates); c > 0 {
+		out.CostUSD = &c
+	}
+	if o.Wall > 0 {
+		ms := float64(o.Wall.Milliseconds())
+		out.LatencyMs = &ms
+	}
+	res, err := assert.Evaluate(asserts, out, nil)
+	if err != nil {
+		return dec, err
+	}
+	if !res.Pass {
+		return Decision{Value: 0, DecidedBy: "assert", Scored: true}, nil
+	}
+	return dec, nil
 }
 
 func aggregate(rs []TicketResult) Aggregate {

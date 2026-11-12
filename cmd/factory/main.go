@@ -55,6 +55,7 @@ func newRoot() *cobra.Command {
 	addCommands(root)
 	addEE(root)
 	mountClients(root)
+	root.AddCommand(docsCmd(newRoot), designCmd())
 	return root
 }
 
@@ -65,7 +66,7 @@ func mountClients(root *cobra.Command) {
 	attach(board, tui.WithControl)
 	dash := dashboard.NewCommand()
 	attach(dash, dashboard.WithControl)
-	root.AddCommand(board, dash, firstrun.NewCommand(), selfupdate.NewCommand(version, selfupdate.GitHubSource{}, ""))
+	root.AddCommand(board, dash, firstrun.NewCommand(firstrun.WithExec(firstRunExec)), selfupdate.NewCommand(version, selfupdate.GitHubSource{}, ""))
 	root.AddCommand(mcp.NewCommand(mcp.WithControl(func() (api.Control, mcp.Handlers, error) {
 		c, err := control(nil)
 		return c, mcp.Handlers{}, err

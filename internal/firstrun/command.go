@@ -1,6 +1,7 @@
 package firstrun
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -12,15 +13,19 @@ import (
 // Option configures NewCommand.
 type Option func(*cmdOpts)
 
-type cmdOpts struct{ exec *Exec }
+type cmdOpts struct {
+	exec func(context.Context) (Exec, error)
+}
 
-// WithExec lets the command dispatch the first fix and open its draft pull request; without it the command only reports.
-func WithExec(e Exec) Option { return func(o *cmdOpts) { o.exec = &e } }
+// WithExec lets `--fix` dispatch the first fix and open its draft pull request. f builds the Exec
+// only when --fix runs, so a plain report needs no token. Without it the command only reports.
+func WithExec(f func(context.Context) (Exec, error)) Option { return func(o *cmdOpts) { o.exec = f } }
 
 // NewCommand returns `factory first-run [--dry-run] [--gh owner/repo]`.
 func NewCommand(opts ...Option) *cobra.Command {
 	var o Options
 	var annPath, sarifPath string
+	var fix bool
 	var co cmdOpts
 	for _, f := range opts {
 		f(&co)
@@ -52,10 +57,14 @@ func NewCommand(opts ...Option) *cobra.Command {
 					return err
 				}
 			}
-			if _, err = fmt.Fprint(cmd.OutOrStdout(), md); err != nil || co.exec == nil {
+			if _, err = fmt.Fprint(cmd.OutOrStdout(), md); err != nil || !fix {
 				return err
 			}
-			res, err := Execute(cmd.Context(), r, *co.exec)
+			e, err := co.exec(cmd.Context())
+			if err != nil {
+				return err
+			}
+			res, err := Execute(cmd.Context(), r, e)
 			if err != nil {
 				return err
 			}
@@ -72,6 +81,9 @@ func NewCommand(opts ...Option) *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&o.DryRun, "dry-run", false, "stop after the report; say what would be dispatched")
+	if co.exec != nil {
+		c.Flags().BoolVar(&fix, "fix", false, "dispatch one build for the first covered finding and open a draft pull request")
+	}
 	c.Flags().StringVar(&o.GH, "gh", "", "also audit this GitHub repo (owner/repo)")
 	c.Flags().StringVar(&annPath, "annotations", defaultAnnotations, "reason-tagged suppressions file; the default is optional")
 	c.Flags().StringVar(&sarifPath, "sarif", "", "also write the findings to this file as SARIF 2.1.0")

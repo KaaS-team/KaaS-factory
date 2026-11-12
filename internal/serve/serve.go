@@ -38,6 +38,8 @@ type Options struct {
 	Jobs     *Jobs         // optional scheduled jobs; Serve drives them and needs Exec
 	JobsPath string        // when Jobs is nil, Serve opens the job database at this path
 	Exec     Executor      // runs one job run
+	// Wrap, when set, wraps the HTTP routes inside the host guard, for example to require a credential.
+	Wrap func(http.Handler) http.Handler
 }
 
 // Server hosts a Core and serves /healthz, /readyz and /events.
@@ -52,6 +54,7 @@ type Server struct {
 	jobs     *Jobs
 	jobsPath string
 	exec     Executor
+	wrap     func(http.Handler) http.Handler
 	onListen func(addr string) // test hook: called with the bound address
 }
 
@@ -63,7 +66,7 @@ func New(core Core, o Options) *Server {
 	if o.Clock == nil {
 		o.Clock = realClock{}
 	}
-	return &Server{core: core, interval: o.Interval, clock: o.Clock, jobs: o.Jobs, jobsPath: o.JobsPath, exec: o.Exec}
+	return &Server{core: core, interval: o.Interval, clock: o.Clock, jobs: o.Jobs, jobsPath: o.JobsPath, exec: o.Exec, wrap: o.Wrap}
 }
 
 func (s *Server) markTick() {
@@ -194,7 +197,11 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 			}
 		}
 	}()
-	srv := &http.Server{Handler: hostguard.New(addr, os.Getenv)(s.Handler()), ReadHeaderTimeout: 10 * time.Second,
+	h := s.Handler()
+	if s.wrap != nil {
+		h = s.wrap(h)
+	}
+	srv := &http.Server{Handler: hostguard.New(addr, os.Getenv)(h), ReadHeaderTimeout: 10 * time.Second,
 		BaseContext: func(net.Listener) context.Context { return ctx }} // ends open /events streams on stop
 	httpDone := make(chan error, 1)
 	go func() { httpDone <- srv.Serve(ln) }()

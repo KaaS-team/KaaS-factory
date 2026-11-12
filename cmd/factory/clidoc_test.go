@@ -53,3 +53,24 @@ func TestCLIReferenceMachineFree(t *testing.T) {
 		t.Fatal("the CLI reference depends on TMPDIR or HOME; resolve that default when the command runs")
 	}
 }
+
+// TestDocsCommandPrintsTheCommittedReferences: `factory docs cli` and `factory docs config` print
+// exactly the committed reference documents, so the binary is how they are regenerated.
+func TestDocsCommandPrintsTheCommittedReferences(t *testing.T) {
+	if eeBuild {
+		t.Skip("the reference documents the default build")
+	}
+	for _, c := range []struct{ arg, file string }{{"cli", "cli-reference.md"}, {"config", "config.md"}} {
+		want, err := os.ReadFile(filepath.Join("..", "..", "docs", c.file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, _, err := runCLI(t, "docs", c.arg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out != string(want) {
+			t.Errorf("factory docs %s differs from docs/%s", c.arg, c.file)
+		}
+	}
+}

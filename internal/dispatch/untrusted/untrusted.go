@@ -46,24 +46,6 @@ var allowed = []string{
 	".factory/gates.sh", ".factory/gates.sh *", "bash .factory/gates.sh", "bash .factory/gates.sh *",
 }
 
-// Permitted reports whether command is on the allowlist. A command that chains, pipes, redirects
-// or substitutes is refused, as one part could be anything.
-func Permitted(command string) bool {
-	if strings.ContainsAny(command, ";&|<>`$()\n\\{}") {
-		return false
-	}
-	for _, p := range allowed {
-		if base, args := strings.CutSuffix(p, " *"); args {
-			if command == base || strings.HasPrefix(command, base+" ") {
-				return true
-			}
-		} else if command == p {
-			return true
-		}
-	}
-	return false
-}
-
 // Deny returns the tools to deny for a pull request by author, or nil when the author has
 // write access. A bot, a missing author and a failed lookup all count as untrusted.
 func Deny(ctx context.Context, a Access, author string) []string {
