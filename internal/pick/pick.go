@@ -3,6 +3,7 @@
 package pick
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -20,6 +21,8 @@ type Locks struct {
 	// Merge returns the paths that conflict when two branches merge, nil when clean.
 	// With Merge nil, an overlap always blocks.
 	Merge func(a, b string) ([]string, error)
+	// Fair, when set, interleaves repos by deficit round robin and caps tickets per repo.
+	Fair *Fair
 }
 
 // Rank returns a copy of ready ordered by priority (lower first), then oldest
@@ -113,11 +116,22 @@ func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, fi
 		open[t.ID] = true
 	}
 	var skips []Skip
+	perRepo := map[string]int{}
+	if f := locks.Fair; f != nil {
+		ranked = f.order(ranked)
+		for _, r := range running {
+			perRepo[r.Repo]++
+		}
+	}
 	for _, t := range ranked {
 		if len(out) >= limit {
 			break
 		}
 		if isRunning[t.ID] {
+			continue
+		}
+		if f := locks.Fair; f != nil && f.cap > 0 && perRepo[t.Repo] >= f.cap {
+			skips = append(skips, Skip{t.ID, fmt.Sprintf("repo %s at cap %d", t.Repo, f.cap)})
 			continue
 		}
 		if b := blocker(t, open); b != "" {
@@ -129,6 +143,10 @@ func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, fi
 			continue
 		}
 		out = append(out, t)
+		if f := locks.Fair; f != nil {
+			perRepo[t.Repo]++
+			f.charge(t.Repo)
+		}
 		held = append(held, holder{t.ID, t.Files, locks.Branches[t.ID]})
 	}
 	return out, skips
