@@ -148,8 +148,7 @@ Resolve a name in this order, and stop at the first hit:
 
 1. **The code.** A box for `guardrails_agent` reads "Guardrails agent". `error_agent` is "Error agent", `sql_agent` is "SQL agent", `execute_sql` is "Execute SQL", `viz_agent` is "Viz agent".
 2. **Deck 1** (`software-factory`). The six layers, in build order, are Boundary, Execution, Context, Skills, Verification, Delivery, never "What it may touch", "What it knows" or "How we work". Those are its captions, which sit beside the names and never replace them.
-3. **The workbook concept index** (`lwp-repos/software-factory/factory/workbook.html`): worktree, branch claim, sandbox limits, protected path, negative proof, holdout tests, gate verdict, triage, draft PR, human merge gate.
-4. **Industry vocabulary** an engineer already uses: sandbox, guardrails, worktree, triage, holdout, idempotent. Never invent a friendlier word.
+3. **Industry vocabulary** an engineer already uses: sandbox, guardrails, worktree, triage, holdout, idempotent. Never invent a friendlier word.
 
 - BAD: "Own folder", "Its limits", "Claim fq-2" (the box is a worktree, the limits are sandbox limits, the claim is a branch claim).
 - BAD: "A guard", "Repair from the error", "An answer" (Guardrails agent, Error agent, Analysis agent).
