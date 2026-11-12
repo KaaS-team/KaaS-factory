@@ -11,8 +11,13 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dashboard"
+	"github.com/KaaS-team/factory/internal/eval"
 	"github.com/KaaS-team/factory/internal/firstrun"
+	"github.com/KaaS-team/factory/internal/initwiz"
+	"github.com/KaaS-team/factory/internal/logs"
 	"github.com/KaaS-team/factory/internal/mcp"
+	"github.com/KaaS-team/factory/internal/packs"
+	"github.com/KaaS-team/factory/internal/plancmd"
 	"github.com/KaaS-team/factory/internal/report"
 	"github.com/KaaS-team/factory/internal/tui"
 	"github.com/KaaS-team/factory/internal/upgrade"
@@ -55,6 +60,12 @@ func mountClients(root *cobra.Command) {
 	root.AddCommand(report.NewCommand(report.WithSource(func(context.Context) (report.Source, error) {
 		return nil, errors.New("report: no ticket source is wired in this build")
 	})))
+	// plan prints the DAG with no filer; --approve fails until a tracker that can file issues is wired.
+	root.AddCommand(initwiz.NewCommand(), plancmd.NewCommand(), eval.NewCommand(),
+		packs.NewAddCommand(), packs.NewPacksCommand())
+	root.AddCommand(logs.NewCommand(logs.Backends{Latest: func(context.Context, api.TicketID) (api.Session, error) {
+		return api.Session{}, errors.New("logs: no session lookup is wired in this build")
+	}}))
 }
 
 // attach builds the Control when cmd runs and hands it to the package through with.
