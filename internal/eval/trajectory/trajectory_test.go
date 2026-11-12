@@ -26,7 +26,7 @@ func TestWriteReadReplayReproducesDiff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Base(p) != "fx-T-1.json" {
+	if filepath.Base(p) != "fx%2FT-1.json" {
 		t.Fatalf("file name %s", p)
 	}
 	got, err := Read(p)
@@ -152,5 +152,22 @@ func TestCommandsOffline(t *testing.T) {
 	cp.SetErr(&out)
 	if err := cp.Execute(); err == nil {
 		t.Fatal("missing path accepted")
+	}
+}
+
+// "a/b" and "a-b" are different tasks and must not share a file.
+func TestFileNameIsInjective(t *testing.T) {
+	dir := t.TempDir()
+	for _, task := range []string{"a/b", "a-b", "a%2Fb"} {
+		if _, err := Write(dir, rec(task, StatePass, 1, 1, 1, "d-"+task)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if FileName("a/b") == FileName("a-b") || FileName("a%2Fb") == FileName("a/b") {
+		t.Fatalf("collision: %s %s %s", FileName("a/b"), FileName("a-b"), FileName("a%2Fb"))
+	}
+	got, err := Load(dir)
+	if err != nil || len(got) != 3 {
+		t.Fatalf("load = %d trajectories, %v; want 3", len(got), err)
 	}
 }

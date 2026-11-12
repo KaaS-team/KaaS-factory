@@ -55,10 +55,13 @@ type Trajectory struct {
 	Cost       Cost   `json:"cost"`
 }
 
-var unsafeName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+var unsafeByte = regexp.MustCompile(`[^A-Za-z0-9._-]`)
 
-// FileName is the file a task is written to: its name with unsafe characters replaced by dashes.
-func FileName(task string) string { return unsafeName.ReplaceAllString(task, "-") + ".json" }
+// FileName is the file a task is written to: each byte outside A-Za-z0-9._- becomes %XX, so the
+// mapping is injective ("a/b" and "a-b" never share a file).
+func FileName(task string) string {
+	return unsafeByte.ReplaceAllStringFunc(task, func(b string) string { return fmt.Sprintf("%%%02X", b[0]) }) + ".json"
+}
 
 // Seal sets the schema and the final diff's checksum, so a later Replay can tell the file was cut or edited.
 func (t *Trajectory) Seal() {
