@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## sourcegraph/zoekt@9e78667
+
+Source: https://github.com/sourcegraph/zoekt (Apache-2.0)
+
+- `internal/packs/category.go` from `index/file_category.go` [tested by `internal/packs/category_test.go`]
