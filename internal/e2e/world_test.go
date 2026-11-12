@@ -29,8 +29,8 @@ import (
 )
 
 const gatesScript = `#!/bin/sh
-# Prints one FACTORY_GATES line from go test; the go output goes to .factory-gate.log.
-if go test ./... >.factory-gate.log 2>&1; then
+# Runs go test, then prints one FACTORY_GATES line; the runner keeps the output tail.
+if go test ./... 2>&1; then
   echo "FACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0 failed_gates=-"
 else
   echo "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=go-test"
@@ -89,7 +89,6 @@ func newWorld(t *testing.T, ctx context.Context, tickets []api.Ticket) *world {
 	if err := os.Chmod(filepath.Join(w.agent, "gates.sh"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	put(w.t, w.agent, ".gitignore", ".factory-gate.log\n")
 	put(w.t, w.agent, "base.go", "package tiny\n\nfunc Base() int { return 1 }\n")
 	put(w.t, w.agent, "base_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestBase(t *testing.T) {\n\tif Base() != 1 {\n\t\tt.Fatal(\"Base\")\n\t}\n}\n")
 	w.git(w.agent, "add", "-A")
@@ -417,11 +416,7 @@ func (g queueGate) Run(ctx context.Context, ref string) (mergeq.Verdict, error) 
 		Env: []string{"GOPROXY=off", "CGO_ENABLED=0"},
 	})
 	w.logf("gate %s %s", strings.Join(w.idsAt(ref), ","), res.Status)
-	tail := res.Raw
-	if b, err := os.ReadFile(filepath.Join(w.queue, ".factory-gate.log")); err == nil && !res.Green() {
-		tail += "\n" + string(b)
-	}
-	return mergeq.Verdict{Pass: res.Green(), LogTail: tail}, nil
+	return mergeq.Verdict{Pass: res.Green(), LogTail: res.Tail}, nil
 }
 
 // idsAt names the tickets merged into a temp ref, from the commits it holds beyond main.
