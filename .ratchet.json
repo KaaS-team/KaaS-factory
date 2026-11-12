@@ -1,5 +1,5 @@
 {
-  "go_lines": 20499,
+  "go_lines": 21418,
   "deadcode": 68,
-  "reason": "initial baseline, lowered by go run ./tools/ratchet --update; a raise needs a hand edit and a new reason here"
+  "reason": "raised by hand on 2026-11-12 to the merged size of next when the ratchet landed (built on an older next at 20499); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
