@@ -18,10 +18,11 @@ You finish the ten fix branches the m1-fix session could not land on `next` of K
 4. `go/k5-sandbox-lifecycle` (merges cleanly; the `undefined: run` vet error did not reproduce).
 5. `go/k5-sandbox-limits`: conflicts in `internal/dispatch/local/local.go`; keep `next`'s stuck guard (`p.err = stuckErr`) and call `sandbox.KillGroup(cmd)`; also resolves in `pkg/sandbox/{plan,sandbox,unix}.go` keeping both intents.
 6. `go/k6-approval`: gate fails with `internal/tracker/github/approval.go:12: undefined: Latest, ParseData`; the codec moved to `internal/marker`, so call `marker.Latest(marker.ParseData(c.Body), stagePlan)`.
+7. `go/k10-eval-scorer`: no conflict, gate passed, only lost the push race in m1-h. Merge it last.
 
 ## Push race
 
-Merge all ten locally on one branch first, run the full gate once, then push. On a rejection: `git fetch`, rebase (or redo the merges on fresh `origin/next`), run `go build ./... && go vet ./...` plus `go test -race` on the packages either side touched, then push; run the full gate once more after the final push and fix forward if red. Up to 10 tries.
+Merge all eleven locally on one branch first, run the full gate once, then push. On a rejection: `git fetch`, rebase (or redo the merges on fresh `origin/next`), run `go build ./... && go vet ./...` plus `go test -race` on the packages either side touched, then push; run the full gate once more after the final push and fix forward if red. Up to 10 tries.
 
 ## Merge procedure per branch
 
