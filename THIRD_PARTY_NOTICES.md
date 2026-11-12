@@ -164,3 +164,9 @@ Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright Trig
 Source: https://github.com/SWE-bench/SWE-bench (MIT, Copyright (c) 2023 Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik R Narasimhan)
 
 - `internal/eval/infra/infra.go` from `swebench/harness/infra_failure.py` [no upstream test]
+
+## sourcegraph/zoekt@9e78667
+
+Source: https://github.com/sourcegraph/zoekt (Apache-2.0)
+
+- `internal/packs/category.go` from `index/file_category.go` [tested by `internal/packs/category_test.go`]

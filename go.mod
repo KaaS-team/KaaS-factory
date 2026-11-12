@@ -10,6 +10,7 @@ require (
 	github.com/chromedp/cdproto v0.159.0
 	github.com/chromedp/chromedp v0.23.0
 	github.com/crewjam/saml v0.6.3
+	github.com/go-enry/go-enry/v2 v2.9.6
 	github.com/google/go-github/v79 v79.0.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/landlock-lsm/go-landlock v0.11.2
@@ -36,6 +37,7 @@ require (
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
+	github.com/go-enry/go-oniguruma v1.2.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
