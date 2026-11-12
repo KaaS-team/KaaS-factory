@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,17 +84,25 @@ func TestNewRoutinesForwardsConfigChecks(t *testing.T) {
 
 func TestEveryExportedIdentifierHasADocComment(t *testing.T) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi os.FileInfo) bool {
-		return !(len(fi.Name()) > 8 && fi.Name()[len(fi.Name())-8:] == "_test.go")
-	}, parser.ParseComments)
+	names, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	ap, ok := pkgs["agentrun"]
-	if !ok {
-		t.Fatal("package agentrun not found")
+	var files []*ast.File
+	for _, n := range names {
+		if strings.HasSuffix(n, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, n, nil, parser.ParseComments)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, f)
 	}
-	p := doc.New(&ast.Package{Name: ap.Name, Files: ap.Files}, "github.com/KaaS-team/factory/pkg/agentrun", doc.AllDecls)
+	p, err := doc.NewFromFiles(fset, files, "github.com/KaaS-team/factory/pkg/agentrun", doc.AllDecls)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if p.Doc == "" {
 		t.Error("package has no doc comment")
 	}
