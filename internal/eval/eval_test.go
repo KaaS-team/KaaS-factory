@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/eval/assert"
 )
 
 type fakeDeps struct {
@@ -214,5 +215,53 @@ func TestDiffVerdictPerMetric(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type outputDeps struct {
+	fakeDeps
+	output string
+}
+
+func (d outputDeps) Dispatch(ctx context.Context, t api.Ticket) (Outcome, error) {
+	o, err := d.fakeDeps.Dispatch(ctx, t)
+	o.Output = d.output
+	return o, err
+}
+
+// A fixture's assertions gate each epoch: hidden tests that pass do not save an output the assertions
+// refuse, the epoch is decided by "assert", and a passing set leaves the scorers' decision alone.
+func TestFixtureAssertionsGateTheScore(t *testing.T) {
+	maxCost := 0.5
+	asserts := []assert.Assertion{{Type: "contains", Value: "DONE"}, {Type: "cost", Threshold: &maxCost}}
+	run := func(output string, costUSD float64) TicketResult {
+		t.Helper()
+		m := Matrix{Fixtures: []Fixture{{Name: "f", Tickets: toFT([]api.Ticket{{ID: "1"}}), Hidden: "true", Assert: asserts}}}
+		d := outputDeps{fakeDeps{
+			passIDs: map[api.TicketID]bool{"1": true},
+			usage:   map[api.TicketID][]api.Usage{"1": {{InputTokens: 1, OutputTokens: 1, CostUSD: costUSD}}},
+		}, output}
+		sc, err := RunArm(context.Background(), m, d, Arm{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sc.Tickets[0]
+	}
+	if r := run("all DONE", 0.1); !r.Merged || r.Epochs[0].DecidedBy == "assert" {
+		t.Errorf("passing assertions changed the result: %+v", r)
+	}
+	if r := run("gave up", 0.1); r.Merged || r.Epochs[0].DecidedBy != "assert" {
+		t.Errorf("a missing DONE still merged: %+v", r)
+	}
+	if r := run("all DONE", 2); r.Merged || r.Epochs[0].DecidedBy != "assert" {
+		t.Errorf("a cost over the threshold still merged: %+v", r)
+	}
+}
+
+// A malformed assertion is an error, not a silent pass.
+func TestFixtureAssertionsRejectUnknownType(t *testing.T) {
+	m := Matrix{Fixtures: []Fixture{{Name: "f", Tickets: toFT([]api.Ticket{{ID: "1"}}), Hidden: "true", Assert: []assert.Assertion{{Type: "bogus"}}}}}
+	if _, err := RunArm(context.Background(), m, fakeDeps{passIDs: map[api.TicketID]bool{"1": true}}, Arm{}); err == nil || !strings.Contains(err.Error(), "bogus") {
+		t.Fatalf("got %v", err)
 	}
 }
