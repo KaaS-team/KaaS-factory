@@ -278,3 +278,10 @@ Source: https://github.com/dagger/dagger (Apache-2.0, Copyright The Dagger Autho
 
 - `internal/eval/replay/replay.go` from `core/llm_recording.go` (algorithm and diff shape; re-implemented against our message type, no go-cmp) [tested by `internal/eval/replay/replay_test.go`]
 - `internal/eval/replay/scrub.go` from `util/scrub/scrub.go` (regex table and `Stabilize` only; Dagger rules replaced with ours) [tested by `internal/eval/replay/scrub_test.go`]
+
+## anthropics/claude-code-action@8a29bc6
+
+Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) Anthropic, PBC, 2025). Ported to Go by hand.
+
+- `internal/dispatch/untrusted/untrusted.go` from `src/github/validation/untrusted-pr.ts` [tested by `internal/dispatch/untrusted/untrusted_test.go`]
+- `internal/dispatch/untrusted/guard.go` from `src/github/operations/session-guard.ts` and the SENSITIVE_PATHS list of `src/github/operations/restore-config.ts` [tested by `internal/dispatch/untrusted/untrusted_test.go`]
