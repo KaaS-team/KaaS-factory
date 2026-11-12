@@ -29,8 +29,9 @@ v2.13.2, `CGO_ENABLED=0`.
 
 ## Session reports
 
-A session finishes by pushing its branch with `.factory/reports/<ticket>.md`: what changed, the
-`just check` result, what was left out and why.
+A cloud session finishes by pushing its report (what changed, the `just check` result, what was left
+out and why) as `report.md` on its own `report/<ticket>` branch. A repo hook refuses writes under
+`.factory/`, so the report never lands in the tree.
 
 ## Tests
 
