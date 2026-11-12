@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## dagger/dagger@835b0ef
+
+Source: https://github.com/dagger/dagger (Apache-2.0, Copyright Dagger, Inc. contributors).
+
+- `internal/packs/lock.go` from `util/lockfile/lockfile.go`: sorted, versioned JSON-lines lockfile with a commit-me header and merge-conflict detection. Namespaces, header text and entry shape changed; the v1 JSON `factory.lock` is still read. [tested by `internal/packs/lockfile_test.go`]
