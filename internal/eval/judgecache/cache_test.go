@@ -3,6 +3,8 @@ package judgecache
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -97,5 +99,29 @@ func TestMarker(t *testing.T) {
 	}
 	if !strings.Contains(Row("fx/T1", Result{Cached: true}), "cached") || strings.Contains(Row("fx/T1", Result{}), "cached") {
 		t.Fatal("row")
+	}
+}
+
+// A dir that cannot be created (its parent is a file, so this also fails as root) must not cost the verdict.
+func TestUnwritableCacheStillReturnsVerdict(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeJudge{}
+	res, err := New(filepath.Join(blocker, "cache"), f).Judge(context.Background(), Request{Fixture: "fx", Output: "o", RubricVersion: "v"})
+	if err != nil || !res.Pass || res.Cached || f.calls != 1 {
+		t.Fatalf("want verdict despite write failure: %+v err=%v calls=%d", res, err, f.calls)
+	}
+}
+
+func TestWriteLeavesNoTempFiles(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := New(dir, &fakeJudge{}).Judge(context.Background(), Request{Fixture: "a", Output: "b", RubricVersion: "c"}); err != nil {
+		t.Fatal(err)
+	}
+	ents, _ := os.ReadDir(dir)
+	if len(ents) != 1 || !strings.HasSuffix(ents[0].Name(), ".json") {
+		t.Fatalf("want exactly one entry, got %v", ents)
 	}
 }
