@@ -44,9 +44,9 @@ func TestStepsMatchJustfile(t *testing.T) {
 
 func TestLintPinMatchesCI(t *testing.T) {
 	pin := match(t, read(t, "justfile"), `(?m)^lint_version := "(.*)"$`)
-	ci := match(t, read(t, ".github/workflows/go.yml"), `(?m)^\s+version: (v[\d.]+)$`)
+	ci := match(t, read(t, ".github/workflows/ci.yml"), `(?m)^\s+version: (v[\d.]+)$`)
 	if pin != ci {
-		t.Fatalf("justfile lint_version %s differs from .github/workflows/go.yml %s", pin, ci)
+		t.Fatalf("justfile lint_version %s differs from .github/workflows/ci.yml %s", pin, ci)
 	}
 }
 
