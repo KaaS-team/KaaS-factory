@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## openrewrite/rewrite@90219c5
+
+Source: https://github.com/openrewrite/rewrite (Apache-2.0). The design is ported to Go, no Java is copied.
+
+- `internal/graph/scanedit/scanedit.go` from `rewrite-core/src/main/java/org/openrewrite/ScanningRecipe.java` [tested by `internal/graph/scanedit/scanedit_test.go`]
