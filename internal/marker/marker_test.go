@@ -113,23 +113,6 @@ func TestWrapFindRoundTrip(t *testing.T) {
 	}
 }
 
-// Posted text must not carry a marker: Neutralise turns every comment opener into visible text.
-func TestNeutralise(t *testing.T) {
-	for _, tc := range []struct{ in, want string }{
-		{"plain", "plain"},
-		{"<!-- factory:status v1 -->", "&lt;!-- factory:status v1 -->"},
-		{"a <!-- b --> <!-- c", "a &lt;!-- b --> &lt;!-- c"},
-	} {
-		got := marker.Neutralise(tc.in)
-		if got != tc.want || strings.Contains(got, "<!--") {
-			t.Fatalf("Neutralise(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-	if got := marker.ParseData(marker.Neutralise(`<!-- factory:data {"stage":"x"} -->`)); len(got) != 0 {
-		t.Fatalf("neutralised text parsed back as a marker: %v", got)
-	}
-}
-
 func TestAllowedOnlyByAllow(t *testing.T) {
 	ctx := context.Background()
 	if marker.Allowed(ctx) || !marker.Allowed(marker.Allow(ctx)) {

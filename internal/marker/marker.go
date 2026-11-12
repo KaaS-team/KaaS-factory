@@ -38,9 +38,6 @@ func JSString(s string) string {
 	return strings.ReplaceAll(out, "\\u2029", "\u2029")
 }
 
-// Neutralise turns every `<!--` in s into visible text, so posted model or user text cannot carry a marker.
-func Neutralise(s string) string { return strings.ReplaceAll(s, "<!--", "&lt;!--") }
-
 type allowKey struct{}
 
 // Allow marks ctx as carrying a body the runner built itself, whose markers a tracker must post as written.
