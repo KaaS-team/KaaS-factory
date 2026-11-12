@@ -1,0 +1,16 @@
+# Data for factory first-run. Finding ids are the auditor's; packs are catalogue pack ids.
+auditor:
+  binary: auditor
+  install: "go install github.com/KaaS-team/auditor/cmd/audit@latest"
+# Prior estimates by size, used until eval history replaces them.
+priors:
+  S: {tokens: 150000, minutes: 10}
+  M: {tokens: 600000, minutes: 35}
+  L: {tokens: 2000000, minutes: 120}
+packs:
+  sec.secrets-in-repo:   {pack: secrets-scan,     size: S, risk: low}
+  sec.unpinned-actions:  {pack: pin-actions,      size: S, risk: low}
+  test.no-ci-gate:       {pack: ci-gate,          size: M, risk: medium}
+  test.low-coverage:     {pack: coverage-ratchet, size: L, risk: medium}
+  dep.outdated-major:    {pack: dep-bump,         size: M, risk: high}
+  doc.no-agents-md:      {pack: agents-md,        size: S, risk: low}
