@@ -97,12 +97,23 @@ func expand(argv, files []string) []string {
 	var out []string
 	for _, a := range argv {
 		if a == "{files}" {
-			out = append(out, files...)
+			for _, f := range files {
+				out = append(out, safeArg(f))
+			}
 		} else {
 			out = append(out, a)
 		}
 	}
 	return out
+}
+
+// safeArg keeps a file name that starts with "-" from being read as a flag. A "./" prefix works for
+// every command, where "--" is not accepted by all of them.
+func safeArg(f string) string {
+	if strings.HasPrefix(f, "-") {
+		return "./" + f
+	}
+	return f
 }
 
 func listFiles(fsys fs.FS) ([]string, error) {
