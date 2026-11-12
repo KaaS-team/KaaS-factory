@@ -1,5 +1,5 @@
 {
-  "go_lines": 31019,
+  "go_lines": 31068,
   "deadcode": 233,
-  "reason": "raised by the reviewed merge of go/k8-mergeq-outcomes (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "reason": "raised by the reviewed merge of go/k8-mergeq-outcomes and the m3-fixes-i fixes; lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
