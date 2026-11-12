@@ -41,6 +41,12 @@ type Spec struct {
 	// Backend selects the isolation: "" or "jail" for the helper below, "runsc" for gVisor
 	// when a pinned runsc is installed; otherwise the jail runs.
 	Backend string
+	// Limits are baseline rlimits by name (see ValidateLimits), applied before exec so the child inherits them.
+	Limits map[string]uint64
+	// ExecLimits override Limits for this one exec.
+	ExecLimits map[string]uint64
+	// Policy bounds the session lifetime; Command stops the child at MaxDuration.
+	Policy Policy
 	// Env is the only environment the child receives, as KEY=value entries.
 	Env []string
 }
@@ -68,6 +74,9 @@ type request struct {
 // Command returns a command that runs name with args under the jail described by spec.
 // The command re-executes the current binary, whose main must call MaybeEnter first.
 func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec.Cmd, error) {
+	if err := ValidateLimits(spec); err != nil {
+		return nil, err
+	}
 	return commandFor(ctx, spec, DefaultRunscPin, name, args...)
 }
 

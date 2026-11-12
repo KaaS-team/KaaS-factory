@@ -66,6 +66,23 @@ func chooseBackend(backend, path string, pin RunscPin) (string, string) {
 
 // commandFor builds the command for spec: runsc when selected and verified, else the jail helper.
 func commandFor(ctx context.Context, spec Spec, pin RunscPin, name string, args ...string) (*exec.Cmd, error) {
+	// Both backends stop the child at MaxDuration. The timer frees itself then; cancel also runs
+	// if the caller's ctx ends first or the command cannot be built.
+	cancel := func() {}
+	if spec.Policy.MaxDuration > 0 {
+		ctx, cancel = context.WithTimeout(ctx, spec.Policy.MaxDuration)
+	}
+	cmd, err := backendCommand(ctx, spec, pin, name, args...)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	kill := cmd.Cancel
+	cmd.Cancel = func() error { cancel(); return kill() }
+	return cmd, nil
+}
+
+func backendCommand(ctx context.Context, spec Spec, pin RunscPin, name string, args ...string) (*exec.Cmd, error) {
 	path, lerr := lookRunsc()
 	if lerr != nil && spec.Backend == "runsc" {
 		path = ""
