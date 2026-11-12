@@ -88,3 +88,14 @@ func TestReplayRejectsBadFile(t *testing.T) {
 		t.Fatalf("empty replay: %v %q", err, b.String())
 	}
 }
+
+// Replay is exported, so a hand-built gate line with no Triggered flag must be an error, not a panic.
+func TestReplayRejectsGateSpanWithoutTriggered(t *testing.T) {
+	line := trace.Line{Event: trace.EventSpanEnd, Span: &trace.Span{TraceID: "t", Type: trace.SpanGate, Name: "g"}}
+	if err := Replay(&bytes.Buffer{}, []trace.Line{line}); err == nil {
+		t.Fatal("want an error for a nil Triggered")
+	}
+	if err := Replay(&bytes.Buffer{}, []trace.Line{{Event: trace.EventSpanEnd}}); err == nil {
+		t.Fatal("want an error for a missing span")
+	}
+}

@@ -5,6 +5,7 @@ package eval
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -349,7 +350,13 @@ func Replay(w io.Writer, lines []trace.Line) error {
 			continue
 		}
 		sp := l.Span
+		if sp == nil {
+			return errors.New("eval: span_end line has no span")
+		}
 		var err error
+		if sp.Type == trace.SpanGate && sp.Triggered == nil {
+			return fmt.Errorf("eval: gate span %s has no triggered flag", sp.Name)
+		}
 		if sp.Type == trace.SpanGate {
 			verdict := "passed"
 			if *sp.Triggered {

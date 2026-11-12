@@ -1,5 +1,5 @@
 {
-  "go_lines": 39149,
+  "go_lines": 39298,
   "deadcode": 382,
-  "reason": "raised by the reviewed merges of go/k7-assert-kit, k7-astgrep-transform, k7-autosubmit, k8-plan-preset, k8-policy-combiner and k8-policy-signed and m3-fixes-b2 (gitx.StageAll, with two unwired call-site wrappers) on top of other landings (packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "reason": "raised by the reviewed merges of go/k7-assert-kit, k7-astgrep-transform, k7-autosubmit, k8-plan-preset, k8-policy-combiner and k8-policy-signed, the m3-fixes-j2 fixes, m3-fixes-g (stuck error-run, job jitter, import symlink guard, credential table) and m3-fixes-b2 (gitx.StageAll, with two unwired call-site wrappers) on top of other landings (packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }

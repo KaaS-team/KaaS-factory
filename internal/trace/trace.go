@@ -119,9 +119,9 @@ type FileSink struct {
 	done chan struct{}
 }
 
-// NewFileSink creates path and returns a sink on it. Cancelling ctx flushes and closes the file.
+// NewFileSink creates path (mode 0600, since traces can hold prompts and tool output) and returns a sink on it. Cancelling ctx flushes and closes the file.
 func NewFileSink(ctx context.Context, path string) (*FileSink, error) {
-	f, err := os.Create(path)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, err
 	}
