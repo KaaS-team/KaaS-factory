@@ -1,0 +1,8 @@
+{
+  "name": "go-stack",
+  "seed": "seed",
+  "hidden": "go test ./...",
+  "tickets": [
+    {"id": "1", "repo": "example.com/g", "title": "Add Sum(a, b int) int to package g", "body": "Export Sum returning a+b. Hidden test calls g.Sum.", "files": ["g.go"], "priority": 0, "created_at": "2026-01-01T00:00:00Z"}
+  ]
+}
