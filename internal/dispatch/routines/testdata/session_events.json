@@ -1,0 +1,7 @@
+{"data":[
+ {"type":"message","text":"started"},
+ {"type":"usage","usage":{"input_tokens":100,"output_tokens":20,"cache_read_tokens":5,"cache_write_tokens":1,"cost_usd":0.05}},
+ {"type":"tool_use","name":"bash"},
+ {"type":"usage","usage":{"input_tokens":400,"output_tokens":90,"cache_read_tokens":30,"cache_write_tokens":4,"cost_usd":0.2}},
+ {"type":"result","usage":{"input_tokens":900,"output_tokens":210,"cache_read_tokens":70,"cache_write_tokens":9,"cost_usd":0.61}}
+]}

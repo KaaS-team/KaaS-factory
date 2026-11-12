@@ -269,3 +269,49 @@ func kindOf(status int) Kind {
 	}
 	return KindProvider
 }
+
+// ErrNoUsage is returned by EventUsage when the session events carry no usage.
+// It means unknown, never zero.
+var ErrNoUsage = errors.New("routines: session reports no usage")
+
+type event struct {
+	Type  string   `json:"type"`
+	Usage *usageIn `json:"usage"`
+}
+
+type usageIn struct {
+	InputTokens      int64   `json:"input_tokens"`
+	OutputTokens     int64   `json:"output_tokens"`
+	CacheReadTokens  int64   `json:"cache_read_tokens"`
+	CacheWriteTokens int64   `json:"cache_write_tokens"`
+	CostUSD          float64 `json:"cost_usd"`
+}
+
+// EventUsage reads the session's events and returns the absolute usage totals
+// from the result event, or else from the last usage event (Symphony §13.5).
+// It returns ErrNoUsage when no event carries usage. The events endpoint shape
+// is this package's assumption, like the rest of the API here.
+func (d *Dispatcher) EventUsage(ctx context.Context, s api.Session) (api.Usage, error) {
+	var l list[event]
+	if err := d.do(ctx, "get session events", http.MethodGet, "/v1/code/sessions/"+url.PathEscape(s.ID)+"/events", nil, &l); err != nil {
+		return api.Usage{}, err
+	}
+	var last *usageIn
+	for _, e := range l.Data {
+		if e.Usage == nil || (e.Type != "result" && e.Type != "usage") {
+			continue
+		}
+		if e.Type == "result" {
+			last = e.Usage
+			break
+		}
+		last = e.Usage
+	}
+	if last == nil {
+		return api.Usage{}, ErrNoUsage
+	}
+	return api.Usage{
+		InputTokens: last.InputTokens, OutputTokens: last.OutputTokens,
+		CacheReadTokens: last.CacheReadTokens, CacheWriteTokens: last.CacheWriteTokens, CostUSD: last.CostUSD,
+	}, nil
+}
