@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## langfuse/langfuse@2e6d034
+
+Source: https://github.com/langfuse/langfuse (MIT, Copyright (c) 2023-2026 ClickHouse, Inc.; files outside `ee/` only)
+
+- `internal/observe/sampling/sampling.go` from `worker/src/features/evaluation/deterministicSampling.ts` (domain string changed) [tested by `internal/observe/sampling/sampling_test.go`]
