@@ -143,6 +143,25 @@ func TestPatterns(t *testing.T) {
 			}
 			return append(l, compact(), compact(), compact())
 		}(), []Kind{Nudge}, Compaction},
+		// Ported behaviour: go/k9-stall internal/dispatch/stall/stall.go counted errors across different calls.
+		{"error-run: three errors from three different calls nudge", func() (l [][]byte) {
+			for i := 0; i < 3; i++ {
+				l = append(l, pair(i, "Bash", map[string]any{"cmd": fmt.Sprint("try", i)}, fmt.Sprint("err", i), true)...)
+			}
+			return l
+		}(), []Kind{Nudge}, ErrorRun},
+		{"error-run: two errors are not yet a run", func() (l [][]byte) {
+			for i := 0; i < 2; i++ {
+				l = append(l, pair(i, "Bash", map[string]any{"cmd": fmt.Sprint("try", i)}, "e", true)...)
+			}
+			return l
+		}(), nil, ""},
+		{"error-run: a success after the nudge is progress, never an abort", func() (l [][]byte) {
+			for i := 0; i < 3; i++ {
+				l = append(l, pair(i, "Bash", map[string]any{"cmd": fmt.Sprint("try", i)}, "e", true)...)
+			}
+			return append(l, pair(9, "Bash", map[string]any{"cmd": "fixed"}, "ok", false)...)
+		}(), []Kind{Nudge}, ErrorRun},
 		{"a user message starts a fresh window", append(repeat(3, "Bash", ls, "a", false), append([][]byte{user("go on")}, repeat(3, "Bash", ls, "a", false)...)...), nil, ""},
 		{"lines that are not tool or message events are ignored", [][]byte{[]byte("not json"), []byte(`{"type":"result"}`), []byte(`{"type":"system","subtype":"init"}`)}, nil, ""},
 	}
