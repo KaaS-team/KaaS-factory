@@ -173,3 +173,97 @@ func TestMissingArchiveFailsCleanly(t *testing.T) {
 		t.Fatal("binary installed after failed download")
 	}
 }
+
+// runArgs runs install.sh with flags, without FACTORY_BIN_DIR or FACTORY_VERSION set.
+func runArgs(t *testing.T, base string, args ...string) (string, error) {
+	t.Helper()
+	cmd := exec.Command("sh", append([]string{"install.sh"}, args...)...)
+	cmd.Env = []string{
+		"PATH=/usr/bin:/bin",
+		"HOME=" + t.TempDir(),
+		"FACTORY_BASE_URL=" + base,
+		"FACTORY_UNAME_S=Linux",
+		"FACTORY_UNAME_M=x86_64",
+	}
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func TestVersionFlagPinsTagAndAcceptsBareNumber(t *testing.T) {
+	for _, tag := range []string{"v9.1.0", "9.1.0"} {
+		t.Run(tag, func(t *testing.T) {
+			a := archive(t, fakeBinary)
+			var paths []string
+			base := serve(t, "factory_linux_amd64.tar.gz", a, a, &paths)
+			bin := filepath.Join(t.TempDir(), "bin")
+			if out, err := runArgs(t, base, "--version", tag, "--dir", bin); err != nil {
+				t.Fatalf("%v\n%s", err, out)
+			}
+			if !strings.Contains(strings.Join(paths, " "), "/releases/download/v9.1.0/") {
+				t.Fatalf("tag not used: %v", paths)
+			}
+		})
+	}
+}
+
+func TestDirFlagInstallsThereAndStillVerifiesChecksum(t *testing.T) {
+	good := archive(t, fakeBinary)
+	bad := archive(t, "#!/bin/sh\necho evil\n")
+	var paths []string
+	base := serve(t, "factory_linux_amd64.tar.gz", good, bad, &paths)
+	bin := filepath.Join(t.TempDir(), "x")
+	out, err := runArgs(t, base, "--dir", bin)
+	if err == nil || !strings.Contains(out, "checksum") {
+		t.Fatalf("tampered archive not refused: %v\n%s", err, out)
+	}
+	if _, statErr := os.Stat(filepath.Join(bin, "factory")); statErr == nil {
+		t.Fatal("installed despite checksum failure")
+	}
+}
+
+func TestUninstallRemovesOnlyTheBinary(t *testing.T) {
+	bin := t.TempDir()
+	keep := filepath.Join(bin, "other")
+	if err := os.WriteFile(keep, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bin, "factory"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runArgs(t, "http://127.0.0.1:1", "--uninstall", "--dir", bin)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if _, e := os.Stat(filepath.Join(bin, "factory")); e == nil {
+		t.Fatal("factory still there")
+	}
+	if _, e := os.Stat(keep); e != nil {
+		t.Fatal("uninstall removed another file")
+	}
+}
+
+func TestFlagErrorsAndHelp(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		ok   bool
+		want string
+	}{
+		{"help", []string{"--help"}, true, "Usage: install.sh"},
+		{"short help", []string{"-h"}, true, "--uninstall"},
+		{"version needs value", []string{"--version"}, false, "--version needs a tag"},
+		{"dir needs value", []string{"--dir"}, false, "--dir needs a path"},
+		{"unknown flag", []string{"--bogus"}, false, "unknown option: --bogus"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := runArgs(t, "http://127.0.0.1:1", c.args...)
+			if c.ok != (err == nil) {
+				t.Fatalf("ok=%v err=%v\n%s", c.ok, err, out)
+			}
+			if !strings.Contains(out, c.want) {
+				t.Fatalf("missing %q:\n%s", c.want, out)
+			}
+		})
+	}
+}

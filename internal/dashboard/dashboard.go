@@ -59,7 +59,29 @@ func Handler(ctl api.Control, opts Options) http.Handler {
 	return mux
 }
 
+// groupOf puts a phase in one of the three groups the factory-plane home screen used.
+func groupOf(p api.Phase) string {
+	switch p {
+	case api.PhaseNeedsHuman, api.PhaseStalled:
+		return "Needs you"
+	case api.PhaseReady, api.PhaseClaimed, api.PhaseRunning, api.PhaseRetryQueue:
+		return "Running"
+	default:
+		return "Done"
+	}
+}
+
+// groupCounts counts the board's slots per group.
+func groupCounts(b api.Board) map[string]int {
+	m := map[string]int{}
+	for _, sl := range b.Slots {
+		m[groupOf(sl.Phase)]++
+	}
+	return m
+}
+
 type view struct {
+	Groups     map[string]int
 	Operator   bool
 	Board      api.Board
 	Slot       api.Slot
@@ -83,6 +105,7 @@ func newHistoryItem(e api.Event) historyItem {
 func (s *server) render(w http.ResponseWriter, name string, v view) {
 	var buf bytes.Buffer
 	v.Operator = s.opts.Operator
+	v.Groups = groupCounts(v.Board)
 	if err := s.tpl.ExecuteTemplate(&buf, name, v); err != nil {
 		http.Error(w, "render failed", http.StatusInternalServerError)
 		return

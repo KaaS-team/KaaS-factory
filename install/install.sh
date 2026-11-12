@@ -2,15 +2,67 @@
 # Installs the factory CLI from a GitHub release. No sudo.
 # Env: FACTORY_VERSION (tag, default latest), FACTORY_BIN_DIR (default $HOME/.local/bin),
 # FACTORY_BASE_URL (release host, for tests), FACTORY_UNAME_S and FACTORY_UNAME_M (override uname).
+# Flags --version, --dir and --uninstall win over their env twins.
 set -eu
 
+usage() {
+	cat <<'EOF'
+Usage: install.sh [--version <tag>] [--dir <path>] [--uninstall] [--help]
+
+  --version <tag>  install a release, for example v9.1.0 or 9.1.0 (default: latest)
+  --dir <path>     where to put the factory binary (default: $HOME/.local/bin)
+  --uninstall      remove <dir>/factory and nothing else
+  --help           show this text
+EOF
+}
+
+uninstall=0
+flag_version=""
+flag_dir=""
+while [ $# -gt 0 ]; do
+	case $1 in
+	--version)
+		[ $# -ge 2 ] || { echo "install: --version needs a tag" >&2; exit 2; }
+		flag_version=$2
+		shift 2
+		;;
+	--dir)
+		[ $# -ge 2 ] || { echo "install: --dir needs a path" >&2; exit 2; }
+		flag_dir=$2
+		shift 2
+		;;
+	--uninstall)
+		uninstall=1
+		shift
+		;;
+	--help | -h)
+		usage
+		exit 0
+		;;
+	*)
+		usage >&2
+		echo "install: unknown option: $1" >&2
+		exit 2
+		;;
+	esac
+done
+
 base="${FACTORY_BASE_URL:-https://github.com/KaaS-team/KaaS-factory}"
-bin_dir="${FACTORY_BIN_DIR:-$HOME/.local/bin}"
+bin_dir="${flag_dir:-${FACTORY_BIN_DIR:-${HOME:?install: no home directory, pass --dir}/.local/bin}}"
+if [ -n "$flag_version" ]; then
+	FACTORY_VERSION="v${flag_version#v}"
+fi
 
 fail() {
 	echo "install: $*" >&2
 	exit 1
 }
+
+if [ "$uninstall" = 1 ]; then
+	rm -f "$bin_dir/factory"
+	echo "removed $bin_dir/factory"
+	exit 0
+fi
 
 os="${FACTORY_UNAME_S:-$(uname -s)}"
 arch="${FACTORY_UNAME_M:-$(uname -m)}"
