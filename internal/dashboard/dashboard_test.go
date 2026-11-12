@@ -331,3 +331,42 @@ func TestTicketPageScriptDedupesByKey(t *testing.T) {
 		t.Fatalf("page lacks key-based dedupe:\n%s", body)
 	}
 }
+
+// Ported from factory-plane src/task-list.js groupRuns: every phase lands in one group.
+func TestGroupOfEveryPhase(t *testing.T) {
+	cases := []struct {
+		phase api.Phase
+		want  string
+	}{
+		{api.PhaseNeedsHuman, "Needs you"},
+		{api.PhaseStalled, "Needs you"},
+		{api.PhaseReady, "Running"},
+		{api.PhaseClaimed, "Running"},
+		{api.PhaseRunning, "Running"},
+		{api.PhaseRetryQueue, "Running"},
+		{api.PhaseDone, "Done"},
+		{api.PhaseQueued, "Done"},
+		{api.PhaseMerged, "Done"},
+		{api.PhaseCanceled, "Done"},
+		{api.Phase("unknown"), "Done"},
+	}
+	for _, c := range cases {
+		if got := groupOf(c.phase); got != c.want {
+			t.Errorf("groupOf(%s) = %s, want %s", c.phase, got, c.want)
+		}
+	}
+}
+
+func TestBoardShowsGroupCounts(t *testing.T) {
+	f := newFake(t)
+	f.BoardVal = api.Board{Slots: []api.Slot{
+		{Ticket: api.Ticket{ID: "A"}, Phase: api.PhaseNeedsHuman},
+		{Ticket: api.Ticket{ID: "B"}, Phase: api.PhaseRunning},
+		{Ticket: api.Ticket{ID: "C"}, Phase: api.PhaseRunning},
+		{Ticket: api.Ticket{ID: "D"}, Phase: api.PhaseMerged},
+	}}
+	_, body := get(t, Handler(f, Options{}), "/")
+	if !strings.Contains(body, "Needs you 1, Running 2, Done 1") {
+		t.Errorf("group counts missing:\n%s", body)
+	}
+}
