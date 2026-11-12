@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## langchain-ai/langgraph@a054ed0
+
+Source: https://github.com/langchain-ai/langgraph (MIT, Copyright (c) 2024 LangChain, Inc.). Only the checkpoint-sqlite table layout was used, ported to Go.
+
+- `internal/graph/checkpoint/checkpoint.go` from `libs/checkpoint-sqlite/langgraph/checkpoint/sqlite/__init__.py` [tested by `internal/graph/checkpoint/checkpoint_test.go`]
