@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/KaaS-team/factory/internal/trace"
 	"github.com/spf13/cobra"
 )
 
@@ -97,7 +98,18 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sc, err := Run(cmd.Context(), m, deps)
+			if err := os.MkdirAll(outDir, 0o755); err != nil {
+				return err
+			}
+			base := filepath.Join(outDir, fmt.Sprintf("%s-%s-%s", o.now().UTC().Format("2006-01-02"), workflow, agent))
+			sink, err := trace.NewFileSink(cmd.Context(), base+".trace.jsonl")
+			if err != nil {
+				return err
+			}
+			sc, err := Run(cmd.Context(), m, deps, WithSink(sink))
+			if cerr := sink.Close(); err == nil {
+				err = cerr
+			}
 			if err != nil {
 				return err
 			}
@@ -106,17 +118,13 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := os.MkdirAll(outDir, 0o755); err != nil {
-				return err
-			}
-			base := filepath.Join(outDir, fmt.Sprintf("%s-%s-%s", o.now().UTC().Format("2006-01-02"), workflow, agent))
 			if err := os.WriteFile(base+".json", append(raw, '\n'), 0o644); err != nil {
 				return err
 			}
 			if err := os.WriteFile(base+".md", []byte(Markdown(sc, false)), 0o644); err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s.json and %s.md\n", base, base)
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s.json, %s.md and %s.trace.jsonl\n", base, base, base)
 			return err
 		},
 	}
@@ -125,7 +133,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 	cmd.Flags().StringVar(&packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
 	cmd.Flags().StringVar(&fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
 	cmd.Flags().StringVar(&outDir, "out", "evals", "directory the scorecard is written to")
-	cmd.AddCommand(newDiffCommand())
+	cmd.AddCommand(newDiffCommand(), newReplayCommand())
 	return cmd
 }
 
@@ -176,6 +184,23 @@ func newDiffCommand() *cobra.Command {
 				return ErrWorse
 			}
 			return nil
+		},
+	}
+}
+
+func newReplayCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:           "replay <run.trace.jsonl>",
+		Short:         "Print the spans a run recorded, gate spans with their triggered flag",
+		Args:          cobra.ExactArgs(1),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			lines, err := trace.ReadFile(args[0])
+			if err != nil {
+				return err
+			}
+			return Replay(cmd.OutOrStdout(), lines)
 		},
 	}
 }

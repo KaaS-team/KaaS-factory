@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## openai/openai-agents-python@64fbde5
+
+Source: https://github.com/openai/openai-agents-python (MIT, Copyright (c) 2025 OpenAI). Design only, no text copied.
+
+- `internal/trace/trace.go` from `src/agents/tracing/span_data.py` and `src/agents/tracing/processor_interface.py` [tested by `internal/trace/trace_test.go`]
