@@ -118,6 +118,9 @@ func newHub(t *testing.T) (*hub, *gh.Tracker) {
 		}
 		writeJSON(w, map[string]any{"id": id})
 	})
+	mux.HandleFunc("GET /users/{login}", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"login": r.PathValue("login"), "type": "User"})
+	})
 	mux.HandleFunc("GET /repos/o/r/collaborators/{login}/permission", func(w http.ResponseWriter, r *http.Request) {
 		h.mu.Lock()
 		defer h.mu.Unlock()

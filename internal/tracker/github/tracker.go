@@ -26,6 +26,8 @@ type Config struct {
 	BaseURL string
 	// Now is the clock for status times and the role cache; nil uses time.Now.
 	Now func() time.Time
+	// AllowedBots is a comma-separated list of bot logins whose comments count, or "*". Empty trusts humans only.
+	AllowedBots string
 }
 
 // Tracker is the GitHub issue thread as an api.Tracker.
@@ -37,6 +39,7 @@ type Tracker struct {
 	filed   map[string]api.TicketID // titles Create filed; the search index lags a fresh issue
 	login   string                  // the token's own login, read once by self
 	now     func() time.Time
+	bots    string
 	trusted *Trust // built once the login is known
 }
 
@@ -63,7 +66,7 @@ func New(cfg Config) (*Tracker, error) {
 		}
 		c.BaseURL = u
 	}
-	return &Tracker{client: c, owner: cfg.Owner, repo: cfg.Repo, now: cfg.Now}, nil
+	return &Tracker{client: c, owner: cfg.Owner, repo: cfg.Repo, now: cfg.Now, bots: cfg.AllowedBots}, nil
 }
 
 // Name returns "github".
