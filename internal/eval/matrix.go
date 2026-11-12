@@ -126,29 +126,24 @@ func RunArm(ctx context.Context, m Matrix, d Deps, a Arm) (Scorecard, error) {
 			var cost float64
 			for try := 1; try <= tries; try++ {
 				tctx := context.WithValue(ctx, runKey{}, runInfo{key: key, save: a.Store.trajectory(key, a.Replay)})
-				o, err := d.Dispatch(tctx, t)
+				tr, os, err := runTicket(tctx, f, t, d)
 				if err != nil {
-					return sc, fmt.Errorf("dispatch %s/%s: %w", f.Name, t.ID, err)
+					return sc, err
 				}
-				green, err := d.Gate(ctx, t)
-				if err != nil {
-					return sc, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
+				outs = append(outs, os...)
+				r.InputTokens += tr.InputTokens
+				r.OutputTokens += tr.OutputTokens
+				cost += tr.CostUSD
+				r.WallTime += tr.WallTime
+				r.Attempts += tr.Attempts
+				r.HumanTouches += tr.HumanTouches
+				for _, o := range os {
+					r.Malformed += o.Malformed
+					r.ExitStatus = o.ExitStatus
 				}
-				pass, err := d.HiddenTest(ctx, t, f.Hidden)
-				if err != nil {
-					return sc, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
-				}
-				in, out := AbsoluteTotals(o.Updates)
-				outs = append(outs, o)
-				r.InputTokens += in
-				r.OutputTokens += out
-				cost += maxCost(o.Updates)
-				r.WallTime += o.Wall
-				r.Attempts += o.Attempts
-				r.HumanTouches += o.HumanTouches
-				r.Malformed += o.Malformed
-				r.ExitStatus = o.ExitStatus
-				r.HiddenPass, r.BaseGreen = pass, green
+				r.HiddenPass, r.BaseGreen = tr.HiddenPass, tr.BaseGreen
+				r.Epochs, r.Reduced = tr.Epochs, tr.Reduced
+				pass, green := tr.HiddenPass, tr.BaseGreen
 				if pass && green {
 					r.PassedOn = try
 					break
