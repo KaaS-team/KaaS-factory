@@ -176,19 +176,29 @@ func nanos(t time.Time) int64 {
 	return t.UnixNano()
 }
 
-// Rebuild fills the store from the tracker and observer alone. Tickets come from the tracker
-// (its Active list when it has one, otherwise its ready tickets); each ticket's attempts are
-// probed upward from 1 until the observer reports no work branch for that attempt.
+// Rebuild fills the store from the tracker and observer alone. Tickets come from the tracker:
+// its ready tickets plus, when it has one, its Active list (claimed and unfinished work), so a
+// restart keeps both the queue and the work in flight. Each ticket's attempts are probed upward
+// from 1 until the observer reports no work branch for that attempt.
 func (s *Store) Rebuild(ctx context.Context, tr api.Tracker, ob api.Observer) error {
-	var tickets []api.Ticket
-	var err error
-	if l, ok := tr.(Lister); ok {
-		tickets, err = l.Active(ctx)
-	} else {
-		tickets, err = tr.Ready(ctx)
-	}
+	tickets, err := tr.Ready(ctx)
 	if err != nil {
-		return fmt.Errorf("list tickets: %w", err)
+		return fmt.Errorf("list ready tickets: %w", err)
+	}
+	if l, ok := tr.(Lister); ok {
+		active, err := l.Active(ctx)
+		if err != nil {
+			return fmt.Errorf("list active tickets: %w", err)
+		}
+		seen := make(map[api.TicketID]bool, len(tickets))
+		for _, t := range tickets {
+			seen[t.ID] = true
+		}
+		for _, t := range active {
+			if !seen[t.ID] {
+				tickets = append(tickets, t)
+			}
+		}
 	}
 	for _, t := range tickets {
 		if err := s.PutTicket(ctx, t); err != nil {

@@ -30,6 +30,8 @@ func fixtures() ([]api.Ticket, []api.Observation) {
 func fakes() (*porttest.Tracker, *porttest.Observer) {
 	ts, obs := fixtures()
 	tr := porttest.NewTracker(ts...)
+	// 1 and 2 have work branches, so the tracker holds them as claimed work; 3 is still ready.
+	tr.Phases["1"], tr.Phases["2"] = api.PhaseRunning, api.PhaseRunning
 	o := porttest.NewObserver()
 	for _, x := range obs {
 		o.Set(x)
