@@ -90,3 +90,18 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## promptfoo/promptfoo@4f6710156d4a8426b852cf3af2b54c593a0e5177
+
+Source: https://github.com/promptfoo/promptfoo (MIT, Copyright (c) Promptfoo 2025). Ported to Go; no model-graded code was used.
+
+- `internal/eval/assert/refusal.go` from `src/redteam/util.ts` and `src/assertions/refusal.ts` [tested by `internal/eval/assert/assert_test.go`]
+- `internal/eval/assert/assert.go` from `src/assertions/{contains,regex,json,cost,latency}.ts`
+- `internal/eval/assert/score.go` from `src/assertions/assertionsResult.ts` and `runAssertions` in `src/assertions/index.ts`
+- `internal/eval/assert/trace.go` from `src/assertions/trajectory.ts` and `src/assertions/traceUtils.ts`
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
