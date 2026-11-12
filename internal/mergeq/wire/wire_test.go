@@ -254,6 +254,12 @@ func TestGitConflictAndBaseMoved(t *testing.T) {
 		t.Fatalf("FastForward after the base moved = %v, want ErrBaseMoved", err)
 	}
 	// Now a (based on the old main) conflicts with b, which is the base.
+	if stale, err := g.Stale(ctx, b, a); err != nil || len(stale) != 1 || stale[0] != "f.txt" {
+		t.Fatalf("Stale(b, a) = %v, %v, want [f.txt]", stale, err)
+	}
+	if stale, err := g.Stale(ctx, a, a); err != nil || len(stale) != 0 {
+		t.Fatalf("Stale(a, a) = %v, %v, want none", stale, err)
+	}
 	if _, err := g.Merge(ctx, []string{a}); !errors.Is(err, mergeq.ErrConflict) {
 		t.Fatalf("Merge of a conflicting head = %v, want ErrConflict", err)
 	}
