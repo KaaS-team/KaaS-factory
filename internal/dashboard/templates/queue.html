@@ -1,0 +1,9 @@
+{{template "head"}}
+<h1>Queue</h1>
+<h2>Ready</h2>
+<table><tr><th>Ticket</th><th>Title</th><th>Priority</th></tr>
+{{range .Board.Ready}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td>P{{.Priority}}</td></tr>
+{{else}}<tr><td colspan="3">Nothing ready.</td></tr>{{end}}</table>
+<h2>Merge queue</h2>
+<ol>{{range .Board.MergeQueue}}<li><a href="/ticket/{{.}}">{{.}}</a></li>{{else}}<li>Empty.</li>{{end}}</ol>
+{{template "live"}}{{template "foot"}}
