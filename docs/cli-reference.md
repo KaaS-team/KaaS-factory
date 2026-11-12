@@ -191,12 +191,6 @@ List the skill packs whose paths or keywords match
 | `--path` | stringSlice | `[]` | a file the task touches (repeatable) |
 | `--text` | string | `` | the task text |
 
-## factory packs run
-
-`factory packs run <pack.yaml> -- <command> [args]`
-
-Run a command and retry it while the manifest's success checks fail
-
 ## factory packs migrate
 
 `factory packs migrate <owner/repo#path> [flags]`
@@ -206,6 +200,12 @@ Run a migration pack pinned in factory.lock over the repository
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
+
+## factory packs run
+
+`factory packs run <pack.yaml> -- <command> [args]`
+
+Run a command and retry it while the manifest's success checks fail
 
 ## factory packs upgrade
 
