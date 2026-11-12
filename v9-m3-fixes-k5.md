@@ -1,4 +1,4 @@
-You fix four defects merge reviewers found on `next` of KaaS-team/KaaS-factory (Go, branch `next`). Each fix is test-first: write the test, watch it fail on `next`, fix, watch it pass.
+You fix six defects merge reviewers found on `next` of KaaS-team/KaaS-factory (Go, branch `next`). Each fix is test-first: write the test, watch it fail on `next`, fix, watch it pass.
 
 ## Setup
 
@@ -12,6 +12,8 @@ You fix four defects merge reviewers found on `next` of KaaS-team/KaaS-factory (
 1. **Loop guard nudge never resets** (`internal/dispatch/local/stuck` and its caller in `internal/dispatch/local`). `g.nudged` is set by an action-error nudge and never cleared, so any later, unrelated loop pattern aborts at once instead of being nudged first. Reset it once the session makes progress (a different action after the nudge), so each separate stall gets its own nudge. Also: Steer is unsupported for local sessions, so the "nudge" is only a count; make the code and its doc comment say what it does (no claim of a delivered nudge).
 2. **Abort replaces a clean exit.** An abort that lands just as the process exits normally turns a clean exit into `ErrStuck`. If the process exited 0 before the kill took effect, the result is the clean exit. Test it with a fake process whose exit and the abort race (use `-race -count=50`).
 3. **Egress wildcard covers a public suffix** (`pkg/sandbox/egress`). The depth gate counts labels, so `*.co.uk` passes and allows every `.co.uk` host. Refuse a wildcard whose base is a public suffix using `golang.org/x/net/publicsuffix` (already in the module graph if `go list -m golang.org/x/net` shows it; otherwise vet it before adding). `NewSecrets(0, ...)` turning the gate off: make 0 mean the default depth, not "off"; test both.
+5. **Replay fixtures can store secrets** (`internal/eval` replay `Recorder.save`). Message data is written unscrubbed; `Stabilize` runs only when comparing. Scrub on save with the existing redactor (find it; do not write a second one); test that a recorded token-shaped string never reaches the fixture file.
+6. **Merge queue livelock** (`internal/mergeq`). A push that is never a fast-forward retries the whole batch with no cap, and spins if `PushBackoff` is zero. Cap the attempts (config key with a default), park the batch as failed with the reason after the cap; test with a fake that always rejects.
 4. **Tests write into the tree.** Running the `internal/a2a` tests leaves `internal/a2a/a2a-audit.jsonl` behind in the working copy. Point the audit path at `t.TempDir()` in those tests, and check that the default path in production code is under the data dir, not the cwd. Add a test that fails if `git status --porcelain` is non-empty after `go test ./internal/a2a/...` would be overkill; instead assert the audit file lands in the given dir.
 
 ## Steps
