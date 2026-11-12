@@ -1,5 +1,5 @@
 {
-  "go_lines": 26678,
-  "deadcode": 153,
-  "reason": "raised by the reviewed merge of go/k10-eventlog (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 26763,
+  "deadcode": 154,
+  "reason": "raised by the reviewed merge of go/k10-fair (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
