@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +19,9 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
+	"github.com/KaaS-team/factory/internal/dispatch/local/input"
 	"github.com/KaaS-team/factory/pkg/sandbox"
+	"github.com/jonboulle/clockwork"
 )
 
 const defaultBudgetUSD = 5.0
@@ -38,6 +41,8 @@ type Run struct {
 type Preset struct {
 	Argv func(Run) ([]string, error)
 	Env  map[string]string
+	// Steer gives the agent a stdin that Steer writes to once its output has settled.
+	Steer bool
 }
 
 // ClaudePreset is the `claude -p` preset. Its argv equals the TypeScript preset's.
@@ -62,6 +67,10 @@ type Config struct {
 	// Writable and the agent's own state under the home directory.
 	Sandbox  bool
 	Writable []string
+	// CloseTimeout is how long Cancel waits after SIGINT before it kills; default 5 seconds.
+	CloseTimeout time.Duration
+	// Clock times the steer gate and the close wait; default the real clock.
+	Clock clockwork.Clock
 }
 
 type usageState struct {
@@ -77,6 +86,7 @@ type process struct {
 	start  time.Time
 	usage  usageState
 	end    time.Time
+	q      *input.Queue // nil unless the preset steers
 }
 
 // Dispatcher implements api.Dispatcher over child processes.
@@ -104,6 +114,12 @@ func New(ctx context.Context, cfg Config) (*Dispatcher, error) {
 	}
 	if cfg.MaxConcurrent <= 0 {
 		cfg.MaxConcurrent = 4
+	}
+	if cfg.CloseTimeout <= 0 {
+		cfg.CloseTimeout = 5 * time.Second
+	}
+	if cfg.Clock == nil {
+		cfg.Clock = clockwork.NewRealClock()
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
@@ -214,11 +230,22 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		cancel()
 		return api.Session{}, err
 	}
+	var q *input.Queue
+	if preset.Steer {
+		in, err := cmd.StdinPipe()
+		if err != nil {
+			cancel()
+			return api.Session{}, err
+		}
+		tail := &input.Tail{Max: 8 << 10}
+		out = io.NopCloser(io.TeeReader(out, tail))
+		q = &input.Queue{Out: in, Snapshot: tail.String, Window: 3, Every: time.Second, Clock: d.cfg.Clock}
+	}
 	if err := cmd.Start(); err != nil {
 		cancel()
 		return api.Session{}, fmt.Errorf("local: start %s: %w", argv[0], err)
 	}
-	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now()}
+	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now(), q: q}
 	d.runs[key] = p
 	go func() { // ends when the process exits; the run context kills it
 		sc := bufio.NewScanner(out)
@@ -275,17 +302,37 @@ func (d *Dispatcher) run(s api.Session) (*process, error) {
 	return p, nil
 }
 
-// Steer returns ErrUnsupported: the pinned argv has no channel into a running session.
-func (d *Dispatcher) Steer(context.Context, api.Session, string) error { return ErrUnsupported }
+// Steer writes message to the session once its output has been unchanged for three samples a
+// second apart, as one bracketed paste (or as raw keys when built with input.Raw). A preset
+// without Steer, such as the pinned claude -p argv, and an unknown session return ErrUnsupported.
+func (d *Dispatcher) Steer(ctx context.Context, s api.Session, message string) error {
+	p, err := d.run(s)
+	if err != nil || p.q == nil {
+		return ErrUnsupported
+	}
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+	go func() { // ends with the call or the process
+		select {
+		case <-p.done:
+			stop()
+		case <-ctx.Done():
+		}
+	}()
+	return p.q.Send(ctx, message)
+}
 
-// Cancel kills the session's whole process group and waits for the process
-// to be reaped. A session that is unknown or already finished is not an error.
+// Cancel sends the session's process group SIGINT, kills it if it is still running after
+// CloseTimeout, and waits for the process to be reaped. A session that is unknown or already
+// finished is not an error.
 func (d *Dispatcher) Cancel(ctx context.Context, s api.Session) error {
 	p, err := d.run(s)
 	if err != nil {
 		return nil
 	}
-	p.cancel()
+	if err := input.Close(ctx, d.cfg.Clock, func() error { return interruptGroup(p.cmd) }, func() error { p.cancel(); return nil }, p.done, d.cfg.CloseTimeout); err != nil {
+		return err
+	}
 	select {
 	case <-p.done:
 		return nil
