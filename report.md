@@ -1,5 +1,5 @@
 BRANCH: go/k8-policy-combiner
-HEAD: e083eecd5a4db4b6240545ea04b8e7746beda455
+HEAD: 9793ef4662d29a3bdd6a2ca8bba834cfe2aabde7
 ## Summary
 Added a generic deny-overrides combiner (`Combine`) in ee/policy/combiner.go with table tests. Nothing in cmd/factory calls it yet, so it is unreachable until the existing Engine.Check is wired to it.
 ## Acceptance
@@ -15,7 +15,7 @@ none
 ## Files outside my area
 none
 ## Gate evidence
-just is not installed; ran its recipes by hand: gofmt clean, go vet (with and without ee), go test -race ./... and -tags ee ./... all ok, CGO_ENABLED=0 go build rc=0. golangci-lint and deadcode were not confirmed (not run to completion); the combiner is unreachable from cmd/factory so deadcode will list it. Non-test Go lines before: 21276, after: about 21335 (+59).
+just is not installed; ran its recipes by hand: gofmt clean, go vet (with and without ee), go test -race ./... and -tags ee ./... all ok, CGO_ENABLED=0 go build rc=0. golangci-lint and deadcode were not confirmed (not run to completion); the combiner is unreachable from cmd/factory so deadcode will list it. Non-test Go lines before: 21276, after: about 21335 (+68).
 ## Learnings
 - just was missing; the gate recipes should be runnable without it.
 - Wiring Combine into Engine.Check needs an edit to policy.go, outside this ticket's area; the brief's "reachable from cmd/factory" and "only combiner.go" conflict.
