@@ -193,3 +193,9 @@ type Control interface {
 	Retry(ctx context.Context, id TicketID) error
 	Events(ctx context.Context) (<-chan Event, error)
 }
+
+// Historian is the optional Control read for a ticket's past events, oldest first.
+// Clients type-assert it and fall back to live events when it is missing.
+type Historian interface {
+	History(ctx context.Context, id TicketID) ([]Event, error)
+}
