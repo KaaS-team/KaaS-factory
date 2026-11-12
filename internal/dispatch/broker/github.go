@@ -47,6 +47,11 @@ func (*githubConn) Classify(method, target string) (Action, error) {
 		return Action{}, ErrUnclassified
 	}
 	p := strings.Split(strings.Trim(u.Path, "/"), "/")
+	for _, seg := range p {
+		if seg == "" || seg == "." || seg == ".." { // upstream normalises these, so the gate would judge a different path
+			return Action{}, ErrUnclassified
+		}
+	}
 	if len(p) < 3 || p[0] != "repos" || p[1] == "" || p[2] == "" {
 		return Action{}, ErrUnclassified
 	}
