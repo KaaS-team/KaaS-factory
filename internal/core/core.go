@@ -249,9 +249,13 @@ func (c *Core) meterPass(ctx context.Context) {
 			continue
 		}
 		k := c.meterKey(id, sess)
-		if _, err := c.d.Meter.Record(k, u); err != nil {
+		delta, err := c.d.Meter.Record(k, u)
+		if err != nil {
 			c.report(err)
 			continue
+		}
+		if th, ok := c.d.Tracker.(meter.Thread); ok {
+			c.report(meter.Ledger{Thread: th, Holder: c.cfg.Team}.Add(ctx, id, e.Attempt, u, delta))
 		}
 		switch c.d.Meter.Check(k) {
 		case meter.Steer:
