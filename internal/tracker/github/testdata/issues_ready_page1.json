@@ -1,0 +1,6 @@
+[
+  {"number": 11, "title": "Add lease", "body": "Body of 11", "state": "open", "created_at": "2026-01-02T03:04:05Z",
+   "labels": [{"name": "factory:ready"}, {"name": "feature"}]},
+  {"number": 12, "title": "A pull request", "body": "not a ticket", "state": "open", "created_at": "2026-01-03T00:00:00Z",
+   "labels": [{"name": "factory:ready"}], "pull_request": {"url": "https://api.github.com/repos/o/r/pulls/12"}}
+]

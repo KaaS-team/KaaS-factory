@@ -1,0 +1,284 @@
+package gitx_test
+
+import (
+	"context"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/KaaS-team/factory/internal/gitx"
+)
+
+// run executes git in dir and fails the test on error.
+func run(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func write(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// newRepo returns a repo with main holding a.txt and b.txt.
+func newRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	run(t, dir, "init", "-q", "-b", "main")
+	write(t, dir, "a.txt", "one\ntwo\nthree\n")
+	write(t, dir, "b.txt", "x\ny\nz\n")
+	run(t, dir, "add", ".")
+	run(t, dir, "commit", "-q", "-m", "base")
+	return dir
+}
+
+func branch(t *testing.T, dir, name string, edits map[string]string) {
+	t.Helper()
+	run(t, dir, "checkout", "-q", "-b", name, "main")
+	for f, c := range edits {
+		write(t, dir, f, c)
+	}
+	run(t, dir, "commit", "-q", "-am", name)
+	run(t, dir, "checkout", "-q", "main")
+}
+
+func TestMergeTree(t *testing.T) {
+	cases := []struct {
+		name string
+		a, b map[string]string
+		want []string
+	}{
+		{"same line, same file", map[string]string{"a.txt": "one\nTWO-A\nthree\n"}, map[string]string{"a.txt": "one\nTWO-B\nthree\n"}, []string{"a.txt"}},
+		{"different files", map[string]string{"a.txt": "one\nTWO-A\nthree\n"}, map[string]string{"b.txt": "x\nY\nz\n"}, nil},
+		{"same file, different lines", map[string]string{"a.txt": "ONE\ntwo\nthree\n"}, map[string]string{"a.txt": "one\ntwo\nTHREE\n"}, nil},
+		{"two conflicting files", map[string]string{"a.txt": "A\ntwo\nthree\n", "b.txt": "A\ny\nz\n"}, map[string]string{"a.txt": "B\ntwo\nthree\n", "b.txt": "B\ny\nz\n"}, []string{"a.txt", "b.txt"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newRepo(t)
+			branch(t, dir, "a", tc.a)
+			branch(t, dir, "b", tc.b)
+			g := gitx.New(dir)
+			got, err := g.MergeTree(context.Background(), "main", "a", "b")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("conflicts = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMergeTreeBadRefIsError(t *testing.T) {
+	dir := newRepo(t)
+	_, err := gitx.New(dir).MergeTree(context.Background(), "main", "nope", "main")
+	if err == nil {
+		t.Fatal("want an error for an unknown ref, not a conflict list")
+	}
+}
+
+func TestDiffNames(t *testing.T) {
+	dir := newRepo(t)
+	branch(t, dir, "feat", map[string]string{"a.txt": "changed\n", "b.txt": "changed\n"})
+	// main moves on; the diff is still only what feat changed (merge-base diff).
+	write(t, dir, "c.txt", "later\n")
+	run(t, dir, "add", ".")
+	run(t, dir, "commit", "-q", "-m", "main moves")
+	got, err := gitx.New(dir).DiffNames(context.Background(), "main", "feat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"a.txt", "b.txt"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("DiffNames = %v, want %v", got, want)
+	}
+}
+
+// bare returns a bare remote and a clone of it that already holds main.
+func bare(t *testing.T) (remote, clone string) {
+	t.Helper()
+	remote = filepath.Join(t.TempDir(), "remote.git")
+	run(t, t.TempDir(), "init", "-q", "--bare", "-b", "main", remote)
+	clone = newRepo(t)
+	run(t, clone, "remote", "add", "origin", remote)
+	run(t, clone, "push", "-q", "origin", "main")
+	return remote, clone
+}
+
+func TestFFPush(t *testing.T) {
+	remote, a := bare(t)
+	g := gitx.New(a)
+	ctx := context.Background()
+
+	write(t, a, "a.txt", "next\n")
+	run(t, a, "commit", "-q", "-am", "ff")
+	if err := g.FFPush(ctx, "origin", "HEAD", "main"); err != nil {
+		t.Fatalf("fast-forward push: %v", err)
+	}
+	if got, want := run(t, remote, "rev-parse", "main"), run(t, a, "rev-parse", "HEAD"); got != want {
+		t.Fatalf("remote main = %s, want %s", got, want)
+	}
+
+	// A rewritten history is not a fast-forward and must be refused, never forced.
+	run(t, a, "reset", "-q", "--hard", "HEAD~1")
+	write(t, a, "a.txt", "rewritten\n")
+	run(t, a, "commit", "-q", "-am", "rewrite")
+	err := g.FFPush(ctx, "origin", "HEAD", "main")
+	if !errors.Is(err, gitx.ErrNotFastForward) {
+		t.Fatalf("err = %v, want ErrNotFastForward", err)
+	}
+}
+
+func TestLeaseRefName(t *testing.T) {
+	cases := []struct {
+		name string
+		want string
+		bad  bool
+	}{
+		{"merge-queue", "refs/factory/lease/merge-queue", false},
+		{"issue_12.a", "refs/factory/lease/issue_12.a", false},
+		{"", "", true},
+		{"a/b", "", true},
+		{"a b", "", true},
+		{"..", "", true},
+		{strings.Repeat("x", 101), "", true},
+	}
+	for _, tc := range cases {
+		got, err := gitx.LeaseRef(tc.name)
+		if (err != nil) != tc.bad || got != tc.want {
+			t.Errorf("LeaseRef(%q) = %q, %v", tc.name, got, err)
+		}
+	}
+}
+
+func TestUpdateRefCAS(t *testing.T) {
+	dir := newRepo(t)
+	g := gitx.New(dir)
+	ctx := context.Background()
+	ref, _ := gitx.LeaseRef("x")
+	c1, err := g.NewLeaseCommit(ctx, "", "holder=a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, _ := g.NewLeaseCommit(ctx, c1, "holder=b")
+	c3, _ := g.NewLeaseCommit(ctx, c1, "holder=c")
+
+	if err := g.UpdateRef(ctx, ref, c1, ""); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := g.UpdateRef(ctx, ref, c1, ""); !errors.Is(err, gitx.ErrCASLost) {
+		t.Fatalf("second create = %v, want ErrCASLost", err)
+	}
+	if err := g.UpdateRef(ctx, ref, c2, c1); err != nil {
+		t.Fatalf("swap: %v", err)
+	}
+	if err := g.UpdateRef(ctx, ref, c3, c1); !errors.Is(err, gitx.ErrCASLost) {
+		t.Fatalf("stale swap = %v, want ErrCASLost", err)
+	}
+	if got := run(t, dir, "rev-parse", ref); got != c2 {
+		t.Fatalf("ref = %s, want %s", got, c2)
+	}
+}
+
+func TestLeaseCommitIsEmptyTreeChild(t *testing.T) {
+	dir := newRepo(t)
+	g := gitx.New(dir)
+	c1, _ := g.NewLeaseCommit(context.Background(), "", "rec")
+	c2, _ := g.NewLeaseCommit(context.Background(), c1, "rec2")
+	if got := run(t, dir, "rev-parse", c2+"^{tree}"); got != "4b825dc642cb6eb9a060e54bf8d69288fbee4904" {
+		t.Fatalf("tree = %s, want the empty tree", got)
+	}
+	if got := run(t, dir, "rev-parse", c2+"^"); got != c1 {
+		t.Fatalf("parent = %s, want %s", got, c1)
+	}
+	if got := run(t, dir, "log", "-1", "--format=%B", c2); got != "rec2" {
+		t.Fatalf("message = %q", got)
+	}
+}
+
+// Two takers read the same lease value and race to replace it; the remote lets exactly one in.
+func TestPushLeaseCASOneWinner(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		initial bool // a lease already exists (old = its sha) or the ref is absent (old = "")
+	}{{"swap existing", true}, {"create absent", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			remote, a := bare(t)
+			ctx := context.Background()
+			b := filepath.Join(t.TempDir(), "b")
+			run(t, t.TempDir(), "clone", "-q", remote, b)
+
+			ref, _ := gitx.LeaseRef("merge-queue")
+			ga, gb := gitx.New(a), gitx.New(b)
+			old := ""
+			if tc.initial {
+				c0, _ := ga.NewLeaseCommit(ctx, "", "holder=seed")
+				if err := ga.PushLease(ctx, "origin", ref, c0, ""); err != nil {
+					t.Fatalf("seed: %v", err)
+				}
+				run(t, b, "fetch", "-q", "origin", ref+":"+ref)
+				old = c0
+			}
+			ca, _ := ga.NewLeaseCommit(ctx, old, "holder=a")
+			cb, _ := gb.NewLeaseCommit(ctx, old, "holder=b")
+
+			errs := make([]error, 2)
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() { defer wg.Done(); errs[0] = ga.PushLease(ctx, "origin", ref, ca, old) }()
+			go func() { defer wg.Done(); errs[1] = gb.PushLease(ctx, "origin", ref, cb, old) }()
+			wg.Wait()
+
+			wins := 0
+			for i, err := range errs {
+				switch {
+				case err == nil:
+					wins++
+				case !errors.Is(err, gitx.ErrCASLost):
+					t.Fatalf("taker %d: %v, want nil or ErrCASLost", i, err)
+				}
+			}
+			if wins != 1 {
+				t.Fatalf("winners = %d (errs %v), want exactly 1", wins, errs)
+			}
+			got, err := ga.RemoteRef(ctx, "origin", ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != ca && got != cb {
+				t.Fatalf("remote lease = %s, want one of the takers", got)
+			}
+
+			// Deterministic half: a taker holding the old value after the winner landed always loses.
+			loser, _ := gb.NewLeaseCommit(ctx, old, "holder=late")
+			if err := gb.PushLease(ctx, "origin", ref, loser, old); !errors.Is(err, gitx.ErrCASLost) {
+				t.Fatalf("stale taker = %v, want ErrCASLost", err)
+			}
+			if after, _ := ga.RemoteRef(ctx, "origin", ref); after != got {
+				t.Fatalf("remote lease moved to %s, want %s", after, got)
+			}
+		})
+	}
+}
+
+func TestRemoteRefAbsent(t *testing.T) {
+	_, a := bare(t)
+	got, err := gitx.New(a).RemoteRef(context.Background(), "origin", "refs/factory/lease/none")
+	if err != nil || got != "" {
+		t.Fatalf("RemoteRef = %q, %v; want empty and nil", got, err)
+	}
+}
