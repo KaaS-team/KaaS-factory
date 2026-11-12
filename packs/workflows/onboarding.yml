@@ -1,0 +1,19 @@
+# Use when a repo has no agent context files: read the code and CI, write the context files
+# (AGENTS.md and rules) as a PR, have a person approve the plan first, and verify the files in a fresh session.
+name: onboarding
+agents:
+  triage: { tier: light, budget: { turns: 15, minutes: 10 } }
+  plan: { tier: deep, budget: { turns: 40, minutes: 30 }, skills: [factory-plan, factory-architecture] }
+  build: { tier: standard, budget: { turns: 50, minutes: 40 }, skills: [factory-build] }
+  verify: { tier: standard, budget: { turns: 30, minutes: 20 }, skills: [factory-verify] }
+  pr: { tier: light, budget: { turns: 10, minutes: 5 }, skills: [factory-pr] }
+steps:
+  triage: { uses: triage, label: "factory:triaging", next: plan }
+  plan:
+    uses: plan
+    label: "factory:planning"
+    next:
+      - { park: awaiting-approval, approve: build, revise: plan }
+  build: { uses: build, label: "factory:building", next: verify }
+  verify: { uses: verify, label: "factory:verifying", next: pr, reject: build }
+  pr: { uses: pr, label: "factory:in-review", revise: build }
