@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS spend (
   input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
   cache_read_tokens INTEGER NOT NULL, cache_write_tokens INTEGER NOT NULL,
   cost_usd REAL NOT NULL, wall_ns INTEGER NOT NULL, PRIMARY KEY (ticket, attempt));
-` + reportSchema
+` + reportSchema + sessionSchema
 
 // Store is the cache. Open one per database file.
 type Store struct{ db *sql.DB }
