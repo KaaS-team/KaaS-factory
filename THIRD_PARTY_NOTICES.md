@@ -319,3 +319,9 @@ Source: https://github.com/dagger/dagger (Apache-2.0, Copyright 2022 Dagger, Inc
 Source: https://github.com/sst/opencode (MIT, Copyright (c) 2025 opencode)
 
 - `internal/dispatch/local/auth.go` from `packages/server/src/auth.ts` [tests in `internal/dispatch/local/auth_test.go`]
+
+## sst/opencode@a1aa513
+
+Source: https://github.com/sst/opencode (MIT, Copyright (c) 2025 opencode). Ported to Go by hand.
+
+- `internal/dispatch/local/rules.go` from `packages/core/src/permission.ts` (evaluate, Unattended) and `packages/core/src/util/wildcard.ts` [tested by `internal/dispatch/local/rules_test.go`]
