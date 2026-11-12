@@ -38,7 +38,7 @@ func TestSandboxCommandWrapsArgvAndDropsProviderKeys(t *testing.T) {
 	parent := []string{"PATH=" + os.Getenv("PATH"), "ANTHROPIC_API_KEY=k1", "OPENAI_API_KEY=k2"}
 	d, wt := sandboxed(t, "true\n", parent)
 	bin := d.cfg.Binary
-	cmd, err := d.command(context.Background(), []string{bin, "-p"}, wt, childEnv(parent, nil), "")
+	cmd, err := d.command(context.Background(), []string{bin, "-p"}, wt, "factory/7-a1", childEnv(parent, nil), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestSandboxCommandWrapsArgvAndDropsProviderKeys(t *testing.T) {
 
 func TestSandboxOffRunsTheAgentDirectly(t *testing.T) {
 	d, wt := newLocal(t, "true\n", nil)
-	cmd, err := d.command(context.Background(), []string{d.cfg.Binary}, wt, []string{"A=1"}, "")
+	cmd, err := d.command(context.Background(), []string{d.cfg.Binary}, wt, "factory/7-a1", []string{"A=1"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

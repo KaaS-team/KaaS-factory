@@ -2,20 +2,28 @@ package local
 
 import (
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 )
 
 // writablePaths is every path a sandboxed agent may write: the temp dir, its own Claude config
 // dir, and under gitDir only what a worktree commit needs. Hooks and config are never listed,
-// so the host's next git command cannot run code the agent planted.
-func writablePaths(gitDir, worktree, cfgDir string) []string {
+// so the host's next git command cannot run code the agent planted. Of refs and logs only the
+// directory holding the session's branch is listed (refs/heads/factory for factory/7-a1), so main,
+// other heads, tags and the lease refs stay out of reach. The jail's rules are directory paths, so
+// the other branches under that same directory remain writable.
+func writablePaths(gitDir, worktree, branch, cfgDir string) []string {
 	rw := []string{os.TempDir(), os.DevNull}
 	if cfgDir != "" {
 		rw = append(rw, cfgDir)
 	}
 	if gitDir != "" {
-		rw = append(rw, filepath.Join(gitDir, "objects"), filepath.Join(gitDir, "refs"), filepath.Join(gitDir, "logs"),
-			filepath.Join(gitDir, "worktrees", filepath.Base(worktree)))
+		rw = append(rw, filepath.Join(gitDir, "objects"))
+		if dir := path.Dir(branch); dir != "." && dir != "/" && !strings.Contains(dir, "..") {
+			rw = append(rw, filepath.Join(gitDir, "refs", "heads", dir), filepath.Join(gitDir, "logs", "refs", "heads", dir))
+		}
+		rw = append(rw, filepath.Join(gitDir, "worktrees", filepath.Base(worktree)))
 	}
 	return rw
 }

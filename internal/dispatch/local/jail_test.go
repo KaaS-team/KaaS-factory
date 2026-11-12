@@ -32,15 +32,15 @@ func TestWritablePathsNeverIncludeHooksConfigOrOperatorClaude(t *testing.T) {
 	}{
 		{"no git, no config", "", "", []string{os.TempDir(), os.DevNull}},
 		{"config dir only", "", cfg, []string{os.TempDir(), os.DevNull, cfg}},
-		{"git and config", git, cfg, []string{os.TempDir(), os.DevNull, cfg, git + "/objects", git + "/refs", git + "/logs", git + "/worktrees/wt-1"}},
+		{"git and config", git, cfg, []string{os.TempDir(), os.DevNull, cfg, git + "/objects", git + "/refs/heads/factory", git + "/logs/refs/heads/factory", git + "/worktrees/wt-1"}},
 	}
 	for _, r := range rows {
-		got := writablePaths(r.gitDir, "/w/wt-1", r.cfgDir)
+		got := writablePaths(r.gitDir, "/w/wt-1", "factory/7-a1", r.cfgDir)
 		if !slices.Equal(got, r.want) {
 			t.Errorf("%s: got %v, want %v", r.name, got, r.want)
 		}
 		for _, p := range got {
-			if p == git || strings.Contains(p, "hooks") || strings.HasSuffix(p, "config") ||
+			if p == git || p == git+"/refs" || p == git+"/refs/heads" || p == git+"/logs" || strings.Contains(p, "hooks") || strings.HasSuffix(p, "config") ||
 				p == filepath.Join(home, ".claude") || p == filepath.Join(home, ".claude.json") {
 				t.Errorf("%s: %s must not be writable", r.name, p)
 			}
@@ -114,11 +114,19 @@ func TestSandboxBlocksGitHooksAndConfigButNotTheWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 	wt := filepath.Join(repo, "wt")
-	run(repo, "worktree", "add", "-q", "-B", "b", wt, "main")
+	run(repo, "worktree", "add", "-q", "-B", bf.Branch, wt, "main")
+	run(repo, "tag", "v1")
+	if err := os.MkdirAll(filepath.Join(repo, ".git", "refs", "factory", "lease"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".git", "refs", "factory", "lease", "7"), []byte("0000000000000000000000000000000000000000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	g := filepath.Join(repo, ".git")
 	body := "echo x > '" + g + "/hooks/post-checkout' 2>hook.err; echo $? > hook.rc\n" +
 		"echo '[core]' >> '" + g + "/config' 2>cfg.err; echo $? > cfg.rc\n" +
 		"echo ok > mine.txt; echo $? > own.rc\n" +
+		"for r in refs/heads/main refs/tags/v1 refs/factory/lease/7 refs/heads/other; do echo $(git rev-parse HEAD) > '" + g + "/'$r 2>/dev/null; echo $r=$? >> refs.rc; done\n" +
 		"git -c user.name=t -c user.email=t@e.test add mine.txt 2>commit.err && git -c user.name=t -c user.email=t@e.test -c commit.gpgsign=false commit -q -m m 2>commit.err; echo $? > commit.rc\n"
 	script := script(t, body)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -139,6 +147,11 @@ func TestSandboxBlocksGitHooksAndConfigButNotTheWorktree(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(g, "hooks", "post-checkout")); err == nil {
 		t.Error("hook exists")
+	}
+	for _, line := range strings.Fields(read(t, filepath.Join(wt, "refs.rc"))) {
+		if strings.HasSuffix(line, "=0") {
+			t.Errorf("agent moved a ref outside its branch directory: %s", line)
+		}
 	}
 	if rc("own.rc") != "0" || rc("commit.rc") != "0" {
 		t.Errorf("worktree write rc %s, commit rc %s: %s", rc("own.rc"), rc("commit.rc"), read(t, filepath.Join(wt, "commit.err")))
@@ -245,5 +258,17 @@ func TestSessionConfigDirIsRemovedWhenTheLoginCopyFails(t *testing.T) {
 	}
 	if left := entries(t, root); len(left) != 0 {
 		t.Errorf("failed copy left %v", left)
+	}
+}
+
+// A branch with no directory part, or one that climbs out of refs/heads, gets no refs entry: the
+// only grant that would let git create it is refs/heads itself.
+func TestWritablePathsGrantNoRefsForABranchWithoutADirectory(t *testing.T) {
+	for _, b := range []string{"main", "", "../../hooks/x"} {
+		for _, p := range writablePaths("/repo/.git", "/w/wt-1", b, "") {
+			if strings.Contains(p, "refs") || strings.Contains(p, "hooks") {
+				t.Errorf("branch %q: %s must not be writable", b, p)
+			}
+		}
 	}
 }

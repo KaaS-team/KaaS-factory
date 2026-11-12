@@ -256,7 +256,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 			_ = os.RemoveAll(cfgDir)
 		}
 	}()
-	cmd, err := d.command(runCtx, argv, dir, env, cfgDir)
+	cmd, err := d.command(runCtx, argv, dir, b.Branch, env, cfgDir)
 	if err != nil {
 		cancel()
 		return api.Session{}, err
@@ -339,13 +339,13 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 
 // command builds the agent process. With Sandbox set it is the jail helper, which applies the
 // restrictions and then execs argv with env as its whole environment.
-func (d *Dispatcher) command(ctx context.Context, argv []string, dir string, env []string, cfgDir string) (*exec.Cmd, error) {
+func (d *Dispatcher) command(ctx context.Context, argv []string, dir, branch string, env []string, cfgDir string) (*exec.Cmd, error) {
 	if !d.cfg.Sandbox {
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		cmd.Dir, cmd.Env = dir, env
 		return cmd, nil
 	}
-	return sandbox.Command(ctx, sandbox.Spec{Workdir: dir, ReadOnly: []string{"/"}, ReadWrite: writablePaths(d.cfg.GitDir, dir, cfgDir), AllowNet: true, Env: env}, argv[0], argv[1:]...)
+	return sandbox.Command(ctx, sandbox.Spec{Workdir: dir, ReadOnly: []string{"/"}, ReadWrite: writablePaths(d.cfg.GitDir, dir, branch, cfgDir), AllowNet: true, Env: env}, argv[0], argv[1:]...)
 }
 
 // Wait blocks until the session's process has exited. It returns the exit
