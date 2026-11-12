@@ -1,0 +1,11 @@
+{
+ "plan": "Plan body.\n\n<!-- factory:data {\"stage\":\"plan\",\"json\":{\"ac\":[\"one\",\"two\"],\"risk\":\"low\",\"files\":[\"a.go\"]}} -->",
+ "verify_reject": "Rejected.\n\n<!-- factory:data {\"stage\":\"verify\",\"json\":{\"result\":\"reject\",\"reasons\":[]}} -->",
+ "html_chars": "x\n\n<!-- factory:data {\"stage\":\"build\",\"json\":{\"note\":\"a < b && c > d\"}} -->",
+ "unicode": "x\n\n<!-- factory:data {\"stage\":\"triage\",\"json\":{\"t\":\"naïve — 日本語 😀\",\"sep\":\"a b c\"}} -->",
+ "quotes": "x\n\n<!-- factory:data {\"stage\":\"question\",\"json\":{\"stage\":\"plan\",\"q\":\"say \\\"hi\\\"\\nand \\\\ done\\t!\"}} -->",
+ "nested": "x\n\n<!-- factory:data {\"stage\":\"build\",\"json\":{\"build\":{\"n\":1,\"f\":1.5,\"e\":1e+21,\"z\":null,\"b\":true},\"gate\":{\"ok\":false}}} -->",
+ "empty_obj": "x\n\n<!-- factory:data {\"stage\":\"park-window\",\"json\":{}} -->",
+ "null_json": "x\n\n<!-- factory:data {\"stage\":\"plan\",\"json\":null} -->",
+ "undefined_json": "x\n\n<!-- factory:data {\"stage\":\"takeover\"} -->"
+}
