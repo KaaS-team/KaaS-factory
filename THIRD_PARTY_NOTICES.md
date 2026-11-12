@@ -90,3 +90,11 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## temporalio/temporal@bfabec7
+
+Source: https://github.com/temporalio/temporal (MIT, Copyright (c) 2025 Temporal Technologies Inc.; Copyright (c) 2020 Uber Technologies, Inc.)
+
+- `pkg/retry/retrypolicy.go` from `common/backoff/retrypolicy.go` (clock, global rand and ConditionalRetryPolicy dropped) [tested by `pkg/retry/retry_test.go`]
+- `pkg/retry/retry.go` from `common/backoff/retry.go` (proto helpers and serviceerror dropped; throttle becomes `Loop.MinDelay`) [tested by `pkg/retry/retry_test.go`]
+- `pkg/retry/jitter.go` from `common/backoff/jitter.go` [tested by `pkg/retry/retry_test.go`]
