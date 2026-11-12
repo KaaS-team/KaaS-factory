@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/KaaS-team/factory/internal/eval/trajectory"
 	"github.com/spf13/cobra"
 )
 
@@ -116,6 +117,18 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if err := os.WriteFile(base+".md", []byte(Markdown(sc, false)), 0o644); err != nil {
 				return err
 			}
+			for _, r := range sc.Tickets {
+				state := trajectory.StateFail
+				if r.Merged {
+					state = trajectory.StatePass
+				}
+				if _, err := trajectory.Write(base+"-trajectories", trajectory.Trajectory{
+					Task: r.Fixture + "/" + string(r.Ticket), Agent: agent, Workflow: workflow, State: state, Steps: []trajectory.Step{},
+					Cost: trajectory.Cost{InputTokens: r.InputTokens, OutputTokens: r.OutputTokens, CostUSD: r.CostUSD},
+				}); err != nil {
+					return err
+				}
+			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s.json and %s.md\n", base, base)
 			return err
 		},
@@ -125,7 +138,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 	cmd.Flags().StringVar(&packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
 	cmd.Flags().StringVar(&fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
 	cmd.Flags().StringVar(&outDir, "out", "evals", "directory the scorecard is written to")
-	cmd.AddCommand(newDiffCommand())
+	cmd.AddCommand(newDiffCommand(), trajectory.NewStatsCommand(), trajectory.NewCompareCommand())
 	return cmd
 }
 

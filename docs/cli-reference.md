@@ -107,11 +107,23 @@ Run the fixtures matrix and write a scorecard
 | `--packs` | string | `` | packs lock file the run used, e.g. factory.lock |
 | `--workflow` | string | `` | workflow name (required) |
 
+## factory eval compare
+
+`factory eval compare <old> <new>`
+
+Compare two sets of trajectory files offline
+
 ## factory eval diff
 
 `factory eval diff <old.json> <new.json>`
 
 Compare two scorecards; exit 1 when the new one is worse
+
+## factory eval stats
+
+`factory eval stats <trajectories>`
+
+Summarise trajectory files offline
 
 ## factory first-run
 
