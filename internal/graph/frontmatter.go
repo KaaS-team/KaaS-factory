@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -63,6 +64,7 @@ var markdownVars = map[string]bool{"ticket.title": true, "ticket.body": true, "a
 
 var markdownKeys = map[string]bool{
 	"name": true, "on": true, "agent": true, "model_tier": true, "budget": true, "nodes": true, "safe_outputs": true,
+	"imports": true, "credentials": true,
 }
 
 var tmplVar = regexp.MustCompile(`\{\{([^{}]*)\}\}`)
@@ -97,6 +99,14 @@ func LoadMarkdown(path string) (*Graph, error) {
 		m = root.Content[0]
 	}
 	body = strings.TrimSpace(body)
+	var imps []imported
+	if m != nil {
+		if list := child(m, "imports"); list != nil {
+			if imps, err = expandImports(path, list); err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+		}
+	}
 	var g *Graph
 	if m != nil && child(m, "nodes") != nil {
 		if g, err = build(name, m, "nodes", body, 1, checkNodePrompt); err != nil {
@@ -118,7 +128,29 @@ func LoadMarkdown(path string) (*Graph, error) {
 			return nil, fmt.Errorf("%s: %w", g.Name, err)
 		}
 	}
+	g.mergeImports(imps)
+	g.Hash = frontHash(m, g.Prompt)
 	return g, nil
+}
+
+// mergeImports puts the imported bodies, dependencies first, before the workflow's own prompt and adds
+// the imported safe outputs after its own, once each.
+func (g *Graph) mergeImports(imps []imported) {
+	var parts []string
+	for _, i := range imps {
+		if i.body != "" {
+			parts = append(parts, i.body)
+		}
+		for _, k := range i.safe {
+			if !slices.Contains(g.SafeOutputs, k) {
+				g.SafeOutputs = append(g.SafeOutputs, k)
+			}
+		}
+	}
+	if g.Prompt != "" {
+		parts = append(parts, g.Prompt)
+	}
+	g.Prompt = strings.Join(parts, "\n\n")
 }
 
 // LoadDefault loads the repo's default workflow: WORKFLOW.md at root when it exists, else
@@ -202,7 +234,7 @@ func (g *Graph) applyFrontMatter(m *yaml.Node) error {
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		k, v := m.Content[i].Value, m.Content[i+1]
 		if !markdownKeys[k] {
-			return fmt.Errorf("unknown key %q", k)
+			return fmt.Errorf("unknown key %q%s", k, suggest(k, markdownKeys))
 		}
 		var err error
 		switch k {
@@ -218,6 +250,10 @@ func (g *Graph) applyFrontMatter(m *yaml.Node) error {
 			}
 		case "safe_outputs":
 			g.SafeOutputs, err = parseSafeOutputs(v)
+		case "credentials":
+			if err = v.Decode(&g.Credentials); err == nil {
+				err = checkNoWriteCredential("the workflow", g.Credentials)
+			}
 		}
 		if err != nil {
 			return err
