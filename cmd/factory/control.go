@@ -19,6 +19,7 @@ import (
 	"github.com/KaaS-team/factory/internal/dispatch/local"
 	"github.com/KaaS-team/factory/internal/dispatch/routines"
 	"github.com/KaaS-team/factory/internal/dispatch/shadow"
+	"github.com/KaaS-team/factory/internal/githubauth"
 	"github.com/KaaS-team/factory/internal/mergeq"
 	"github.com/KaaS-team/factory/internal/mergeq/wire"
 	"github.com/KaaS-team/factory/internal/meter"
@@ -49,6 +50,7 @@ var newDeps = buildDeps
 const (
 	envGitHubToken   = "GITHUB_TOKEN"
 	envGitHubURL     = "GITHUB_API_URL"
+	envGitHubAppKey  = "GITHUB_APP_PRIVATE_KEY"
 	envLinearToken   = "LINEAR_API_KEY"
 	envLinearURL     = "LINEAR_API_URL"
 	envJiraToken     = "JIRA_API_TOKEN"
@@ -123,12 +125,42 @@ func newGitHubConn(c config.Config) (gitHubConn, error) {
 	if !ok || owner == "" || repo == "" {
 		return gitHubConn{}, fmt.Errorf("tracker github: key repo must be owner/name, got %q", c.Repo)
 	}
-	tok := os.Getenv(envGitHubToken)
-	if tok == "" {
-		return gitHubConn{}, fmt.Errorf("tracker github: env var %s is not set", envGitHubToken)
+	auth, err := gitHubAuth(c)
+	if err != nil {
+		return gitHubConn{}, err
 	}
 	return gitHubConn{owner: owner, repo: repo, baseURL: os.Getenv(envGitHubURL),
-		http: &http.Client{Timeout: 30 * time.Second, Transport: bearer{tok, http.DefaultTransport}}}, nil
+		http: &http.Client{Timeout: 30 * time.Second, Transport: auth}}, nil
+}
+
+// gitHubAuth signs requests as the GitHub App when its config keys are set, else with GITHUB_TOKEN.
+func gitHubAuth(c config.Config) (http.RoundTripper, error) {
+	a := c.GitHubApp
+	if a.ID == 0 {
+		tok := os.Getenv(envGitHubToken)
+		if tok == "" {
+			return nil, fmt.Errorf("tracker github: env var %s is not set", envGitHubToken)
+		}
+		return bearer{tok, http.DefaultTransport}, nil
+	}
+	if a.InstallationID == 0 {
+		return nil, errors.New("tracker github: github_app.installation_id is required with github_app.id")
+	}
+	var pem []byte
+	var err error
+	if a.KeyFile != "" {
+		pem, err = githubauth.KeyFromFile(a.KeyFile)
+	} else {
+		pem, err = githubauth.KeyFromEnv(envGitHubAppKey)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("tracker github: %w", err)
+	}
+	app := &githubauth.App{ID: int64(a.ID), InstallationID: int64(a.InstallationID), PrivateKeyPEM: pem, APIBase: os.Getenv(envGitHubURL)}
+	if _, err := app.JWT(); err != nil {
+		return nil, fmt.Errorf("tracker github: %w", err)
+	}
+	return appAuth{app, http.DefaultTransport}, nil
 }
 
 func (g gitHubConn) tracker() (*github.Tracker, error) {
@@ -204,6 +236,20 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 	r = r.Clone(r.Context())
 	r.Header.Set("Authorization", "Bearer "+b.token)
 	return b.next.RoundTrip(r)
+}
+
+// appAuth adds a GitHub App installation token, minted or refreshed as needed, to every request.
+type appAuth struct {
+	app  *githubauth.App
+	next http.RoundTripper
+}
+
+func (a appAuth) RoundTrip(r *http.Request) (*http.Response, error) {
+	tok, err := a.app.Token(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	return bearer{tok, a.next}.RoundTrip(r)
 }
 
 func pick[T any](port, key string, table map[string]T) (T, error) {

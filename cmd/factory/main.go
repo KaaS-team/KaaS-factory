@@ -24,6 +24,7 @@ import (
 	"github.com/KaaS-team/factory/internal/packs"
 	"github.com/KaaS-team/factory/internal/plancmd"
 	"github.com/KaaS-team/factory/internal/report"
+	"github.com/KaaS-team/factory/internal/selfupdate"
 	"github.com/KaaS-team/factory/internal/store"
 	"github.com/KaaS-team/factory/internal/tracker/github"
 	"github.com/KaaS-team/factory/internal/tui"
@@ -60,7 +61,7 @@ func mountClients(root *cobra.Command) {
 	attach(board, tui.WithControl)
 	dash := dashboard.NewCommand()
 	attach(dash, dashboard.WithControl)
-	root.AddCommand(board, dash, firstrun.NewCommand(), upgrade.NewCommand())
+	root.AddCommand(board, dash, firstrun.NewCommand(), upgrade.NewSelfCommand(version, selfupdate.GitHubSource{}, ""))
 	root.AddCommand(mcp.NewCommand(mcp.WithControl(func() (api.Control, mcp.Handlers, error) {
 		c, err := control(nil)
 		return c, mcp.Handlers{}, err
@@ -82,8 +83,15 @@ func mountClients(root *cobra.Command) {
 			return github.Epic(tr)(ctx, n)
 		}),
 		plancmd.WithFiler(lazyFiler{}),
-	), eval.NewCommand(), packs.NewAddCommand(), packs.NewPacksCommand())
+	), eval.NewCommand(), packs.NewAddCommand(), packsCommand())
 	root.AddCommand(logs.NewCommand(logBackends()), newServe(), a2a.NewCommand(a2aDeps), browsercheck.NewCommand())
+}
+
+// packsCommand is `factory packs`, with `packs upgrade` bumping pinned packs.
+func packsCommand() *cobra.Command {
+	c := packs.NewPacksCommand()
+	c.AddCommand(upgrade.NewCommand())
+	return c
 }
 
 // logBackends reads the session the run loop recorded for a ticket and its cloud run log.

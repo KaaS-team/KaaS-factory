@@ -176,6 +176,22 @@ Print each lock entry
 | `--json` | bool | `false` | print JSON |
 | `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
 
+## factory packs upgrade
+
+`factory packs upgrade [flags]`
+
+Bump pinned packs to their newest upstream when the eval says it is not worse
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--baseline` | string | `` | scorecard JSON of the pinned version |
+| `--cache` | string | `` | directory for cached bare repositories (default: factory-packs under the system temp dir) |
+| `--candidate` | string | `` | scorecard JSON of the new version |
+| `--dir` | string | `.` | directory holding factory.lock |
+| `--dry-run` | bool | `false` | report what would change and write nothing |
+| `--remote` | string | `https://github.com` | base URL packs are cloned from |
+| `--tolerance` | float64 | `0.05` | largest allowed rise in tokens per merged PR, as a fraction |
+
 ## factory packs verify
 
 `factory packs verify [flags]`
@@ -266,17 +282,11 @@ Send a message to a ticket's running session
 
 `factory upgrade [flags]`
 
-Bump pinned packs to their newest upstream when the eval says it is not worse
+Replace this binary with the latest factory release
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--baseline` | string | `` | scorecard JSON of the pinned version |
-| `--cache` | string | `` | directory for cached bare repositories (default: factory-packs under the system temp dir) |
-| `--candidate` | string | `` | scorecard JSON of the new version |
-| `--dir` | string | `.` | directory holding factory.lock |
-| `--dry-run` | bool | `false` | report what would change and write nothing |
-| `--remote` | string | `https://github.com` | base URL packs are cloned from |
-| `--tolerance` | float64 | `0.05` | largest allowed rise in tokens per merged PR, as a fraction |
+| `--check` | bool | `false` | report whether a newer release exists and change nothing |
 
 ## factory version
 

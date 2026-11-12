@@ -97,6 +97,9 @@ var specs = []spec{
 	{key: "sandbox", kind: kBool, def: true},
 	{key: "trust.min_role", kind: kRole, ceil: ceilFloor, def: "write"},
 	{key: "trust.allow", kind: kList, def: []string{}},
+	{key: "github_app.id", kind: kInt, min: 0, def: 0},
+	{key: "github_app.installation_id", kind: kInt, min: 0, def: 0},
+	{key: "github_app.key_file", kind: kString, def: ""},
 }
 
 // foreign lists the top-level keys of the factory-config org and team files that this package

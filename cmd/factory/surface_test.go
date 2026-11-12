@@ -1,9 +1,17 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/KaaS-team/factory/internal/config"
 	"github.com/KaaS-team/factory/pkg/sandbox"
@@ -91,5 +99,91 @@ func TestCanJail(t *testing.T) {
 		if got := canJail(tc.c); got != tc.want {
 			t.Errorf("%s: got %v", tc.name, got)
 		}
+	}
+}
+
+// TestUpgradeMounts: `upgrade` is the self-update and pack bumps live under `packs upgrade`.
+func TestUpgradeMounts(t *testing.T) {
+	out, _, err := runCLI(t, "upgrade", "--help")
+	if err != nil || !strings.Contains(out, "--check") {
+		t.Fatalf("upgrade --help: %v\n%s", err, out)
+	}
+	if out, _, err := runCLI(t, "packs", "upgrade", "--help"); err != nil || !strings.Contains(out, "--baseline") {
+		t.Fatalf("packs upgrade --help: %v\n%s", err, out)
+	}
+}
+
+func appKeyPEM(t *testing.T) []byte {
+	t.Helper()
+	k, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)})
+}
+
+// TestGitHubAuth: app keys mint an installation token; without them GITHUB_TOKEN is used as before.
+func TestGitHubAuth(t *testing.T) {
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.Path+" "+r.Header.Get("Authorization")[:7])
+		if r.URL.Path == "/app/installations/9/access_tokens" {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"token":"inst-token","expires_at":"` + time.Now().Add(time.Hour).UTC().Format(time.RFC3339) + `"}`))
+			return
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer inst-token" && got != "Bearer env-token" {
+			t.Errorf("authorization %q", got)
+		}
+	}))
+	defer srv.Close()
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	keyFile := filepath.Join(t.TempDir(), "app.pem")
+	if err := os.WriteFile(keyFile, appKeyPEM(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("app", func(t *testing.T) {
+		t.Setenv("GITHUB_TOKEN", "")
+		g, err := newGitHubConn(config.Config{Repo: "a/b", GitHubApp: config.GitHubApp{ID: 1, InstallationID: 9, KeyFile: keyFile}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := g.http.Get(srv.URL + "/repos/a/b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if len(seen) != 2 || !strings.HasPrefix(seen[0], "POST /app/installations/9/access_tokens Bearer") {
+			t.Fatalf("requests: %v", seen)
+		}
+	})
+	t.Run("token without app keys", func(t *testing.T) {
+		t.Setenv("GITHUB_TOKEN", "env-token")
+		g, err := newGitHubConn(config.Config{Repo: "a/b"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := g.http.Get(srv.URL + "/repos/a/b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+	})
+	for name, tc := range map[string]struct {
+		app  config.GitHubApp
+		want string
+	}{
+		"no installation":  {config.GitHubApp{ID: 1, KeyFile: keyFile}, "installation_id"},
+		"missing key file": {config.GitHubApp{ID: 1, InstallationID: 9, KeyFile: keyFile + ".none"}, "app private key"},
+		"no key at all":    {config.GitHubApp{ID: 1, InstallationID: 9}, "GITHUB_APP_PRIVATE_KEY"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("GITHUB_APP_PRIVATE_KEY", "")
+			_, err := newGitHubConn(config.Config{Repo: "a/b", GitHubApp: tc.app})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want %q", err, tc.want)
+			}
+		})
 	}
 }
