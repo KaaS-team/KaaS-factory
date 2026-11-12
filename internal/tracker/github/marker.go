@@ -28,7 +28,6 @@ type DataMarker struct {
 
 var (
 	dataMarkerRE = regexp.MustCompile(`(?s)<!-- factory:data (\{.*?\}) -->`)
-	trailingRE   = regexp.MustCompile(`(?s)\n*<!-- factory:data \{.*?\} -->\s*$`)
 )
 
 // ParseData returns the data markers found in the given comment bodies, in order.
@@ -82,11 +81,6 @@ func jsString(s string) string {
 	return strings.ReplaceAll(out, `\u2029`, "\u2029")
 }
 
-// StripData removes a data marker that ends the body, with the blank lines before it.
-func StripData(body string) string {
-	return strings.TrimRight(trailingRE.ReplaceAllString(body, ""), " \t\r\n")
-}
-
 // Latest returns the payload of the last marker for stage.
 func Latest(markers []DataMarker, stage string) (json.RawMessage, bool) {
 	for i := len(markers) - 1; i >= 0; i-- {
@@ -95,17 +89,6 @@ func Latest(markers []DataMarker, stage string) (json.RawMessage, bool) {
 		}
 	}
 	return nil, false
-}
-
-// Count returns how many markers name stage.
-func Count(markers []DataMarker, stage string) int {
-	n := 0
-	for _, m := range markers {
-		if m.Stage == stage {
-			n++
-		}
-	}
-	return n
 }
 
 // FindStatus returns the latest comment that carries the status marker.

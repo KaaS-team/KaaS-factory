@@ -133,7 +133,7 @@ func TestTickStallRetryNeedsHuman(t *testing.T) {
 		if state.Entries["a"].Phase != api.PhaseRetryQueue || state.Entries["a"].Attempt != attempt {
 			t.Fatalf("attempt %d: %+v", attempt, state.Entries["a"])
 		}
-		c.t = c.t.Add(backoffCap(attempt, 5*time.Minute))
+		c.t = c.t.Add((Config{}).Backoff(attempt))
 		Tick(ctx, deps, &state, cf) // redispatched
 		if state.Entries["a"].Attempt != attempt+1 {
 			t.Fatalf("attempt %d not redispatched: %+v", attempt, state.Entries["a"])

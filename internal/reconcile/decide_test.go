@@ -37,12 +37,12 @@ func st(entries ...Entry) State {
 func TestBackoff(t *testing.T) { // Symphony 8.4
 	want := []time.Duration{10 * time.Second, 20 * time.Second, 40 * time.Second, 80 * time.Second, 160 * time.Second, 5 * time.Minute, 5 * time.Minute}
 	for i, w := range want {
-		if got := backoffCap(i+1, 5*time.Minute); got != w {
+		if got := (Config{}).Backoff(i + 1); got != w {
 			t.Errorf("attempt %d: got %v want %v", i+1, got, w)
 		}
 	}
-	if backoffCap(0, 5*time.Minute) != 10*time.Second || backoffCap(1000, 5*time.Minute) != 5*time.Minute {
-		t.Error("backoffCap must clamp attempt below 1 and above the cap")
+	if (Config{}).Backoff(0) != 10*time.Second || (Config{}).Backoff(1000) != 5*time.Minute {
+		t.Error("Backoff must clamp attempt below 1 and above the cap")
 	}
 }
 

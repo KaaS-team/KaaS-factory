@@ -127,17 +127,17 @@ func Test17_4_BackoffFormula(t *testing.T) {
 	want := []time.Duration{10, 20, 40, 80, 160, 300, 300, 300}
 	for i, secs := range want {
 		n := i + 1
-		got := reconcile.Backoff(n)
+		got := (reconcile.Config{}).Backoff(n)
 		if got != secs*time.Second || got != delay(n) {
 			t.Errorf("attempt %d: Backoff %v, want %v (formula %v)", n, got, secs*time.Second, delay(n))
 		}
 	}
 	for _, n := range []int{0, -3} {
-		if got := reconcile.Backoff(n); got != 10*time.Second {
+		if got := (reconcile.Config{}).Backoff(n); got != 10*time.Second {
 			t.Errorf("attempt %d: Backoff %v, want the first delay of 10s", n, got)
 		}
 	}
-	if got := reconcile.Backoff(1 << 20); got != 5*time.Minute {
+	if got := (reconcile.Config{}).Backoff(1 << 20); got != 5*time.Minute {
 		t.Errorf("huge attempt: Backoff %v, want the 5 minute cap", got)
 	}
 }

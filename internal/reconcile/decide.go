@@ -42,8 +42,9 @@ func (c Config) withDefaults() Config {
 	return c
 }
 
-// backoffCap is the wait before retrying after failed attempt n: min(10s*2^(n-1), limit) (Symphony 8.4).
-func backoffCap(n int, limit time.Duration) time.Duration {
+// Backoff is the wait before retrying after failed attempt n: min(10s*2^(n-1), MaxRetryBackoff) (Symphony 8.4).
+func (c Config) Backoff(n int) time.Duration {
+	limit := c.withDefaults().MaxRetryBackoff
 	d := 10 * time.Second
 	for i := 1; i < n && d < limit; i++ {
 		d *= 2
@@ -205,7 +206,7 @@ func reconcileOne(e Entry, o api.Observation, now time.Time, cfg Config) (Action
 		if e.Attempt >= cfg.MaxAttempts {
 			return Action{Kind: NeedsHuman, ID: id, Attempt: e.Attempt, Reason: "stalled after " + strconv.Itoa(e.Attempt) + " attempts"}, true
 		}
-		return Action{Kind: Retry, ID: id, Attempt: e.Attempt, At: now.Add(cfg.backoff(e.Attempt)), Reason: "stalled"}, true
+		return Action{Kind: Retry, ID: id, Attempt: e.Attempt, At: now.Add(cfg.Backoff(e.Attempt)), Reason: "stalled"}, true
 	case elapsed >= cfg.StallAfter && e.SteeredAt.Before(since):
 		return Action{Kind: Steer, ID: id, Attempt: e.Attempt, Message: SteerMessage}, true
 	}
@@ -214,5 +215,3 @@ func reconcileOne(e Entry, o api.Observation, now time.Time, cfg Config) (Action
 
 // SlotsExhausted is the error recorded on a retry that found no free slot (Symphony 8.4).
 const SlotsExhausted = "no available orchestrator slots"
-
-func (c Config) backoff(n int) time.Duration { return backoffCap(n, c.MaxRetryBackoff) }

@@ -271,7 +271,7 @@ func dispatch(ctx context.Context, d Deps, s *State, a Action, now time.Time, cf
 			return
 		}
 		if d.Tracker.SetPhase(ctx, a.ID, api.PhaseRetryQueue) == nil {
-			s.Entries[a.ID] = Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.backoff(a.Attempt)), Error: err.Error()}
+			s.Entries[a.ID] = Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.Backoff(a.Attempt)), Error: err.Error()}
 		}
 		return
 	}

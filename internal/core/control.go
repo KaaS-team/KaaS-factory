@@ -69,6 +69,7 @@ func (c *Core) start(ctx context.Context, t api.Ticket, attempt int) (api.Sessio
 	c.attempts[t.ID] = max(c.attempts[t.ID], attempt)
 	delete(c.warned, t.ID)
 	c.report(c.d.Tracker.SetPhase(ctx, t.ID, api.PhaseRunning))
+	delete(c.parked, t.ID)
 	return s, nil
 }
 
@@ -114,6 +115,11 @@ func (c *Core) Cancel(ctx context.Context, id api.TicketID) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.recover(ctx)
+	return c.cancel(ctx, id)
+}
+
+// cancel is Cancel with c.mu held.
+func (c *Core) cancel(ctx context.Context, id api.TicketID) error {
 	e, ok := c.state.Entries[id]
 	if !ok {
 		return fmt.Errorf("ticket %s is not tracked", id)
@@ -137,6 +143,11 @@ func (c *Core) Retry(ctx context.Context, id api.TicketID) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.recover(ctx)
+	return c.retry(ctx, id)
+}
+
+// retry is Retry with c.mu held.
+func (c *Core) retry(ctx context.Context, id api.TicketID) error {
 	e, tracked := c.state.Entries[id]
 	t := e.Ticket
 	last := c.attempts[id]

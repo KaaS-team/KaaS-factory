@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
 	gogithub "github.com/google/go-github/v79/github"
@@ -21,6 +22,8 @@ type Config struct {
 	HTTPClient *http.Client
 	// BaseURL overrides the API root (GitHub Enterprise, or a test server). Empty means api.github.com.
 	BaseURL string
+	// Now is the clock for status times and the role cache; nil uses time.Now.
+	Now func() time.Time
 }
 
 // Tracker is the GitHub issue thread as an api.Tracker.
@@ -28,9 +31,11 @@ type Tracker struct {
 	client      *gogithub.Client
 	owner, repo string
 
-	mu    sync.Mutex
-	filed map[string]api.TicketID // titles Create filed; the search index lags a fresh issue
-	login string                  // the token's own login, read once by self
+	mu      sync.Mutex
+	filed   map[string]api.TicketID // titles Create filed; the search index lags a fresh issue
+	login   string                  // the token's own login, read once by self
+	now     func() time.Time
+	trusted *Trust // built once the login is known
 }
 
 var (
@@ -55,7 +60,7 @@ func New(cfg Config) (*Tracker, error) {
 		}
 		c.BaseURL = u
 	}
-	return &Tracker{client: c, owner: cfg.Owner, repo: cfg.Repo}, nil
+	return &Tracker{client: c, owner: cfg.Owner, repo: cfg.Repo, now: cfg.Now}, nil
 }
 
 // Name returns "github".

@@ -49,15 +49,6 @@ var (
 	signatureRE = regexp.MustCompile(`\n*<sub>Sent from the factory control plane by [^<\n]+</sub>\s*$`)
 )
 
-// SignedBy appends the control-plane signature line naming who sent the body.
-func SignedBy(body, who string) string {
-	sep := ""
-	if body != "" {
-		sep = "\n\n"
-	}
-	return body + sep + "<sub>Sent from the factory control plane by " + who + "</sub>"
-}
-
 // Unsigned removes a trailing control-plane signature line.
 func Unsigned(body string) string { return signatureRE.ReplaceAllString(body, "") }
 
