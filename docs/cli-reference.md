@@ -121,6 +121,39 @@ Serve the read-only web view
 | `--addr` | string | `127.0.0.1:8787` | listen address (loopback by default) |
 | `--operator` | bool | `false` | show usage and budget numbers |
 
+## factory design
+
+`factory design`
+
+Make design edits to a JSX tree without a coding agent
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--jail` | bool | `false` | run the pack under the sandbox with no network and only the tree writable |
+| `--pack` | string | `packs/design` | directory of the design pack |
+
+## factory design edit
+
+`factory design edit <dir> <file> <requests.json> [flags]`
+
+Apply edit requests (a JSON list of requests) to a file and print the diff without writing it
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--strip-ids` | bool | `false` | leave no data-oid or move key in the result |
+
+## factory design stamp
+
+`factory design stamp <dir>`
+
+Give every JSX element under dir one unique oid
+
+## factory design tweak
+
+`factory design tweak <dir> <delta>`
+
+Apply a design delta (a file under dir) to the tree; fail when the edit needs an agent
+
 ## factory dispatch
 
 `factory dispatch <ticket>`
@@ -198,6 +231,7 @@ Audit this repo and show what the factory would fix, at no cost
 |---|---|---|---|
 | `--annotations` | string | `.factory/annotations.yml` | reason-tagged suppressions file; the default is optional |
 | `--dry-run` | bool | `false` | stop after the report; say what would be dispatched |
+| `--fix` | bool | `false` | dispatch one build for the first covered finding and open a draft pull request |
 | `--gh` | string | `` | also audit this GitHub repo (owner/repo) |
 | `--sarif` | string | `` | also write the findings to this file as SARIF 2.1.0 |
 
@@ -397,6 +431,12 @@ Run the factory loop as a service with /healthz, /readyz and /events
 |---|---|---|---|
 | `--addr` | string | `127.0.0.1:8787` | address for /healthz, /readyz and /events |
 | `--drain` | duration | `30s` | how long to wait for the tick in flight on SIGTERM |
+
+## factory serve token
+
+`factory serve token`
+
+Print a session token for the serve listener, signed from KAAS_SERVE_PASSWORD
 
 ## factory shadow
 
