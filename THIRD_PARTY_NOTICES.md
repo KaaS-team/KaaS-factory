@@ -90,3 +90,9 @@ text ships beside it as `LICENSE-geist.txt`.
 Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
 
 - `contrib/agents/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
+
+## anthropics/claude-code-action@8a29bc6
+
+Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) 2025 Anthropic, PBC)
+
+- `internal/tracker/sanitize/prompt.go` from `src/github/utils/sanitizer.ts` [tested by `internal/tracker/sanitize/prompt_test.go`]
