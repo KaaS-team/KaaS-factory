@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/pick"
 )
 
@@ -256,11 +257,15 @@ func dispatch(ctx context.Context, d Deps, s *State, a Action, now time.Time, cf
 		return
 	}
 	t := a.Ticket
-	sess, err := d.Dispatcher.Dispatch(ctx, api.Brief{
-		Ticket: t.ID, Attempt: a.Attempt, Name: fmt.Sprintf("%s-a%d.md", t.ID, a.Attempt),
-		Text: t.Title + "\n\n" + t.Body, Repo: t.Repo, Base: cfg.Base,
-		Branch: fmt.Sprintf("factory/%s-a%d", t.ID, a.Attempt), Workflow: t.Workflow,
-	})
+	name, err := brief.Name(t.ID, a.Attempt)
+	var sess api.Session
+	if err == nil {
+		sess, err = d.Dispatcher.Dispatch(ctx, api.Brief{
+			Ticket: t.ID, Attempt: a.Attempt, Name: name,
+			Text: t.Title + "\n\n" + t.Body, Repo: t.Repo, Base: cfg.Base,
+			Branch: fmt.Sprintf("factory/%s-a%d", t.ID, a.Attempt), Workflow: t.Workflow,
+		})
+	}
 	if err != nil {
 		d.report(err)
 		if ctx.Err() != nil {
