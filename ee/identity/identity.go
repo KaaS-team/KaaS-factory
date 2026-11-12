@@ -197,6 +197,9 @@ func (is *Issuer) sweep() {
 // Authorize is the check before a side effect: a valid, unrevoked token, then the gate's live
 // answer for action.
 func (is *Issuer) Authorize(ctx context.Context, g Gate, tok, action string) error {
+	if g == nil {
+		return errors.New("identity: authorize needs a gate")
+	}
 	c, err := is.Verify(tok)
 	if err != nil {
 		return err

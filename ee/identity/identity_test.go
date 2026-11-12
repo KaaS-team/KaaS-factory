@@ -230,6 +230,15 @@ func TestAuthorizeAsksGateEveryCall(t *testing.T) {
 	}
 }
 
+// A nil gate is an error, not a panic, and no token is let through without a gate's answer.
+func TestAuthorizeNilGateIsAnError(t *testing.T) {
+	is, _, _ := newIssuer(t)
+	tok, _ := is.Mint(context.Background(), human, "a1", "run-1", "acme")
+	if err := is.Authorize(context.Background(), nil, tok, "push"); err == nil {
+		t.Fatal("nil gate authorized")
+	}
+}
+
 // A failed ledger write fails the mint and the revoke: no unrecorded identity changes.
 func TestLedgerFailureFailsOperation(t *testing.T) {
 	is, _, _ := newIssuer(t)
