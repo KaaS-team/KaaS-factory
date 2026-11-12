@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,5 +118,28 @@ func TestAbnormalExitRows(t *testing.T) {
 				t.Errorf("prs: %+v, want %d", prs.got, c.want)
 			}
 		})
+	}
+}
+
+// The loop guard sees every line first; a run it lets through must still reach the autosubmit guard,
+// so a shadowed or skipped guard would show here as no partial PR.
+func TestAutosubmitGuardFiresWhileLoopGuardIsActive(t *testing.T) {
+	varied := `i=0
+while [ $i -lt 100 ]; do
+  echo "{\"type\":\"assistant\",\"message\":{\"content\":\"step $i\"}}"
+  echo work$i > f$i.txt
+  i=$((i+1))
+  sleep 0.05
+done
+`
+	d, s, prs, _ := partialRun(t, varied, autosubmit.Caps{Calls: 4})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	err := d.Wait(ctx, s)
+	if errors.Is(err, ErrStuck) {
+		t.Fatalf("varied run was aborted as stuck: %v", err)
+	}
+	if len(prs.got) != 1 {
+		t.Fatalf("prs: %+v, want the call cap to open one partial PR", prs.got)
 	}
 }
