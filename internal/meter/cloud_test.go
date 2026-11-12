@@ -1,6 +1,7 @@
 package meter
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -93,7 +94,7 @@ func TestCloudSpendSumsRunsAndCost(t *testing.T) {
 	k2 := Key{Team: "t", Ticket: "8", Node: "build", Session: "sess_b"}
 	_, _ = c.Poll(ck, tok(1, 1, 0.25))
 	_, _ = c.Poll(k2, nil)
-	if s := c.Spend("w"); s != (Spend{Holder: "w", CostUSD: 0.25, UnreportedRuns: 1, Runs: 2}) {
+	if s := c.Spend("w"); !reflect.DeepEqual(s, Spend{Holder: "w", CostUSD: 0.25, UnreportedRuns: 1, Runs: 2}) {
 		t.Errorf("%+v", s)
 	}
 }
