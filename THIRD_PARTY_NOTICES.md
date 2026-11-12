@@ -290,3 +290,9 @@ Source: https://github.com/temporalio/temporal (MIT, Copyright (c) 2025 Temporal
 
 - `pkg/retry/retrypolicy.go` from `common/backoff/retrypolicy.go` (clock, global rand and ConditionalRetryPolicy dropped) [tested by `pkg/retry/retry_test.go`]
 - `pkg/retry/retry.go` from `common/backoff/retry.go` (proto helpers and serviceerror dropped; throttle becomes `Loop.MinDelay`) [tested by `pkg/retry/retry_test.go`]
+
+## openrewrite/rewrite@90219c5
+
+Source: https://github.com/openrewrite/rewrite (Apache-2.0). The design is ported to Go, no Java is copied.
+
+- `internal/graph/scanedit/scanedit.go` from `rewrite-core/src/main/java/org/openrewrite/ScanningRecipe.java` [tested by `internal/graph/scanedit/scanedit_test.go`]
