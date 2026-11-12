@@ -305,7 +305,6 @@ Source: https://github.com/dagger/dagger (Apache-2.0, Copyright 2022 Dagger, Inc
 
 - `pkg/sandbox/cachevol/store.go` from `engine/cachevolumedir/store.go`, with the Dagger naming removed, a tenant field added to the identity, and the test hooks dropped [tested by `pkg/sandbox/cachevol/store_test.go`]
 
-- `internal/tracker/sanitize/prompt.go` from `src/github/utils/sanitizer.ts` [tested by `internal/tracker/sanitize/prompt_test.go`]
 
 ## promptfoo/promptfoo@4f6710156d4a8426b852cf3af2b54c593a0e5177
 
