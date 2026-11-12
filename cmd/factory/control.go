@@ -43,7 +43,9 @@ var newControl = func(cfg config.Config) (api.Control, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.Stages = stagesFor(cfg)
+	if d.Stages, err = stagesFor(cfg); err != nil {
+		return nil, fmt.Errorf("open the workflow checkpoints: %w", err)
+	}
 	// An empty store (first start, or a deleted file) is rebuilt from the thread. Only the GitHub
 	// tracker has an observer and thread reads to rebuild from.
 	if st, ok := d.Store.(*store.Store); ok {
@@ -76,6 +78,7 @@ const (
 	readyLabel         = "factory:ready"
 	dbPath             = ".factory/cache/factory.db"
 	stepLogDir         = ".factory/cache/steps"
+	checkpointPath     = ".factory/cache/checkpoints.db"
 )
 
 // trackers is one row per tracker adapter. The key is the value of the `tracker` config key.

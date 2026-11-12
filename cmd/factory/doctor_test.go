@@ -123,3 +123,28 @@ func TestDoctorDispatcherPrerequisite(t *testing.T) {
 		})
 	}
 }
+
+// TestDoctorWorkflowsLoad: doctor loads every file in .factory/workflows and fails naming the one that does not.
+func TestDoctorWorkflowsLoad(t *testing.T) {
+	doctorEnv(t, map[string]string{"git": "exit 0", "gh": "exit 0", "claude": "exit 0", "go": "exit 0"})
+	if out, _, err := runCLI(t, "doctor"); err != nil || strings.Contains(out, "workflows") {
+		t.Fatalf("no workflows dir: err = %v\n%s", err, out)
+	}
+	dir := filepath.Join(".factory", "workflows")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "broken.yml"), []byte("- not a map\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := runCLI(t, "doctor")
+	if err == nil || !strings.Contains(out, "fail\tworkflows\tbroken.yml") {
+		t.Fatalf("err = %v, want a failing workflows row naming broken.yml:\n%s", err, out)
+	}
+	if err := os.Remove(filepath.Join(dir, "broken.yml")); err != nil {
+		t.Fatal(err)
+	}
+	if out, _, err := runCLI(t, "doctor"); err != nil || !strings.Contains(out, "pass\tworkflows\t0 load") {
+		t.Fatalf("empty dir: err = %v\n%s", err, out)
+	}
+}

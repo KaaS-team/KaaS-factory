@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/KaaS-team/factory/internal/config"
 	"github.com/KaaS-team/factory/internal/core"
 	"github.com/KaaS-team/factory/internal/graph"
+	"github.com/KaaS-team/factory/internal/graph/checkpoint"
 	"github.com/KaaS-team/factory/internal/tutor"
 )
 
@@ -50,10 +52,23 @@ func loadWorkflow(root, name string) (*graph.Graph, error) {
 
 // stagesFor is how the run loop walks workflows in the working directory. The tutor picks tiers only when
 // config names a model for both tiers; a node that pins a tier gets it either way.
-func stagesFor(cfg config.Config) *core.Stages {
-	s := &core.Stages{Graph: func(name string) (*graph.Graph, error) { return workflowGraph(".", name) }}
+func stagesFor(cfg config.Config) (*core.Stages, error) {
+	cp, err := openCheckpoints()
+	if err != nil {
+		return nil, err
+	}
+	s := &core.Stages{Graph: func(name string) (*graph.Graph, error) { return workflowGraph(".", name) }, Checkpoints: cp}
 	if cfg.Models[studentTier] != "" && cfg.Models[teacherTier] != "" {
 		s.Policy = tutor.Policy{Student: studentTier, Teacher: teacherTier, MaxStudentAttempts: 2, TeacherVerifies: true}
 	}
-	return s
+	return s, nil
+}
+
+// openCheckpoints opens the file that holds each ticket's place in its workflow, so a restart
+// resumes at the node it had reached instead of the first one.
+func openCheckpoints() (*checkpoint.Store, error) {
+	if err := os.MkdirAll(filepath.Dir(checkpointPath), 0o755); err != nil {
+		return nil, err
+	}
+	return checkpoint.Open(checkpointPath)
 }
