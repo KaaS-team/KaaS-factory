@@ -1,5 +1,5 @@
 {
-  "go_lines": 39077,
-  "deadcode": 380,
-  "reason": "raised by the reviewed merges of go/k7-assert-kit, k7-astgrep-transform, k7-autosubmit, k8-plan-preset, k8-policy-combiner and k8-policy-signed on top of other landings (packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 39174,
+  "deadcode": 379,
+  "reason": "raised by the reviewed merges of go/k7-assert-kit, k7-astgrep-transform, k7-autosubmit, k8-plan-preset, k8-policy-combiner and k8-policy-signed on top of other landings (packages not yet wired into cmd/factory); raised by m3-fixes-f2 (base-branch restore in the untrusted guard and the cmd/factory wiring of Config.Untrusted); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
