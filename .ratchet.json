@@ -1,5 +1,5 @@
 {
-  "go_lines": 28047,
-  "deadcode": 207,
-  "reason": "raised by the reviewed merge of go/k8-cred-broker (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
+  "go_lines": 28334,
+  "deadcode": 215,
+  "reason": "raised by the reviewed merge of go/k7-review-only (session packages not yet wired into cmd/factory); lowered by go run ./tools/ratchet --update, a raise needs a hand edit and a new reason here"
 }
