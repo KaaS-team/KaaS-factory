@@ -206,3 +206,38 @@ func TestRerecordFromEnv(t *testing.T) {
 		}
 	}
 }
+
+// A recorded credential-shaped string must never reach the fixture file, in text, tool arguments or
+// nested tool results, and the recorder's own conversation is not altered.
+func TestSaveRedactsCredentials(t *testing.T) {
+	token := "ghp_" + strings.Repeat("a1B2", 9)
+	path := filepath.Join(t.TempDir(), "rec.json")
+	reply := Message{Role: RoleAssistant, Content: []Block{
+		{Kind: "text", Text: "key " + token},
+		{Kind: "tool_call", CallID: "c1", ToolName: "Bash", Arguments: `{"cmd":"echo ` + token + `"}`},
+		{Kind: "tool_result", CallID: "c1", Content: []Block{{Kind: "text", Text: "out " + token}}},
+	}}
+	s, save, err := Open(path, true, &countingLive{reply: reply})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Send(context.Background(), []Message{text(RoleUser, "use "+token)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := save(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), token) {
+		t.Fatalf("fixture holds the token:\n%s", data)
+	}
+	if !strings.Contains(string(data), "[REDACTED_GITHUB_TOKEN]") {
+		t.Fatalf("fixture has no redaction tag:\n%s", data)
+	}
+	if got := s.(*Recorder).conv[1].Content[0].Text; !strings.Contains(got, token) {
+		t.Fatal("save altered the recorder's conversation")
+	}
+}
