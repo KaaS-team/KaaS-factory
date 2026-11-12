@@ -531,7 +531,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("mcp: listen: %w", err)
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "mcp: serving http://%s/mcp\n", ln.Addr())
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "mcp: serving http://%s/mcp\n", ln.Addr())
 			return Serve(cmd.Context(), ln, handler)
 		},
 	}

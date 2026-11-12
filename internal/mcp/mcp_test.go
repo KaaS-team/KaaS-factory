@@ -686,7 +686,7 @@ func post(t *testing.T, url, auth, body string) (int, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<16))
 	return res.StatusCode, strings.TrimSpace(string(b))
 }
@@ -735,7 +735,7 @@ func TestHTTPClientListsToolsAndCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cs.Close()
+	defer func() { _ = cs.Close() }()
 	got := listTools(t, cs)
 	for _, n := range toolNames {
 		if got[n] == nil {
