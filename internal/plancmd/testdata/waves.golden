@@ -1,13 +1,69 @@
-Wave 1:
-  T1  Add parser
-      Files: internal/a/a.go
-  T2  Add store
-      Files: internal/b/b.go
-Wave 2:
-  T3  Add command
-      Files: internal/c/c.go
-  T4  Add report
-      Files: internal/d/d.go
-Wave 3:
-  T5  Wire it
-      Files: internal/e/e.go
+## Wave 1
+
+### T1: Add parser
+
+**Problem:** why
+
+**Acceptance:**
+- AC-1: ok
+
+Files: `internal/a/a.go`
+Depends on: none
+
+### T2: Add store
+
+**Problem:** why
+
+**Acceptance:**
+- AC-1: ok
+
+Files: `internal/b/b.go`
+Depends on: none
+
+## Wave 2
+
+### T3: Add command
+
+**Problem:** why
+
+**Acceptance:**
+- AC-1: ok
+
+Files: `internal/c/c.go`
+Depends on: T1
+
+### T4: Add report
+
+**Problem:** why
+
+**Acceptance:**
+- AC-1: ok
+
+Files: `internal/d/d.go`
+Depends on: T1, T2
+
+## Wave 3
+
+### T5: Wire it
+
+**Problem:** why
+
+**Acceptance:**
+- AC-1: ok
+
+Files: `internal/e/e.go`
+Depends on: T3, T4
+
+```mermaid
+graph TD
+  T1["T1: Add parser"]
+  T2["T2: Add store"]
+  T3["T3: Add command"]
+  T4["T4: Add report"]
+  T5["T5: Wire it"]
+  T1 --> T3
+  T1 --> T4
+  T2 --> T4
+  T3 --> T5
+  T4 --> T5
+```

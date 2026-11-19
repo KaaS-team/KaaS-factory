@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -186,6 +187,26 @@ func TestNoControlForPlainCommands(t *testing.T) {
 		if built != 0 {
 			t.Fatalf("%v built a Control", args)
 		}
+	}
+}
+
+// TestBoardReplayNeedsNoControl: a demo replays a recorded fleet in an empty directory, with no
+// tracker configured, so `board --replay` must never build a Control.
+func TestBoardReplayNeedsNoControl(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	old := newControl
+	newControl = func(config.Config) (api.Control, error) { return nil, errors.New("constructed a Control") }
+	t.Cleanup(func() { newControl = old })
+	board, _, err := newRoot().Find([]string{"board"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := board.ParseFlags([]string{"--replay", filepath.Join(dir, "fleet.ndjson")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := board.PersistentPreRunE(board, nil); err != nil {
+		t.Fatalf("board --replay built a Control: %v", err)
 	}
 }
 

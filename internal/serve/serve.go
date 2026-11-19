@@ -38,6 +38,7 @@ type Options struct {
 	Jobs     *Jobs         // optional scheduled jobs; Serve drives them and needs Exec
 	JobsPath string        // when Jobs is nil, Serve opens the job database at this path
 	Exec     Executor      // runs one job run
+	Schedule *Scheduler    // optional cron schedules, ticked once per Interval
 	// Wrap, when set, wraps the HTTP routes inside the host guard, for example to require a credential.
 	Wrap func(http.Handler) http.Handler
 }
@@ -47,6 +48,7 @@ type Server struct {
 	core     Core
 	interval time.Duration
 	clock    Clock
+	sched    *Scheduler
 	mu       sync.Mutex
 	lastTick time.Time
 	ticked   bool
@@ -66,7 +68,7 @@ func New(core Core, o Options) *Server {
 	if o.Clock == nil {
 		o.Clock = realClock{}
 	}
-	return &Server{core: core, interval: o.Interval, clock: o.Clock, jobs: o.Jobs, jobsPath: o.JobsPath, exec: o.Exec, wrap: o.Wrap}
+	return &Server{core: core, interval: o.Interval, clock: o.Clock, jobs: o.Jobs, jobsPath: o.JobsPath, exec: o.Exec, wrap: o.Wrap, sched: o.Schedule}
 }
 
 func (s *Server) markTick() {
@@ -207,6 +209,9 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 	go func() { httpDone <- srv.Serve(ln) }()
 	runDone := make(chan error, 1)
 	s.ready.Store(true)
+	if s.sched != nil {
+		go s.runSchedules(ctx)
+	}
 	go func() { runDone <- s.core.Run(ctx) }()
 
 	select {
@@ -241,4 +246,18 @@ func (s *Server) stopHTTP(srv *http.Server, d time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
+}
+
+// runSchedules ticks the scheduler every interval until ctx ends. A failed tick is retried on the next one.
+func (s *Server) runSchedules(ctx context.Context) {
+	t := time.NewTicker(s.interval)
+	defer t.Stop()
+	for {
+		_ = s.sched.Tick(ctx, s.clock.Now())
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }

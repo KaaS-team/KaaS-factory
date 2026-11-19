@@ -33,9 +33,15 @@ Pin a file from a GitHub repository (MIT or Apache-2.0 only) in factory.lock
 
 ## factory board
 
-`factory board`
+`factory board [flags]`
 
 Open the terminal board
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--operator` | bool | `false` | show tokens against budget on each card |
+| `--replay` | string | `` | play a recorded headless event stream (NDJSON) instead of a live fleet |
+| `--speed` | float64 | `1` | replay speed: 10 plays ten times faster than recorded |
 
 ## factory browsercheck
 
@@ -273,6 +279,7 @@ Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--http` | string | `` | serve streamable HTTP at /mcp on this address (default host 127.0.0.1); the bearer token is read from FACTORY_MCP_TOKEN |
+| `--read-only` | bool | `false` | serve only the read tools; write tools are refused |
 
 ## factory packs
 
@@ -360,6 +367,7 @@ Turn a goal, epic or spec into a ticket DAG; --approve files it
 | `--approve` | bool | `false` | file the tickets; without it nothing is written |
 | `--epic` | int | `0` | read the spec and tickets from epic issue `n` |
 | `--json` | bool | `false` | print the DAG as JSON |
+| `--repo-dir` | string | `` | the repository the agent reads when drafting from a goal (default: here) |
 | `--spec` | string | `` | read the spec and tickets from `file` |
 
 ## factory queue

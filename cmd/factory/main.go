@@ -66,7 +66,7 @@ func mountClients(root *cobra.Command) {
 	attach(board, tui.WithControl)
 	dash := dashboard.NewCommand()
 	attach(dash, dashboard.WithControl)
-	root.AddCommand(board, dash, firstrun.NewCommand(firstrun.WithExec(firstRunExec)), selfupdate.NewCommand(version, selfupdate.GitHubSource{}, ""))
+	root.AddCommand(board, dash, firstrun.NewCommand(firstrun.WithExec(firstRunExec)), upgrade.NewSelfCommand(version, selfupdate.GitHubSource{}, ""))
 	root.AddCommand(mcp.NewCommand(mcp.WithControl(func() (api.Control, mcp.Handlers, error) {
 		c, err := control(nil)
 		return c, mcp.Handlers{}, err
@@ -84,6 +84,7 @@ func mountClients(root *cobra.Command) {
 	})))
 	root.AddCommand(initwiz.NewCommand(), plancmd.NewCommand(
 		plancmd.WithSpecFunc(plancmd.LocalSpec("claude", ".")),
+		plancmd.WithSpecFactory(func(dir string) plancmd.SpecFunc { return plancmd.LocalSpec("claude", dir) }),
 		plancmd.WithEpic(func(ctx context.Context, n int) (string, error) {
 			tr, err := planTracker()
 			if err != nil {
@@ -167,6 +168,10 @@ func (lazyFiler) Create(ctx context.Context, t api.Ticket) (api.TicketID, error)
 // attach builds the Control when cmd runs and hands it to the package through with.
 func attach(cmd *cobra.Command, with func(context.Context, api.Control) context.Context) {
 	cmd.PersistentPreRunE = func(c *cobra.Command, _ []string) error {
+		// A replay plays a recorded file, so it needs no tracker or live fleet.
+		if f := c.Flags().Lookup("replay"); f != nil && f.Value.String() != "" {
+			return nil
+		}
 		ctl, err := control(nil)
 		if err != nil {
 			return err
@@ -183,6 +188,10 @@ func main() {
 	}
 	if err := newRoot().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "factory:", err)
+		var ec interface{ ExitCode() int }
+		if errors.As(err, &ec) {
+			os.Exit(ec.ExitCode())
+		}
 		os.Exit(1)
 	}
 }

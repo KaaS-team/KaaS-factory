@@ -75,7 +75,23 @@ type Model struct {
 	input   textinput.Model
 	pending api.TicketID
 	status  string
+
+	operator bool // show tokens against budget
+	merged   int  // merged events seen
+	help     bool
 }
+
+// Option changes how the board is built.
+type Option func(*Model)
+
+// WithOperator shows tokens against budget on each card. Without it the board never shows them.
+func WithOperator(on bool) Option { return func(m *Model) { m.operator = on } }
+
+// WithClock sets the board's clock; a replay uses the time of its newest event.
+func WithClock(now func() time.Time) Option { return func(m *Model) { m.now = now } }
+
+// skipper is the optional Control read for lines a replay could not parse.
+type skipper interface{ Skipped() int }
 
 type (
 	boardMsg  api.Board
@@ -91,11 +107,11 @@ type (
 )
 
 // New returns the board model for ctl.
-func New(ctl api.Control) tea.Model {
+func New(ctl api.Control, opts ...Option) tea.Model {
 	ctx, cancel := context.WithCancel(context.Background())
 	in := textinput.New()
 	in.Prompt = "steer> "
-	return &Model{
+	m := &Model{
 		ctl: ctl, ctx: ctx, cancel: cancel, now: time.Now,
 		width: defaultWidth, height: defaultHeight,
 		stalled:   map[api.TicketID]bool{},
@@ -104,6 +120,10 @@ func New(ctl api.Control) tea.Model {
 		reasons:   map[api.TicketID]string{},
 		input:     in,
 	}
+	for _, o := range opts {
+		o(m)
+	}
+	return m
 }
 
 // Init loads the board once and opens the event stream.
@@ -141,6 +161,9 @@ func (m *Model) waitEvent() tea.Cmd {
 		select {
 		case e, ok := <-ch:
 			if !ok {
+				if _, replay := m.ctl.(skipper); replay {
+					return doneMsg{note: "replay finished"}
+				}
 				return errMsg{fmt.Errorf("event stream closed")}
 			}
 			return eventMsg(e)
@@ -198,6 +221,7 @@ func (m *Model) applyEvent(e api.Event) tea.Cmd {
 		m.stalled[e.Ticket] = true
 		return nil
 	case "merged":
+		m.merged++
 		m.removeTicket(e.Ticket)
 		return nil
 	}
@@ -291,6 +315,18 @@ func (m *Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.cursor > 0 {
 			m.cursor--
 		}
+	case "g":
+		m.cursor = 0
+	case "G":
+		m.cursor = max(m.rows()-1, 0)
+	case "?":
+		m.help = !m.help
+	case "]":
+		m.screen = (m.screen + 1) % screenTimeline
+		m.cursor = 0
+	case "[":
+		m.screen = (m.screen + screenTimeline - 1) % screenTimeline
+		m.cursor = 0
 	case "tab":
 		m.screen = (m.screen + 1) % screenTimeline
 		m.cursor = 0
@@ -435,13 +471,22 @@ func (m *Model) header(w int) string {
 
 func (m *Model) footer(w int) []string {
 	line := fmt.Sprintf("fires left: %d", m.board.FiresLeft)
+	if _, replay := m.ctl.(skipper); replay {
+		line = "replay"
+	}
 	switch m.mode {
 	case modeSteer:
 		return []string{clip(line, w), clip(m.input.View(), w)}
 	case modeConfirmCancel:
 		return []string{clip(line, w), clip(fmt.Sprintf("cancel #%s? y/n", m.pending), w)}
 	}
-	help := "j/k move  enter timeline  s steer  c cancel  r retry  tab screen  q quit"
+	if sk, ok := m.ctl.(skipper); ok && sk.Skipped() > 0 {
+		line += fmt.Sprintf("  skipped %d malformed lines", sk.Skipped())
+	}
+	help := "j/k move  g/G top/bottom  enter timeline  [/] screen  s steer  c cancel  r retry  ? more  q quit"
+	if m.help {
+		help = "tab next screen  esc back  s steer  c cancel (y/n)  r retry  g top  G bottom  ? close  q quit"
+	}
 	if m.status != "" {
 		line += "  " + m.status
 	}
@@ -463,9 +508,11 @@ func (m *Model) body(w, h int) string {
 const cardHeight = 4
 
 func (m *Model) boardView(w, h int) string {
+	strip := m.queueStrip(w)
+	h--
 	slots := m.board.Slots
 	if len(slots) == 0 {
-		return styleDim.Render("no active slots")
+		return strip + "\n" + styleDim.Render("no active slots")
 	}
 	per := max(h/cardHeight, 1)
 	start := 0
@@ -477,7 +524,20 @@ func (m *Model) boardView(w, h int) string {
 	for i := start; i < end; i++ {
 		cards = append(cards, m.card(slots[i], i == m.cursor, w))
 	}
-	return strings.Join(cards, "\n")
+	return strip + "\n" + strings.Join(cards, "\n")
+}
+
+// queueStrip is the one-line merge queue: who waits to land, and how many have landed.
+func (m *Model) queueStrip(w int) string {
+	q := "empty"
+	if len(m.board.MergeQueue) > 0 {
+		ids := make([]string, len(m.board.MergeQueue))
+		for i, id := range m.board.MergeQueue {
+			ids[i] = "#" + string(id)
+		}
+		q = strings.Join(ids, " ")
+	}
+	return clip(styleSelected.Render("merge queue")+": "+q+fmt.Sprintf("   merged %d", m.merged), w)
 }
 
 func (m *Model) card(s api.Slot, sel bool, w int) string {
@@ -493,7 +553,6 @@ func (m *Model) card(s api.Slot, sel bool, w int) string {
 	if !s.LastPush.IsZero() {
 		push = dur(m.now().Sub(s.LastPush)) + " ago"
 	}
-	bar, _ := usageBar(s.Usage, s.Budget, 20)
 	mark := "  "
 	border := lipgloss.NormalBorder()
 	style := lipgloss.NewStyle().Border(border).Width(w - 2)
@@ -503,7 +562,11 @@ func (m *Model) card(s api.Slot, sel bool, w int) string {
 	}
 	title := fmt.Sprintf("%s#%s %s", mark, s.Ticket.ID, s.Ticket.Title)
 	l1 := fmt.Sprintf("%s  [%s]%s", title, s.Phase, flag)
-	l2 := fmt.Sprintf("  elapsed %s   last push %s   usage %s", elapsed, push, bar)
+	l2 := fmt.Sprintf("  elapsed %s   last push %s", elapsed, push)
+	if m.operator {
+		bar, _ := usageBar(s.Usage, s.Budget, 20)
+		l2 += fmt.Sprintf("   tokens %d/%d %s", s.Usage.InputTokens+s.Usage.OutputTokens, s.Budget.Tokens, bar)
+	}
 	inner := w - 4
 	return style.Render(clip(l1, inner) + "\n" + clip(l2, inner))
 }

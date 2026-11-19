@@ -1,18 +1,18 @@
 factory  [board]  waves   queue 
 
+merge queue: #99 #100   merged 0
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
 │> #101 Add the TUI board  [running]                                                             │
-│  elapsed 42m   last push 3m ago   usage ████████░░░░░░░░░░░░ 40%                               │
+│  elapsed 42m   last push 3m ago                                                                │
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
 │  #102 Port the merge queue  [running]                                                          │
-│  elapsed 1h30m   last push 5m ago   usage ██████████████████░░ 90% !                           │
+│  elapsed 1h30m   last push 5m ago                                                              │
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
 │  #103 Wire the dashboard  [stalled]  STALLED                                                   │
-│  elapsed 2h10m   last push 1h01m ago   usage ██░░░░░░░░░░░░░░░░░░ 10%                          │
+│  elapsed 2h10m   last push 1h01m ago                                                           │
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
 
 
 
@@ -27,4 +27,4 @@ factory  [board]  waves   queue
 
 
 fires left: 7
-j/k move  enter timeline  s steer  c cancel  r retry  tab screen  q quit
+j/k move  g/G top/bottom  enter timeline  [/] screen  s steer  c cancel  r retry  ? more  q quit
