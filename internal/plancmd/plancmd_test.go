@@ -68,7 +68,7 @@ func TestPlanPrintsWavesGolden(t *testing.T) {
 
 func TestPlanGoalUsesInjectedSpec(t *testing.T) {
 	out, err := run(t, nil, "ship it")
-	if err != nil || !strings.Contains(out, "Wave 3:") {
+	if err != nil || !strings.Contains(out, "## Wave 3") {
 		t.Fatalf("err=%v out=%s", err, out)
 	}
 }
@@ -177,7 +177,7 @@ func TestEpicReadsIssueBody(t *testing.T) {
 	var out bytes.Buffer
 	c.SetOut(&out)
 	c.SetArgs([]string{"--epic", "7"})
-	if err := c.ExecuteContext(context.Background()); err != nil || !strings.Contains(out.String(), "Wave 1:") {
+	if err := c.ExecuteContext(context.Background()); err != nil || !strings.Contains(out.String(), "## Wave 1") {
 		t.Fatalf("err=%v out=%s", err, out.String())
 	}
 }

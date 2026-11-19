@@ -73,7 +73,7 @@ func TestLocalSpecPrintsDAG(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "Wave 1:") || !strings.Contains(out, "Wire it") {
+	if !strings.Contains(out, "## Wave 1") || !strings.Contains(out, "Wire it") {
 		t.Fatalf("no DAG in output:\n%s", out)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "argv1")); err == nil {
@@ -87,7 +87,7 @@ func TestLocalSpecRetriesOnceWithErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if !strings.Contains(out, "Wave 1:") {
+	if !strings.Contains(out, "## Wave 1") {
 		t.Fatalf("no DAG:\n%s", out)
 	}
 	second := strings.Join(argvOf(t, dir, 1), "\n")

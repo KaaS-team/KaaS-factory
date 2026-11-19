@@ -42,13 +42,17 @@ var ErrNoSpecSource = errors.New("drafting a spec from a goal needs the agent ru
 type Option func(*deps)
 
 type deps struct {
-	spec  SpecFunc
-	epic  EpicFunc
-	filer Filer
+	specFor func(dir string) SpecFunc
+	spec    SpecFunc
+	epic    EpicFunc
+	filer   Filer
 }
 
 // WithSpecFunc sets the model step that drafts spec text from a goal.
 func WithSpecFunc(f SpecFunc) Option { return func(d *deps) { d.spec = f } }
+
+// WithSpecFactory sets the model step per repository, so --repo-dir decides where the agent reads.
+func WithSpecFactory(f func(dir string) SpecFunc) Option { return func(d *deps) { d.specFor = f } }
 
 // WithEpic sets how `--epic <n>` reads the epic body.
 func WithEpic(f EpicFunc) Option { return func(d *deps) { d.epic = f } }
@@ -78,7 +82,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 	for _, o := range opts {
 		o(d)
 	}
-	var specFile string
+	var specFile, repoDir string
 	var epic int
 	var approve, asJSON bool
 	c := &cobra.Command{
@@ -87,6 +91,14 @@ func NewCommand(opts ...Option) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
+			if repoDir != "" {
+				if st, err := os.Stat(repoDir); err != nil || !st.IsDir() {
+					return fmt.Errorf("--repo-dir %s is not a directory", repoDir)
+				}
+				if d.specFor != nil {
+					d.spec = d.specFor(repoDir)
+				}
+			}
 			text, slug, err := source(ctx, d, args, specFile, epic)
 			if err != nil {
 				return err
@@ -112,6 +124,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 	}
 	c.Flags().StringVar(&specFile, "spec", "", "read the spec and tickets from `file`")
 	c.Flags().IntVar(&epic, "epic", 0, "read the spec and tickets from epic issue `n`")
+	c.Flags().StringVar(&repoDir, "repo-dir", "", "the repository the agent reads when drafting from a goal (default: here)")
 	c.Flags().BoolVar(&approve, "approve", false, "file the tickets; without it nothing is written")
 	c.Flags().BoolVar(&asJSON, "json", false, "print the DAG as JSON")
 	return c
@@ -223,12 +236,8 @@ func render(w io.Writer, res intent.Result, problems []string, asJSON bool) erro
 		enc.SetIndent("", "  ")
 		return enc.Encode(dag)
 	}
-	for i, wave := range res.Waves {
-		say(w, "Wave %d:\n", i+1)
-		for _, id := range wave {
-			t := by[id]
-			say(w, "  %s  %s\n      Files: %s\n", t.ID, t.Title, strings.Join(t.Files, ", "))
-		}
+	if len(problems) == 0 {
+		say(w, "%s", plan.Markdown(res.Plan, res.Waves))
 	}
 	if len(problems) > 0 {
 		say(w, "Problems:\n")

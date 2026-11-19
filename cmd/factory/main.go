@@ -84,6 +84,7 @@ func mountClients(root *cobra.Command) {
 	})))
 	root.AddCommand(initwiz.NewCommand(), plancmd.NewCommand(
 		plancmd.WithSpecFunc(plancmd.LocalSpec("claude", ".")),
+		plancmd.WithSpecFactory(func(dir string) plancmd.SpecFunc { return plancmd.LocalSpec("claude", dir) }),
 		plancmd.WithEpic(func(ctx context.Context, n int) (string, error) {
 			tr, err := planTracker()
 			if err != nil {
