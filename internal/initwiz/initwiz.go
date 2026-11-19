@@ -33,10 +33,10 @@ type preset struct {
 
 var presets = map[string]preset{
 	"solo":       {slots: 1, dispatcher: "local", approval: "always"},
-	"startup":    {slots: 3, dispatcher: "routines", approval: "on-risk:low"},
-	"scaleup":    {slots: 6, dispatcher: "routines", approval: "on-risk:low", batchSize: 4},
-	"enterprise": {slots: 6, dispatcher: "routines", approval: "always", teamDay: 250, month: 5000},
-	"regulated":  {slots: 3, dispatcher: "routines", approval: "always", noAutoPR: true},
+	"startup":    {slots: 3, dispatcher: "claude-cloud", approval: "on-risk:low"},
+	"scaleup":    {slots: 6, dispatcher: "claude-cloud", approval: "on-risk:low", batchSize: 4},
+	"enterprise": {slots: 6, dispatcher: "claude-cloud", approval: "always", teamDay: 250, month: 5000},
+	"regulated":  {slots: 3, dispatcher: "claude-cloud", approval: "always", noAutoPR: true},
 	"oss":        {slots: 2, dispatcher: "local", approval: "always"},
 }
 
@@ -49,7 +49,7 @@ func Tiers() []string {
 func Trackers() []string { return []string{"github", "linear", "jira"} }
 
 // Dispatchers lists the dispatcher names a user may pick, in the order the form shows them.
-func Dispatchers() []string { return []string{"local", "routines", "fire"} }
+func Dispatchers() []string { return []string{"local", "claude-cloud", "fire"} }
 
 // Answers is what the wizard collects. Dispatcher and Repo may be empty: the tier's dispatcher
 // and no repo key are used then.

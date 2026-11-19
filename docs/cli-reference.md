@@ -245,7 +245,7 @@ Write .factory/factory.yaml from a tier preset
 |---|---|---|---|
 | `--accessible` | bool | `false` | plain numbered prompts instead of the full-screen form |
 | `--dir` | string | `.` | repo root to write into |
-| `--dispatcher` | string | `` | dispatcher: local, routines, fire; default from the tier |
+| `--dispatcher` | string | `` | dispatcher: local, claude-cloud, fire; default from the tier |
 | `--force` | bool | `false` | overwrite an existing .factory/factory.yaml |
 | `--repo` | string | `` | owner/name; default from the origin remote |
 | `--tier` | string | `` | tier preset: solo, startup, scaleup, enterprise, regulated, oss |

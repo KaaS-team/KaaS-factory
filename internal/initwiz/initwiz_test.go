@@ -66,10 +66,10 @@ func TestYesWritesPresetPerTier(t *testing.T) {
 		teamDay    float64
 	}{
 		{"solo", 1, "local", "always", "queue", 1, 100},
-		{"startup", 3, "routines", "on-risk:low", "queue", 1, 100},
-		{"scaleup", 6, "routines", "on-risk:low", "queue", 4, 100},
-		{"enterprise", 6, "routines", "always", "queue", 1, 250},
-		{"regulated", 3, "routines", "always", "queue", 1, 100},
+		{"startup", 3, "claude-cloud", "on-risk:low", "queue", 1, 100},
+		{"scaleup", 6, "claude-cloud", "on-risk:low", "queue", 4, 100},
+		{"enterprise", 6, "claude-cloud", "always", "queue", 1, 250},
+		{"regulated", 3, "claude-cloud", "always", "queue", 1, 100},
 		{"oss", 2, "local", "always", "queue", 1, 100},
 	}
 	for _, tc := range cases {
