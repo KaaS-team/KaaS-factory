@@ -13,7 +13,7 @@ factory init --tier solo
 factory first-run --dry-run
 ```
 
-`doctor` checks your tools. `init` writes `.factory/factory.yaml`. `first-run --dry-run` audits the
+`doctor` checks your tools. `init` writes `factory.yaml` into your repo's `.factory` folder. `first-run --dry-run` audits the
 repository, lists the first fixes, and changes nothing.
 
 ## The loop

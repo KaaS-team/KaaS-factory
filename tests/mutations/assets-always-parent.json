@@ -1,7 +1,0 @@
-{
-  "name": "assets: always parent",
-  "file": "src/assets-branch.ts",
-  "find": "const parent = head ? [\"-p\", head] : [];",
-  "replace": "const parent = [\"-p\", head ?? \"HEAD\"];",
-  "test": "tests/assets-branch.test.ts"
-}

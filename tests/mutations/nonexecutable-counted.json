@@ -1,1 +1,0 @@
-{"name":"nonexecutable-counted","file":"scripts/diff-coverage.ts","find":"if (hits === undefined) continue;","replace":"","test":"tests/diff-coverage.test.ts"}

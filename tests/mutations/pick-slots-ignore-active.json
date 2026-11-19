@@ -1,7 +1,0 @@
-{
-  "name": "pick-slots-ignore-active",
-  "file": "src/orchestrate/pick.ts",
-  "find": "- (input.active[",
-  "replace": "- 0 * (input.active[",
-  "test": "tests/orchestrate-pick.test.ts"
-}

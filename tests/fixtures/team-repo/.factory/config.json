@@ -1,1 +1,0 @@
-{ "repo": "acme/core-api", "merge": { "policy": "auto" }, "riskPolicy": { "autoApproveLowRisk": true, "autoApproveMaxRisk": "medium" }, "labels": { "factory:ready": "ready-for-ai" } }

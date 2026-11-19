@@ -1,8 +1,0 @@
-name: acme
-policy:
-  auto_merge:
-    allowed: false
-  risk_max: low
-  deny:
-    auto_merge.allowed: hard
-    risk_max: soft

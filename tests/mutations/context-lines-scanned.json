@@ -1,1 +1,0 @@
-{"name":"context-lines-scanned","file":"scripts/check-action-pins.ts","find":"startsWith(\"+\")","replace":"startsWith(\"\")","test":"tests/check-action-pins.test.ts"}
