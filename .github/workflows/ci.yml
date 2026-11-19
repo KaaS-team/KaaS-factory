@@ -27,10 +27,10 @@ jobs:
         with:
           go-version-file: go.mod
       - uses: extractions/setup-just@v3
-      - uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.13.2
-          install-only: true
+      # The lint step in `just check` uses this binary because it is exactly the pinned version.
+      # The lint action is not used: it ignores install-only and lints with its own gofmt (12 Nov red run).
+      - name: Install the pinned golangci-lint
+        run: GOTOOLCHAIN=go1.26.7 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
       - name: Every commit is signed off (DCO, CONTRIBUTING.md)
         if: github.event_name == 'pull_request'
