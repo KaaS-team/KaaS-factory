@@ -37,7 +37,8 @@ ok  	github.com/KaaS-team/factory/internal/smoke	13.103s
 Other findings:
 - The old full-loop tests `TestLive` and `TestLiveShadow` match `-run Live`. On a first run they
   claimed the two ready issues, opened PRs #7 and #8 and failed (needs-human; the session proxy
-  refuses branch deletes). I closed those PRs and put #1 and #2 back to open with `factory:ready`.
+  refuses branch deletes). PR #7 was merged into demo-sandbox `main` (one small file under
+  `smoke/`; I did not revert it). I closed #8 and put #1 and #2 back to open with `factory:ready`.
   Stale branches `factory/1-a1`, `factory/2-a1`, `factory/6-a1`, `report/1`, `report/2`, `report/6`
   remain in demo-sandbox and need a local delete. Issues #6, #9 and #10 are closed smoke leftovers.
 - So the full-loop tests now need `FACTORY_SMOKE_LOOP=1`. They claim every ready issue.
