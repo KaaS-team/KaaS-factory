@@ -516,6 +516,17 @@ Summarize what shadow mode would have dispatched
 |---|---|---|---|
 | `--file` | string | `.factory/shadow.ndjson` | shadow log to read |
 
+## factory smoke
+
+`factory smoke [flags]`
+
+Run the loop once against a sandbox GitHub repository with a fake agent
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--shadow` | bool | `false` | shadow run: nothing is dispatched or merged |
+| `--timeout` | duration | `5m0s` | how long to wait for the work to land |
+
 ## factory status
 
 `factory status [flags]`

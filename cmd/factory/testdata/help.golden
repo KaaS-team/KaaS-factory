@@ -34,6 +34,7 @@ Available Commands:
   run          Run the factory; --headless streams one JSON event per line
   serve        Run the factory loop as a service with /healthz, /readyz and /events
   shadow       Summarize what shadow mode would have dispatched
+  smoke        Run the loop once against a sandbox GitHub repository with a fake agent
   status       Show the board, one row per slot
   steer        Send a message to a ticket's running session
   upgrade      Replace this binary with the latest factory release
@@ -726,6 +727,18 @@ Usage:
 Flags:
       --file string   shadow log to read (default ".factory/shadow.ndjson")
   -h, --help          help for shadow
+
+=== factory smoke
+Opens an issue in the sandbox repository, runs it through the real loop and merge queue with a fake agent
+and reads the result back. Set FACTORY_SMOKE_REPO=owner/name and GITHUB_TOKEN. Use a repository you do not mind writing to.
+
+Usage:
+  factory smoke [flags]
+
+Flags:
+  -h, --help               help for smoke
+      --shadow             shadow run: nothing is dispatched or merged
+      --timeout duration   how long to wait for the work to land (default 5m0s)
 
 === factory status
 Show the board, one row per slot
