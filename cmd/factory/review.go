@@ -91,14 +91,14 @@ func (s packSource) Checks(ctx context.Context) ([]review.Check, error) {
 
 func (s packSource) changed(ctx context.Context) ([]string, error) {
 	var all []string
-	for _, args := range [][]string{{"diff", "--name-only", "HEAD"}, {"ls-files", "--others", "--exclude-standard"}} {
+	for _, args := range [][]string{{"diff", "-z", "--name-only", "HEAD"}, {"ls-files", "-z", "--others", "--exclude-standard"}} {
 		cmd := exec.CommandContext(ctx, "git", args...)
 		cmd.Dir = s.repo
 		out, err := cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("git %s: %w", args[0], err)
 		}
-		all = append(all, strings.Fields(string(out))...)
+		all = append(all, strings.FieldsFunc(string(out), func(r rune) bool { return r == 0 })...)
 	}
 	return all, nil
 }

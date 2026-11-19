@@ -132,7 +132,7 @@ func (r Runner) prompt(ctx context.Context, w *worktree, c Check) (string, error
 	if err != nil {
 		return "", err
 	}
-	names, err := git(ctx, w.dir, nil, "diff", "--name-only", base, "HEAD")
+	names, err := git(ctx, w.dir, nil, "diff", "-z", "--name-only", base, "HEAD")
 	if err != nil {
 		return "", err
 	}
@@ -152,7 +152,7 @@ func (r Runner) prompt(ctx context.Context, w *worktree, c Check) (string, error
 	b.WriteString("- You may read a changed file for context, but do not flag unchanged parts of it.\n")
 	b.WriteString("- Edit only the changed files, and only to fix a violation of the rule above. If there is none, edit nothing and say so.\n\n")
 	b.WriteString("## Changed files\n")
-	for _, f := range strings.Fields(names) {
+	for _, f := range strings.FieldsFunc(names, func(r rune) bool { return r == 0 }) {
 		fmt.Fprintf(&b, "- %s\n", f)
 	}
 	b.WriteString("\n## Diff\n```diff\n" + strings.TrimRight(diff, "\n") + "\n```\n")

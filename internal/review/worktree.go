@@ -15,7 +15,7 @@ import (
 
 // git runs git in dir with argv (no shell) and returns stdout. stdin may be nil.
 func git(ctx context.Context, dir string, stdin []byte, args ...string) (string, error) {
-	base := []string{"-C", dir, "-c", "user.name=factory", "-c", "user.email=factory@localhost", "-c", "commit.gpgsign=false"}
+	base := []string{"-C", dir, "-c", "user.name=factory", "-c", "user.email=factory@localhost", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}
 	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
 	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_TERMINAL_PROMPT=0")
 	if stdin != nil {
