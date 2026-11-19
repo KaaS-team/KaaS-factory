@@ -24,7 +24,12 @@ import (
 const servePasswordEnv = "KAAS_SERVE_PASSWORD" // not FACTORY_*: that prefix is reserved for config keys
 
 // serveAuth returns the address to listen on and the middleware that guards the routes.
-func serveAuth(addr string) (string, func(http.Handler) http.Handler, error) {
+func serveAuth(ctx context.Context, addr string) (string, func(http.Handler) http.Handler, error) {
+	if os.Getenv(serve.EnvOIDCIssuer) != "" {
+		// OIDC guards every route, so the listener may leave loopback. serve.AuthWrap builds it.
+		wrap, err := serve.AuthWrap(ctx, os.Getenv, nil)
+		return addr, wrap, err
+	}
 	pw := os.Getenv(servePasswordEnv)
 	if pw == "" {
 		a, err := local.LoopbackAddr(addr)
@@ -75,7 +80,7 @@ func newServe() *cobra.Command {
 		Short: "Run the factory loop as a service with /healthz, /readyz and /events",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			listen, wrap, err := serveAuth(addr)
+			listen, wrap, err := serveAuth(cmd.Context(), addr)
 			if err != nil {
 				return err
 			}

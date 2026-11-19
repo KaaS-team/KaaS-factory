@@ -20,7 +20,8 @@ const EnvPrefix = "FACTORY_"
 
 // runtimeEnv lists the FACTORY_ variables other packages read; the env layer skips them. Add new ones here only.
 var runtimeEnv = strings.Fields(`FACTORY_MCP_TOKEN FACTORY_A2A_TOKEN FACTORY_ALLOWED_HOSTS FACTORY_ALLOWED_ORIGINS
-	FACTORY_SCIM_TOKEN FACTORY_SMOKE_REPO FACTORY_EVAL_RERECORD FACTORY_POLICY FACTORY_ROLE FACTORY_ACTOR`)
+	FACTORY_SCIM_TOKEN FACTORY_SMOKE_REPO FACTORY_EVAL_RERECORD FACTORY_POLICY FACTORY_ROLE FACTORY_ACTOR
+	FACTORY_OIDC_ISSUER FACTORY_OIDC_AUDIENCE FACTORY_SANDBOX_URL FACTORY_SANDBOX_TOKEN`)
 
 // Source is the text of one file layer and the name used when an error mentions it.
 type Source struct {
