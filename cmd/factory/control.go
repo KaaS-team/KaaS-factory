@@ -170,7 +170,7 @@ func gitHubAuth(c config.Config) (http.RoundTripper, error) {
 		if tok == "" {
 			return nil, fmt.Errorf("tracker github: env var %s is not set", envGitHubToken)
 		}
-		return bearer{tok, http.DefaultTransport}, nil
+		return bearer{tok, apiHost(), http.DefaultTransport}, nil
 	}
 	if a.InstallationID == 0 {
 		return nil, errors.New("tracker github: github_app.installation_id is required with github_app.id")
@@ -329,16 +329,28 @@ func routinesURL() string {
 	return defaultRoutinesURL
 }
 
-// bearer adds an Authorization header to every request.
+// bearer adds an Authorization header to requests for host only. A redirect to another host
+// passes through this transport too, so it must not receive the token.
 type bearer struct {
 	token string
+	host  string
 	next  http.RoundTripper
 }
 
 func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
-	r = r.Clone(r.Context())
-	r.Header.Set("Authorization", "Bearer "+b.token)
+	if r.URL.Host == b.host {
+		r = r.Clone(r.Context())
+		r.Header.Set("Authorization", "Bearer "+b.token)
+	}
 	return b.next.RoundTrip(r)
+}
+
+// apiHost is the host of the GitHub API: the FACTORY_GITHUB_URL override, else api.github.com.
+func apiHost() string {
+	if u, err := url.Parse(os.Getenv(envGitHubURL)); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return "api.github.com"
 }
 
 // appAuth adds a GitHub App installation token, minted or refreshed as needed, to every request.
@@ -352,7 +364,7 @@ func (a appAuth) RoundTrip(r *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bearer{tok, a.next}.RoundTrip(r)
+	return bearer{tok, apiHost(), a.next}.RoundTrip(r)
 }
 
 func pick[T any](port, key string, table map[string]T) (T, error) {

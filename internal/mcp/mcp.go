@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/serve/hostguard"
 )
 
 // PlanInput is the input of the plan tool.
@@ -477,9 +478,10 @@ func BindAddr(addr string) string {
 	return addr
 }
 
-// Serve answers on ln until ctx ends.
+// Serve answers on ln until ctx ends. It refuses a foreign Host or Origin with 403 (DNS rebinding
+// guard, see internal/serve/hostguard) before h runs.
 func Serve(ctx context.Context, ln net.Listener, h http.Handler) error {
-	hs := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}
+	hs := &http.Server{Handler: hostguard.New(ln.Addr().String(), os.Getenv)(h), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
