@@ -24,4 +24,4 @@ The first two commands need an agent, so only `splits` and `--help` were run for
 Inspect AI (MIT): task, sample id and split shape only. No code copied.
 
 ## 4. Outside my area / workflow changes
-None. `eval.NewCommand()` is already registered in `cmd/factory/main.go`. `eval run` and `eval splits` are subcommands of it.
+Generated file `docs/cli-reference.md` regenerated (`UPDATE_GOLDEN=1 go test ./cmd/factory`) so the new `--split` flag and subcommands show; `TestCLIReferenceFresh` fails without it. `eval.NewCommand()` is already registered in `cmd/factory/main.go`. `eval run` and `eval splits` are subcommands of it.
