@@ -31,7 +31,10 @@ brews:
     repository:
       owner: KaaS-team
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      # A write deploy key on KaaS-team/homebrew-tap only; its private half is the factory repo secret.
+      git:
+        url: git@github.com:KaaS-team/homebrew-tap.git
+        private_key: "{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}"
     test: |
       system "#{bin}/factory", "version"
 

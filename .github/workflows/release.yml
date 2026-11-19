@@ -27,5 +27,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          # A fine-grained token with contents:write on KaaS-team/homebrew-tap only.
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          # The private half of a write deploy key on KaaS-team/homebrew-tap only.
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
