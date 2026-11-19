@@ -43,7 +43,8 @@ Available Commands:
   version      Print the factory version
 
 Flags:
-  -h, --help   help for factory
+  -h, --help      help for factory
+  -v, --version   version for factory
 
 Use "factory [command] --help" for more information about a command.
 
