@@ -360,6 +360,7 @@ Turn a goal, epic or spec into a ticket DAG; --approve files it
 | `--approve` | bool | `false` | file the tickets; without it nothing is written |
 | `--epic` | int | `0` | read the spec and tickets from epic issue `n` |
 | `--json` | bool | `false` | print the DAG as JSON |
+| `--repo-dir` | string | `` | the repository the agent reads when drafting from a goal (default: here) |
 | `--spec` | string | `` | read the spec and tickets from `file` |
 
 ## factory queue
