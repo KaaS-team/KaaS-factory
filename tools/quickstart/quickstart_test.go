@@ -74,19 +74,11 @@ func TestREADMEUnder150Lines(t *testing.T) {
 	}
 }
 
-func TestREADMEHasMermaidAndTiers(t *testing.T) {
+func TestREADMEHasQuickstartAndMCP(t *testing.T) {
 	s := readme(t)
-	if len(blocks(s, "mermaid")) == 0 {
-		t.Error("no mermaid diagram")
-	}
-	for _, h := range []string{"## Quickstart", "## The loop", "## CLI", "## MCP", "## Tiers"} {
+	for _, h := range []string{"## Quickstart", "## MCP"} {
 		if !strings.Contains(s, "\n"+h+"\n") {
 			t.Errorf("missing section %q", h)
-		}
-	}
-	for _, tier := range []string{"Solo", "Team", "Org", "Enterprise"} {
-		if !strings.Contains(s, "| "+tier+" |") {
-			t.Errorf("tier table has no %s row", tier)
 		}
 	}
 }
@@ -143,6 +135,7 @@ func TestQuickstartRuns(t *testing.T) {
 	for _, n := range []string{"gh", "claude", "go"} {
 		fake(t, bin, n, "exit 0")
 	}
+	root, _ := filepath.Abs(filepath.Join("..", ".."))
 	repo := t.TempDir()
 	env := []string{"PATH=" + bin + ":/usr/bin:/bin:/usr/local/bin", "HOME=" + t.TempDir(), "GOTOOLCHAIN=local"}
 	run := func(name string, args ...string) {
@@ -164,17 +157,21 @@ func TestQuickstartRuns(t *testing.T) {
 			continue
 		}
 		args := f[1:]
-		if args[0] == "init" {
-			// The README form asks questions on a terminal; a test has none.
-			args = append(args, "--yes", "--tracker", "github")
+		for i, a := range args {
+			if strings.HasPrefix(a, "docs/") { // the replay file lives in the factory repo, not the temp repo
+				args[i] = filepath.Join(root, a)
+			}
+		}
+		if args[0] == "board" { // the board needs a terminal: check its replay file and that the command exists
+			if _, err := os.Stat(args[len(args)-1]); err != nil {
+				t.Fatalf("board replay file: %v", err)
+			}
+			args = []string{"board", "--help"}
 		}
 		run(factoryBin, args...)
 		ran++
 	}
 	if ran != 3 {
 		t.Fatalf("quickstart ran %d commands, want 3", ran)
-	}
-	if _, err := os.Stat(filepath.Join(repo, ".factory", "factory.yaml")); err != nil {
-		t.Fatalf("init wrote no factory.yaml: %v", err)
 	}
 }

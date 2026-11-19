@@ -1,7 +1,0 @@
-{
-  "name": "claude-prompt-in-argv",
-  "file": "src/cloud/claude.ts",
-  "find": "{promptFile}",
-  "replace": "{prompt}",
-  "test": "tests/cloud-claude.test.ts"
-}

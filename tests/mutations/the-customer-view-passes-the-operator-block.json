@@ -1,1 +1,0 @@
-{"name":"the customer view passes the operator block","file":"src/summary/render.ts","find":"notProven: s.notProven };","replace":"notProven: s.notProven, operator: s.operator } as CustomerSummary;","test":"tests/summary-render.test.ts"}

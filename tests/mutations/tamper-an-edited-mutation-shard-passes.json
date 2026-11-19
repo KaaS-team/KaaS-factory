@@ -1,7 +1,0 @@
-{
-  "name": "tamper: an edited mutation shard passes",
-  "file": "src/tamper.ts",
-  "find": "if (SHARD.test(f.path) && !f.deleted && f.removed.length)",
-  "replace": "if (false)",
-  "test": "tests/tamper.test.ts"
-}

@@ -1,1 +1,0 @@
-{"name":"mc: follow-up ignores what the run waits for","file":"src/mc/adapters/factory.ts","find":"run.status === \"awaiting-approval\" ? \"revise\" : \"answer\"","replace":"\"answer\"","test":"tests/mc-adapter-factory.test.ts"}

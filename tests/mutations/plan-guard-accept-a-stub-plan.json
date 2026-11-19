@@ -1,7 +1,0 @@
-{
-  "name": "plan-guard: accept a stub plan",
-  "file": "src/plan-guard.ts",
-  "find": "MIN_BYTES = 1500",
-  "replace": "MIN_BYTES = 0",
-  "test": "tests/plan-guard.test.ts"
-}

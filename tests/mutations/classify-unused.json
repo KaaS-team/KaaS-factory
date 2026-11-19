@@ -1,1 +1,0 @@
-{"name":"classify-unused","file":"src/adapters/pool/execution.ts","find":"classifyLaunch(","replace":"String(","test":"tests/launch-attempt.test.ts"}

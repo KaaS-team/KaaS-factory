@@ -1,1 +1,0 @@
-{"script":"scripts/check-tests-only.ts","workflows":[".github/workflows/ci.yml","ci/ci.yml"]}

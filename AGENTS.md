@@ -1,45 +1,42 @@
-# KaaS Factory (Go, branch `next`)
+# KaaS Factory
 
-Plans work into tickets and runs them on parallel coding-agent sessions (cloud routines or local
-`claude -p`), then lands them through a merge queue. This branch is the v9 Go rewrite.
+Plans work into tickets and runs them on parallel coding-agent sessions, then lands them through a
+merge queue. Go v9. The TypeScript line is deleted; tag `ts-final` holds it.
 
-`src/`, `tests/`, `dashboard/`, `scripts/` and the other TS files are the frozen v8 tree (tag
-`ts-final`). Read them for porting; never edit them. They are deleted at cutover.
+## Gate
 
-## Stack
-
-Go (go.mod `go 1.26.0`, which modernc sqlite needs; set `GOTOOLCHAIN=auto` if yours is older), cobra, `just`, golangci-lint
-v2.13.2, `CGO_ENABLED=0`.
-
-## Commands
-
-- `just check`: the gate (gofmt, vet, golangci-lint, `go test -race`, static build). CI runs it
-  (`.github/workflows/go.yml`) and so does the pre-push hook (`.agents/repo.json`).
-- `./gate.sh`: the same steps as `just check` for hosts without `just`; `tools/gate` fails when they or the lint pin (justfile vs `go.yml`) drift.
-- `just fast`: gofmt, vet, `go test` without race or lint. Run it before every push.
+`just check` is the gate: gofmt, vet, golangci-lint, `go test -race`, static build, ratchet. CI and the
+pre-push hook run it. `./gate.sh` does the same without `just`. `just fast` skips race and lint; run it
+before every push. It must end with zero errors and zero warnings.
 
 ## Boundaries
 
-- `internal/api` is the one contract: the core reaches the world only through its ports, and the
-  CLI, TUI, MCP and dashboard reach the core only through `Control` and `Event`.
-- A copied file starts with `// Ported from <repo>@<sha> <path>`, MIT or Apache-2.0 only, and its
-  `repo@sha` gets a section in `THIRD_PARTY_NOTICES.md` (`internal/provenance` test).
-- No `ANTHROPIC_*` or other provider key anywhere; sessions run under the operator's login.
-- Token counts, cost and model names never go in a PR body or a customer-facing view.
-- Cloud sessions cannot push `.github/workflows/**`; leave workflow changes for a local session.
+- `internal/api` is the one contract. The CLI, TUI, MCP and dashboard reach the core only through
+  `Control` and `Event`.
+- A copied file starts with `// Ported from <repo>@<sha> <path>`, MIT or Apache-2.0 only, with a section in
+  `THIRD_PARTY_NOTICES.md` (`internal/provenance` test).
+- No provider key anywhere. Token counts, cost and model names stay out of PR bodies and customer views.
+- Cloud sessions cannot push `.github/workflows/**`.
 
-## Session reports
+## Package map
 
-A cloud session finishes by pushing its report (what changed, the `just check` result, what was left
-out and why) as `report.md` on its own `report/<ticket>` branch. A repo hook refuses writes under
-`.factory/`, so the report never lands in the tree.
-
-## Tests
-
-| Package | Covers |
+| Path | Holds |
 |---|---|
-| `internal/api/porttest` | fakes for every port; dispatch is idempotent per attempt |
-| `internal/provenance` | notices match ported-file headers |
-| `cmd/factory` | root command and `version` |
-| `tools/ratchet` | line and deadcode ratchet: below, equal, above, and `--update` never raises |
-| `pkg/agentrun` | public re-export of the dispatchers and meter; every export has a doc comment |
+| `cmd/factory` | the `factory` CLI |
+| `internal/api` | the contract and its ports |
+| `internal/core` | the planner, loop and state |
+| `internal/plan`, `internal/plancmd` | plan DAG and `factory plan` |
+| `internal/mergeq` | the merge queue |
+| `internal/dispatch` | session runners: local, cloud, untrusted |
+| `internal/mcp` | the MCP server |
+| `internal/dashboard`, `internal/tui` | the board views |
+| `internal/config` | layered config |
+| `internal/firstrun` | `factory first-run` |
+| `internal/eval` | evals |
+| `pkg/agentrun`, `pkg/sandbox`, `pkg/retry` | public packages |
+| `ee` | enterprise code, its own licence |
+| `tools/ratchet`, `tools/gate`, `tools/prcheck`, `tools/doccheck` | repo checks |
+| `packs`, `template`, `evals` | pack, skill and eval data |
+| `docs` | guides; `docs/demo` holds demo output |
+
+`tools/doccheck` fails when a backticked path in `README.md` or `AGENTS.md` does not exist.
