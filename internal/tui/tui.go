@@ -1,4 +1,8 @@
-// Package tui is the terminal board, a client of api.Control only.
+// Package tui is the terminal board for the factory. It shows the board, waves,
+// merge queue and a per-ticket timeline, and lets the user steer, cancel or retry
+// a ticket. It reaches the core only through api.Control and api.Event. The
+// factory CLI starts it through NewCommand, and the replay view reuses its
+// renderers to play back a recorded run.
 package tui
 
 import (
@@ -290,23 +294,45 @@ func (m *Model) selected() (api.TicketID, bool) {
 	return "", false
 }
 
+// key routes a key press by mode: steer prompt, cancel confirm, or normal browsing.
 func (m *Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.mode {
 	case modeSteer:
 		return m.keySteer(msg)
 	case modeConfirmCancel:
-		m.mode = modeNormal
-		if msg.String() == "y" {
-			return m, m.call("cancel", m.pending, func(id api.TicketID) error { return m.ctl.Cancel(m.ctx, id) })
-		}
-		m.status = "cancel aborted"
-		return m, nil
+		return m.keyConfirmCancel(msg)
 	}
 	m.status = ""
 	switch msg.String() {
 	case "q", "ctrl+c":
 		m.cancel()
 		return m, tea.Quit
+	case "enter", "s", "r":
+		return m, m.keyAct(msg.String())
+	case "c":
+		if id, ok := m.selected(); ok {
+			m.pending = id
+			m.mode = modeConfirmCancel
+		}
+	default:
+		m.keyNav(msg.String())
+	}
+	return m, nil
+}
+
+// keyConfirmCancel answers the cancel prompt: y cancels the pending ticket, anything else aborts.
+func (m *Model) keyConfirmCancel(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	m.mode = modeNormal
+	if msg.String() == "y" {
+		return m, m.call("cancel", m.pending, func(id api.TicketID) error { return m.ctl.Cancel(m.ctx, id) })
+	}
+	m.status = "cancel aborted"
+	return m, nil
+}
+
+// keyNav handles keys that only move the cursor, switch screens or toggle help.
+func (m *Model) keyNav(k string) {
+	switch k {
 	case "down", "j":
 		if m.cursor+1 < m.rows() {
 			m.cursor++
@@ -321,45 +347,41 @@ func (m *Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.cursor = max(m.rows()-1, 0)
 	case "?":
 		m.help = !m.help
-	case "]":
+	case "]", "tab":
 		m.screen = (m.screen + 1) % screenTimeline
 		m.cursor = 0
 	case "[":
 		m.screen = (m.screen + screenTimeline - 1) % screenTimeline
 		m.cursor = 0
-	case "tab":
-		m.screen = (m.screen + 1) % screenTimeline
-		m.cursor = 0
-	case "enter":
-		if m.screen != screenTimeline {
-			if id, ok := m.selected(); ok {
-				m.screen = screenTimeline
-				return m, m.openTimeline(id)
-			}
-		}
 	case "esc":
 		if m.screen == screenTimeline {
 			m.screen = screenBoard
 			m.cursor = 0
 		}
-	case "s":
-		if id, ok := m.selected(); ok {
-			m.pending = id
-			m.mode = modeSteer
-			m.input.Reset()
-			return m, m.input.Focus()
-		}
-	case "c":
-		if id, ok := m.selected(); ok {
-			m.pending = id
-			m.mode = modeConfirmCancel
-		}
-	case "r":
-		if id, ok := m.selected(); ok {
-			return m, m.call("retry", id, func(id api.TicketID) error { return m.ctl.Retry(m.ctx, id) })
-		}
 	}
-	return m, nil
+}
+
+// keyAct handles keys that act on the selected ticket: enter opens its timeline, s steers, r retries.
+func (m *Model) keyAct(k string) tea.Cmd {
+	id, ok := m.selected()
+	if !ok {
+		return nil
+	}
+	switch k {
+	case "enter":
+		if m.screen != screenTimeline {
+			m.screen = screenTimeline
+			return m.openTimeline(id)
+		}
+	case "s":
+		m.pending = id
+		m.mode = modeSteer
+		m.input.Reset()
+		return m.input.Focus()
+	case "r":
+		return m.call("retry", id, func(id api.TicketID) error { return m.ctl.Retry(m.ctx, id) })
+	}
+	return nil
 }
 
 func trimTimeline(tl []api.Event) []api.Event {
