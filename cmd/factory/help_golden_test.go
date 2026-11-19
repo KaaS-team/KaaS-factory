@@ -27,7 +27,10 @@ func TestHelpGolden(t *testing.T) {
 		}
 		b.WriteString("=== factory " + strings.Join(p, " ") + "\n" + out + "\n")
 	}
-	const file = "testdata/help.golden"
+	file := "testdata/help.golden"
+	if eeBuild {
+		file = "testdata/help_ee.golden"
+	}
 	if os.Getenv("UPDATE_GOLDEN") != "" {
 		if err := os.MkdirAll("testdata", 0o755); err != nil {
 			t.Fatal(err)

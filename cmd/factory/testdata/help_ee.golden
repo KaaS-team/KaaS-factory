@@ -1,0 +1,745 @@
+=== factory 
+Plan work into tickets and run them on parallel coding-agent sessions
+
+Usage:
+  factory [command]
+
+Available Commands:
+  a2a          Serve the factory as an A2A agent
+  add          Pin a file from a GitHub repository (MIT or Apache-2.0 only) in factory.lock
+  audit        Read the audit log of what the factory did
+  board        Open the terminal board
+  browsercheck Run browser steps in headless Chrome and print one FACTORY_GATES line
+  cancel       Cancel a ticket's running session
+  checkpoint   Snapshot and restore the worktree around an agent session
+  completion   Generate the autocompletion script for the specified shell
+  config       Read resolved configuration
+  dashboard    Serve the read-only web view
+  design       Make design edits to a JSX tree without a coding agent
+  dispatch     Start a session for a ticket now
+  doctor       Check the tools and settings the factory needs
+  eval         Run the fixtures matrix and write a scorecard
+  first-run    Audit this repo and show what the factory would fix, at no cost
+  help         Help about any command
+  init         Write .factory/factory.yaml from a tier preset
+  logs         Print what a ticket's session is doing
+  mcp          Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)
+  packs        Inspect the packs pinned in factory.lock
+  plan         Turn a goal, epic or spec into a ticket DAG; --approve files it
+  policy       Check an action against a policy rules file (enterprise)
+  queue        Show tickets ready to run and the merge queue
+  repomap      Print a ranked, token-budgeted symbol map of the repository for a context pack
+  report       Show tokens per merged PR, rework, human touches and cycle time (operator only)
+  retry        Queue a new attempt for a ticket
+  review       Run the check packs in .factory/checks against the uncommitted changes, edits returned as patches
+  run          Run the factory; --headless streams one JSON event per line
+  scim         Serve SCIM 2.0 Users and Groups for an identity provider (enterprise)
+  serve        Run the factory loop as a service with /healthz, /readyz and /events
+  shadow       Summarize what shadow mode would have dispatched
+  status       Show the board, one row per slot
+  steer        Send a message to a ticket's running session
+  upgrade      Replace this binary with the latest factory release
+  version      Print the factory version
+
+Flags:
+  -h, --help   help for factory
+
+Use "factory [command] --help" for more information about a command.
+
+=== factory a2a
+Serve the factory as an A2A agent
+
+Usage:
+  factory a2a [flags]
+
+Flags:
+      --addr string          listen address (default "127.0.0.1:8787")
+      --audit-log string     file that gets one JSON line per call (default ".factory/a2a-audit.jsonl")
+  -h, --help                 help for a2a
+      --signing-key string   ECDSA P-256 PEM key that signs the agent card (a new key per start when empty)
+
+=== factory add
+Pin a file from a GitHub repository (MIT or Apache-2.0 only) in factory.lock
+
+Usage:
+  factory add <repo>#<path>[@ref] [flags]
+
+Flags:
+  -h, --help          help for add
+      --kind string   skill, agent, workflow or check (default: from the path)
+      --root string   repository root holding factory.lock and .factory/cache (default ".")
+
+=== factory audit
+Read the audit log of what the factory did
+
+Usage:
+  factory audit [command]
+
+Available Commands:
+  export      Print audit records from the last --since, as jsonl or csv
+
+Flags:
+  -h, --help   help for audit
+
+Use "factory audit [command] --help" for more information about a command.
+
+=== factory audit export
+Print audit records from the last --since, as jsonl or csv
+
+Usage:
+  factory audit export [flags]
+
+Flags:
+      --format string   jsonl or csv (default "jsonl")
+  -h, --help            help for export
+      --since string    how far back to read, such as 7d or 12h (default "7d")
+
+=== factory board
+Open the terminal board
+
+Usage:
+  factory board [flags]
+
+Flags:
+  -h, --help            help for board
+      --operator        show tokens against budget on each card
+      --replay string   play a recorded headless event stream (NDJSON) instead of a live fleet
+      --speed float     replay speed: 10 plays ten times faster than recorded (default 1)
+
+=== factory browsercheck
+Run browser steps in headless Chrome and print one FACTORY_GATES line
+
+Usage:
+  factory browsercheck [flags]
+
+Flags:
+  -h, --help             help for browsercheck
+      --out string       directory for screenshots (default ".factory/browser-out")
+      --profile string   Chrome user-data-dir whose Default profile is copied, without caches, for the run
+      --secrets string   YAML file of secrets for type_secret steps; values are never printed
+      --steps string     YAML file of browser steps (default ".factory/browser-steps.yaml")
+
+=== factory cancel
+Cancel a ticket's running session
+
+Usage:
+  factory cancel <ticket> [flags]
+
+Flags:
+  -h, --help   help for cancel
+
+=== factory checkpoint
+Snapshot and restore the worktree around an agent session
+
+Usage:
+  factory checkpoint [command]
+
+Available Commands:
+  diff        List the paths that differ between run N and the worktree now
+  drop        Delete a session's snapshots
+  reap        Delete snapshots and scratch dirs left by sessions that never ended
+  restore     Put the worktree back as run N saved it
+  save        Snapshot tracked, staged and untracked files as run N
+
+Flags:
+  -h, --help   help for checkpoint
+
+Use "factory checkpoint [command] --help" for more information about a command.
+
+=== factory checkpoint diff
+List the paths that differ between run N and the worktree now
+
+Usage:
+  factory checkpoint diff <session> <run> [flags]
+
+Flags:
+  -h, --help   help for diff
+
+=== factory checkpoint drop
+Delete a session's snapshots
+
+Usage:
+  factory checkpoint drop <session> [flags]
+
+Flags:
+  -h, --help   help for drop
+
+=== factory checkpoint reap
+Delete snapshots and scratch dirs left by sessions that never ended
+
+Usage:
+  factory checkpoint reap [flags]
+
+Flags:
+  -h, --help   help for reap
+
+=== factory checkpoint restore
+Put the worktree back as run N saved it
+
+Usage:
+  factory checkpoint restore <session> <run> [flags]
+
+Flags:
+  -h, --help   help for restore
+
+=== factory checkpoint save
+Snapshot tracked, staged and untracked files as run N
+
+Usage:
+  factory checkpoint save <session> <run> [flags]
+
+Flags:
+  -h, --help   help for save
+
+=== factory config
+Read resolved configuration
+
+Usage:
+  factory config [command]
+
+Available Commands:
+  explain     Print which layer set a key and which layers it overrode
+  get         Print the resolved value of a key
+
+Flags:
+  -h, --help   help for config
+
+Use "factory config [command] --help" for more information about a command.
+
+=== factory config explain
+Print which layer set a key and which layers it overrode
+
+Usage:
+  factory config explain <key> [flags]
+
+Flags:
+  -h, --help   help for explain
+
+=== factory config get
+Print the resolved value of a key
+
+Usage:
+  factory config get <key> [flags]
+
+Flags:
+  -h, --help   help for get
+
+=== factory dashboard
+Serve the read-only web view
+
+Usage:
+  factory dashboard [flags]
+
+Flags:
+      --addr string   listen address (loopback by default) (default "127.0.0.1:8787")
+  -h, --help          help for dashboard
+      --operator      show usage and budget numbers
+
+=== factory design
+Make design edits to a JSX tree without a coding agent
+
+Usage:
+  factory design [command]
+
+Available Commands:
+  edit        Apply edit requests (a JSON list of requests) to a file and print the diff without writing it
+  stamp       Give every JSX element under dir one unique oid
+  tweak       Apply a design delta (a file under dir) to the tree; fail when the edit needs an agent
+
+Flags:
+  -h, --help          help for design
+      --jail          run the pack under the sandbox with no network and only the tree writable
+      --pack string   directory of the design pack (default "packs/design")
+
+Use "factory design [command] --help" for more information about a command.
+
+=== factory design edit
+Apply edit requests (a JSON list of requests) to a file and print the diff without writing it
+
+Usage:
+  factory design edit <dir> <file> <requests.json> [flags]
+
+Flags:
+  -h, --help        help for edit
+      --strip-ids   leave no data-oid or move key in the result
+
+Global Flags:
+      --jail          run the pack under the sandbox with no network and only the tree writable
+      --pack string   directory of the design pack (default "packs/design")
+
+=== factory design stamp
+Give every JSX element under dir one unique oid
+
+Usage:
+  factory design stamp <dir> [flags]
+
+Flags:
+  -h, --help   help for stamp
+
+Global Flags:
+      --jail          run the pack under the sandbox with no network and only the tree writable
+      --pack string   directory of the design pack (default "packs/design")
+
+=== factory design tweak
+Apply a design delta (a file under dir) to the tree; fail when the edit needs an agent
+
+Usage:
+  factory design tweak <dir> <delta> [flags]
+
+Flags:
+  -h, --help   help for tweak
+
+Global Flags:
+      --jail          run the pack under the sandbox with no network and only the tree writable
+      --pack string   directory of the design pack (default "packs/design")
+
+=== factory dispatch
+Start a session for a ticket now
+
+Usage:
+  factory dispatch <ticket> [flags]
+
+Flags:
+  -h, --help   help for dispatch
+
+=== factory docs
+Print a generated reference document
+
+Usage:
+  factory docs [command]
+
+Available Commands:
+  cli         Print the CLI reference from the command tree
+  config      Print the config reference from internal/config
+
+Flags:
+  -h, --help   help for docs
+
+Use "factory docs [command] --help" for more information about a command.
+
+=== factory docs cli
+Print the CLI reference from the command tree
+
+Usage:
+  factory docs cli [flags]
+
+Flags:
+  -h, --help   help for cli
+
+=== factory docs config
+Print the config reference from internal/config
+
+Usage:
+  factory docs config [flags]
+
+Flags:
+  -h, --help   help for config
+
+=== factory doctor
+Check the tools and settings the factory needs
+
+Usage:
+  factory doctor [flags]
+
+Flags:
+  -h, --help   help for doctor
+
+=== factory eval
+Run the fixtures matrix and write a scorecard
+
+Usage:
+  factory eval [flags]
+  factory eval [command]
+
+Available Commands:
+  check       Lint the fixtures; exit 1 when one is malformed
+  compare     Compare two sets of trajectory files offline
+  diff        Compare two scorecards; exit 1 when the new one is worse
+  replay      Print the spans a run recorded, gate spans with their triggered flag
+  stats       Summarise trajectory files offline
+
+Flags:
+      --agent string      agent preset name, never a model name (required)
+      --arm strings       arms to run: preset, control (bare-bash baseline) (default [preset])
+      --fixtures string   directory of fixtures (default "evals/fixtures")
+      --format string     edit format axis, e.g. diff or whole
+  -h, --help              help for eval
+      --out string        directory the scorecard is written to (default "evals")
+      --packs string      packs lock file the run used, e.g. factory.lock
+      --redo              rerun tickets --run-dir already finished
+      --replay            re-score the outputs stored in --run-dir without dispatching
+      --run-dir string    keep results and trajectories here so a killed run resumes
+      --tries int         tries per ticket; the scorecard gets pass_rate_1..N (default 1)
+      --workflow string   workflow name (required)
+
+Use "factory eval [command] --help" for more information about a command.
+
+=== factory eval check
+Checks every fixture for its required file and keys, its seed, and a hidden directory per ticket.
+--fix writes back only what the tree determines: the name and the seed key.
+
+Usage:
+  factory eval check [flags]
+
+Flags:
+      --fix               write back the data the tree determines
+      --fixtures string   directory of fixtures (default "evals/fixtures")
+  -h, --help              help for check
+
+=== factory eval compare
+Compare two sets of trajectory files offline
+
+Usage:
+  factory eval compare <old> <new> [flags]
+
+Flags:
+  -h, --help   help for compare
+
+=== factory eval diff
+Prints pass rate, main green rate, tokens per merged PR and median wall time with deltas.
+Exits 1 when the new scorecard is worse on pass rate or on tokens per merged PR (more than 10% up).
+
+Usage:
+  factory eval diff <old.json> <new.json> [flags]
+
+Flags:
+  -h, --help   help for diff
+
+=== factory eval replay
+Print the spans a run recorded, gate spans with their triggered flag
+
+Usage:
+  factory eval replay <run.trace.jsonl> [flags]
+
+Flags:
+  -h, --help   help for replay
+
+=== factory eval stats
+Summarise trajectory files offline
+
+Usage:
+  factory eval stats <trajectories> [flags]
+
+Flags:
+  -h, --help   help for stats
+
+=== factory first-run
+Audit this repo and show what the factory would fix, at no cost
+
+Usage:
+  factory first-run [flags]
+
+Flags:
+      --annotations string   reason-tagged suppressions file; the default is optional (default ".factory/annotations.yml")
+      --dry-run              stop after the report; say what would be dispatched
+      --fix                  dispatch one build for the first covered finding and open a draft pull request
+      --gh string            also audit this GitHub repo (owner/repo)
+  -h, --help                 help for first-run
+      --sarif string         also write the findings to this file as SARIF 2.1.0
+
+=== factory init
+Write .factory/factory.yaml from a tier preset
+
+Usage:
+  factory init [flags]
+
+Flags:
+      --accessible          plain numbered prompts instead of the full-screen form
+      --dir string          repo root to write into (default ".")
+      --dispatcher string   dispatcher: local, claude-cloud, fire; default from the tier
+      --force               overwrite an existing .factory/factory.yaml
+  -h, --help                help for init
+      --repo string         owner/name; default from the origin remote
+      --tier string         tier preset: solo, startup, scaleup, enterprise, regulated, oss
+      --tracker string      tracker: github, linear, jira
+      --yes                 run without prompts; needs --tier and --tracker
+
+=== factory logs
+Print what a ticket's session is doing
+
+Usage:
+  factory logs <ticket> [flags]
+
+Flags:
+  -f, --follow              keep polling until the session ends
+  -h, --help                help for logs
+      --interval duration   poll interval for --follow (default 5s)
+      --json                print one JSON event per line
+
+=== factory mcp
+Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)
+
+Usage:
+  factory mcp [flags]
+
+Flags:
+  -h, --help          help for mcp
+      --http string   serve streamable HTTP at /mcp on this address (default host 127.0.0.1); the bearer token is read from FACTORY_MCP_TOKEN
+      --read-only     serve only the read tools; write tools are refused
+
+=== factory packs
+Inspect the packs pinned in factory.lock
+
+Usage:
+  factory packs [command]
+
+Available Commands:
+  list        Print each lock entry
+  match       List the skill packs whose paths or keywords match
+  migrate     Run a migration pack pinned in factory.lock over the repository
+  run         Run a command and retry it while the manifest's success checks fail
+  upgrade     Bump pinned packs to their newest upstream when the eval says it is not worse
+  verify      Re-hash the cache against factory.lock
+
+Flags:
+  -h, --help   help for packs
+
+Use "factory packs [command] --help" for more information about a command.
+
+=== factory packs list
+Print each lock entry
+
+Usage:
+  factory packs list [flags]
+
+Flags:
+  -h, --help          help for list
+      --json          print JSON
+      --root string   repository root holding factory.lock and .factory/cache (default ".")
+
+=== factory packs match
+List the skill packs whose paths or keywords match
+
+Usage:
+  factory packs match <dir> [flags]
+
+Flags:
+  -h, --help           help for match
+      --path strings   a file the task touches (repeatable)
+      --text string    the task text
+
+=== factory packs migrate
+Run a migration pack pinned in factory.lock over the repository
+
+Usage:
+  factory packs migrate <owner/repo#path> [flags]
+
+Flags:
+  -h, --help          help for migrate
+      --root string   repository root holding factory.lock and .factory/cache (default ".")
+
+=== factory packs run
+Run a command and retry it while the manifest's success checks fail
+
+Usage:
+  factory packs run <pack.yaml> -- <command> [args] [flags]
+
+Flags:
+  -h, --help          help for run
+      --root string   repository root holding factory.lock and .factory/cache (default ".")
+      --unlocked      run a pack that is not pinned in factory.lock (local authoring only)
+
+=== factory packs upgrade
+Bump pinned packs to their newest upstream when the eval says it is not worse
+
+Usage:
+  factory packs upgrade [flags]
+
+Flags:
+      --baseline string    scorecard JSON of the pinned version
+      --cache string       directory for cached bare repositories (default: factory-packs under the system temp dir)
+      --candidate string   scorecard JSON of the new version
+      --dir string         directory holding factory.lock (default ".")
+      --dry-run            report what would change and write nothing
+  -h, --help               help for upgrade
+      --remote string      base URL packs are cloned from (default "https://github.com")
+      --tolerance float    largest allowed rise in tokens per merged PR, as a fraction (default 0.05)
+
+=== factory packs verify
+Re-hash the cache against factory.lock
+
+Usage:
+  factory packs verify [flags]
+
+Flags:
+  -h, --help          help for verify
+      --root string   repository root holding factory.lock and .factory/cache (default ".")
+
+=== factory plan
+Turn a goal, epic or spec into a ticket DAG; --approve files it
+
+Usage:
+  factory plan [goal] [flags]
+
+Flags:
+      --approve           file the tickets; without it nothing is written
+      --epic n            read the spec and tickets from epic issue n
+  -h, --help              help for plan
+      --json              print the DAG as JSON
+      --repo-dir string   the repository the agent reads when drafting from a goal (default: here)
+      --spec file         read the spec and tickets from file
+
+=== factory policy
+Check an action against a policy rules file (enterprise)
+
+Usage:
+  factory policy <action> [flags]
+
+Flags:
+  -h, --help           help for policy
+      --repo string    repository the action touches
+      --role string    actor role
+      --rules string   path to the YAML rules file
+      --usd float      spend the action would add
+
+=== factory queue
+Show tickets ready to run and the merge queue
+
+Usage:
+  factory queue [flags]
+
+Flags:
+  -h, --help   help for queue
+
+=== factory repomap
+Print a ranked, token-budgeted symbol map of the repository for a context pack
+
+Usage:
+  factory repomap [flags]
+
+Flags:
+      --budget int      token budget of the map (default 1024)
+  -h, --help            help for repomap
+      --root string     repository root (default ".")
+      --ticket string   ticket text; files and identifiers it names seed the ranking
+
+=== factory report
+Show tokens per merged PR, rework, human touches and cycle time (operator only)
+
+Usage:
+  factory report [flags]
+
+Flags:
+      --by string      group rows by team, workflow or pack (default "team")
+      --churn string   with --cost, a revert within this long after merge counts against the PR (default "14d")
+      --cost           print cost per surviving merged PR, per repo and in total
+  -h, --help           help for report
+      --json           write JSON instead of markdown
+      --out string     write the report to this file; never under .github/ or a PR body file
+      --since string   window length ending now, such as 7d or 36h (default "7d")
+
+=== factory retry
+Queue a new attempt for a ticket
+
+Usage:
+  factory retry <ticket> [flags]
+
+Flags:
+  -h, --help   help for retry
+
+=== factory review
+Run the check packs in .factory/checks against the uncommitted changes, edits returned as patches
+
+Usage:
+  factory review [flags]
+
+Flags:
+      --base string        ref the prompt's diff starts from (empty: only the uncommitted changes)
+  -h, --help               help for review
+      --timeout duration   limit per check (default 10m0s)
+
+=== factory run
+Run the factory; --headless streams one JSON event per line
+
+Usage:
+  factory run [flags]
+
+Flags:
+      --headless    print one api.Event JSON object per line and nothing else on stdout
+  -h, --help        help for run
+      --slots int   number of parallel slots (overrides config)
+
+=== factory scim
+Serve SCIM 2.0 Users and Groups for an identity provider (enterprise)
+
+Usage:
+  factory scim [flags]
+
+Flags:
+      --addr string   listen address (default "127.0.0.1:8089")
+  -h, --help          help for scim
+
+=== factory serve
+Run the factory loop as a service with /healthz, /readyz and /events
+
+Usage:
+  factory serve [flags]
+  factory serve [command]
+
+Available Commands:
+  token       Print a session token for the serve listener, signed from KAAS_SERVE_PASSWORD
+
+Flags:
+      --addr string      address for /healthz, /readyz and /events (default "127.0.0.1:8787")
+      --drain duration   how long to wait for the tick in flight on SIGTERM (default 30s)
+  -h, --help             help for serve
+
+Use "factory serve [command] --help" for more information about a command.
+
+=== factory serve token
+Print a session token for the serve listener, signed from KAAS_SERVE_PASSWORD
+
+Usage:
+  factory serve token [flags]
+
+Flags:
+  -h, --help   help for token
+
+=== factory shadow
+Summarize what shadow mode would have dispatched
+
+Usage:
+  factory shadow [flags]
+
+Flags:
+      --file string   shadow log to read (default ".factory/shadow.ndjson")
+  -h, --help          help for shadow
+
+=== factory status
+Show the board, one row per slot
+
+Usage:
+  factory status [flags]
+
+Flags:
+  -h, --help   help for status
+      --json   print the board as one JSON object
+
+=== factory steer
+Send a message to a ticket's running session
+
+Usage:
+  factory steer <ticket> [message...] [flags]
+
+Flags:
+  -h, --help   help for steer
+
+=== factory upgrade
+Replace this binary with the latest factory release
+
+Usage:
+  factory upgrade [flags]
+
+Flags:
+      --check   report whether a newer release exists and change nothing
+  -h, --help    help for upgrade
+
+=== factory version
+Print the factory version
+
+Usage:
+  factory version [flags]
+
+Flags:
+  -h, --help   help for version
+
