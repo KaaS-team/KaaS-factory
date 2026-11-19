@@ -45,9 +45,6 @@ var (
 	awsAnsiTail   = regexp.MustCompile(`\[[0-9;]*m$`)
 )
 
-// Tag renders a redaction. kind is a name such as GITHUB_TOKEN.
-type Tag func(kind string) string
-
 // Secrets replaces every token with [REDACTED_<KIND>].
 func Secrets(s string) string { return replace(s, rules, tagged) }
 
@@ -63,7 +60,7 @@ func Has(s string) bool { return Secrets(s) != s }
 func tagged(kind string) string { return "[REDACTED_" + kind + "]" }
 func plain(string) string       { return "[redacted]" }
 
-func replace(s string, rs []rule, tag Tag) string {
+func replace(s string, rs []rule, tag func(kind string) string) string {
 	for _, r := range rs {
 		k := r.tag
 		s = r.re.ReplaceAllStringFunc(s, func(string) string { return tag(k) })
