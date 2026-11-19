@@ -329,12 +329,10 @@ func routinesURL() string {
 	return defaultRoutinesURL
 }
 
-// bearer adds an Authorization header to requests for host only. A redirect to another host
-// passes through this transport too, so it must not receive the token.
+// bearer adds an Authorization header to requests for host only; a redirect must not carry the token away.
 type bearer struct {
-	token string
-	host  string
-	next  http.RoundTripper
+	token, host string
+	next        http.RoundTripper
 }
 
 func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -345,9 +343,8 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 	return b.next.RoundTrip(r)
 }
 
-// apiHost is the host of the GitHub API: the FACTORY_GITHUB_URL override, else api.github.com.
 func apiHost() string {
-	if u, err := url.Parse(os.Getenv(envGitHubURL)); err == nil && u.Host != "" {
+	if u, _ := url.Parse(os.Getenv(envGitHubURL)); u != nil && u.Host != "" {
 		return u.Host
 	}
 	return "api.github.com"

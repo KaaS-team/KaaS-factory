@@ -478,8 +478,7 @@ func BindAddr(addr string) string {
 	return addr
 }
 
-// Serve answers on ln until ctx ends. It refuses a foreign Host or Origin with 403 (DNS rebinding
-// guard, see internal/serve/hostguard) before h runs.
+// Serve answers on ln until ctx ends, refusing a foreign Host or Origin with 403 (hostguard).
 func Serve(ctx context.Context, ln net.Listener, h http.Handler) error {
 	hs := &http.Server{Handler: hostguard.New(ln.Addr().String(), os.Getenv)(h), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
