@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -207,6 +208,19 @@ func TestBoardReplayNeedsNoControl(t *testing.T) {
 	}
 	if err := board.PersistentPreRunE(board, nil); err != nil {
 		t.Fatalf("board --replay built a Control: %v", err)
+	}
+}
+
+// TestMCPHandlersWired: every MCP tool with a handler slot is wired, except the two named in
+// mcpHandlers' comment, so no listed tool answers "not available in this build" by accident.
+func TestMCPHandlersWired(t *testing.T) {
+	unwired := map[string]bool{"ApprovePlan": true, "ExplainConfig": true}
+	v := reflect.ValueOf(mcpHandlers())
+	for i := range v.NumField() {
+		f, name := v.Field(i), v.Type().Field(i).Name
+		if f.Kind() == reflect.Func && f.IsNil() && !unwired[name] {
+			t.Errorf("mcp handler %s is not wired", name)
+		}
 	}
 }
 

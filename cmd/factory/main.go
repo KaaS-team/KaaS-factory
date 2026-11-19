@@ -2,12 +2,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -69,7 +71,7 @@ func mountClients(root *cobra.Command) {
 	root.AddCommand(board, dash, firstrun.NewCommand(firstrun.WithExec(firstRunExec)), upgrade.NewSelfCommand(version, selfupdate.GitHubSource{}, ""))
 	root.AddCommand(mcp.NewCommand(mcp.WithControl(func() (api.Control, mcp.Handlers, error) {
 		c, err := control(nil)
-		return c, mcp.Handlers{}, err
+		return c, mcpHandlers(), err
 	})))
 	root.AddCommand(report.NewCommand(report.WithSource(func(context.Context) (report.Source, error) {
 		st, err := openStore()
@@ -163,6 +165,31 @@ func (lazyFiler) Create(ctx context.Context, t api.Ticket) (api.TicketID, error)
 		return "", err
 	}
 	return tr.Create(ctx, t)
+}
+
+// mcpHandlers backs the MCP tools that have a CLI command with that command, run in process, so a
+// tool and its command share one code path. approve_plan and explain_config stay unwired: approving
+// needs a plan id the CLI does not keep, and explain needs a key the tool does not take.
+func mcpHandlers() mcp.Handlers {
+	return mcp.Handlers{
+		FirstRun: func(ctx context.Context) (string, error) { return runSub(ctx, "first-run", "--dry-run") },
+		Report:   func(ctx context.Context) (string, error) { return runSub(ctx, "report") },
+		Plan: func(ctx context.Context, in mcp.PlanInput) (string, error) {
+			return runSub(ctx, "plan", in.Goal)
+		},
+	}
+}
+
+// runSub runs one factory subcommand and returns what it printed.
+func runSub(ctx context.Context, args ...string) (string, error) {
+	var out bytes.Buffer
+	root := newRoot()
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs(args)
+	err := root.ExecuteContext(ctx)
+	return out.String(), err
 }
 
 // attach builds the Control when cmd runs and hands it to the package through with.
