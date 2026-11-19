@@ -465,3 +465,36 @@ func TestImportsOnlyAPI(t *testing.T) {
 		}
 	}
 }
+
+func TestKeysCursorScreenHelp(t *testing.T) {
+	tests := []struct {
+		name   string
+		keys   []string
+		cursor int
+		screen screen
+		help   bool
+	}{
+		{"G goes to last row", []string{"G"}, 2, screenBoard, false},
+		{"g returns to first row", []string{"G", "g"}, 0, screenBoard, false},
+		{"] next screen resets cursor", []string{"j", "]"}, 0, screenWaves, false},
+		{"[ wraps to queue", []string{"["}, 0, screenQueue, false},
+		{"[ then ] returns", []string{"[", "]"}, 0, screenBoard, false},
+		{"? opens help", []string{"?"}, 0, screenBoard, true},
+		{"? twice closes help", []string{"?", "?"}, 0, screenBoard, false},
+		{"esc on board does nothing", []string{"j", "esc"}, 1, screenBoard, false},
+		{"enter on timeline stays", []string{"enter", "enter"}, 0, screenTimeline, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m, _ := newModel(t, fixedBoard())
+			for _, k := range tc.keys {
+				var cmd tea.Cmd
+				m, cmd = press(t, m, k)
+				m = settle(t, m, cmd)
+			}
+			if m.cursor != tc.cursor || m.screen != tc.screen || m.help != tc.help {
+				t.Fatalf("cursor=%d screen=%v help=%v, want %d %v %v", m.cursor, m.screen, m.help, tc.cursor, tc.screen, tc.help)
+			}
+		})
+	}
+}
