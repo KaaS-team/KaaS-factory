@@ -7,9 +7,16 @@ import (
 	"time"
 )
 
+// EnvLoop opts in to the full-loop tests. They claim every factory:ready issue in the repo, write
+// branches and merge a pull request, so they run on an empty sandbox only.
+const EnvLoop = "FACTORY_SMOKE_LOOP"
+
 // liveConfig skips unless the operator opted in, and sets up git credentials for the run.
 func liveConfig(t *testing.T) Config {
 	t.Helper()
+	if os.Getenv(EnvLoop) != "1" {
+		t.Skip("full-loop test is opt-in: set " + EnvLoop + "=1 on a sandbox with no factory:ready issues")
+	}
 	e, skip := FromEnv(os.Getenv)
 	if skip != "" {
 		t.Skip("live smoke test is opt-in: " + skip)
