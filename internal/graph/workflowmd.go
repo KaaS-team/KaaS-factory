@@ -26,82 +26,106 @@ type imported struct {
 // expandImports resolves the imports of the workflow file at path in topological order, dependencies
 // first, each file once. A cycle is an error naming the whole path (a -> b -> c -> a).
 func expandImports(path string, front *yaml.Node) ([]imported, error) {
-	root := filepath.Dir(path)
-	var out []imported
-	done := map[string]bool{}
-	var visit func(from string, list *yaml.Node, stack []string) error
-	visit = func(from string, list *yaml.Node, stack []string) error {
-		if list.Kind != yaml.SequenceNode {
-			return fmt.Errorf("imports must be a list of file paths")
-		}
-		for _, it := range list.Content {
-			rel := filepath.Join(filepath.Dir(from), it.Value)
-			if it.Kind != yaml.ScalarNode || !filepath.IsLocal(it.Value) {
-				return fmt.Errorf("import %q must be a relative path inside its own directory", it.Value)
-			}
-			for i, s := range stack {
-				if s == rel {
-					return fmt.Errorf("import cycle: %s", strings.Join(append(stack[i:len(stack):len(stack)], rel), " -> "))
-				}
-			}
-			if done[rel] {
-				continue
-			}
-			data, err := readInside(root, rel)
-			if err != nil {
-				return fmt.Errorf("import %s: %w", rel, err)
-			}
-			fm, body, _, err := splitFrontMatter(string(data))
-			if err != nil {
-				return fmt.Errorf("import %s: %w", rel, err)
-			}
-			var n yaml.Node
-			if err := yaml.Unmarshal([]byte(fm), &n); err != nil {
-				return fmt.Errorf("import %s: workflow_parse_error: %w", rel, err)
-			}
-			imp := imported{body: strings.TrimSpace(body)}
-			var sub *yaml.Node
-			if len(n.Content) > 0 {
-				m := n.Content[0]
-				if m.Kind != yaml.MappingNode {
-					return fmt.Errorf("import %s: workflow_front_matter_not_a_map", rel)
-				}
-				for i := 0; i+1 < len(m.Content); i += 2 {
-					if k := m.Content[i].Value; !importKeys[k] {
-						return fmt.Errorf("import %s: key %q is not allowed in an imported file%s", rel, k, suggest(k, importKeys))
-					}
-				}
-				sub = child(m, "imports")
-				if v := child(m, "safe_outputs"); v != nil {
-					if imp.safe, err = parseSafeOutputs(v); err != nil {
-						return fmt.Errorf("import %s: %w", rel, err)
-					}
-				}
-			}
-			if err := checkMarkdownVars(imp.body, 0); err != nil {
-				return fmt.Errorf("import %s: %w", rel, err)
-			}
-			if _, err := parseTemplate(imp.body); err != nil {
-				return fmt.Errorf("import %s: %w", rel, err)
-			}
-			if sub != nil {
-				if err := visit(rel, sub, append(stack[:len(stack):len(stack)], rel)); err != nil {
-					return err
-				}
-			}
-			done[rel] = true
-			out = append(out, imp)
-		}
-		return nil
-	}
-	self, err := filepath.Rel(root, path)
+	e := &importExpander{root: filepath.Dir(path), done: map[string]bool{}}
+	self, err := filepath.Rel(e.root, path)
 	if err != nil {
 		return nil, err
 	}
-	if err := visit(self, front, []string{self}); err != nil {
+	if err := e.visit(self, front, []string{self}); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return e.out, nil
+}
+
+// importExpander walks the import lists depth first and collects each file once.
+type importExpander struct {
+	root string
+	out  []imported
+	done map[string]bool
+}
+
+// visit expands the import list of the file from. stack holds the files on the way down, for cycles.
+func (e *importExpander) visit(from string, list *yaml.Node, stack []string) error {
+	if list.Kind != yaml.SequenceNode {
+		return fmt.Errorf("imports must be a list of file paths")
+	}
+	for _, it := range list.Content {
+		rel := filepath.Join(filepath.Dir(from), it.Value)
+		if it.Kind != yaml.ScalarNode || !filepath.IsLocal(it.Value) {
+			return fmt.Errorf("import %q must be a relative path inside its own directory", it.Value)
+		}
+		for i, s := range stack {
+			if s == rel {
+				return fmt.Errorf("import cycle: %s", strings.Join(append(stack[i:len(stack):len(stack)], rel), " -> "))
+			}
+		}
+		if e.done[rel] {
+			continue
+		}
+		imp, sub, err := e.load(rel)
+		if err != nil {
+			return err
+		}
+		if sub != nil {
+			if err := e.visit(rel, sub, append(stack[:len(stack):len(stack)], rel)); err != nil {
+				return err
+			}
+		}
+		e.done[rel] = true
+		e.out = append(e.out, imp)
+	}
+	return nil
+}
+
+// load reads and checks one imported file. It returns the file's own imports list, or nil.
+func (e *importExpander) load(rel string) (imported, *yaml.Node, error) {
+	data, err := readInside(e.root, rel)
+	if err != nil {
+		return imported{}, nil, fmt.Errorf("import %s: %w", rel, err)
+	}
+	fm, body, _, err := splitFrontMatter(string(data))
+	if err != nil {
+		return imported{}, nil, fmt.Errorf("import %s: %w", rel, err)
+	}
+	var n yaml.Node
+	if err := yaml.Unmarshal([]byte(fm), &n); err != nil {
+		return imported{}, nil, fmt.Errorf("import %s: workflow_parse_error: %w", rel, err)
+	}
+	imp := imported{body: strings.TrimSpace(body)}
+	var sub *yaml.Node
+	if len(n.Content) > 0 {
+		if sub, err = readImportFront(&imp, n.Content[0], rel); err != nil {
+			return imported{}, nil, err
+		}
+	}
+	if err := checkMarkdownVars(imp.body, 0); err != nil {
+		return imported{}, nil, fmt.Errorf("import %s: %w", rel, err)
+	}
+	if _, err := parseTemplate(imp.body); err != nil {
+		return imported{}, nil, fmt.Errorf("import %s: %w", rel, err)
+	}
+	return imp, sub, nil
+}
+
+// readImportFront checks the keys of an imported file's front matter, stores its safe outputs in imp and
+// returns its own imports list, or nil.
+func readImportFront(imp *imported, m *yaml.Node, rel string) (*yaml.Node, error) {
+	if m.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("import %s: workflow_front_matter_not_a_map", rel)
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if k := m.Content[i].Value; !importKeys[k] {
+			return nil, fmt.Errorf("import %s: key %q is not allowed in an imported file%s", rel, k, suggest(k, importKeys))
+		}
+	}
+	if v := child(m, "safe_outputs"); v != nil {
+		safe, err := parseSafeOutputs(v)
+		if err != nil {
+			return nil, fmt.Errorf("import %s: %w", rel, err)
+		}
+		imp.safe = safe
+	}
+	return child(m, "imports"), nil
 }
 
 // CanonicalHash returns the sha256 of the sorted-key canonical JSON of v and body, as hex. Map keys are

@@ -77,28 +77,10 @@ func LoadMarkdown(path string) (*Graph, error) {
 		return nil, fmt.Errorf("missing_workflow_file: %w", err)
 	}
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	front, body, bodyLine, err := splitFrontMatter(string(data))
+	m, body, err := parseMarkdownFront(name, string(data))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
+		return nil, err
 	}
-	if err := checkMarkdownVars(body, bodyLine); err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
-	}
-	if _, err := parseTemplate(body); err != nil { // syntax and filters; the variables passed above
-		return nil, fmt.Errorf("%s: %w", name, err)
-	}
-	var root yaml.Node
-	if err := yaml.Unmarshal([]byte(front), &root); err != nil {
-		return nil, fmt.Errorf("workflow_parse_error: %w", err)
-	}
-	var m *yaml.Node
-	if len(root.Content) > 0 {
-		if root.Content[0].Kind != yaml.MappingNode {
-			return nil, fmt.Errorf("workflow_front_matter_not_a_map: %s", name)
-		}
-		m = root.Content[0]
-	}
-	body = strings.TrimSpace(body)
 	var imps []imported
 	if m != nil {
 		if list := child(m, "imports"); list != nil {
@@ -107,21 +89,9 @@ func LoadMarkdown(path string) (*Graph, error) {
 			}
 		}
 	}
-	var g *Graph
-	if m != nil && child(m, "nodes") != nil {
-		if g, err = build(name, m, "nodes", body, 1, checkNodePrompt); err != nil {
-			return nil, err
-		}
-	} else {
-		g = &Graph{Name: name, Start: "run", Prompt: body, nodes: []Node{{ID: "run", Kind: KindAgent, Uses: "agent"}}}
-		if m != nil {
-			var top struct {
-				Name string `yaml:"name"`
-			}
-			if err := m.Decode(&top); err == nil && top.Name != "" {
-				g.Name = top.Name
-			}
-		}
+	g, err := markdownGraph(name, m, body)
+	if err != nil {
+		return nil, err
 	}
 	if m != nil {
 		if err := g.applyFrontMatter(m); err != nil {
@@ -130,6 +100,49 @@ func LoadMarkdown(path string) (*Graph, error) {
 	}
 	g.mergeImports(imps)
 	g.Hash = frontHash(m, g.Prompt)
+	return g, nil
+}
+
+// parseMarkdownFront splits a workflow file into its front matter mapping (nil when there is none) and its
+// trimmed body, and checks the body's template. name only prefixes errors.
+func parseMarkdownFront(name, text string) (*yaml.Node, string, error) {
+	front, body, bodyLine, err := splitFrontMatter(text)
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: %w", name, err)
+	}
+	if err := checkMarkdownVars(body, bodyLine); err != nil {
+		return nil, "", fmt.Errorf("%s: %w", name, err)
+	}
+	if _, err := parseTemplate(body); err != nil { // syntax and filters; the variables passed above
+		return nil, "", fmt.Errorf("%s: %w", name, err)
+	}
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(front), &root); err != nil {
+		return nil, "", fmt.Errorf("workflow_parse_error: %w", err)
+	}
+	if len(root.Content) == 0 {
+		return nil, strings.TrimSpace(body), nil
+	}
+	if root.Content[0].Kind != yaml.MappingNode {
+		return nil, "", fmt.Errorf("workflow_front_matter_not_a_map: %s", name)
+	}
+	return root.Content[0], strings.TrimSpace(body), nil
+}
+
+// markdownGraph builds the graph: from the "nodes" key when present, else one agent node that runs the body.
+func markdownGraph(name string, m *yaml.Node, body string) (*Graph, error) {
+	if m != nil && child(m, "nodes") != nil {
+		return build(name, m, "nodes", body, 1, checkNodePrompt)
+	}
+	g := &Graph{Name: name, Start: "run", Prompt: body, nodes: []Node{{ID: "run", Kind: KindAgent, Uses: "agent"}}}
+	if m != nil {
+		var top struct {
+			Name string `yaml:"name"`
+		}
+		if err := m.Decode(&top); err == nil && top.Name != "" {
+			g.Name = top.Name
+		}
+	}
 	return g, nil
 }
 

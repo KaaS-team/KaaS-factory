@@ -5,6 +5,7 @@
 // Package scanedit is a two-node workflow: Scan reads every file and writes an accumulator to disk,
 // Edit reads that accumulator and rewrites files. Each file call has a deadline; a file that exceeds
 // it is abandoned, reported and the run continues. Rows go to a CSV that folds into a scorecard row.
+// Nothing outside this package tree calls it yet; it is a worked example used by its tests.
 package scanedit
 
 import (

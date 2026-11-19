@@ -8,6 +8,7 @@
 // then runs again from its top; the n-th Interrupt call returns the n-th stored answer, so several
 // interrupts in one task are matched by order. Everything is in SQLite, so a restart keeps a
 // pending question and an answer nobody has consumed yet.
+// The core loop and the workflow command call it.
 package interrupt
 
 import (

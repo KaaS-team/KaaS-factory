@@ -2,7 +2,7 @@
 
 // Package checkpoint keeps a workflow run's state in SQLite, one checkpoint per step and the writes
 // of tasks that finished after it, so a restart re-runs only the tasks that had not finished. The
-// tables and their keys are langgraph's; state and values are JSON, so the type column holds "json".
+// tables and their keys are langgraph's; state and values are JSON, so the type column holds "json". The core loop and the store call it to save and resume stage runs.
 package checkpoint
 
 import (

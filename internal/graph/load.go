@@ -187,38 +187,9 @@ func build(name string, m *yaml.Node, key, body string, lineOff int, check func(
 	if top.Name != "" {
 		g.Name = top.Name
 	}
-	sn := child(m, key)
-	if sn == nil || sn.Kind != yaml.MappingNode || len(sn.Content) == 0 {
-		return nil, fmt.Errorf("%s: %q must be a map with at least one step", g.Name, key)
-	}
-	var steps []namedStep
-	ids := map[string]bool{}
-	for i := 0; i+1 < len(sn.Content); i += 2 {
-		id, node := sn.Content[i].Value, sn.Content[i+1]
-		if ids[id] || id == "" {
-			return nil, fmt.Errorf("%s: duplicate or empty step id %q", g.Name, id)
-		}
-		ids[id] = true
-		if node.Kind != yaml.MappingNode {
-			return nil, fmt.Errorf("%s: step %s must be a map", g.Name, id)
-		}
-		for j := 0; j+1 < len(node.Content); j += 2 {
-			if k := node.Content[j].Value; !stepKeys[k] {
-				return nil, fmt.Errorf("%s: step %s: unknown key %q%s", g.Name, id, k, suggest(k, stepKeys))
-			}
-		}
-		var s step
-		if err := node.Decode(&s); err != nil {
-			return nil, fmt.Errorf("%s: step %s: %w", g.Name, id, err)
-		}
-		if s.Uses == "" {
-			s.Uses = id
-		}
-		ns := namedStep{id: id, step: s, keyLine: map[string]int{}}
-		if err := ns.readAgentKeys(node, lineOff); err != nil {
-			return nil, fmt.Errorf("%s: step %s: %w", g.Name, id, err)
-		}
-		steps = append(steps, ns)
+	steps, err := readSteps(g.Name, m, key, lineOff)
+	if err != nil {
+		return nil, err
 	}
 	if err := g.applyAgentsMap(m, steps); err != nil {
 		return nil, fmt.Errorf("%s: %w", g.Name, err)
@@ -240,6 +211,54 @@ func build(name string, m *yaml.Node, key, body string, lineOff int, check func(
 		return nil, fmt.Errorf("%s: %w", g.Name, err)
 	}
 	return g, nil
+}
+
+// readSteps reads the steps mapping under key in file order, rejecting empty or duplicate ids, non-map
+// steps and unknown keys. graphName only prefixes errors.
+func readSteps(graphName string, m *yaml.Node, key string, lineOff int) ([]namedStep, error) {
+	sn := child(m, key)
+	if sn == nil || sn.Kind != yaml.MappingNode || len(sn.Content) == 0 {
+		return nil, fmt.Errorf("%s: %q must be a map with at least one step", graphName, key)
+	}
+	var steps []namedStep
+	ids := map[string]bool{}
+	for i := 0; i+1 < len(sn.Content); i += 2 {
+		id, node := sn.Content[i].Value, sn.Content[i+1]
+		if ids[id] || id == "" {
+			return nil, fmt.Errorf("%s: duplicate or empty step id %q", graphName, id)
+		}
+		ids[id] = true
+		ns, err := readStep(id, node, lineOff)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", graphName, err)
+		}
+		steps = append(steps, ns)
+	}
+	return steps, nil
+}
+
+// readStep decodes one step mapping. Its errors name the step.
+func readStep(id string, node *yaml.Node, lineOff int) (namedStep, error) {
+	if node.Kind != yaml.MappingNode {
+		return namedStep{}, fmt.Errorf("step %s must be a map", id)
+	}
+	for j := 0; j+1 < len(node.Content); j += 2 {
+		if k := node.Content[j].Value; !stepKeys[k] {
+			return namedStep{}, fmt.Errorf("step %s: unknown key %q%s", id, k, suggest(k, stepKeys))
+		}
+	}
+	var s step
+	if err := node.Decode(&s); err != nil {
+		return namedStep{}, fmt.Errorf("step %s: %w", id, err)
+	}
+	if s.Uses == "" {
+		s.Uses = id
+	}
+	ns := namedStep{id: id, step: s, keyLine: map[string]int{}}
+	if err := ns.readAgentKeys(node, lineOff); err != nil {
+		return namedStep{}, fmt.Errorf("step %s: %w", id, err)
+	}
+	return ns, nil
 }
 
 func suggestType(got string) string {
