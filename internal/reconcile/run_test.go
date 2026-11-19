@@ -2,6 +2,7 @@ package reconcile
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sort"
 	"strings"
@@ -260,5 +261,51 @@ func TestDispatchBriefNameIsBriefName(t *testing.T) {
 	want, err := brief.Name("a", 1)
 	if err != nil || spy.briefs[0].Name != want || want != "v9-a-a1.md" {
 		t.Fatalf("brief name %q, want %q (err %v)", spy.briefs[0].Name, want, err)
+	}
+}
+
+// retryFails is a tracker whose SetPhase(RetryQueue) always fails.
+type retryFails struct{ activeTracker }
+
+func (r retryFails) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) error {
+	if p == api.PhaseRetryQueue {
+		return errors.New("tracker down")
+	}
+	return r.activeTracker.SetPhase(ctx, id, p)
+}
+
+type failingDispatcher struct {
+	*porttest.Dispatcher
+	calls int
+}
+
+func (f *failingDispatcher) Dispatch(context.Context, api.Brief) (api.Session, error) {
+	f.calls++
+	return api.Session{}, errors.New("no capacity")
+}
+
+// A dispatch that fails while the tracker rejects the retry label must still count the attempt,
+// so the ticket stops at MaxAttempts and is labelled needs-human (review finding L1).
+func TestDispatchFailuresStopAtMaxAttempts(t *testing.T) {
+	c := &clock{t0}
+	tr := activeTracker{porttest.NewTracker(tkt("a"))}
+	disp := &failingDispatcher{Dispatcher: porttest.NewDispatcher(1)}
+	deps := newDeps(retryFails{tr}, porttest.NewObserver(), disp, c)
+	cf := cfg()
+	cf.MaxAttempts = 3
+	var state *State
+	for i := 0; i < 3; i++ {
+		Tick(context.Background(), deps, &state, cf)
+		c.t = c.t.Add(24 * time.Hour)
+	}
+	if tr.Phases["a"] != api.PhaseNeedsHuman {
+		t.Fatalf("phase %v after 3 failed dispatches, entry %+v", tr.Phases["a"], state.Entries["a"])
+	}
+	if len(tr.Comments["a"]) == 0 {
+		t.Fatal("no comment on the escalated ticket")
+	}
+	Tick(context.Background(), deps, &state, cf)
+	if disp.calls != 3 {
+		t.Fatalf("want 3 dispatch calls, got %d", disp.calls)
 	}
 }

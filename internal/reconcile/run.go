@@ -49,10 +49,10 @@ func (d Deps) report(err error) {
 	}
 }
 
-// Tick runs one pass: read the tracker, observe running tickets, Decide and
-// apply. A nil *sp means a fresh process: the state is rebuilt from the
-// tracker and observer (Symphony 14.3). Errors go to d.OnError and leave the
-// state as it was, so the next tick tries again.
+// Tick runs one pass: refresh the ticket list, mark terminal tickets, set the caps, observe
+// running tickets, Decide and apply. A nil *sp means a fresh process: the state is rebuilt from
+// the tracker and observer (Symphony 14.3). Errors go to d.OnError and leave the state as it
+// was, so the next tick tries again.
 func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 	cfg = cfg.withDefaults()
 	if ctx.Err() != nil {
@@ -77,23 +77,43 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 	// checks run from the stored state and only new dispatch is skipped.
 	s.noDispatch = err != nil
 	if err == nil {
-		// The Ready list must include claimed and running tickets (core merges in Lister.Active);
-		// a ticket missing from it is marked terminal and its session cancelled.
-		listed := map[api.TicketID]api.Ticket{}
-		for _, t := range ready {
-			listed[t.ID] = t
+		refresh(s, ready)
+	}
+	cfg = capSlots(d, s, cfg, now)
+	obs, ok := observeRunning(ctx, d, s)
+	if !ok {
+		return
+	}
+	for _, a := range Decide(*s, obs, now, cfg) {
+		if ctx.Err() != nil {
+			return
 		}
-		s.Ready = ready
-		s.Terminal = map[api.TicketID]bool{}
-		for id, e := range s.Entries {
-			if t, ok := listed[id]; ok {
-				e.Ticket = t
-				s.Entries[id] = e
-			} else {
-				s.Terminal[id] = true
-			}
+		apply(ctx, d, s, a, now, cfg)
+	}
+}
+
+// refresh stores the tracker's view on each entry and marks an entry missing from it terminal.
+// The Ready list must include claimed and running tickets (core merges in Lister.Active); a
+// ticket missing from it has its session cancelled.
+func refresh(s *State, ready []api.Ticket) {
+	listed := map[api.TicketID]api.Ticket{}
+	for _, t := range ready {
+		listed[t.ID] = t
+	}
+	s.Ready = ready
+	s.Terminal = map[api.TicketID]bool{}
+	for id, e := range s.Entries {
+		if t, ok := listed[id]; ok {
+			e.Ticket = t
+			s.Entries[id] = e
+		} else {
+			s.Terminal[id] = true
 		}
 	}
+}
+
+// capSlots applies the dispatcher's concurrency cap to cfg and counts the fires left this hour.
+func capSlots(d Deps, s *State, cfg Config, now time.Time) Config {
 	caps := d.Dispatcher.Caps()
 	if cfg.MaxConcurrent <= 0 || (caps.MaxConcurrent > 0 && caps.MaxConcurrent < cfg.MaxConcurrent) {
 		cfg.MaxConcurrent = caps.MaxConcurrent
@@ -103,6 +123,11 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 		s.fired = recent(s.fired, now)
 		s.FiresLeft = max(0, caps.FiresPerHour-len(s.fired))
 	}
+	return cfg
+}
+
+// observeRunning reads each slot-holding, non-terminal entry. It reports false when ctx ended.
+func observeRunning(ctx context.Context, d Deps, s *State) ([]api.Observation, bool) {
 	var obs []api.Observation
 	s.Unobserved = map[api.TicketID]bool{}
 	for id, e := range s.Entries {
@@ -110,7 +135,7 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 			continue
 		}
 		if ctx.Err() != nil {
-			return
+			return nil, false
 		}
 		o, err := d.Observer.Observe(ctx, id, e.Attempt)
 		if err != nil {
@@ -122,12 +147,7 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 		s.Entries[id] = e
 		obs = append(obs, o)
 	}
-	for _, a := range Decide(*s, obs, now, cfg) {
-		if ctx.Err() != nil {
-			return
-		}
-		apply(ctx, d, s, a, now, cfg)
-	}
+	return obs, true
 }
 
 func recent(ts []time.Time, now time.Time) []time.Time {
@@ -319,11 +339,12 @@ func dispatch(ctx context.Context, d Deps, s *State, a Action, now time.Time, cf
 			escalate(ctx, d, s, a.ID, fmt.Sprintf("dispatch failed after %d attempts", a.Attempt), now)
 			return
 		}
-		if d.Tracker.SetPhase(ctx, a.ID, api.PhaseRetryQueue) == nil {
-			e := Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.Backoff(a.Attempt)), Error: err.Error()}
-			s.Entries[a.ID] = e
-			d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindRetry, Time: now, Ticket: &t, Attempt: a.Attempt, At: e.RetryAt, Reason: e.Error})
-		}
+		// The attempt counts even when the tracker rejects the label: the entry in memory is what
+		// stops a broken ticket at MaxAttempts (L1).
+		d.report(d.Tracker.SetPhase(ctx, a.ID, api.PhaseRetryQueue))
+		e := Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.Backoff(a.Attempt)), Error: err.Error()}
+		s.Entries[a.ID] = e
+		d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindRetry, Time: now, Ticket: &t, Attempt: a.Attempt, At: e.RetryAt, Reason: e.Error})
 		return
 	}
 	s.fired = append(s.fired, now)
