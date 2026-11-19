@@ -175,25 +175,24 @@ func mcpHandlers() mcp.Handlers {
 		FirstRun: func(ctx context.Context) (string, error) { return runSub(ctx, "first-run", "--dry-run") },
 		Report:   func(ctx context.Context) (string, error) { return runSub(ctx, "report") },
 		Plan: func(ctx context.Context, in mcp.PlanInput) (string, error) {
-			// The goal is data: a goal such as "--approve" must never become a flag.
-			if g := strings.TrimSpace(in.Goal); g == "" || strings.HasPrefix(g, "-") {
-				return "", fmt.Errorf("plan: goal must be text, not empty or a flag")
-			}
-			return runSub(ctx, "plan", "--", in.Goal)
+			return dataSub(ctx, "plan", in.Goal, "plan", "goal must be text")
 		},
 		ApprovePlan: func(ctx context.Context, in mcp.ApprovePlanInput) (string, error) {
-			if g := strings.TrimSpace(in.Goal); g == "" || strings.HasPrefix(g, "-") {
-				return "", fmt.Errorf("approve_plan: goal must be text, not empty or a flag")
-			}
-			return runSub(ctx, "plan", "--approve", "--", in.Goal)
+			return dataSub(ctx, "approve_plan", in.Goal, "plan", "goal must be text", "--approve")
 		},
 		ExplainConfig: func(ctx context.Context, in mcp.ExplainConfigInput) (string, error) {
-			if k := strings.TrimSpace(in.Key); k == "" || strings.HasPrefix(k, "-") {
-				return "", fmt.Errorf("explain_config: key must be a name, not empty or a flag")
-			}
-			return runSub(ctx, "config", "explain", "--", in.Key)
+			return dataSub(ctx, "explain_config", in.Key, "config", "key must be a name", "explain")
 		},
 	}
+}
+
+// dataSub runs `factory <cmd> <args> -- <value>`. The value is data: empty or starting with "-" is
+// refused, so a client can never turn it into a flag.
+func dataSub(ctx context.Context, tool, value, cmd, want string, args ...string) (string, error) {
+	if v := strings.TrimSpace(value); v == "" || strings.HasPrefix(v, "-") {
+		return "", fmt.Errorf("%s: %s, not empty or a flag", tool, want)
+	}
+	return runSub(ctx, append(append([]string{cmd}, args...), "--", value)...)
 }
 
 // runSub runs one factory subcommand and returns what it printed.
