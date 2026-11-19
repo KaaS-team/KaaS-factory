@@ -16,7 +16,7 @@
 ## Change
 `NewCommand` is now flags plus wiring. New: `runFlags` (`validate`, `packsSum`), `localRunner`,
 `runEval`, `runArms`, `writeScorecard`, `writeTrajectories`. `diff`, `check` and `replay` were already
-separate functions. `runEval` is the longest at about 45 lines; the cap is 60, not the 40 the finding names.
+separate functions. `runEval` is the longest at 50 lines; the cap is 60, not the 40 the finding names.
 
 ## Upstreams copied
 None.
