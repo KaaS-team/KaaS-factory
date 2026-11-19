@@ -453,6 +453,7 @@ Show tokens per merged PR, rework, human touches and cycle time (operator only)
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
+| `--budget` | bool | `false` | print spend against each budget in .factory/budgets.yaml |
 | `--by` | string | `team` | group rows by team, workflow or pack |
 | `--churn` | string | `14d` | with --cost, a revert within this long after merge counts against the PR |
 | `--cost` | bool | `false` | print cost per surviving merged PR, per repo and in total |

@@ -1,0 +1,34 @@
+{
+  "budgets": [
+    {
+      "scope": "team:alpha",
+      "period": "month",
+      "spent_usd": 4,
+      "limit_usd": 5,
+      "percent": 80,
+      "state": "alert",
+      "since": "2026-11-01T00:00:00Z",
+      "resets": "2026-12-01T00:00:00Z"
+    },
+    {
+      "scope": "team:beta",
+      "period": "month",
+      "spent_usd": 3.5,
+      "limit_usd": 10,
+      "percent": 35,
+      "state": "ok",
+      "since": "2026-11-01T00:00:00Z",
+      "resets": "2026-12-01T00:00:00Z"
+    },
+    {
+      "scope": "client:acme",
+      "period": "month",
+      "spent_usd": 3,
+      "limit_usd": 3,
+      "percent": 100,
+      "state": "over",
+      "since": "2026-11-01T00:00:00Z",
+      "resets": "2026-12-01T00:00:00Z"
+    }
+  ]
+}

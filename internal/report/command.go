@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/KaaS-team/factory/internal/budget"
 	"github.com/spf13/cobra"
 )
 
@@ -85,7 +86,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 		f(&o)
 	}
 	var since, by, out string
-	var asJSON, cost bool
+	var asJSON, cost, showBudget bool
 	var churn string
 	cmd := &cobra.Command{
 		Use:   "report",
@@ -113,6 +114,9 @@ func NewCommand(opts ...Option) *cobra.Command {
 				return err
 			}
 			now := o.now()
+			if showBudget {
+				return runBudget(cmd, src, budget.DefaultPath, now, asJSON, out)
+			}
 			var rep Report
 			if !cost {
 				if rep, err = Build(cmd.Context(), src, Window{Since: now.Add(-d), Until: now}); err != nil {
@@ -153,6 +157,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 	cmd.Flags().StringVar(&since, "since", "7d", "window length ending now, such as 7d or 36h")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "write JSON instead of markdown")
 	cmd.Flags().BoolVar(&cost, "cost", false, "print cost per surviving merged PR, per repo and in total")
+	cmd.Flags().BoolVar(&showBudget, "budget", false, "print spend against each budget in .factory/budgets.yaml")
 	cmd.Flags().StringVar(&churn, "churn", "14d", "with --cost, a revert within this long after merge counts against the PR")
 	cmd.Flags().StringVar(&by, "by", "team", "group rows by team, workflow or pack")
 	cmd.Flags().StringVar(&out, "out", "", "write the report to this file; never under .github/ or a PR body file")
