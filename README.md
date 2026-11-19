@@ -16,20 +16,7 @@ factory first-run --dry-run
 `doctor` checks your tools. `init` writes `factory.yaml` into your repo's `.factory` folder. `first-run --dry-run` audits the
 repository, lists the first fixes, and changes nothing.
 
-## The loop
-
-```mermaid
-flowchart LR
-  G[Goal] --> P[Plan]
-  P --> T[Tickets]
-  T --> S1[Session 1]
-  T --> S2[Session 2]
-  T --> S3[Session 3]
-  S1 & S2 & S3 --> V{Verify}
-  V -- pass --> M[Merge queue]
-  V -- fail --> T
-  M --> B[Green base]
-```
+## How it works
 
 Each ticket runs in its own session. Your own gates (tests, lint, build) decide whether a result moves
 on. The merge queue lands one change at a time, so the base stays green. Risky changes wait for your
@@ -44,7 +31,13 @@ brew install kaas-team/tap/factory
 Or, with no sudo (installs to `$HOME/.local/bin`, checks the checksum first):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/KaaS-team/KaaS-factory/main/install/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/KaaS-team/factory/main/install.sh | sh
+```
+
+Or build from source with Go 1.26 or newer:
+
+```sh
+go install github.com/KaaS-team/factory/cmd/factory@latest
 ```
 
 More in [docs/install.md](docs/install.md).
@@ -63,8 +56,19 @@ factory cancel <ticket>
 factory retry <ticket>
 ```
 
-`plan` turns a goal into a ticket graph. `--approve` files it. `run` starts the loop. The full list is
-in [docs/cli-reference.md](docs/cli-reference.md).
+`plan` turns a goal into a ticket graph. `--approve` files it. `run` starts the loop.
+
+### Command list
+
+| Group | Commands |
+|---|---|
+| Set up | `doctor`, `init`, `first-run`, `config`, `packs`, `add`, `upgrade`, `version` |
+| Plan and run | `plan`, `run`, `dispatch`, `serve`, `eval`, `design`, `review`, `repomap`, `checkpoint`, `browsercheck` |
+| Watch and steer | `status`, `queue`, `logs`, `steer`, `cancel`, `retry`, `board`, `dashboard`, `report`, `shadow`, `audit` |
+| Connect | `mcp`, `a2a` |
+
+The full flag list for every command is in [docs/cli-reference.md](docs/cli-reference.md). A test keeps
+it equal to the real command tree.
 
 ## MCP
 
@@ -96,6 +100,14 @@ Pick one with `factory init --tier <name>`. Each tier is a preset you can edit a
 Settings come from layers, lowest to highest: defaults, the org file, the team file, the repository
 file, `FACTORY_*` variables, and flags. The org layer is a ceiling. Every key is in
 [docs/config.md](docs/config.md).
+
+## Links
+
+- [docs/install.md](docs/install.md) for install options.
+- [docs/config.md](docs/config.md) for every setting.
+- [docs/workflows.md](docs/workflows.md) for workflows.
+- [AGENTS.md](AGENTS.md) for the package map and the gate.
+- Issues and releases: https://github.com/KaaS-team/factory
 
 ## Contributing and license
 
