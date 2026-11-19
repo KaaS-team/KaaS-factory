@@ -45,13 +45,18 @@ import (
 // version is set at release time with -ldflags "-X main.version=...".
 var version = "0.0.0-dev"
 
+// commit and date are set the same way (-X main.commit, -X main.date).
+var commit, date = "none", "unknown"
+
 func newRoot() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "factory",
 		Short:         "Plan work into tickets and run them on parallel coding-agent sessions",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Version:       fmt.Sprintf("%s (commit %s, built %s)", version, commit, date),
 	}
+	root.SetVersionTemplate("factory {{.Version}}\n")
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the factory version",

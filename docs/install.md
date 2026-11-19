@@ -46,4 +46,6 @@ factory doctor
 `goreleaser` builds the four archives (`factory_<os>_<arch>.tar.gz`), the checksums file and the
 tap formula from `.goreleaser.yaml`. The release workflow runs on a `v*` tag and needs the `HOMEBREW_TAP_GITHUB_TOKEN` secret.
 
+The binary reports its build with `factory --version`: version, commit and date.
+
 To try it without publishing: `goreleaser release --snapshot --clean`, then look in `dist/`.
