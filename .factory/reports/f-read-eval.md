@@ -28,3 +28,4 @@ None.
 - `just` and a current `golangci-lint` were missing locally, so lint ran only in CI.
 - `./gate.sh` showed `internal/reconcile` `TestRunTwoTicketsToPullRequests` flaking (PR numbers 101 and 102 swap). Not touched here.
 - The PR body check rejects a body that links a Claude session. The PR tool appends one, so edit the body after creating the PR.
+- File outside my area: `.ratchet.json` raised by 58 lines (42880 to 42938) with a reason, as the repo's ratchet process asks. The split adds function headers, a type and doc comments.
