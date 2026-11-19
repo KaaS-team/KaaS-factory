@@ -168,20 +168,31 @@ func (lazyFiler) Create(ctx context.Context, t api.Ticket) (api.TicketID, error)
 }
 
 // mcpHandlers backs the MCP tools that have a CLI command with that command, run in process, so a
-// tool and its command share one code path. approve_plan and explain_config stay unwired: approving
-// needs a plan id the CLI does not keep, and explain needs a key the tool does not take.
+// tool and its command share one code path. The CLI keeps no plan id between calls, so approve_plan
+// takes the goal and runs `plan --approve` in one call.
 func mcpHandlers() mcp.Handlers {
 	return mcp.Handlers{
 		FirstRun: func(ctx context.Context) (string, error) { return runSub(ctx, "first-run", "--dry-run") },
 		Report:   func(ctx context.Context) (string, error) { return runSub(ctx, "report") },
 		Plan: func(ctx context.Context, in mcp.PlanInput) (string, error) {
-			// The goal is data: a goal such as "--approve" must never become a flag.
-			if g := strings.TrimSpace(in.Goal); g == "" || strings.HasPrefix(g, "-") {
-				return "", fmt.Errorf("plan: goal must be text, not empty or a flag")
-			}
-			return runSub(ctx, "plan", "--", in.Goal)
+			return dataSub(ctx, "plan", in.Goal, "plan", "goal must be text")
+		},
+		ApprovePlan: func(ctx context.Context, in mcp.ApprovePlanInput) (string, error) {
+			return dataSub(ctx, "approve_plan", in.Goal, "plan", "goal must be text", "--approve")
+		},
+		ExplainConfig: func(ctx context.Context, in mcp.ExplainConfigInput) (string, error) {
+			return dataSub(ctx, "explain_config", in.Key, "config", "key must be a name", "explain")
 		},
 	}
+}
+
+// dataSub runs `factory <cmd> <args> -- <value>`. The value is data: empty or starting with "-" is
+// refused, so a client can never turn it into a flag.
+func dataSub(ctx context.Context, tool, value, cmd, want string, args ...string) (string, error) {
+	if v := strings.TrimSpace(value); v == "" || strings.HasPrefix(v, "-") {
+		return "", fmt.Errorf("%s: %s, not empty or a flag", tool, want)
+	}
+	return runSub(ctx, append(append([]string{cmd}, args...), "--", value)...)
 }
 
 // runSub runs one factory subcommand and returns what it printed.
