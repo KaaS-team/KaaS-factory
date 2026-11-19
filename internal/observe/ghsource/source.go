@@ -85,62 +85,81 @@ func (s *Source) Checks(ctx context.Context, pr int) (observe.Checks, error) {
 	}
 	sha := p.GetHead().GetSHA()
 
-	var failed, pending, seen bool
+	var roll rollup
+	if err := s.rollCheckRuns(ctx, sha, &roll); err != nil {
+		return observe.ChecksNone, err
+	}
+	if err := s.rollStatuses(ctx, sha, &roll); err != nil {
+		return observe.ChecksNone, err
+	}
+	return roll.result(), nil
+}
+
+// rollup collects what the checks on one commit reported.
+type rollup struct{ failed, pending, seen bool }
+
+func (r rollup) result() observe.Checks {
+	switch {
+	case r.failed:
+		return observe.ChecksRed
+	case r.pending:
+		return observe.ChecksPending
+	case r.seen:
+		return observe.ChecksGreen
+	}
+	return observe.ChecksNone
+}
+
+// rollCheckRuns folds every page of check runs on sha into roll.
+func (s *Source) rollCheckRuns(ctx context.Context, sha string, roll *rollup) error {
 	opts := &gogithub.ListCheckRunsOptions{ListOptions: gogithub.ListOptions{PerPage: perPage}}
 	for {
 		res, resp, err := s.client.Checks.ListCheckRunsForRef(ctx, s.owner, s.repo, sha, opts)
 		if err != nil {
-			return observe.ChecksNone, wrap(resp, fmt.Errorf("list check runs: %w", err))
+			return wrap(resp, fmt.Errorf("list check runs: %w", err))
 		}
 		for _, r := range res.CheckRuns {
-			seen = true
+			roll.seen = true
 			if r.GetStatus() != "completed" {
-				pending = true
+				roll.pending = true
 				continue
 			}
 			switch r.GetConclusion() {
 			case "success", "neutral", "skipped":
 			default:
-				failed = true
+				roll.failed = true
 			}
 		}
 		if resp.NextPage == 0 {
-			break
+			return nil
 		}
 		opts.Page = resp.NextPage
 	}
+}
 
-	lopts := &gogithub.ListOptions{PerPage: perPage}
+// rollStatuses folds every page of legacy commit statuses on sha into roll.
+func (s *Source) rollStatuses(ctx context.Context, sha string, roll *rollup) error {
+	opts := &gogithub.ListOptions{PerPage: perPage}
 	for {
-		st, resp, err := s.client.Repositories.GetCombinedStatus(ctx, s.owner, s.repo, sha, lopts)
+		st, resp, err := s.client.Repositories.GetCombinedStatus(ctx, s.owner, s.repo, sha, opts)
 		if err != nil {
-			return observe.ChecksNone, wrap(resp, fmt.Errorf("get combined status: %w", err))
+			return wrap(resp, fmt.Errorf("get combined status: %w", err))
 		}
 		for _, c := range st.Statuses {
-			seen = true
+			roll.seen = true
 			switch c.GetState() {
 			case "success":
 			case "pending":
-				pending = true
+				roll.pending = true
 			default:
-				failed = true
+				roll.failed = true
 			}
 		}
 		if resp.NextPage == 0 {
-			break
+			return nil
 		}
-		lopts.Page = resp.NextPage
+		opts.Page = resp.NextPage
 	}
-
-	switch {
-	case failed:
-		return observe.ChecksRed, nil
-	case pending:
-		return observe.ChecksPending, nil
-	case seen:
-		return observe.ChecksGreen, nil
-	}
-	return observe.ChecksNone, nil
 }
 
 // DiffFiles lists the names of the files the branch changes against the base, across every page.
