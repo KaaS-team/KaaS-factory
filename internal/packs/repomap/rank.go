@@ -3,12 +3,14 @@
 package repomap
 
 import (
+	"cmp"
 	"context"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -91,32 +93,38 @@ func tagsOf(ctx context.Context, o Options, rel string) ([]Tag, bool) {
 // personalised PageRank over the reference graph with the weights of repomap.py. Files without
 // definitions follow as tags with an empty Name.
 func Rank(ctx context.Context, o Options) ([]Tag, error) {
-	set := map[string]bool{}
-	for _, f := range append(append([]string{}, o.Chat...), o.Others...) {
-		set[f] = true
+	fnames := candidates(o)
+	chat := setOf(o.Chat)
+	ts, err := tags(ctx, o, fnames, chat)
+	if err != nil || len(fnames) == 0 {
+		return nil, err
 	}
-	fnames := make([]string, 0, len(set))
-	for f := range set {
-		fnames = append(fnames, f)
-	}
-	sort.Strings(fnames)
-	if len(fnames) == 0 {
-		return nil, nil
-	}
-	chat := map[string]bool{}
-	for _, f := range o.Chat {
-		chat[f] = true
-	}
+	edges := graph(ts, o.MentionedIdents, chat)
+	return rankOrder(o, ts, edges, pagerank(edges, ts.pers), chat), nil
+}
+
+// candidates is the sorted union of the Chat and Others files.
+func candidates(o Options) []string {
+	return sortedKeys(setOf(append(slices.Clone(o.Chat), o.Others...)))
+}
+
+// tagSet: seeds, definers and referrers per identifier, definition tags per file and identifier.
+type tagSet struct {
+	pers    map[string]float64
+	defines map[string]map[string]bool
+	refs    map[string][]string
+	defs    map[[2]string][]Tag
+}
+
+// tags parses every file and gathers the seeds, definitions and references.
+func tags(ctx context.Context, o Options, fnames []string, chat map[string]bool) (*tagSet, error) {
 	personalize := 100 / float64(len(fnames))
-	pers := map[string]float64{}
-	defines := map[string]map[string]bool{}
-	refs := map[string][]string{}
-	defs := map[[2]string][]Tag{}
+	ts := &tagSet{map[string]float64{}, map[string]map[string]bool{}, map[string][]string{}, map[[2]string][]Tag{}}
 	for _, f := range fnames {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		tags, ok := tagsOf(ctx, o, f)
+		fileTags, ok := tagsOf(ctx, o, f)
 		if !ok {
 			continue
 		}
@@ -131,44 +139,45 @@ func Rank(ctx context.Context, o Options) ([]Tag, error) {
 			cur += personalize
 		}
 		if cur > 0 {
-			pers[f] = cur
+			ts.pers[f] = cur
 		}
-		for _, t := range tags {
+		for _, t := range fileTags {
 			if t.Kind == "def" {
-				if defines[t.Name] == nil {
-					defines[t.Name] = map[string]bool{}
+				if ts.defines[t.Name] == nil {
+					ts.defines[t.Name] = map[string]bool{}
 				}
-				defines[t.Name][f] = true
-				defs[[2]string{f, t.Name}] = append(defs[[2]string{f, t.Name}], t)
+				ts.defines[t.Name][f] = true
+				k := [2]string{f, t.Name}
+				ts.defs[k] = append(ts.defs[k], t)
 			} else {
-				refs[t.Name] = append(refs[t.Name], f)
+				ts.refs[t.Name] = append(ts.refs[t.Name], f)
 			}
 		}
 	}
-	if len(refs) == 0 {
-		for k, v := range defines {
+	if len(ts.refs) == 0 {
+		for k, v := range ts.defines {
 			for f := range v {
-				refs[k] = append(refs[k], f)
+				ts.refs[k] = append(ts.refs[k], f)
 			}
 		}
 	}
+	return ts, nil
+}
+
+// graph turns references into weighted edges from the referencing file to the defining file.
+func graph(ts *tagSet, mentioned map[string]bool, chat map[string]bool) []edge {
 	var edges []edge
-	idents := make([]string, 0, len(defines))
-	for id := range defines {
-		idents = append(idents, id)
-	}
-	sort.Strings(idents)
-	for _, id := range idents {
-		definers := sortedKeys(defines[id])
-		if _, ok := refs[id]; !ok {
+	for _, id := range sortedKeys(ts.defines) {
+		definers := sortedKeys(ts.defines[id])
+		if _, ok := ts.refs[id]; !ok {
 			for _, d := range definers {
 				edges = append(edges, edge{d, d, 0.1, id})
 			}
 			continue
 		}
-		mul := identWeight(id, o.MentionedIdents[id], len(definers))
+		mul := identWeight(id, mentioned[id], len(definers))
 		count := map[string]int{}
-		for _, r := range refs[id] {
+		for _, r := range ts.refs[id] {
 			count[r]++
 		}
 		for _, r := range sortedKeys(count) {
@@ -182,8 +191,11 @@ func Rank(ctx context.Context, o Options) ([]Tag, error) {
 			}
 		}
 	}
-	ranked := pageRank(edges, pers)
+	return edges
+}
 
+// rankOrder orders the definitions by score, then the files that have none.
+func rankOrder(o Options, ts *tagSet, edges []edge, ranked map[string]float64, chat map[string]bool) []Tag {
 	outW := map[string]float64{}
 	for _, e := range edges {
 		outW[e.src] += e.w
@@ -193,18 +205,9 @@ func Rank(ctx context.Context, o Options) ([]Tag, error) {
 	for _, e := range edges {
 		score[fi{e.dst, e.ident}] += ranked[e.src] * e.w / outW[e.src]
 	}
-	keys := make([]fi, 0, len(score))
-	for k := range score {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if score[keys[i]] != score[keys[j]] {
-			return score[keys[i]] > score[keys[j]]
-		}
-		if keys[i].file != keys[j].file {
-			return keys[i].file > keys[j].file
-		}
-		return keys[i].ident > keys[j].ident
+	keys := slices.Collect(maps.Keys(score))
+	slices.SortFunc(keys, func(a, b fi) int {
+		return cmp.Or(cmp.Compare(score[b], score[a]), cmp.Compare(b.file, a.file), cmp.Compare(b.ident, a.ident))
 	})
 	var out []Tag
 	included := map[string]bool{}
@@ -212,23 +215,12 @@ func Rank(ctx context.Context, o Options) ([]Tag, error) {
 		if chat[k.file] {
 			continue
 		}
-		out = append(out, defs[[2]string{k.file, k.ident}]...)
+		out = append(out, ts.defs[[2]string{k.file, k.ident}]...)
 		included[k.file] = true
 	}
-	rest := map[string]bool{}
-	for _, f := range o.Others {
-		rest[f] = true
-	}
-	nodes := make([]string, 0, len(ranked))
-	for n := range ranked {
-		nodes = append(nodes, n)
-	}
-	sort.Slice(nodes, func(i, j int) bool {
-		if ranked[nodes[i]] != ranked[nodes[j]] {
-			return ranked[nodes[i]] > ranked[nodes[j]]
-		}
-		return nodes[i] > nodes[j]
-	})
+	rest := setOf(o.Others)
+	nodes := slices.Collect(maps.Keys(ranked))
+	slices.SortFunc(nodes, func(a, b string) int { return cmp.Or(cmp.Compare(ranked[b], ranked[a]), cmp.Compare(b, a)) })
 	for _, n := range nodes {
 		delete(rest, n)
 		if !included[n] && !chat[n] {
@@ -237,19 +229,22 @@ func Rank(ctx context.Context, o Options) ([]Tag, error) {
 		}
 	}
 	for _, f := range sortedKeys(rest) {
-		if !included[f] {
-			out = append(out, Tag{File: f})
-		}
+		out = append(out, Tag{File: f})
 	}
-	return out, nil
+	return out
+}
+
+func setOf(l []string) map[string]bool {
+	m := make(map[string]bool, len(l))
+	for _, f := range l {
+		m[f] = true
+	}
+	return m
 }
 
 func sortedKeys[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
+	out := slices.Collect(maps.Keys(m))
+	slices.Sort(out)
 	return out
 }
 
@@ -269,9 +264,9 @@ func matchesIdent(rel string, idents map[string]bool) bool {
 	return false
 }
 
-// pageRank is power iteration with damping 0.85 over the weighted multigraph. The personalization,
+// pagerank is power iteration with damping 0.85 over the weighted multigraph. The personalization,
 // when given, is both the teleport and the dangling distribution, as in the networkx call of repomap.py.
-func pageRank(edges []edge, pers map[string]float64) map[string]float64 {
+func pagerank(edges []edge, pers map[string]float64) map[string]float64 {
 	nodes := map[string]bool{}
 	out := map[string]float64{}
 	for _, e := range edges {
