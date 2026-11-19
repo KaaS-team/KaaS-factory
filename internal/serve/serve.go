@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -35,9 +34,6 @@ func (realClock) Now() time.Time { return time.Now() }
 type Options struct {
 	Interval time.Duration // the loop's tick interval; /healthz allows 3 of them since the last tick
 	Clock    Clock         // defaults to the wall clock
-	Jobs     *Jobs         // optional scheduled jobs; Serve drives them and needs Exec
-	JobsPath string        // when Jobs is nil, Serve opens the job database at this path
-	Exec     Executor      // runs one job run
 	Schedule *Scheduler    // optional cron schedules, ticked once per Interval
 	// Wrap, when set, wraps the HTTP routes inside the host guard, for example to require a credential.
 	Wrap func(http.Handler) http.Handler
@@ -53,9 +49,6 @@ type Server struct {
 	lastTick time.Time
 	ticked   bool
 	ready    atomic.Bool
-	jobs     *Jobs
-	jobsPath string
-	exec     Executor
 	wrap     func(http.Handler) http.Handler
 	onListen func(addr string) // test hook: called with the bound address
 }
@@ -68,7 +61,7 @@ func New(core Core, o Options) *Server {
 	if o.Clock == nil {
 		o.Clock = realClock{}
 	}
-	return &Server{core: core, interval: o.Interval, clock: o.Clock, jobs: o.Jobs, jobsPath: o.JobsPath, exec: o.Exec, wrap: o.Wrap, sched: o.Schedule}
+	return &Server{core: core, interval: o.Interval, clock: o.Clock, wrap: o.Wrap, sched: o.Schedule}
 }
 
 func (s *Server) markTick() {
@@ -83,10 +76,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/healthz", s.healthz)
 	mux.HandleFunc("/readyz", s.readyz)
 	mux.HandleFunc("/events", s.events)
-	mux.HandleFunc("POST /jobs/{id}/{action}", s.jobAction)
-	mux.HandleFunc("PUT /jobs/{id}/cron", s.jobCron)
-	mux.HandleFunc("PUT /jobs/{id}", s.jobAdd)
-	mux.HandleFunc("GET /jobs/{id}/runs", s.jobRuns)
 	return mux
 }
 
@@ -161,36 +150,10 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 	if s.onListen != nil {
 		s.onListen(ln.Addr().String())
 	}
-	if (s.jobs != nil || s.jobsPath != "") && s.exec == nil {
-		_ = ln.Close()
-		return errors.New("serve: jobs need an Exec")
-	}
-	if s.jobs == nil && s.jobsPath != "" {
-		j, err := OpenJobs(s.jobsPath, s.clock, func(f string, a ...any) { log.Printf(f, a...) })
-		if err != nil {
-			_ = ln.Close()
-			return err
-		}
-		defer func() { _ = j.Close() }()
-		j.SetJitter(DefaultJitterWindow, j.holder)
-		s.jobs = j
-	}
 	ev, err := s.core.Events(ctx)
 	if err != nil {
 		_ = ln.Close()
 		return err
-	}
-	if s.jobs != nil {
-		jctx, stopJobs := context.WithCancel(ctx)
-		jobsDone := make(chan struct{})
-		go func() { defer close(jobsDone); s.jobs.Run(jctx, s.exec, s.interval) }()
-		defer func() {
-			stopJobs()
-			select {
-			case <-jobsDone:
-			case <-time.After(drain):
-			}
-		}()
 	}
 	go func() {
 		for e := range ev {
@@ -214,32 +177,29 @@ func (s *Server) Serve(ctx context.Context, addr string, drain time.Duration) er
 	}
 	go func() { runDone <- s.core.Run(ctx) }()
 
+	// One stop path: the loop ending, the HTTP server failing and ctx ending all go through it.
+	var runErr error
 	select {
-	case err := <-runDone: // the loop ended without ctx ending
-		s.stopHTTP(srv, drain)
-		if err == nil || errors.Is(err, context.Canceled) {
-			return nil
-		}
-		return err
+	case runErr = <-runDone: // the loop ended without ctx ending
 	case err := <-httpDone:
 		return fmt.Errorf("http server: %w", err)
 	case <-ctx.Done():
-	}
-	// Stop dispatching is the ctx cancel itself; now wait for the tick in flight.
-	s.ready.Store(false)
-	timer := time.NewTimer(drain)
-	defer timer.Stop()
-	select {
-	case err := <-runDone:
-		s.stopHTTP(srv, drain)
-		if err == nil || errors.Is(err, context.Canceled) {
-			return nil
+		// Stop dispatching is the ctx cancel itself; now wait for the tick in flight.
+		s.ready.Store(false)
+		timer := time.NewTimer(drain)
+		defer timer.Stop()
+		select {
+		case runErr = <-runDone:
+		case <-timer.C:
+			_ = srv.Close()
+			return fmt.Errorf("drain: tick still in flight after %s", drain)
 		}
-		return err
-	case <-timer.C:
-		_ = srv.Close()
-		return fmt.Errorf("drain: tick still in flight after %s", drain)
 	}
+	s.stopHTTP(srv, drain)
+	if runErr == nil || errors.Is(runErr, context.Canceled) {
+		return nil
+	}
+	return runErr
 }
 
 func (s *Server) stopHTTP(srv *http.Server, d time.Duration) {
