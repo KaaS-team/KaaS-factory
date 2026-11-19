@@ -32,3 +32,6 @@ None. Used go.opentelemetry.io/otel (log, sdk/log, otlploghttp), Apache-2.0, as 
 
 ## Workflow changes needed
 None.
+
+## CI notes
+The repo's `prcheck body` rejects a PR body that links a Claude session, so the PR body carries no session link or footer. A rerun of that check replays the old PR body, so only a new push picks up the edit.
