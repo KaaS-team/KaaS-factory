@@ -34,7 +34,10 @@ brews:
       # A write deploy key on KaaS-team/homebrew-tap only; its private half is the factory repo secret.
       git:
         url: git@github.com:KaaS-team/homebrew-tap.git
-        private_key: "{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}"
+        private_key: '{{ envOrDefault "HOMEBREW_TAP_DEPLOY_KEY" "" }}'
+    # With no deploy key the binaries still ship and the formula waits; rerunning the release run
+    # after the secret is set pushes it (replace_existing_artifacts below makes the rerun safe).
+    skip_upload: '{{ if isEnvSet "HOMEBREW_TAP_DEPLOY_KEY" }}false{{ else }}true{{ end }}'
     test: |
       system "#{bin}/factory", "version"
 
@@ -42,3 +45,4 @@ release:
   github:
     owner: KaaS-team
     name: factory
+  replace_existing_artifacts: true
