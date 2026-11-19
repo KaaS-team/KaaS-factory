@@ -33,14 +33,3 @@ func JitterOffset(nominal time.Time, window time.Duration, instance string) time
 	ms := int64(float64(x) / 0xffffffff * float64(window.Milliseconds()))
 	return time.Duration(ms) * time.Millisecond
 }
-
-// SetJitter lets each tick start up to window before its nominal time, seeded by instance. A zero
-// window (the default) keeps every tick on time. The run is still keyed by the nominal period.
-func (j *Jobs) SetJitter(window time.Duration, instance string) {
-	j.jitter, j.instance = window, instance
-}
-
-// due reports whether the cron tick t may start at now.
-func (j *Jobs) due(t, now time.Time) bool {
-	return !t.Add(-JitterOffset(t, j.jitter, j.instance)).After(now)
-}

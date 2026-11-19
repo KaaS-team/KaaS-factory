@@ -272,3 +272,20 @@ func TestServeTicksSchedules(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// The route table is the three probes and nothing else: no /jobs route is reachable.
+func TestHandlerRoutes(t *testing.T) {
+	h := New(nil, Options{}).Handler()
+	for _, tc := range []struct {
+		method, path string
+		want         bool
+	}{
+		{"GET", "/healthz", true}, {"GET", "/readyz", true}, {"GET", "/events", true},
+		{"PUT", "/jobs/a", false}, {"POST", "/jobs/a/run", false}, {"PUT", "/jobs/a/cron", false}, {"GET", "/jobs/a/runs", false},
+	} {
+		_, pattern := h.(*http.ServeMux).Handler(httptest.NewRequest(tc.method, tc.path, nil))
+		if (pattern != "") != tc.want {
+			t.Errorf("%s %s: registered=%t, want %t", tc.method, tc.path, pattern != "", tc.want)
+		}
+	}
+}
