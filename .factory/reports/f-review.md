@@ -119,9 +119,6 @@ Test: a fake `Untrusted` that blocks; `Wait` on another session must return. Loc
   touches a file; assert it did not run.
 - **L5. HTTP MCP has no Host or Origin guard.** `internal/mcp/mcp.go:447-465` checks only the bearer, while `serve`
   and `a2a` wrap `hostguard`. Low because the token is required. Test: request with `Host: evil.test` is refused.
-- **L6. Update path is not atomic across devices.** `selfupdate.go:195` creates the temp file beside the target, so
-  that is fine, but a read-only install dir (`/usr/local/bin` as non-root) fails after the full download. Check
-  writability first.
 
 ## Dead or duplicate code
 
@@ -146,7 +143,7 @@ Test: a fake `Untrusted` that blocks; `Wait` on another session must return. Loc
 
 ## Acceptance
 
-- [x] Findings ranked by severity, each with file:line and a failing input: done (H1-H2, M1-M8, L1-L6).
+- [x] Findings ranked by severity, each with file:line and a failing input: done (H1-H2, M1-M8, L1-L5).
 - [x] Five hardest-to-read places with a one-line simpler shape: done.
 
 ## Upstreams copied
