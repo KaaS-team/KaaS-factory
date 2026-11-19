@@ -89,33 +89,56 @@ func Run(ctx context.Context, o Options) Result {
 		chromedp.ExecPath(bin), chromedp.NoSandbox, chromedp.UserDataDir(dir))...))
 	defer cancelCtx()
 
-	var mu sync.Mutex
-	consoleErrs := 0
-	if err := chromedp.Listen(bctx, func(ev any) {
-		mu.Lock()
-		defer mu.Unlock()
-		switch e := ev.(type) {
-		case *runtime.EventConsoleAPICalled:
-			if e.Type == "error" {
-				consoleErrs++
-			}
-		case *runtime.EventExceptionThrown:
-			consoleErrs++
-		}
-	}); err != nil {
+	console, err := watchConsole(bctx)
+	if err != nil {
 		return Result{Failed: 1, Message: "browser: " + err.Error()}
 	}
-
 	env, err := newPageEnv(bctx)
 	if err != nil {
 		return Result{Failed: 1, Message: "browser: " + err.Error()}
 	}
+	return runStepList(bctx, env, o, console)
+}
+
+// consoleCount counts console errors and uncaught exceptions seen on the page.
+type consoleCount struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (c *consoleCount) add() {
+	c.mu.Lock()
+	c.n++
+	c.mu.Unlock()
+}
+
+func (c *consoleCount) get() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.n
+}
+
+// watchConsole starts counting console errors on the browser context.
+func watchConsole(bctx context.Context) (*consoleCount, error) {
+	c := &consoleCount{}
+	err := chromedp.Listen(bctx, func(ev any) {
+		switch e := ev.(type) {
+		case *runtime.EventConsoleAPICalled:
+			if e.Type == "error" {
+				c.add()
+			}
+		case *runtime.EventExceptionThrown:
+			c.add()
+		}
+	})
+	return c, err
+}
+
+// runStepList runs each step in order and stops at the first failure.
+func runStepList(bctx context.Context, env *pageEnv, o Options, console *consoleCount) Result {
 	res := Result{}
 	for i, s := range o.Steps {
-		mu.Lock()
-		errs := consoleErrs
-		mu.Unlock()
-		if err := runStep(bctx, env, s, o, errs); err != nil {
+		if err := runStep(bctx, env, s, o, console.get()); err != nil {
 			res.Failed = 1
 			res.Message = o.Secrets.Redact(fmt.Sprintf("browser: step %d %s: %v", i+1, s.Kind, err))
 			return res
@@ -133,57 +156,67 @@ const (
 	quietWindow = 80 * time.Millisecond
 )
 
+// runStep runs one step. Actions settle the page afterwards; checks do not.
 func runStep(ctx context.Context, env *pageEnv, s Step, o Options, consoleErrs int) error {
 	began := env.now()
+	var err error
 	switch s.Kind {
 	case "goto":
-		if err := chromedp.Do(ctx, chromedp.Navigate(s.URL)); err != nil {
-			return err
-		}
-		Settle(env, settleAll, actionCap, quietWindow, began)
+		err = chromedp.Do(ctx, chromedp.Navigate(s.URL))
 	case "click":
-		if err := chromedp.Do(ctx, chromedp.Click(chromedp.CSS(s.Selector))); err != nil {
-			return err
-		}
-		Settle(env, settleAll, actionCap, quietWindow, began)
+		err = chromedp.Do(ctx, chromedp.Click(chromedp.CSS(s.Selector)))
 	case "fill":
-		if err := chromedp.Do(ctx, chromedp.SetValue(chromedp.CSS(s.Selector), s.Value)); err != nil {
-			return err
-		}
-		Settle(env, settleAll, actionCap, quietWindow, began)
+		err = chromedp.Do(ctx, chromedp.SetValue(chromedp.CSS(s.Selector), s.Value))
 	case "type_secret":
-		host, err := pageHost(ctx)
-		if err != nil {
-			return err
-		}
-		v, err := o.Secrets.Lookup(s.Name, host)
-		if err != nil {
-			return err
-		}
-		if err := chromedp.Do(ctx, chromedp.Clear(chromedp.CSS(s.Selector)), chromedp.SendKeys(chromedp.CSS(s.Selector), v)); err != nil {
-			return err
-		}
-		Settle(env, settleAll, actionCap, quietWindow, began)
+		err = typeSecret(ctx, s, o.Secrets)
 	case "expect_text":
-		body, err := chromedp.Run(ctx, chromedp.Text(chromedp.CSS("body")))
-		if err != nil {
-			return err
-		}
-		if !strings.Contains(body, s.Text) {
-			return fmt.Errorf("text %q not found on page", s.Text)
-		}
+		return expectText(ctx, s.Text)
 	case "expect_no_console_error":
 		if consoleErrs > 0 {
 			return fmt.Errorf("console error seen (%d)", consoleErrs)
 		}
+		return nil
 	case "screenshot":
-		buf, err := chromedp.Run(ctx, chromedp.FullScreenshot(100))
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(filepath.Join(o.OutDir, s.Name+".png"), buf, 0o644)
+		return screenshot(ctx, filepath.Join(o.OutDir, s.Name+".png"))
+	default:
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	Settle(env, settleAll, actionCap, quietWindow, began)
+	return nil
+}
+
+func typeSecret(ctx context.Context, s Step, secrets Secrets) error {
+	host, err := pageHost(ctx)
+	if err != nil {
+		return err
+	}
+	v, err := secrets.Lookup(s.Name, host)
+	if err != nil {
+		return err
+	}
+	return chromedp.Do(ctx, chromedp.Clear(chromedp.CSS(s.Selector)), chromedp.SendKeys(chromedp.CSS(s.Selector), v))
+}
+
+func expectText(ctx context.Context, want string) error {
+	body, err := chromedp.Run(ctx, chromedp.Text(chromedp.CSS("body")))
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(body, want) {
+		return fmt.Errorf("text %q not found on page", want)
 	}
 	return nil
+}
+
+func screenshot(ctx context.Context, path string) error {
+	buf, err := chromedp.Run(ctx, chromedp.FullScreenshot(100))
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, buf, 0o644)
 }
 
 // pageHost returns the host of the page the run is on, empty when it cannot be read.
