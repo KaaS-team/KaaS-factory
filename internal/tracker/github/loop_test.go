@@ -52,6 +52,20 @@ func newHub(t *testing.T) (*hub, *gh.Tracker) {
 	t.Helper()
 	h := &hub{labels: map[int][]string{}, titles: map[int]string{}, perms: map[string]string{"bot": "admin"}, nextID: 100}
 	mux := http.NewServeMux()
+	h.issueRoutes(mux)
+	h.commentRoutes(mux)
+	h.repoRoutes(mux)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	tr, err := gh.New(gh.Config{Owner: "o", Repo: "r", BaseURL: srv.URL + "/", HTTPClient: srv.Client(), Now: func() time.Time { return loopT0 }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h, tr
+}
+
+// issueRoutes serves the user, issue and label endpoints.
+func (h *hub) issueRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /user", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, map[string]any{"login": "bot"}) })
 	mux.HandleFunc("GET /repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
 		h.mu.Lock()
@@ -87,6 +101,10 @@ func newHub(t *testing.T) (*hub, *gh.Tracker) {
 		h.labels[n] = slices.DeleteFunc(h.labels[n], func(l string) bool { return l == r.PathValue("name") })
 		writeJSON(w, []any{})
 	})
+}
+
+// commentRoutes serves the issue comment endpoints.
+func (h *hub) commentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /repos/o/r/issues/{n}/comments", func(w http.ResponseWriter, r *http.Request) {
 		h.mu.Lock()
 		defer h.mu.Unlock()
@@ -118,6 +136,10 @@ func newHub(t *testing.T) (*hub, *gh.Tracker) {
 		}
 		writeJSON(w, map[string]any{"id": id})
 	})
+}
+
+// repoRoutes serves the user lookup, permission, pull and event endpoints.
+func (h *hub) repoRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /users/{login}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"login": r.PathValue("login"), "type": "User"})
 	})
@@ -154,13 +176,6 @@ func newHub(t *testing.T) (*hub, *gh.Tracker) {
 		}
 		writeJSON(w, append(out, map[string]any{"type": "WatchEvent", "actor": map[string]any{"login": "x"}}))
 	})
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
-	tr, err := gh.New(gh.Config{Owner: "o", Repo: "r", BaseURL: srv.URL + "/", HTTPClient: srv.Client(), Now: func() time.Time { return loopT0 }})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return h, tr
 }
 
 var loopT0 = time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)

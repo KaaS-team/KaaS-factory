@@ -123,6 +123,13 @@ func strip(v any) any {
 	return v
 }
 
+func fakeReply(w http.ResponseWriter, status int, v any) {
+	w.WriteHeader(status)
+	if v != nil {
+		_ = json.NewEncoder(w).Encode(v)
+	}
+}
+
 func (f *fakeJira) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -140,57 +147,63 @@ func (f *fakeJira) serve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
 		return
 	}
-	reply := func(status int, v any) {
-		w.WriteHeader(status)
-		if v != nil {
-			_ = json.NewEncoder(w).Encode(v)
-		}
-	}
 	if r.URL.Path == "/rest/api/3/search/jql" && r.Method == "POST" {
-		jql := body["jql"].(string)
-		m := projectJQL.FindStringSubmatch(jql)
-		if m == nil {
-			reply(400, map[string]any{"errorMessages": []string{"unsupported jql " + jql}})
-			return
-		}
-		st, lb := statusJQL.FindStringSubmatch(jql), labelJQL.FindStringSubmatch(jql)
-		var inSet []string
-		if sm := statusInJQL.FindStringSubmatch(jql); sm != nil {
-			for _, q := range quotedJQL.FindAllStringSubmatch(sm[1], -1) {
-				inSet = append(inSet, q[1])
-			}
-			st = nil
-		}
-		or := strings.Contains(jql, " OR ")
-		rows := []any{}
-		for _, i := range f.Issues {
-			if !strings.HasPrefix(i.Key, m[1]+"-") || category(i.Status) == "done" {
-				continue
-			}
-			hasSt := st != nil && i.Status == st[1]
-			hasLb := false
-			if lb != nil {
-				for _, l := range i.Labels {
-					hasLb = hasLb || l == lb[1]
-				}
-			}
-			ok := (st == nil || hasSt) && (lb == nil || hasLb)
-			if inSet != nil {
-				ok = false
-				for _, n := range inSet {
-					ok = ok || i.Status == n
-				}
-			}
-			if or {
-				ok = hasSt || hasLb
-			}
-			if ok {
-				rows = append(rows, f.view(i))
-			}
-		}
-		reply(200, map[string]any{"issues": rows, "isLast": true})
+		f.search(w, body)
 		return
 	}
+	f.issueRoute(w, r, body)
+}
+
+// search answers the JQL search the fake supports: project plus optional status, label or status set.
+func (f *fakeJira) search(w http.ResponseWriter, body map[string]any) {
+	reply := func(status int, v any) { fakeReply(w, status, v) }
+	jql := body["jql"].(string)
+	m := projectJQL.FindStringSubmatch(jql)
+	if m == nil {
+		reply(400, map[string]any{"errorMessages": []string{"unsupported jql " + jql}})
+		return
+	}
+	st, lb := statusJQL.FindStringSubmatch(jql), labelJQL.FindStringSubmatch(jql)
+	var inSet []string
+	if sm := statusInJQL.FindStringSubmatch(jql); sm != nil {
+		for _, q := range quotedJQL.FindAllStringSubmatch(sm[1], -1) {
+			inSet = append(inSet, q[1])
+		}
+		st = nil
+	}
+	or := strings.Contains(jql, " OR ")
+	rows := []any{}
+	for _, i := range f.Issues {
+		if !strings.HasPrefix(i.Key, m[1]+"-") || category(i.Status) == "done" {
+			continue
+		}
+		hasSt := st != nil && i.Status == st[1]
+		hasLb := false
+		if lb != nil {
+			for _, l := range i.Labels {
+				hasLb = hasLb || l == lb[1]
+			}
+		}
+		ok := (st == nil || hasSt) && (lb == nil || hasLb)
+		if inSet != nil {
+			ok = false
+			for _, n := range inSet {
+				ok = ok || i.Status == n
+			}
+		}
+		if or {
+			ok = hasSt || hasLb
+		}
+		if ok {
+			rows = append(rows, f.view(i))
+		}
+	}
+	reply(200, map[string]any{"issues": rows, "isLast": true})
+}
+
+// issueRoute answers the per-issue calls: view, transitions and comments.
+func (f *fakeJira) issueRoute(w http.ResponseWriter, r *http.Request, body map[string]any) {
+	reply := func(status int, v any) { fakeReply(w, status, v) }
 	m := issuePath.FindStringSubmatch(r.URL.Path)
 	var i *fIssue
 	if m != nil {

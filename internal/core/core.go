@@ -6,7 +6,6 @@ package core
 import (
 	"context"
 	"errors"
-	"fmt"
 	"maps"
 	"slices"
 	"sync"
@@ -195,144 +194,11 @@ func (c *Core) Tick(ctx context.Context) {
 }
 
 // restoreStage puts a ticket back at the workflow node its thread says it reached. A parked ticket
-// with no saved position is left alone: it was not parked by a workflow node.
-func (c *Core) restoreStage(ctx context.Context, t api.Ticket) *stageRun {
-	if c.d.Stages == nil {
-		return nil
-	}
-	if c.parked[t.ID] {
-		if _, ok := c.savedPosition(ctx, t.ID); !ok {
-			return nil
-		}
-	}
-	st, err := c.stageOf(ctx, t.ID, t.Workflow)
-	c.report(err)
-	return st
-}
-
-// recover builds the running set once: from the tracker's Active list when it
-// has one, otherwise from Ready (Symphony 14.3). A ticket with a work branch
-// for some attempt is running that attempt.
-func (c *Core) recover(ctx context.Context) {
-	if c.started || ctx.Err() != nil {
-		return
-	}
-	var tickets []api.Ticket
-	var err error
-	if l, ok := c.d.Tracker.(api.Lister); ok {
-		tickets, err = l.Active(ctx)
-	} else {
-		tickets, err = c.d.Tracker.Ready(ctx)
-	}
-	if err != nil {
-		c.report(err)
-		return
-	}
-	if p, ok := c.d.Tracker.(observe.Parker); ok {
-		parked, err := p.Parked(ctx)
-		c.report(err)
-		for _, t := range parked {
-			c.parked[t.ID] = true
-			c.tickets[t.ID] = t
-			c.restoreStage(ctx, t)
-		}
-	}
-	s := &reconcile.State{Entries: map[api.TicketID]reconcile.Entry{}}
-	for _, t := range tickets {
-		base := 0 // attempts the finished nodes used; the observer counts attempts across nodes
-		if st := c.restoreStage(ctx, t); st != nil {
-			base = st.base
-		}
-		for n := c.cfg.Reconcile.MaxAttempts; n >= 1; n-- {
-			o, err := c.d.Observer.Observe(ctx, t.ID, base+n)
-			if err != nil {
-				c.report(err)
-				break
-			}
-			if o.Attempt == base+n && o.Branch != "" {
-				started := o.LastPush
-				if started.IsZero() {
-					started = c.d.Clock.Now()
-				}
-				s.Entries[t.ID] = reconcile.Entry{Ticket: t, Phase: api.PhaseRunning, Attempt: n, StartedAt: started}
-				c.attempts[t.ID] = base + n
-				c.lastPush[t.ID] = o.LastPush
-				break
-			}
-		}
-	}
-	c.reconcileDeps().Restore(s, tickets)
-	for id, e := range s.Entries {
-		c.attempts[id] = max(c.attempts[id], e.Attempt)
-	}
-	c.state, c.started = s, true
-}
 
 func (c *Core) reconcileDeps() reconcile.Deps {
 	return reconcile.Deps{
 		Dispatcher: loopDispatcher{c}, Tracker: loopTracker{c}, Observer: loopObserver{c},
 		Now: c.d.Clock.Now, OnError: c.d.OnError, Log: c.d.Log,
-	}
-}
-
-func (c *Core) meterKey(id api.TicketID, s api.Session) meter.Key {
-	return meter.Key{Team: c.cfg.Team, Ticket: id, Session: s.Key}
-}
-
-func (c *Core) sessionOf(e reconcile.Entry) api.Session {
-	if e.Session != nil {
-		return *e.Session
-	}
-	if s, ok := c.sessions[e.Ticket.ID]; ok && s.Attempt == e.Attempt {
-		return s
-	}
-	return api.Session{Key: fmt.Sprintf("%s-a%d", e.Ticket.ID, e.Attempt), Ticket: e.Ticket.ID, Attempt: e.Attempt, Dispatcher: c.d.Dispatcher.Name()}
-}
-
-func holdsSlot(p api.Phase) bool {
-	return p == api.PhaseClaimed || p == api.PhaseRunning || p == api.PhaseStalled
-}
-
-// meterPass records each running session's usage and applies the meter's verdict (Symphony 13.5).
-func (c *Core) meterPass(ctx context.Context) {
-	for id, e := range c.state.Entries {
-		if !holdsSlot(e.Phase) || ctx.Err() != nil {
-			continue
-		}
-		sess := c.sessionOf(e)
-		u, err := c.d.Dispatcher.Usage(ctx, sess)
-		if err != nil {
-			c.report(err)
-			continue
-		}
-		k := c.meterKey(id, sess)
-		delta, err := c.d.Meter.Record(k, u)
-		if err != nil {
-			c.report(err)
-			continue
-		}
-		if th, ok := c.d.Tracker.(meter.Thread); ok {
-			c.report(meter.Ledger{Thread: th, Holder: c.cfg.Team}.Add(ctx, id, e.Attempt, u, delta))
-		}
-		switch c.d.Meter.Check(k) {
-		case meter.Steer:
-			if c.warned[id] {
-				continue
-			}
-			if err := c.d.Dispatcher.Steer(ctx, sess, "Budget nearly used. Commit and push what you have, then wrap up."); err != nil {
-				c.report(err)
-				continue
-			}
-			c.warned[id] = true
-			c.hub.emit(KindBudget, id, map[string]any{"verdict": string(meter.Steer)})
-		case meter.Stop:
-			if err := c.d.Dispatcher.Cancel(ctx, sess); err != nil {
-				c.report(err)
-				continue
-			}
-			c.hub.emit(KindBudget, id, map[string]any{"verdict": string(meter.Stop)})
-			c.escalate(ctx, id, "budget used")
-		}
 	}
 }
 

@@ -255,14 +255,16 @@ func TestTwoSlotsThreeTicketsThirdAfterMerge(t *testing.T) {
 }
 
 // Control: each manual call reaches the dispatcher once and emits one event.
-func TestManualControl(t *testing.T) {
-	tests := []struct {
-		name  string
-		setup func(t *testing.T, r *rig)
-		do    func(ctx context.Context, c *Core) error
-		check func(t *testing.T, r *rig)
-		event string
-	}{
+type manualCase struct {
+	name  string
+	setup func(t *testing.T, r *rig)
+	do    func(ctx context.Context, c *Core) error
+	check func(t *testing.T, r *rig)
+	event string
+}
+
+func manualControlCases() []manualCase {
+	return []manualCase{
 		{"dispatch", func(*testing.T, *rig) {},
 			func(ctx context.Context, c *Core) error { return c.Dispatch(ctx, "a") },
 			func(t *testing.T, r *rig) {
@@ -302,7 +304,10 @@ func TestManualControl(t *testing.T) {
 				}
 			}, KindRetried},
 	}
-	for _, tc := range tests {
+}
+
+func TestManualControl(t *testing.T) {
+	for _, tc := range manualControlCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRig(t, 2, meter.Budgets{}, tkt("a", 0))
 			tc.setup(t, r)
@@ -367,6 +372,43 @@ func TestRetryAfterNeedsHuman(t *testing.T) {
 	}
 }
 
+// countEvents reads ch until it has seen n ticks and reports the tick and drop counts through get.
+func countEvents(ch <-chan api.Event, n int) (done chan struct{}, get func() (ticks, dropped int)) {
+	var ticks, dropped int
+	done = make(chan struct{})
+	go func() {
+		defer close(done)
+		for ev := range ch {
+			switch ev.Kind {
+			case KindTick:
+				ticks++
+			case KindSubscriberDropped:
+				dropped++
+			}
+			if ticks >= n {
+				return
+			}
+		}
+	}()
+	return done, func() (int, int) { return ticks, dropped }
+}
+
+// advanceTicks moves the fake clock n times, waiting for the loop to sleep before each step.
+func advanceTicks(r *rig, done <-chan struct{}, n int) {
+	for i := 0; i < n; i++ {
+		for r.clk.waiting() == 0 {
+			select {
+			case <-done:
+			default:
+				time.Sleep(time.Millisecond)
+				continue
+			}
+			break
+		}
+		r.clk.advance(30 * time.Second)
+	}
+}
+
 // A subscriber that never reads is dropped after its buffer fills; the loop keeps ticking.
 func TestSlowSubscriberDroppedLoopKeepsTicking(t *testing.T) {
 	r := newRig(t, 2, meter.Budgets{}, tkt("a", 0))
@@ -383,36 +425,10 @@ func TestSlowSubscriberDroppedLoopKeepsTicking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ticks, dropped int
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for ev := range fast {
-			switch ev.Kind {
-			case KindTick:
-				ticks++
-			case KindSubscriberDropped:
-				dropped++
-			}
-			if ticks >= 6 {
-				return
-			}
-		}
-	}()
+	done, get := countEvents(fast, 6)
 	runDone := make(chan error, 1)
 	go func() { runDone <- r.c.Run(ctx) }()
-	for i := 0; i < 6; i++ {
-		for r.clk.waiting() == 0 {
-			select {
-			case <-done:
-			default:
-				time.Sleep(time.Millisecond)
-				continue
-			}
-			break
-		}
-		r.clk.advance(30 * time.Second)
-	}
+	advanceTicks(r, done, 6)
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
@@ -422,6 +438,7 @@ func TestSlowSubscriberDroppedLoopKeepsTicking(t *testing.T) {
 	if err := <-runDone; !errors.Is(err, context.Canceled) {
 		t.Fatalf("Run = %v, want context canceled", err)
 	}
+	ticks, dropped := get()
 	if ticks < 6 || dropped != 1 {
 		t.Fatalf("ticks = %d, dropped = %d, want >= 6 and 1", ticks, dropped)
 	}
