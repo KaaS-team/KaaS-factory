@@ -1,10 +1,12 @@
 package reconcile
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
@@ -49,10 +51,9 @@ func (d Deps) report(err error) {
 	}
 }
 
-// Tick runs one pass: refresh the ticket list, mark terminal tickets, set the caps, observe
-// running tickets, Decide and apply. A nil *sp means a fresh process: the state is rebuilt from
-// the tracker and observer (Symphony 14.3). Errors go to d.OnError and leave the state as it
-// was, so the next tick tries again.
+// Tick runs one pass: refresh, mark terminal, cap, observe, decide, dispatch. A nil *sp means a
+// fresh process: the state is rebuilt from the tracker and observer (Symphony 14.3). Errors go
+// to d.OnError and leave the state as it was, so the next tick tries again.
 func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 	cfg = cfg.withDefaults()
 	if ctx.Err() != nil {
@@ -73,9 +74,7 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 	if ctx.Err() != nil {
 		return
 	}
-	// Symphony 8.1: running work is reconciled first. When Ready fails, stall and terminal
-	// checks run from the stored state and only new dispatch is skipped.
-	s.noDispatch = err != nil
+	s.noDispatch = err != nil // Symphony 8.1: when Ready fails, only new dispatch is skipped
 	if err == nil {
 		refresh(s, ready)
 	}
@@ -92,27 +91,21 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 	}
 }
 
-// refresh stores the tracker's view on each entry and marks an entry missing from it terminal.
-// The Ready list must include claimed and running tickets (core merges in Lister.Active); a
-// ticket missing from it has its session cancelled.
+// refresh stores the tracker's view; an entry missing from Ready (it must list claimed and running tickets) is terminal.
 func refresh(s *State, ready []api.Ticket) {
-	listed := map[api.TicketID]api.Ticket{}
-	for _, t := range ready {
-		listed[t.ID] = t
+	s.Ready, s.Terminal = ready, map[api.TicketID]bool{}
+	for id := range s.Entries {
+		s.Terminal[id] = true
 	}
-	s.Ready = ready
-	s.Terminal = map[api.TicketID]bool{}
-	for id, e := range s.Entries {
-		if t, ok := listed[id]; ok {
+	for _, t := range ready {
+		if e, ok := s.Entries[t.ID]; ok {
 			e.Ticket = t
-			s.Entries[id] = e
-		} else {
-			s.Terminal[id] = true
+			s.Entries[t.ID] = e
+			delete(s.Terminal, t.ID)
 		}
 	}
 }
 
-// capSlots applies the dispatcher's concurrency cap to cfg and counts the fires left this hour.
 func capSlots(d Deps, s *State, cfg Config, now time.Time) Config {
 	caps := d.Dispatcher.Caps()
 	if cfg.MaxConcurrent <= 0 || (caps.MaxConcurrent > 0 && caps.MaxConcurrent < cfg.MaxConcurrent) {
@@ -151,13 +144,7 @@ func observeRunning(ctx context.Context, d Deps, s *State) ([]api.Observation, b
 }
 
 func recent(ts []time.Time, now time.Time) []time.Time {
-	var out []time.Time
-	for _, t := range ts {
-		if now.Sub(t) < time.Hour {
-			out = append(out, t)
-		}
-	}
-	return out
+	return slices.DeleteFunc(slices.Clone(ts), func(t time.Time) bool { return now.Sub(t) >= time.Hour })
 }
 
 // recoverState rebuilds the running set from the tracker's active tickets and
@@ -177,11 +164,7 @@ func recoverState(ctx context.Context, d Deps, ready []api.Ticket, cfg Config, n
 				break
 			}
 			if o.Attempt == n && o.Branch != "" {
-				started := o.LastPush
-				if started.IsZero() {
-					started = now
-				}
-				s.Entries[t.ID] = Entry{Ticket: t, Phase: api.PhaseRunning, Attempt: n, StartedAt: started}
+				s.Entries[t.ID] = Entry{Ticket: t, Phase: api.PhaseRunning, Attempt: n, StartedAt: cmp.Or(o.LastPush, now)}
 				break
 			}
 		}
@@ -222,6 +205,12 @@ func sessionOf(d Deps, e Entry) api.Session {
 	}
 }
 
+func cancelSession(ctx context.Context, d Deps, e Entry) bool {
+	err := d.Dispatcher.Cancel(ctx, sessionOf(d, e))
+	d.report(err)
+	return err == nil
+}
+
 func apply(ctx context.Context, d Deps, s *State, a Action, now time.Time, cfg Config) {
 	e := s.Entries[a.ID]
 	switch a.Kind {
@@ -236,11 +225,7 @@ func apply(ctx context.Context, d Deps, s *State, a Action, now time.Time, cfg C
 		s.Entries[a.ID] = e
 		d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindSteer, Time: now})
 	case Retry:
-		if err := d.Dispatcher.Cancel(ctx, sessionOf(d, e)); err != nil {
-			d.report(err)
-			return
-		}
-		if ctx.Err() != nil {
+		if !cancelSession(ctx, d, e) || ctx.Err() != nil {
 			return
 		}
 		if err := d.Tracker.SetPhase(ctx, a.ID, api.PhaseRetryQueue); err != nil {
@@ -265,21 +250,16 @@ func apply(ctx context.Context, d Deps, s *State, a Action, now time.Time, cfg C
 		delete(s.Entries, a.ID)
 		d.logStep(a.ID, eventlog.Event{Kind: eventlog.KindEnd, Time: now, Reason: string(MarkDone)})
 	case NeedsHuman:
-		if err := d.Dispatcher.Cancel(ctx, sessionOf(d, e)); err != nil {
-			d.report(err)
-			return
+		if cancelSession(ctx, d, e) {
+			escalate(ctx, d, s, a.ID, a.Reason, now)
 		}
-		escalate(ctx, d, s, a.ID, a.Reason, now)
 	}
 }
 
 // cancelEntry reports whether the entry was removed.
 func cancelEntry(ctx context.Context, d Deps, s *State, e Entry, a Action) bool {
-	if holdsSlot(e.Phase) {
-		if err := d.Dispatcher.Cancel(ctx, sessionOf(d, e)); err != nil {
-			d.report(err)
-			return false
-		}
+	if holdsSlot(e.Phase) && !cancelSession(ctx, d, e) {
+		return false
 	}
 	// A terminal ticket already has its final phase in the tracker; only an operator cancel writes one.
 	if a.Reason == "canceled" {
@@ -339,8 +319,7 @@ func dispatch(ctx context.Context, d Deps, s *State, a Action, now time.Time, cf
 			escalate(ctx, d, s, a.ID, fmt.Sprintf("dispatch failed after %d attempts", a.Attempt), now)
 			return
 		}
-		// The attempt counts even when the tracker rejects the label: the entry in memory is what
-		// stops a broken ticket at MaxAttempts (L1).
+		// The attempt counts even if the tracker rejects the label, so MaxAttempts is reached (L1).
 		d.report(d.Tracker.SetPhase(ctx, a.ID, api.PhaseRetryQueue))
 		e := Entry{Ticket: t, Phase: api.PhaseRetryQueue, Attempt: a.Attempt, RetryAt: now.Add(cfg.Backoff(a.Attempt)), Error: err.Error()}
 		s.Entries[a.ID] = e
