@@ -34,7 +34,7 @@ func goldenCheck(t *testing.T, name, got string) {
 
 // Every command's --help is pinned, so splitting NewCommand cannot change a flag or a word.
 func TestEvalHelpGolden(t *testing.T) {
-	for _, sub := range [][]string{{}, {"diff"}, {"check"}, {"replay"}, {"stats"}, {"compare"}} {
+	for _, sub := range [][]string{{}, {"diff"}, {"check"}, {"replay"}, {"stats"}, {"compare"}, {"run"}, {"splits"}} {
 		name := "help-" + strings.Join(append([]string{"eval"}, sub...), "-") + ".golden"
 		t.Run(name, func(t *testing.T) {
 			var out bytes.Buffer
