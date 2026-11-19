@@ -36,6 +36,7 @@ ok  	github.com/KaaS-team/factory/internal/redact
 - The gate tail still replaces a whole line with `[redacted]` when it holds a token (existing behaviour).
 - Left alone: `browsercheck/secrets.go` and `eval/replay` (outside my area; replay already calls
   `sanitize.RedactSecrets`, so it gets the new list).
+- `go test -race ./...` passes on every package.
 - `just` is not installed here. I ran the gate steps by hand: gofmt, `go vet`, `./gate.sh lint` (0 issues),
   `go run ./tools/ratchet` (go_lines 42837, under baseline 42880), `go test -race ./...`.
 
