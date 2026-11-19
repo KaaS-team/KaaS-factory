@@ -58,6 +58,15 @@ type tally struct {
 // Summary reads an NDJSON log and prints, per UTC day and per ticket, what
 // would have run.
 func Summary(r io.Reader, w io.Writer) error {
+	days, err := tallyLog(r)
+	if err != nil {
+		return err
+	}
+	return renderSummary(w, days)
+}
+
+// tallyLog counts the records in an NDJSON log per UTC day and ticket.
+func tallyLog(r io.Reader) (map[string]map[api.TicketID]*tally, error) {
 	days := map[string]map[api.TicketID]*tally{}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
@@ -67,7 +76,7 @@ func Summary(r io.Reader, w io.Writer) error {
 		}
 		var rec Record
 		if err := json.Unmarshal(sc.Bytes(), &rec); err != nil {
-			return fmt.Errorf("shadow: line %d: %w", n, err)
+			return nil, fmt.Errorf("shadow: line %d: %w", n, err)
 		}
 		day := rec.Time.UTC().Format("2006-01-02")
 		if days[day] == nil {
@@ -88,9 +97,11 @@ func Summary(r io.Reader, w io.Writer) error {
 			t.cancels++
 		}
 	}
-	if err := sc.Err(); err != nil {
-		return err
-	}
+	return days, sc.Err()
+}
+
+// renderSummary prints the tallies, days and tickets in sorted order.
+func renderSummary(w io.Writer, days map[string]map[api.TicketID]*tally) error {
 	if len(days) == 0 {
 		_, err := fmt.Fprintln(w, "no shadow records")
 		return err

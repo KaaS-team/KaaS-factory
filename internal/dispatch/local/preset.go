@@ -176,16 +176,7 @@ func ClaudeArgv(in ClaudeInput) ([]string, error) {
 	if in.ReadOnly {
 		tools = withoutEditTools(tools)
 	}
-	command := in.Prompt
-	if command == "" {
-		command = "/factory-" + in.Stage + " " + in.Issue
-	}
-	prompt := command
-	argv := []string{"claude", "-p"}
-	if in.Resume != nil {
-		prompt = command + "\n\nThe last attempt was sent back. The tail of why:\n\n" + in.Resume.Failure
-	}
-	argv = append(argv, prompt)
+	argv := []string{"claude", "-p", claudePrompt(in)}
 	if in.Resume != nil && in.Resume.SessionID != "" {
 		argv = append(argv, "--resume", in.Resume.SessionID, "--fork-session")
 	}
@@ -198,33 +189,57 @@ func ClaudeArgv(in ClaudeInput) ([]string, error) {
 	if in.MCPConfig != "" {
 		argv = append(argv, "--mcp-config", in.MCPConfig)
 	}
+	argv = append(argv, claudeToolArgs(in, tools)...)
+	argv = append(argv, claudeModelArgs(in)...)
+	if in.JSONSchema != "" {
+		argv = append(argv, "--json-schema", in.JSONSchema)
+	}
+	return argv, nil
+}
+
+// claudePrompt is the stage command, plus the failure tail when the run resumes.
+func claudePrompt(in ClaudeInput) string {
+	command := in.Prompt
+	if command == "" {
+		command = "/factory-" + in.Stage + " " + in.Issue
+	}
+	if in.Resume != nil {
+		return command + "\n\nThe last attempt was sent back. The tail of why:\n\n" + in.Resume.Failure
+	}
+	return command
+}
+
+// claudeToolArgs are the tool, settings and guidance flags.
+func claudeToolArgs(in ClaudeInput, tools []string) []string {
 	guidance := stageGuidance
 	if in.ContextPack != "" {
 		guidance += "\n\n" + in.ContextPack
 	}
-	argv = append(argv,
+	return []string{
 		"--strict-mcp-config",
 		"--disallowedTools", strings.Join(stageDisallowedTools, ","),
 		"--tools", strings.Join(tools, ","),
 		"--settings", settings(in),
 		"--append-system-prompt", guidance,
 		"--max-budget-usd", strconv.FormatFloat(in.MaxBudgetUSD, 'f', -1, 64),
-	)
+	}
+}
+
+// claudeModelArgs are the model and effort flags for the stage.
+func claudeModelArgs(in ClaudeInput) []string {
+	var args []string
 	d := stageModel[in.Stage]
 	model := d.model
 	if in.Model != "" {
 		model = in.Model
 	}
 	if model != "" {
-		argv = append(argv, "--model", model)
+		args = append(args, "--model", model)
 	}
 	if d.effort != "" {
-		argv = append(argv, "--effort", d.effort)
+		args = append(args, "--effort", d.effort)
 	}
-	if in.JSONSchema != "" {
-		argv = append(argv, "--json-schema", in.JSONSchema)
-	}
-	return argv, nil
+	return args
 }
 
 // withoutEditTools drops the tools that write files.
