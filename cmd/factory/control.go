@@ -144,17 +144,17 @@ var dispatchers = map[string]func(context.Context, config.Config) (api.Dispatche
 	},
 }
 
-// checkRuntime accepts the sandbox runtimes: "" for the local jail and "remote" for the service that
+// checkRuntime accepts the sandbox runtimes: "" or "local" for the local jail and "remote" for the service that
 // FACTORY_SANDBOX_URL names. The remote one fails at start-up when that service is not set.
 func checkRuntime(rt string) error {
 	switch rt {
-	case "":
+	case "", "local":
 		return nil
 	case sandbox.BackendRemote:
 		_, err := remote.FromEnv()
 		return err
 	}
-	return fmt.Errorf("sandbox_runtime %q: want \"\" or %q", rt, sandbox.BackendRemote)
+	return fmt.Errorf("sandbox_runtime %q: want local or %q", rt, sandbox.BackendRemote)
 }
 
 // canJail says whether this host can enforce a jail; where it cannot, sandbox: true is a no-op.

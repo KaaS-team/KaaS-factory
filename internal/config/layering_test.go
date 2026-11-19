@@ -48,6 +48,7 @@ var layerRows = []layerRow{
 	{key: "requester_cannot_approve", hi: "false", lo: "true"},
 	{key: "shadow", hi: "true", lo: "false", clamped: true},
 	{key: "sandbox", hi: "false", lo: "true"},
+	{key: "sandbox_runtime", hi: "remote", lo: "local"},
 	{key: "github_app.id", hi: "7", lo: "3"},
 	{key: "github_app.installation_id", hi: "70", lo: "30"},
 	{key: "github_app.key_file", hi: "/k/hi.pem", lo: "/k/lo.pem"},
