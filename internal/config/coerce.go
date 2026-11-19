@@ -13,65 +13,86 @@ import (
 func coerce(sp spec, raw any) (any, error) {
 	switch sp.kind {
 	case kString:
-		s, ok := raw.(string)
-		if !ok {
-			return nil, fmt.Errorf("expected a string, got %v", raw)
-		}
-		return s, nil
+		return coerceString(raw)
 	case kInt:
-		n, err := toFloat(raw)
-		if err != nil || n != math.Trunc(n) {
-			return nil, fmt.Errorf("expected a whole number, got %v", raw)
-		}
-		if n < sp.min {
-			return nil, fmt.Errorf("expected at least %v, got %v", sp.min, raw)
-		}
-		return int(n), nil
+		return coerceInt(sp, raw)
 	case kFloat:
-		n, err := toFloat(raw)
-		if err != nil || n < 0 {
-			return nil, fmt.Errorf("expected a number of 0 or more, got %v", raw)
-		}
-		return n, nil
+		return coerceFloat(raw)
 	case kDuration:
-		if d, ok := raw.(time.Duration); ok {
-			return d, nil
-		}
-		s, ok := raw.(string)
-		if !ok {
-			return nil, fmt.Errorf("expected a duration such as 30m, got %v", raw)
-		}
-		d, err := time.ParseDuration(s)
-		if err != nil || d <= 0 {
-			return nil, fmt.Errorf("expected a positive duration such as 30m, got %q", s)
-		}
-		return d, nil
+		return coerceDuration(raw)
 	case kList:
 		return toList(raw)
 	case kBool:
-		switch b := raw.(type) {
-		case bool:
-			return b, nil
-		case string:
-			if v, err := strconv.ParseBool(b); err == nil {
-				return v, nil
-			}
-		}
-		return nil, fmt.Errorf("expected true or false, got %v", raw)
+		return coerceBool(raw)
 	case kRole:
-		s, _ := raw.(string)
-		if !slices.Contains(roles, s) {
-			return nil, fmt.Errorf("expected one of %s, got %v", strings.Join(roles, ", "), raw)
-		}
-		return s, nil
+		return coerceOneOf(raw, roles)
 	case kRisk:
-		s, _ := raw.(string)
-		if !slices.Contains(risks, s) {
-			return nil, fmt.Errorf("expected one of %s, got %v", strings.Join(risks, ", "), raw)
-		}
-		return s, nil
+		return coerceOneOf(raw, risks)
 	}
 	return nil, fmt.Errorf("unsupported kind")
+}
+
+func coerceString(raw any) (any, error) {
+	s, ok := raw.(string)
+	if !ok {
+		return nil, fmt.Errorf("expected a string, got %v", raw)
+	}
+	return s, nil
+}
+
+func coerceInt(sp spec, raw any) (any, error) {
+	n, err := toFloat(raw)
+	if err != nil || n != math.Trunc(n) {
+		return nil, fmt.Errorf("expected a whole number, got %v", raw)
+	}
+	if n < sp.min {
+		return nil, fmt.Errorf("expected at least %v, got %v", sp.min, raw)
+	}
+	return int(n), nil
+}
+
+func coerceFloat(raw any) (any, error) {
+	n, err := toFloat(raw)
+	if err != nil || n < 0 {
+		return nil, fmt.Errorf("expected a number of 0 or more, got %v", raw)
+	}
+	return n, nil
+}
+
+func coerceDuration(raw any) (any, error) {
+	if d, ok := raw.(time.Duration); ok {
+		return d, nil
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return nil, fmt.Errorf("expected a duration such as 30m, got %v", raw)
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return nil, fmt.Errorf("expected a positive duration such as 30m, got %q", s)
+	}
+	return d, nil
+}
+
+func coerceBool(raw any) (any, error) {
+	switch b := raw.(type) {
+	case bool:
+		return b, nil
+	case string:
+		if v, err := strconv.ParseBool(b); err == nil {
+			return v, nil
+		}
+	}
+	return nil, fmt.Errorf("expected true or false, got %v", raw)
+}
+
+// coerceOneOf accepts a string that is in allowed.
+func coerceOneOf(raw any, allowed []string) (any, error) {
+	s, _ := raw.(string)
+	if !slices.Contains(allowed, s) {
+		return nil, fmt.Errorf("expected one of %s, got %v", strings.Join(allowed, ", "), raw)
+	}
+	return s, nil
 }
 
 func toFloat(raw any) (float64, error) {

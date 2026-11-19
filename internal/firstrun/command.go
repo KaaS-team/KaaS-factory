@@ -23,71 +23,96 @@ func WithExec(f func(context.Context) (Exec, error)) Option { return func(o *cmd
 
 // NewCommand returns `factory first-run [--dry-run] [--gh owner/repo]`.
 func NewCommand(opts ...Option) *cobra.Command {
-	var o Options
-	var annPath, sarifPath string
-	var fix bool
 	var co cmdOpts
 	for _, f := range opts {
 		f(&co)
 	}
+	var f runFlags
 	c := &cobra.Command{
 		Use:   "first-run",
 		Short: "Audit this repo and show what the factory would fix, at no cost",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ann, err := loadAnnotations(annPath, cmd.Flags().Changed("annotations"))
-			if err != nil {
-				return err
-			}
-			o.Annotations = ann
-			r, err := Run(cmd.Context(), o)
-			if err != nil {
-				return err
-			}
-			md, err := r.Markdown()
-			if err != nil {
-				return err
-			}
-			if sarifPath != "" {
-				js, err := r.SARIF("")
-				if err != nil {
-					return err
-				}
-				if err := os.WriteFile(sarifPath, js, 0o644); err != nil {
-					return err
-				}
-			}
-			if _, err = fmt.Fprint(cmd.OutOrStdout(), md); err != nil || !fix {
-				return err
-			}
-			e, err := co.exec(cmd.Context())
-			if err != nil {
-				return err
-			}
-			res, err := Execute(cmd.Context(), r, e)
-			if err != nil {
-				return err
-			}
-			if res.Plan != "" {
-				_, err = fmt.Fprintln(cmd.OutOrStdout(), res.Plan)
-				return err
-			}
-			js, err := res.Scorecard.JSON()
-			if err != nil {
-				return err
-			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "\nDraft pull request #%d opened.\n\n%s\n", res.PR, js)
-			return err
+			return runFirstRun(cmd, &f, co)
 		},
 	}
-	c.Flags().BoolVar(&o.DryRun, "dry-run", false, "stop after the report; say what would be dispatched")
-	if co.exec != nil {
-		c.Flags().BoolVar(&fix, "fix", false, "dispatch one build for the first covered finding and open a draft pull request")
-	}
-	c.Flags().StringVar(&o.GH, "gh", "", "also audit this GitHub repo (owner/repo)")
-	c.Flags().StringVar(&annPath, "annotations", defaultAnnotations, "reason-tagged suppressions file; the default is optional")
-	c.Flags().StringVar(&sarifPath, "sarif", "", "also write the findings to this file as SARIF 2.1.0")
+	f.register(c, co.exec != nil)
 	return c
+}
+
+// runFlags holds the parsed flag values of the first-run command.
+type runFlags struct {
+	opts               Options
+	annPath, sarifPath string
+	fix                bool
+}
+
+func (f *runFlags) register(c *cobra.Command, canFix bool) {
+	c.Flags().BoolVar(&f.opts.DryRun, "dry-run", false, "stop after the report; say what would be dispatched")
+	if canFix {
+		c.Flags().BoolVar(&f.fix, "fix", false, "dispatch one build for the first covered finding and open a draft pull request")
+	}
+	c.Flags().StringVar(&f.opts.GH, "gh", "", "also audit this GitHub repo (owner/repo)")
+	c.Flags().StringVar(&f.annPath, "annotations", defaultAnnotations, "reason-tagged suppressions file; the default is optional")
+	c.Flags().StringVar(&f.sarifPath, "sarif", "", "also write the findings to this file as SARIF 2.1.0")
+}
+
+// runFirstRun audits, prints the report, writes SARIF if asked, and with --fix opens the draft PR.
+func runFirstRun(cmd *cobra.Command, f *runFlags, co cmdOpts) error {
+	ann, err := loadAnnotations(f.annPath, cmd.Flags().Changed("annotations"))
+	if err != nil {
+		return err
+	}
+	f.opts.Annotations = ann
+	r, err := Run(cmd.Context(), f.opts)
+	if err != nil {
+		return err
+	}
+	md, err := r.Markdown()
+	if err != nil {
+		return err
+	}
+	if err := writeSARIF(r, f.sarifPath); err != nil {
+		return err
+	}
+	if _, err = fmt.Fprint(cmd.OutOrStdout(), md); err != nil || !f.fix {
+		return err
+	}
+	return runFix(cmd, r, co)
+}
+
+// writeSARIF writes the findings to path; an empty path writes nothing.
+func writeSARIF(r Report, path string) error {
+	if path == "" {
+		return nil
+	}
+	js, err := r.SARIF("")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, js, 0o644)
+}
+
+// runFix dispatches the first fix and prints the plan, or the PR number and scorecard.
+func runFix(cmd *cobra.Command, r Report, co cmdOpts) error {
+	e, err := co.exec(cmd.Context())
+	if err != nil {
+		return err
+	}
+	res, err := Execute(cmd.Context(), r, e)
+	if err != nil {
+		return err
+	}
+	if res.Plan != "" {
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), res.Plan)
+		return err
+	}
+	js, err := res.Scorecard.JSON()
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(cmd.OutOrStdout(), "\nDraft pull request #%d opened.\n\n%s\n", res.PR, js)
+	return err
 }
 
 const defaultAnnotations = ".factory/annotations.yml"
