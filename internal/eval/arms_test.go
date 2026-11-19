@@ -60,7 +60,7 @@ func TestEvalControlArmBesidePreset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := len(m.Fixtures); arms["preset"] != n || arms["control"] != n {
+	if n := len(FilterMatrix(m, SplitDev).Fixtures); arms["preset"] != n || arms["control"] != n {
 		t.Fatalf("want a preset and a control cell per fixture, got %v", arms)
 	}
 	var ctl int

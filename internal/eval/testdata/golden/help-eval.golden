@@ -11,6 +11,8 @@ Available Commands:
   diff        Compare two scorecards; exit 1 when the new one is worse
   help        Help about any command
   replay      Print the spans a run recorded, gate spans with their triggered flag
+  run         Run one split of the fixtures matrix and write a scorecard
+  splits      Print pass rate per split, dev and holdout side by side
   stats       Summarise trajectory files offline
 
 Flags:
@@ -24,6 +26,7 @@ Flags:
       --redo              rerun tickets --run-dir already finished
       --replay            re-score the outputs stored in --run-dir without dispatching
       --run-dir string    keep results and trajectories here so a killed run resumes
+      --split string      samples to run: dev (default) or holdout; holdout runs only when named (default "dev")
       --tries int         tries per ticket; the scorecard gets pass_rate_1..N (default 1)
       --workflow string   workflow name (required)
 

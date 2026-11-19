@@ -69,6 +69,25 @@ func NewCommand(opts ...Option) *cobra.Command {
 		SilenceErrors: true,
 		RunE:          func(cmd *cobra.Command, _ []string) error { return runEval(cmd, &o, rf) },
 	}
+	addRunFlags(cmd, &rf)
+	var rrf runFlags
+	run := &cobra.Command{
+		Use:           "run",
+		Short:         "Run one split of the fixtures matrix and write a scorecard",
+		Long:          "Same as the bare eval command. --split dev (the default) runs the dev samples. Holdout samples run only with --split holdout.",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          func(cmd *cobra.Command, _ []string) error { return runEval(cmd, &o, rrf) },
+	}
+	addRunFlags(run, &rrf)
+	cmd.AddCommand(run, newSplitsCommand())
+	cmd.AddCommand(newDiffCommand(), newCheckCommand(), trajectory.NewStatsCommand(), trajectory.NewCompareCommand(), newReplayCommand())
+	return cmd
+}
+
+// addRunFlags registers the run flags on cmd, for the bare command and for `run`.
+func addRunFlags(cmd *cobra.Command, rf *runFlags) {
 	cmd.Flags().StringVar(&rf.workflow, "workflow", "", "workflow name (required)")
 	cmd.Flags().StringVar(&rf.agent, "agent", "", "agent preset name, never a model name (required)")
 	cmd.Flags().StringVar(&rf.format, "format", "", "edit format axis, e.g. diff or whole")
@@ -80,16 +99,15 @@ func NewCommand(opts ...Option) *cobra.Command {
 	cmd.Flags().StringVar(&rf.packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
 	cmd.Flags().StringVar(&rf.fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
 	cmd.Flags().StringVar(&rf.outDir, "out", "evals", "directory the scorecard is written to")
-	cmd.AddCommand(newDiffCommand(), newCheckCommand(), trajectory.NewStatsCommand(), trajectory.NewCompareCommand(), newReplayCommand())
-	return cmd
+	cmd.Flags().StringVar(&rf.split, "split", string(SplitDev), "samples to run: dev (default) or holdout; holdout runs only when named")
 }
 
 // runFlags holds the flags of the bare `eval` run.
 type runFlags struct {
-	workflow, agent, format, packs, fixtures, outDir, runDir string
-	arms                                                     []string
-	tries                                                    int
-	replay, redo                                             bool
+	workflow, agent, format, packs, fixtures, outDir, runDir, split string
+	arms                                                            []string
+	tries                                                           int
+	replay, redo                                                    bool
 }
 
 // validate checks the flags before any file is read or written.
@@ -99,6 +117,9 @@ func (rf runFlags) validate() error {
 	}
 	if (rf.replay || rf.redo) && rf.runDir == "" {
 		return errors.New("eval: --replay and --redo need --run-dir")
+	}
+	if _, err := ParseSplit(rf.split); err != nil {
+		return err
 	}
 	checked := map[string]string{"workflow": rf.workflow, "agent": rf.agent}
 	if rf.format != "" {
@@ -167,6 +188,9 @@ func runEval(cmd *cobra.Command, o *options, rf runFlags) error {
 	}
 	if len(m.Fixtures) == 0 {
 		return fmt.Errorf("eval: no fixtures under %s", rf.fixtures)
+	}
+	if m = FilterMatrix(m, Split(rf.split)); len(m.Fixtures) == 0 {
+		return fmt.Errorf("eval: no %s samples under %s", rf.split, rf.fixtures)
 	}
 	run := o.runner
 	if run == nil {
