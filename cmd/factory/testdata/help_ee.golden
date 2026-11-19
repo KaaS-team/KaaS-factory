@@ -356,6 +356,8 @@ Available Commands:
   compare     Compare two sets of trajectory files offline
   diff        Compare two scorecards; exit 1 when the new one is worse
   replay      Print the spans a run recorded, gate spans with their triggered flag
+  run         Run one split of the fixtures matrix and write a scorecard
+  splits      Print pass rate per split, dev and holdout side by side
   stats       Summarise trajectory files offline
 
 Flags:
@@ -369,6 +371,7 @@ Flags:
       --redo              rerun tickets --run-dir already finished
       --replay            re-score the outputs stored in --run-dir without dispatching
       --run-dir string    keep results and trajectories here so a killed run resumes
+      --split string      samples to run: dev (default) or holdout; holdout runs only when named (default "dev")
       --tries int         tries per ticket; the scorecard gets pass_rate_1..N (default 1)
       --workflow string   workflow name (required)
 
@@ -413,6 +416,36 @@ Usage:
 
 Flags:
   -h, --help   help for replay
+
+=== factory eval run
+Same as the bare eval command. --split dev (the default) runs the dev samples. Holdout samples run only with --split holdout.
+
+Usage:
+  factory eval run [flags]
+
+Flags:
+      --agent string      agent preset name, never a model name (required)
+      --arm strings       arms to run: preset, control (bare-bash baseline) (default [preset])
+      --fixtures string   directory of fixtures (default "evals/fixtures")
+      --format string     edit format axis, e.g. diff or whole
+  -h, --help              help for run
+      --out string        directory the scorecard is written to (default "evals")
+      --packs string      packs lock file the run used, e.g. factory.lock
+      --redo              rerun tickets --run-dir already finished
+      --replay            re-score the outputs stored in --run-dir without dispatching
+      --run-dir string    keep results and trajectories here so a killed run resumes
+      --split string      samples to run: dev (default) or holdout; holdout runs only when named (default "dev")
+      --tries int         tries per ticket; the scorecard gets pass_rate_1..N (default 1)
+      --workflow string   workflow name (required)
+
+=== factory eval splits
+Reads one or more scorecards, puts each ticket in dev or holdout by the hash of its sample id, and prints both pass rates in one table.
+
+Usage:
+  factory eval splits <scorecard.json>... [flags]
+
+Flags:
+  -h, --help   help for splits
 
 === factory eval stats
 Summarise trajectory files offline
@@ -484,6 +517,7 @@ Usage:
   factory packs [command]
 
 Available Commands:
+  install     Install a pack from a signed catalogue
   list        Print each lock entry
   match       List the skill packs whose paths or keywords match
   migrate     Run a migration pack pinned in factory.lock over the repository
@@ -495,6 +529,18 @@ Flags:
   -h, --help   help for packs
 
 Use "factory packs [command] --help" for more information about a command.
+
+=== factory packs install
+Install a pack from a signed catalogue
+
+Usage:
+  factory packs install <name>[@version] [flags]
+
+Flags:
+      --catalogue string   catalogue file or URL; its signature is read from <catalogue>.sig
+  -h, --help               help for install
+      --pubkey string      base64 ed25519 public key (default: $FACTORY_PACKS_PUBKEY)
+      --root string        repository root holding factory.lock and .factory/cache (default ".")
 
 === factory packs list
 Print each lock entry
@@ -620,6 +666,7 @@ Usage:
   factory report [flags]
 
 Flags:
+      --budget         print spend against each budget in .factory/budgets.yaml
       --by string      group rows by team, workflow or pack (default "team")
       --churn string   with --cost, a revert within this long after merge counts against the PR (default "14d")
       --cost           print cost per surviving merged PR, per repo and in total
