@@ -39,7 +39,13 @@ type Handlers struct {
 	ExplainConfig func(ctx context.Context) (string, error)
 	FirstRun      func(ctx context.Context) (string, error)
 	Report        func(ctx context.Context) (string, error)
+	// ReadOnly hides every write tool, so a call to one is refused (the --read-only flag).
+	ReadOnly bool
 }
+
+// writeTools change the factory or file work. Read-only mode removes them.
+var writeTools = []string{"plan", "approve_plan", "dispatch", "steer", "cancel", "retry",
+	"create_task", "hand_off_task", "queue_followup"}
 
 // Empty is the input of tools that take no arguments.
 type Empty struct{}
@@ -366,6 +372,9 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 		func(ctx context.Context, req *sdk.ReadResourceRequest) (*sdk.ReadResourceResult, error) {
 			return ticketResource(ctx, ctl, req.Params.URI)
 		})
+	if extra.ReadOnly {
+		s.RemoveTools(writeTools...)
+	}
 	return s
 }
 
@@ -503,6 +512,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 		o(&cfg)
 	}
 	var httpAddr string
+	var readOnly bool
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)",
@@ -519,6 +529,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			h.ReadOnly = readOnly
 			srv := NewServer(c, h)
 			if httpAddr == "" {
 				return srv.Run(cmd.Context(), &sdk.StdioTransport{})
@@ -535,6 +546,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 			return Serve(cmd.Context(), ln, handler)
 		},
 	}
+	cmd.Flags().BoolVar(&readOnly, "read-only", false, "serve only the read tools; write tools are refused")
 	cmd.Flags().StringVar(&httpAddr, "http", "", "serve streamable HTTP at /mcp on this address (default host 127.0.0.1); the bearer token is read from "+TokenEnv)
 	return cmd
 }
