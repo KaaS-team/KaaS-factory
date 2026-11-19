@@ -1,6 +1,6 @@
 // Package config resolves the runner's settings from layered sources: builtin defaults, the org,
 // team and repo files, FACTORY_* environment variables and flags, later layers winning. The org
-// layer is a ceiling that the layers below it can lower but never raise.
+// layer is a ceiling that the layers below it can lower but never raise. cmd/factory loads it once at startup and hands the result to the commands.
 package config
 
 import (

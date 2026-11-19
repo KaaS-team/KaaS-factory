@@ -1,5 +1,5 @@
 // Package firstrun is the first-hour demo: it runs the auditor, maps each finding to a catalogue
-// pack, sizes the fixes and writes a scorecard. Run dispatches nothing; Execute dispatches the first fix.
+// pack, sizes the fixes and writes a scorecard. Run dispatches nothing; Execute dispatches the first fix. cmd/factory registers NewCommand as `factory first-run`.
 package firstrun
 
 import (
