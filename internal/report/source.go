@@ -28,6 +28,7 @@ type TicketRecord struct {
 	PR              int       // merged PR number, 0 if unknown
 	RevertedAt      time.Time // zero if the PR was not reverted
 	Team            string
+	Client          string
 	Workflow        string
 	Pack            string
 	Attempts        []Attempt
