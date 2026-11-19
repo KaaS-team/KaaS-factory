@@ -85,7 +85,8 @@ func NewCommand(opts ...Option) *cobra.Command {
 		f(&o)
 	}
 	var since, by, out string
-	var asJSON bool
+	var asJSON, cost bool
+	var churn string
 	cmd := &cobra.Command{
 		Use:   "report",
 		Short: "Show tokens per merged PR, rework, human touches and cycle time (operator only)",
@@ -112,12 +113,29 @@ func NewCommand(opts ...Option) *cobra.Command {
 				return err
 			}
 			now := o.now()
-			rep, err := Build(cmd.Context(), src, Window{Since: now.Add(-d), Until: now})
-			if err != nil {
-				return err
+			var rep Report
+			if !cost {
+				if rep, err = Build(cmd.Context(), src, Window{Since: now.Add(-d), Until: now}); err != nil {
+					return err
+				}
 			}
 			var buf bytes.Buffer
-			if asJSON {
+			if cost {
+				cw, err := parseSince(churn)
+				if err != nil {
+					return fmt.Errorf("report: bad --churn %q", churn)
+				}
+				recs, err := src.Tickets(cmd.Context(), Window{Since: now.Add(-d), Until: now})
+				if err != nil {
+					return err
+				}
+				cr := BuildCost(recs, Window{Since: now.Add(-d), Until: now}, cw)
+				if asJSON {
+					err = WriteCostJSON(&buf, cr)
+				} else {
+					err = WriteCostMarkdown(&buf, cr)
+				}
+			} else if asJSON {
 				err = WriteJSON(&buf, rep, g)
 			} else {
 				err = WriteMarkdown(&buf, rep, g)
@@ -134,6 +152,8 @@ func NewCommand(opts ...Option) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&since, "since", "7d", "window length ending now, such as 7d or 36h")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "write JSON instead of markdown")
+	cmd.Flags().BoolVar(&cost, "cost", false, "print cost per surviving merged PR, per repo and in total")
+	cmd.Flags().StringVar(&churn, "churn", "14d", "with --cost, a revert within this long after merge counts against the PR")
 	cmd.Flags().StringVar(&by, "by", "team", "group rows by team, workflow or pack")
 	cmd.Flags().StringVar(&out, "out", "", "write the report to this file; never under .github/ or a PR body file")
 	return cmd

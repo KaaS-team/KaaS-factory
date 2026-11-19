@@ -24,6 +24,9 @@ type Attempt struct {
 // the store (sessions, spend) and the tracker thread (merge time, chatops, pushes).
 type TicketRecord struct {
 	ID              api.TicketID
+	Repo            string    // owner/name
+	PR              int       // merged PR number, 0 if unknown
+	RevertedAt      time.Time // zero if the PR was not reverted
 	Team            string
 	Workflow        string
 	Pack            string

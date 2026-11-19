@@ -100,6 +100,7 @@ type AttemptRow struct {
 // TicketRow is a ticket as the report reads it: labels-derived team and pack, thread data and spend.
 type TicketRow struct {
 	ID              api.TicketID
+	Repo            string
 	Team            string
 	Workflow        string
 	Pack            string
@@ -115,7 +116,7 @@ type TicketRow struct {
 // tickets with none.
 func (s *Store) ReportRows(ctx context.Context) ([]TicketRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT t.id, t.workflow, COALESCE(m.team, ''), COALESCE(m.pack, ''),
+SELECT t.id, t.repo, t.workflow, COALESCE(m.team, ''), COALESCE(m.pack, ''),
   COALESCE(x.first_dispatch, 0), COALESCE(x.merged_at, 0), COALESCE(h.chatops, 0), COALESCE(h.pushes, 0)
 FROM tickets t
 LEFT JOIN ticket_meta m ON m.ticket = t.id
@@ -131,7 +132,7 @@ ORDER BY t.id`)
 		var r TicketRow
 		var id string
 		var first, merged int64
-		if err := rows.Scan(&id, &r.Workflow, &r.Team, &r.Pack, &first, &merged, &r.ChatopsCommands, &r.ManualPushes); err != nil {
+		if err := rows.Scan(&id, &r.Repo, &r.Workflow, &r.Team, &r.Pack, &first, &merged, &r.ChatopsCommands, &r.ManualPushes); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
