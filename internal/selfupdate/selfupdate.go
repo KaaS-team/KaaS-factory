@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -18,8 +19,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
+
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -29,9 +31,12 @@ const (
 	maxArchiveSize     = 100 << 20
 	binaryName         = "factory"
 	checksumsName      = "checksums.txt"
+	signatureName      = checksumsName + ".sig"
 )
 
-var versionRe = regexp.MustCompile(`^v([0-9]+)\.([0-9]+)\.([0-9]+)([.-][0-9A-Za-z.-]+)?$`)
+// versionRe pins the shape to vMAJOR.MINOR.PATCH with optional -prerelease and
+// +build; ordering is left to golang.org/x/mod/semver.
+var versionRe = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
 
 // Release names one published version.
 type Release struct {
@@ -48,45 +53,22 @@ type Source interface {
 
 // Check reports the latest release and whether it is newer than current.
 // A current version that is not vMAJOR.MINOR.PATCH counts as older.
+// Prereleases order by semver, so v9.0.0-rc1 updates to v9.0.0.
 func Check(ctx context.Context, current string, src Source) (Release, bool, error) {
 	rel, err := src.Latest(ctx)
 	if err != nil {
 		return Release{}, false, err
 	}
-	latest, ok := parseVersion(rel.Version)
-	if !ok {
+	if !parseVersion(rel.Version) {
 		return Release{}, false, fmt.Errorf("invalid release version %q; expected vMAJOR.MINOR.PATCH", rel.Version)
 	}
-	cur, ok := parseVersion(current)
-	if !ok {
+	if !parseVersion(current) {
 		return rel, true, nil
 	}
-	return rel, compare(latest, cur) > 0, nil
+	return rel, semver.Compare(rel.Version, current) > 0, nil
 }
 
-func parseVersion(v string) ([3]int, bool) {
-	m := versionRe.FindStringSubmatch(v)
-	if m == nil {
-		return [3]int{}, false
-	}
-	var out [3]int
-	for i := range out {
-		out[i], _ = strconv.Atoi(m[i+1])
-	}
-	return out, true
-}
-
-func compare(a, b [3]int) int {
-	for i := range a {
-		if a[i] != b[i] {
-			if a[i] < b[i] {
-				return -1
-			}
-			return 1
-		}
-	}
-	return 0
-}
+func parseVersion(v string) bool { return versionRe.MatchString(v) && semver.IsValid(v) }
 
 // AssetName is the archive name of a release for one platform.
 func AssetName(version, goos, goarch string) string {
@@ -98,7 +80,25 @@ func AssetName(version, goos, goarch string) string {
 // binary at exe through a rename in the same directory. On any failure the
 // old binary is left untouched.
 func Apply(ctx context.Context, rel Release, src Source, exe, goos, goarch string) error {
-	if _, ok := parseVersion(rel.Version); !ok {
+	var v Verifier
+	if ReleaseKey != nil {
+		v = Ed25519Verifier{Key: ReleaseKey}
+	}
+	_, _ = fmt.Fprintln(Notice, TrustNote(v))
+	return ApplyVerified(ctx, rel, src, exe, goos, goarch, v)
+}
+
+// ReleaseKey is the ed25519 key that signs checksums.txt. It is empty until
+// goreleaser signs releases; while empty, Apply is checksum-only and says so.
+var ReleaseKey ed25519.PublicKey
+
+// Notice receives the trust line Apply prints before it downloads.
+var Notice io.Writer = os.Stderr
+
+// ApplyVerified is Apply with a signature check on checksums.txt. A nil
+// verifier keeps the checksum-only path; see TrustNote.
+func ApplyVerified(ctx context.Context, rel Release, src Source, exe, goos, goarch string, v Verifier) error {
+	if !parseVersion(rel.Version) {
 		return fmt.Errorf("invalid release version %q", rel.Version)
 	}
 	if goos == "" {
@@ -124,6 +124,15 @@ func Apply(ctx context.Context, rel Release, src Source, exe, goos, goarch strin
 	sums, err := src.Asset(ctx, rel.Version, checksumsName)
 	if err != nil {
 		return fmt.Errorf("download checksums: %w", err)
+	}
+	if v != nil {
+		sig, err := src.Asset(ctx, rel.Version, signatureName)
+		if err == nil {
+			err = v.Verify(sums, sig)
+		}
+		if err != nil {
+			return fmt.Errorf("verify %s: %w", checksumsName, err)
+		}
 	}
 	want, err := checksumFor(sums, name)
 	if err != nil {
