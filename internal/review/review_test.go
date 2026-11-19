@@ -225,3 +225,35 @@ func TestWorkflowFileLoads(t *testing.T) {
 		t.Fatalf("name %q", g.Name)
 	}
 }
+
+// A changed file with a space in its name is listed whole in the prompt.
+func TestPromptListsFileWithSpace(t *testing.T) {
+	dir := repo(t)
+	writeFile(t, dir, "a b.go", "package ab\n")
+	var prompt string
+	agent := agentFunc(func(_ context.Context, _, p string) (string, error) { prompt = p; return "ok", nil })
+	if _, err := (Runner{Repo: dir, Source: fakeSource{{Name: "c"}}, Agent: agent}).Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(prompt, "- a b.go\n") {
+		t.Fatalf("prompt lacks whole name:\n%s", prompt)
+	}
+}
+
+// Repo hooks must not run when the review worktree is created.
+func TestWorktreeSkipsRepoHooks(t *testing.T) {
+	dir := repo(t)
+	marker := filepath.Join(t.TempDir(), "hook-ran")
+	hook := filepath.Join(dir, ".git", "hooks", "post-checkout")
+	writeFile(t, dir, ".git/hooks/post-checkout", "#!/bin/sh\ntouch '"+marker+"'\n")
+	if err := os.Chmod(hook, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	agent := agentFunc(func(context.Context, string, string) (string, error) { return "ok", nil })
+	if _, err := (Runner{Repo: dir, Source: fakeSource{{Name: "c"}}, Agent: agent}).Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("post-checkout hook ran in the review worktree")
+	}
+}

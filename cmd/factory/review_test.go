@@ -86,3 +86,22 @@ func TestReviewCommandFailsOnPatch(t *testing.T) {
 		t.Fatalf("out %q", out)
 	}
 }
+
+// TestReviewCommandMatchesFileWithSpace: a changed file with a space in its name still selects its pack.
+func TestReviewCommandMatchesFileWithSpace(t *testing.T) {
+	reviewRepo(t)
+	if err := os.WriteFile("my notes.md", []byte("hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pack := "---\nname: spaced\nglobs: \"my notes.md\"\n---\nCheck it.\n"
+	if err := os.WriteFile(".factory/checks/spaced.md", []byte(pack), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runReview(t, editAgent(func(string) error { return nil }))
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "pass\tspaced") {
+		t.Fatalf("spaced pack did not run: %q", out)
+	}
+}
