@@ -248,3 +248,13 @@ func TestConfig(t *testing.T) {
 		t.Fatal("want unknown key error")
 	}
 }
+
+// An empty board still prints a line, so `factory status` is never silent.
+func TestStatusEmptyBoardSays(t *testing.T) {
+	doctorEnv(t, map[string]string{"git": "exit 0", "gh": "exit 0", "claude": "exit 0", "go": "exit 0"})
+	use(t, &fakeControl{board: api.Board{Ready: []api.Ticket{{ID: "1"}}}})
+	out, _, err := runCLI(t, "status")
+	if err != nil || strings.TrimSpace(out) != "no tickets running (1 ready, 0 in the merge queue)" {
+		t.Fatalf("out %q, err %v", out, err)
+	}
+}
