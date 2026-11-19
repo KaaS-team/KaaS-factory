@@ -83,3 +83,24 @@ func TestWorktreeAddIgnoresHooks(t *testing.T) {
 		t.Fatal("post-checkout hook ran")
 	}
 }
+
+// A dir at the worktree path that git does not list (a failed add, or something planted) is refused.
+func TestGitWorktreesRefusesAStrayDir(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@e.test", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "i"}, {"update-ref", "refs/remotes/origin/main", "HEAD"}} {
+		if out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	root := t.TempDir()
+	stray := filepath.Join(root, "factory-7-a1")
+	if err := os.Mkdir(stray, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (GitWorktrees{Repo: repo, Root: root}).Add(context.Background(), bf); err == nil {
+		t.Fatal("a stray dir was reused as a worktree")
+	}
+}

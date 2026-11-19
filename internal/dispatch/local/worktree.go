@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
@@ -31,6 +32,9 @@ func (g GitWorktrees) Add(ctx context.Context, b api.Brief) (string, error) {
 	}
 	dir := filepath.Join(g.Root, fmt.Sprintf("factory-%s-a%d", b.Ticket, b.Attempt))
 	if _, err := os.Stat(dir); err == nil {
+		if !g.registered(ctx, dir) {
+			return "", fmt.Errorf("local: %s exists but is not a worktree of %s; remove it", dir, g.Repo)
+		}
 		return dir, nil
 	}
 	if err := os.MkdirAll(g.Root, 0o755); err != nil {
@@ -41,6 +45,29 @@ func (g GitWorktrees) Add(ctx context.Context, b api.Brief) (string, error) {
 		return "", fmt.Errorf("local: git worktree add: %w: %s", err, firstLine(out))
 	}
 	return dir, nil
+}
+
+// registered reports whether dir is a worktree git lists for Repo, so a stray or half-made dir is
+// never reused.
+func (g GitWorktrees) registered(ctx context.Context, dir string) bool {
+	out, err := exec.CommandContext(ctx, "git", "-C", g.Repo, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return false
+	}
+	want := realPath(dir)
+	for _, line := range strings.Split(string(out), "\n") {
+		if p, ok := strings.CutPrefix(line, "worktree "); ok && realPath(p) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func realPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return filepath.Clean(p)
 }
 
 func firstLine(b []byte) string {
