@@ -33,9 +33,15 @@ Pin a file from a GitHub repository (MIT or Apache-2.0 only) in factory.lock
 
 ## factory board
 
-`factory board`
+`factory board [flags]`
 
 Open the terminal board
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--operator` | bool | `false` | show tokens against budget on each card |
+| `--replay` | string | `` | play a recorded headless event stream (NDJSON) instead of a live fleet |
+| `--speed` | float64 | `1` | replay speed: 10 plays ten times faster than recorded |
 
 ## factory browsercheck
 

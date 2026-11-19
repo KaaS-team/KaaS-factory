@@ -32,3 +32,19 @@ func TestCommandRunsAndQuits(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCommandReplayRunsAndQuits(t *testing.T) {
+	c := NewCommand()
+	c.SetContext(context.Background())
+	c.SetIn(strings.NewReader("q"))
+	var out strings.Builder
+	c.SetOut(&out)
+	c.SetArgs([]string{"--replay", "../../docs/demo/fleet.ndjson", "--speed", "1000"})
+	if err := c.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	c.SetArgs([]string{"--replay", "missing.ndjson"})
+	if err := c.Execute(); err == nil {
+		t.Fatal("a missing replay file must fail")
+	}
+}
