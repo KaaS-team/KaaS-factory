@@ -16,7 +16,7 @@ import (
 
 // addCommands adds the daily operator commands to root.
 func addCommands(root *cobra.Command) {
-	root.AddCommand(statusCmd(), runCmd(), queueCmd(), configCmd(), doctorCmd())
+	root.AddCommand(statusCmd(), runCmd(), queueCmd(), configCmd(), doctorCmd(), smokeCmd())
 	for _, a := range []struct {
 		name, short string
 		call        func(context.Context, api.Control, api.TicketID) error

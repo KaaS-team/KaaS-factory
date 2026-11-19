@@ -34,7 +34,7 @@ type Spec struct {
 	// AllowHosts is recorded in the report only; no host filtering is enforced.
 	AllowHosts []string
 	// Backend selects the isolation: "" or "jail" for the helper below, "runsc" for gVisor
-	// when a pinned runsc is installed; "remote" runs off the host through RunRemote.
+	// when a pinned runsc is installed; "remote" runs off the host on the service that FACTORY_SANDBOX_URL names.
 	Backend string
 	// Baseline is the session's rlimit layer; every process in the jail inherits it.
 	Baseline Limits
@@ -73,7 +73,7 @@ func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec
 		return nil, err
 	}
 	if spec.Backend == BackendRemote {
-		return nil, ErrRemoteBackend
+		return remoteCommand(ctx, spec, name, args...)
 	}
 	return commandFor(ctx, spec, DefaultRunscPin, name, args...)
 }
@@ -111,6 +111,9 @@ func MaybeEnter() error {
 	var req request
 	if err := json.Unmarshal([]byte(raw), &req); err != nil || len(req.Argv) == 0 {
 		return errors.New("sandbox: bad helper request")
+	}
+	if req.Spec.Backend == BackendRemote {
+		return runRemoteHelper(req)
 	}
 	caps := Probe()
 	if req.Caps != nil {

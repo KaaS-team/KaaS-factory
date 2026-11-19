@@ -21,6 +21,7 @@ import (
 	"github.com/KaaS-team/factory/internal/dispatch/local"
 	"github.com/KaaS-team/factory/internal/dispatch/routines"
 	"github.com/KaaS-team/factory/internal/dispatch/shadow"
+	"github.com/KaaS-team/factory/internal/dispatch/spend"
 	"github.com/KaaS-team/factory/internal/dispatch/untrusted"
 	"github.com/KaaS-team/factory/internal/githubauth"
 	"github.com/KaaS-team/factory/internal/mergeq"
@@ -36,6 +37,7 @@ import (
 	"github.com/KaaS-team/factory/internal/tracker/jira"
 	"github.com/KaaS-team/factory/internal/tracker/linear"
 	"github.com/KaaS-team/factory/pkg/sandbox"
+	"github.com/KaaS-team/factory/pkg/sandbox/remote"
 	gogithub "github.com/google/go-github/v79/github"
 )
 
@@ -126,7 +128,10 @@ var dispatchers = map[string]func(context.Context, config.Config) (api.Dispatche
 		}
 		root := filepath.Join(repo, ".factory", "worktrees")
 		cfg := local.Config{Worktrees: local.GitWorktrees{Repo: repo, Root: root}, MaxConcurrent: c.Slots,
-			Sandbox: c.Sandbox && canJail(sandbox.Probe()), GitDir: filepath.Join(repo, ".git")}
+			Sandbox: c.Sandbox && canJail(sandbox.Probe()), GitDir: filepath.Join(repo, ".git"), Runtime: c.SandboxRuntime}
+		if err := checkRuntime(c.SandboxRuntime); err != nil {
+			return nil, err
+		}
 		if c.Tracker == "github" { // a pull request's author is only known on GitHub
 			g, err := newGitHubConn(c)
 			if err != nil {
@@ -138,6 +143,19 @@ var dispatchers = map[string]func(context.Context, config.Config) (api.Dispatche
 		}
 		return local.New(ctx, cfg)
 	},
+}
+
+// checkRuntime accepts the sandbox runtimes: "" or "local" for the local jail and "remote" for the service that
+// FACTORY_SANDBOX_URL names. The remote one fails at start-up when that service is not set.
+func checkRuntime(rt string) error {
+	switch rt {
+	case "", "local":
+		return nil
+	case sandbox.BackendRemote:
+		_, err := remote.FromEnv()
+		return err
+	}
+	return fmt.Errorf("sandbox_runtime %q: want local or %q", rt, sandbox.BackendRemote)
 }
 
 // canJail says whether this host can enforce a jail; where it cannot, sandbox: true is a no-op.
@@ -391,7 +409,12 @@ func buildDispatcher(ctx context.Context, c config.Config) (api.Dispatcher, erro
 	if err != nil {
 		return nil, err
 	}
-	return f(ctx, c)
+	d, err := f(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	configureBudget()
+	return spend.Wrap(d), nil
 }
 
 func buildDeps(c config.Config) (core.Deps, error) {

@@ -82,6 +82,9 @@ type Config struct {
 	// under GitDir (never hooks or config), and a per-session Claude config dir.
 	Sandbox bool
 	GitDir  string
+	// Runtime "remote" runs each agent in a box on the remote sandbox service (pkg/sandbox/remote),
+	// whatever Sandbox says. Empty keeps the local choice above.
+	Runtime string
 	// CloseTimeout is how long Cancel waits after SIGINT before it kills; default 5 seconds.
 	CloseTimeout time.Duration
 	// Clock times the steer gate and the close wait; default the real clock.
@@ -508,6 +511,9 @@ func exitErr(waitErr error, ps *os.ProcessState, stuckErr error) error {
 // command builds the agent process. With Sandbox set it is the jail helper, which applies the
 // restrictions and then execs argv with env as its whole environment.
 func (d *Dispatcher) command(ctx context.Context, argv []string, dir, branch string, env []string, cfgDir string) (*exec.Cmd, error) {
+	if d.cfg.Runtime == sandbox.BackendRemote {
+		return sandbox.Command(ctx, sandbox.Spec{Backend: sandbox.BackendRemote, Workdir: dir, AllowNet: true, Env: env}, argv[0], argv[1:]...)
+	}
 	if !d.cfg.Sandbox {
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		cmd.Dir, cmd.Env = dir, env

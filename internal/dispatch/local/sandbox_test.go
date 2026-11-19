@@ -3,6 +3,8 @@ package local
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -78,5 +80,32 @@ func TestSandboxDispatchRunsAgent(t *testing.T) {
 	got := read(t, wt+"/env.txt")
 	if strings.Contains(got, "ANTHROPIC_") || !strings.Contains(got, "PATH=") {
 		t.Fatalf("env:\n%s", got)
+	}
+}
+
+// Runtime "remote" sends the agent to the sandbox service instead of running it here, even with
+// Sandbox off: the output comes from the fake service, and the local binary is never run.
+func TestRemoteRuntimeRunsTheAgentOnTheService(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /sandboxes", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"id":"b1"}`)) })
+	mux.HandleFunc("POST /sandboxes/b1/exec", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"stream":"stdout","data":"from the box\n"}` + "\n" + `{"exit":0}` + "\n"))
+	})
+	mux.HandleFunc("DELETE /sandboxes/b1", func(http.ResponseWriter, *http.Request) {})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	t.Setenv("FACTORY_SANDBOX_URL", srv.URL)
+	t.Setenv("FACTORY_SANDBOX_TOKEN", "tok")
+	d, err := New(t.Context(), Config{Worktrees: dirWorktrees{t.TempDir()}, Runtime: "remote", Now: time.Now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd, err := d.command(t.Context(), []string{"/nonexistent/agent", "--go"}, t.TempDir(), "factory/7-a1", []string{"A=1"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := cmd.Output()
+	if err != nil || string(out) != "from the box\n" {
+		t.Fatalf("out %q err %v", out, err)
 	}
 }
