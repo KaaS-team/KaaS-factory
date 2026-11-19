@@ -183,3 +183,35 @@ func FuzzPublication(f *testing.F) {
 		_ = Prompt(s)
 	})
 }
+
+func TestPublicationKeepsEveryLetter(t *testing.T) {
+	for _, in := range []string{
+		"Привет, мир. Москва",
+		"Καλημέρα κόσμε, Ελλάδα",
+		"こんにちは，世界（テスト）",
+		"नमस्ते दुनिया, हिन्दी पाठ",
+		"Ｆｕｌｌｗｉｄｔｈ ｔｅｘｔ",
+	} {
+		if got := Publication(in, DefaultOptions()); got != in {
+			t.Errorf("Publication(%q) = %q, want it unchanged", in, got)
+		}
+	}
+}
+
+func TestPublicationNeutralizesFoldedMentionButKeepsTheRestOfTheLine(t *testing.T) {
+	got := Publication("Привет，@оctocat и мир", DefaultOptions())
+	if want := "Привет，`@octocat` и мир"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if got := Publication("Привет @org/команда", DefaultOptions()); strings.Contains(got, " @org") {
+		t.Fatalf("mention still live: %q", got)
+	}
+}
+
+func TestPublicationStripsTrojanSourceControls(t *testing.T) {
+	for _, r := range "\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069\u200E\u200F\u061C\u200B" {
+		if got := Publication("a"+string(r)+"b", DefaultOptions()); got != "ab" {
+			t.Errorf("U+%04X not removed: %q", r, got)
+		}
+	}
+}

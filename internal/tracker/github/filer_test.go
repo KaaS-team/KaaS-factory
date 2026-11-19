@@ -254,3 +254,28 @@ func TestEpicReturnsBodyAndNamesMissingIssue(t *testing.T) {
 		t.Fatal("epic 0: want error")
 	}
 }
+
+func TestRequestTicketsWithTheSameFirstLineStayTwoIssues(t *testing.T) {
+	f := newIssues(t)
+	tr := f.tracker(t)
+	ctx := context.Background()
+	body := func(text, hash string) string {
+		return text + "\n\n" + `<!-- factory:request {"sha256":"` + hash + `"} -->`
+	}
+	a, err := tr.Create(ctx, api.Ticket{Title: "Fix login", Body: body("Fix login\nuse OAuth", "aa")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := tr.Create(ctx, api.Ticket{Title: "Fix login", Body: body("Fix login\nuse SAML", "bb")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == b || len(f.posts) != 2 || !strings.Contains(fmt.Sprint(f.posts[1]["body"]), "use SAML") {
+		t.Fatalf("a=%q b=%q posts=%d: the second request was dropped", a, b, len(f.posts))
+	}
+	// The same request again, from a fresh Tracker that must find it by search, files nothing.
+	again, err := f.tracker(t).Create(ctx, api.Ticket{Title: "Fix login", Body: body("Fix login\nuse SAML", "bb")})
+	if err != nil || again != b || len(f.posts) != 2 {
+		t.Fatalf("repeat = %q %v, posts %d, want %q and 2", again, err, len(f.posts), b)
+	}
+}
