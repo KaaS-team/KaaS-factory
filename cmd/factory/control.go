@@ -19,6 +19,7 @@ import (
 	"github.com/KaaS-team/factory/internal/core"
 	"github.com/KaaS-team/factory/internal/dispatch/fire"
 	"github.com/KaaS-team/factory/internal/dispatch/local"
+	"github.com/KaaS-team/factory/internal/dispatch/spend"
 	"github.com/KaaS-team/factory/internal/dispatch/routines"
 	"github.com/KaaS-team/factory/internal/dispatch/shadow"
 	"github.com/KaaS-team/factory/internal/dispatch/untrusted"
@@ -408,7 +409,12 @@ func buildDispatcher(ctx context.Context, c config.Config) (api.Dispatcher, erro
 	if err != nil {
 		return nil, err
 	}
-	return f(ctx, c)
+	d, err := f(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	configureBudget()
+	return spend.Wrap(d), nil
 }
 
 func buildDeps(c config.Config) (core.Deps, error) {

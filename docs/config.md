@@ -37,6 +37,7 @@ Keys under `models.` are open: any tier name takes a string.
 | `requester_cannot_approve` | bool | `true` | when the org sets true, lower layers cannot set false |
 | `shadow` | bool | `false` | when the org sets true the value is true; lower layers cannot turn it off |
 | `sandbox` | bool | `true` | when the org sets true, lower layers cannot set false |
+| `sandbox_runtime` | string | `""` | any layer may set it |
 | `trust.min_role` | role | `"write"` | the org value is a floor; lower layers may only pick a role at or above it |
 | `trust.allow` | list | `[]` | any layer may set it |
 | `github_app.id` | int | `0` | any layer may set it |
