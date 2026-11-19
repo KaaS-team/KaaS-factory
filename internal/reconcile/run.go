@@ -25,6 +25,7 @@ type Deps struct {
 	OnError      func(error)
 	InitialLocks pick.Locks      // Locks for the state Tick builds on a fresh start
 	Log          *eventlog.Store // append-only step log replayed on a fresh start; nil keeps none
+	Publisher    Publisher       // push and PR open as durable steps; nil skips them
 }
 
 // logStep records a completed step; a write error is reported and the tick goes on.
@@ -83,6 +84,7 @@ func Tick(ctx context.Context, d Deps, sp **State, cfg Config) {
 	if !ok {
 		return
 	}
+	obs = publish(ctx, d, s, obs)
 	for _, a := range Decide(*s, obs, now, cfg) {
 		if ctx.Err() != nil {
 			return
