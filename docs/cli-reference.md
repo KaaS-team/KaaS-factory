@@ -304,6 +304,18 @@ Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)
 
 Inspect the packs pinned in factory.lock
 
+## factory packs install
+
+`factory packs install <name>[@version] [flags]`
+
+Install a pack from a signed catalogue
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--catalogue` | string | `` | catalogue file or URL; its signature is read from <catalogue>.sig |
+| `--pubkey` | string | `` | base64 ed25519 public key (default: $FACTORY_PACKS_PUBKEY) |
+| `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
+
 ## factory packs list
 
 `factory packs list [flags]`
