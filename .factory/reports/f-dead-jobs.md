@@ -43,3 +43,6 @@ None. Workflow changes needed: none.
 `tools/prcheck` body check rejects any PR body containing `claude.ai/code` or `Claude-Session:`. A session
 footer on the PR body fails CI, and a re-run replays the old body, so only a new push picks up an edit.
 A Claude session link must not go in the body.
+
+`tools/prcheck` also fails a PR that deletes a test file unless the body has a `Test change reason:` line.
+This PR deletes `jobs_test.go`, so its body carries one.
