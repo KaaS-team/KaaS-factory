@@ -1,0 +1,7 @@
+Compare two sets of trajectory files offline
+
+Usage:
+  eval compare <old> <new> [flags]
+
+Flags:
+  -h, --help   help for compare

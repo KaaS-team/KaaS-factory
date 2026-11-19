@@ -1,0 +1,8 @@
+Prints pass rate, main green rate, tokens per merged PR and median wall time with deltas.
+Exits 1 when the new scorecard is worse on pass rate or on tokens per merged PR (more than 10% up).
+
+Usage:
+  eval diff <old.json> <new.json> [flags]
+
+Flags:
+  -h, --help   help for diff

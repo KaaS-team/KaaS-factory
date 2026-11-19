@@ -1,0 +1,10 @@
+Checks every fixture for its required file and keys, its seed, and a hidden directory per ticket.
+--fix writes back only what the tree determines: the name and the seed key.
+
+Usage:
+  eval check [flags]
+
+Flags:
+      --fix               write back the data the tree determines
+      --fixtures string   directory of fixtures (default "evals/fixtures")
+  -h, --help              help for check
