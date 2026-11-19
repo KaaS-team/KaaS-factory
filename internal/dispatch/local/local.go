@@ -115,6 +115,13 @@ type process struct {
 	canceled   atomic.Bool
 	partialURL string // set before done closes
 	partialErr error
+
+	// what begin needs from launch
+	out    io.ReadCloser
+	runCtx context.Context
+	dir    string
+	cfgDir string
+	guard  *untrusted.Guard
 }
 
 // Dispatcher implements api.Dispatcher over child processes.
@@ -122,8 +129,9 @@ type Dispatcher struct {
 	ctx context.Context
 	cfg Config
 
-	mu   sync.Mutex
-	runs map[string]*process
+	mu      sync.Mutex // guards runs and pending, and nothing slow
+	runs    map[string]*process
+	pending map[string]time.Time // keys being set up, with their start
 }
 
 // New returns a Dispatcher. Cancelling ctx kills every run it started.
@@ -152,7 +160,7 @@ func New(ctx context.Context, cfg Config) (*Dispatcher, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Dispatcher{ctx: ctx, cfg: cfg, runs: map[string]*process{}}, nil
+	return &Dispatcher{ctx: ctx, cfg: cfg, runs: map[string]*process{}, pending: map[string]time.Time{}}, nil
 }
 
 // Name returns "local".
@@ -161,6 +169,55 @@ func (d *Dispatcher) Name() string { return "local" }
 // Caps reports a local dispatcher: not remote, and it can push workflow files.
 func (d *Dispatcher) Caps() api.Caps {
 	return api.Caps{MaxConcurrent: d.cfg.MaxConcurrent, CanPushWorkflows: true}
+}
+
+// envAllow is what an agent session inherits from the operator, by exact name. It is an allow
+// list: the agent gets no real secrets. GITHUB_TOKEN and GH_TOKEN are left out on purpose. Pushes
+// use the operator's git credentials through HOME and SSH_AUTH_SOCK, and the host opens the PR.
+var envAllow = map[string]bool{
+	"PATH": true, "HOME": true, "USER": true, "LOGNAME": true, "SHELL": true, "LANG": true, "LANGUAGE": true,
+	"TERM": true, "COLORTERM": true, "TMPDIR": true, "TZ": true, "SSH_AUTH_SOCK": true,
+	"HTTP_PROXY": true, "HTTPS_PROXY": true, "NO_PROXY": true, "ALL_PROXY": true,
+	"http_proxy": true, "https_proxy": true, "no_proxy": true, "all_proxy": true,
+	"SSL_CERT_FILE": true, "SSL_CERT_DIR": true, "NODE_EXTRA_CA_CERTS": true, "CLAUDE_CONFIG_DIR": true,
+}
+
+// envAllowPrefix lets whole families through: locale, XDG dirs and the agent CLI's own settings and
+// login (CLAUDE_CODE_*). CLAUDE_ROUTINES_TOKEN is not in the family.
+var envAllowPrefix = []string{"LC_", "XDG_", "CLAUDE_CODE_"}
+
+func envAllowed(name string) bool {
+	if envAllow[name] {
+		return true
+	}
+	for _, p := range envAllowPrefix {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// childEnv is the allow-listed part of parent, plus extra. Sessions run under the operator's
+// login, so no provider key, App key or service token is ever passed on.
+func childEnv(parent []string, extra map[string]string) []string {
+	var out []string
+	for _, kv := range parent {
+		name, _, _ := strings.Cut(kv, "=")
+		if _, over := extra[name]; over || !envAllowed(name) || providerVar(name) {
+			continue
+		}
+		out = append(out, kv)
+	}
+	keys := make([]string, 0, len(extra))
+	for k := range extra {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		out = append(out, k+"="+extra[k])
+	}
+	return out
 }
 
 var providerPrefixes = []string{"ANTHROPIC_", "OPENAI_", "AZURE_OPENAI_", "GEMINI_", "MISTRAL_", "COHERE_"}
@@ -178,37 +235,41 @@ func providerVar(name string) bool {
 	return false
 }
 
-// childEnv is parent without provider keys, plus extra. Sessions run under
-// the operator's login, so no key is ever passed on.
-func childEnv(parent []string, extra map[string]string) []string {
-	var out []string
-	for _, kv := range parent {
-		name, _, _ := strings.Cut(kv, "=")
-		if _, over := extra[name]; over || providerVar(name) {
-			continue
-		}
-		out = append(out, kv)
-	}
-	keys := make([]string, 0, len(extra))
-	for k := range extra {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		out = append(out, k+"="+extra[k])
-	}
-	return out
-}
-
 // Dispatch starts the agent in a worktree and returns at once. A key this
 // process already started returns the same session and starts nothing.
 func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, error) {
-	name, err := brief.Name(b.Ticket, b.Attempt)
+	key, preset, err := d.lookup(b)
 	if err != nil {
 		return api.Session{}, err
 	}
+	session := func(started time.Time) api.Session {
+		return api.Session{Key: key, ID: key, Ticket: b.Ticket, Attempt: b.Attempt, Dispatcher: d.Name(), StartedAt: started}
+	}
+	if started, dup := d.reserve(key); dup {
+		return session(started), nil
+	}
+	p, err := d.launch(ctx, b, key, preset)
+	d.mu.Lock() // the lock covers the map update only, never git or a process start
+	delete(d.pending, key)
+	if err == nil {
+		d.runs[key] = p
+	}
+	d.mu.Unlock()
+	if err != nil {
+		return api.Session{}, err
+	}
+	p.begin(d, b, session(p.start))
+	return session(p.start), nil
+}
+
+// lookup names the run's key and finds its preset.
+func (d *Dispatcher) lookup(b api.Brief) (string, Preset, error) {
+	name, err := brief.Name(b.Ticket, b.Attempt)
+	if err != nil {
+		return "", Preset{}, err
+	}
 	if b.Name != name {
-		return api.Session{}, fmt.Errorf("local: brief is named %q, want %q", b.Name, name)
+		return "", Preset{}, fmt.Errorf("local: brief is named %q, want %q", b.Name, name)
 	}
 	agent := b.Agent
 	if agent == "" {
@@ -216,97 +277,150 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 	}
 	preset, ok := d.cfg.Presets[agent]
 	if !ok {
-		return api.Session{}, fmt.Errorf("local: no preset named %q", agent)
+		return "", Preset{}, fmt.Errorf("local: no preset named %q", agent)
 	}
-	key := fmt.Sprintf("factory-%s-a%d", b.Ticket, b.Attempt)
-	session := func(p *process) api.Session {
-		return api.Session{Key: key, ID: key, Ticket: b.Ticket, Attempt: b.Attempt, Dispatcher: d.Name(), StartedAt: p.start}
-	}
+	return fmt.Sprintf("factory-%s-a%d", b.Ticket, b.Attempt), preset, nil
+}
 
+// reserve claims key so a second Dispatch of it neither starts a second run nor waits on git.
+// dup is true when the key already runs or is being set up; started is then that run's start.
+func (d *Dispatcher) reserve(key string) (started time.Time, dup bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if p, ok := d.runs[key]; ok {
-		return session(p), nil
+		return p.start, true
 	}
-	budget := b.Budget.USD
-	if budget <= 0 {
-		budget = defaultBudgetUSD
+	if t, ok := d.pending[key]; ok {
+		return t, true
 	}
-	argv, err := preset.Argv(Run{Brief: b, Prompt: brief.Prompt(b.Name), Stage: d.cfg.Stage, Budget: budget})
+	d.pending[key] = d.cfg.Now()
+	return time.Time{}, false
+}
+
+// launch prepares everything and starts the process: preset argv, worktree, untrusted guard,
+// sandbox env, command. It touches no Dispatcher state.
+func (d *Dispatcher) launch(ctx context.Context, b api.Brief, key string, preset Preset) (*process, error) {
+	argv, err := d.argv(b, preset)
 	if err != nil {
-		return api.Session{}, err
-	}
-	if d.cfg.Binary != "" {
-		argv[0] = d.cfg.Binary
+		return nil, err
 	}
 	dir, err := d.cfg.Worktrees.Add(ctx, b)
 	if err != nil {
-		return api.Session{}, err
+		return nil, err
 	}
-	var guard *untrusted.Guard
-	if d.cfg.Untrusted != nil {
-		if deny := d.cfg.Untrusted(ctx, b); len(deny) > 0 {
-			if argv, err = untrusted.Restrict(argv, deny); err != nil {
-				return api.Session{}, err
-			}
-			if guard, err = untrusted.Snapshot(dir, "origin/"+b.Base); err != nil {
-				return api.Session{}, err
-			}
-			if _, err = guard.Restore(); err != nil { // the run starts on the base's settings, not the PR's
-				return api.Session{}, fmt.Errorf("local: put the base settings in place: %w", err)
-			}
-		}
+	argv, guard, err := d.guard(ctx, b, dir, argv)
+	if err != nil {
+		return nil, err
 	}
-
 	runCtx, cancel := context.WithCancel(d.ctx)
-	env := childEnv(d.cfg.Environ, preset.Env)
-	var cfgDir string
-	if d.cfg.Sandbox {
-		if cfgDir, err = sessionConfigDir(); err != nil {
-			cancel()
-			return api.Session{}, err
-		}
-		env = append(env, "CLAUDE_CONFIG_DIR="+cfgDir)
+	env, cfgDir, err := d.sandboxEnv(preset)
+	if err != nil {
+		cancel()
+		return nil, err
 	}
 	// The dir holds a copy of the operator's login: it goes when the session ends, and on every
-	// way out of Dispatch before the session's goroutine owns it.
+	// way out of launch before the session's goroutine owns it.
 	started := false
 	defer func() {
 		if !started && cfgDir != "" {
 			_ = os.RemoveAll(cfgDir)
 		}
 	}()
-	cmd, err := d.command(runCtx, argv, dir, b.Branch, env, cfgDir)
+	cmd, out, q, err := d.run0(runCtx, argv, dir, b.Branch, env, cfgDir, preset.Steer)
 	if err != nil {
 		cancel()
-		return api.Session{}, err
+		return nil, err
+	}
+	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now(), q: q}
+	p.out, p.runCtx, p.dir, p.cfgDir, p.guard = out, runCtx, dir, cfgDir, guard
+	started = true
+	return p, nil
+}
+
+// argv is the preset's argv with the budget and the test binary applied.
+func (d *Dispatcher) argv(b api.Brief, preset Preset) ([]string, error) {
+	budget := b.Budget.USD
+	if budget <= 0 {
+		budget = defaultBudgetUSD
+	}
+	argv, err := preset.Argv(Run{Brief: b, Prompt: brief.Prompt(b.Name), Stage: d.cfg.Stage, Budget: budget})
+	if err != nil {
+		return nil, err
+	}
+	if d.cfg.Binary != "" {
+		argv[0] = d.cfg.Binary
+	}
+	return argv, nil
+}
+
+// guard restricts the argv and snapshots the settings for a brief whose author lacks write access.
+func (d *Dispatcher) guard(ctx context.Context, b api.Brief, dir string, argv []string) ([]string, *untrusted.Guard, error) {
+	if d.cfg.Untrusted == nil {
+		return argv, nil, nil
+	}
+	deny := d.cfg.Untrusted(ctx, b)
+	if len(deny) == 0 {
+		return argv, nil, nil
+	}
+	argv, err := untrusted.Restrict(argv, deny)
+	if err != nil {
+		return nil, nil, err
+	}
+	guard, err := untrusted.Snapshot(dir, "origin/"+b.Base)
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err = guard.Restore(); err != nil { // the run starts on the base's settings, not the PR's
+		return nil, nil, fmt.Errorf("local: put the base settings in place: %w", err)
+	}
+	return argv, guard, nil
+}
+
+// sandboxEnv is the child environment, with a per-session Claude config dir when sandboxed.
+func (d *Dispatcher) sandboxEnv(preset Preset) (env []string, cfgDir string, err error) {
+	env = childEnv(d.cfg.Environ, preset.Env)
+	if d.cfg.Sandbox {
+		if cfgDir, err = sessionConfigDir(); err != nil {
+			return nil, "", err
+		}
+		env = append(env, "CLAUDE_CONFIG_DIR="+cfgDir)
+	}
+	return env, cfgDir, nil
+}
+
+// run0 builds and starts the process, wiring stdout and, for a steering preset, stdin.
+func (d *Dispatcher) run0(ctx context.Context, argv []string, dir, branch string, env []string, cfgDir string, steer bool) (*exec.Cmd, io.ReadCloser, *input.Queue, error) {
+	cmd, err := d.command(ctx, argv, dir, branch, env, cfgDir)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	sandbox.OwnGroup(cmd)
 	cmd.Cancel = func() error { return sandbox.KillGroup(cmd) }
 	cmd.WaitDelay = 2 * time.Second
 	out, err := cmd.StdoutPipe()
 	if err != nil {
-		cancel()
-		return api.Session{}, err
+		return nil, nil, nil, err
 	}
 	var q *input.Queue
-	if preset.Steer {
+	if steer {
 		in, err := cmd.StdinPipe()
 		if err != nil {
-			cancel()
-			return api.Session{}, err
+			return nil, nil, nil, err
 		}
 		tail := &input.Tail{Max: 8 << 10}
 		out = io.NopCloser(io.TeeReader(out, tail))
 		q = &input.Queue{Out: in, Snapshot: tail.String, Window: 3, Every: time.Second, Clock: d.cfg.Clock}
 	}
 	if err := cmd.Start(); err != nil {
-		cancel()
-		return api.Session{}, fmt.Errorf("local: start %s: %w", argv[0], err)
+		return nil, nil, nil, fmt.Errorf("local: start %s: %w", argv[0], err)
 	}
-	p := &process{cmd: cmd, cancel: cancel, done: make(chan struct{}), start: d.cfg.Now(), q: q}
-	d.runs[key] = p
-	started = true
+	return cmd, out, q, nil
+}
+
+// begin reads the process's output until it exits, and ends the run.
+func (p *process) begin(d *Dispatcher, b api.Brief, sess api.Session) {
+	cmd, out, cancel, runCtx, dir, cfgDir, guard := p.cmd, p.out, p.cancel, p.runCtx, p.dir, p.cfgDir, p.guard
+	session := func(*process) api.Session { return sess }
 	var capGuard *autosubmit.Guard
 	if d.cfg.Autosubmit != nil {
 		capGuard = d.cfg.Autosubmit.Guard()
@@ -368,7 +482,6 @@ func (d *Dispatcher) Dispatch(ctx context.Context, b api.Brief) (api.Session, er
 		cancel()
 		close(p.done)
 	}()
-	return session(p), nil
 }
 
 // exitErr is a run's result. An abort replaces the exit error only when the kill did the ending: a

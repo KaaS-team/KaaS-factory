@@ -86,8 +86,8 @@ func TestChildEnvHasNoProviderVariables(t *testing.T) {
 }
 
 func TestChildEnvFilterRows(t *testing.T) {
-	got := childEnv([]string{"A=1", "ANTHROPIC_X=1", "OPENAI_API_KEY=1", "B=ANTHROPIC_Y", "MISTRAL_API_KEY=1", "COHERE_API_KEY=1", "AZURE_OPENAI_API_KEY=1"}, map[string]string{"Z": "9"})
-	want := []string{"A=1", "B=ANTHROPIC_Y", "Z=9"}
+	got := childEnv([]string{"HOME=/h", "ANTHROPIC_X=1", "OPENAI_API_KEY=1", "A=1", "MISTRAL_API_KEY=1", "COHERE_API_KEY=1", "AZURE_OPENAI_API_KEY=1"}, map[string]string{"Z": "9"})
+	want := []string{"HOME=/h", "Z=9"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("got %v", got)
 	}
@@ -386,4 +386,94 @@ func TestAbortDoesNotReplaceCleanExit(t *testing.T) {
 			t.Fatalf("%s: %v, want ErrStuck", sc, err)
 		}
 	}
+}
+
+// The agent gets no real secrets: only the allow list passes, and each secret the operator holds is dropped.
+func TestChildEnvDropsOperatorSecrets(t *testing.T) {
+	parent := []string{"PATH=/bin", "HOME=/h", "LANG=C", "TERM=x", "TMPDIR=/t", "CLAUDE_CODE_OAUTH_TOKEN=login",
+		"GITHUB_APP_PRIVATE_KEY=pem", "GITHUB_TOKEN=t", "GH_TOKEN=g", "CLAUDE_ROUTINES_TOKEN=r", "KAAS_SERVE_PASSWORD=p",
+		"FACTORY_MCP_TOKEN=m", "FACTORY_DASH_TOKEN=d", "AWS_SECRET_ACCESS_KEY=a"}
+	got := strings.Join(childEnv(parent, nil), "\n")
+	for _, secret := range []string{"GITHUB_APP_PRIVATE_KEY", "GITHUB_TOKEN", "GH_TOKEN", "CLAUDE_ROUTINES_TOKEN", "KAAS_SERVE_PASSWORD", "FACTORY_MCP_TOKEN", "FACTORY_DASH_TOKEN", "AWS_SECRET_ACCESS_KEY"} {
+		if strings.Contains(got, secret) {
+			t.Errorf("child env carries %s", secret)
+		}
+	}
+	for _, keep := range []string{"PATH=/bin", "HOME=/h", "LANG=C", "TERM=x", "TMPDIR=/t", "CLAUDE_CODE_OAUTH_TOKEN=login"} {
+		if !strings.Contains(got, keep) {
+			t.Errorf("child env lacks %s", keep)
+		}
+	}
+}
+
+type gateWorktrees struct {
+	entered chan struct{}
+	release chan struct{}
+	dir     string
+}
+
+func (g gateWorktrees) Add(_ context.Context, b api.Brief) (string, error) {
+	if b.Attempt == 1 {
+		close(g.entered)
+		<-g.release
+	}
+	return g.dir, nil
+}
+
+// A slow Worktrees.Add for one ticket must not hold the lock the next Dispatch needs.
+func TestDispatchDoesNotHoldTheLockAcrossWorktreeAdd(t *testing.T) {
+	g := gateWorktrees{entered: make(chan struct{}), release: make(chan struct{}), dir: t.TempDir()}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	d, err := New(ctx, Config{Worktrees: g, Binary: script(t, "true\n"), Environ: []string{"PATH=" + os.Getenv("PATH")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := make(chan error, 1)
+	go func() { _, err := d.Dispatch(ctx, brief1(1)); first <- err }()
+	<-g.entered
+	second := make(chan error, 1)
+	go func() { _, err := d.Dispatch(ctx, brief1(2)); second <- err }()
+	select {
+	case err := <-second:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("second Dispatch blocked behind a slow Worktrees.Add")
+	}
+	close(g.release)
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The same key dispatched while its worktree is being made starts one run, not two.
+func TestDispatchOfAKeyInSetupStartsOnce(t *testing.T) {
+	g := gateWorktrees{entered: make(chan struct{}), release: make(chan struct{}), dir: t.TempDir()}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	d, err := New(ctx, Config{Worktrees: g, Binary: script(t, "true\n"), Environ: []string{"PATH=" + os.Getenv("PATH")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := make(chan api.Session, 1)
+	go func() { s, _ := d.Dispatch(ctx, brief1(1)); first <- s }()
+	<-g.entered
+	s2, err := d.Dispatch(ctx, brief1(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(g.release)
+	if s1 := <-first; s1.Key != s2.Key {
+		t.Fatalf("keys %q %q", s1.Key, s2.Key)
+	}
+}
+
+func brief1(attempt int) api.Brief {
+	b := bf
+	b.Attempt = attempt
+	b.Name = fmt.Sprintf("v9-7-a%d.md", attempt)
+	b.Branch = fmt.Sprintf("factory/7-a%d", attempt)
+	return b
 }

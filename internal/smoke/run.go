@@ -222,12 +222,16 @@ func drive(ctx context.Context, cfg Config, gc *gogithub.Client, res Result, rec
 	}
 	runCtx, stopRuns := context.WithCancel(ctx)
 	defer stopRuns()
-	env := append(os.Environ(),
-		"SMOKE_FILE="+res.File, "SMOKE_API_URL="+cfg.APIURL, "SMOKE_REPO="+cfg.Owner+"/"+cfg.Repo,
-		"SMOKE_BASE="+cfg.Base, "SMOKE_TOKEN="+cfg.Token, "SMOKE_LOG="+agentLog)
+	// The local dispatcher passes on only an allow list of the parent environment, so the fake
+	// agent's own settings travel as the preset's extra environment.
+	preset := local.ClaudePreset
+	preset.Env = map[string]string{
+		"SMOKE_FILE": res.File, "SMOKE_API_URL": cfg.APIURL, "SMOKE_REPO": cfg.Owner + "/" + cfg.Repo,
+		"SMOKE_BASE": cfg.Base, "SMOKE_TOKEN": cfg.Token, "SMOKE_LOG": agentLog,
+	}
 	ld, err := local.New(runCtx, local.Config{
 		Worktrees: local.GitWorktrees{Repo: agentRepo, Root: filepath.Join(cfg.Dir, "worktrees")},
-		Binary:    script, Environ: env, MaxConcurrent: 1,
+		Binary:    script, Environ: os.Environ(), MaxConcurrent: 1, Presets: map[string]local.Preset{"claude": preset},
 	})
 	if err != nil {
 		return err
