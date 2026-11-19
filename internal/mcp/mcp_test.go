@@ -845,7 +845,7 @@ func TestTokenIsEnvOnlyAndComparedInConstantTime(t *testing.T) {
 		t.Error("no --http flag")
 	}
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if f.Name != "http" && f.Name != "help" {
+		if f.Name != "http" && f.Name != "read-only" && f.Name != "help" {
 			t.Errorf("unexpected flag --%s", f.Name)
 		}
 	})
@@ -858,5 +858,37 @@ func TestTokenIsEnvOnlyAndComparedInConstantTime(t *testing.T) {
 	}
 	if regexp.MustCompile(`(?i)Header\.Get\("Authorization"\)\s*[!=]=`).Match(src) {
 		t.Error("the Authorization header is compared with ==")
+	}
+}
+
+func TestReadOnlyRefusesWriteTools(t *testing.T) {
+	f := newFake()
+	cs := connect(t, f, factorymcp.Handlers{ReadOnly: true})
+	have := map[string]bool{}
+	for tool, err := range cs.Tools(t.Context(), nil) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		have[tool.Name] = true
+	}
+	for _, n := range []string{"status", "list_tickets", "queue", "list_events", "list_repos", "explain_config", "first_run", "report"} {
+		if !have[n] {
+			t.Errorf("read tool %s missing in read-only mode", n)
+		}
+	}
+	for _, n := range []string{"plan", "approve_plan", "dispatch", "steer", "cancel", "retry", "create_task", "hand_off_task", "queue_followup"} {
+		if have[n] {
+			t.Errorf("write tool %s listed in read-only mode", n)
+		}
+		res, err := cs.CallTool(t.Context(), &sdk.CallToolParams{Name: n, Arguments: callArgs[n]})
+		if err == nil && (res == nil || !res.IsError) {
+			t.Errorf("write tool %s was not refused", n)
+		}
+	}
+}
+
+func TestReadOnlyFlagExists(t *testing.T) {
+	if factorymcp.NewCommand().Flags().Lookup("read-only") == nil {
+		t.Fatal("no --read-only flag")
 	}
 }

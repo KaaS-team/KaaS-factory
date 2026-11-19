@@ -273,6 +273,7 @@ Serve the factory to Claude Code over stdio, or over HTTP with --http (MCP)
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--http` | string | `` | serve streamable HTTP at /mcp on this address (default host 127.0.0.1); the bearer token is read from FACTORY_MCP_TOKEN |
+| `--read-only` | bool | `false` | serve only the read tools; write tools are refused |
 
 ## factory packs
 
