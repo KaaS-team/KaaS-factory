@@ -419,7 +419,7 @@ func (d *Dispatcher) run0(ctx context.Context, argv []string, dir, branch string
 
 // begin reads the process's output until it exits, and ends the run.
 func (p *process) begin(d *Dispatcher, b api.Brief, sess api.Session) {
-	cmd, out, cancel, runCtx, dir, cfgDir, guard := p.cmd, p.out, p.cancel, p.runCtx, p.dir, p.cfgDir, p.guard
+	out, cancel, runCtx, guard := p.out, p.cancel, p.runCtx, p.guard
 	session := func(*process) api.Session { return sess }
 	var capGuard *autosubmit.Guard
 	if d.cfg.Autosubmit != nil {
@@ -461,27 +461,35 @@ func (p *process) begin(d *Dispatcher, b api.Brief, sess api.Session) {
 				}
 			}
 		}
-		p.err = exitErr(cmd.Wait(), cmd.ProcessState, stuckErr)
-		_ = sandbox.KillGroup(cmd) // anything the agent left behind
-		if guard != nil {
-			restore()
-			if restoreErr != nil && p.err == nil {
-				p.err = fmt.Errorf("local: restore after untrusted session: %w", restoreErr)
-			}
-		}
-		if cfgDir != "" {
-			_ = os.RemoveAll(cfgDir)
-		}
-		p.end = d.cfg.Now()
-		if capGuard != nil && d.ctx.Err() == nil && !p.canceled.Load() && (breach != "" || p.err != nil) {
-			if breach == "" {
-				breach = autosubmit.Died
-			}
-			p.partialURL, p.partialErr = d.cfg.Autosubmit.Submit(d.ctx, autosubmit.Exit{Brief: b, Dir: dir, Reason: breach})
-		}
-		cancel()
-		close(p.done)
+		p.finish(d, b, breach, stuckErr, restoreErr, restore)
 	}()
+}
+
+// finish reaps the process, restores the settings, removes the temp config and, when a cap or a
+// death ended the run, submits what the agent left. It ends the run.
+func (p *process) finish(d *Dispatcher, b api.Brief, breach autosubmit.Reason, stuckErr, restoreErr error, restore func()) {
+	cmd, cancel, dir, cfgDir, guard := p.cmd, p.cancel, p.dir, p.cfgDir, p.guard
+	capGuard := d.cfg.Autosubmit
+	p.err = exitErr(cmd.Wait(), cmd.ProcessState, stuckErr)
+	_ = sandbox.KillGroup(cmd) // anything the agent left behind
+	if guard != nil {
+		restore()
+		if restoreErr != nil && p.err == nil {
+			p.err = fmt.Errorf("local: restore after untrusted session: %w", restoreErr)
+		}
+	}
+	if cfgDir != "" {
+		_ = os.RemoveAll(cfgDir)
+	}
+	p.end = d.cfg.Now()
+	if capGuard != nil && d.ctx.Err() == nil && !p.canceled.Load() && (breach != "" || p.err != nil) {
+		if breach == "" {
+			breach = autosubmit.Died
+		}
+		p.partialURL, p.partialErr = d.cfg.Autosubmit.Submit(d.ctx, autosubmit.Exit{Brief: b, Dir: dir, Reason: breach})
+	}
+	cancel()
+	close(p.done)
 }
 
 // exitErr is a run's result. An abort replaces the exit error only when the kill did the ending: a

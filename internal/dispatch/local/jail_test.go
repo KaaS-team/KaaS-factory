@@ -88,11 +88,8 @@ func TestSandboxDispatchUsesSessionConfigDir(t *testing.T) {
 }
 
 // A jailed agent cannot plant a hook or edit git config; it can write its worktree and commit.
-func TestSandboxBlocksGitHooksAndConfigButNotTheWorktree(t *testing.T) {
-	skipWithoutJail(t)
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git")
-	}
+// jailRepo makes a repo with a worktree, a tag and a lease ref, and returns the repo and worktree dirs.
+func jailRepo(t *testing.T) (repo, wt string) {
 	// The jail's temp dir must not contain the repo, so the repo lives under the package dir.
 	t.Setenv("TMPDIR", t.TempDir())
 	repo, err := os.MkdirTemp(".", "jailrepo-")
@@ -113,7 +110,7 @@ func TestSandboxBlocksGitHooksAndConfigButNotTheWorktree(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".git", "hooks"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	wt := filepath.Join(repo, "wt")
+	wt = filepath.Join(repo, "wt")
 	run(repo, "worktree", "add", "-q", "-B", bf.Branch, wt, "main")
 	run(repo, "tag", "v1")
 	if err := os.MkdirAll(filepath.Join(repo, ".git", "refs", "factory", "lease"), 0o755); err != nil {
@@ -122,6 +119,15 @@ func TestSandboxBlocksGitHooksAndConfigButNotTheWorktree(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, ".git", "refs", "factory", "lease", "7"), []byte("0000000000000000000000000000000000000000\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return repo, wt
+}
+
+func TestSandboxBlocksGitHooksAndConfigButNotTheWorktree(t *testing.T) {
+	skipWithoutJail(t)
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	repo, wt := jailRepo(t)
 	g := filepath.Join(repo, ".git")
 	body := "echo x > '" + g + "/hooks/post-checkout' 2>hook.err; echo $? > hook.rc\n" +
 		"echo '[core]' >> '" + g + "/config' 2>cfg.err; echo $? > cfg.rc\n" +

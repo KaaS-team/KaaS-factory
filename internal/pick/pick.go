@@ -101,22 +101,7 @@ func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, fi
 	if limit <= 0 {
 		return out, nil
 	}
-	held := []holder{{files: locks.Files}}
-	open := map[api.TicketID]bool{}
-	for id, v := range locks.Unmerged {
-		if v {
-			open[id] = true
-		}
-	}
-	isRunning := map[api.TicketID]bool{}
-	for _, r := range running {
-		held = append(held, holder{r.ID, r.Files, locks.Branches[r.ID]})
-		open[r.ID] = true
-		isRunning[r.ID] = true
-	}
-	for _, t := range ranked {
-		open[t.ID] = true
-	}
+	held, open, isRunning := startState(running, ranked, locks)
 	var skips []Skip
 	perRepo := map[string]int{}
 	if f := locks.Fair; f != nil {
@@ -156,6 +141,27 @@ func Refill(free int, ranked []api.Ticket, running []api.Ticket, locks Locks, fi
 		held = append(held, holder{t.ID, t.Files, locks.Branches[t.ID]})
 	}
 	return out, skips
+}
+
+// startState returns the holders of files, the tickets that still count as open, and the running set.
+func startState(running, ranked []api.Ticket, locks Locks) ([]holder, map[api.TicketID]bool, map[api.TicketID]bool) {
+	held := []holder{{files: locks.Files}}
+	open := map[api.TicketID]bool{}
+	for id, v := range locks.Unmerged {
+		if v {
+			open[id] = true
+		}
+	}
+	isRunning := map[api.TicketID]bool{}
+	for _, r := range running {
+		held = append(held, holder{r.ID, r.Files, locks.Branches[r.ID]})
+		open[r.ID] = true
+		isRunning[r.ID] = true
+	}
+	for _, t := range ranked {
+		open[t.ID] = true
+	}
+	return held, open, isRunning
 }
 
 // overlap returns why t must wait for a holder, or "" when it may start.

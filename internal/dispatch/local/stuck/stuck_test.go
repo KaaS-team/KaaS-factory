@@ -70,14 +70,17 @@ func same(a, b []Kind) bool {
 	return true
 }
 
-func TestPatterns(t *testing.T) {
+type patternRow struct {
+	name  string
+	lines [][]byte
+	want  []Kind
+	pat   Pattern // pattern of the first verdict
+}
+
+// repeatRows are the TestPatterns rows for one family of patterns.
+func repeatRows() []patternRow {
 	ls := map[string]any{"cmd": "ls"}
-	rows := []struct {
-		name  string
-		lines [][]byte
-		want  []Kind
-		pat   Pattern // pattern of the first verdict
-	}{
+	return []patternRow{
 		{"scenario 1: same call, same result, 3 times is not yet a loop", repeat(3, "Bash", ls, "a", false), nil, ""},
 		{"scenario 1: same call, same result, 4 times nudges", repeat(4, "Bash", ls, "a", false), []Kind{Nudge}, ActionObservation},
 		{"scenario 1: the next 4 repeats after the nudge abort", repeat(8, "Bash", ls, "a", false), []Kind{Nudge, Abort}, ActionObservation},
@@ -99,6 +102,13 @@ func TestPatterns(t *testing.T) {
 			}
 			return l
 		}(), nil, ""},
+	}
+}
+
+// errorStreakRows are the TestPatterns rows for one family of patterns.
+func errorStreakRows() []patternRow {
+	ls := map[string]any{"cmd": "ls"}
+	return []patternRow{
 		{"scenario 2: the third identical error nudges", repeat(3, "Bash", ls, "boom", true), []Kind{Nudge}, ActionError},
 		{"scenario 2: the fourth identical error aborts", repeat(4, "Bash", ls, "boom", true), []Kind{Nudge, Abort}, ActionError},
 		{"scenario 2: the streak counts the call, not the error text: nudge at 3, abort at 4", func() (l [][]byte) {
@@ -124,9 +134,22 @@ func TestPatterns(t *testing.T) {
 			}
 			return l
 		}(), nil, ""},
+	}
+}
+
+// monologueRows are the TestPatterns rows for one family of patterns.
+func monologueRows() []patternRow {
+	return []patternRow{
 		{"scenario 3: two agent messages are not a monologue", [][]byte{say("a"), say("b")}, nil, ""},
 		{"scenario 3: three agent messages in a row nudge", [][]byte{say("a"), say("b"), say("c")}, []Kind{Nudge}, Monologue},
 		{"scenario 3: a tool result in between breaks it", [][]byte{say("a"), say("b"), result("x", "r", false), say("c")}, nil, ""},
+	}
+}
+
+// alternationRows are the TestPatterns rows for one family of patterns.
+func alternationRows() []patternRow {
+	ls := map[string]any{"cmd": "ls"}
+	return []patternRow{
 		{"scenario 4: A B A B A B alternation nudges", func() (l [][]byte) {
 			for i := 0; i < 6; i++ {
 				in, out := ls, "one"
@@ -143,6 +166,13 @@ func TestPatterns(t *testing.T) {
 			}
 			return append(l, compact(), compact(), compact())
 		}(), []Kind{Nudge}, Compaction},
+	}
+}
+
+// errorRunRows are the TestPatterns rows for one family of patterns.
+func errorRunRows() []patternRow {
+	ls := map[string]any{"cmd": "ls"}
+	return []patternRow{
 		// Ported behaviour: go/k9-stall internal/dispatch/stall/stall.go counted errors across different calls.
 		{"error-run: three errors from three different calls nudge", func() (l [][]byte) {
 			for i := 0; i < 3; i++ {
@@ -164,6 +194,13 @@ func TestPatterns(t *testing.T) {
 		}(), []Kind{Nudge}, ErrorRun},
 		{"a user message starts a fresh window", append(repeat(3, "Bash", ls, "a", false), append([][]byte{user("go on")}, repeat(3, "Bash", ls, "a", false)...)...), nil, ""},
 		{"lines that are not tool or message events are ignored", [][]byte{[]byte("not json"), []byte(`{"type":"result"}`), []byte(`{"type":"system","subtype":"init"}`)}, nil, ""},
+	}
+}
+
+func TestPatterns(t *testing.T) {
+	var rows []patternRow
+	for _, g := range [][]patternRow{repeatRows(), errorStreakRows(), monologueRows(), alternationRows(), errorRunRows()} {
+		rows = append(rows, g...)
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {

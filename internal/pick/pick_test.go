@@ -116,7 +116,8 @@ func TestRefill(t *testing.T) {
 
 // Symphony 8.1 (dispatch preflight): an area overlap with an in-flight ticket waits unless the
 // two branches really merge clean. This uses real git, not a fake.
-func TestRefillMergeTree(t *testing.T) {
+// mergeTreeRepo builds a repo with branches run, clash (conflicts with run) and clean, and returns its dir.
+func mergeTreeRepo(t *testing.T) string {
 	dir := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()
@@ -150,6 +151,11 @@ func TestRefillMergeTree(t *testing.T) {
 	edit("clash", "a.txt", "1\nclash\n3\n")
 	edit("clean", "b.txt", "y\n")
 
+	return dir
+}
+
+func TestRefillMergeTree(t *testing.T) {
+	dir := mergeTreeRepo(t)
 	g := gitx.New(dir)
 	merge := func(a, b string) ([]string, error) { return g.MergeTree(context.Background(), "main", a, b) }
 	running := []api.Ticket{tk("R", 0, 0, "a.txt")}
