@@ -148,3 +148,25 @@ func TestDoctorWorkflowsLoad(t *testing.T) {
 		t.Fatalf("empty dir: err = %v\n%s", err, out)
 	}
 }
+
+// gh auth status rejects some working tokens; a token that can call the API passes the gh check.
+func TestDoctorGhTokenFallback(t *testing.T) {
+	for _, tc := range []struct {
+		name, script, token string
+		fail                bool
+	}{
+		{"token works for the API", `[ "$1" = auth ] && exit 1; exit 0`, "tok", false},
+		{"token rejected by the API", "exit 1", "tok", true},
+		{"no token", `[ "$1" = auth ] && exit 1; exit 0`, "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doctorEnv(t, map[string]string{"git": "exit 0", "gh": tc.script, "claude": "exit 0", "go": "exit 0"})
+			t.Setenv("GH_TOKEN", tc.token)
+			t.Setenv("GITHUB_TOKEN", "")
+			out, _, err := runCLI(t, "doctor")
+			if tc.fail != strings.Contains(out, "fail\tgh") || tc.fail != (err != nil) {
+				t.Fatalf("fail = %v, err = %v, out:\n%s", tc.fail, err, out)
+			}
+		})
+	}
+}

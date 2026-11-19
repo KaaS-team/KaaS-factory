@@ -98,7 +98,7 @@ func ghCheck() checkRow {
 	if row.Status != statusPass {
 		return row
 	}
-	if err := exec.Command("gh", "auth", "status").Run(); err != nil {
+	if exec.Command("gh", "auth", "status").Run() != nil && (os.Getenv("GH_TOKEN")+os.Getenv("GITHUB_TOKEN") == "" || exec.Command("gh", "api", "rate_limit").Run() != nil) {
 		return checkRow{"gh", statusFail, "gh is not logged in", "run `gh auth login`"}
 	}
 	row.Detail += " (logged in)"
