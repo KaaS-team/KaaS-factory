@@ -414,6 +414,8 @@ Show tokens per merged PR, rework, human touches and cycle time (operator only)
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--by` | string | `team` | group rows by team, workflow or pack |
+| `--churn` | string | `14d` | with --cost, a revert within this long after merge counts against the PR |
+| `--cost` | bool | `false` | print cost per surviving merged PR, per repo and in total |
 | `--json` | bool | `false` | write JSON instead of markdown |
 | `--out` | string | `` | write the report to this file; never under .github/ or a PR body file |
 | `--since` | string | `7d` | window length ending now, such as 7d or 36h |

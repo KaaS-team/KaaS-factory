@@ -39,7 +39,7 @@ func (s StoreSource) Tickets(ctx context.Context, w Window) ([]TicketRecord, err
 	var out []TicketRecord
 	for _, r := range rows {
 		rec := TicketRecord{
-			ID: r.ID, Team: r.Team, Workflow: r.Workflow, Pack: r.Pack,
+			ID: r.ID, Repo: r.Repo, Team: r.Team, Workflow: r.Workflow, Pack: r.Pack,
 			FirstDispatch: r.FirstDispatch, MergedAt: r.MergedAt,
 			ChatopsCommands: r.ChatopsCommands, ManualPushes: r.ManualPushes,
 		}

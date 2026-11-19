@@ -1,0 +1,29 @@
+{
+  "churn_days": 14,
+  "total": {
+    "repo": "all",
+    "merged": 3,
+    "surviving": 2,
+    "spend_usd": 7.5,
+    "cost_per_surviving_pr_usd": 3.75,
+    "revert_rate": 0.3333333333333333
+  },
+  "repos": [
+    {
+      "repo": "o/a",
+      "merged": 2,
+      "surviving": 1,
+      "spend_usd": 5.5,
+      "cost_per_surviving_pr_usd": 5.5,
+      "revert_rate": 0.5
+    },
+    {
+      "repo": "o/b",
+      "merged": 1,
+      "surviving": 1,
+      "spend_usd": 2,
+      "cost_per_surviving_pr_usd": 2,
+      "revert_rate": 0
+    }
+  ]
+}
