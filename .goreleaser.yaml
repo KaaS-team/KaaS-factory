@@ -24,7 +24,8 @@ checksum:
 brews:
   - name: factory
     ids: [factory]
-    homepage: https://github.com/KaaS-team/KaaS-factory
+    directory: Formula
+    homepage: https://github.com/KaaS-team/factory
     description: Plans work into tickets and runs them on parallel coding-agent sessions
     license: Apache-2.0
     repository:
@@ -33,3 +34,8 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     test: |
       system "#{bin}/factory", "version"
+
+release:
+  github:
+    owner: KaaS-team
+    name: factory
