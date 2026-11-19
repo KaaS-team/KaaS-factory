@@ -168,8 +168,8 @@ func (lazyFiler) Create(ctx context.Context, t api.Ticket) (api.TicketID, error)
 }
 
 // mcpHandlers backs the MCP tools that have a CLI command with that command, run in process, so a
-// tool and its command share one code path. approve_plan and explain_config stay unwired: approving
-// needs a plan id the CLI does not keep, and explain needs a key the tool does not take.
+// tool and its command share one code path. The CLI keeps no plan id between calls, so approve_plan
+// takes the goal and runs `plan --approve` in one call.
 func mcpHandlers() mcp.Handlers {
 	return mcp.Handlers{
 		FirstRun: func(ctx context.Context) (string, error) { return runSub(ctx, "first-run", "--dry-run") },
@@ -180,6 +180,18 @@ func mcpHandlers() mcp.Handlers {
 				return "", fmt.Errorf("plan: goal must be text, not empty or a flag")
 			}
 			return runSub(ctx, "plan", "--", in.Goal)
+		},
+		ApprovePlan: func(ctx context.Context, in mcp.ApprovePlanInput) (string, error) {
+			if g := strings.TrimSpace(in.Goal); g == "" || strings.HasPrefix(g, "-") {
+				return "", fmt.Errorf("approve_plan: goal must be text, not empty or a flag")
+			}
+			return runSub(ctx, "plan", "--approve", "--", in.Goal)
+		},
+		ExplainConfig: func(ctx context.Context, in mcp.ExplainConfigInput) (string, error) {
+			if k := strings.TrimSpace(in.Key); k == "" || strings.HasPrefix(k, "-") {
+				return "", fmt.Errorf("explain_config: key must be a name, not empty or a flag")
+			}
+			return runSub(ctx, "config", "explain", "--", in.Key)
 		},
 	}
 }

@@ -28,7 +28,12 @@ type PlanInput struct {
 
 // ApprovePlanInput is the input of the approve_plan tool.
 type ApprovePlanInput struct {
-	PlanID string `json:"plan_id" jsonschema:"id of the plan to approve"`
+	Goal string `json:"goal" jsonschema:"the goal to plan and approve in one call"`
+}
+
+// ExplainConfigInput is the input of the explain_config tool.
+type ExplainConfigInput struct {
+	Key string `json:"key" jsonschema:"config key to explain, such as tracker"`
 }
 
 // Handlers holds the optional tool implementations; a nil func makes its tool
@@ -36,7 +41,7 @@ type ApprovePlanInput struct {
 type Handlers struct {
 	Plan          func(ctx context.Context, in PlanInput) (string, error)
 	ApprovePlan   func(ctx context.Context, in ApprovePlanInput) (string, error)
-	ExplainConfig func(ctx context.Context) (string, error)
+	ExplainConfig func(ctx context.Context, in ExplainConfigInput) (string, error)
 	FirstRun      func(ctx context.Context) (string, error)
 	Report        func(ctx context.Context) (string, error)
 	// ReadOnly hides every write tool, so a call to one is refused (the --read-only flag).
@@ -306,8 +311,8 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 	s := sdk.NewServer(&sdk.Implementation{Name: "factory", Version: "v9"}, nil)
 
 	sdk.AddTool(s, &sdk.Tool{Name: "plan", Description: "Plan a goal into tickets"}, textTool("plan", extra.Plan))
-	sdk.AddTool(s, &sdk.Tool{Name: "approve_plan", Description: "Approve a plan so its tickets are filed"}, textTool("approve_plan", extra.ApprovePlan))
-	sdk.AddTool(s, &sdk.Tool{Name: "explain_config", Description: "Explain the active configuration"}, textTool("explain_config", noArg(extra.ExplainConfig)))
+	sdk.AddTool(s, &sdk.Tool{Name: "approve_plan", Description: "Plan a goal and approve it in one call, so its tickets are filed. The factory keeps no plan id between calls, so this takes the goal, not an id. Each call files tickets."}, textTool("approve_plan", extra.ApprovePlan))
+	sdk.AddTool(s, &sdk.Tool{Name: "explain_config", Description: "Explain which layer set a config key and which layers it overrode. Read-only."}, textTool("explain_config", extra.ExplainConfig))
 	sdk.AddTool(s, &sdk.Tool{Name: "first_run", Description: "Walk through a first run"}, textTool("first_run", noArg(extra.FirstRun)))
 	sdk.AddTool(s, &sdk.Tool{Name: "report", Description: "Report on finished work"}, textTool("report", noArg(extra.Report)))
 

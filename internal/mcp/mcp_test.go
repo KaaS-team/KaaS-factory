@@ -65,7 +65,7 @@ var toolNames = []string{"plan", "approve_plan", "list_tickets", "status", "disp
 // callArgs gives each tool a valid input.
 var callArgs = map[string]map[string]any{
 	"plan":           {"goal": "g"},
-	"approve_plan":   {"plan_id": "p"},
+	"approve_plan":   {"goal": "g"},
 	"list_tickets":   {},
 	"status":         {},
 	"dispatch":       {"ticket": "7"},
@@ -73,7 +73,7 @@ var callArgs = map[string]map[string]any{
 	"cancel":         {"ticket": "7"},
 	"retry":          {"ticket": "7"},
 	"queue":          {},
-	"explain_config": {},
+	"explain_config": {"key": "tracker"},
 	"first_run":      {},
 	"report":         {},
 	"create_task":    {"title": "t", "body": "b"},
@@ -213,7 +213,7 @@ func TestNoToolOutputLeaksUsageCostOrModel(t *testing.T) {
 	h := factorymcp.Handlers{
 		Plan:          func(context.Context, factorymcp.PlanInput) (string, error) { return "fine", nil },
 		ApprovePlan:   func(context.Context, factorymcp.ApprovePlanInput) (string, error) { return "fine", nil },
-		ExplainConfig: func(context.Context) (string, error) { return "fine", nil },
+		ExplainConfig: func(context.Context, factorymcp.ExplainConfigInput) (string, error) { return "fine", nil },
 		FirstRun:      func(context.Context) (string, error) { return "fine", nil },
 		Report:        func(context.Context) (string, error) { return "fine", nil },
 	}
@@ -472,7 +472,7 @@ func TestErrorsAreToolErrorsWithoutOperatorDetail(t *testing.T) {
 	h := factorymcp.Handlers{
 		Plan:          func(context.Context, factorymcp.PlanInput) (string, error) { return "", boom },
 		ApprovePlan:   func(context.Context, factorymcp.ApprovePlanInput) (string, error) { return "", boom },
-		ExplainConfig: failing, FirstRun: failing, Report: failing,
+		ExplainConfig: func(context.Context, factorymcp.ExplainConfigInput) (string, error) { return "", boom }, FirstRun: failing, Report: failing,
 	}
 	cs := connect(t, &spy{Control: newFake(), failWith: boom}, h)
 	for _, n := range toolNames {
