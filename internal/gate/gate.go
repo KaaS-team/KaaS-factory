@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/KaaS-team/factory/internal/redact"
 )
 
 // DefaultTail is how many bytes of output Run keeps when Spec.TailBytes is zero.
@@ -21,9 +23,6 @@ const (
 	tailCap    = 8 * 1024
 	bufferSize = 64 * 1024
 )
-
-// secretRE matches the shapes of common tokens: GitHub, OpenAI-style, Slack and AWS keys.
-var secretRE = regexp.MustCompile(`ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|\bsk-[A-Za-z0-9_-]{16,}|xox[bp]-[A-Za-z0-9-]{10,}|\bAKIA[0-9A-Z]{16}`)
 
 // WaitDelay bounds how long Run waits for output pipes after the process group is killed.
 const waitDelay = 2 * time.Second
@@ -55,13 +54,15 @@ type Spec struct {
 
 var lineRE = regexp.MustCompile(`FACTORY_GATES:\s*status=(\w+)\s+passed=(\d+)\s+failed=(\d+)\s+skipped=(\d+)\s+failed_gates=(\S*)`)
 
-// Parse reads the first FACTORY_GATES line in output, as parseGateLine in src/gates.ts does.
+// Parse reads the last FACTORY_GATES line in output: the gate script prints its verdict at the
+// end, so an earlier line (a test fixture, a nested run) must not decide it.
 // The second result is false when there is no well-formed line.
 func Parse(output string) (Result, bool) {
-	m := lineRE.FindStringSubmatch(output)
-	if m == nil {
+	all := lineRE.FindAllStringSubmatch(output, -1)
+	if all == nil {
 		return Result{}, false
 	}
+	m := all[len(all)-1]
 	nums := [3]int{}
 	for i := range nums {
 		n, err := strconv.Atoi(m[2+i])
@@ -120,6 +121,13 @@ func Run(ctx context.Context, s Spec) Result {
 	}
 	if r, ok := Parse(full); ok {
 		r.Tail = tl
+		if r.Status == "GREEN" && err != nil {
+			// A GREEN line with a non-zero exit is a disagreement, and any disagreement is RED.
+			r.Status, r.Reason = "RED", "gate printed GREEN but the process failed: "+err.Error()
+			r.FailedGates = append(r.FailedGates, "exit")
+		} else if r.Status == "RED" && err == nil {
+			r.Reason = "gate printed RED but the process exited 0"
+		}
 		return r
 	}
 	reason := "gates produced no FACTORY_GATES line"
@@ -138,7 +146,7 @@ func makeTail(out string) string {
 		lines = lines[len(lines)-tailLines:]
 	}
 	for i, l := range lines {
-		if secretRE.MatchString(l) {
+		if redact.Has(l) {
 			lines[i] = "[redacted]"
 		}
 	}

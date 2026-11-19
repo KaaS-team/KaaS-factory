@@ -23,7 +23,7 @@ func TestParse(t *testing.T) {
 		{"skipped", "FACTORY_GATES: status=GREEN passed=3 failed=0 skipped=2 failed_gates=", Result{Status: "GREEN", Passed: 3, Skipped: 2, FailedGates: []string{}}, true},
 		{"lowercase status is upcased", "FACTORY_GATES: status=green passed=1 failed=0 skipped=0 failed_gates=-", Result{Status: "GREEN", Passed: 1, FailedGates: []string{}}, true},
 		{"misconfigured is unknown", "FACTORY_GATES: status=MISCONFIGURED passed=0 failed=0 skipped=0 failed_gates=-", Result{Status: "UNKNOWN", FailedGates: []string{}}, true},
-		{"first line wins", "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=a\nFACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0 failed_gates=-", Result{Status: "RED", Failed: 1, FailedGates: []string{"a"}}, true},
+		{"last line wins", "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=a\nFACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0 failed_gates=-", Result{Status: "GREEN", Passed: 1, FailedGates: []string{}}, true},
 		{"malformed: missing field", "FACTORY_GATES: status=GREEN passed=2 failed=0", Result{}, false},
 		{"malformed: bare marker", "FACTORY_GATES first", Result{}, false},
 		{"malformed: non numeric", "FACTORY_GATES: status=GREEN passed=x failed=0 skipped=0 failed_gates=-", Result{}, false},
@@ -183,4 +183,29 @@ func TestRunTailRedactsTokens(t *testing.T) {
 			t.Fatalf("Tail = %q", r.Tail)
 		}
 	})
+}
+
+// The verdict is the last FACTORY_GATES line AND a zero exit. Any disagreement is RED.
+func TestRunVerdict(t *testing.T) {
+	green := "FACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0 failed_gates=-"
+	red := "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=unit"
+	tests := []struct {
+		name, script string
+		wantGreen    bool
+		wantStatus   string
+	}{
+		{"green then red", "echo '" + green + "'; echo '" + red + "'", false, "RED"},
+		{"green with exit 1", "echo '" + green + "'; exit 1", false, "RED"},
+		{"red with exit 0", "echo '" + red + "'", false, "RED"},
+		{"red then green", "echo '" + red + "'; echo '" + green + "'", true, "GREEN"},
+		{"green with exit 0", "echo '" + green + "'", true, "GREEN"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := Run(context.Background(), Spec{Command: tc.script, Timeout: 5 * time.Second})
+			if r.Green() != tc.wantGreen || r.Status != tc.wantStatus {
+				t.Fatalf("Green=%v Status=%s Reason=%q", r.Green(), r.Status, r.Reason)
+			}
+		})
+	}
 }

@@ -210,6 +210,7 @@ Source: https://github.com/anthropics/claude-code-action (MIT, Copyright (c) 202
 
 - `internal/tracker/github/trigger.go` from `src/github/validation/trigger.ts`, `src/github/validation/actor.ts` and `src/github/utils/actor-filter.ts` [ported to Go; tested by `internal/tracker/github/trigger_test.go`]
 - `internal/tracker/sanitize/prompt.go` from `src/github/utils/sanitizer.ts` [tested by `internal/tracker/sanitize/prompt_test.go`]
+- `internal/redact/redact.go` AWS key boundary rule from `src/github/utils/sanitizer.ts` [tested by `internal/redact/redact_test.go`]
 
 ```
 MIT License
@@ -371,3 +372,9 @@ Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright (c) 
 
 - `internal/serve/schedule.go` from `internal-packages/schedule-engine/src/engine/scheduleCalculation.ts` [tested by `internal/serve/schedule_test.go`]
 - `internal/serve/schedule.go` from `internal-packages/schedule-engine/src/engine/distributedScheduling.ts` [tested by `internal/serve/schedule_test.go`]
+
+## gitleaks/gitleaks@5f6ec56
+
+Source: https://github.com/gitleaks/gitleaks (MIT, Copyright (c) 2019 Zachary Rice)
+
+- `internal/redact/redact.go` token families from `cmd/generate/config/rules/github.go`, `anthropic.go`, `openai.go`, `aws.go`, `slack.go` and `privatekey.go` [tested by `internal/redact/redact_test.go`]

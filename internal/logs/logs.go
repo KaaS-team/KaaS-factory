@@ -11,9 +11,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"time"
+
+	"github.com/KaaS-team/factory/internal/redact"
 )
 
 // DefaultInterval is how often follow mode polls a remote run log.
@@ -114,25 +115,5 @@ func writeEvent(w io.Writer, e Event, asJSON bool) error {
 	return err
 }
 
-// credentialRE lists the token shapes the gate redacts (copied from the v8
-// src/mc/redact.ts; another session moves the list into internal/gate).
-var credentialRE = []*regexp.Regexp{
-	regexp.MustCompile(`//[^\s/@:]+:[^\s/@]+@`),
-	regexp.MustCompile(`(?i)\b(Bearer|Basic)\s+[A-Za-z0-9+/=._~-]{8,}`),
-	regexp.MustCompile(`\bgh[pousr]_[A-Za-z0-9]{20,}`),
-	regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}`),
-	regexp.MustCompile(`\bsk-(ant-)?[A-Za-z0-9_-]{16,}`),
-	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
-	regexp.MustCompile(`\bxox[abpr]-[A-Za-z0-9-]{10,}`),
-	regexp.MustCompile(`\beyJ[\w-]+\.[\w-]+\.[\w-]+`),
-	regexp.MustCompile(`(?i)[?&](token|access_token|key|api_key|secret|sig|signature|code|auth)=[^&\s#]*`),
-	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),
-}
-
-// Redact replaces every token-shaped substring of s with "[redacted]".
-func Redact(s string) string {
-	for _, re := range credentialRE {
-		s = re.ReplaceAllString(s, "[redacted]")
-	}
-	return s
-}
+// Redact replaces every token-shaped substring of s with "[redacted]". It is redact.Strict.
+func Redact(s string) string { return redact.Strict(s) }
