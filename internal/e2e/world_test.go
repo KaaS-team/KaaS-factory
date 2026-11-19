@@ -121,12 +121,27 @@ func (w *world) gitTry(dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(w.ctx, "git", args...)
 	cmd.Dir = dir
 	d := w.clk.Now().Format(time.RFC3339)
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(isolatedEnv(),
 		"GIT_AUTHOR_NAME=agent", "GIT_AUTHOR_EMAIL=agent@example.com",
 		"GIT_COMMITTER_NAME=agent", "GIT_COMMITTER_EMAIL=agent@example.com",
 		"GIT_AUTHOR_DATE="+d, "GIT_COMMITTER_DATE="+d, "GIT_TERMINAL_PROMPT=0")
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
+}
+
+// isolatedEnv drops the git variables that point a command at another repo. A gate run from a
+// git hook inherits GIT_DIR, and with it set the harness once committed and pushed "tiny module"
+// to the real origin's main.
+func isolatedEnv() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		switch strings.SplitN(kv, "=", 2)[0] {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY":
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
 }
 
 func (w *world) git(dir string, args ...string) string {
