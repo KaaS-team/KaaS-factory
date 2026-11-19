@@ -44,10 +44,10 @@ brew install kaas-team/tap/factory
 Or, with no sudo (installs to `$HOME/.local/bin`, checks the checksum first):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/KaaS-team/KaaS-factory/main/install/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/KaaS-team/factory/main/install.sh | sh
 ```
 
-More in [docs/install.md](docs/install.md).
+Or build from source with Go 1.26 or newer: `go install github.com/KaaS-team/factory/cmd/factory@latest`. More in [docs/install.md](docs/install.md).
 
 ## CLI
 
@@ -63,8 +63,19 @@ factory cancel <ticket>
 factory retry <ticket>
 ```
 
-`plan` turns a goal into a ticket graph. `--approve` files it. `run` starts the loop. The full list is
-in [docs/cli-reference.md](docs/cli-reference.md).
+`plan` turns a goal into a ticket graph. `--approve` files it. `run` starts the loop.
+
+### Command list
+
+| Group | Commands |
+|---|---|
+| Set up | `doctor`, `init`, `first-run`, `config`, `packs`, `add`, `upgrade`, `version` |
+| Plan and run | `plan`, `run`, `dispatch`, `serve`, `eval`, `design`, `review`, `repomap`, `checkpoint`, `browsercheck` |
+| Watch and steer | `status`, `queue`, `logs`, `steer`, `cancel`, `retry`, `board`, `dashboard`, `report`, `shadow`, `audit` |
+| Connect | `mcp`, `a2a` |
+
+The full flag list for every command is in [docs/cli-reference.md](docs/cli-reference.md). A test keeps
+it equal to the real command tree.
 
 ## MCP
 
@@ -89,13 +100,19 @@ Pick one with `factory init --tier <name>`. Each tier is a preset you can edit a
 | Org | `enterprise` | Six slots, approval always, daily team and monthly spend caps. |
 | Enterprise | `regulated` | Approval always, and the requester cannot approve or auto-merge. |
 
-`oss` is a fifth preset for open-source maintainers: two local slots, approval always.
+`oss` is a fifth preset: two local slots, approval always.
 
 ## Configuration
 
 Settings come from layers, lowest to highest: defaults, the org file, the team file, the repository
 file, `FACTORY_*` variables, and flags. The org layer is a ceiling. Every key is in
 [docs/config.md](docs/config.md).
+
+## Links
+
+- [docs/config.md](docs/config.md) for every setting.
+- [AGENTS.md](AGENTS.md) for the package map and the gate.
+- Issues and releases: https://github.com/KaaS-team/factory
 
 ## Contributing and license
 
