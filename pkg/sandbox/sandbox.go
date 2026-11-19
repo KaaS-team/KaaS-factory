@@ -34,7 +34,7 @@ type Spec struct {
 	// AllowHosts is recorded in the report only; no host filtering is enforced.
 	AllowHosts []string
 	// Backend selects the isolation: "" or "jail" for the helper below, "runsc" for gVisor
-	// when a pinned runsc is installed; otherwise the jail runs.
+	// when a pinned runsc is installed; "remote" runs off the host through RunRemote.
 	Backend string
 	// Baseline is the session's rlimit layer; every process in the jail inherits it.
 	Baseline Limits
@@ -71,6 +71,9 @@ type request struct {
 func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec.Cmd, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
+	}
+	if spec.Backend == BackendRemote {
+		return nil, ErrRemoteBackend
 	}
 	return commandFor(ctx, spec, DefaultRunscPin, name, args...)
 }
