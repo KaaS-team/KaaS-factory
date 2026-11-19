@@ -175,7 +175,11 @@ func mcpHandlers() mcp.Handlers {
 		FirstRun: func(ctx context.Context) (string, error) { return runSub(ctx, "first-run", "--dry-run") },
 		Report:   func(ctx context.Context) (string, error) { return runSub(ctx, "report") },
 		Plan: func(ctx context.Context, in mcp.PlanInput) (string, error) {
-			return runSub(ctx, "plan", in.Goal)
+			// The goal is data: a goal such as "--approve" must never become a flag.
+			if g := strings.TrimSpace(in.Goal); g == "" || strings.HasPrefix(g, "-") {
+				return "", fmt.Errorf("plan: goal must be text, not empty or a flag")
+			}
+			return runSub(ctx, "plan", "--", in.Goal)
 		},
 	}
 }

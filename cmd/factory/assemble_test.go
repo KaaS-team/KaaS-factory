@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/KaaS-team/factory/internal/mcp"
 	"math"
 	"os"
 	"path/filepath"
@@ -220,6 +221,16 @@ func TestMCPHandlersWired(t *testing.T) {
 		f, name := v.Field(i), v.Type().Field(i).Name
 		if f.Kind() == reflect.Func && f.IsNil() && !unwired[name] {
 			t.Errorf("mcp handler %s is not wired", name)
+		}
+	}
+}
+
+// TestMCPPlanGoalIsNotAFlag: an MCP client cannot pass flags through the goal, so "--approve"
+// never files tickets.
+func TestMCPPlanGoalIsNotAFlag(t *testing.T) {
+	for _, g := range []string{"--approve", "-h", "", "  "} {
+		if _, err := mcpHandlers().Plan(context.Background(), mcp.PlanInput{Goal: g}); err == nil || !strings.Contains(err.Error(), "goal must be text") {
+			t.Errorf("goal %q: err = %v, want a refusal", g, err)
 		}
 	}
 }
