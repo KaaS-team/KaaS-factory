@@ -23,8 +23,8 @@ PASS
 ok  	github.com/KaaS-team/factory/internal/smoke	13.103s
 ```
 
-`factory doctor` printed seven `pass` rows. `factory status` printed
-`no tickets running (0 ready, 0 in the merge queue)`. `factory report` printed the zero table.
+`factory doctor` printed seven `pass` rows. `factory status --json` printed
+`{"slots":[],"ready":[],"merge_queue":[],"fires_left":-1}`. `factory report` printed the zero table.
 
 ## 2. Acceptance
 
@@ -43,7 +43,7 @@ Other findings:
   remain in demo-sandbox and need a local delete. Issues #6, #9 and #10 are closed smoke leftovers.
 - So the full-loop tests now need `FACTORY_SMOKE_LOOP=1`. They claim every ready issue.
 - `factory status` and `factory board` read the process's own state, not the tracker, so the seeded
-  issues do not show on a fresh run. Status now prints a line when empty.
+  issues do not show on a fresh run. Plain `factory status` prints nothing on an empty board, so the test runs `status --json`.
 
 ## 3. Upstreams copied
 
@@ -51,8 +51,7 @@ None.
 
 ## 4. Files outside my area
 
-- `cmd/factory/doctor.go` and `doctor_test.go`: the gh check passes when `gh auth status` fails but
+- `cmd/factory/doctor.go` (net 0 lines, to hold the line ratchet) and `doctor_test.go`: the gh check passes when `gh auth status` fails but
   the token in `GH_TOKEN` or `GITHUB_TOKEN` can call the API (an app installation token).
-- `cmd/factory/commands.go` and `commands_test.go`: `status` prints a line on an empty board.
 
 Workflow changes needed: none.

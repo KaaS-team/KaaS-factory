@@ -13,7 +13,7 @@ import (
 )
 
 // liveCommands are the four commands a new user runs first. See docs/smoke.md.
-var liveCommands = [][]string{{"doctor"}, {"first-run", "--dry-run"}, {"status"}, {"report"}}
+var liveCommands = [][]string{{"doctor"}, {"first-run", "--dry-run"}, {"status", "--json"}, {"report"}}
 
 // liveCommandEnv is the process environment for the factory binary: the sandbox repo, the GitHub
 // tracker and the local dispatcher, the token for gh and the API, and no ANTHROPIC_* variable
@@ -29,7 +29,7 @@ func liveCommandEnv(e Env) []string {
 		"GITHUB_TOKEN="+e.Token, "GH_TOKEN="+e.Token)
 }
 
-// TestLiveCommands runs doctor, first-run --dry-run, status and report against FACTORY_SMOKE_REPO
+// TestLiveCommands runs doctor, first-run --dry-run, status --json and report against FACTORY_SMOKE_REPO
 // and checks each exits 0 with output. It builds the binary from this checkout.
 func TestLiveCommands(t *testing.T) {
 	e, skip := FromEnv(os.Getenv)

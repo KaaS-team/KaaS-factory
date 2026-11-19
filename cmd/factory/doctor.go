@@ -98,21 +98,11 @@ func ghCheck() checkRow {
 	if row.Status != statusPass {
 		return row
 	}
-	if err := exec.Command("gh", "auth", "status").Run(); err != nil && !tokenWorks() {
+	if exec.Command("gh", "auth", "status").Run() != nil && (os.Getenv("GH_TOKEN")+os.Getenv("GITHUB_TOKEN") == "" || exec.Command("gh", "api", "rate_limit").Run() != nil) {
 		return checkRow{"gh", statusFail, "gh is not logged in", "run `gh auth login`"}
 	}
 	row.Detail += " (logged in)"
 	return row
-}
-
-// tokenWorks says whether a token in GH_TOKEN or GITHUB_TOKEN can call the API. `gh auth status`
-// rejects some working tokens (an app installation token cannot read /user), so a logged-out
-// result is not final when one is set.
-func tokenWorks() bool {
-	if os.Getenv("GH_TOKEN") == "" && os.Getenv("GITHUB_TOKEN") == "" {
-		return false
-	}
-	return exec.Command("gh", "api", "rate_limit").Run() == nil
 }
 
 // envCheck fails when any ANTHROPIC_* variable is set: sessions run under the operator's login.

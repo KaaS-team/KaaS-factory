@@ -22,7 +22,7 @@ sandbox, tracker `github`, dispatcher `local`, and your token as `GH_TOKEN`.
 ```
 factory doctor
 factory first-run --dry-run
-factory status
+factory status --json
 factory report
 ```
 
@@ -38,11 +38,11 @@ pass	dispatcher	/opt/node22/bin/claude
 pass	env	no ANTHROPIC_* variable set
 ```
 
-Healthy `factory status` on a board with nothing running says so, and lists one row per running
-ticket otherwise:
+Healthy `factory status --json` is one JSON object, even when nothing is running. Plain
+`factory status` prints one row per running ticket, so it is empty on a quiet board:
 
 ```
-no tickets running (0 ready, 0 in the merge queue)
+{"slots":[],"ready":[],"merge_queue":[],"fires_left":-1}
 ```
 
 Healthy `factory report` is the unit-economics table. A fresh sandbox has zeros:
@@ -59,8 +59,8 @@ Healthy `factory report` is the unit-economics table. A fresh sandbox has zeros:
 the test skips that step with the same hint. With it, the output is the findings and what the
 factory would fix, and nothing is changed.
 
-`status` shows only what this process has loaded, so it does not list the open issues of the
-sandbox. Use `factory board` or the tracker to see them.
+`status` shows only the state this process has loaded, so it does not list the open issues of the
+sandbox. Use the tracker to see them.
 
 ## The full loop (separate opt-in)
 

@@ -96,9 +96,6 @@ func statusCmd() *cobra.Command {
 			if asJSON {
 				return json.NewEncoder(out).Encode(b)
 			}
-			if len(b.Slots) == 0 {
-				_, _ = fmt.Fprintf(out, "no tickets running (%d ready, %d in the merge queue)\n", len(b.Ready), len(b.MergeQueue))
-			}
 			for _, s := range b.Slots {
 				_, _ = fmt.Fprintf(out, "%s\t%s\t%s\n", s.Ticket.ID, s.Phase, s.Ticket.Title)
 			}
