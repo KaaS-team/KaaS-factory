@@ -23,3 +23,8 @@ None.
 
 ## Files outside my area / workflow changes
 None.
+
+## CI notes
+- `just` and a current `golangci-lint` were missing locally, so lint ran only in CI.
+- `./gate.sh` showed `internal/reconcile` `TestRunTwoTicketsToPullRequests` flaking (PR numbers 101 and 102 swap). Not touched here.
+- The PR body check rejects a body that links a Claude session. The PR tool appends one, so edit the body after creating the PR.
