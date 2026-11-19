@@ -212,10 +212,10 @@ func TestBoardReplayNeedsNoControl(t *testing.T) {
 	}
 }
 
-// TestMCPHandlersWired: every MCP tool with a handler slot is wired, except the two named in
-// mcpHandlers' comment, so no listed tool answers "not available in this build" by accident.
+// TestMCPHandlersWired: every MCP tool with a handler slot is wired, so no listed tool answers
+// "not available in this build" by accident.
 func TestMCPHandlersWired(t *testing.T) {
-	unwired := map[string]bool{"ApprovePlan": true, "ExplainConfig": true}
+	unwired := map[string]bool{}
 	v := reflect.ValueOf(mcpHandlers())
 	for i := range v.NumField() {
 		f, name := v.Field(i), v.Type().Field(i).Name
@@ -231,6 +231,18 @@ func TestMCPPlanGoalIsNotAFlag(t *testing.T) {
 	for _, g := range []string{"--approve", "-h", "", "  "} {
 		if _, err := mcpHandlers().Plan(context.Background(), mcp.PlanInput{Goal: g}); err == nil || !strings.Contains(err.Error(), "goal must be text") {
 			t.Errorf("goal %q: err = %v, want a refusal", g, err)
+		}
+	}
+}
+
+// TestMCPApproveAndExplainRefuseFlags: approve_plan and explain_config take data, never a flag.
+func TestMCPApproveAndExplainRefuseFlags(t *testing.T) {
+	for _, a := range []string{"--approve", "-h", "", "  "} {
+		if _, err := mcpHandlers().ApprovePlan(context.Background(), mcp.ApprovePlanInput{Goal: a}); err == nil || !strings.Contains(err.Error(), "goal must be text") {
+			t.Errorf("approve_plan %q: err = %v, want a refusal", a, err)
+		}
+		if _, err := mcpHandlers().ExplainConfig(context.Background(), mcp.ExplainConfigInput{Key: a}); err == nil || !strings.Contains(err.Error(), "key must be a name") {
+			t.Errorf("explain_config %q: err = %v, want a refusal", a, err)
 		}
 	}
 }
