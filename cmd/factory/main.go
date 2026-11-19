@@ -183,6 +183,10 @@ func main() {
 	}
 	if err := newRoot().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "factory:", err)
+		var ec interface{ ExitCode() int }
+		if errors.As(err, &ec) {
+			os.Exit(ec.ExitCode())
+		}
 		os.Exit(1)
 	}
 }
