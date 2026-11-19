@@ -61,6 +61,7 @@ type Config struct {
 	RequesterCannotApprove bool              `key:"requester_cannot_approve"`
 	Shadow                 bool              `key:"shadow"`
 	Sandbox                bool              `key:"sandbox"`
+	SandboxRuntime         string            `key:"sandbox_runtime"`
 	Trust                  Trust             `key:"trust"`
 	GitHubApp              GitHubApp         `key:"github_app"`
 }

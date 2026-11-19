@@ -95,6 +95,7 @@ var specs = []spec{
 	{key: "requester_cannot_approve", kind: kBool, ceil: ceilTrue, def: true},
 	{key: "shadow", kind: kBool, ceil: ceilForceTrue, def: false},
 	{key: "sandbox", kind: kBool, ceil: ceilTrue, def: true},
+	{key: "sandbox_runtime", kind: kString, def: ""},
 	{key: "trust.min_role", kind: kRole, ceil: ceilFloor, def: "write"},
 	{key: "trust.allow", kind: kList, def: []string{}},
 	{key: "github_app.id", kind: kInt, min: 0, def: 0},

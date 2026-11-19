@@ -34,7 +34,9 @@ func TestRunRemoteCreateFailureDestroysNothing(t *testing.T) {
 	}
 }
 
-func TestCommandRejectsRemote(t *testing.T) {
+func TestCommandRemoteNeedsService(t *testing.T) {
+	t.Setenv("FACTORY_SANDBOX_URL", "")
+	t.Setenv("FACTORY_SANDBOX_TOKEN", "")
 	if _, err := Command(t.Context(), Spec{Backend: BackendRemote, Workdir: t.TempDir()}, "echo"); !errors.Is(err, ErrRemoteBackend) {
 		t.Fatalf("got %v", err)
 	}

@@ -1,4 +1,4 @@
-package remote
+package remote_test
 
 import (
 	"bytes"
@@ -13,9 +13,10 @@ import (
 	"testing"
 
 	"github.com/KaaS-team/factory/pkg/sandbox"
+	"github.com/KaaS-team/factory/pkg/sandbox/remote"
 )
 
-var _ sandbox.Session = (*Client)(nil)
+var _ sandbox.Session = (*remote.Client)(nil)
 
 // fake is an in-memory remote sandbox API.
 type fake struct {
@@ -62,19 +63,19 @@ func (f *fake) handler(t *testing.T) http.Handler {
 	})
 }
 
-func newFake(t *testing.T) (*fake, *Client) {
+func newFake(t *testing.T) (*fake, *remote.Client) {
 	f := &fake{files: map[string][]byte{}, live: map[string]bool{}}
 	srv := httptest.NewServer(f.handler(t))
 	t.Cleanup(srv.Close)
-	c, err := New(srv.URL, "tok", srv.Client())
+	c, err := remote.New(srv.URL, "tok", srv.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
 	return f, c
 }
 
-func create(c *Client) func(context.Context) (string, error) {
-	return func(ctx context.Context) (string, error) { return c.Create(ctx, CreateSpec{Workdir: "/work"}) }
+func create(c *remote.Client) func(context.Context) (string, error) {
+	return func(ctx context.Context) (string, error) { return c.Create(ctx, remote.CreateSpec{Workdir: "/work"}) }
 }
 
 func TestFullCycle(t *testing.T) {
@@ -110,7 +111,7 @@ func TestDestroyWhenExecFails(t *testing.T) {
 	err := sandbox.RunRemote(t.Context(), create(c), c, func(id string) error {
 		return c.Exec(t.Context(), id, []string{"false"}, io.Discard, io.Discard)
 	})
-	var ee *ExitError
+	var ee *remote.ExitError
 	if !asExit(err, &ee) || ee.Code != 3 {
 		t.Fatalf("want exit 3, got %v", err)
 	}
@@ -132,22 +133,23 @@ func TestDestroyWhenContextCancelled(t *testing.T) {
 }
 
 func TestBadTokenAndEnv(t *testing.T) {
-	_, c := newFake(t)
-	c.token = "wrong"
-	if _, err := c.Create(t.Context(), CreateSpec{}); err == nil || !strings.Contains(err.Error(), "401") {
+	f, _ := newFake(t)
+	_ = f
+	c := wrongToken(t)
+	if _, err := c.Create(t.Context(), remote.CreateSpec{}); err == nil || !strings.Contains(err.Error(), "401") {
 		t.Fatalf("want 401, got %v", err)
 	}
-	t.Setenv(EnvURL, "")
-	if _, err := FromEnv(); err == nil {
+	t.Setenv(remote.EnvURL, "")
+	if _, err := remote.FromEnv(); err == nil {
 		t.Fatal("want error for missing url")
 	}
-	t.Setenv(EnvURL, "http://x")
-	t.Setenv(EnvToken, "")
-	if _, err := FromEnv(); err == nil {
+	t.Setenv(remote.EnvURL, "http://x")
+	t.Setenv(remote.EnvToken, "")
+	if _, err := remote.FromEnv(); err == nil {
 		t.Fatal("want error for missing token")
 	}
-	t.Setenv(EnvToken, "t")
-	if _, err := FromEnv(); err != nil {
+	t.Setenv(remote.EnvToken, "t")
+	if _, err := remote.FromEnv(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -157,10 +159,22 @@ func TestStreamWithoutExitIsError(t *testing.T) {
 		_, _ = io.WriteString(w, `{"stream":"stdout","data":"x"}`+"\n")
 	}))
 	defer srv.Close()
-	c, _ := New(srv.URL, "t", nil)
+	c, _ := remote.New(srv.URL, "t", nil)
 	if err := c.Exec(t.Context(), "b", []string{"x"}, io.Discard, io.Discard); err == nil {
 		t.Fatal("want error")
 	}
 }
 
-func asExit(err error, target **ExitError) bool { return errors.As(err, target) }
+func asExit(err error, target **remote.ExitError) bool { return errors.As(err, target) }
+
+// wrongToken is a client for a fake server that wants the token "tok", holding another one.
+func wrongToken(t *testing.T) *remote.Client {
+	t.Helper()
+	srv := httptest.NewServer((&fake{files: map[string][]byte{}, live: map[string]bool{}}).handler(t))
+	t.Cleanup(srv.Close)
+	c, err := remote.New(srv.URL, "wrong", srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
