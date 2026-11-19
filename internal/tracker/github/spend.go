@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/audit"
 	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/meter"
 	gogithub "github.com/google/go-github/v79/github"
@@ -50,7 +51,8 @@ func (t *Tracker) SpendComment(ctx context.Context, id api.TicketID) (string, er
 }
 
 // PutSpendComment edits the issue's spend ledger comment in place, or posts it the first time.
-func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body string) error {
+func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body string) (err error) {
+	defer audit.Done(ctx, "tracker.put_spend_comment", string(id), string(id), &err)
 	n, err := number(id)
 	if err != nil {
 		return err

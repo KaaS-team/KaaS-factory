@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/audit"
 	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/observe"
 	"github.com/KaaS-team/factory/internal/store"
@@ -187,7 +188,8 @@ func readStatus(cs []Comment) (statusData, bool) {
 
 // RecordStatus writes the phase into the status comment, creating it on first use. Running sets the
 // first dispatch time once; Merged sets the merge time; other phases only update the phase.
-func (t *Tracker) RecordStatus(ctx context.Context, id api.TicketID, p api.Phase) error {
+func (t *Tracker) RecordStatus(ctx context.Context, id api.TicketID, p api.Phase) (err error) {
+	defer audit.Done(ctx, "tracker.record_status", string(id), string(id), &err)
 	n, err := number(id)
 	if err != nil {
 		return err
@@ -306,7 +308,8 @@ func stageText(cs []Comment, stage string, v any) bool {
 // OpenPR opens the draft pull request for a finished branch, its body rendered from the plan, the
 // verdict and the pr stage's text in the thread. It returns 0 without opening when the branch has
 // had a pull request, open or closed.
-func (t *Tracker) OpenPR(ctx context.Context, id api.TicketID, branch, base string, files []string) (int, error) {
+func (t *Tracker) OpenPR(ctx context.Context, id api.TicketID, branch, base string, files []string) (num int, err error) {
+	defer func() { audit.Record(ctx, "tracker.open_pr", branch, string(id), err) }()
 	n, err := number(id)
 	if err != nil {
 		return 0, err
@@ -391,7 +394,8 @@ func (t *Tracker) positionComment(ctx context.Context, n int) (Comment, bool, er
 }
 
 // SavePosition writes the workflow position into one comment, edited in place, posted the first time.
-func (t *Tracker) SavePosition(ctx context.Context, id api.TicketID, p observe.Position) error {
+func (t *Tracker) SavePosition(ctx context.Context, id api.TicketID, p observe.Position) (err error) {
+	defer audit.Done(ctx, "tracker.save_position", string(id), string(id), &err)
 	n, err := number(id)
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/KaaS-team/factory/internal/audit"
 	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 	"net/http"
 	"net/url"
@@ -178,7 +179,8 @@ func (t *Tracker) Get(ctx context.Context, id api.TicketID) (api.Ticket, error) 
 
 // Comment posts body on the issue thread through sanitize.Publication (which drops every `<!--`), unless ctx came from
 // marker.Allow: the caller then built body itself and its markers go out as written.
-func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) error {
+func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) (err error) {
+	defer audit.Done(ctx, "tracker.comment", string(id), string(id), &err)
 	n, err := number(id)
 	if err != nil {
 		return err
@@ -195,7 +197,8 @@ func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) err
 // SetPhase swaps the issue's lifecycle label for the one that shows phase. It
 // removes only labels the factory owns (see OwnsLabel) and leaves type,
 // provenance and human labels alone.
-func (t *Tracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) error {
+func (t *Tracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) (err error) {
+	defer audit.Done(ctx, "tracker.set_phase", string(id), string(id), &err)
 	target, known := phaseLabel[p]
 	if !known {
 		return fmt.Errorf("github tracker: unknown phase %q", p)

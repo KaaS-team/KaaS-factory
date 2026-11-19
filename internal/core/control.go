@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/audit"
 	"github.com/KaaS-team/factory/internal/dispatch/brief"
 	"github.com/KaaS-team/factory/internal/meter"
 	spendcap "github.com/KaaS-team/factory/internal/meter/cap"
@@ -97,7 +98,8 @@ func (c *Core) start(ctx context.Context, t api.Ticket, attempt int) (api.Sessio
 }
 
 // Dispatch starts attempt 1 of a ticket now, whatever the slot count.
-func (c *Core) Dispatch(ctx context.Context, id api.TicketID) error {
+func (c *Core) Dispatch(ctx context.Context, id api.TicketID) (err error) {
+	defer audit.Done(ctx, "dispatch.start", string(id), string(id), &err)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.recover(ctx)
