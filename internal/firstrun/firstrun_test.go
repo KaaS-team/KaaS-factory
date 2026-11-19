@@ -3,6 +3,8 @@ package firstrun
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,5 +192,47 @@ func TestCommandPrintsReport(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "## Top 3 risks") || !strings.Contains(out.String(), "Would dispatch one build") || strings.Contains(out.String(), "factory approve") {
 		t.Fatalf("out:\n%s", out.String())
+	}
+}
+
+// TestGoldenHonoReport pins the report shape from a recorded `auditor report --json` of a repo with
+// no named risk area: the top 3 risks are filled from open findings, each with a location.
+func TestGoldenHonoReport(t *testing.T) {
+	raw, err := os.ReadFile("testdata/hono.report.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var a Audit
+	if err := json.Unmarshal(raw, &a); err != nil {
+		t.Fatal(err)
+	}
+	cat, _ := LoadCatalogue()
+	r := Build(a, cat)
+	r.DryRun = true
+	r.First = Pick(r.Rows)
+	md, err := r.Markdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+	golden := "testdata/hono.golden.md"
+	if os.Getenv("UPDATE_GOLDEN") != "" {
+		_ = os.WriteFile(golden, []byte(md), 0o644)
+	}
+	want, _ := os.ReadFile(golden)
+	if md != string(want) {
+		t.Fatalf("report differs from %s (UPDATE_GOLDEN=1 to refresh):\n%s", golden, md)
+	}
+	top := md[strings.Index(md, "## Top 3 risks"):strings.Index(md, "## What the factory would fix")]
+	if n := strings.Count(top, "\n1. ") + strings.Count(top, "\n2. ") + strings.Count(top, "\n3. "); n != 3 {
+		t.Fatalf("top risks:\n%s", top)
+	}
+}
+
+func TestMissingAuditorExitsTwo(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	_, err := Run(context.Background(), Options{})
+	var ec interface{ ExitCode() int }
+	if !errors.As(err, &ec) || ec.ExitCode() != 2 || strings.Contains(err.Error(), "\n") {
+		t.Fatalf("err = %v", err)
 	}
 }
