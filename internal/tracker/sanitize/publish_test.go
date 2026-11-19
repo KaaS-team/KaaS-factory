@@ -6,9 +6,21 @@ import (
 	"unicode/utf8"
 )
 
-func TestPublication(t *testing.T) {
-	cases := []struct{ name, in, want string }{
-		// URL allowlist and userinfo
+type publicationCase struct{ name, in, want string }
+
+func runPublicationCases(t *testing.T, cases []publicationCase) {
+	t.Helper()
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := Publication(c.in, DefaultOptions()); got != c.want {
+				t.Fatalf("Publication(%q)\n got %q\nwant %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
+func urlCases() []publicationCase {
+	return []publicationCase{
 		{"allowed url kept", "see https://github.com/a/b/issues/1 now", "see https://github.com/a/b/issues/1 now"},
 		{"allowed subdomain kept", "https://api.github.com/x", "https://api.github.com/x"},
 		{"unknown host redacted", "go https://evil.example.com/p?q=1 ok", "go (evil.example.com/redacted) ok"},
@@ -33,7 +45,11 @@ func TestPublication(t *testing.T) {
 		{"www allowed", "visit www.github.com/x", "visit www.github.com/x"},
 		{"angle autolink allowed", "<https://github.com/x>", "<https://github.com/x>"},
 		{"angle autolink slack label", "<https://evil.com/x|click me>", "(evil.com/redacted)|click me"},
-		// mentions
+	}
+}
+
+func mentionCases() []publicationCase {
+	return []publicationCase{
 		{"mention wrapped", "hi @octocat now", "hi `@octocat` now"},
 		{"team mention wrapped", "ping @org/team", "ping `@org/team`"},
 		{"mention at start", "@octocat go", "`@octocat` go"},
@@ -46,7 +62,11 @@ func TestPublication(t *testing.T) {
 		{"fullwidth mention", "hi \uFF20octocat", "hi `@octocat`"},
 		{"homoglyph mention", "hi @\u043Ectocat", "hi `@octocat`"},
 		{"email untouched", "a@b.com", "a@b.com"},
-		// XML and templates
+	}
+}
+
+func markupCases() []publicationCase {
+	return []publicationCase{
 		{"comment removed", "a<!-- @x payload -->b", "ab"},
 		{"nested comment removed", "a<!-- <!-- --> PAYLOAD -->b", "ab"},
 		{"unknown tag converted", "<script>alert(1)</script>", "(script)alert(1)(/script)"},
@@ -67,13 +87,12 @@ func TestPublication(t *testing.T) {
 		{"tag chars removed", "a\U000E0041b", "ab"},
 		{"trim", "  x \n", "x"},
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := Publication(c.in, DefaultOptions()); got != c.want {
-				t.Fatalf("Publication(%q)\n got %q\nwant %q", c.in, got, c.want)
-			}
-		})
-	}
+}
+
+func TestPublication(t *testing.T) {
+	runPublicationCases(t, urlCases())
+	runPublicationCases(t, mentionCases())
+	runPublicationCases(t, markupCases())
 }
 
 func TestBotTriggerCap(t *testing.T) {

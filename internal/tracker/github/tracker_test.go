@@ -195,6 +195,25 @@ func TestComment(t *testing.T) {
 }
 
 // SetPhase swaps the factory state label and never removes a label it does not own.
+// labelChanges reads the label deletes and adds the fake saw for issue n.
+func labelChanges(t *testing.T, f *fakeGitHub, n int) (removed, added []string) {
+	t.Helper()
+	for _, r := range f.requests() {
+		switch r.Method {
+		case http.MethodDelete:
+			removed = append(removed, r.Path[len(fmt.Sprintf("/repos/o/r/issues/%d/labels/", n)):])
+		case http.MethodPost:
+			var labels []string
+			if err := json.Unmarshal([]byte(r.Body), &labels); err != nil {
+				t.Fatalf("POST body %q: %v", r.Body, err)
+			}
+			added = append(added, labels...)
+		}
+	}
+	sort.Strings(removed)
+	return removed, added
+}
+
 func TestSetPhase(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -236,20 +255,7 @@ func TestSetPhase(t *testing.T) {
 			if err := f.tracker(t).SetPhase(context.Background(), api.TicketID(fmt.Sprint(n)), tc.phase); err != nil {
 				t.Fatal(err)
 			}
-			var removed, added []string
-			for _, r := range f.requests() {
-				switch r.Method {
-				case http.MethodDelete:
-					removed = append(removed, r.Path[len(fmt.Sprintf("/repos/o/r/issues/%d/labels/", n)):])
-				case http.MethodPost:
-					var labels []string
-					if err := json.Unmarshal([]byte(r.Body), &labels); err != nil {
-						t.Fatalf("POST body %q: %v", r.Body, err)
-					}
-					added = append(added, labels...)
-				}
-			}
-			sort.Strings(removed)
+			removed, added := labelChanges(t, f, n)
 			if !reflect.DeepEqual(removed, tc.removed) || !reflect.DeepEqual(added, tc.added) {
 				t.Fatalf("removed %v added %v; want removed %v added %v", removed, added, tc.removed, tc.added)
 			}

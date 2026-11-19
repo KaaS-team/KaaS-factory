@@ -39,15 +39,17 @@ func ids(a ...string) []string { return a }
 
 // Every row is one branch of Plan. The batch rows follow Symphony section 7's rule that state is
 // re-derived from observation each pass.
-func TestPlan(t *testing.T) {
+type planCase struct {
+	name  string
+	queue []Entry
+	st    State
+	want  []Action
+}
+
+func planCases() []planCase {
 	base := State{Base: "B", BatchSize: 4, PRs: prs(8)}
 	r12 := res(ids("1", "2"), ids("h1", "h2"), "B", true)
-	tests := []struct {
-		name  string
-		queue []Entry
-		st    State
-		want  []Action
-	}{
+	return []planCase{
 		{"empty queue", nil, base, nil},
 		{"one PR untested", q(1), base, []Action{{Kind: KindTest, IDs: ids("1"), Heads: ids("h1")}}},
 		{"one PR green lands", q(1), withResults(base, res(ids("1"), ids("h1"), "B", true)),
@@ -102,7 +104,10 @@ func TestPlan(t *testing.T) {
 			State{Base: "B", PRs: map[string]PRState{"1": open("h1")}},
 			[]Action{{Kind: KindDrop, ID: "x", Reason: ReasonClosed}}},
 	}
-	for _, tc := range tests {
+}
+
+func TestPlan(t *testing.T) {
+	for _, tc := range planCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Plan(tc.queue, tc.st)
 			if !reflect.DeepEqual(got, tc.want) {

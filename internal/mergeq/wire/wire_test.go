@@ -109,39 +109,47 @@ func (f *fakeHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // The whole queue over real git and a real gate process: the green PR lands on the remote base,
 // the red one is ejected with the gate log in a steer comment.
-func TestRunLandsGreenAndEjectsRed(t *testing.T) {
-	root := t.TempDir()
-	remote := filepath.Join(root, "remote.git")
+func writeFile(t *testing.T, dir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// seedRepo builds a bare remote with a base commit and one branch per PR, and a clone of it.
+// It returns the remote path, the clone path and the head commit of each PR branch.
+func seedRepo(t *testing.T, root string) (remote, clone string, heads map[int]string) {
+	t.Helper()
+	remote = filepath.Join(root, "remote.git")
 	seed := filepath.Join(root, "seed")
-	clone := filepath.Join(root, "clone")
+	clone = filepath.Join(root, "clone")
 	git(t, root, "init", "-q", "--bare", "remote.git")
 	git(t, root, "clone", "-q", "remote.git", "seed")
-	write := func(dir, name, body string) {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write(seed, "base.txt", "base\n")
+	writeFile(t, seed, "base.txt", "base\n")
 	git(t, seed, "add", ".")
 	git(t, seed, "commit", "-qm", "base")
 	git(t, seed, "push", "-q", "origin", "HEAD:refs/heads/main")
-	var heads = map[int]string{}
+	heads = map[int]string{}
 	for pr, file := range map[int]string{11: "green.txt", 12: "red.txt"} {
 		git(t, seed, "checkout", "-q", "-b", "b"+file, "origin/main")
-		write(seed, file, file+"\n")
+		writeFile(t, seed, file, file+"\n")
 		git(t, seed, "add", ".")
 		git(t, seed, "commit", "-qm", file)
 		git(t, seed, "push", "-q", "origin", "HEAD:refs/heads/b"+file)
 		heads[pr] = git(t, seed, "rev-parse", "HEAD")
 	}
 	git(t, root, "clone", "-q", "remote.git", "clone")
+	return remote, clone, heads
+}
 
-	// The gate script is found on PATH; it is red when red.txt is in the tree it runs on.
+// installGate puts a gates.sh on PATH that is red when red.txt is in the tree it runs on.
+func installGate(t *testing.T, root string) {
+	t.Helper()
 	bin := filepath.Join(root, "bin")
 	if err := os.Mkdir(bin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	write(bin, "gates.sh", `#!/bin/sh
+	writeFile(t, bin, "gates.sh", `#!/bin/sh
 if [ -f red.txt ]; then
   echo "FAIL red.txt must not exist"
   echo "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=redcheck"
@@ -153,6 +161,12 @@ echo "FACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0 failed_gates=-"
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestRunLandsGreenAndEjectsRed(t *testing.T) {
+	root := t.TempDir()
+	remote, clone, heads := seedRepo(t, root)
+	installGate(t, root)
 
 	marker := func(pr int) string {
 		return fmt.Sprintf("Queued for merge as PR #%d.\n\n<!-- factory:queued {\"pr\":%d,\"head\":%q} -->", pr, pr, heads[pr])
