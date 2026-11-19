@@ -27,7 +27,8 @@ func TestRecordWritesDailyJSONLWithRedaction(t *testing.T) {
 	dir := t.TempDir()
 	fixed(t, time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC))
 	defer SetSink(&File{Dir: dir})()
-	ctx := WithActor(context.Background(), "bot-1")
+	t.Setenv("FACTORY_ACTOR", "bot-1")
+	ctx := context.Background()
 	Record(ctx, "tracker.comment", "12", "12", nil)
 	Record(ctx, "tracker.set_phase", "12", "12", errors.New("denied for ghp_abcdefghijklmnopqrstuvwxyz0123"))
 
@@ -126,7 +127,8 @@ func TestOTLPReceiverGetsRecordsWhenEnvSet(t *testing.T) {
 		t.Fatalf("NewOTLPFromEnv = %v, %v", o, err)
 	}
 	defer SetSink(o)()
-	Record(WithActor(context.Background(), "bot-9"), "dispatch.start", "ticket-77", "77", nil)
+	t.Setenv("FACTORY_ACTOR", "bot-9")
+	Record(context.Background(), "dispatch.start", "ticket-77", "77", nil)
 	if err := o.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}

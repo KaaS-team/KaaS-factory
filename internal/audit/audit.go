@@ -54,17 +54,8 @@ func SetSink(s Sink) (restore func()) {
 	return func() { mu.Lock(); sink = old; mu.Unlock() }
 }
 
-type actorKey struct{}
-
-// WithActor names who is acting for calls made with the returned context.
-func WithActor(ctx context.Context, actor string) context.Context {
-	return context.WithValue(ctx, actorKey{}, actor)
-}
-
-func actor(ctx context.Context) string {
-	if a, ok := ctx.Value(actorKey{}).(string); ok && a != "" {
-		return a
-	}
+// actor is who is acting: FACTORY_ACTOR, or "factory".
+func actor() string {
 	if a := os.Getenv("FACTORY_ACTOR"); a != "" {
 		return a
 	}
@@ -91,7 +82,7 @@ func Record(ctx context.Context, action, target, ticket string, err error) {
 	}
 	r := Entry{
 		Timestamp: now().UTC(), SeverityText: "INFO", Body: action + " " + target + ": ok",
-		Attributes: map[string]string{KeyActor: actor(ctx), KeyAction: action, KeyTarget: target, KeyResult: "ok", KeyTicket: ticket},
+		Attributes: map[string]string{KeyActor: actor(), KeyAction: action, KeyTarget: target, KeyResult: "ok", KeyTicket: ticket},
 	}
 	if err != nil {
 		r.SeverityText, r.Attributes[KeyResult] = "ERROR", "error"
