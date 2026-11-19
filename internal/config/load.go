@@ -18,6 +18,10 @@ import (
 // EnvPrefix starts every environment variable this package reads.
 const EnvPrefix = "FACTORY_"
 
+// runtimeEnv lists the FACTORY_ variables other packages read; the env layer skips them. Add new ones here only.
+var runtimeEnv = strings.Fields(`FACTORY_MCP_TOKEN FACTORY_A2A_TOKEN FACTORY_ALLOWED_HOSTS FACTORY_ALLOWED_ORIGINS
+	FACTORY_SCIM_TOKEN FACTORY_SMOKE_REPO FACTORY_EVAL_RERECORD FACTORY_POLICY FACTORY_ROLE FACTORY_ACTOR`)
+
 // Source is the text of one file layer and the name used when an error mentions it.
 type Source struct {
 	Name string
@@ -82,7 +86,7 @@ func Load(s Sources) (*Loaded, error) {
 		k := koanf.New(".")
 		err := k.Load(env.Provider(".", env.Opt{
 			Prefix:      EnvPrefix,
-			EnvironFunc: func() []string { return s.Env },
+			EnvironFunc: func() []string { return configEnv(s.Env) },
 			TransformFunc: func(k, v string) (string, any) {
 				return strings.ToLower(strings.TrimPrefix(k, EnvPrefix)), v
 			},
@@ -113,6 +117,14 @@ func Load(s Sources) (*Loaded, error) {
 	l.resolve()
 	l.clamp()
 	return l, nil
+}
+
+// configEnv drops the runtime variables from a KEY=VALUE list.
+func configEnv(env []string) []string {
+	return slices.DeleteFunc(slices.Clone(env), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return slices.Contains(runtimeEnv, name)
+	})
 }
 
 func builtin() layerValues {
