@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -890,5 +891,47 @@ func TestReadOnlyRefusesWriteTools(t *testing.T) {
 func TestReadOnlyFlagExists(t *testing.T) {
 	if factorymcp.NewCommand().Flags().Lookup("read-only") == nil {
 		t.Fatal("no --read-only flag")
+	}
+}
+
+// TestServeRefusesForeignHostAndOrigin: the DNS-rebinding guard answers 403 before auth is checked.
+func TestServeRefusesForeignHostAndOrigin(t *testing.T) {
+	h, err := factorymcp.Handler(factorymcp.NewServer(newFake(), factorymcp.Handlers{}), httpToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { _ = factorymcp.Serve(t.Context(), ln, h) }()
+	url := "http://" + ln.Addr().String() + "/mcp"
+	cases := []struct {
+		name, host, origin string
+		want               int
+	}{
+		{"foreign host", "evil.test", "", http.StatusForbidden},
+		{"foreign origin", "", "https://evil.test", http.StatusForbidden},
+		{"loopback host and no origin", "", "", http.StatusOK},
+	}
+	for _, c := range cases {
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, url, strings.NewReader(initBody))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Authorization", "Bearer "+httpToken)
+		if c.host != "" {
+			req.Host = c.host
+		}
+		if c.origin != "" {
+			req.Header.Set("Origin", c.origin)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		if res.StatusCode != c.want {
+			t.Errorf("%s: status %d, want %d", c.name, res.StatusCode, c.want)
+		}
 	}
 }
