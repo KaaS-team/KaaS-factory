@@ -25,6 +25,9 @@
 //
 // Every change a crash could interrupt is a rename or a temp-file-and-rename,
 // so the directory is consistent at any point a process stops.
+//
+// Sandbox runners call Open, Acquire and Collect. Nothing else in this repo
+// imports it yet.
 package cachevol
 
 import (
@@ -310,8 +313,30 @@ func (s *Store) Acquire(ctx context.Context, ident Identity, writable bool, popu
 	id := ident.ID()
 	volDir := s.volumeDir(id)
 
-	// Counted from before any filesystem work, so Close can't give the
-	// directory away under a volume being created.
+	done, err := s.beginAcquire(ident)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+
+	unlock := s.createMu.lock(id)
+	defer unlock()
+
+	created, err := s.ensureAndLock(ctx, ident, populate)
+	if err != nil {
+		return nil, err
+	}
+	// s.mu is held here, and the volume is known to exist.
+	pin, touch, now := s.registerPin(id, volDir, writable, created)
+	s.mu.Unlock()
+
+	return s.finishPin(pin, volDir, writable, touch, now)
+}
+
+// beginAcquire counts the acquire from before any filesystem work, so Close
+// can't give the directory away under a volume being created. The returned
+// function ends the count.
+func (s *Store) beginAcquire(ident Identity) (func(), error) {
 	s.mu.Lock()
 	if s.lock == nil {
 		s.mu.Unlock()
@@ -319,43 +344,50 @@ func (s *Store) Acquire(ctx context.Context, ident Identity, writable bool, popu
 	}
 	s.acquiring++
 	s.mu.Unlock()
-	defer func() {
+	return func() {
 		s.mu.Lock()
 		s.acquiring--
 		s.mu.Unlock()
-	}()
+	}, nil
+}
 
-	unlock := s.createMu.lock(id)
-	defer unlock()
-
-	// Holding createMu excludes creating this volume elsewhere; s.mu excludes
-	// removing it, and a pinned volume is never removed. A removal can still
-	// land between the check and the pin, so check again under s.mu.
-	var created bool
+// ensureAndLock creates the volume if it is missing and returns with s.mu
+// held and the volume present. Holding createMu excludes creating this volume
+// elsewhere; s.mu excludes removing it, and a pinned volume is never removed.
+// A removal can still land between the check and the pin, so it checks again
+// under s.mu.
+func (s *Store) ensureAndLock(ctx context.Context, ident Identity, populate func(ctx context.Context, fsDir string) error) (created bool, err error) {
+	id := ident.ID()
+	fsPath := filepath.Join(s.volumeDir(id), fsName)
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return false, err
 		}
-		exists, err := pathExists(filepath.Join(volDir, fsName))
+		exists, err := pathExists(fsPath)
 		if err != nil {
-			return nil, fmt.Errorf("stat cache volume %s: %w", id, err)
+			return false, fmt.Errorf("stat cache volume %s: %w", id, err)
 		}
 		if !exists {
 			if err := s.create(ctx, ident, populate); err != nil {
-				return nil, err
+				return false, err
 			}
 			created = true
 		}
 		s.mu.Lock()
-		exists, err = pathExists(filepath.Join(volDir, fsName))
+		exists, err = pathExists(fsPath)
 		if err == nil && exists {
-			break // pin with s.mu held
+			return created, nil // pin with s.mu held
 		}
 		s.mu.Unlock()
 		if err != nil {
-			return nil, fmt.Errorf("stat cache volume %s: %w", id, err)
+			return false, fmt.Errorf("stat cache volume %s: %w", id, err)
 		}
 	}
+}
+
+// registerPin counts the pin under s.mu. It also reports whether the last-used
+// time should be written, and the time to write.
+func (s *Store) registerPin(id, volDir string, writable, created bool) (pin *Pin, touch bool, now time.Time) {
 	st := s.pins[id]
 	first := st == nil
 	if first {
@@ -367,24 +399,27 @@ func (s *Store) Acquire(ctx context.Context, ident Identity, writable bool, popu
 		st.writers++
 		st.writeEpoch++
 	}
-	now := s.opts.Now()
-	touch := st.lastUsedSet.IsZero() || now.Sub(st.lastUsedSet) >= lastUsedWriteInterval
+	now = s.opts.Now()
+	touch = st.lastUsedSet.IsZero() || now.Sub(st.lastUsedSet) >= lastUsedWriteInterval
 	if touch {
 		st.lastUsedSet = now
 	}
-	s.mu.Unlock()
+	pin = &Pin{s: s, id: id, path: filepath.Join(volDir, fsName), writable: writable, created: created, first: first}
+	return pin, touch, now
+}
 
-	pin := &Pin{s: s, id: id, path: filepath.Join(volDir, fsName), writable: writable, created: created, first: first}
+// finishPin writes the dirty marker and last-used time, releasing the pin on failure.
+func (s *Store) finishPin(pin *Pin, volDir string, writable, touch bool, now time.Time) (*Pin, error) {
 	if writable {
 		// Before the writer can write: a crash from here on leaves the
 		// marker, and the next owner remeasures.
 		if err := writeMarker(filepath.Join(volDir, dirtyName)); err != nil {
 			pin.Release()
-			return nil, fmt.Errorf("mark cache volume %s dirty: %w", id, err)
+			return nil, fmt.Errorf("mark cache volume %s dirty: %w", pin.id, err)
 		}
 	}
 	if touch {
-		if err := s.updateMeta(id, func(m *meta) { m.LastUsedAt = now }); err != nil {
+		if err := s.updateMeta(pin.id, func(m *meta) { m.LastUsedAt = now }); err != nil {
 			pin.Release()
 			return nil, err
 		}
@@ -549,12 +584,17 @@ func (s *Store) volumeEntry(ctx context.Context, id string) (Entry, error) {
 	s.mu.Unlock()
 
 	_, dirtyErr := os.Stat(filepath.Join(volDir, dirtyName))
-	stale := dirtyErr == nil || m.SizeBytes == nil
-	if !stale {
+	if dirtyErr != nil && m.SizeBytes != nil {
 		e.SizeBytes = *m.SizeBytes
 		return e, nil
 	}
+	return s.measure(ctx, e)
+}
 
+// measure walks the volume to find its size and, when no writer touched it
+// during the walk, stores the size and clears the dirty marker.
+func (s *Store) measure(ctx context.Context, e Entry) (Entry, error) {
+	id, volDir := e.ID, e.path
 	s.mu.Lock()
 	var epoch uint64
 	writersBefore := 0

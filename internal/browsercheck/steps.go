@@ -1,4 +1,7 @@
-// Package browsercheck drives headless Chrome through a list of steps and reports one FACTORY_GATES line.
+// Package browsercheck drives headless Chrome through a list of steps and reports one
+// FACTORY_GATES line. ParseSteps reads the YAML step list, Run executes it and stops at the
+// first failing step, and Result.Line renders the gate line. The factory browsercheck command
+// in cmd/factory is the caller.
 package browsercheck
 
 import (
@@ -43,75 +46,102 @@ func ParseSteps(data []byte) ([]Step, error) {
 	return steps, nil
 }
 
+// parseStep checks one single-key step map. Each kind has its own parser.
 func parseStep(m map[string]yaml.Node) (Step, error) {
 	if len(m) != 1 {
 		return Step{}, errors.New("want exactly one key")
 	}
 	for kind, n := range m {
-		s := Step{Kind: kind}
-		switch kind {
-		case "goto":
-			if err := n.Decode(&s.URL); err != nil {
-				return s, err
-			}
-			u, err := url.Parse(s.URL)
-			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-				return s, errors.New("goto needs an http or https URL")
-			}
-		case "click":
-			if err := n.Decode(&s.Selector); err != nil {
-				return s, err
-			}
-			if s.Selector == "" {
-				return s, errors.New("click needs a selector")
-			}
-		case "fill":
-			var f struct {
-				Selector string  `yaml:"selector"`
-				Value    *string `yaml:"value"`
-			}
-			if err := n.Decode(&f); err != nil {
-				return s, err
-			}
-			if f.Selector == "" {
-				return s, errors.New("fill needs a selector")
-			}
-			if f.Value == nil {
-				return s, errors.New("fill needs a value")
-			}
-			s.Selector, s.Value = f.Selector, *f.Value
-		case "type_secret":
-			var f struct {
-				Name     string `yaml:"name"`
-				Selector string `yaml:"selector"`
-			}
-			if err := n.Decode(&f); err != nil {
-				return s, errors.New("type_secret needs {name, selector}")
-			}
-			if f.Name == "" || f.Selector == "" {
-				return s, errors.New("type_secret needs a name and a selector")
-			}
-			s.Name, s.Selector = f.Name, f.Selector
-		case "expect_text":
-			if err := n.Decode(&s.Text); err != nil {
-				return s, err
-			}
-			if s.Text == "" {
-				return s, errors.New("expect_text needs text")
-			}
-		case "expect_no_console_error":
-			// the value is ignored; the key alone turns the check on
-		case "screenshot":
-			if err := n.Decode(&s.Name); err != nil {
-				return s, err
-			}
-			if s.Name == "" || strings.ContainsAny(s.Name, `/\`) || strings.Contains(s.Name, "..") {
-				return s, errors.New("screenshot name must be a plain file name")
-			}
-		default:
-			return s, fmt.Errorf("unknown step %q", kind)
+		parse, ok := stepParsers[kind]
+		if !ok {
+			return Step{Kind: kind}, fmt.Errorf("unknown step %q", kind)
 		}
-		return s, nil
+		s := Step{Kind: kind}
+		return s, parse(&s, &n)
 	}
 	return Step{}, nil
+}
+
+var stepParsers = map[string]func(*Step, *yaml.Node) error{
+	"goto":                    parseGoto,
+	"click":                   parseClick,
+	"fill":                    parseFill,
+	"type_secret":             parseTypeSecret,
+	"expect_text":             parseExpectText,
+	"expect_no_console_error": func(*Step, *yaml.Node) error { return nil }, // the key alone turns the check on
+	"screenshot":              parseScreenshot,
+}
+
+func parseGoto(s *Step, n *yaml.Node) error {
+	if err := n.Decode(&s.URL); err != nil {
+		return err
+	}
+	u, err := url.Parse(s.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return errors.New("goto needs an http or https URL")
+	}
+	return nil
+}
+
+func parseClick(s *Step, n *yaml.Node) error {
+	if err := n.Decode(&s.Selector); err != nil {
+		return err
+	}
+	if s.Selector == "" {
+		return errors.New("click needs a selector")
+	}
+	return nil
+}
+
+func parseFill(s *Step, n *yaml.Node) error {
+	var f struct {
+		Selector string  `yaml:"selector"`
+		Value    *string `yaml:"value"`
+	}
+	if err := n.Decode(&f); err != nil {
+		return err
+	}
+	if f.Selector == "" {
+		return errors.New("fill needs a selector")
+	}
+	if f.Value == nil {
+		return errors.New("fill needs a value")
+	}
+	s.Selector, s.Value = f.Selector, *f.Value
+	return nil
+}
+
+func parseTypeSecret(s *Step, n *yaml.Node) error {
+	var f struct {
+		Name     string `yaml:"name"`
+		Selector string `yaml:"selector"`
+	}
+	if err := n.Decode(&f); err != nil {
+		return errors.New("type_secret needs {name, selector}")
+	}
+	if f.Name == "" || f.Selector == "" {
+		return errors.New("type_secret needs a name and a selector")
+	}
+	s.Name, s.Selector = f.Name, f.Selector
+	return nil
+}
+
+func parseExpectText(s *Step, n *yaml.Node) error {
+	if err := n.Decode(&s.Text); err != nil {
+		return err
+	}
+	if s.Text == "" {
+		return errors.New("expect_text needs text")
+	}
+	return nil
+}
+
+func parseScreenshot(s *Step, n *yaml.Node) error {
+	if err := n.Decode(&s.Name); err != nil {
+		return err
+	}
+	if s.Name == "" || strings.ContainsAny(s.Name, `/\`) || strings.Contains(s.Name, "..") {
+		return errors.New("screenshot name must be a plain file name")
+	}
+	return nil
 }
