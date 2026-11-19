@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -49,6 +50,7 @@ type rig struct {
 	now    time.Time
 	mu     sync.Mutex
 	prs    map[api.TicketID]int
+	order  []api.TicketID  // tickets in seed order; a PR number follows this, not the race to open one
 	leases map[string]bool // every lease ref that was ever created
 	events []api.Event
 }
@@ -91,7 +93,7 @@ func (h harnessTracker) OpenPR(_ context.Context, id api.TicketID, branch, _ str
 	if n := h.r.prs[id]; n > 0 {
 		return n, nil
 	}
-	h.r.prs[id] = 100 + len(h.r.prs) + 1
+	h.r.prs[id] = 101 + slices.Index(h.r.order, id)
 	return h.r.prs[id], nil
 }
 
@@ -140,6 +142,9 @@ func newRig(t *testing.T, tickets ...api.Ticket) (*rig, *core.Core) {
 	root := t.TempDir()
 	r := &rig{t: t, origin: filepath.Join(root, "origin.git"), now: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		prs: map[api.TicketID]int{}, leases: map[string]bool{}}
+	for _, t0 := range tickets {
+		r.order = append(r.order, t0.ID)
+	}
 	git(t, root, "init", "-q", "--bare", "-b", "main", r.origin)
 	seed := filepath.Join(root, "seed")
 	git(t, root, "clone", "-q", r.origin, seed)
