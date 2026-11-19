@@ -389,3 +389,10 @@ Source: https://github.com/UKGovernmentBEIS/inspect_ai (MIT, Copyright (c) 2024 
 - `internal/eval/cascade.go` from `src/inspect_ai/scorer/_cascade.py` [tested by `internal/eval/cascade_test.go`, cases from `tests/scorer/test_cascade.py`]
 - `internal/eval/wilson.go` from `src/inspect_ai/scorer/_metrics/std.py` (`ci_wilson`, without clustering) [tested by `internal/eval/wilson_test.go`, values from `tests/scorer/test_metric.py`]
 - `internal/eval/epochs.go` from `src/inspect_ai/scorer/_reducer/reducer.py` (mean, max, pass_at, at_least) [tested by `internal/eval/epochs_test.go`]
+
+## triggerdotdev/trigger.dev@2fbd5c7cf4e9c8e19b88e2b72a7133795611e33d
+
+Source: https://github.com/triggerdotdev/trigger.dev (Apache-2.0, Copyright (c) Trigger.dev)
+
+- `internal/serve/schedule.go` from `internal-packages/schedule-engine/src/engine/scheduleCalculation.ts` [tested by `internal/serve/schedule_test.go`]
+- `internal/serve/schedule.go` from `internal-packages/schedule-engine/src/engine/distributedScheduling.ts` [tested by `internal/serve/schedule_test.go`]
