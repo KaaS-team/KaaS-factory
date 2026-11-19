@@ -1,81 +1,102 @@
 # KaaS Factory
 
-KaaS Factory turns the issues in your repository into reviewed pull requests. You describe work as
-tickets. The factory plans each one, hands it to a coding agent in its own session, checks the result
-against your gates, and lands it through a merge queue. You stay in control: risky changes wait for
-your approval, and every limit is a setting you own.
+KaaS Factory turns a goal into reviewed pull requests: it plans tickets, runs them on parallel
+coding-agent sessions, checks each result against your gates, and lands them through a merge queue.
 
-## What it does for a codebase
+## Quickstart
 
-- Reads the repository and scores how ready it is for agents, then proposes the first fixes.
-- Splits a goal into tickets and runs several of them at the same time.
-- Runs your own gates (tests, lint, build) before anything is proposed for merge.
-- Keeps a merge queue so parallel work lands one change at a time on a green base.
-- Records what each session did, so a person can review it later.
+Inside the repository you want to automate:
+
+```sh
+factory doctor
+factory init --tier solo
+factory first-run --dry-run
+```
+
+`doctor` checks your tools. `init` writes `.factory/factory.yaml`. `first-run --dry-run` audits the
+repository, lists the first fixes, and changes nothing.
+
+## The loop
+
+```mermaid
+flowchart LR
+  G[Goal] --> P[Plan]
+  P --> T[Tickets]
+  T --> S1[Session 1]
+  T --> S2[Session 2]
+  T --> S3[Session 3]
+  S1 & S2 & S3 --> V{Verify}
+  V -- pass --> M[Merge queue]
+  V -- fail --> T
+  M --> B[Green base]
+```
+
+Each ticket runs in its own session. Your own gates (tests, lint, build) decide whether a result moves
+on. The merge queue lands one change at a time, so the base stays green. Risky changes wait for your
+approval.
 
 ## Install
-
-With Homebrew:
 
 ```sh
 brew install kaas-team/tap/factory
 ```
 
-With the install script (no sudo, installs to `$HOME/.local/bin`, checks the checksum first):
+Or, with no sudo (installs to `$HOME/.local/bin`, checks the checksum first):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/KaaS-team/KaaS-factory/main/install/install.sh | sh
 ```
 
-Check it worked:
+More in [docs/install.md](docs/install.md).
+
+## CLI
 
 ```sh
-factory version
-```
-
-More detail is in [docs/install.md](docs/install.md).
-
-## Start
-
-Inside the repository you want to automate:
-
-```sh
-factory init
-```
-
-This writes `.factory/factory.yaml` with the settings for the repository. Every key is listed in
-[docs/config.md](docs/config.md).
-
-Then run a first audit:
-
-```sh
-factory first-run
-```
-
-It scores the repository, shows the first fixes it would make, and changes nothing until you approve.
-Add `--dry-run` to preview only.
-
-Then start the loop:
-
-```sh
+factory plan "add rate limiting to the API"
+factory plan "add rate limiting to the API" --approve
 factory run
+factory status
+factory queue
+factory logs <ticket>
+factory steer <ticket> "use the existing limiter"
+factory cancel <ticket>
+factory retry <ticket>
 ```
 
-Use `factory status` to see what is running, `factory queue` to see what waits to merge, and
-`factory doctor` to check your setup. The full command list is in the CLI reference.
+`plan` turns a goal into a ticket graph. `--approve` files it. `run` starts the loop. The full list is
+in [docs/cli-reference.md](docs/cli-reference.md).
+
+## MCP
+
+Use the factory from Claude Code or any MCP client.
+
+```sh
+factory mcp
+```
+
+This serves over stdio. Add `--http 127.0.0.1:8080` for HTTP at `/mcp`; the bearer token comes from
+`FACTORY_MCP_TOKEN`. Tools include `plan`, `approve_plan`, `create_task`, `status`, `list_tickets`,
+`queue`, `dispatch`, `cancel`, `retry` and `steer`. The board is a resource at `factory://board`.
+
+## Tiers
+
+Pick one with `factory init --tier <name>`. Each tier is a preset you can edit afterwards.
+
+| Tier | `--tier` | What it sets |
+|---|---|---|
+| Solo | `solo` | One slot, local sessions, you approve every change. |
+| Team | `startup`, `scaleup` | Three to six slots on routines, low-risk changes auto-approve. |
+| Org | `enterprise` | Six slots, approval always, daily team and monthly spend caps. |
+| Enterprise | `regulated` | Approval always, and the requester cannot approve or auto-merge. |
+
+`oss` is a fifth preset for open-source maintainers: two local slots, approval always.
 
 ## Configuration
 
-Settings come from layers, lowest to highest: builtin defaults, the org file, the team file, the
-repository file, `FACTORY_*` environment variables, and flags. The org layer is a ceiling: lower
-layers may lower a limit but never raise it.
+Settings come from layers, lowest to highest: defaults, the org file, the team file, the repository
+file, `FACTORY_*` variables, and flags. The org layer is a ceiling. Every key is in
+[docs/config.md](docs/config.md).
 
-## Documents
+## Contributing and license
 
-- [docs/config.md](docs/config.md): every config key, generated from the code.
-- [docs/install.md](docs/install.md): install and upgrade.
-- [CONTRIBUTING.md](CONTRIBUTING.md): working on the factory itself.
-
-## License
-
-See [LICENSE](LICENSE).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [LICENSE](LICENSE).
