@@ -1,7 +1,7 @@
 // Ported from anthropics/claude-code-action@8a29bc6 src/github/utils/sanitizer.ts
 //
-// MIT License, Copyright (c) 2025 Anthropic, PBC. Go port: RE2 has no lookbehind, so the AWS key
-// boundary rule is checked in code.
+// MIT License, Copyright (c) 2025 Anthropic, PBC. Go port. The credential patterns moved to
+// internal/redact.
 
 // Package sanitize cleans text on its way into an agent prompt (Prompt) and on its way out to a
 // tracker or channel (Publication).
@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/KaaS-team/factory/internal/redact"
 )
 
 var (
@@ -24,13 +26,6 @@ var (
 	linkTitleSQ    = regexp.MustCompile(`(\[[^\]]*\]\([^)]+)\s+'[^']*'`)
 	numEntityDec   = regexp.MustCompile(`&#(\d+);`)
 	numEntityHex   = regexp.MustCompile(`&#[xX]([0-9a-fA-F]+);`)
-	ghToken        = regexp.MustCompile(`(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{11,221})\b`)
-	anthropicKey   = regexp.MustCompile(`sk-ant-[A-Za-z0-9_-]{20,}`)
-	awsKey         = regexp.MustCompile(`(?:AKIA|ASIA)[A-Z0-9]{16}\b`)
-	awsEscapeTail  = regexp.MustCompile(`\\(?:[nrtbf"\\/]|u[0-9a-fA-F]{4})$`)
-	awsAnsiTail    = regexp.MustCompile(`\[[0-9;]*m$`)
-	slackToken     = regexp.MustCompile(`xox[abpsr]-[A-Za-z0-9-]{10,}`)
-	jwtToken       = regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`)
 	hiddenAttrExpr = hiddenAttrRegexes()
 )
 
@@ -74,32 +69,5 @@ func asciiEntity(digits string, base int) string {
 	return string(rune(n))
 }
 
-// RedactSecrets replaces GitHub, Anthropic, AWS, Slack and JWT credentials with a [REDACTED_*] tag.
-func RedactSecrets(s string) string {
-	s = ghToken.ReplaceAllString(s, "[REDACTED_GITHUB_TOKEN]")
-	s = anthropicKey.ReplaceAllString(s, "[REDACTED_ANTHROPIC_KEY]")
-	s = redactAWS(s)
-	s = slackToken.ReplaceAllString(s, "[REDACTED_SLACK_TOKEN]")
-	return jwtToken.ReplaceAllString(s, "[REDACTED_JWT]")
-}
-
-// redactAWS keeps upstream's boundary: a word break, a JSON escape or an ANSI colour code before the key.
-func redactAWS(s string) string {
-	var b strings.Builder
-	last := 0
-	for _, m := range awsKey.FindAllStringIndex(s, -1) {
-		head := s[:m[0]]
-		if m[0] > 0 && isWordByte(head[len(head)-1]) && !awsEscapeTail.MatchString(head) && !awsAnsiTail.MatchString(head) {
-			continue
-		}
-		b.WriteString(s[last:m[0]])
-		b.WriteString("[REDACTED_AWS_KEY_ID]")
-		last = m[1]
-	}
-	b.WriteString(s[last:])
-	return b.String()
-}
-
-func isWordByte(c byte) bool {
-	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
-}
+// RedactSecrets replaces credentials with a [REDACTED_*] tag. It is redact.Secrets.
+func RedactSecrets(s string) string { return redact.Secrets(s) }
