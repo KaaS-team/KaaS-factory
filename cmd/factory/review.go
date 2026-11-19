@@ -98,11 +98,7 @@ func (s packSource) changed(ctx context.Context) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("git %s: %w", args[0], err)
 		}
-		for _, f := range strings.Split(string(out), "\x00") {
-			if f != "" {
-				all = append(all, f)
-			}
-		}
+		all = append(all, strings.FieldsFunc(string(out), func(r rune) bool { return r == 0 })...)
 	}
 	return all, nil
 }

@@ -152,10 +152,7 @@ func (r Runner) prompt(ctx context.Context, w *worktree, c Check) (string, error
 	b.WriteString("- You may read a changed file for context, but do not flag unchanged parts of it.\n")
 	b.WriteString("- Edit only the changed files, and only to fix a violation of the rule above. If there is none, edit nothing and say so.\n\n")
 	b.WriteString("## Changed files\n")
-	for _, f := range strings.Split(names, "\x00") {
-		if f == "" {
-			continue
-		}
+	for _, f := range strings.FieldsFunc(names, func(r rune) bool { return r == 0 }) {
 		fmt.Fprintf(&b, "- %s\n", f)
 	}
 	b.WriteString("\n## Diff\n```diff\n" + strings.TrimRight(diff, "\n") + "\n```\n")
