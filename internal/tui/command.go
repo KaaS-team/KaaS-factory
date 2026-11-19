@@ -39,7 +39,7 @@ func NewCommand() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("board: %w", err)
 				}
-				defer f.Close()
+				defer func() { _ = f.Close() }()
 				rp, err := NewReplay(f, speed)
 				if err != nil {
 					return fmt.Errorf("board: read %s: %w", replay, err)

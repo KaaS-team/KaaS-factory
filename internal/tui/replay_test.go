@@ -36,7 +36,7 @@ func fixtureReplay(t *testing.T) *Replay {
 func replayModel(t *testing.T, rp *Replay, n int, opts ...Option) *Model {
 	t.Helper()
 	opts = append([]Option{WithClock(rp.Now)}, opts...)
-	var mm tea.Model = New(rp, opts...)
+	mm := New(rp, opts...)
 	mm, _ = mm.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m := mm.(*Model)
 	for range n {
