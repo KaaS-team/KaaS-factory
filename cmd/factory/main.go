@@ -16,6 +16,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/a2a"
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/audit"
 	"github.com/KaaS-team/factory/internal/browsercheck"
 	"github.com/KaaS-team/factory/internal/dashboard"
 	"github.com/KaaS-team/factory/internal/dispatch/shadow"
@@ -96,7 +97,7 @@ func mountClients(root *cobra.Command) {
 		}),
 		plancmd.WithFiler(lazyFiler{}),
 	), eval.NewCommand(), shadow.NewCommand(), packs.NewAddCommand(), packsCommand(), repomap.NewCommand())
-	root.AddCommand(logs.NewCommand(logBackends()), newServe(), a2a.NewCommand(a2aDeps), browsercheck.NewCommand())
+	root.AddCommand(audit.NewCommand(), logs.NewCommand(logBackends()), newServe(), a2a.NewCommand(a2aDeps), browsercheck.NewCommand())
 }
 
 // packsCommand is `factory packs`, with `packs upgrade` bumping pinned packs.
@@ -228,7 +229,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "factory:", err)
 		os.Exit(1)
 	}
-	if err := newRoot().Execute(); err != nil {
+	flush := audit.Install(context.Background())
+	err := newRoot().Execute()
+	flush()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "factory:", err)
 		var ec interface{ ExitCode() int }
 		if errors.As(err, &ec) {

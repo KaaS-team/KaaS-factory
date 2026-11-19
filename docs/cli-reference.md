@@ -31,6 +31,23 @@ Pin a file from a GitHub repository (MIT or Apache-2.0 only) in factory.lock
 | `--kind` | string | `` | skill, agent, workflow or check (default: from the path) |
 | `--root` | string | `.` | repository root holding factory.lock and .factory/cache |
 
+## factory audit
+
+`factory audit`
+
+Read the audit log of what the factory did
+
+## factory audit export
+
+`factory audit export [flags]`
+
+Print audit records from the last --since, as jsonl or csv
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--format` | string | `jsonl` | jsonl or csv |
+| `--since` | string | `7d` | how far back to read, such as 7d or 12h |
+
 ## factory board
 
 `factory board [flags]`

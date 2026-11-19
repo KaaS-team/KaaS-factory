@@ -3,6 +3,7 @@
 package linear
 
 import (
+	"github.com/KaaS-team/factory/internal/audit"
 	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 
@@ -258,7 +259,8 @@ func (t *Tracker) Get(ctx context.Context, id api.TicketID) (api.Ticket, error) 
 
 // Comment adds a comment through sanitize.Publication, unless ctx came from marker.Allow: the caller
 // then built body itself and its markers survive Linear's comment stripping through a sealed footer.
-func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) error {
+func (t *Tracker) Comment(ctx context.Context, id api.TicketID, body string) (err error) {
+	defer audit.Done(ctx, "tracker.comment", string(id), string(id), &err)
 	tok, err := t.token()
 	if err != nil {
 		return err
@@ -289,7 +291,8 @@ func (t *Tracker) owned(name string) bool {
 
 // SetPhase moves the issue to the state mapped to p. A phase with no mapping is an error, and an
 // issue sitting in a state the factory does not own is left alone.
-func (t *Tracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) error {
+func (t *Tracker) SetPhase(ctx context.Context, id api.TicketID, p api.Phase) (err error) {
+	defer audit.Done(ctx, "tracker.set_phase", string(id), string(id), &err)
 	target, ok := t.cfg.Phases[p]
 	if !ok || target == "" {
 		return fmt.Errorf("linear: no state mapped for phase %q", p)
@@ -364,7 +367,8 @@ func (t *Tracker) SpendComment(ctx context.Context, id api.TicketID) (string, er
 }
 
 // PutSpendComment updates the issue's spend ledger comment in place, or adds it the first time.
-func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body string) error {
+func (t *Tracker) PutSpendComment(ctx context.Context, id api.TicketID, body string) (err error) {
+	defer audit.Done(ctx, "tracker.put_spend_comment", string(id), string(id), &err)
 	_, c, _, err := t.spend(ctx, id)
 	if err != nil {
 		return err

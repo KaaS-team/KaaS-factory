@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/KaaS-team/factory/internal/audit"
 )
 
 // Errors a caller can branch on.
@@ -121,7 +123,8 @@ func (g Git) DiffNames(ctx context.Context, base, head string) ([]string, error)
 
 // FFPush pushes the commit `src` to branch `branch` on `remote`. It never
 // forces: a push that would rewrite the branch returns ErrNotFastForward.
-func (g Git) FFPush(ctx context.Context, remote, src, branch string) error {
+func (g Git) FFPush(ctx context.Context, remote, src, branch string) (err error) {
+	defer audit.Done(ctx, "git.push", remote+" "+branch, "", &err)
 	r, err := g.run(ctx, "push", "--no-verify", "-q", remote, src+":refs/heads/"+branch)
 	if err != nil {
 		return err

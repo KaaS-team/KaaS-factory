@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/audit"
 	"github.com/KaaS-team/factory/internal/plancmd"
 	gogithub "github.com/google/go-github/v79/github"
 )
@@ -46,7 +47,8 @@ func (t *Tracker) Find(ctx context.Context, title string) (api.TicketID, bool, e
 // body v1 (with its Files and Blocked by lines) reaches GitHub byte for byte. With no labels the
 // issue gets factory:ready. A title already filed, found by search or created by this Tracker,
 // returns the first id and posts nothing.
-func (t *Tracker) Create(ctx context.Context, tk api.Ticket) (api.TicketID, error) {
+func (t *Tracker) Create(ctx context.Context, tk api.Ticket) (out api.TicketID, err error) {
+	defer func() { audit.Record(ctx, "tracker.create_issue", tk.Title, string(out), err) }()
 	if strings.TrimSpace(tk.Title) == "" {
 		return "", errors.New("github tracker: create needs a title")
 	}
