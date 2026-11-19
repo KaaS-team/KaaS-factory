@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -71,6 +73,13 @@ func TestCheck(t *testing.T) {
 		{"same", "v1.2.3", "v1.2.3", false, false},
 		{"older latest", "v2.0.0", "v1.9.9", false, false},
 		{"dev build updates", "dev", "v0.1.0", true, false},
+		{"rc reaches final", "v9.0.0-rc1", "v9.0.0", true, false},
+		{"rc2 after rc1", "v9.0.0-rc1", "v9.0.0-rc2", true, false},
+		{"rc.10 after rc.2 (dotted numeric)", "v9.0.0-rc.2", "v9.0.0-rc.10", true, false},
+		{"final does not go back to rc", "v9.0.0", "v9.0.0-rc1", false, false},
+		{"beta before rc", "v9.0.0-beta.1", "v9.0.0-rc.1", true, false},
+		{"build metadata ignored", "v1.2.3+a", "v1.2.3+b", false, false},
+		{"prerelease with build", "v1.2.3-rc1+x", "v1.2.3", true, false},
 		{"bad latest", "v1.0.0", "latest", false, true},
 	}
 	for _, r := range rows {
@@ -204,5 +213,39 @@ func TestGitHubSourceAgainstLocalServer(t *testing.T) {
 	}
 	if _, err := src.Asset(context.Background(), "v9.9.9", "x"); err == nil {
 		t.Fatal("want 404 error")
+	}
+}
+
+func TestApplyRefusesTamperedChecksumsWhenSigned(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	content := []byte("new binary")
+	good := release(t, "v1.0.0", content, "")
+	goodSums := good.files["v1.0.0/checksums.txt"]
+	sig := base64.StdEncoding.EncodeToString(ed25519.Sign(priv, goodSums))
+	v := Ed25519Verifier{Key: pub}
+	run := func(src fakeSource) error {
+		src.files["v1.0.0/checksums.txt.sig"] = []byte(sig)
+		return ApplyVerified(context.Background(), Release{Version: "v1.0.0"}, src, installed(t), "linux", "amd64", v)
+	}
+	if err := run(good); err != nil {
+		t.Fatalf("signed release refused: %v", err)
+	}
+	evil := []byte("evil")
+	bad := release(t, "v1.0.0", evil, "")
+	if err := run(bad); err == nil || !strings.Contains(err.Error(), "verify checksums.txt") {
+		t.Fatalf("tampered pair accepted: %v", err)
+	}
+	var out bytes.Buffer
+	Notice = &out
+	t.Cleanup(func() { Notice, ReleaseKey = os.Stderr, nil })
+	if err := Apply(context.Background(), Release{Version: "v1.0.0"}, bad, installed(t), "linux", "amd64"); err != nil || !strings.Contains(out.String(), "checksum-only") {
+		t.Fatalf("unsigned path changed: %v %q", err, out.String())
+	}
+	ReleaseKey = pub
+	if err := Apply(context.Background(), Release{Version: "v1.0.0"}, bad, installed(t), "linux", "amd64"); err == nil {
+		t.Fatal("Apply with a release key accepted an unsigned release")
+	}
+	if !strings.Contains(TrustNote(nil), "checksum-only") || strings.Contains(TrustNote(v), "only") {
+		t.Fatal("trust note wrong")
 	}
 }
