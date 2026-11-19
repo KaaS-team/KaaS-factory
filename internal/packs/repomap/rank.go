@@ -3,12 +3,14 @@
 package repomap
 
 import (
+	"cmp"
 	"context"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -92,36 +94,21 @@ func tagsOf(ctx context.Context, o Options, rel string) ([]Tag, bool) {
 // definitions follow as tags with an empty Name.
 func Rank(ctx context.Context, o Options) ([]Tag, error) {
 	fnames := candidates(o)
-	if len(fnames) == 0 {
-		return nil, nil
-	}
-	chat := map[string]bool{}
-	for _, f := range o.Chat {
-		chat[f] = true
-	}
+	chat := setOf(o.Chat)
 	ts, err := tags(ctx, o, fnames, chat)
-	if err != nil {
+	if err != nil || len(fnames) == 0 {
 		return nil, err
 	}
 	edges := graph(ts, o.MentionedIdents, chat)
-	ranked := pagerank(edges, ts.pers)
-	return rankOrder(o, ts, edges, ranked, chat), nil
+	return rankOrder(o, ts, edges, pagerank(edges, ts.pers), chat), nil
 }
 
 // candidates is the sorted union of the Chat and Others files.
 func candidates(o Options) []string {
-	set := map[string]bool{}
-	for _, f := range o.Chat {
-		set[f] = true
-	}
-	for _, f := range o.Others {
-		set[f] = true
-	}
-	return sortedKeys(set)
+	return sortedKeys(setOf(append(slices.Clone(o.Chat), o.Others...)))
 }
 
-// tagSet is what tags() reads from the files: the personalization seeds, who defines and who
-// references each identifier, and the definition tags per file and identifier.
+// tagSet: seeds, definers and referrers per identifier, definition tags per file and identifier.
 type tagSet struct {
 	pers    map[string]float64
 	defines map[string]map[string]bool
@@ -132,12 +119,7 @@ type tagSet struct {
 // tags parses every file and gathers the seeds, definitions and references.
 func tags(ctx context.Context, o Options, fnames []string, chat map[string]bool) (*tagSet, error) {
 	personalize := 100 / float64(len(fnames))
-	ts := &tagSet{
-		pers:    map[string]float64{},
-		defines: map[string]map[string]bool{},
-		refs:    map[string][]string{},
-		defs:    map[[2]string][]Tag{},
-	}
+	ts := &tagSet{map[string]float64{}, map[string]map[string]bool{}, map[string][]string{}, map[[2]string][]Tag{}}
 	for _, f := range fnames {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -223,18 +205,9 @@ func rankOrder(o Options, ts *tagSet, edges []edge, ranked map[string]float64, c
 	for _, e := range edges {
 		score[fi{e.dst, e.ident}] += ranked[e.src] * e.w / outW[e.src]
 	}
-	keys := make([]fi, 0, len(score))
-	for k := range score {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if score[keys[i]] != score[keys[j]] {
-			return score[keys[i]] > score[keys[j]]
-		}
-		if keys[i].file != keys[j].file {
-			return keys[i].file > keys[j].file
-		}
-		return keys[i].ident > keys[j].ident
+	keys := slices.Collect(maps.Keys(score))
+	slices.SortFunc(keys, func(a, b fi) int {
+		return cmp.Or(cmp.Compare(score[b], score[a]), cmp.Compare(b.file, a.file), cmp.Compare(b.ident, a.ident))
 	})
 	var out []Tag
 	included := map[string]bool{}
@@ -245,20 +218,9 @@ func rankOrder(o Options, ts *tagSet, edges []edge, ranked map[string]float64, c
 		out = append(out, ts.defs[[2]string{k.file, k.ident}]...)
 		included[k.file] = true
 	}
-	rest := map[string]bool{}
-	for _, f := range o.Others {
-		rest[f] = true
-	}
-	nodes := make([]string, 0, len(ranked))
-	for n := range ranked {
-		nodes = append(nodes, n)
-	}
-	sort.Slice(nodes, func(i, j int) bool {
-		if ranked[nodes[i]] != ranked[nodes[j]] {
-			return ranked[nodes[i]] > ranked[nodes[j]]
-		}
-		return nodes[i] > nodes[j]
-	})
+	rest := setOf(o.Others)
+	nodes := slices.Collect(maps.Keys(ranked))
+	slices.SortFunc(nodes, func(a, b string) int { return cmp.Or(cmp.Compare(ranked[b], ranked[a]), cmp.Compare(b, a)) })
 	for _, n := range nodes {
 		delete(rest, n)
 		if !included[n] && !chat[n] {
@@ -267,19 +229,22 @@ func rankOrder(o Options, ts *tagSet, edges []edge, ranked map[string]float64, c
 		}
 	}
 	for _, f := range sortedKeys(rest) {
-		if !included[f] {
-			out = append(out, Tag{File: f})
-		}
+		out = append(out, Tag{File: f})
 	}
 	return out
 }
 
-func sortedKeys[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
+func setOf(l []string) map[string]bool {
+	m := make(map[string]bool, len(l))
+	for _, f := range l {
+		m[f] = true
 	}
-	sort.Strings(out)
+	return m
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	out := slices.Collect(maps.Keys(m))
+	slices.Sort(out)
 	return out
 }
 
