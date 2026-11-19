@@ -121,12 +121,12 @@ func NewCommand(opts ...Option) *cobra.Command {
 			}
 			var buf bytes.Buffer
 			if cost {
-				cw, err := parseSince(churn)
-				if err != nil {
+				cw, perr := parseSince(churn)
+				if perr != nil {
 					return fmt.Errorf("report: bad --churn %q", churn)
 				}
-				recs, err := src.Tickets(cmd.Context(), Window{Since: now.Add(-d), Until: now})
-				if err != nil {
+				var recs []TicketRecord
+				if recs, err = src.Tickets(cmd.Context(), Window{Since: now.Add(-d), Until: now}); err != nil {
 					return err
 				}
 				cr := BuildCost(recs, Window{Since: now.Add(-d), Until: now}, cw)
