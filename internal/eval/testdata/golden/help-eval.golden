@@ -1,0 +1,30 @@
+Run the fixtures matrix and write a scorecard
+
+Usage:
+  eval [flags]
+  eval [command]
+
+Available Commands:
+  check       Lint the fixtures; exit 1 when one is malformed
+  compare     Compare two sets of trajectory files offline
+  completion  Generate the autocompletion script for the specified shell
+  diff        Compare two scorecards; exit 1 when the new one is worse
+  help        Help about any command
+  replay      Print the spans a run recorded, gate spans with their triggered flag
+  stats       Summarise trajectory files offline
+
+Flags:
+      --agent string      agent preset name, never a model name (required)
+      --arm strings       arms to run: preset, control (bare-bash baseline) (default [preset])
+      --fixtures string   directory of fixtures (default "evals/fixtures")
+      --format string     edit format axis, e.g. diff or whole
+  -h, --help              help for eval
+      --out string        directory the scorecard is written to (default "evals")
+      --packs string      packs lock file the run used, e.g. factory.lock
+      --redo              rerun tickets --run-dir already finished
+      --replay            re-score the outputs stored in --run-dir without dispatching
+      --run-dir string    keep results and trajectories here so a killed run resumes
+      --tries int         tries per ticket; the scorecard gets pass_rate_1..N (default 1)
+      --workflow string   workflow name (required)
+
+Use "eval [command] --help" for more information about a command.

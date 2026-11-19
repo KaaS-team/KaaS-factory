@@ -1,0 +1,26 @@
+# Eval scorecard
+
+Workflow: default
+
+Agent: claude
+
+- Pass rate: 0.80 (4 of 5), 95% Wilson interval 0.38 to 0.96
+- Main green rate: 1.00
+- Tokens per merged PR: 150
+- Median wall time: 4s
+- Human touches per PR: 0.00
+
+| Cell | Tickets | Pass rate by try | Malformed | Cost |
+|---|---|---|---|---|
+| preset/claude//bun-add | 1 | 1.00 | 0 | 0.0000 |
+| preset/claude//go-stack | 1 | 1.00 | 0 | 0.0000 |
+| preset/claude//splitbill | 2 | 0.50 | 0 | 0.0000 |
+| preset/claude//uv-add | 1 | 1.00 | 0 | 0.0000 |
+
+| Fixture | Ticket | Passed | Base green | Tokens in | Tokens out | Wall | Attempts | Touches |
+|---|---|---|---|---|---|---|---|---|
+| bun-add | 1 | true | true | 100 | 20 | 4s | 1 | 0 |
+| go-stack | 1 | true | true | 100 | 20 | 4s | 1 | 0 |
+| splitbill | 1 | true | true | 100 | 20 | 4s | 1 | 0 |
+| splitbill | 2 | false | true | 100 | 20 | 4s | 1 | 0 |
+| uv-add | 1 | true | true | 100 | 20 | 4s | 1 | 0 |

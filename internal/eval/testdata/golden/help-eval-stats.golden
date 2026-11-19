@@ -1,0 +1,7 @@
+Summarise trajectory files offline
+
+Usage:
+  eval stats <trajectories> [flags]
+
+Flags:
+  -h, --help   help for stats
