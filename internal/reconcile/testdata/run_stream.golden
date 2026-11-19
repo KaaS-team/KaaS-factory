@@ -1,0 +1,8 @@
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"dispatched","ticket":"t1","data":{"attempt":1,"session":"factory-t1-a1"}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"pushed","ticket":"t1","data":{"attempt":1,"branch":"factory/t1-a1"}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"queued","ticket":"t1","data":{"pr":101}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"merged","ticket":"t1","data":{"pr":101}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"dispatched","ticket":"t2","data":{"attempt":1,"session":"factory-t2-a1"}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"pushed","ticket":"t2","data":{"attempt":1,"branch":"factory/t2-a1"}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"queued","ticket":"t2","data":{"pr":102}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"merged","ticket":"t2","data":{"pr":102}}
