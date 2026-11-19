@@ -310,13 +310,28 @@ func addTaskTools(s *sdk.Server, ctl api.Control) {
 // factory://board and factory://ticket/{id} resources.
 func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 	s := sdk.NewServer(&sdk.Implementation{Name: "factory", Version: "v9"}, nil)
+	addTextTools(s, extra)
+	addBoardTools(s, ctl)
+	addTicketActionTools(s, ctl)
+	addTaskTools(s, ctl)
+	addResources(s, ctl)
+	if extra.ReadOnly {
+		s.RemoveTools(writeTools...)
+	}
+	return s
+}
 
+// addTextTools registers the tools whose work the caller supplies as Handlers.
+func addTextTools(s *sdk.Server, extra Handlers) {
 	sdk.AddTool(s, &sdk.Tool{Name: "plan", Description: "Plan a goal into tickets"}, textTool("plan", extra.Plan))
 	sdk.AddTool(s, &sdk.Tool{Name: "approve_plan", Description: "Plan a goal and approve it in one call, so its tickets are filed. The factory keeps no plan id between calls, so this takes the goal, not an id. Each call files tickets."}, textTool("approve_plan", extra.ApprovePlan))
 	sdk.AddTool(s, &sdk.Tool{Name: "explain_config", Description: "Explain which layer set a config key and which layers it overrode. Read-only."}, textTool("explain_config", extra.ExplainConfig))
 	sdk.AddTool(s, &sdk.Tool{Name: "first_run", Description: "Walk through a first run"}, textTool("first_run", noArg(extra.FirstRun)))
 	sdk.AddTool(s, &sdk.Tool{Name: "report", Description: "Report on finished work"}, textTool("report", noArg(extra.Report)))
+}
 
+// addBoardTools registers the read-only tools that show the board.
+func addBoardTools(s *sdk.Server, ctl api.Control) {
 	sdk.AddTool(s, &sdk.Tool{Name: "status", Description: "Show the board, or one ticket with its history"},
 		func(ctx context.Context, _ *sdk.CallToolRequest, in StatusInput) (*sdk.CallToolResult, StatusOutput, error) {
 			b, err := ctl.Board(ctx)
@@ -349,7 +364,10 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 			b, err := ctl.Board(ctx)
 			return nil, QueueOutput{MergeQueue: nonNil(b.MergeQueue)}, safe("queue", err)
 		})
+}
 
+// addTicketActionTools registers the tools that act on one ticket.
+func addTicketActionTools(s *sdk.Server, ctl api.Control) {
 	sdk.AddTool(s, &sdk.Tool{Name: "dispatch", Description: "Dispatch a ready ticket"},
 		act("dispatch", func(ctx context.Context, in TicketInput) error { return ctl.Dispatch(ctx, api.TicketID(in.Ticket)) }))
 	sdk.AddTool(s, &sdk.Tool{Name: "cancel", Description: "Cancel a ticket's session"},
@@ -364,8 +382,10 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 			return nil, OK{Ticket: in.Ticket, Done: "steer"}, nil
 		})
 
-	addTaskTools(s, ctl)
+}
 
+// addResources registers the factory://board and factory://ticket/{id} resources.
+func addResources(s *sdk.Server, ctl api.Control) {
 	s.AddResource(&sdk.Resource{URI: "factory://board", Name: "board", MIMEType: "application/json", Description: "The factory board"},
 		func(ctx context.Context, req *sdk.ReadResourceRequest) (*sdk.ReadResourceResult, error) {
 			b, err := ctl.Board(ctx)
@@ -378,10 +398,6 @@ func NewServer(ctl api.Control, extra Handlers) *sdk.Server {
 		func(ctx context.Context, req *sdk.ReadResourceRequest) (*sdk.ReadResourceResult, error) {
 			return ticketResource(ctx, ctl, req.Params.URI)
 		})
-	if extra.ReadOnly {
-		s.RemoveTools(writeTools...)
-	}
-	return s
 }
 
 func jsonResource(uri string, v any) (*sdk.ReadResourceResult, error) {

@@ -141,138 +141,171 @@ func decode(r *http.Request, v any) {
 	_ = json.NewDecoder(r.Body).Decode(v)
 }
 
+func writeNotFound(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+}
+
 func (h *fakeHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.requests = append(h.requests, r.Method+" "+r.URL.Path)
 	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	notFound := func() { w.WriteHeader(http.StatusNotFound); _, _ = w.Write([]byte(`{"message":"Not Found"}`)) }
 	if r.URL.Path == "/user" {
-		_ = enc.Encode(map[string]any{"login": "factory-bot"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"login": "factory-bot"})
 		return
 	}
 	prefix := "/repos/" + h.owner + "/" + h.repo + "/"
 	if !strings.HasPrefix(r.URL.Path, prefix) {
-		notFound()
+		writeNotFound(w)
 		return
 	}
 	rest := strings.TrimPrefix(r.URL.Path, prefix)
 	m := r.Method
 	switch {
 	case m == "POST" && rest == "issues":
-		var in struct {
-			Title  string   `json:"title"`
-			Body   string   `json:"body"`
-			Labels []string `json:"labels"`
-		}
-		decode(r, &in)
-		is := &fhIssue{n: len(h.issues) + 1, title: in.Title, body: in.Body, state: "open", created: h.tick()}
-		for _, l := range in.Labels {
-			is.labels = append(is.labels, l)
-			is.timeline = append(is.timeline, fhEvent{l, h.tick()})
-		}
-		h.issues = append(h.issues, is)
-		w.WriteHeader(http.StatusCreated)
-		_ = enc.Encode(h.issueJSON(is))
+		h.createIssue(w, r)
 	case m == "GET" && rest == "issues":
-		label, state := r.URL.Query().Get("labels"), r.URL.Query().Get("state")
-		out := []map[string]any{}
-		for _, is := range h.issues {
-			if (state == "open" && is.state != "open") || (label != "" && !is.has(label)) {
-				continue
-			}
-			out = append(out, h.issueJSON(is))
-		}
-		_ = enc.Encode(out)
+		h.listIssues(w, r)
 	case strings.HasPrefix(rest, "issues/"):
 		h.serveIssue(w, r, strings.Split(strings.TrimPrefix(rest, "issues/"), "/"))
 	case m == "GET" && strings.HasPrefix(rest, "branches/"):
-		name := strings.TrimPrefix(rest, "branches/")
-		sha, _ := h.git("rev-parse", "--verify", "-q", "refs/heads/"+name)
-		if sha == "" {
-			notFound()
-			return
-		}
-		date, _ := h.git("log", "-1", "--format=%cI", sha)
-		_ = enc.Encode(map[string]any{"name": name, "commit": map[string]any{"sha": sha, "commit": map[string]any{"committer": map[string]any{"date": date}}}})
+		h.getBranch(w, strings.TrimPrefix(rest, "branches/"))
 	case m == "GET" && rest == "pulls":
-		head := strings.TrimPrefix(r.URL.Query().Get("head"), h.owner+":")
-		out := []map[string]any{}
-		for i := len(h.prs) - 1; i >= 0; i-- {
-			if h.prs[i].head == head {
-				out = append(out, h.prJSON(h.prs[i]))
-			}
-		}
-		_ = enc.Encode(out)
+		h.listPulls(w, r)
 	case m == "POST" && rest == "pulls":
-		var in struct{ Title, Head, Base string }
-		decode(r, &in)
-		if sha, _ := h.git("rev-parse", "--verify", "-q", "refs/heads/"+in.Head); sha == "" {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			_, _ = w.Write([]byte(`{"message":"head branch does not exist"}`))
-			return
-		}
-		p := &fhPR{n: len(h.prs) + 1, head: in.Head, base: in.Base, title: in.Title}
-		h.prs = append(h.prs, p)
-		w.WriteHeader(http.StatusCreated)
-		_ = enc.Encode(h.prJSON(p))
+		h.createPull(w, r)
 	case strings.HasPrefix(rest, "pulls/"):
-		n, _ := strconv.Atoi(strings.TrimPrefix(rest, "pulls/"))
-		if n < 1 || n > len(h.prs) {
-			notFound()
-			return
-		}
-		if m == "PATCH" {
-			var in struct{ State string }
-			decode(r, &in)
-			h.prs[n-1].closed = in.State == "closed"
-		}
-		_ = enc.Encode(h.prJSON(h.prs[n-1]))
+		h.servePull(w, r, strings.TrimPrefix(rest, "pulls/"))
 	case m == "GET" && strings.HasPrefix(rest, "compare/"):
-		spec := strings.TrimPrefix(rest, "compare/")
-		base, head, _ := strings.Cut(spec, "...")
-		out, _ := h.git("diff", "--name-only", "refs/heads/"+base+"...refs/heads/"+head)
-		files := []map[string]any{}
-		for _, f := range strings.Fields(out) {
-			files = append(files, map[string]any{"filename": f})
-		}
-		_ = enc.Encode(map[string]any{"files": files})
+		h.compare(w, strings.TrimPrefix(rest, "compare/"))
 	case m == "GET" && strings.HasSuffix(rest, "/check-runs"):
-		_ = enc.Encode(map[string]any{"total_count": 0, "check_runs": []any{}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"total_count": 0, "check_runs": []any{}})
 	case m == "GET" && strings.HasSuffix(rest, "/status"):
-		_ = enc.Encode(map[string]any{"state": "pending", "statuses": []any{}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"state": "pending", "statuses": []any{}})
 	case m == "GET" && strings.HasPrefix(rest, "contents/"):
-		ref := r.URL.Query().Get("ref")
-		path := strings.TrimPrefix(rest, "contents/")
-		out, code := h.git("show", "refs/heads/"+ref+":"+path)
-		if code != 0 {
-			notFound()
-			return
-		}
-		_ = enc.Encode(map[string]any{"type": "file", "name": path, "path": path, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(out))})
+		h.getContents(w, r, strings.TrimPrefix(rest, "contents/"))
 	case m == "DELETE" && strings.HasPrefix(rest, "git/refs/"):
-		ref := "refs/" + strings.TrimPrefix(rest, "git/refs/")
-		if _, code := h.git("update-ref", "-d", ref); code != 0 {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
+		h.deleteRef(w, strings.TrimPrefix(rest, "git/refs/"))
 	default:
 		h.t.Errorf("fake hub: unhandled %s %s", m, r.URL.Path)
 		w.WriteHeader(http.StatusTeapot)
 	}
 }
 
+func (h *fakeHub) createIssue(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Title  string   `json:"title"`
+		Body   string   `json:"body"`
+		Labels []string `json:"labels"`
+	}
+	decode(r, &in)
+	is := &fhIssue{n: len(h.issues) + 1, title: in.Title, body: in.Body, state: "open", created: h.tick()}
+	for _, l := range in.Labels {
+		is.labels = append(is.labels, l)
+		is.timeline = append(is.timeline, fhEvent{l, h.tick()})
+	}
+	h.issues = append(h.issues, is)
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(h.issueJSON(is))
+}
+
+func (h *fakeHub) listIssues(w http.ResponseWriter, r *http.Request) {
+	label, state := r.URL.Query().Get("labels"), r.URL.Query().Get("state")
+	out := []map[string]any{}
+	for _, is := range h.issues {
+		if (state == "open" && is.state != "open") || (label != "" && !is.has(label)) {
+			continue
+		}
+		out = append(out, h.issueJSON(is))
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func (h *fakeHub) getBranch(w http.ResponseWriter, name string) {
+	sha, _ := h.git("rev-parse", "--verify", "-q", "refs/heads/"+name)
+	if sha == "" {
+		writeNotFound(w)
+		return
+	}
+	date, _ := h.git("log", "-1", "--format=%cI", sha)
+	_ = json.NewEncoder(w).Encode(map[string]any{"name": name, "commit": map[string]any{"sha": sha, "commit": map[string]any{"committer": map[string]any{"date": date}}}})
+}
+
+func (h *fakeHub) listPulls(w http.ResponseWriter, r *http.Request) {
+	head := strings.TrimPrefix(r.URL.Query().Get("head"), h.owner+":")
+	out := []map[string]any{}
+	for i := len(h.prs) - 1; i >= 0; i-- {
+		if h.prs[i].head == head {
+			out = append(out, h.prJSON(h.prs[i]))
+		}
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func (h *fakeHub) createPull(w http.ResponseWriter, r *http.Request) {
+	var in struct{ Title, Head, Base string }
+	decode(r, &in)
+	if sha, _ := h.git("rev-parse", "--verify", "-q", "refs/heads/"+in.Head); sha == "" {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"message":"head branch does not exist"}`))
+		return
+	}
+	p := &fhPR{n: len(h.prs) + 1, head: in.Head, base: in.Base, title: in.Title}
+	h.prs = append(h.prs, p)
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(h.prJSON(p))
+}
+
+func (h *fakeHub) servePull(w http.ResponseWriter, r *http.Request, num string) {
+	n, _ := strconv.Atoi(num)
+	if n < 1 || n > len(h.prs) {
+		writeNotFound(w)
+		return
+	}
+	if r.Method == "PATCH" {
+		var in struct{ State string }
+		decode(r, &in)
+		h.prs[n-1].closed = in.State == "closed"
+	}
+	_ = json.NewEncoder(w).Encode(h.prJSON(h.prs[n-1]))
+}
+
+func (h *fakeHub) compare(w http.ResponseWriter, spec string) {
+	base, head, _ := strings.Cut(spec, "...")
+	out, _ := h.git("diff", "--name-only", "refs/heads/"+base+"...refs/heads/"+head)
+	files := []map[string]any{}
+	for _, f := range strings.Fields(out) {
+		files = append(files, map[string]any{"filename": f})
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"files": files})
+}
+
+func (h *fakeHub) getContents(w http.ResponseWriter, r *http.Request, path string) {
+	out, code := h.git("show", "refs/heads/"+r.URL.Query().Get("ref")+":"+path)
+	if code != 0 {
+		writeNotFound(w)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"type": "file", "name": path, "path": path, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(out))})
+}
+
+func (h *fakeHub) deleteRef(w http.ResponseWriter, ref string) {
+	if _, code := h.git("update-ref", "-d", "refs/"+ref); code != 0 {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *fakeHub) serveIssue(w http.ResponseWriter, r *http.Request, p []string) {
-	enc := json.NewEncoder(w)
 	n, _ := strconv.Atoi(p[0])
 	is := h.issue(n)
 	if is == nil {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+		writeNotFound(w)
 		return
 	}
+	enc := json.NewEncoder(w)
 	switch {
 	case len(p) == 1 && r.Method == "GET":
 		_ = enc.Encode(h.issueJSON(is))
@@ -283,19 +316,8 @@ func (h *fakeHub) serveIssue(w http.ResponseWriter, r *http.Request, p []string)
 			is.state = in.State
 		}
 		_ = enc.Encode(h.issueJSON(is))
-	case len(p) == 2 && p[1] == "comments" && r.Method == "POST":
-		var in struct{ Body string }
-		decode(r, &in)
-		c := fhComment{id: len(is.comments) + 1, body: in.Body, at: h.tick()}
-		is.comments = append(is.comments, c)
-		w.WriteHeader(http.StatusCreated)
-		_ = enc.Encode(map[string]any{"id": c.id, "body": c.body, "created_at": c.at.Format(time.RFC3339), "user": map[string]any{"login": "factory-bot"}})
-	case len(p) == 2 && p[1] == "comments" && r.Method == "GET":
-		out := []map[string]any{}
-		for _, c := range is.comments {
-			out = append(out, map[string]any{"id": c.id, "body": c.body, "created_at": c.at.Format(time.RFC3339), "user": map[string]any{"login": "factory-bot"}})
-		}
-		_ = enc.Encode(out)
+	case len(p) == 2 && p[1] == "comments":
+		h.issueComments(w, r, is)
 	case len(p) == 2 && p[1] == "labels" && r.Method == "POST":
 		var labels []string
 		decode(r, &labels)
@@ -319,6 +341,33 @@ func (h *fakeHub) serveIssue(w http.ResponseWriter, r *http.Request, p []string)
 		out := []map[string]any{}
 		for _, e := range is.timeline {
 			out = append(out, map[string]any{"event": "labeled", "label": map[string]any{"name": e.label}, "created_at": e.at.Format(time.RFC3339)})
+		}
+		_ = enc.Encode(out)
+	default:
+		h.t.Errorf("fake hub: unhandled %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusTeapot)
+	}
+}
+
+func commentJSON(c fhComment) map[string]any {
+	return map[string]any{"id": c.id, "body": c.body, "created_at": c.at.Format(time.RFC3339), "user": map[string]any{"login": "factory-bot"}}
+}
+
+// issueComments serves POST and GET on an issue's comments; any other method is unhandled.
+func (h *fakeHub) issueComments(w http.ResponseWriter, r *http.Request, is *fhIssue) {
+	enc := json.NewEncoder(w)
+	switch r.Method {
+	case "POST":
+		var in struct{ Body string }
+		decode(r, &in)
+		c := fhComment{id: len(is.comments) + 1, body: in.Body, at: h.tick()}
+		is.comments = append(is.comments, c)
+		w.WriteHeader(http.StatusCreated)
+		_ = enc.Encode(commentJSON(c))
+	case "GET":
+		out := []map[string]any{}
+		for _, c := range is.comments {
+			out = append(out, commentJSON(c))
 		}
 		_ = enc.Encode(out)
 	default:

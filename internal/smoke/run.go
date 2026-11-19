@@ -194,34 +194,51 @@ func logTail(path string) string {
 	return "\nagent log:\n" + string(b)
 }
 
+// drive builds the loop and ticks it until the work lands, the shadow ticks run out, or ctx ends.
 func drive(ctx context.Context, cfg Config, gc *gogithub.Client, res Result, rec *recorder) error {
-	clone := func(name string) (string, error) {
-		dir := filepath.Join(cfg.Dir, name)
-		if _, err := git(ctx, cfg.Dir, "clone", "-q", cfg.RemoteURL, dir); err != nil {
-			return "", err
-		}
-		return dir, nil
-	}
-	agentRepo, err := clone("agent")
+	agentLog := filepath.Join(cfg.Dir, "agent.log")
+	disp, stopRuns, err := newDispatcher(ctx, cfg, res, rec, agentLog)
 	if err != nil {
 		return err
 	}
-	queueRepo, err := clone("queue")
+	defer stopRuns()
+	st, err := store.Open(filepath.Join(cfg.Dir, "factory.db"))
 	if err != nil {
 		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	var loopErrs []error
+	c, err := newCore(ctx, cfg, gc, disp, st, &loopErrs)
+	if err != nil {
+		return err
+	}
+	return tickUntilDone(ctx, cfg, gc, res, c, func() error {
+		return fmt.Errorf("smoke: not finished after %s: %w (loop errors: %v)%s", cfg.Timeout, ctx.Err(), loopErrs, logTail(agentLog))
+	})
+}
+
+// cloneRepo clones the remote into a named directory under cfg.Dir.
+func cloneRepo(ctx context.Context, cfg Config, name string) (string, error) {
+	dir := filepath.Join(cfg.Dir, name)
+	if _, err := git(ctx, cfg.Dir, "clone", "-q", cfg.RemoteURL, dir); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
+// newDispatcher clones the agent's repository, writes the fake agent and returns a local
+// dispatcher that runs it. The returned stop function ends the runs it started.
+func newDispatcher(ctx context.Context, cfg Config, res Result, rec *recorder, agentLog string) (api.Dispatcher, func(), error) {
+	agentRepo, err := cloneRepo(ctx, cfg, "agent")
+	if err != nil {
+		return nil, nil, err
 	}
 	script := filepath.Join(cfg.Dir, "fake-agent.sh")
 	if err := os.WriteFile(script, []byte(agentScript), 0o755); err != nil {
-		return err
-	}
-	agentLog := filepath.Join(cfg.Dir, "agent.log")
-
-	tr, err := ghtracker.New(ghtracker.Config{Owner: cfg.Owner, Repo: cfg.Repo, HTTPClient: cfg.httpClient(), BaseURL: cfg.APIURL + "/"})
-	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	runCtx, stopRuns := context.WithCancel(ctx)
-	defer stopRuns()
 	// The local dispatcher passes on only an allow list of the parent environment, so the fake
 	// agent's own settings travel as the preset's extra environment.
 	preset := local.ClaudePreset
@@ -234,17 +251,24 @@ func drive(ctx context.Context, cfg Config, gc *gogithub.Client, res Result, rec
 		Binary:    script, Environ: os.Environ(), MaxConcurrent: 1, Presets: map[string]local.Preset{"claude": preset},
 	})
 	if err != nil {
-		return err
+		stopRuns()
+		return nil, nil, err
 	}
 	var disp api.Dispatcher = ld
-	disp = shadow.Wrap(disp, config.Config{Shadow: cfg.Shadow}, rec)
+	return shadow.Wrap(disp, config.Config{Shadow: cfg.Shadow}, rec), stopRuns, nil
+}
 
-	st, err := store.Open(filepath.Join(cfg.Dir, "factory.db"))
+// newCore wires the tracker, dispatcher, merge queue and observer into one core.
+// Errors the loop reports are appended to loopErrs.
+func newCore(ctx context.Context, cfg Config, gc *gogithub.Client, disp api.Dispatcher, st *store.Store, loopErrs *[]error) (*core.Core, error) {
+	queueRepo, err := cloneRepo(ctx, cfg, "queue")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer func() { _ = st.Close() }()
-
+	tr, err := ghtracker.New(ghtracker.Config{Owner: cfg.Owner, Repo: cfg.Repo, HTTPClient: cfg.httpClient(), BaseURL: cfg.APIURL + "/"})
+	if err != nil {
+		return nil, err
+	}
 	g := gitx.New(queueRepo)
 	var queue core.MergeQueue = mergeq.NewCoreQueue(mergeq.Deps{
 		Tracker: tr, Git: wire.Git{G: g}, Gate: wire.Gate{G: g, Command: greenGate},
@@ -253,19 +277,19 @@ func drive(ctx context.Context, cfg Config, gc *gogithub.Client, res Result, rec
 	if cfg.Shadow {
 		queue = shadowQueue{queue}
 	}
-	var loopErrs []error
-	c, err := core.New(core.Deps{
+	return core.New(core.Deps{
 		Tracker: tr, Dispatcher: disp, Observer: observe.New(ghsource.New(gc, cfg.Owner, cfg.Repo, cfg.Base)),
 		Store: st, Meter: meter.New(meter.Budgets{}, cfg.Now), Queue: queue,
-		OnError: func(e error) { loopErrs = append(loopErrs, e) },
+		OnError: func(e error) { *loopErrs = append(*loopErrs, e) },
 	}, core.Config{
 		Reconcile: reconcile.Config{Tick: cfg.Poll, MaxAttempts: 1, MaxConcurrent: 1, Base: cfg.Base},
 		Team:      cfg.Owner + "/" + cfg.Repo,
 	})
-	if err != nil {
-		return err
-	}
+}
 
+// tickUntilDone ticks c every poll interval. It returns nil when the work landed (or, in shadow
+// mode, after ShadowTicks ticks) and timeout() when ctx ends first.
+func tickUntilDone(ctx context.Context, cfg Config, gc *gogithub.Client, res Result, c *core.Core, timeout func() error) error {
 	for n := 1; ; n++ {
 		c.Tick(ctx)
 		if cfg.Shadow {
@@ -279,7 +303,7 @@ func drive(ctx context.Context, cfg Config, gc *gogithub.Client, res Result, rec
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("smoke: not finished after %s: %w (loop errors: %v)%s", cfg.Timeout, ctx.Err(), loopErrs, logTail(agentLog))
+			return timeout()
 		case <-time.After(cfg.Poll):
 		}
 	}
