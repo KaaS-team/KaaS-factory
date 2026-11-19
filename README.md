@@ -74,8 +74,8 @@ Use the factory from Claude Code or any MCP client.
 factory mcp
 ```
 
-This serves over stdio. Add `--http 127.0.0.1:8080` for HTTP at `/mcp`; the bearer token comes from
-`FACTORY_MCP_TOKEN`. Tools include `plan`, `approve_plan`, `create_task`, `status`, `list_tickets`,
+This serves over stdio. Add `--http 127.0.0.1:8080` for HTTP at `/mcp`; it needs a bearer secret
+(see `factory mcp --help`). Tools include `plan`, `approve_plan`, `create_task`, `status`, `list_tickets`,
 `queue`, `dispatch`, `cancel`, `retry` and `steer`. The board is a resource at `factory://board`.
 
 ## Tiers
