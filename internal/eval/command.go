@@ -54,171 +54,229 @@ var (
 // NamesModel reports whether s mentions a model name. Scorecards carry the agent preset name only.
 func NamesModel(s string) bool { return modelWord.MatchString(s) }
 
-// NewCommand returns the `eval` command: a run that writes a scorecard, and `eval diff`.
+// NewCommand returns the `eval` command: a run that writes a scorecard, and its subcommands.
 func NewCommand(opts ...Option) *cobra.Command {
 	o := options{now: time.Now}
 	for _, f := range opts {
 		f(&o)
 	}
-	var workflow, agent, format, packs, fixtures, outDir, runDir string
-	var arms []string
-	var tries int
-	var replay, redo bool
+	var rf runFlags
 	cmd := &cobra.Command{
 		Use:           "eval",
 		Short:         "Run the fixtures matrix and write a scorecard",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if tries < 1 {
-				return fmt.Errorf("eval: --tries %d must be at least 1", tries)
-			}
-			if (replay || redo) && runDir == "" {
-				return errors.New("eval: --replay and --redo need --run-dir")
-			}
-			checked := map[string]string{"workflow": workflow, "agent": agent}
-			if format != "" {
-				checked["format"] = format
-			}
-			for _, a := range arms {
-				if a != "preset" && a != "control" {
-					return fmt.Errorf("eval: --arm %q must be preset or control", a)
-				}
-			}
-			for flag, v := range checked {
-				if !safeName.MatchString(v) {
-					return fmt.Errorf("eval: --%s %q must be lowercase letters, digits, dot, dash or underscore", flag, v)
-				}
-				if NamesModel(v) {
-					return fmt.Errorf("eval: --%s %q names a model; use the preset name", flag, v)
-				}
-			}
-			var lockSum string
-			if packs != "" {
-				b, err := os.ReadFile(packs)
-				if err != nil {
-					return fmt.Errorf("eval: read packs lock: %w", err)
-				}
-				sum := sha256.Sum256(b)
-				lockSum = "sha256:" + hex.EncodeToString(sum[:])
-			}
-			m, err := LoadMatrix(fixtures)
-			if err != nil {
-				return err
-			}
-			if len(m.Fixtures) == 0 {
-				return fmt.Errorf("eval: no fixtures under %s", fixtures)
-			}
-			run := o.runner
-			if run == nil { // the default runs each ticket through the local dispatcher in a scratch directory
-				work, err := os.MkdirTemp("", "factory-eval-")
-				if err != nil {
-					return err
-				}
-				defer func() { _ = os.RemoveAll(work) }()
-				run = func(ctx context.Context, workflow, agent, _ string) (Deps, error) {
-					armWork, err := os.MkdirTemp(work, "arm-") // each arm builds its fixture repos apart
-					if err != nil {
-						return nil, err
-					}
-					return NewLocalDeps(ctx, LocalConfig{Fixtures: fixtures, Agent: agent, Workflow: workflow, Work: armWork})
-				}
-			}
-			var store *RunStore
-			if runDir != "" {
-				if store, err = OpenRunStore(runDir); err != nil {
-					return err
-				}
-			}
-			if slices.Contains(arms, "control") && o.control == nil {
-				return errors.New("eval: no control model configured") // before the trace file exists
-			}
-			if err := os.MkdirAll(outDir, 0o755); err != nil {
-				return err
-			}
-			base := filepath.Join(outDir, fmt.Sprintf("%s-%s-%s", o.now().UTC().Format("2006-01-02"), workflow, agent))
-			sink, err := trace.NewFileSink(cmd.Context(), base+".trace.jsonl")
-			if err != nil {
-				return err
-			}
-			closed := false
-			defer func() {
-				if !closed {
-					_ = sink.Close()
-				}
-			}()
-			sc := Scorecard{Schema: SchemaV1, Tries: tries}
-			for _, arm := range arms {
-				deps, err := run(cmd.Context(), workflow, agent, format)
-				if err != nil {
-					return err
-				}
-				if arm == "control" {
-					if o.control == nil {
-						return errors.New("eval: no control model configured")
-					}
-					model, shell, err := o.control(cmd.Context(), agent)
-					if err != nil {
-						return err
-					}
-					deps = controlDeps{Deps: deps, model: model, shell: shell}
-				}
-				part, err := RunArm(cmd.Context(), m, deps, Arm{Arm: arm, Agent: agent, Format: format, Tries: tries, Store: store, Replay: replay, Redo: redo, Sink: sink})
-				if err != nil {
-					return err
-				}
-				sc.Tickets = append(sc.Tickets, part.Tickets...)
-				sc.Cells = append(sc.Cells, part.Cells...)
-			}
-			closed = true
-			if err := sink.Close(); err != nil {
-				return err
-			}
-			sc.Aggregate = aggregate(sc.Tickets)
-			if preset := presetOnly(sc.Tickets); len(preset) > 0 {
-				sc.Aggregate = aggregate(preset) // the control arm is a baseline, not part of the headline
-			}
-			sc.Workflow, sc.Agent, sc.Packs = workflow, agent, lockSum
-			raw, err := json.MarshalIndent(sc, "", "  ")
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(base+".json", append(raw, '\n'), 0o644); err != nil {
-				return err
-			}
-			if err := os.WriteFile(base+".md", []byte(Markdown(sc, false)), 0o644); err != nil {
-				return err
-			}
-			for _, r := range sc.Tickets {
-				state := trajectory.StateFail
-				if r.Merged {
-					state = trajectory.StatePass
-				}
-				if _, err := trajectory.Write(base+"-trajectories", trajectory.Trajectory{
-					Task: r.Fixture + "/" + string(r.Ticket), Agent: agent, Workflow: workflow, State: state, Steps: []trajectory.Step{},
-					Cost: trajectory.Cost{InputTokens: r.InputTokens, OutputTokens: r.OutputTokens, CostUSD: r.CostUSD},
-				}); err != nil {
-					return err
-				}
-			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s.json, %s.md and %s.trace.jsonl\n", base, base, base)
-			return err
-		},
+		RunE:          func(cmd *cobra.Command, _ []string) error { return runEval(cmd, &o, rf) },
 	}
-	cmd.Flags().StringVar(&workflow, "workflow", "", "workflow name (required)")
-	cmd.Flags().StringVar(&agent, "agent", "", "agent preset name, never a model name (required)")
-	cmd.Flags().StringVar(&format, "format", "", "edit format axis, e.g. diff or whole")
-	cmd.Flags().StringSliceVar(&arms, "arm", []string{"preset"}, "arms to run: preset, control (bare-bash baseline)")
-	cmd.Flags().IntVar(&tries, "tries", 1, "tries per ticket; the scorecard gets pass_rate_1..N")
-	cmd.Flags().StringVar(&runDir, "run-dir", "", "keep results and trajectories here so a killed run resumes")
-	cmd.Flags().BoolVar(&replay, "replay", false, "re-score the outputs stored in --run-dir without dispatching")
-	cmd.Flags().BoolVar(&redo, "redo", false, "rerun tickets --run-dir already finished")
-	cmd.Flags().StringVar(&packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
-	cmd.Flags().StringVar(&fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
-	cmd.Flags().StringVar(&outDir, "out", "evals", "directory the scorecard is written to")
+	cmd.Flags().StringVar(&rf.workflow, "workflow", "", "workflow name (required)")
+	cmd.Flags().StringVar(&rf.agent, "agent", "", "agent preset name, never a model name (required)")
+	cmd.Flags().StringVar(&rf.format, "format", "", "edit format axis, e.g. diff or whole")
+	cmd.Flags().StringSliceVar(&rf.arms, "arm", []string{"preset"}, "arms to run: preset, control (bare-bash baseline)")
+	cmd.Flags().IntVar(&rf.tries, "tries", 1, "tries per ticket; the scorecard gets pass_rate_1..N")
+	cmd.Flags().StringVar(&rf.runDir, "run-dir", "", "keep results and trajectories here so a killed run resumes")
+	cmd.Flags().BoolVar(&rf.replay, "replay", false, "re-score the outputs stored in --run-dir without dispatching")
+	cmd.Flags().BoolVar(&rf.redo, "redo", false, "rerun tickets --run-dir already finished")
+	cmd.Flags().StringVar(&rf.packs, "packs", "", "packs lock file the run used, e.g. factory.lock")
+	cmd.Flags().StringVar(&rf.fixtures, "fixtures", "evals/fixtures", "directory of fixtures")
+	cmd.Flags().StringVar(&rf.outDir, "out", "evals", "directory the scorecard is written to")
 	cmd.AddCommand(newDiffCommand(), newCheckCommand(), trajectory.NewStatsCommand(), trajectory.NewCompareCommand(), newReplayCommand())
 	return cmd
+}
+
+// runFlags holds the flags of the bare `eval` run.
+type runFlags struct {
+	workflow, agent, format, packs, fixtures, outDir, runDir string
+	arms                                                     []string
+	tries                                                    int
+	replay, redo                                             bool
+}
+
+// validate checks the flags before any file is read or written.
+func (rf runFlags) validate() error {
+	if rf.tries < 1 {
+		return fmt.Errorf("eval: --tries %d must be at least 1", rf.tries)
+	}
+	if (rf.replay || rf.redo) && rf.runDir == "" {
+		return errors.New("eval: --replay and --redo need --run-dir")
+	}
+	checked := map[string]string{"workflow": rf.workflow, "agent": rf.agent}
+	if rf.format != "" {
+		checked["format"] = rf.format
+	}
+	for _, a := range rf.arms {
+		if a != "preset" && a != "control" {
+			return fmt.Errorf("eval: --arm %q must be preset or control", a)
+		}
+	}
+	for flag, v := range checked {
+		if !safeName.MatchString(v) {
+			return fmt.Errorf("eval: --%s %q must be lowercase letters, digits, dot, dash or underscore", flag, v)
+		}
+		if NamesModel(v) {
+			return fmt.Errorf("eval: --%s %q names a model; use the preset name", flag, v)
+		}
+	}
+	return nil
+}
+
+// packsSum returns the sha256 of the packs lock file, or "" when there is none.
+func (rf runFlags) packsSum() (string, error) {
+	if rf.packs == "" {
+		return "", nil
+	}
+	b, err := os.ReadFile(rf.packs)
+	if err != nil {
+		return "", fmt.Errorf("eval: read packs lock: %w", err)
+	}
+	sum := sha256.Sum256(b)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+type runnerFunc = func(ctx context.Context, workflow, agent, format string) (Deps, error)
+
+// localRunner runs each ticket through the local dispatcher, one scratch directory per arm.
+// The returned cleanup removes the scratch tree.
+func localRunner(fixtures string) (runnerFunc, func(), error) {
+	work, err := os.MkdirTemp("", "factory-eval-")
+	if err != nil {
+		return nil, nil, err
+	}
+	run := func(ctx context.Context, workflow, agent, _ string) (Deps, error) {
+		armWork, err := os.MkdirTemp(work, "arm-") // each arm builds its fixture repos apart
+		if err != nil {
+			return nil, err
+		}
+		return NewLocalDeps(ctx, LocalConfig{Fixtures: fixtures, Agent: agent, Workflow: workflow, Work: armWork})
+	}
+	return run, func() { _ = os.RemoveAll(work) }, nil
+}
+
+// runEval is the body of the bare `eval` command: check, run every arm, write the scorecard.
+func runEval(cmd *cobra.Command, o *options, rf runFlags) error {
+	if err := rf.validate(); err != nil {
+		return err
+	}
+	lockSum, err := rf.packsSum()
+	if err != nil {
+		return err
+	}
+	m, err := LoadMatrix(rf.fixtures)
+	if err != nil {
+		return err
+	}
+	if len(m.Fixtures) == 0 {
+		return fmt.Errorf("eval: no fixtures under %s", rf.fixtures)
+	}
+	run := o.runner
+	if run == nil {
+		var cleanup func()
+		if run, cleanup, err = localRunner(rf.fixtures); err != nil {
+			return err
+		}
+		defer cleanup()
+	}
+	var store *RunStore
+	if rf.runDir != "" {
+		if store, err = OpenRunStore(rf.runDir); err != nil {
+			return err
+		}
+	}
+	if slices.Contains(rf.arms, "control") && o.control == nil {
+		return errors.New("eval: no control model configured") // before the trace file exists
+	}
+	if err := os.MkdirAll(rf.outDir, 0o755); err != nil {
+		return err
+	}
+	base := filepath.Join(rf.outDir, fmt.Sprintf("%s-%s-%s", o.now().UTC().Format("2006-01-02"), rf.workflow, rf.agent))
+	sc, err := runArms(cmd.Context(), o, rf, m, run, store, base)
+	if err != nil {
+		return err
+	}
+	sc.Workflow, sc.Agent, sc.Packs = rf.workflow, rf.agent, lockSum
+	if err := writeScorecard(base, sc); err != nil {
+		return err
+	}
+	if err := writeTrajectories(base, rf, sc); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s.json, %s.md and %s.trace.jsonl\n", base, base, base)
+	return err
+}
+
+// runArms runs every arm into one scorecard and records spans in base.trace.jsonl.
+func runArms(ctx context.Context, o *options, rf runFlags, m Matrix, run runnerFunc, store *RunStore, base string) (Scorecard, error) {
+	sink, err := trace.NewFileSink(ctx, base+".trace.jsonl")
+	if err != nil {
+		return Scorecard{}, err
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = sink.Close()
+		}
+	}()
+	sc := Scorecard{Schema: SchemaV1, Tries: rf.tries}
+	for _, arm := range rf.arms {
+		deps, err := run(ctx, rf.workflow, rf.agent, rf.format)
+		if err != nil {
+			return sc, err
+		}
+		if arm == "control" {
+			if o.control == nil {
+				return sc, errors.New("eval: no control model configured")
+			}
+			model, shell, err := o.control(ctx, rf.agent)
+			if err != nil {
+				return sc, err
+			}
+			deps = controlDeps{Deps: deps, model: model, shell: shell}
+		}
+		part, err := RunArm(ctx, m, deps, Arm{Arm: arm, Agent: rf.agent, Format: rf.format, Tries: rf.tries, Store: store, Replay: rf.replay, Redo: rf.redo, Sink: sink})
+		if err != nil {
+			return sc, err
+		}
+		sc.Tickets = append(sc.Tickets, part.Tickets...)
+		sc.Cells = append(sc.Cells, part.Cells...)
+	}
+	closed = true
+	if err := sink.Close(); err != nil {
+		return sc, err
+	}
+	sc.Aggregate = aggregate(sc.Tickets)
+	if preset := presetOnly(sc.Tickets); len(preset) > 0 {
+		sc.Aggregate = aggregate(preset) // the control arm is a baseline, not part of the headline
+	}
+	return sc, nil
+}
+
+// writeScorecard writes base.json and base.md.
+func writeScorecard(base string, sc Scorecard) error {
+	raw, err := json.MarshalIndent(sc, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(base+".json", append(raw, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(base+".md", []byte(Markdown(sc, false)), 0o644)
+}
+
+// writeTrajectories writes one trajectory per ticket result under base-trajectories.
+func writeTrajectories(base string, rf runFlags, sc Scorecard) error {
+	for _, r := range sc.Tickets {
+		state := trajectory.StateFail
+		if r.Merged {
+			state = trajectory.StatePass
+		}
+		if _, err := trajectory.Write(base+"-trajectories", trajectory.Trajectory{
+			Task: r.Fixture + "/" + string(r.Ticket), Agent: rf.agent, Workflow: rf.workflow, State: state, Steps: []trajectory.Step{},
+			Cost: trajectory.Cost{InputTokens: r.InputTokens, OutputTokens: r.OutputTokens, CostUSD: r.CostUSD},
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func presetOnly(rs []TicketResult) []TicketResult {
