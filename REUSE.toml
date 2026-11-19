@@ -1,7 +1,7 @@
 version = 1
 SPDX-PackageName = "KaaS Factory"
 SPDX-PackageSupplier = "Secret SaaS OÜ"
-SPDX-PackageDownloadLocation = "https://github.com/KaaS-team/KaaS-factory"
+SPDX-PackageDownloadLocation = "https://github.com/KaaS-team/factory"
 
 # The core: everything not matched below. LICENSE says which parts differ.
 [[annotations]]

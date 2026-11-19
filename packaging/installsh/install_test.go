@@ -346,7 +346,7 @@ func TestDefaultReleaseHostIsTheRenamedRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(src), "https://github.com/KaaS-team/factory}") || strings.Contains(string(src), "KaaS-factory") {
+	if !strings.Contains(string(src), "https://github.com/KaaS-team/factory}") || strings.Contains(string(src), "KaaS-"+"factory") {
 		t.Fatal("install.sh must default to github.com/KaaS-team/factory")
 	}
 }

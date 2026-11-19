@@ -13,4 +13,4 @@ A fork that is distributed or hosted for others must:
 - replace `dashboard/public/icon.svg` and the names in `dashboard/public/manifest.webmanifest`;
 - keep LICENSE, NOTICE and THIRD_PARTY_NOTICES.md.
 
-For anything else, open an issue on KaaS-team/KaaS-factory.
+For anything else, open an issue on KaaS-team/factory.

@@ -1,4 +1,4 @@
-# KaaS-team/KaaS-factory factory charter
+# KaaS-team/factory factory charter
 
 ## Stack
 

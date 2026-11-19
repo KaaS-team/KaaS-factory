@@ -1,6 +1,6 @@
 name: core
 mission: Build and harden the factory engine.
-repos: [KaaS-team/KaaS-factory, KaaS-team/factory-plugins, KaaS-team/factory-enterprise]
+repos: [KaaS-team/factory, KaaS-team/factory-plugins, KaaS-team/factory-enterprise]
 source:
   kind: github
   ready: "label:factory:ready"

@@ -3,6 +3,7 @@ package docs
 
 import (
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -38,12 +39,26 @@ func TestReadmeShape(t *testing.T) {
 	if n := strings.Count(readme, "\n"); n >= 150 {
 		t.Errorf("README.md has %d lines; keep it under 150", n)
 	}
-	if strings.Contains(readme, "KaaS-factory") {
-		t.Error("README.md uses the old repo name KaaS-factory; it is KaaS-team/factory")
-	}
 	for _, want := range []string{"brew install", "install.sh | sh", "go install github.com/KaaS-team/factory/cmd/factory@latest"} {
 		if !strings.Contains(readme, want) {
 			t.Errorf("README.md is missing the install route %q", want)
+		}
+	}
+}
+
+// oldName is the repo name before the rename, split so this file does not match itself.
+var oldName = "KaaS-" + "factory"
+
+// TestNoOldRepoName fails when a tracked file other than CHANGELOG.md (which records the rename)
+// still names the old repo.
+func TestNoOldRepoName(t *testing.T) {
+	out, err := exec.Command("git", "-C", "..", "grep", "-l", "-I", "-F", oldName).Output()
+	if err != nil && len(out) == 0 {
+		return // git grep exits 1 when nothing matches
+	}
+	for _, f := range strings.Fields(string(out)) {
+		if f != "CHANGELOG.md" {
+			t.Errorf("%s names the old repo %s; it is KaaS-team/factory", f, oldName)
 		}
 	}
 }

@@ -1,5 +1,5 @@
 {
-  "repo": "KaaS-team/KaaS-factory",
+  "repo": "KaaS-team/factory",
   "base": "main",
   "baselineTag": "baseline",
   "gates": [
