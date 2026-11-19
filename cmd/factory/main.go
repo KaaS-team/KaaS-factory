@@ -1,4 +1,8 @@
-// Command factory is the KaaS Factory CLI.
+// Command factory is the KaaS Factory CLI. It builds the cobra command tree: the board and run
+// commands over the api.Control contract, plus the plan, pack, eval, audit, MCP and design
+// commands mounted from internal packages. People and CI call it as `factory <command>`, and the
+// pack and workflow files run it as a subprocess. Each command lives in its own file here and stays
+// a thin parse, call and render layer over internal code.
 package main
 
 import (

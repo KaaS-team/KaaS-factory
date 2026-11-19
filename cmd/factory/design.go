@@ -32,9 +32,15 @@ func designCmd() *cobra.Command {
 		}
 		return design.NodeRunner{Pack: abs, Jail: jail}
 	}
-	print := func(cmd *cobra.Command, v any) error { return json.NewEncoder(cmd.OutOrStdout()).Encode(v) }
+	c.AddCommand(designTweakCmd(runner), designStampCmd(runner), designEditCmd(runner))
+	return c
+}
 
-	c.AddCommand(&cobra.Command{
+// printJSON writes v as one JSON line to the command's stdout.
+func printJSON(cmd *cobra.Command, v any) error { return json.NewEncoder(cmd.OutOrStdout()).Encode(v) }
+
+func designTweakCmd(runner func() design.Runner) *cobra.Command {
+	return &cobra.Command{
 		Use:   "tweak <dir> <delta>",
 		Short: "Apply a design delta (a file under dir) to the tree; fail when the edit needs an agent",
 		Args:  cobra.ExactArgs(2),
@@ -46,9 +52,13 @@ func designCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return print(cmd, o)
+			return printJSON(cmd, o)
 		},
-	}, &cobra.Command{
+	}
+}
+
+func designStampCmd(runner func() design.Runner) *cobra.Command {
+	return &cobra.Command{
 		Use:   "stamp <dir>",
 		Short: "Give every JSX element under dir one unique oid",
 		Args:  cobra.ExactArgs(1),
@@ -57,10 +67,12 @@ func designCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return print(cmd, map[string][]string{"stamped": files})
+			return printJSON(cmd, map[string][]string{"stamped": files})
 		},
-	})
+	}
+}
 
+func designEditCmd(runner func() design.Runner) *cobra.Command {
 	var strip bool
 	edit := &cobra.Command{
 		Use:   "edit <dir> <file> <requests.json>",
@@ -79,10 +91,9 @@ func designCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return print(cmd, d)
+			return printJSON(cmd, d)
 		},
 	}
 	edit.Flags().BoolVar(&strip, "strip-ids", false, "leave no data-oid or move key in the result")
-	c.AddCommand(edit)
-	return c
+	return edit
 }
