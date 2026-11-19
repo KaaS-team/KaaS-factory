@@ -30,6 +30,7 @@ const (
 	KindSteer    Kind = "steer"    // the session was told to push
 	KindRetry    Kind = "retry"    // the attempt was given up and queued to run again at At
 	KindEnd      Kind = "end"      // the ticket left the scheduler (done, canceled or needs a human)
+	KindStep     Kind = "step"     // a named side effect finished (Reason) for Attempt; the state is unchanged
 	KindAudit    Kind = "audit"    // the log was repaired on replay; the state is unchanged
 )
 
@@ -86,6 +87,8 @@ func fold(e *Entry, ev Event) *Entry {
 		n.Phase, n.SteeredAt = api.PhaseStalled, ev.Time
 	case KindEnd:
 		return nil
+	case KindStep:
+		return e
 	default: // audit and unknown kinds leave the state alone
 		return e
 	}
@@ -102,6 +105,23 @@ func checksum(e *Entry) string {
 type tlog struct {
 	seq   int
 	state *Entry
+	steps map[string]bool // done durable steps, keyed by StepKey
+}
+
+// StepKey names one durable step of one attempt.
+func StepKey(attempt int, name string) string { return fmt.Sprintf("%d/%s", attempt, name) }
+
+// note tracks the durable steps in l: a step event adds one, an end event clears them all.
+func (l *tlog) note(ev Event) {
+	switch ev.Kind {
+	case KindStep:
+		if l.steps == nil {
+			l.steps = map[string]bool{}
+		}
+		l.steps[StepKey(ev.Attempt, ev.Reason)] = true
+	case KindEnd:
+		l.steps = nil
+	}
 }
 
 // Store is a directory of per-ticket logs, one `<ticket>.jsonl` file each.
@@ -165,7 +185,24 @@ func (s *Store) appendLocked(id api.TicketID, ev Event) error {
 		return werr
 	}
 	l.seq, l.state = ev.Seq, next
+	l.note(ev)
 	return nil
+}
+
+// Steps returns the durable steps the ticket has finished, as StepKey values. A ticket that
+// ended has none. The DBOS idea: a step result is on disk before the next step runs.
+func (s *Store) Steps(id api.TicketID) (map[string]bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l, _, err := s.load(id)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]bool, len(l.steps))
+	for k := range l.steps {
+		out[k] = true
+	}
+	return out, nil
 }
 
 // load returns the cached log for id, replaying the file the first time. The string is an audit
@@ -200,6 +237,7 @@ func (s *Store) load(id api.TicketID) (*tlog, string, error) {
 				break
 			}
 			l.seq, l.state = ev.Seq, next
+			l.note(ev)
 			good += i + 1
 			rest = rest[i+1:]
 		}

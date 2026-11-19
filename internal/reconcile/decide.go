@@ -155,8 +155,14 @@ func Decide(s State, obs []api.Observation, now time.Time, cfg Config) []Action 
 		}
 	}
 
+	return append(out, dispatchActions(s, due, running, used, cfg)...)
+}
+
+// dispatchActions picks due retries, then new tickets, while slots and fires remain.
+func dispatchActions(s State, due []Entry, running []api.Ticket, used int, cfg Config) []Action {
+	var out []Action
 	if cfg.MaxConcurrent <= 0 || s.noDispatch {
-		return out
+		return nil
 	}
 	free := cfg.MaxConcurrent - used
 	fires := s.FiresLeft
