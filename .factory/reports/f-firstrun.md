@@ -26,3 +26,6 @@ None. Read KaaS-team/auditor README and JSON output.
 .ratchet.json and cmd/factory/main.go (exit code via ExitCode() interface, 5 lines). Needs ErrNoAuditor in internal/firstrun.
 ## Workflow changes needed
 None. Note: AGENTS.md says a hook refuses writes under .factory/.
+
+## PR
+Draft PR #680. Its body follows .github/pull_request_template.md; the first body did not and failed check-pr-body.
