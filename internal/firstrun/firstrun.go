@@ -33,7 +33,19 @@ type Finding struct {
 	Pack      string `json:"pack"`
 	Effort    string `json:"effort"`
 	ScoreGain int    `json:"score_gain"`
+	// Evidence lists where the finding shows; an entry may read "path:line" or "path:line detail".
+	Evidence []string `json:"evidence"`
 }
+
+// ErrNoAuditor is returned when the auditor binary is not on PATH. The CLI exits 2 on it.
+type ErrNoAuditor struct{ Binary, Install string }
+
+func (e ErrNoAuditor) Error() string {
+	return fmt.Sprintf("auditor not found on PATH; install it with: %s", e.Install)
+}
+
+// ExitCode is the process exit status for this error.
+func (ErrNoAuditor) ExitCode() int { return 2 }
 
 // Schema is the auditor report contract first-run reads (auditor docs/json.md).
 const Schema = "auditor.report/v1"
@@ -126,7 +138,7 @@ func Run(ctx context.Context, o Options) (Report, error) {
 	}
 	bin, err := exec.LookPath(cat.Auditor.Binary)
 	if err != nil {
-		return Report{}, fmt.Errorf("auditor binary %q not found on PATH; install it with: %s", cat.Auditor.Binary, cat.Auditor.Install)
+		return Report{}, ErrNoAuditor{cat.Auditor.Binary, cat.Auditor.Install}
 	}
 	dir := o.Dir
 	if dir == "" {
@@ -242,6 +254,7 @@ func Build(a Audit, cat Catalogue) Report {
 	if len(r.TopRisks) > 3 {
 		r.TopRisks = r.TopRisks[:3]
 	}
+	r.TopRisks = fillRisks(r.TopRisks, a.Findings)
 	total := 0
 	for _, f := range a.Findings {
 		if f.Severity == "ok" {
@@ -258,6 +271,44 @@ func Build(a Audit, cat Catalogue) Report {
 	}
 	r.ScoreAfter = clamp(score + total)
 	return r
+}
+
+// fillRisks tops the risk list up to three with the worst open findings when the auditor names fewer
+// (a repo with no auth, payments or infra area has none). Failures rank before warnings, then by gain.
+func fillRisks(risks, findings []Finding) []Finding {
+	if len(risks) >= 3 {
+		return risks
+	}
+	seen := map[string]bool{}
+	for _, f := range risks {
+		seen[f.ID] = true
+	}
+	var open []Finding
+	for _, f := range findings {
+		if f.Severity != "ok" && !seen[f.ID] && f.Pack != "" {
+			open = append(open, f)
+		}
+	}
+	sort.SliceStable(open, func(i, j int) bool {
+		a, b := open[i], open[j]
+		if (loc(a) != "repo-wide") != (loc(b) != "repo-wide") {
+			return loc(a) != "repo-wide"
+		}
+		if (a.Severity == "fail") != (b.Severity == "fail") {
+			return a.Severity == "fail"
+		}
+		if a.ScoreGain != b.ScoreGain {
+			return a.ScoreGain > b.ScoreGain
+		}
+		return a.ID < b.ID
+	})
+	for _, f := range open {
+		if len(risks) == 3 {
+			break
+		}
+		risks = append(risks, f)
+	}
+	return risks
 }
 
 func clamp(n int) int { return min(n, 100) }
@@ -353,6 +404,11 @@ func (r Report) Markdown() (string, error) {
 
 func loc(f Finding) string {
 	if f.File == "" {
+		for _, e := range f.Evidence {
+			if p, _, _ := strings.Cut(e, " "); p != "" && p != "..." {
+				return p
+			}
+		}
 		return "repo-wide"
 	}
 	if f.Line > 0 {

@@ -250,3 +250,25 @@ func TestServe_RejectsForeignHostAndOrigin(t *testing.T) {
 	cancel()
 	<-done
 }
+
+func TestServeTicksSchedules(t *testing.T) {
+	fired := make(chan Occurrence, 4)
+	clock := &fakeClock{t: time.Date(2026, 3, 1, 12, 10, 0, 0, time.UTC)}
+	st := memStore{"h": time.Date(2026, 3, 1, 6, 0, 0, 0, time.UTC)}
+	sc := &Scheduler{Schedules: []Schedule{{Name: "h", Spec: "0 * * * *"}}, Store: st,
+		Fire: func(_ context.Context, o Occurrence) error { fired <- o; return nil }}
+	srv := New(newFakeCore(), Options{Interval: time.Hour, Clock: clock, Schedule: sc})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ctx, "127.0.0.1:0", time.Second) }()
+	select {
+	case o := <-fired:
+		if !o.Skipped || o.Nominal.Hour() != 12 {
+			t.Fatalf("got %+v", o)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve never ticked the scheduler")
+	}
+	cancel()
+	<-done
+}

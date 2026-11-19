@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/KaaS-team/factory/internal/mcp"
 	"math"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -185,6 +188,49 @@ func TestNoControlForPlainCommands(t *testing.T) {
 		_ = root.Execute()
 		if built != 0 {
 			t.Fatalf("%v built a Control", args)
+		}
+	}
+}
+
+// TestBoardReplayNeedsNoControl: a demo replays a recorded fleet in an empty directory, with no
+// tracker configured, so `board --replay` must never build a Control.
+func TestBoardReplayNeedsNoControl(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	old := newControl
+	newControl = func(config.Config) (api.Control, error) { return nil, errors.New("constructed a Control") }
+	t.Cleanup(func() { newControl = old })
+	board, _, err := newRoot().Find([]string{"board"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := board.ParseFlags([]string{"--replay", filepath.Join(dir, "fleet.ndjson")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := board.PersistentPreRunE(board, nil); err != nil {
+		t.Fatalf("board --replay built a Control: %v", err)
+	}
+}
+
+// TestMCPHandlersWired: every MCP tool with a handler slot is wired, except the two named in
+// mcpHandlers' comment, so no listed tool answers "not available in this build" by accident.
+func TestMCPHandlersWired(t *testing.T) {
+	unwired := map[string]bool{"ApprovePlan": true, "ExplainConfig": true}
+	v := reflect.ValueOf(mcpHandlers())
+	for i := range v.NumField() {
+		f, name := v.Field(i), v.Type().Field(i).Name
+		if f.Kind() == reflect.Func && f.IsNil() && !unwired[name] {
+			t.Errorf("mcp handler %s is not wired", name)
+		}
+	}
+}
+
+// TestMCPPlanGoalIsNotAFlag: an MCP client cannot pass flags through the goal, so "--approve"
+// never files tickets.
+func TestMCPPlanGoalIsNotAFlag(t *testing.T) {
+	for _, g := range []string{"--approve", "-h", "", "  "} {
+		if _, err := mcpHandlers().Plan(context.Background(), mcp.PlanInput{Goal: g}); err == nil || !strings.Contains(err.Error(), "goal must be text") {
+			t.Errorf("goal %q: err = %v, want a refusal", g, err)
 		}
 	}
 }

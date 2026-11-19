@@ -2,12 +2,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -66,10 +68,10 @@ func mountClients(root *cobra.Command) {
 	attach(board, tui.WithControl)
 	dash := dashboard.NewCommand()
 	attach(dash, dashboard.WithControl)
-	root.AddCommand(board, dash, firstrun.NewCommand(firstrun.WithExec(firstRunExec)), selfupdate.NewCommand(version, selfupdate.GitHubSource{}, ""))
+	root.AddCommand(board, dash, firstrun.NewCommand(firstrun.WithExec(firstRunExec)), upgrade.NewSelfCommand(version, selfupdate.GitHubSource{}, ""))
 	root.AddCommand(mcp.NewCommand(mcp.WithControl(func() (api.Control, mcp.Handlers, error) {
 		c, err := control(nil)
-		return c, mcp.Handlers{}, err
+		return c, mcpHandlers(), err
 	})))
 	root.AddCommand(report.NewCommand(report.WithSource(func(context.Context) (report.Source, error) {
 		st, err := openStore()
@@ -84,6 +86,7 @@ func mountClients(root *cobra.Command) {
 	})))
 	root.AddCommand(initwiz.NewCommand(), plancmd.NewCommand(
 		plancmd.WithSpecFunc(plancmd.LocalSpec("claude", ".")),
+		plancmd.WithSpecFactory(func(dir string) plancmd.SpecFunc { return plancmd.LocalSpec("claude", dir) }),
 		plancmd.WithEpic(func(ctx context.Context, n int) (string, error) {
 			tr, err := planTracker()
 			if err != nil {
@@ -164,9 +167,42 @@ func (lazyFiler) Create(ctx context.Context, t api.Ticket) (api.TicketID, error)
 	return tr.Create(ctx, t)
 }
 
+// mcpHandlers backs the MCP tools that have a CLI command with that command, run in process, so a
+// tool and its command share one code path. approve_plan and explain_config stay unwired: approving
+// needs a plan id the CLI does not keep, and explain needs a key the tool does not take.
+func mcpHandlers() mcp.Handlers {
+	return mcp.Handlers{
+		FirstRun: func(ctx context.Context) (string, error) { return runSub(ctx, "first-run", "--dry-run") },
+		Report:   func(ctx context.Context) (string, error) { return runSub(ctx, "report") },
+		Plan: func(ctx context.Context, in mcp.PlanInput) (string, error) {
+			// The goal is data: a goal such as "--approve" must never become a flag.
+			if g := strings.TrimSpace(in.Goal); g == "" || strings.HasPrefix(g, "-") {
+				return "", fmt.Errorf("plan: goal must be text, not empty or a flag")
+			}
+			return runSub(ctx, "plan", "--", in.Goal)
+		},
+	}
+}
+
+// runSub runs one factory subcommand and returns what it printed.
+func runSub(ctx context.Context, args ...string) (string, error) {
+	var out bytes.Buffer
+	root := newRoot()
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs(args)
+	err := root.ExecuteContext(ctx)
+	return out.String(), err
+}
+
 // attach builds the Control when cmd runs and hands it to the package through with.
 func attach(cmd *cobra.Command, with func(context.Context, api.Control) context.Context) {
 	cmd.PersistentPreRunE = func(c *cobra.Command, _ []string) error {
+		// A replay plays a recorded file, so it needs no tracker or live fleet.
+		if f := c.Flags().Lookup("replay"); f != nil && f.Value.String() != "" {
+			return nil
+		}
 		ctl, err := control(nil)
 		if err != nil {
 			return err
@@ -183,6 +219,10 @@ func main() {
 	}
 	if err := newRoot().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "factory:", err)
+		var ec interface{ ExitCode() int }
+		if errors.As(err, &ec) {
+			os.Exit(ec.ExitCode())
+		}
 		os.Exit(1)
 	}
 }

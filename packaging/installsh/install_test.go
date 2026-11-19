@@ -1,4 +1,4 @@
-package install
+package installsh
 
 import (
 	"archive/tar"
@@ -18,6 +18,9 @@ import (
 	"testing"
 	"time"
 )
+
+// script is the installer at the repo root.
+const script = "../../install.sh"
 
 const fakeBinary = "#!/bin/sh\necho factory-fake 1.2.3\n"
 
@@ -64,7 +67,7 @@ func serve(t *testing.T, name string, good, served []byte, paths *[]string) stri
 
 func run(t *testing.T, base, binDir string, extra ...string) (string, error) {
 	t.Helper()
-	cmd := exec.Command("sh", "install.sh")
+	cmd := exec.Command("sh", script)
 	cmd.Env = append([]string{
 		"PATH=/usr/bin:/bin",
 		"HOME=" + t.TempDir(),
@@ -180,7 +183,7 @@ func TestMissingArchiveFailsCleanly(t *testing.T) {
 // runArgs runs install.sh with flags, without FACTORY_BIN_DIR or FACTORY_VERSION set.
 func runArgs(t *testing.T, base string, args ...string) (string, error) {
 	t.Helper()
-	cmd := exec.Command("sh", append([]string{"install.sh"}, args...)...)
+	cmd := exec.Command("sh", append([]string{script}, args...)...)
 	cmd.Env = []string{
 		"PATH=/usr/bin:/bin",
 		"HOME=" + t.TempDir(),
@@ -335,5 +338,15 @@ func TestInstallsFromPythonHTTPServer(t *testing.T) {
 	got, err := exec.Command(filepath.Join(binDir, "factory")).Output()
 	if err != nil || !strings.Contains(string(got), "factory-fake") {
 		t.Fatalf("installed binary did not run: %v %q", err, got)
+	}
+}
+
+func TestDefaultReleaseHostIsTheRenamedRepo(t *testing.T) {
+	src, err := os.ReadFile(script)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), "https://github.com/KaaS-team/factory}") || strings.Contains(string(src), "KaaS-factory") {
+		t.Fatal("install.sh must default to github.com/KaaS-team/factory")
 	}
 }

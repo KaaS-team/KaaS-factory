@@ -47,7 +47,7 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-base="${FACTORY_BASE_URL:-https://github.com/KaaS-team/KaaS-factory}"
+base="${FACTORY_BASE_URL:-https://github.com/KaaS-team/factory}"
 bin_dir="${flag_dir:-${FACTORY_BIN_DIR:-${PREFIX:+$PREFIX/bin}}}"
 [ -n "$bin_dir" ] || bin_dir="${HOME:?install: no home directory, pass --dir}/.local/bin"
 if [ -n "$flag_version" ]; then
