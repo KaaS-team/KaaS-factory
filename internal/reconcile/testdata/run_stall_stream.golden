@@ -1,0 +1,7 @@
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"dispatched","ticket":"slow","data":{"attempt":1,"session":"factory-slow-a1"}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"stalled","ticket":"slow","data":{"message":"No push seen for a while. Commit and push what you have, then continue, or say what blocks you."}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"retried","ticket":"slow","data":{"attempt":2}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"dispatched","ticket":"slow","data":{"attempt":2,"session":"factory-slow-a2"}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"pushed","ticket":"slow","data":{"attempt":2,"branch":"factory/slow-a2"}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"queued","ticket":"slow","data":{"pr":101}}
+{"v":1,"time":"0001-01-01T00:00:00Z","kind":"merged","ticket":"slow","data":{"pr":101}}
