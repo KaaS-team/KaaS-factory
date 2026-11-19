@@ -1,0 +1,40 @@
+{"v":1,"time":"2026-01-02T12:00:00Z","kind":"dispatched","ticket":"101","data":{"title":"Add the TUI board","attempt":1,"budget":1000000}}
+{"v":1,"time":"2026-01-02T12:00:01Z","kind":"dispatched","ticket":"102","data":{"title":"Port the merge queue","attempt":1,"budget":1000000}}
+{"v":1,"time":"2026-01-02T12:00:02Z","kind":"dispatched","ticket":"103","data":{"title":"Wire the dashboard","attempt":1,"budget":1000000}}
+{"v":1,"time":"2026-01-02T12:00:03Z","kind":"dispatched","ticket":"104","data":{"title":"Docs sweep","attempt":1,"budget":1000000}}
+{"v":1,"time":"2026-01-02T12:00:04Z","kind":"dispatched","ticket":"105","data":{"title":"Release notes","attempt":1,"budget":1000000}}
+{"v":1,"time":"2026-01-02T12:00:05Z","kind":"dispatched","ticket":"106","data":{"title":"Doctor checks","attempt":1,"budget":1000000}}
+{"v":1,"time":"2026-01-02T12:00:06Z","kind":"tick","data":{"slots":6,"ready":0,"queued":0}}
+{"v":1,"time":"2026-01-02T12:00:21Z","kind":"pushed","ticket":"101","data":{"attempt":1,"branch":"factory/101-a1","tokens":110000}}
+{"v":1,"time":"2026-01-02T12:00:22Z","kind":"pushed","ticket":"102","data":{"attempt":1,"branch":"factory/102-a1","tokens":120000}}
+{"v":1,"time":"2026-01-02T12:00:23Z","kind":"pushed","ticket":"103","data":{"attempt":1,"branch":"factory/103-a1","tokens":130000}}
+{"v":1,"time":"2026-01-02T12:00:24Z","kind":"pushed","ticket":"104","data":{"attempt":1,"branch":"factory/104-a1","tokens":140000}}
+{"v":1,"time":"2026-01-02T12:00:25Z","kind":"pushed","ticket":"105","data":{"attempt":1,"branch":"factory/105-a1","tokens":80000}}
+{"v":1,"time":"2026-01-02T12:00:26Z","kind":"pushed","ticket":"106","data":{"attempt":1,"branch":"factory/106-a1","tokens":90000}}
+{"v":1,"time":"2026-01-02T12:00:41Z","kind":"pushed","ticket":"101","data":{"attempt":1,"branch":"factory/101-a1","tokens":220000}}
+{"v":1,"time":"2026-01-02T12:00:42Z","kind":"pushed","ticket":"102","data":{"attempt":1,"branch":"factory/102-a1","tokens":240000}}
+{"v":1,"time":"2026-01-02T12:00:43Z","kind":"pushed","ticket":"103","data":{"attempt":1,"branch":"factory/103-a1","tokens":260000}}
+{"v":1,"time":"2026-01-02T12:00:44Z","kind":"pushed","ticket":"104","data":{"attempt":1,"branch":"factory/104-a1","tokens":280000}}
+{"v":1,"time":"2026-01-02T12:00:45Z","kind":"pushed","ticket":"105","data":{"attempt":1,"branch":"factory/105-a1","tokens":160000}}
+{"v":1,"time":"2026-01-02T12:00:46Z","kind":"pushed","ticket":"106","data":{"attempt":1,"branch":"factory/106-a1","tokens":180000}}
+{"v":1,"time":"2026-01-02T12:01:01Z","kind":"pushed","ticket":"101","data":{"attempt":1,"branch":"factory/101-a1","tokens":330000}}
+{"v":1,"time":"2026-01-02T12:01:02Z","kind":"pushed","ticket":"102","data":{"attempt":1,"branch":"factory/102-a1","tokens":360000}}
+{"v":1,"time":"2026-01-02T12:01:03Z","kind":"pushed","ticket":"103","data":{"attempt":1,"branch":"factory/103-a1","tokens":390000}}
+{"v":1,"time":"2026-01-02T12:01:05Z","kind":"pushed","ticket":"105","data":{"attempt":1,"branch":"factory/105-a1","tokens":240000}}
+{"v":1,"time":"2026-01-02T12:01:06Z","kind":"pushed","ticket":"106","data":{"attempt":1,"branch":"factory/106-a1","tokens":270000}}
+{"v":1,"time":"2026-01-02T12:01:21Z","kind":"pushed","ticket":"101","data":{"attempt":1,"branch":"factory/101-a1","tokens":440000}}
+{"v":1,"time":"2026-01-02T12:01:22Z","kind":"pushed","ticket":"102","data":{"attempt":1,"branch":"factory/102-a1","tokens":480000}}
+{"v":1,"time":"2026-01-02T12:01:23Z","kind":"pushed","ticket":"103","data":{"attempt":1,"branch":"factory/103-a1","tokens":520000}}
+{"v":1,"time":"2026-01-02T12:01:25Z","kind":"pushed","ticket":"105","data":{"attempt":1,"branch":"factory/105-a1","tokens":320000}}
+{"v":1,"time":"2026-01-02T12:01:26Z","kind":"pushed","ticket":"106","data":{"attempt":1,"branch":"factory/106-a1","tokens":360000}}
+{"v":1,"time":"2026-01-02T12:01:50Z","kind":"tick","data":{"slots":6,"ready":0,"queued":0}}
+{"v":1,"time":"2026-01-02T12:02:05Z","kind":"stalled","ticket":"104","data":{"message":"no push for 65s, steering"}}
+{"v":1,"time":"2026-01-02T12:02:20Z","kind":"pushed","ticket":"101","data":{"attempt":1,"branch":"factory/101-a1","tokens":700000}}
+{"v":1,"time":"2026-01-02T12:02:30Z","kind":"queued","ticket":"101","data":{"pr":201}}
+{"v":1,"time":"2026-01-02T12:02:35Z","kind":"gate","data":{"runs":1}}
+{"v":1,"time":"2026-01-02T12:02:45Z","kind":"merged","ticket":"101","data":{"pr":201}}
+{"v":1,"time":"2026-01-02T12:02:50Z","kind":"pushed","ticket":"102","data":{"attempt":1,"branch":"factory/102-a1","tokens":640000}}
+{"v":1,"time":"2026-01-02T12:03:10Z","kind":"queued","ticket":"102","data":{"pr":202}}
+{"v":1,"time":"2026-01-02T12:03:15Z","kind":"gate","data":{"runs":2}}
+{"v":1,"time":"2026-01-02T12:03:25Z","kind":"merged","ticket":"102","data":{"pr":202}}
+{"v":1,"time":"2026-01-02T12:03:30Z","kind":"tick","data":{"slots":4,"ready":0,"queued":0}}

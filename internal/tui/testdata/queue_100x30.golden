@@ -27,4 +27,4 @@ gate  12:00:00  runs=2
 
 
 fires left: 7
-j/k move  enter timeline  s steer  c cancel  r retry  tab screen  q quit
+j/k move  g/G top/bottom  enter timeline  [/] screen  s steer  c cancel  r retry  ? more  q quit
