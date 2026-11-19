@@ -10,6 +10,8 @@ package a2a
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"iter"
 	"net/http"
@@ -22,6 +24,8 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2asrv/taskstore"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
+	"github.com/KaaS-team/factory/internal/tracker/sanitize"
 )
 
 // LabelReady is the label a filed ticket carries so the factory picks it up.
@@ -125,7 +129,7 @@ func (e *executor) Execute(ctx context.Context, ec *a2asrv.ExecutorContext) iter
 			yield(nil, fmt.Errorf("%w: the request needs text", sdk.ErrInvalidParams))
 			return
 		}
-		id, err := e.deps.Filer.Create(ctx, api.Ticket{Title: titleOf(body), Body: body, Labels: []string{LabelReady}})
+		id, err := e.deps.Filer.Create(ctx, api.Ticket{Title: sanitize.Publication(titleOf(body), sanitize.DefaultOptions()), Body: ticketBody(body), Labels: []string{LabelReady}})
 		if err != nil {
 			yield(nil, fmt.Errorf("file ticket: %w", err))
 			return
@@ -263,6 +267,14 @@ func textOf(m *sdk.Message) string {
 		text = append(text, p.Text())
 	}
 	return strings.TrimSpace(strings.Join(text, "\n"))
+}
+
+// ticketBody is what is posted for a request: the text run through the publish sanitizer (a peer must
+// not be able to mention a team or close an issue), then a hidden marker with a hash of the whole raw
+// request, which the tracker dedupes on instead of the title.
+func ticketBody(request string) string {
+	sum := sha256.Sum256([]byte(request))
+	return sanitize.Publication(request, sanitize.DefaultOptions()) + "\n\n" + marker.Wrap("request", `{"sha256":"`+hex.EncodeToString(sum[:])+`"}`)
 }
 
 // titleOf is the first line of a request, cut to 80 runes.

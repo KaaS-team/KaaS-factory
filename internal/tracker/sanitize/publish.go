@@ -42,7 +42,7 @@ var (
 	ansiCSI       = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
 	ctrlNoNL      = regexp.MustCompile(`[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]`)
 	invisibles    = regexp.MustCompile("[\u00AD\u034F\u200B-\u200F\u2060-\u2064\uFEFF\\x{E0000}-\\x{E007F}]")
-	bidiControls  = regexp.MustCompile("[\u202A-\u202E\u2066-\u2069]")
+	bidiControls  = regexp.MustCompile("[\u061C\u202A-\u202E\u2066-\u2069]")
 	namedEntities = regexp.MustCompile(`(?i)&(?:amp;)?(commat|gt|lt|amp|shy|zwnj|zwj|lrm|rlm|ZeroWidthSpace|NoBreak|af|ApplyFunction|it|InvisibleTimes|ic|InvisibleComma|ip|InvisiblePlus);`)
 	numEntity     = regexp.MustCompile(`&(?:amp;)?#(?:[xX]([0-9a-fA-F]+)|(\d+));`)
 	mentionRe     = regexp.MustCompile(`(^|[^A-Za-z0-9])@([A-Za-z0-9](?:[A-Za-z0-9_-]{0,37}[A-Za-z0-9])?(?:/[A-Za-z0-9._-]+)?)`)
@@ -59,7 +59,7 @@ var entityChars = map[string]string{
 	"invisiblecomma": "\u2063", "ip": "\u2064", "invisibleplus": "\u2064",
 }
 
-// homoglyphs maps Cyrillic and Greek lookalikes to Latin (Unicode TR39 confusables).
+// homoglyphs maps Cyrillic and Greek lookalikes to Latin (Unicode TR39 confusables), for fold only.
 var homoglyphs = strings.NewReplacer(
 	"\u0410", "A", "\u0412", "B", "\u0415", "E", "\u041A", "K", "\u041C", "M", "\u041D", "H", "\u041E", "O", "\u0420", "P", "\u0421", "C", "\u0422", "T", "\u0425", "X", "\u0405", "S", "\u0406", "I",
 	"\u0430", "a", "\u0435", "e", "\u043E", "o", "\u0440", "p", "\u0441", "c", "\u0445", "x", "\u0443", "y", "\u0456", "i", "\u0455", "s", "\u0458", "j",
@@ -127,7 +127,12 @@ func harden(s string) string {
 		return string(rune(n))
 	})
 	s = invisibles.ReplaceAllString(s, "")
-	s = bidiControls.ReplaceAllString(s, "")
+	return bidiControls.ReplaceAllString(s, "")
+}
+
+// fold maps fullwidth forms and Cyrillic or Greek lookalikes to ASCII, one rune for one rune. It is
+// only a detection view for mentions and bot triggers; text that is not matched is never folded.
+func fold(s string) string {
 	s = strings.Map(func(r rune) rune {
 		if r >= 0xFF01 && r <= 0xFF5E {
 			return r - 0xFEE0
@@ -364,7 +369,7 @@ func codeSpan(s string) func(text, before, after string) string {
 func neutralizeMentions(s string) string {
 	wrap := codeSpan(s)
 	return inNonCode(s, func(seg, rb, ra string) string {
-		return replaceIdx(mentionRe, seg, func(m []int) string {
+		return replaceFolded(mentionRe, seg, func(seg string, m []int, orig func(a, b int) string) string {
 			prefix := seg[m[2]:m[3]]
 			before := prefix
 			if prefix == "" && m[0] == 0 {
@@ -374,7 +379,7 @@ func neutralizeMentions(s string) string {
 			if m[1] < len(seg) {
 				after = seg[m[1] : m[1]+1]
 			}
-			return prefix + wrap("@"+seg[m[4]:m[5]], before, after)
+			return orig(m[2], m[3]) + wrap("@"+seg[m[4]:m[5]], before, after)
 		})
 	})
 }
@@ -383,10 +388,10 @@ func neutralizeBotTriggers(s string, keep int) string {
 	wrap := codeSpan(s)
 	count := 0
 	return inNonCode(s, func(seg, rb, ra string) string {
-		return replaceIdx(botTriggerRe, seg, func(m []int) string {
+		return replaceFolded(botTriggerRe, seg, func(seg string, m []int, orig func(a, b int) string) string {
 			count++
 			if count <= keep {
-				return seg[m[0]:m[1]]
+				return orig(m[0], m[1])
 			}
 			before, after := rb, ra
 			if m[0] > 0 {
@@ -403,6 +408,34 @@ func neutralizeBotTriggers(s string, keep int) string {
 var templateEscaper = strings.NewReplacer("{{", `\{\{`, "<%=", `\<%=`, "${", `\$\{`, "{#", `\{\#`, "{%", `\{\%`)
 
 func neutralizeTemplates(s string) string { return templateEscaper.Replace(s) }
+
+// replaceFolded matches re against fold(s) and replaces each match with fn(folded, submatch indexes,
+// orig), where orig(a, b) returns the original text for folded bytes a to b. Text outside a match
+// comes back as it was, so non-Latin letters and fullwidth punctuation survive.
+func replaceFolded(re *regexp.Regexp, s string, fn func(folded string, m []int, orig func(a, b int) string) string) string {
+	f := fold(s)
+	// at[i] is the byte offset in s of byte i of f; only rune starts (and len(f)) are set, which is
+	// where a match can begin or end.
+	at := make([]int, len(f)+1)
+	fi := 0
+	for si, r := range s {
+		at[fi] = si
+		fi += utf8.RuneLen(foldRune(r))
+	}
+	at[len(f)] = len(s)
+	orig := func(a, b int) string { return s[at[a]:at[b]] }
+	var b strings.Builder
+	last := 0
+	for _, m := range re.FindAllStringSubmatchIndex(f, -1) {
+		b.WriteString(orig(last, m[0]))
+		b.WriteString(fn(f, m, orig))
+		last = m[1]
+	}
+	b.WriteString(orig(last, len(f)))
+	return b.String()
+}
+
+func foldRune(r rune) rune { return []rune(fold(string(r)))[0] }
 
 // replaceIdx replaces each match of re in s with fn(submatch indexes).
 func replaceIdx(re *regexp.Regexp, s string, fn func([]int) string) string {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/KaaS-team/factory/internal/api"
+	"github.com/KaaS-team/factory/internal/marker"
 	"github.com/KaaS-team/factory/internal/plancmd"
 	gogithub "github.com/google/go-github/v79/github"
 )
@@ -45,12 +46,22 @@ func (t *Tracker) Find(ctx context.Context, title string) (api.TicketID, bool, e
 // Create files t as an open issue and returns its number. The body is posted as given, so a planned
 // body v1 (with its Files and Blocked by lines) reaches GitHub byte for byte. With no labels the
 // issue gets factory:ready. A title already filed, found by search or created by this Tracker,
-// returns the first id and posts nothing.
+// returns the first id and posts nothing. A body carrying a request marker is matched on title and marker
+// together, so two requests with the same first line stay two issues.
 func (t *Tracker) Create(ctx context.Context, tk api.Ticket) (api.TicketID, error) {
 	if strings.TrimSpace(tk.Title) == "" {
 		return "", errors.New("github tracker: create needs a title")
 	}
-	if id, ok, err := t.Find(ctx, tk.Title); err != nil {
+	key := tk.Title
+	if req := marker.Find(tk.Body, RequestMarker); len(req) > 0 {
+		// A request ticket is the same ticket only if the whole request is the same, not its first line.
+		key = tk.Title + "\x00" + req[0]
+		if id, ok, err := t.findRequest(ctx, tk.Title, key, req[0]); err != nil {
+			return "", err
+		} else if ok {
+			return id, nil
+		}
+	} else if id, ok, err := t.Find(ctx, tk.Title); err != nil {
 		return "", err
 	} else if ok {
 		return id, nil
@@ -66,8 +77,40 @@ func (t *Tracker) Create(ctx context.Context, tk api.Ticket) (api.TicketID, erro
 		return "", fmt.Errorf("github tracker: create %q: %w", tk.Title, err)
 	}
 	id := api.TicketID(strconv.Itoa(is.GetNumber()))
-	t.remember(tk.Title, id)
+	t.remember(key, id)
 	return id, nil
+}
+
+// RequestMarker names the hidden marker whose payload is a hash of the whole request a ticket was filed from.
+const RequestMarker = "request"
+
+// findRequest is Find for a request ticket: an open issue with this title whose body carries the same request marker.
+func (t *Tracker) findRequest(ctx context.Context, title, key, payload string) (api.TicketID, bool, error) {
+	if id, ok := t.created(key); ok {
+		return id, true, nil
+	}
+	q := fmt.Sprintf("repo:%s/%s is:issue is:open in:title %s", t.owner, t.repo, strconv.Quote(title))
+	opts := &gogithub.SearchOptions{ListOptions: gogithub.ListOptions{PerPage: 100}}
+	for {
+		res, resp, err := t.client.Search.Issues(ctx, q, opts)
+		if err != nil {
+			return "", false, fmt.Errorf("github tracker: search %q: %w", title, err)
+		}
+		for _, is := range res.Issues {
+			if is.IsPullRequest() || is.GetTitle() != title {
+				continue
+			}
+			for _, p := range marker.Find(is.GetBody(), RequestMarker) {
+				if p == payload {
+					return api.TicketID(strconv.Itoa(is.GetNumber())), true, nil
+				}
+			}
+		}
+		if resp.NextPage == 0 {
+			return "", false, nil
+		}
+		opts.Page = resp.NextPage
+	}
 }
 
 func (t *Tracker) created(title string) (api.TicketID, bool) {

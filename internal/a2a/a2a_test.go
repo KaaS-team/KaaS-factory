@@ -19,6 +19,7 @@ import (
 
 	"github.com/KaaS-team/factory/internal/api"
 	"github.com/KaaS-team/factory/internal/api/porttest"
+	"github.com/KaaS-team/factory/internal/marker"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -338,5 +339,36 @@ func TestDefaultAuditLogIsUnderDataDir(t *testing.T) {
 	f := NewCommand(func(context.Context) (Deps, error) { return Deps{}, nil }).Flags().Lookup("audit-log")
 	if f == nil || f.DefValue != DefaultAuditLog || filepath.Dir(DefaultAuditLog) != ".factory" {
 		t.Fatalf("audit-log default %v, want %s under .factory", f, DefaultAuditLog)
+	}
+}
+
+// A peer's text goes through the publish sanitizer, and the ticket carries a hash of the whole request.
+func TestRequestBodyIsSanitizedAndHashed(t *testing.T) {
+	deps, tr, _ := newDeps()
+	h := mustHandler(t, deps)
+	send := func(text string) api.Ticket {
+		t.Helper()
+		_, out := rpc(t, h, testToken, "message/send", sendParams(text))
+		res, ok := out["result"].(map[string]any)
+		if !ok {
+			t.Fatalf("send: %v", out)
+		}
+		tk, err := tr.Get(context.Background(), api.TicketID(res["metadata"].(map[string]any)[MetaTicket].(string)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tk
+	}
+	a := send("Fix login\n@org/team fixes #1 Привет")
+	b := send("Fix login\nuse SAML")
+	if strings.Contains(a.Body, " @org/team") || !strings.Contains(a.Body, "`@org/team`") || !strings.Contains(a.Body, "Привет") {
+		t.Errorf("body not sanitized, or lost letters: %q", a.Body)
+	}
+	ma, mb := marker.Find(a.Body, "request"), marker.Find(b.Body, "request")
+	if len(ma) != 1 || len(mb) != 1 || ma[0] == mb[0] {
+		t.Errorf("markers %v %v: same first line must give different request hashes", ma, mb)
+	}
+	if a.Title != b.Title {
+		t.Errorf("setup: titles differ %q %q", a.Title, b.Title)
 	}
 }
