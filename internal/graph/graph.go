@@ -1,5 +1,6 @@
 // Package graph runs a pipeline as nodes and edges. It loads the factory's .factory/workflows files
-// (yml steps, md stages) and a Symphony-style WORKFLOW.md (spec section 5) into one Graph.
+// (yml steps, md stages) and a Symphony-style WORKFLOW.md (spec section 5) into one Graph. The CLI (workflow, doctor and serve commands), the core loop and the pack and
+// design checks call it to load and validate workflows.
 package graph
 
 import (
