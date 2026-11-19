@@ -1,0 +1,7 @@
+Reads one or more scorecards, puts each ticket in dev or holdout by the hash of its sample id, and prints both pass rates in one table.
+
+Usage:
+  eval splits <scorecard.json>... [flags]
+
+Flags:
+  -h, --help   help for splits

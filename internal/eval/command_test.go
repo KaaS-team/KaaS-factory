@@ -50,7 +50,7 @@ func TestEvalRunWritesJSONAndMarkdownThatAgree(t *testing.T) {
 	if err := os.WriteFile(lock, []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The fixtures have five tickets; four have id 1, so the fake solves 4 of 5.
+	// The fixtures have five tickets; the default dev split runs three, all with id 1, so the fake solves 3 of 3.
 	solves := map[api.TicketID]bool{"1": true}
 	_, run := newTestCommand(t, dir, solves)
 	out := filepath.Join(dir, "evals")
@@ -73,7 +73,7 @@ func TestEvalRunWritesJSONAndMarkdownThatAgree(t *testing.T) {
 		t.Fatalf("identity fields: %+v", sc)
 	}
 	a := sc.Aggregate
-	if a.Total != 5 || a.Merged != 4 || a.PassRate != 0.8 || a.MainGreenRate != 1 || a.TokensPerMergedPR != 150 {
+	if a.Total != 3 || a.Merged != 3 || a.PassRate != 1 || a.MainGreenRate != 1 || a.TokensPerMergedPR != 120 {
 		t.Fatalf("aggregate %+v", a)
 	}
 	want := []string{
@@ -234,8 +234,8 @@ func TestEvalWritesTrajectoriesAndCompareStatsReadThem(t *testing.T) {
 	}
 	oldDir := runOnce("old", map[api.TicketID]bool{})
 	newDir := runOnce("new", map[api.TicketID]bool{"1": true})
-	if files, _ := filepath.Glob(filepath.Join(newDir, "*.json")); len(files) != 5 {
-		t.Fatalf("want 5 trajectory files, got %d", len(files))
+	if files, _ := filepath.Glob(filepath.Join(newDir, "*.json")); len(files) != 3 {
+		t.Fatalf("want 3 trajectory files, got %d", len(files))
 	}
 	for _, args := range [][]string{{"compare", oldDir, newDir}, {"stats", newDir}} {
 		var out bytes.Buffer
@@ -245,7 +245,7 @@ func TestEvalWritesTrajectoriesAndCompareStatsReadThem(t *testing.T) {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("%v: %v", args, err)
 		}
-		want := map[string]string{"compare": "Fixed: 4. Regressed: 0.", "stats": "Pass rate: 0.80"}[args[0]]
+		want := map[string]string{"compare": "Fixed: 3. Regressed: 0.", "stats": "Pass rate: 1.00"}[args[0]]
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("%v: want %q in\n%s", args, want, out.String())
 		}

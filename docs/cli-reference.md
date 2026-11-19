@@ -206,6 +206,7 @@ Run the fixtures matrix and write a scorecard
 | `--redo` | bool | `false` | rerun tickets --run-dir already finished |
 | `--replay` | bool | `false` | re-score the outputs stored in --run-dir without dispatching |
 | `--run-dir` | string | `` | keep results and trajectories here so a killed run resumes |
+| `--split` | string | `dev` | samples to run: dev (default) or holdout; holdout runs only when named |
 | `--tries` | int | `1` | tries per ticket; the scorecard gets pass_rate_1..N |
 | `--workflow` | string | `` | workflow name (required) |
 
@@ -237,6 +238,33 @@ Compare two scorecards; exit 1 when the new one is worse
 `factory eval replay <run.trace.jsonl>`
 
 Print the spans a run recorded, gate spans with their triggered flag
+
+## factory eval run
+
+`factory eval run [flags]`
+
+Run one split of the fixtures matrix and write a scorecard
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--agent` | string | `` | agent preset name, never a model name (required) |
+| `--arm` | stringSlice | `[preset]` | arms to run: preset, control (bare-bash baseline) |
+| `--fixtures` | string | `evals/fixtures` | directory of fixtures |
+| `--format` | string | `` | edit format axis, e.g. diff or whole |
+| `--out` | string | `evals` | directory the scorecard is written to |
+| `--packs` | string | `` | packs lock file the run used, e.g. factory.lock |
+| `--redo` | bool | `false` | rerun tickets --run-dir already finished |
+| `--replay` | bool | `false` | re-score the outputs stored in --run-dir without dispatching |
+| `--run-dir` | string | `` | keep results and trajectories here so a killed run resumes |
+| `--split` | string | `dev` | samples to run: dev (default) or holdout; holdout runs only when named |
+| `--tries` | int | `1` | tries per ticket; the scorecard gets pass_rate_1..N |
+| `--workflow` | string | `` | workflow name (required) |
+
+## factory eval splits
+
+`factory eval splits <scorecard.json>...`
+
+Print pass rate per split, dev and holdout side by side
 
 ## factory eval stats
 

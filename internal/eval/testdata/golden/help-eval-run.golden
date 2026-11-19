@@ -1,0 +1,19 @@
+Same as the bare eval command. --split dev (the default) runs the dev samples. Holdout samples run only with --split holdout.
+
+Usage:
+  eval run [flags]
+
+Flags:
+      --agent string      agent preset name, never a model name (required)
+      --arm strings       arms to run: preset, control (bare-bash baseline) (default [preset])
+      --fixtures string   directory of fixtures (default "evals/fixtures")
+      --format string     edit format axis, e.g. diff or whole
+  -h, --help              help for run
+      --out string        directory the scorecard is written to (default "evals")
+      --packs string      packs lock file the run used, e.g. factory.lock
+      --redo              rerun tickets --run-dir already finished
+      --replay            re-score the outputs stored in --run-dir without dispatching
+      --run-dir string    keep results and trajectories here so a killed run resumes
+      --split string      samples to run: dev (default) or holdout; holdout runs only when named (default "dev")
+      --tries int         tries per ticket; the scorecard gets pass_rate_1..N (default 1)
+      --workflow string   workflow name (required)

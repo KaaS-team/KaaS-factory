@@ -123,36 +123,10 @@ func RunArm(ctx context.Context, m Matrix, d Deps, a Arm) (Scorecard, error) {
 					return sc, err
 				}
 			}
-			r := TicketResult{Fixture: f.Name, Ticket: t.ID, Arm: a.Arm, Agent: a.Agent, Format: a.Format}
-			var outs []Outcome
-			var cost float64
-			for try := 1; try <= tries; try++ {
-				tctx := context.WithValue(ctx, runKey{}, runInfo{key: key, save: a.Store.trajectory(key, a.Replay)})
-				tr, os, err := runTicket(tctx, f, t, d, a.Sink)
-				if err != nil {
-					return sc, err
-				}
-				outs = append(outs, os...)
-				r.InputTokens += tr.InputTokens
-				r.OutputTokens += tr.OutputTokens
-				cost += tr.CostUSD
-				r.WallTime += tr.WallTime
-				r.Attempts += tr.Attempts
-				r.HumanTouches += tr.HumanTouches
-				for _, o := range os {
-					r.Malformed += o.Malformed
-					r.ExitStatus = o.ExitStatus
-				}
-				r.HiddenPass, r.BaseGreen = tr.HiddenPass, tr.BaseGreen
-				r.Epochs, r.Reduced = tr.Epochs, tr.Reduced
-				pass, green := tr.HiddenPass, tr.BaseGreen
-				if pass && green {
-					r.PassedOn = try
-					break
-				}
+			r, outs, err := runTries(ctx, f, t, d, a, key, tries)
+			if err != nil {
+				return sc, err
 			}
-			r.CostUSD = cost
-			r.Merged = r.PassedOn > 0
 			sc.Tickets = append(sc.Tickets, r)
 			if !a.Replay {
 				if err := a.Store.finish(key, storedTicket{Result: r, Outcomes: outs}); err != nil {
@@ -164,6 +138,40 @@ func RunArm(ctx context.Context, m Matrix, d Deps, a Arm) (Scorecard, error) {
 	sc.Cells = cells(sc.Tickets, tries)
 	sc.Aggregate = aggregate(sc.Tickets)
 	return sc, nil
+}
+
+// runTries runs one ticket up to tries times, stopping at the first merge, and folds the tries into one result.
+func runTries(ctx context.Context, f Fixture, t api.Ticket, d Deps, a Arm, key string, tries int) (TicketResult, []Outcome, error) {
+	r := TicketResult{Fixture: f.Name, Ticket: t.ID, Arm: a.Arm, Agent: a.Agent, Format: a.Format}
+	var outs []Outcome
+	var cost float64
+	for try := 1; try <= tries; try++ {
+		tctx := context.WithValue(ctx, runKey{}, runInfo{key: key, save: a.Store.trajectory(key, a.Replay)})
+		tr, os, err := runTicket(tctx, f, t, d, a.Sink)
+		if err != nil {
+			return r, outs, err
+		}
+		outs = append(outs, os...)
+		r.InputTokens += tr.InputTokens
+		r.OutputTokens += tr.OutputTokens
+		cost += tr.CostUSD
+		r.WallTime += tr.WallTime
+		r.Attempts += tr.Attempts
+		r.HumanTouches += tr.HumanTouches
+		for _, o := range os {
+			r.Malformed += o.Malformed
+			r.ExitStatus = o.ExitStatus
+		}
+		r.HiddenPass, r.BaseGreen = tr.HiddenPass, tr.BaseGreen
+		r.Epochs, r.Reduced = tr.Epochs, tr.Reduced
+		if tr.HiddenPass && tr.BaseGreen {
+			r.PassedOn = try
+			break
+		}
+	}
+	r.CostUSD = cost
+	r.Merged = r.PassedOn > 0
+	return r, outs, nil
 }
 
 func cells(rs []TicketResult, tries int) []Cell {

@@ -1,0 +1,4 @@
+| Split | Samples | Merged | Pass rate |
+|---|---|---|---|
+| dev | 7 | 5 | 0.71 |
+| holdout | 3 | 3 | 1.00 |

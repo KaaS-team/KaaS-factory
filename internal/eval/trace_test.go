@@ -53,7 +53,7 @@ func TestRunGateSpansCarryTriggered(t *testing.T) {
 // Acceptance: one task run writes a trace file, and eval replay reads it.
 func TestEvalRunWritesTraceAndReplayReadsIt(t *testing.T) {
 	dir := t.TempDir()
-	out, run := newTestCommand(t, dir, map[api.TicketID]bool{"1": true})
+	out, run := newTestCommand(t, dir, map[api.TicketID]bool{})
 	if err := run("--workflow", "default", "--agent", "claude", "--fixtures", fixturesDir, "--out", dir); err != nil {
 		t.Fatal(err)
 	}

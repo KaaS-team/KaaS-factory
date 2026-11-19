@@ -181,20 +181,7 @@ func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps, sink trace.
 		if err != nil {
 			return r, outs, fmt.Errorf("gate %s/%s: %w", f.Name, t.ID, err)
 		}
-		stages := make([]Stage, len(cmds))
-		for i, c := range cmds {
-			stages[i] = Stage{Name: c, Score: func(ctx context.Context) (float64, bool, error) {
-				ok, err := d.HiddenTest(ctx, t, c)
-				if err != nil {
-					return 0, false, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
-				}
-				if ok {
-					return 1, true, nil
-				}
-				return 0, true, nil
-			}}
-		}
-		dec, err := Cascade(ctx, 1, stages)
+		dec, err := scoreEpoch(ctx, f, t, d, cmds)
 		if err != nil {
 			return r, outs, err
 		}
@@ -222,6 +209,24 @@ func runTicket(ctx context.Context, f Fixture, t api.Ticket, d Deps, sink trace.
 	r.HiddenPass = r.Reduced >= PassThreshold
 	r.Merged = r.HiddenPass && r.BaseGreen
 	return r, outs, nil
+}
+
+// scoreEpoch scores one run of a ticket by a cascade of the fixture's scorers, cheapest first.
+func scoreEpoch(ctx context.Context, f Fixture, t api.Ticket, d Deps, cmds []string) (Decision, error) {
+	stages := make([]Stage, len(cmds))
+	for i, c := range cmds {
+		stages[i] = Stage{Name: c, Score: func(ctx context.Context) (float64, bool, error) {
+			ok, err := d.HiddenTest(ctx, t, c)
+			if err != nil {
+				return 0, false, fmt.Errorf("hidden test %s/%s: %w", f.Name, t.ID, err)
+			}
+			if ok {
+				return 1, true, nil
+			}
+			return 0, true, nil
+		}}
+	}
+	return Cascade(ctx, 1, stages)
 }
 
 // assertGate applies the fixture's assertions to one epoch: a failing set replaces the decision with a 0
